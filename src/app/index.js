@@ -1,4 +1,5 @@
 import {
+    StackedPane,
     PatternPane,
     WorldPane,
     LinearGradientBackground,
@@ -82,10 +83,15 @@ var bgPane = new WorldPane(
     , fadeBg
 );
 
-var player0 = new Image();
+const player0 = new Image();
 player0.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA7ElEQVRYR9WX0Q6FIAxD2f9/NAYTDE5g7ZQFfbk+SHuAsnEl55xTSklEpPxGPZdvfYmEuHkW40gI7XUtewREz+O27yshRtqP4K2AmGl2k/8lhKU1PHrWQOS4IhrTs48IjEDQsWbxQYVaEGaMCcDWCcb8LH7IXqIQrDkFYEF4zGmAEYTX3AWgIdot9HRUOAM6K+2s33TSfwLo2dfVCdmCXuDCQjgz8kLAGUAMkG90mCEARpj5FqoDrKBVMakV8JhXA3TsnhcSlB7ppJbWXpdSixaZMXtF2+OPycqZz7po6R0Sad49ohXA08m+yMQB423wEY5FdSYAAAAASUVORK5CYII=";
 
-var patternBg = new PatternPane(player0, 'repeat');
+const patternBg = new PatternPane(player0, 'repeat');
+const patternBg2 = new PatternPane(player0, 'repeat');
+const patternBg3 = new PatternPane(player0, 'repeat');
+const patternBg4 = new PatternPane(player0, 'repeat');
+
+const patternsBg = new StackedPane('Y', [bgPane, patternBg, patternBg2, patternBg3, patternBg4], [136, 16, 16, 16, 16]);
 
 function prepareSpriteMaps() {
 
@@ -103,14 +109,18 @@ function init() {
     prepareSpriteMaps();
     var player = getNewSprite('x', 30, 20);
     sprites.push(player);
+
     levelPane.init(canvas.width, canvas.height);
+/*
     bgPane.init(canvas.width, canvas.height, false);
-    patternBg.init(canvas.width, canvas.height);
+    */
+    fadeBg.init();
+    patternsBg.init(canvas.width, canvas.height);
 }
 
 function render() {
-    bgPane.render(ctx);
-//        patternBg.render(ctx);
+    //bgPane.render(ctx);
+    patternsBg.render(ctx);
     levelPane.render(ctx);
 
     sprites.forEach(
@@ -118,7 +128,10 @@ function render() {
             ctx.drawImage(player0, v.x, v.y);
         }
     );
-    patternBg.scrollBy(2, 1);
+    patternBg.scrollBy(1, 0);
+    patternBg2.scrollBy(1.2, 0);
+    patternBg3.scrollBy(1.5, 0);
+    patternBg4.scrollBy(2, 0);
 }
 
 function update() {
@@ -130,8 +143,6 @@ function update() {
     render();
     printDebugs();
 }
-
-onload = update;
 
 function handleKeys() {
     var moveX = 0;
@@ -232,3 +243,7 @@ onkeydown = function(e) {
 onkeyup = function(e) {
     delete keys[e.key];
 };
+
+document.addEventListener("DOMContentLoaded", function(event) {
+    update();
+});
