@@ -1,26 +1,122 @@
-class OffscreenCanvasManager {
-
+class CanvasManager {
 
     constructor() {
+        this.overlayElem = null;
+        this.offscreenElem = null;
         this.canvasElems = [];
     }
 
-    getNewCanvas(dimX, dimY) {
-        const id = 'offcan_' + this.canvasElems.length;
-        const offElem = document.getElementById('offscreen');
+    getOverlayElem() {
+        if (this.overlayElem === null) {
+            this.overlayElem = document.getElementById('overlay');
+        }
+        return this.overlayElem;
+    }
+
+    getOffscreenElem() {
+        if (this.offscreenElem === null) {
+            this.offscreenElem = document.getElementById('offscreen');
+        }
+        return this.offscreenElem;
+    }
+
+    getNewOverlayCanvas(dimX, dimY) {
+        return this.getNewCanvas('overlay', dimX, dimY);
+    }
+
+    getNewOffscreenCanvas(dimX, dimY) {
+        return this.getNewCanvas('offscreen', dimX, dimY);
+    }
+
+    getNewCanvas(type, dimX, dimY) {
+        const id = type + '_' + this.canvasElems.length;
+        const parentElem = type === 'offscreen' ? this.getOffscreenElem() : this.getOverlayElem();
         const elem = document.createElement('canvas');
         elem.id = id;
         elem.setAttribute('width', dimX);
         elem.setAttribute('height', dimY);
-        offElem.appendChild(elem);
-        const canvas = {id: id, elem: elem, ctx: elem.getContext('2d'), width: dimX, height: dimY};
+        if (type === 'overlay') {
+            elem.setAttribute('style', 'position: absolute; top: 0px; left: 0px');
+        }
+        parentElem.appendChild(elem);
+        const canvas = {id, type, elem, ctx: elem.getContext('2d'), width: dimX, height: dimY};
         this.canvasElems.push(canvas);
 
         return canvas;
     }
 }
 
-const OCM = new OffscreenCanvasManager();
+const OCM = new CanvasManager();
+
+class ScreenManager {
+
+    constructor(id) {
+        let elem = document.getElementById(id);
+        this.dimX = elem.width;
+        this.dimY = elem.height;
+        elem = elem.parentNode;
+        elem.innerHTML =
+            '<div id="overlay" style="position: relative"></div>' +
+            '<center><pre id="d"></pre></center>' +
+            '<div id="offscreen" style="display: none"></div>';
+
+        this.screens = {};
+        this.view = null;
+        debugElem = document.getElementById('d');
+    }
+
+    addScreen(id, panes) {
+        this.screens[id] = {
+            panes
+        };
+    }
+
+    gotoScreen(id) {
+        if (this.screens[id] === undefined) {
+            throw Error('Unknown screen id ' + id);
+        }
+        if (this.view !== null) {
+            // TODO destroy current screen
+        }
+
+        const view = [];
+        const screen = this.screens[id];
+
+        // TODO go backwards to find first opaque pane
+        for(let pane of screen.panes) {
+            pane.init(this.dimX, this.dimY);
+            view.push({
+                canvas: OCM.getNewOverlayCanvas(this.dimX, this.dimY),
+                pane
+            });
+        }
+        this.view = view;
+    }
+
+    renderScreen() {
+        if (this.view === null) {
+            return;
+        }
+        for (let elem of this.view) {
+            elem.pane.render(elem.canvas.ctx);
+        }
+    }
+
+    getMainCanvas() {
+        if (this.view === null) {
+            return;
+        }
+        return this.view[this.view.length - 1].canvas;
+    }
+}
+
+class EmptyPane {
+    constructor() {}
+
+    init(dimX, dimY) {}
+
+    render(target) {}
+}
 
 class StackedPane {
 
@@ -35,13 +131,14 @@ class StackedPane {
         this.dimX = dimX;
         this.dimY = dimY;
         const subCanvas = [];
+
         let pos = 0;
         if (this.isHorizontal) {
             let i = 0;
             while(i < this.panes.length && pos < this.dimX) {
                 const width = this.len[i];
                 this.panes[i].init(width, this.dimY);
-                subCanvas.push(OCM.getNewCanvas(width, this.dimY));
+                subCanvas.push(OCM.getNewOffscreenCanvas(width, this.dimY));
                 pos += width;
                 i++;
             }
@@ -50,7 +147,7 @@ class StackedPane {
             while(i < this.panes.length && pos < this.dimY) {
                 const height = this.len[i];
                 this.panes[i].init(this.dimX, height);
-                subCanvas.push(OCM.getNewCanvas(this.dimX, height));
+                subCanvas.push(OCM.getNewOffscreenCanvas(this.dimX, height));
                 pos += height;
                 i++;
             }
@@ -59,6 +156,7 @@ class StackedPane {
     }
 
     render(target) {
+        target.clearRect(0, 0, this.dimX, this.dimY);
         let x = 0;
         let y = 0;
         const i_max = this.subCanvas.length;
@@ -66,12 +164,7 @@ class StackedPane {
             const pane = this.panes[i];
             const c = this.subCanvas[i];
             pane.render(c.ctx);
-                target.putImageData(
-                    c.ctx.getImageData(0, 0, c.width, c.height),
-                    x,
-                    y
-                );
-
+            target.drawImage(c.elem, 0, 0, c.width, c.height, x, y, c.width, c.height);
             if (this.isHorizontal) {
                 x += this.len[i];
             } else {
@@ -94,26 +187,14 @@ class PatternPane {
         this.patternDimY = this.pattern.height;
         var dimX = width + this.patternDimX;
         var dimY = height + this.patternDimY;
-        this.canvas = OCM.getNewCanvas(dimX, dimY);
-        this.canvas.ctx.fillStyle = '"rgba(0, 0, 0, 1)"';
+        this.canvas = OCM.getNewOffscreenCanvas(dimX, dimY);
+
+        this.canvas.ctx.clearRect(0, 0, dimX, dimY);
+
+        // opaque pattern
+        var pattern = this.canvas.ctx.createPattern(this.pattern, this.repeat);
+        this.canvas.ctx.fillStyle = pattern;
         this.canvas.ctx.fillRect(0, 0, dimX, dimY);
-        if (true) {
-            // opaque pattern
-            var pattern = this.canvas.ctx.createPattern(this.pattern, this.repeat);
-            this.canvas.ctx.fillStyle = pattern;
-            this.canvas.ctx.fillRect(0, 0, dimX, dimY);
-        } else {
-            // transparent pattern
-            var y = 0;
-            while (y < dimY) {
-                var x = 0;
-                while (x < dimX) {
-                    this.canvas.ctx.drawImage(this.pattern, x, y);
-                    x += this.patternDimX;
-                }
-                y += this.patternDimY;
-            }
-        }
         this.width = width;
         this.height = height;
         this.image = null;
@@ -124,13 +205,13 @@ class PatternPane {
     getImage() {
         if (this.image === null) {
             this.image =
-                this.canvas.ctx.getImageData(this.scrollX, this.scrollY, this.width, this.height);
+                this.canvas.ctx.getImageData(0, 0, this.width + this.patternDimX, this.height);
         }
         return this.image;
     }
 
     render(target) {
-        target.putImageData(this.getImage(), 0, 0);
+        target.putImageData(this.getImage(), 0 - this.scrollX, 0 - this.scrollY);
     }
 
     scrollBy(Sx, Sy) {
@@ -146,7 +227,6 @@ class PatternPane {
         } else if (this.scrollY >= this.patternDimY) {
             this.scrollY -= this.patternDimY;
         }
-        this.image = null;
     }
 }
 
@@ -174,7 +254,7 @@ class WorldPane {
         this.worldMaxX = Math.max(this.world[0].length - this.viewWidth, 0);
         this.VOMaxY = height % this.tl;
         this.VOMaxX = width % this.tl;
-        this.offCanvas = (offscreen === true) ? OCM.getNewCanvas(width, height) : null;
+        this.offCanvas = (offscreen === true) ? OCM.getNewOffscreenCanvas(width, height) : null;
     }
 
     render(drawTarget) {
@@ -182,12 +262,9 @@ class WorldPane {
         if (this.bgPane !== undefined) {
             this.bgPane.render(target);
             target.fillRect(0, 0, this.dimX, this.dimY);
-        }
-        /*
-         else {
+        } else {
             target.clearRect(0, 0, this.dimX, this.dimY);
         }
-        */
 
         var x_max = Math.min(this.worldX + this.viewWidth + 1, this.world[0].length);
         var y_max = Math.min(this.worldY + this.viewHeight + 1, this.world.length);
@@ -479,11 +556,12 @@ function getNewSprite(mapKey, x, y) {
     return {im: spriteMaps[mapKey].im, x: x, y: y, len: spriteMaps[mapKey].len};
 }
 
-var debugElem = document.getElementById('d');
+var debugElem = null;
 var debugs = [];
 var spriteMaps = [];
 
 module.exports = {
+    EmptyPane,
     StackedPane,
     PatternPane,
     WorldPane,
@@ -493,7 +571,8 @@ module.exports = {
     SpriteMap,
     getNewSpriteMap,
     getNewSprite,
-    spriteMaps
+    spriteMaps,
+    ScreenManager
 };
 
 

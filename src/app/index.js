@@ -1,4 +1,5 @@
 import {
+    EmptyPane,
     StackedPane,
     PatternPane,
     WorldPane,
@@ -7,11 +8,12 @@ import {
     d,
     getNewSpriteMap,
     getNewSprite,
-    spriteMaps
+    spriteMaps,
+    ScreenManager
 } from './engine.js';
 
-var canvas = document.getElementById('c');
-var ctx = canvas.getContext('2d');
+
+let SM = new ScreenManager('c');
 
 var sprites = [];
 var keys = {};
@@ -50,7 +52,7 @@ var world = [
 ];
 
 var levelPane = new WorldPane(tb, spriteSheet, world);
-var fadeBg = new LinearGradientBackground('Y', canvas.height);
+var fadeBg = new LinearGradientBackground('Y', SM.dimY);
 fadeBg.addColorStop('#000000', 100);
 fadeBg.addColorStop('#400000', 100);
 fadeBg.addColorStop('#000080', 100);
@@ -91,9 +93,9 @@ const patternBg2 = new PatternPane(player0, 'repeat');
 const patternBg3 = new PatternPane(player0, 'repeat');
 const patternBg4 = new PatternPane(player0, 'repeat');
 
-const patternsBg = new StackedPane('Y', [bgPane, patternBg, patternBg2, patternBg3, patternBg4], [136, 16, 16, 16, 16]);
+const patternsBg = new StackedPane('Y', [new EmptyPane(), patternBg, patternBg2, patternBg3, patternBg4], [136, 16, 16, 16, 16]);
 
-function prepareSpriteMaps() {
+function prepareSpriteMaps(ctx) {
 
     var player = getNewSpriteMap(ctx, 6);
     player.makeTransparent();
@@ -106,32 +108,27 @@ function prepareSpriteMaps() {
 }
 
 function init() {
-    prepareSpriteMaps();
+
+    SM.addScreen('turrican', [bgPane, patternsBg, levelPane]);
+    SM.gotoScreen('turrican');
+    const ctx = SM.getMainCanvas().ctx;
+
+
+    prepareSpriteMaps(ctx);
     var player = getNewSprite('x', 30, 20);
     sprites.push(player);
-
-    levelPane.init(canvas.width, canvas.height);
-/*
-    bgPane.init(canvas.width, canvas.height, false);
-    */
-    fadeBg.init();
-    patternsBg.init(canvas.width, canvas.height);
 }
 
 function render() {
-    //bgPane.render(ctx);
-    patternsBg.render(ctx);
-    levelPane.render(ctx);
+    SM.renderScreen();
+
+    const ctx = SM.getMainCanvas().ctx;
 
     sprites.forEach(
         function (v) {
             ctx.drawImage(player0, v.x, v.y);
         }
     );
-    patternBg.scrollBy(1, 0);
-    patternBg2.scrollBy(1.2, 0);
-    patternBg3.scrollBy(1.5, 0);
-    patternBg4.scrollBy(2, 0);
 }
 
 function update() {
@@ -167,6 +164,8 @@ function handleKeys() {
                 break;
         }
     };
+
+    const canvas = SM.getMainCanvas().elem;
 
     var scrollBoundsTop = {x: 130, y: 50};
     var scrollBoundsBottom = {x: 130, y: 50};
@@ -224,6 +223,10 @@ function handleKeys() {
 
     fadeBg.scrollBy(0.75 * (fadeBg.isHorizontal ? scrollX : scrollY));
     bgPane.scrollBy(0.25 * scrollX, 0.25 * scrollY);
+    patternBg.scrollBy(1.2 * scrollX, 0);
+    patternBg2.scrollBy(1.4 * scrollX, 0);
+    patternBg3.scrollBy(1.6 * scrollX, 0);
+    patternBg4.scrollBy(1.8 * scrollX, 0);
 
     var unscrolled = levelPane.scrollBy(scrollX, scrollY);
     if (unscrolled.x !== 0) {
