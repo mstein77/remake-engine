@@ -20,15 +20,35 @@ class CanvasManager {
         return this.offscreenElem;
     }
 
-    getNewOverlayCanvas(dimX, dimY) {
-        return this.getNewCanvas('overlay', dimX, dimY);
+
+    getNewOverlayCanvas(dimX, dimY, offX, offY, opaque = false) {
+        return this.getNewCanvas('overlay', dimX, dimY, offX, offY, opaque);
     }
 
     getNewOffscreenCanvas(dimX, dimY) {
         return this.getNewCanvas('offscreen', dimX, dimY);
     }
 
-    getNewCanvas(type, dimX, dimY) {
+    getNewScrollCanvas(dimX, dimY, sizeX, sizeY, offX, offY, opaque = false) {
+        const id = 'scroll_' + this.canvasElems.length;
+        const parentElem = this.getOverlayElem();
+        const container = document.createElement('div');
+        container.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + dimX + 'px; height: ' + dimY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden');
+        const elem = document.createElement('canvas');
+        elem.id = id;
+        elem.setAttribute('width', sizeX);
+        elem.setAttribute('height', sizeY);
+        elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px');
+        container.appendChild(elem);
+        parentElem.appendChild(container);
+
+        const canvas = {id, type: 'scroll', elem, ctx: elem.getContext('2d', {alpha: !opaque}), width: sizeX, height: sizeY};
+        this.canvasElems.push(canvas);
+
+        return canvas;
+    }
+
+    getNewCanvas(type, dimX, dimY, offX = 0, offY = 0, opaque = false) {
         const id = type + '_' + this.canvasElems.length;
         const parentElem = type === 'offscreen' ? this.getOffscreenElem() : this.getOverlayElem();
         const elem = document.createElement('canvas');
@@ -36,10 +56,10 @@ class CanvasManager {
         elem.setAttribute('width', dimX);
         elem.setAttribute('height', dimY);
         if (type === 'overlay') {
-            elem.setAttribute('style', 'position: absolute; top: 0px; left: 0px');
+            elem.setAttribute('style', 'position: absolute; top: ' + offY + 'px; left: ' + offX + 'px');
         }
         parentElem.appendChild(elem);
-        const canvas = {id, type, elem, ctx: elem.getContext('2d'), width: dimX, height: dimY};
+        const canvas = {id, type, elem, ctx: elem.getContext('2d', {alpha: !opaque}), width: dimX, height: dimY};
         this.canvasElems.push(canvas);
 
         return canvas;
@@ -48,6 +68,221 @@ class CanvasManager {
 
 const OCM = new CanvasManager();
 
+class Area {
+
+    constructor() {
+        this.panes = [];
+        this.dimX = null;
+        this.dimY = null;
+    }
+
+    addPane(pane) {
+        this.panes.push(pane);
+    }
+
+    setDimension(dimX, dimY, offX, offY, dims) {
+        this.dimX = dimX;
+        this.dimY = dimY;
+        for (let i = 0; i < this.panes.length; i++) {
+            const pane = this.panes[i];
+            if (this.firstArea === true && i === 0) {
+                pane.opaque = true;
+            }
+            pane.init(dimX, dimY);
+            const sizeX = pane.oversize ? pane.sizeX : dimX;
+            const sizeY = pane.oversize ? pane.sizeY : dimY;
+            dims.push({
+                pane,
+                off: {x: offX, y: offY},
+                dim: {x: dimX, y: dimY},
+                size: {x: sizeX, y: sizeY}
+            });
+        }
+        return dims;
+    }
+}
+
+class SplitArea {
+
+    constructor(axis, areaSizes) {
+        this.axis = axis;
+        this.areaSizes = areaSizes;
+        this.areas = [];
+        let i = 0;
+        while (i < areaSizes.length) {
+            this.areas.push(null);
+            i++;
+        }
+    }
+
+    addArea(area, pos = null) {
+        if (pos === null) {
+            pos = 0;
+            while (pos < this.areas.length && this.areas[pos] !== null) {
+                pos++;
+            }
+            if (pos === this.areas.length) {
+                throw new Error('No free area slot found!');
+            }
+        }
+        if (pos >= this.areas.length) {
+            return;
+        }
+        this.areas[pos] = area;
+    }
+
+    setDimension(dimX, dimY, offX, offY, dims) {
+
+        let pos = 0;
+        let pos_max = (this.axis === 'X') ? dimX : dimY;
+
+        for (let i = 0; i < this.areas.length; i++) {
+            if (this.areas[i] === null) {
+                continue;
+            }
+            const size = this.areaSizes[i];
+            let x = (this.axis === 'X') ? size : dimX;
+            let y = (this.axis !== 'X') ? size : dimY;
+            const oldPos = pos;
+            pos += size;
+            if (pos > pos_max) {
+                if (this.axis === 'X') {
+                    x = pos_max - oldPos;
+                } else {
+                    y = pos_max - oldPos;
+                }
+            }
+            if (this.firstArea === true) {
+                this.areas[i].firstArea = true;
+            }
+            this.areas[i].setDimension(x, y, offX, offY, dims);
+            if (pos >= pos_max) {
+                break;
+            }
+            if (this.axis === 'X') {
+                offX += size;
+            } else {
+                offY += size;
+            }
+        }
+    }
+}
+
+class Screen {
+    constructor() {
+        this.areas = [];
+        this.dimX = null;
+        this.dimY = null;
+    }
+
+    addArea(area) {
+        if (this.areas.length === 0) {
+            area.firstArea = true;
+        }
+        this.areas.push(area);
+    }
+
+    setDimension(dimX, dimY) {
+        this.dimX = dimX;
+        this.dimY = dimY;
+        const dims = [];
+        for (let i = 0; i < this.areas.length; i++) {
+            this.areas[i].setDimension(dimX, dimY, 0, 0, dims);
+        }
+
+        for(let elem of dims) {
+            const oversize = (elem.dim.y !== elem.size.y || elem.dim.x !== elem.size.x);
+            elem.canvas = oversize ?
+                OCM.getNewScrollCanvas(elem.dim.x, elem.dim.y, elem.size.x, elem.size.y, elem.off.x, elem.off.y, elem.pane.opaque === true) :
+                OCM.getNewOverlayCanvas(elem.dim.x, elem.dim.y, elem.off.x, elem.off.y, elem.pane.opaque === true);
+            if (oversize) {
+                elem.pane.setScrollElem(elem.canvas.elem);
+            }
+        }
+        this.elems = dims;
+    }
+
+    render() {
+        for(let elem of this.elems) {
+            const isDirty = !(elem.pane.dirty === false);
+            if (isDirty) {
+                elem.pane.render(elem.canvas.ctx);
+            }
+        }
+    }
+}
+
+/**
+ * The screen manager holds all possible screens of the game and allows transitions to a new screen by deleting and
+ * creating overlay canvases of the current view.
+ *
+ * A screen can either be a Area (=overlays of different panes with the same dimension) or a
+ * Split-Area which divides the screen in different subAreas along one axis (where each subArea can also be a Area or Split-Area).
+ *
+ * An area will create a canvas for each pane with the same dimension:
+ *
+ *   Area1:
+ *     a) colorPane (=fix background color, opaque, no repaints)
+ *     b) MapPane (=scrollable World, canvas will be bigger than the viewPort for css-scrolling, transparent, repaints on worldPos change)
+ *     c) SpritePane (transparent, repaints)
+ *
+ *   Turrican:
+ *
+ *     Y230-Area1:
+ *        a) GradientPane (opaque, repaint on scroll)
+ *        b) MapPane (transparent, repaints on worldPos change)
+ *        c) SpritePane (transparent, repaints)
+ *
+ *     Y20-Area1:
+ *        a) backgroundPane (opaque, no repaints)
+ *        b) textPane (transparent, repaint on status-update)
+ *
+ *    => Areas:
+ *     A1.1 [0, 0, 320, 230] -> GradientPane, MapPane, SpritePane
+ *     A1.2 [0, 230, 320, 20] -> backgroundPane, textPane
+ *
+ *
+ *
+ *
+ *   Shadow of the Beast:
+ *
+ *    Area 1:
+ *     Y150-Area:
+ *       a) GradientPane
+ *     Y100-Area:
+ *       a) EmptyPane
+ *
+ *    Area 2:
+ *     Y20-Area: PatternPane (opaque, scrollable, no repaints)
+ *     Y40-Area: PatternPane
+ *     Y30-Area: PatternPane
+ *     Y50...
+ *
+ *    Area 3:
+ *     Y200-Area: MapPane, SpritePane
+ *     Y50-Area: PatternPane
+ *
+ *
+ *    => Areas:
+ *      A1.1 [0, 0, 320, 150] -> GradientPane
+ *      A1.2 [0, 150, 320, 100] -> EmptyPane
+ *      A2.1 [0, 0, 320, 20] -> PatternPane
+ *      A2.2 [0, 20, 320, 40] -> PatternPane
+ *      A2.3 [0, 60, 320, 30] -> PatternPane
+ *      ..
+ *      A3.1 [0, 0, 320, 200] -> MapPane, SpritePane
+ *      A3.2 [0, 200, 320, 250] -> PatternPane
+ *
+ *
+ *
+ * Ein Screen besteht aus einer Folge von Areas, die alle mit der gleichen Dimension initialisiert werden
+ * Liegt eine Splitarea vor, dann werden die darunterliegenden Areas entlang der SplitAxis auf einen vorgegebenen Wert gesetzt
+ *
+ * Für jede Area wird ein Canvas erzeugt, sofern es keine SplitArea ist
+ *
+ *
+ *
+ */
 class ScreenManager {
 
     constructor(id) {
@@ -98,7 +333,10 @@ class ScreenManager {
             return;
         }
         for (let elem of this.view) {
-            elem.pane.render(elem.canvas.ctx);
+            const isDirty = !(elem.pane.dirty === false);
+            if (isDirty) {
+                elem.pane.render(elem.canvas.ctx);
+            }
         }
     }
 
@@ -110,14 +348,37 @@ class ScreenManager {
     }
 }
 
+
 class EmptyPane {
     constructor() {}
 
     init(dimX, dimY) {}
 
-    render(target) {}
+    render(target) {
+        this.dirty = false;
+    }
 }
 
+class ColorPane {
+    constructor(color) {
+        this.color = color;
+        this.dimX = null;
+        this.dimY = null;
+    }
+
+    init(dimX, dimY) {
+        this.dimX = dimX;
+        this.dimY = dimY;
+    }
+
+    render(target) {
+        target.fillStyle = this.color;
+        target.fillRect(0, 0, this.dimX, this.dimY);
+        this.dirty = false;
+    }
+}
+
+/*
 class StackedPane {
 
     constructor(axis, panes, len) {
@@ -173,6 +434,27 @@ class StackedPane {
         }
     }
 }
+*/
+
+class SpritePane {
+    constructor(sprite, sprites) {
+        this.sprite = sprite;
+        this.sprites = sprites;
+    }
+
+    init(dimX, dimY) {
+        this.dimX = dimX;
+        this.dimY = dimY;
+    }
+
+    render(target) {
+        target.clearRect(0, 0, this.dimX, this.dimY);
+
+        for (let sprite of this.sprites) {
+            target.drawImage(this.sprite, sprite.x, sprite.y);
+        }
+    }
+}
 
 class PatternPane {
 
@@ -180,6 +462,7 @@ class PatternPane {
         this.canvas = null;
         this.pattern = pattern;
         this.repeat = repeat;
+        this.oversize = true;
     }
 
     init(width, height) {
@@ -187,31 +470,32 @@ class PatternPane {
         this.patternDimY = this.pattern.height;
         var dimX = width + this.patternDimX;
         var dimY = height + this.patternDimY;
-        this.canvas = OCM.getNewOffscreenCanvas(dimX, dimY);
-
-        this.canvas.ctx.clearRect(0, 0, dimX, dimY);
-
-        // opaque pattern
-        var pattern = this.canvas.ctx.createPattern(this.pattern, this.repeat);
-        this.canvas.ctx.fillStyle = pattern;
-        this.canvas.ctx.fillRect(0, 0, dimX, dimY);
         this.width = width;
         this.height = height;
         this.image = null;
         this.scrollX = 0;
         this.scrollY = 0;
+        this.sizeX = dimX;
+        this.sizeY = dimY;
+    }
+
+    setScrollElem(elem) {
+        this.scrollElem = elem;
     }
 
     getImage() {
         if (this.image === null) {
             this.image =
-                this.canvas.ctx.getImageData(0, 0, this.width + this.patternDimX, this.height);
+                this.canvas.ctx.getImageData(0, 0, this.width + this.patternDimX, this.height + this.patternDimY);
         }
         return this.image;
     }
 
     render(target) {
-        target.putImageData(this.getImage(), 0 - this.scrollX, 0 - this.scrollY);
+        var pattern = target.createPattern(this.pattern, this.repeat);
+        target.fillStyle = pattern;
+        target.fillRect(0, 0, this.sizeX, this.sizeY);
+        this.dirty = false;
     }
 
     scrollBy(Sx, Sy) {
@@ -226,6 +510,14 @@ class PatternPane {
             this.scrollY += this.patternDimY;
         } else if (this.scrollY >= this.patternDimY) {
             this.scrollY -= this.patternDimY;
+        }
+        if (this.scrollElem) {
+            if (Sx > 0) {
+                this.scrollElem.style.left = -this.scrollX;
+            }
+            if (Sy > 0) {
+                this.scrollElem.style.top = -this.scrollY;
+            }
         }
     }
 }
@@ -255,6 +547,7 @@ class WorldPane {
         this.VOMaxY = height % this.tl;
         this.VOMaxX = width % this.tl;
         this.offCanvas = (offscreen === true) ? OCM.getNewOffscreenCanvas(width, height) : null;
+        this.dirty = true;
     }
 
     render(drawTarget) {
@@ -304,6 +597,7 @@ class WorldPane {
             var im = target.getImageData(0, 0, this.dimX, this.dimY);
             drawTarget.putImageData(im, 0, 0);
         }
+        this.dirty = false;
     }
 
     scrollBy(Sx, Sy) {
@@ -376,6 +670,10 @@ class WorldPane {
                 }
             }
         }
+        if (Sx !== 0 || Sy !== 0) {
+            this.dirty = true;
+        }
+
         return unscrolled;
     }
 }
@@ -396,7 +694,9 @@ class LinearGradientBackground {
         this.colorStops.push([color, size]);
     }
 
-    init() {
+    init(dimX, dimY) {
+        this.dimX = dimX;
+        this.dimY = dimY;
         this.colorStopIndex = 0;
         this.colorStopPosition = 0;
         this.viewPosition = 0;
@@ -409,6 +709,7 @@ class LinearGradientBackground {
     }
 
     render(bgCtx) {
+        this.dirty = false;
         d('Index', this.colorStopIndex, '| Position', this.colorStopPosition);
         d('View: ', this.viewPosition, ' of ', this.viewPositionMax);
 
@@ -447,6 +748,7 @@ class LinearGradientBackground {
         }
 
         bgCtx.fillStyle = gradient;
+        bgCtx.fillRect(0, 0, this.dimX, this.dimY);
     }
 
     scrollBy(speed) {
@@ -482,6 +784,9 @@ class LinearGradientBackground {
 
         }
         this.viewPosition = newPos;
+        if (speed !== 0) {
+            this.dirty = true;
+        }
     }
 }
 
@@ -510,9 +815,17 @@ function d() {
 
 class SpriteMap {
 
-    constructor(ctx, bits) {
+    static getCtx() {
+        if (SpriteMap.ctx === undefined) {
+            const canvas = OCM.getNewOffscreenCanvas(1, 1);
+            SpriteMap.ctx = canvas.ctx;
+        }
+        return SpriteMap.ctx;
+    }
+
+    constructor(bits) {
         const len = 1 << (bits - 1);
-        const sprite = ctx.createImageData(len, len);
+        const sprite = SpriteMap.getCtx().createImageData(len, len);
         this.im = sprite;
         this.len = len;
         this.bits = bits;
@@ -545,8 +858,8 @@ class SpriteMap {
     }
 }
 
-function getNewSpriteMap(ctx, bits) {
-    return new SpriteMap(ctx, bits);
+function getNewSpriteMap(bits) {
+    return new SpriteMap(bits);
 }
 
 function getNewSprite(mapKey, x, y) {
@@ -561,8 +874,13 @@ var debugs = [];
 var spriteMaps = [];
 
 module.exports = {
+    Area,
+    SplitArea,
+    Screen,
     EmptyPane,
-    StackedPane,
+    SpritePane,
+    ColorPane,
+ //   StackedPane,
     PatternPane,
     WorldPane,
     LinearGradientBackground,

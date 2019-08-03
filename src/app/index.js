@@ -1,6 +1,11 @@
 import {
+    Area,
+    SplitArea,
+    Screen,
     EmptyPane,
-    StackedPane,
+    ColorPane,
+//    StackedPane,
+    SpritePane,
     PatternPane,
     WorldPane,
     LinearGradientBackground,
@@ -58,9 +63,8 @@ fadeBg.addColorStop('#400000', 100);
 fadeBg.addColorStop('#000080', 100);
 fadeBg.addColorStop('#F0F040', 100);
 fadeBg.addColorStop('#802050', 100);
-fadeBg.init();
 
-var bgPane = new WorldPane(
+const bgPane = new WorldPane(
     tb,
     spriteSheet,
     [
@@ -93,11 +97,15 @@ const patternBg2 = new PatternPane(player0, 'repeat');
 const patternBg3 = new PatternPane(player0, 'repeat');
 const patternBg4 = new PatternPane(player0, 'repeat');
 
-const patternsBg = new StackedPane('Y', [new EmptyPane(), patternBg, patternBg2, patternBg3, patternBg4], [136, 16, 16, 16, 16]);
+prepareSpriteMaps();
+var player = getNewSprite('x', 30, 20);
+sprites.push(player);
 
-function prepareSpriteMaps(ctx) {
+const playerPane = new SpritePane(player0, sprites);
 
-    var player = getNewSpriteMap(ctx, 6);
+function prepareSpriteMaps() {
+
+    var player = getNewSpriteMap(6);
     player.makeTransparent();
     player.addCol(255, 230, 220, 255);
     for (var i = 0; i < player.len; i++) {
@@ -107,34 +115,60 @@ function prepareSpriteMaps(ctx) {
     spriteMaps['x'] = player;
 }
 
+let gameScreen = new Screen();
+
 function init() {
 
-    SM.addScreen('turrican', [bgPane, patternsBg, levelPane]);
+   // SM.addScreen('turrican', [bgPane, patternsBg, levelPane]);
+
+
+// Turrican
+// ------------------------
+    console.log('Turrican');
+    let gameArea = new Area();
+    gameArea.addPane(fadeBg);
+    gameArea.addPane(levelPane);
+    gameArea.addPane(playerPane /* SpritePane */);
+
+    let logoArea = new Area();
+    logoArea.addPane(patternBg);
+    let textArea = new Area();
+    textArea.addPane(new ColorPane('#A07070'));
+    textArea.addPane(patternBg3);
+    let statusArea = new SplitArea('X', [100, 220]);
+    statusArea.addArea(textArea, 1);
+    statusArea.addArea(logoArea);
+
+    let mainArea = new SplitArea('Y', [200, 10]);
+    mainArea.addArea(gameArea);
+    mainArea.addArea(statusArea);
+
+    gameScreen.addArea(mainArea);
+    gameScreen.setDimension(320, 210);
+// ------------------------
+
+    /*
     SM.gotoScreen('turrican');
     const ctx = SM.getMainCanvas().ctx;
-
-
-    prepareSpriteMaps(ctx);
-    var player = getNewSprite('x', 30, 20);
-    sprites.push(player);
+ */
 }
 
 function render() {
+    gameScreen.render();
+/*
     SM.renderScreen();
-
-    const ctx = SM.getMainCanvas().ctx;
-
-    sprites.forEach(
-        function (v) {
-            ctx.drawImage(player0, v.x, v.y);
-        }
-    );
+*/
+    patternBg.scrollBy(1, 0);
+    patternBg3.scrollBy(0, 1)
 }
+
+let initialized = false;
 
 function update() {
     requestAnimationFrame(update);
-    if (sprites.length === 0) {
+    if (!initialized) {
         init();
+        initialized = true;
     }
     handleKeys();
     render();
@@ -165,7 +199,10 @@ function handleKeys() {
         }
     };
 
-    const canvas = SM.getMainCanvas().elem;
+    const canvas = {
+        width: levelPane.dimX,
+        height: levelPane.dimY
+    };
 
     var scrollBoundsTop = {x: 130, y: 50};
     var scrollBoundsBottom = {x: 130, y: 50};
@@ -224,9 +261,7 @@ function handleKeys() {
     fadeBg.scrollBy(0.75 * (fadeBg.isHorizontal ? scrollX : scrollY));
     bgPane.scrollBy(0.25 * scrollX, 0.25 * scrollY);
     patternBg.scrollBy(1.2 * scrollX, 0);
-    patternBg2.scrollBy(1.4 * scrollX, 0);
     patternBg3.scrollBy(1.6 * scrollX, 0);
-    patternBg4.scrollBy(1.8 * scrollX, 0);
 
     var unscrolled = levelPane.scrollBy(scrollX, scrollY);
     if (unscrolled.x !== 0) {
