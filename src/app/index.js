@@ -259,17 +259,22 @@ const Turrican = new Game(320, 256, 1, function () {
 
     const shadowScreen = new Screen('shadow-ingame');
 
-    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 20, 20]);
+    const scolArea = new SplitArea('Y', [94, 73, 20]);
     const sbgFadeBg = new LinearGradientPane('Y', 50);
     sbgFadeBg.addColorStop('#677b96', 50);
     sbgFadeBg.addColorStop('#ff7b96', 1);
+    scolArea.addPane(new ColorPane('#677b96'), 0);
+    scolArea.addPane(sbgFadeBg, 1);
+    scolArea.addPane(new EmptyPane(), 2);
+    shadowScreen.addArea(scolArea);
+
+    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 20]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
     sbgArea.addPane(patternBg4, 3);
     sbgArea.addPane(patternBg5, 4);
-    sbgArea.addPane(patternBg6, 6);
-    sbgArea.addPane(sbgFadeBg, 5);
+    sbgArea.addPane(patternBg6, 5);
     sbgArea.addPane(patternBg7, 7);
     shadowScreen.addArea(sbgArea);
 
