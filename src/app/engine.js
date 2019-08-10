@@ -1,3 +1,262 @@
+
+class Game {
+
+    constructor(width, height, zoom, init) {
+        // analyse the element?
+        if (Game.instance) {
+            throw new Error('There is already a running game instance!');
+        }
+        Game.instance = this;
+        this.width = width;
+        this.height = height;
+        this.init = init.bind(this);
+        this.screens = {};
+        this.currentScreen = null;
+        this.debug = false;
+        this.globalKeyHandlers = [];
+        this.timers = {};
+        this.durations = {};
+        this.frames = 0;
+        this.zoom = zoom;
+        this.elems = {};
+        this.minFps = 100;
+        this.logs = [];
+
+        document.addEventListener('DOMContentLoaded', function(event) {
+            Game.instance.boot();
+        });
+    }
+
+    getDomElem(id) {
+        if (this.elems[id] === undefined) {
+            const elem = document.getElementById(id);
+            if (elem === null) {
+                throw Error('Required element with ID "' + id + '" not found in DOM!');
+            }
+            this.elems[id] = elem;
+        }
+        return this.elems[id];
+    }
+
+    log() {
+        if (arguments.length === 0) {
+            return;
+        }
+        const values = [];
+        for (let i = 0; i < arguments.length; i++) {
+            values.push('' + arguments[i]);
+        }
+        this.logs.push(values.join(' '));
+    }
+
+    setZoom(value) {
+        this.log('setZoom', value);
+        this.zoom = value;
+        const overlay = this.getDomElem('overlay');
+        overlay.style.transform =  'scale(' + this.zoom +')';
+        overlay.style.transformOrigin = 'top left';
+        const elem = this.getDomElem('screen-div');
+        elem.style.width = '' + this.width * this.zoom;
+        elem.style.height = '' + this.height * this.zoom;
+        this.resetFps();
+    }
+
+    addGlobalKeyHandler(handler) {
+        this.globalKeyHandlers.push(handler.bind(this));
+    }
+
+    render(force = false) {
+        if (this.currentScreen !== null) {
+            this.screens[this.currentScreen].render(force);
+        }
+    }
+
+    startTimer(name) {
+        this.timers[name] = performance.now();
+    }
+
+    addTimerDuration(name) {
+        const delta = performance.now() - this.timers[name];
+        if (this.durations[name] === undefined) {
+            this.durations[name] = 0;
+        }
+        this.durations[name] += delta;
+        return delta;
+    }
+
+    resetTimers(names) {
+        for (let name of names) {
+            this.timers[name] = 0;
+            this.durations[name] = 0;
+        }
+    }
+
+    addScreen(screen) {
+        this.screens[screen.id] = screen;
+    }
+
+    gotoScreen(screenId) {
+        this.log('gotoScreen', screenId);
+        OCM.clear();
+        this.currentScreen = screenId;
+        const screen = this.screens[screenId];
+        screen.setDimension(this.width, this.height);
+        screen.render(true);
+    }
+
+    resetFps() {
+        this.resetTimers(['game', 'render']);
+        this.startTimer('game');
+        this.frames = 0;
+        this.minFps = 100;
+    }
+
+    setDebug(value) {
+        this.debug = (value === true);
+        this.getDomElem('log-div').style.display = this.debug ? 'block' : 'none';
+        this.getDomElem('debugs').style.display = this.debug ? 'block' : 'none';
+    }
+
+    line() {
+        return "=================================================\n";
+    }
+
+    printDebugs() {
+
+        if (this.debug) {
+            const gameDuration = this.running ? this.addTimerDuration('game') : this.durations['game'];
+            const frameTime = this.getRounded(this.durations['render'] / this.frames, 2);
+            const fps = this.frames === 0 ? '-' : Math.round((1000 / (gameDuration / this.frames)));
+            this.minFps = Math.min(fps, this.minFps);
+            const perfKpis =
+                this.line() +
+                " Performance\n" +
+                this.line() +
+                "FPS: " + fps + " - Min: " + this.minFps + "\n" +
+                "Rendering: " + frameTime + "ms\n" +
+                "Boot-Time: " + this.getRounded(this.durations['boot'], 2) + "ms\n\n";
+            ;
+            const out = [];
+            out.push(this.line() + " Debug\n" + this.line());
+            for (let k in debugs) {
+                out.push(k + ': ' + debugs[k])
+            }
+            this.getDomElem('d').innerHTML = perfKpis + out.join("\n");
+
+            if (this.logs.length > 0) {
+                this.getDomElem('log').innerHTML += this.logs.join("\n") + "\n";
+                this.logs = [];
+            }
+        }
+        debugs = [];
+    }
+
+    handleKeys() {
+        for (let handler of this.globalKeyHandlers) {
+            const stop = handler();
+            if (stop) {
+                this.keys = {};
+                return;
+            }
+        }
+
+        if (this.running) {
+            const screen = this.screens[this.currentScreen];
+            if (screen.keyHandler !== null) {
+                screen.keyHandler();
+            }
+        }
+
+        this.keys = {};
+    }
+
+    getRounded(value, decimals) {
+        let f = 1;
+        while(decimals > 0) {
+            f *= 10;
+            decimals--;
+        }
+        return Math.round(value * f) / f;
+    }
+
+    updateFrame() {
+        const screen = this.screens[this.currentScreen];
+        this.handleKeys();
+        if (this.running) {
+            this.startTimer('render');
+            this.render();
+            this.addTimerDuration('render');
+            this.frames++;
+        }
+        if (this.debug) {
+            this.printDebugs();
+        }
+        if (this.running) {
+            if (screen.frameHandler !== null) {
+                screen.frameHandler();
+            }
+        }
+        this.lastAnimationFrame = requestAnimationFrame(this.updateFrame.bind(this));
+    }
+
+    setRunning(value) {
+        this.log('setRunning', value);
+        this.running = value;
+        if (value) {
+            this.resetFps();
+        } else {
+            this.addTimerDuration('game');
+        }
+    }
+
+    boot() {
+        this.startTimer('boot');
+        this.log('Boot game engine...');
+        this.keysDown = {};
+        this.keys = {};
+
+        // register key handlers
+        const keyDownHandler = (e) => {
+            this.keysDown[e.key] = e.key;
+        };
+        document.onkeydown = keyDownHandler;
+
+        const keyUpHandler = (e) => {
+            delete this.keysDown[e.key];
+            this.keys[e.key] = e.key;
+        };
+        document.onkeyup = keyUpHandler;
+
+        document.body.innerHTML =
+            '<div style="display: flex; justify-content: center; margin-top: 20px">' +
+
+                '<div id="log-div" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0">' +
+                    '<pre id="log" style="float: right; margin: 0">' + this.line() + " Log\n" + this.line() + '</pre>' +
+                '</div>' +
+
+                '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"><div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"></div>' +
+                '</div>' +
+
+                '<div id="debugs" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0"><pre id="d" style="margin: 0"></pre>' +
+                '</div>' +
+            '</div>' +
+
+            '<div id="offscreen" style="display: none"></div>';
+
+        if (this.zoom !== 1) {
+            this.setZoom(this.zoom);
+        }
+
+        debugElem = document.getElementById('d');
+        const startScreen = this.init();
+        this.addTimerDuration('boot');
+        this.gotoScreen(startScreen);
+        this.setRunning(true);
+        this.updateFrame();
+        this.log('...booting done');
+    }
+}
+
 class CanvasManager {
 
     constructor() {
@@ -42,7 +301,9 @@ class CanvasManager {
         container.appendChild(elem);
         parentElem.appendChild(container);
 
-        const canvas = {id, type: 'scroll', elem, ctx: elem.getContext('2d', {alpha: !opaque}), width: sizeX, height: sizeY};
+        const ctx = elem.getContext('2d', {alpha: !opaque});
+        ctx.imageSmoothingEnabled = false;
+        const canvas = {id, type: 'scroll', elem, ctx, width: sizeX, height: sizeY};
         this.canvasElems.push(canvas);
 
         return canvas;
@@ -59,14 +320,26 @@ class CanvasManager {
             elem.setAttribute('style', 'position: absolute; top: ' + offY + 'px; left: ' + offX + 'px');
         }
         parentElem.appendChild(elem);
-        const canvas = {id, type, elem, ctx: elem.getContext('2d', {alpha: !opaque}), width: dimX, height: dimY};
+        const ctx = elem.getContext('2d', {alpha: !opaque});
+        ctx.imageSmoothingEnabled = false;
+        const canvas = {id, type, elem, ctx, width: dimX, height: dimY};
         this.canvasElems.push(canvas);
 
         return canvas;
     }
-}
 
-const OCM = new CanvasManager();
+    removeChildren(node) {
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
+    clear() {
+        this.canvasElems = [];
+        this.removeChildren(this.getOffscreenElem());
+        this.removeChildren(this.getOverlayElem());
+    }
+}
 
 class Area {
 
@@ -131,6 +404,12 @@ class SplitArea {
         this.areas[pos] = area;
     }
 
+    addPane(pane, pos = null) {
+        const area = new Area();
+        area.addPane(pane);
+        this.addArea(area, pos);
+    }
+
     setDimension(dimX, dimY, offX, offY, dims) {
 
         let pos = 0;
@@ -169,10 +448,13 @@ class SplitArea {
 }
 
 class Screen {
-    constructor() {
+    constructor(id) {
+        this.id = id;
         this.areas = [];
         this.dimX = null;
         this.dimY = null;
+        this.keyHandler = null;
+        this.frameHandler = null;
     }
 
     addArea(area) {
@@ -202,152 +484,28 @@ class Screen {
         this.elems = dims;
     }
 
-    render() {
+    render(force = false) {
         for(let elem of this.elems) {
             const isDirty = !(elem.pane.dirty === false);
-            if (isDirty) {
-                elem.pane.render(elem.canvas.ctx);
-            }
-        }
-    }
-}
-
-/**
- * The screen manager holds all possible screens of the game and allows transitions to a new screen by deleting and
- * creating overlay canvases of the current view.
- *
- * A screen can either be a Area (=overlays of different panes with the same dimension) or a
- * Split-Area which divides the screen in different subAreas along one axis (where each subArea can also be a Area or Split-Area).
- *
- * An area will create a canvas for each pane with the same dimension:
- *
- *   Area1:
- *     a) colorPane (=fix background color, opaque, no repaints)
- *     b) MapPane (=scrollable World, canvas will be bigger than the viewPort for css-scrolling, transparent, repaints on worldPos change)
- *     c) SpritePane (transparent, repaints)
- *
- *   Turrican:
- *
- *     Y230-Area1:
- *        a) GradientPane (opaque, repaint on scroll)
- *        b) MapPane (transparent, repaints on worldPos change)
- *        c) SpritePane (transparent, repaints)
- *
- *     Y20-Area1:
- *        a) backgroundPane (opaque, no repaints)
- *        b) textPane (transparent, repaint on status-update)
- *
- *    => Areas:
- *     A1.1 [0, 0, 320, 230] -> GradientPane, MapPane, SpritePane
- *     A1.2 [0, 230, 320, 20] -> backgroundPane, textPane
- *
- *
- *
- *
- *   Shadow of the Beast:
- *
- *    Area 1:
- *     Y150-Area:
- *       a) GradientPane
- *     Y100-Area:
- *       a) EmptyPane
- *
- *    Area 2:
- *     Y20-Area: PatternPane (opaque, scrollable, no repaints)
- *     Y40-Area: PatternPane
- *     Y30-Area: PatternPane
- *     Y50...
- *
- *    Area 3:
- *     Y200-Area: MapPane, SpritePane
- *     Y50-Area: PatternPane
- *
- *
- *    => Areas:
- *      A1.1 [0, 0, 320, 150] -> GradientPane
- *      A1.2 [0, 150, 320, 100] -> EmptyPane
- *      A2.1 [0, 0, 320, 20] -> PatternPane
- *      A2.2 [0, 20, 320, 40] -> PatternPane
- *      A2.3 [0, 60, 320, 30] -> PatternPane
- *      ..
- *      A3.1 [0, 0, 320, 200] -> MapPane, SpritePane
- *      A3.2 [0, 200, 320, 250] -> PatternPane
- *
- *
- *
- * Ein Screen besteht aus einer Folge von Areas, die alle mit der gleichen Dimension initialisiert werden
- * Liegt eine Splitarea vor, dann werden die darunterliegenden Areas entlang der SplitAxis auf einen vorgegebenen Wert gesetzt
- *
- * Für jede Area wird ein Canvas erzeugt, sofern es keine SplitArea ist
- *
- *
- *
- */
-class ScreenManager {
-
-    constructor(id) {
-        let elem = document.getElementById(id);
-        this.dimX = elem.width;
-        this.dimY = elem.height;
-        elem = elem.parentNode;
-        elem.innerHTML =
-            '<div id="overlay" style="position: relative"></div>' +
-            '<center><pre id="d"></pre></center>' +
-            '<div id="offscreen" style="display: none"></div>';
-
-        this.screens = {};
-        this.view = null;
-        debugElem = document.getElementById('d');
-    }
-
-    addScreen(id, panes) {
-        this.screens[id] = {
-            panes
-        };
-    }
-
-    gotoScreen(id) {
-        if (this.screens[id] === undefined) {
-            throw Error('Unknown screen id ' + id);
-        }
-        if (this.view !== null) {
-            // TODO destroy current screen
-        }
-
-        const view = [];
-        const screen = this.screens[id];
-
-        // TODO go backwards to find first opaque pane
-        for(let pane of screen.panes) {
-            pane.init(this.dimX, this.dimY);
-            view.push({
-                canvas: OCM.getNewOverlayCanvas(this.dimX, this.dimY),
-                pane
-            });
-        }
-        this.view = view;
-    }
-
-    renderScreen() {
-        if (this.view === null) {
-            return;
-        }
-        for (let elem of this.view) {
-            const isDirty = !(elem.pane.dirty === false);
-            if (isDirty) {
+            if (force || isDirty) {
                 elem.pane.render(elem.canvas.ctx);
             }
         }
     }
 
-    getMainCanvas() {
-        if (this.view === null) {
-            return;
-        }
-        return this.view[this.view.length - 1].canvas;
+    setKeyHandler(handler) {
+        this.keyHandler = handler.bind(Game.instance);
+    }
+
+    setFrameHandler(handler) {
+        this.frameHandler = handler.bind(Game.instance);
     }
 }
 
+
+// #############################################
+//      P a n e s
+// #############################################
 
 class EmptyPane {
     constructor() {}
@@ -437,9 +595,25 @@ class StackedPane {
 */
 
 class SpritePane {
-    constructor(sprite, sprites) {
-        this.sprite = sprite;
-        this.sprites = sprites;
+    constructor() {
+        this.sprites = [];
+    }
+
+    addSprite(id, img,  x, y) {
+        this.sprites[id] = {id, img, x, y};
+        this.dirty = true;
+    }
+
+    getSpritePos(id) {
+        const sprite = this.sprites[id];
+        return {x: sprite.x, y: sprite.y, len: sprite.img.width};
+    }
+
+    setSpritePos(id, x, y) {
+        const sprite = this.sprites[id];
+        sprite.x = x;
+        sprite.y = y;
+        this.dirty = true;
     }
 
     init(dimX, dimY) {
@@ -450,9 +624,11 @@ class SpritePane {
     render(target) {
         target.clearRect(0, 0, this.dimX, this.dimY);
 
-        for (let sprite of this.sprites) {
-            target.drawImage(this.sprite, sprite.x, sprite.y);
+        for (let id in this.sprites) {
+            const sprite = this.sprites[id];
+            target.drawImage(sprite.img, sprite.x, sprite.y);
         }
+        this.dirty = false;
     }
 }
 
@@ -468,11 +644,10 @@ class PatternPane {
     init(width, height) {
         this.patternDimX = this.pattern.width;
         this.patternDimY = this.pattern.height;
-        var dimX = width + this.patternDimX;
-        var dimY = height + this.patternDimY;
+        const dimX = width + this.patternDimX;
+        const dimY = height + this.patternDimY;
         this.width = width;
         this.height = height;
-        this.image = null;
         this.scrollX = 0;
         this.scrollY = 0;
         this.sizeX = dimX;
@@ -483,17 +658,8 @@ class PatternPane {
         this.scrollElem = elem;
     }
 
-    getImage() {
-        if (this.image === null) {
-            this.image =
-                this.canvas.ctx.getImageData(0, 0, this.width + this.patternDimX, this.height + this.patternDimY);
-        }
-        return this.image;
-    }
-
     render(target) {
-        var pattern = target.createPattern(this.pattern, this.repeat);
-        target.fillStyle = pattern;
+        target.fillStyle = target.createPattern(this.pattern, this.repeat);;
         target.fillRect(0, 0, this.sizeX, this.sizeY);
         this.dirty = false;
     }
@@ -678,7 +844,7 @@ class WorldPane {
     }
 }
 
-class LinearGradientBackground {
+class LinearGradientPane {
 
     constructor(axis, pViewSize) {
         this.colorStops = [];
@@ -708,7 +874,7 @@ class LinearGradientBackground {
         this.viewPositionMax = totalSize - (this.viewSize + 1);
     }
 
-    render(bgCtx) {
+    render(target) {
         this.dirty = false;
         d('Index', this.colorStopIndex, '| Position', this.colorStopPosition);
         d('View: ', this.viewPosition, ' of ', this.viewPositionMax);
@@ -733,8 +899,8 @@ class LinearGradientBackground {
         }
 
         var gradient = this.isHorizontal ?
-            bgCtx.createLinearGradient(posStart, 0, pos, 0) :
-            bgCtx.createLinearGradient(0, posStart, 0, pos);
+            target.createLinearGradient(posStart, 0, pos, 0) :
+            target.createLinearGradient(0, posStart, 0, pos);
 
         var faktor = 1 / len;
         pos = 0;
@@ -747,8 +913,8 @@ class LinearGradientBackground {
             pos += stop[1] * faktor;
         }
 
-        bgCtx.fillStyle = gradient;
-        bgCtx.fillRect(0, 0, this.dimX, this.dimY);
+        target.fillStyle = gradient;
+        target.fillRect(0, 0, this.dimX, this.dimY);
     }
 
     scrollBy(speed) {
@@ -790,16 +956,9 @@ class LinearGradientBackground {
     }
 }
 
-function printDebugs() {
-    const out = [];
-    out.push("Debug:");
-    out.push("===============================================");
-    for (let k in debugs) {
-        out.push(k + ': ' + debugs[k])
-    }
-    debugElem.innerHTML = out.join("\n");
-    debugs = [];
-}
+// ####################################
+//
+// ####################################
 
 function d() {
     if (arguments.length === 0) {
@@ -869,28 +1028,26 @@ function getNewSprite(mapKey, x, y) {
     return {im: spriteMaps[mapKey].im, x: x, y: y, len: spriteMaps[mapKey].len};
 }
 
-var debugElem = null;
-var debugs = [];
+const OCM = new CanvasManager();
+let debugElem = null;
+let debugs = [];
+
 var spriteMaps = [];
 
 module.exports = {
+    Game,
     Area,
     SplitArea,
     Screen,
     EmptyPane,
     SpritePane,
     ColorPane,
- //   StackedPane,
     PatternPane,
     WorldPane,
-    LinearGradientBackground,
-    printDebugs,
+    LinearGradientPane,
     d,
     SpriteMap,
     getNewSpriteMap,
     getNewSprite,
-    spriteMaps,
-    ScreenManager
+    spriteMaps
 };
-
-
