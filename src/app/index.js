@@ -305,15 +305,15 @@ const Turrican = new Game(320, 256, 1, function () {
     sbgArea.addPane(patternBg11, 10);
     shadowScreen.addArea(sbgArea);
 
-    const sfgArea = new SplitArea('Y', [188, 21]);
-/*
+    const sfgArea = new SplitArea('Y', [178, 21]);
+
     sfgArea.addPane(new WorldPane(
         tb,
         spriteSheet,
         world
     ), 0);
- */
-    sfgArea.addPane(new EmptyPane(), 0);
+
+    //sfgArea.addPane(new EmptyPane(), 0);
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
@@ -328,8 +328,8 @@ const Turrican = new Game(320, 256, 1, function () {
         patternBg7.scrollBy(1,0);
         patternBg8.scrollBy(1.2,0);
         patternBg9.scrollBy(1.5,0);
-        patternBg10.scrollBy(2,0);
-        patternBg11.scrollBy(3, 0);
+        patternBg10.scrollBy(1.8,0);
+        patternBg11.scrollBy(2.2, 0);
         patternFg.scrollBy(4, 0);
     });
 
