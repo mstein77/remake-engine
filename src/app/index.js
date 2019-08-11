@@ -155,10 +155,12 @@ const Turrican = new Game(320, 256, 1, function () {
     gameArea.addPane(playerPane);
 
     let logoArea = new Area();
-    logoArea.addPane(patternBg);
+    logoArea.addPane(new ColorPane('#508050'));
+
     let textArea = new Area();
     textArea.addPane(new ColorPane('#A07070'));
-    textArea.addPane(patternBg3);
+    textArea.addPane(new ColorPane('#A0A040'));
+
     let statusArea = new SplitArea('X', [100, 220]);
     statusArea.addArea(textArea, 1);
     statusArea.addArea(logoArea);
@@ -259,8 +261,10 @@ const Turrican = new Game(320, 256, 1, function () {
 
         fadeBg.scrollBy(0.75 * (fadeBg.isHorizontal ? scrollX : scrollY));
         bgPane.scrollBy(0.25 * scrollX, 0.25 * scrollY);
+        /*
         patternBg.scrollBy(1.2 * scrollX, 0);
         patternBg3.scrollBy(1.6 * scrollX, 0);
+        */
 
         var unscrolled = levelPane.scrollBy(scrollX, scrollY);
         if (unscrolled.x !== 0) {
@@ -289,9 +293,8 @@ const Turrican = new Game(320, 256, 1, function () {
 
     class ColorAndMoonPane extends ColorPane {
         render(target) {
-            console.log('xxx');
             super.render(target);
-            target.drawImage(moon, 200, 18);
+            target.drawImage(moon, 220, 18);
         }
     }
 
@@ -327,17 +330,24 @@ const Turrican = new Game(320, 256, 1, function () {
         world
     ), 0);
 */
-    sfgArea.addPane(new EmptyPane(), 0);
+    class TreePane extends EmptyPane {
+        render(target) {
+            target.drawImage(tree, 0, -6);
+            this.dirty = false;
+        }
+    }
+
+    sfgArea.addPane(new TreePane(), 0);
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
 
     shadowScreen.setFrameHandler(function() {
-        patternBg.scrollBy(1,0);
-        patternBg2.scrollBy(0.6,0);
-        patternBg3.scrollBy(0.4,0);
-        patternBg4.scrollBy(0.3,0);
-        patternBg5.scrollBy(0.5,0);
+        patternBg.scrollBy(1.2,0);
+        patternBg2.scrollBy(0.9,0);
+        patternBg3.scrollBy(0.6,0);
+        patternBg4.scrollBy(0.4,0);
+        patternBg5.scrollBy(0.2,0);
         patternBg6.scrollBy(0.8,0);
         patternBg7.scrollBy(1,0);
         patternBg8.scrollBy(1.2,0);

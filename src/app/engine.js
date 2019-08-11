@@ -50,6 +50,9 @@ class Game {
     }
 
     setZoom(value) {
+        if (value < 1 || value > 4 || this.zoom === value) {
+            return;
+        }
         this.log('setZoom', value);
         this.zoom = value;
         const overlay = this.getDomElem('overlay');
@@ -359,7 +362,7 @@ class Area {
         for (let i = 0; i < this.panes.length; i++) {
             const pane = this.panes[i];
             if (this.firstArea === true && i === 0) {
-                //pane.opaque = true;
+                pane.opaque = true;
             }
             pane.init(dimX, dimY);
             const sizeX = pane.oversize ? pane.sizeX : dimX;
@@ -734,10 +737,10 @@ class WorldPane {
         d('WorldMaxY', this.worldMaxY);
         d('World-Pos', this.worldX, '/', this.worldY);
 
-        j = 0;
-        for (y = this.worldY; y < y_max; y++) {
-            i = 0;
-            for (x = this.worldX; x < x_max; x++) {
+        let j = 0;
+        for (let y = this.worldY; y < y_max; y++) {
+            let i = 0;
+            for (let x = this.worldX; x < x_max; x++) {
                 var tile = this.world[y][x];
                 if (tile === 0) {
                     i++;
@@ -995,7 +998,7 @@ class SpriteMap {
     makeTransparent() {
         let i = 3;
         var d = this.im.data;
-        i_max = d.length;
+        let i_max = d.length;
         while(i < i_max) {
             d[i] = 0;
             i += 4;
