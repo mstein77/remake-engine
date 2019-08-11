@@ -115,6 +115,9 @@ const Turrican = new Game(320, 256, 1, function () {
     var green3 = new Image();
     green3.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAAFCAYAAADllTGxAAACPklEQVRYR8VXiW3DQAxzNsgIGakjZISOnBGyQYprIYBmSYl2AzRA0eSs00NRvPPl4769rtdt93k+t43XykA9q7X1f31qL66vNdzLe2of+8ff6LfWyy/GVvlwLiueygeB6GpVdok9Y7RHfp8TY34WX8R+ypFjIA8ejz0vXD+5/xOmiluVh+JF10uF79TniQsdj2uv4r2rq/BBnMp2rTHOzBGOibOAMadZ7Xih5hBrRF5gr7o6Kh7ifbl/bq+jA+sa6sRDiQMmcVY8brefctd+FiTXJLe+9pc/tEn9cD3cXGwef6/6WWyLiLzOw7nseFCTocFBUDlMA+SEoBONTmwcZh2vkj3IDcYUD7DOV4fvkWfv5pMTap5pzFH1h/vCouIuKTy7CouaK8Xny7oBocKiSrHy4jPVrK5IlSiqpVNRtc5xnB+XL4KNYqBAT8RTYeZw7PDFOjqhVHUxBup0cxijeDohRcxZ7JNYU90phly7winhc8rzo9xShznm6GYkPUCUsLh5mHCYMOcb2mQ/xVNY/hKgTnT42dnfXAgW2g3JROIkHxweN2xHyZkQwOXmhDxpJhMk7d1f6kNBXn7WX93AVI2q1+rUng6jd9TW8eO/uNX1/ww3juI98TLF3fUexVcd8N8CxFfcZJDZ5owPvtaVT3wdQGKmeSW5JISr1zJ3C+vywRySfKYBTHwkNomwuVcWRUbsIdecxHJ1cy1Jv1Q/zvYBD6eUd8lMVB3uFjnF4v0Tb5y/o/gm3HI26oJRa1+Bf7DP74ifEAAAAABJRU5ErkJggg==";
 
+    var green4 = new Image();
+    green4.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAAICAYAAABZCyJvAAADMklEQVRoQ81ZW3IbQQiU/vzpI/goOYKPkKP7CP70n1NY6birTQOzDylbpZJ2hx2GBhpmdH39ffm8/L2en28/3t/xJP+OcchWkioX73RzZ/NN55msayLDa8jkH4XT6toVy7Pe3zuvi6HA+e1tFmscw7GeaczUkT4bnep6erpc4vPxcfu4C2MhW10qB/lq7plF3zzQ5bnLaTxHvsc9PuFTXFcmIJf88RwTugWpE6p7Hlt5D+TIBND9hk2dHucYBrAj27Nx0iTLfJElLdteFYGtPlO/ZPfOD/oca3CktuLHbo4jdbnYDDKoiARkxDKZvJJNdc9jUzLjOK8KSoU/x1bWaICA4PMgouuv18snk4suBEnFAPPknASarOxgTk79zTqgp9LLhmpCZbY4fRnozn4N1kfjpNjCxqzyKHFmAdbZk5GfxkGHkYuVzBZes/N39lyfaTyFLujLyHirLhffjky4W+HOCHYzcbAsCA2dFMvrnDHG3dBZec6+6khf/TEiIAbXOc85kytc1UFw4oApswDXwJzOr7qr4OtIbUKAZ+OUJWi27j34cLB0JD4hqKPWol2vVlvtDDkpssrsyO4ImyYEFHogp0XcdTp4R8kpyzGQ1f8Y119bMOdAfc7gcBC45J50I1nbxq2aa+Vctc0qkSZSRYRurCLYe+PUETnsddit2LgFq9V3uk5kUjwyndV2s4rf1fVX8tm5jDsL4u1YrM+dF7ktXUZW0OXI/9Fx/dUBVQC6isEksTfBXaJkLfuW4Mjawio4YQ/0d7KV/UfilHUhXKUVG+C6SkTTZO5wYdy7DnfFr51et37101FxUW3pOrvcgXQQB0go5ugOrjs9W8fPzv8fBKQdiZKAtreVfJUwGSBdQHTje0DOtn1dp8EJfk+cuJq5dXOF17Z+K05doaow1O303g6ki7uMjDV2OxwmxKIkC5JzZyHZlkm7pOxAmgnIjXf2TMbvnf//CMgB5ha9Kj8xnmXOmn/vvKvvr8p3OO0hE7fdXfUxb39RZFxBcXNrZzj5u51J7OXldpisW/EJSVbFr/MX45/h4Lqz6b9RWNuqfGV3909cZ3MXk9NmQgtn3P8BcCUy7j8i1xEAAAAASUVORK5CYII=";
+
     const patternBg = new PatternPane(clouds, 'repeat');
     const patternBg2 = new PatternPane(clouds2, 'repeat');
     const patternBg3 = new PatternPane(clouds3, 'repeat');
@@ -124,6 +127,7 @@ const Turrican = new Game(320, 256, 1, function () {
     const patternBg7 = new PatternPane(green1, 'repeat');
     const patternBg8 = new PatternPane(green2, 'repeat');
     const patternBg9 = new PatternPane(green3, 'repeat');
+    const patternBg10 = new PatternPane(green4, 'repeat');
     const patternFg = new PatternPane(fence, 'repeat');
 
 
@@ -283,7 +287,7 @@ const Turrican = new Game(320, 256, 1, function () {
     scolArea.addPane(new EmptyPane(), 2);
     shadowScreen.addArea(scolArea);
 
-    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 5, 31]);
+    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 5, 8]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
@@ -293,6 +297,7 @@ const Turrican = new Game(320, 256, 1, function () {
     sbgArea.addPane(patternBg7, 6);
     sbgArea.addPane(patternBg8, 7);
     sbgArea.addPane(patternBg9, 8);
+    sbgArea.addPane(patternBg10, 9);
     shadowScreen.addArea(sbgArea);
 
     const sfgArea = new SplitArea('Y', [188, 21]);
