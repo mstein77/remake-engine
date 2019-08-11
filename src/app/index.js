@@ -112,6 +112,8 @@ const Turrican = new Game(320, 256, 1, function () {
     var green2 = new Image();
     green2.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFYAAAACCAYAAADCSSsWAAAAb0lEQVQoU61S2wkAIQyrGziiI9zobqDUIxhCfRxcv4qmeVRTeazlbFarjfra68zLMov5Vvw7TZ9xb45BrxoRL2P/ygQP0Icv9gfd5Itlowq6vVuFZRN4PJyp0YhDF3RacMRxmwkPAHykpR+Fs7BOB2zXS8E5RWMjAAAAAElFTkSuQmCC";
 
+    var green3 = new Image();
+    green3.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAAFCAYAAADllTGxAAACPklEQVRYR8VXiW3DQAxzNsgIGakjZISOnBGyQYprIYBmSYl2AzRA0eSs00NRvPPl4769rtdt93k+t43XykA9q7X1f31qL66vNdzLe2of+8ff6LfWyy/GVvlwLiueygeB6GpVdok9Y7RHfp8TY34WX8R+ypFjIA8ejz0vXD+5/xOmiluVh+JF10uF79TniQsdj2uv4r2rq/BBnMp2rTHOzBGOibOAMadZ7Xih5hBrRF5gr7o6Kh7ifbl/bq+jA+sa6sRDiQMmcVY8brefctd+FiTXJLe+9pc/tEn9cD3cXGwef6/6WWyLiLzOw7nseFCTocFBUDlMA+SEoBONTmwcZh2vkj3IDcYUD7DOV4fvkWfv5pMTap5pzFH1h/vCouIuKTy7CouaK8Xny7oBocKiSrHy4jPVrK5IlSiqpVNRtc5xnB+XL4KNYqBAT8RTYeZw7PDFOjqhVHUxBup0cxijeDohRcxZ7JNYU90phly7winhc8rzo9xShznm6GYkPUCUsLh5mHCYMOcb2mQ/xVNY/hKgTnT42dnfXAgW2g3JROIkHxweN2xHyZkQwOXmhDxpJhMk7d1f6kNBXn7WX93AVI2q1+rUng6jd9TW8eO/uNX1/ww3juI98TLF3fUexVcd8N8CxFfcZJDZ5owPvtaVT3wdQGKmeSW5JISr1zJ3C+vywRySfKYBTHwkNomwuVcWRUbsIdecxHJ1cy1Jv1Q/zvYBD6eUd8lMVB3uFjnF4v0Tb5y/o/gm3HI26oJRa1+Bf7DP74ifEAAAAABJRU5ErkJggg==";
 
     const patternBg = new PatternPane(clouds, 'repeat');
     const patternBg2 = new PatternPane(clouds2, 'repeat');
@@ -121,7 +123,7 @@ const Turrican = new Game(320, 256, 1, function () {
     const patternBg6 = new PatternPane(mountains, 'repeat');
     const patternBg7 = new PatternPane(green1, 'repeat');
     const patternBg8 = new PatternPane(green2, 'repeat');
-    const patternBg9 = new PatternPane(green2, 'repeat');
+    const patternBg9 = new PatternPane(green3, 'repeat');
     const patternFg = new PatternPane(fence, 'repeat');
 
 
@@ -281,7 +283,7 @@ const Turrican = new Game(320, 256, 1, function () {
     scolArea.addPane(new EmptyPane(), 2);
     shadowScreen.addArea(scolArea);
 
-    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 36]);
+    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 5, 31]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
