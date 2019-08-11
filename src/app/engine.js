@@ -359,7 +359,7 @@ class Area {
         for (let i = 0; i < this.panes.length; i++) {
             const pane = this.panes[i];
             if (this.firstArea === true && i === 0) {
-                pane.opaque = true;
+                //pane.opaque = true;
             }
             pane.init(dimX, dimY);
             const sizeX = pane.oversize ? pane.sizeX : dimX;

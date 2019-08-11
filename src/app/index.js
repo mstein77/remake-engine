@@ -119,7 +119,9 @@ const Turrican = new Game(320, 256, 1, function () {
     const patternBg4 = new PatternPane(clouds4, 'repeat');
     const patternBg5 = new PatternPane(clouds5, 'repeat');
     const patternBg6 = new PatternPane(mountains, 'repeat');
-    const patternBg7 = new PatternPane(player, 'repeat');
+    const patternBg7 = new PatternPane(green1, 'repeat');
+    const patternBg8 = new PatternPane(green2, 'repeat');
+    const patternBg9 = new PatternPane(green2, 'repeat');
     const patternFg = new PatternPane(fence, 'repeat');
 
 
@@ -270,31 +272,38 @@ const Turrican = new Game(320, 256, 1, function () {
     const shadowScreen = new Screen('shadow-ingame');
 
     const scolArea = new SplitArea('Y', [94, 73, 20]);
+    scolArea.addPane(new ColorPane('#677b96'), 0);
     const sbgFadeBg = new LinearGradientPane('Y', 50);
     sbgFadeBg.addColorStop('#677b96', 50);
     sbgFadeBg.addColorStop('#ff7b96', 1);
-    scolArea.addPane(new ColorPane('#677b96'), 0);
+
     scolArea.addPane(sbgFadeBg, 1);
     scolArea.addPane(new EmptyPane(), 2);
     shadowScreen.addArea(scolArea);
 
-    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 20]);
+    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 36]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
     sbgArea.addPane(patternBg4, 3);
     sbgArea.addPane(patternBg5, 4);
     sbgArea.addPane(patternBg6, 5);
-    sbgArea.addPane(patternBg7, 7);
+    sbgArea.addPane(patternBg7, 6);
+    sbgArea.addPane(patternBg8, 7);
+    sbgArea.addPane(patternBg9, 8);
     shadowScreen.addArea(sbgArea);
 
-    const sfgArea = new SplitArea('Y', [198, 21]);
+    const sfgArea = new SplitArea('Y', [188, 21]);
+/*
     sfgArea.addPane(new WorldPane(
         tb,
         spriteSheet,
         world
     ), 0);
+ */
+    sfgArea.addPane(new EmptyPane(), 0);
     sfgArea.addPane(patternFg, 1);
+
     shadowScreen.addArea(sfgArea);
 
     shadowScreen.setFrameHandler(function() {
@@ -305,7 +314,9 @@ const Turrican = new Game(320, 256, 1, function () {
         patternBg5.scrollBy(0.5,0);
         patternBg6.scrollBy(0.8,0);
         patternBg7.scrollBy(1,0);
-        patternFg.scrollBy(2, 0);
+        patternBg8.scrollBy(1.2,0);
+        patternBg9.scrollBy(1.5,0);
+        patternFg.scrollBy(4, 0);
     });
 
     this.addScreen(shadowScreen);
