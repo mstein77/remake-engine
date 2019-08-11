@@ -284,8 +284,16 @@ const Turrican = new Game(320, 256, 1, function () {
 
     const shadowScreen = new Screen('shadow-ingame');
 
+    class ColorAndMoonPane extends ColorPane {
+        render(target) {
+            console.log('xxx');
+            super.render(target);
+            target.drawImage(moon, 200, 18);
+        }
+    }
+
     const scolArea = new SplitArea('Y', [94, 73, 20]);
-    scolArea.addPane(new ColorPane('#677b96'), 0);
+    scolArea.addPane(new ColorAndMoonPane('#677b96'), 0);
     const sbgFadeBg = new LinearGradientPane('Y', 50);
     sbgFadeBg.addColorStop('#677b96', 50);
     sbgFadeBg.addColorStop('#ff7b96', 1);
@@ -294,7 +302,7 @@ const Turrican = new Game(320, 256, 1, function () {
     scolArea.addPane(new EmptyPane(), 2);
     shadowScreen.addArea(scolArea);
 
-    const sbgArea = new SplitArea('Y', [21, 40, 19, 9, 5, 73, 2, 2, 5, 8, 15]);
+    const sbgArea = new SplitArea('Y', [20, 40, 19, 9, 5, 72, 2, 2, 5, 8, 15]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
@@ -308,15 +316,15 @@ const Turrican = new Game(320, 256, 1, function () {
     sbgArea.addPane(patternBg11, 10);
     shadowScreen.addArea(sbgArea);
 
-    const sfgArea = new SplitArea('Y', [178, 21]);
-
+    const sfgArea = new SplitArea('Y', [176, 21]);
+/*
     sfgArea.addPane(new WorldPane(
         tb,
         spriteSheet,
         world
     ), 0);
-
-    //sfgArea.addPane(new EmptyPane(), 0);
+*/
+    sfgArea.addPane(new EmptyPane(), 0);
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
