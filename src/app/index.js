@@ -141,8 +141,23 @@ const Turrican = new Game(320, 256, 1, function () {
     const patternBg9 = new PatternPane(green3, 'repeat');
     const patternBg10 = new PatternPane(green4, 'repeat');
     const patternBg11 = new PatternPane(green5, 'repeat');
+    const patternBg12 = new PatternPane(green6, 'repeat');
     const patternFg = new PatternPane(fence, 'repeat');
 
+
+    const elem = document.createElement('canvas');
+    let tileLines = Math.ceil(176 / 32);
+    let tileColumns = 192;
+    elem.setAttribute('width', tileLines * 192);
+    elem.setAttribute('height', 32);
+    elem.style.display = 'none';
+    const ctx = elem.getContext('2d');
+    for (let i = 0; i < tileLines; i++) {
+        ctx.drawImage(tree,  0, 7 + 32 * i, 192, 32, i * tileColumns, 0, 192, 32);
+    }
+    document.body.appendChild(elem);
+    const shadowTiles = new Image();
+    shadowTiles.src = elem.toDataURL('image/png');
 
     // ##############################
     //   Turrican
@@ -311,7 +326,7 @@ const Turrican = new Game(320, 256, 1, function () {
     scolArea.addPane(new EmptyPane(), 2);
     shadowScreen.addArea(scolArea);
 
-    const sbgArea = new SplitArea('Y', [20, 40, 19, 9, 5, 72, 2, 2, 5, 8, 15]);
+    const sbgArea = new SplitArea('Y', [20, 40, 19, 9, 5, 72, 2, 2, 5, 8, 10, 5]);
     sbgArea.addPane(patternBg, 0);
     sbgArea.addPane(patternBg2, 1);
     sbgArea.addPane(patternBg3, 2);
@@ -323,16 +338,28 @@ const Turrican = new Game(320, 256, 1, function () {
     sbgArea.addPane(patternBg9, 8);
     sbgArea.addPane(patternBg10, 9);
     sbgArea.addPane(patternBg11, 10);
+    sbgArea.addPane(patternBg12, 11);
     shadowScreen.addArea(sbgArea);
 
     const sfgArea = new SplitArea('Y', [176, 21]);
-/*
-    sfgArea.addPane(new WorldPane(
-        tb,
-        spriteSheet,
-        world
-    ), 0);
-*/
+    const shadowWorldPane = new WorldPane(
+        5,
+        shadowTiles,
+//        spriteSheet,
+//        world
+
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 25, 26, 27, 28, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    );
+
+    sfgArea.addPane(shadowWorldPane);
+ /*
     class TreePane extends EmptyPane {
         render(target) {
             target.drawImage(tree, 0, -6);
@@ -341,11 +368,14 @@ const Turrican = new Game(320, 256, 1, function () {
     }
 
     sfgArea.addPane(new TreePane(), 0);
+
+*/
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
 
     shadowScreen.setFrameHandler(function() {
+/*
         patternBg.scrollBy(1.2,0);
         patternBg2.scrollBy(0.9,0);
         patternBg3.scrollBy(0.6,0);
@@ -357,7 +387,41 @@ const Turrican = new Game(320, 256, 1, function () {
         patternBg9.scrollBy(1.5,0);
         patternBg10.scrollBy(1.8,0);
         patternBg11.scrollBy(2.2, 0);
+        patternBg12.scrollBy(3, 0);
         patternFg.scrollBy(4, 0);
+        */
+    });
+    shadowScreen.setKeyHandler(() => {
+        let moveX = 0;
+        const speed = 2;
+        for (var key in this.keysDown) {
+            switch (key) {
+                case 'a':
+                    moveX -= speed;
+                    break;
+
+                case 'd':
+                    moveX += speed;
+                    break;
+            }
+        };
+
+        if (moveX !== 0) {
+            shadowWorldPane.scrollBy(moveX, 0);
+            patternBg.scrollBy(moveX * 1.2,0);
+            patternBg2.scrollBy(moveX * 0.9,0);
+            patternBg3.scrollBy(moveX * 0.6,0);
+            patternBg4.scrollBy(moveX * 0.4,0);
+            patternBg5.scrollBy(moveX * 0.2,0);
+            patternBg6.scrollBy(moveX * 0.8,0);
+            patternBg7.scrollBy(moveX * 1,0);
+            patternBg8.scrollBy(moveX * 1.2,0);
+            patternBg9.scrollBy(moveX * 1.5,0);
+            patternBg10.scrollBy(moveX * 1.8,0);
+            patternBg11.scrollBy(moveX * 2.2, 0);
+            patternBg12.scrollBy(moveX * 3, 0);
+            patternFg.scrollBy(moveX * 4, 0);
+        }
     });
 
     this.addScreen(shadowScreen);
@@ -395,7 +459,7 @@ const Turrican = new Game(320, 256, 1, function () {
         }
     });
 
-    return 'turrican-ingame';
+    return 'shadow-ingame';
 });
 
 /**

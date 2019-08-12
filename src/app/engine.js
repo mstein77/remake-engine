@@ -484,6 +484,7 @@ class Screen {
                 elem.pane.setScrollElem(elem.canvas.elem);
             }
         }
+        console.log(dims);
         this.elems = dims;
     }
 
@@ -681,10 +682,10 @@ class PatternPane {
             this.scrollY -= this.patternDimY;
         }
         if (this.scrollElem) {
-            if (Sx > 0) {
+            if (Sx !== 0) {
                 this.scrollElem.style.left = -this.scrollX;
             }
-            if (Sy > 0) {
+            if (Sy !== 0) {
                 this.scrollElem.style.top = -this.scrollY;
             }
         }
@@ -720,6 +721,7 @@ class WorldPane {
     }
 
     render(drawTarget) {
+        console.log('RENDER', this);
         var target = this.offCanvas !== null ? this.offCanvas.ctx : drawTarget;
         if (this.bgPane !== undefined) {
             this.bgPane.render(target);
