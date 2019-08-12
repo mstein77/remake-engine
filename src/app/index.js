@@ -316,10 +316,11 @@ const Turrican = new Game(320, 256, 1, function () {
         }
     }
 
-    const scolArea = new SplitArea('Y', [94, 73, 20]);
-    scolArea.addPane(new ColorAndMoonPane('#677b96'), 0);
-    const sbgFadeBg = new LinearGradientPane('Y', 50);
-    sbgFadeBg.addColorStop('#677b96', 50);
+    const scolArea = new SplitArea('Y', [74, 93, 20]);
+    scolArea.addPane(new ColorAndMoonPane('#607080'), 0);
+    const sbgFadeBg = new LinearGradientPane('Y', 70);
+    sbgFadeBg.addColorStop('#607080', 30);
+    sbgFadeBg.addColorStop('#677b96', 40);
     sbgFadeBg.addColorStop('#ff7b96', 1);
 
     scolArea.addPane(sbgFadeBg, 1);
