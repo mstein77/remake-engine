@@ -663,7 +663,7 @@ class PatternPane {
     }
 
     render(target) {
-        target.fillStyle = target.createPattern(this.pattern, this.repeat);;
+        target.fillStyle = target.createPattern(this.pattern, this.repeat);
         target.fillRect(0, 0, this.sizeX, this.sizeY);
         this.dirty = false;
     }
