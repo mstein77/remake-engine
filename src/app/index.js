@@ -153,7 +153,7 @@ const Turrican = new Game(320, 256, 1, function () {
     elem.style.display = 'none';
     const ctx = elem.getContext('2d');
     for (let i = 0; i < tileLines; i++) {
-        ctx.drawImage(tree,  0, 7 + 32 * i, 192, 32, i * tileColumns, 0, 192, 32);
+        ctx.drawImage(tree,  0, 8 + 32 * i, 192, 32, i * tileColumns, 0, 192, 32);
     }
     document.body.appendChild(elem);
     const shadowTiles = new Image();
@@ -393,7 +393,7 @@ const Turrican = new Game(320, 256, 1, function () {
     });
     shadowScreen.setKeyHandler(() => {
         let moveX = 0;
-        const speed = 2;
+        const speed = 1.5;
         for (var key in this.keysDown) {
             switch (key) {
                 case 'a':
@@ -407,13 +407,13 @@ const Turrican = new Game(320, 256, 1, function () {
         };
 
         if (moveX !== 0) {
-            shadowWorldPane.scrollBy(moveX, 0);
-            patternBg.scrollBy(moveX * 1.2,0);
-            patternBg2.scrollBy(moveX * 0.9,0);
-            patternBg3.scrollBy(moveX * 0.6,0);
-            patternBg4.scrollBy(moveX * 0.4,0);
-            patternBg5.scrollBy(moveX * 0.2,0);
-            patternBg6.scrollBy(moveX * 0.8,0);
+            shadowWorldPane.scrollBy(moveX * 1.2, 0);
+            patternBg.scrollBy(moveX * 0.5,0);
+            patternBg2.scrollBy(moveX * 0.3,0);
+            patternBg3.scrollBy(moveX * 0.2,0);
+            patternBg4.scrollBy(moveX * 0.15,0);
+            patternBg5.scrollBy(moveX * 0.1,0);
+            patternBg6.scrollBy(moveX * 0.25,0);
             patternBg7.scrollBy(moveX * 1,0);
             patternBg8.scrollBy(moveX * 1.2,0);
             patternBg9.scrollBy(moveX * 1.5,0);
