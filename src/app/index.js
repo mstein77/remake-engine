@@ -9,6 +9,8 @@ import {
     PatternPane,
     WorldPane,
     LinearGradientPane,
+    PaneScroller,
+    ScrollBounds,
     d
 } from './engine.js';
 
@@ -84,6 +86,7 @@ const Turrican = new Game(320, 256, 2, function () {
     const player = new Image();
     player.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA7ElEQVRYR9WX0Q6FIAxD2f9/NAYTDE5g7ZQFfbk+SHuAsnEl55xTSklEpPxGPZdvfYmEuHkW40gI7XUtewREz+O27yshRtqP4K2AmGl2k/8lhKU1PHrWQOS4IhrTs48IjEDQsWbxQYVaEGaMCcDWCcb8LH7IXqIQrDkFYEF4zGmAEYTX3AWgIdot9HRUOAM6K+2s33TSfwLo2dfVCdmCXuDCQjgz8kLAGUAMkG90mCEARpj5FqoDrKBVMakV8JhXA3TsnhcSlB7ppJbWXpdSixaZMXtF2+OPycqZz7po6R0Sad49ohXA08m+yMQB423wEY5FdSYAAAAASUVORK5CYII=";
     playerPane.addSprite('player', player, 30, 20);
+    playerPane.setActor('player');
 
     var clouds = new Image();
 	clouds.src = "data:image/png;base64,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";
@@ -174,6 +177,12 @@ const Turrican = new Game(320, 256, 2, function () {
 
     gameScreen.addArea(mainArea);
 
+    const gamePanesScroller = new PaneScroller(levelPane);
+    gamePanesScroller.addSubPane(fadeBg, 0.75, 0.75);
+    gamePanesScroller.addSubPane(bgPane, 0.25, 0.25);
+
+    const gameScrollBounds = new ScrollBounds(playerPane, gamePanesScroller, {x: 130, y: 50});
+
     gameScreen.setKeyHandler(function() {
         let moveX = 0;
         let moveY = 0;
@@ -196,90 +205,11 @@ const Turrican = new Game(320, 256, 2, function () {
                     moveY += speed;
                     break;
             }
-        };
-
-        const canvas = {
-            width: levelPane.dimX,
-            height: levelPane.dimY
-        };
-
-        const scrollBoundsTop = {x: 130, y: 50};
-        const scrollBoundsBottom = {x: 130, y: 50};
-
-        const sprite = playerPane.getSpritePos('player');
-
-        let move = false;
-        let scrollX = 0;
-        if (moveX !== 0) {
-            let pos = sprite.x + moveX;
-            if (pos < scrollBoundsTop.x) {
-                // new position is left of scrollbounds
-                if (sprite.x >= scrollBoundsTop.x) {
-                    scrollX = -Math.abs(scrollBoundsTop.x - pos);
-                    pos = scrollBoundsTop.x;
-                } else if (pos < 0) {
-                    pos = 0;
-                }
-            }
-
-            let max = canvas.width - 1 - sprite.len;
-            let rightScrollBound = max - scrollBoundsBottom.x;
-            if (pos > rightScrollBound) {
-                if (sprite.x <= rightScrollBound) {
-                    scrollX = Math.abs(pos - rightScrollBound);
-                    pos = rightScrollBound;
-                } else if (pos > max) {
-                    pos = max;
-                }
-            }
-            sprite.x = pos;
-            move = true;
         }
 
-        let scrollY = 0;
-        if (moveY !== 0) {
-            let pos = sprite.y + moveY;
-            if (pos < scrollBoundsTop.y) {
-
-                if (sprite.y >= scrollBoundsTop.y) {
-                    scrollY = -Math.abs(scrollBoundsTop.y - pos);
-                    pos = scrollBoundsTop.y;
-                } else if (pos < 0) {
-                    pos = 0;
-                }
-            }
-            let max = canvas.height - 1 - sprite.len;
-            let bottomScrollBound = max - scrollBoundsBottom.y;
-            if (pos > bottomScrollBound) {
-                if (sprite.y <= bottomScrollBound) {
-                    scrollY = Math.abs(pos - bottomScrollBound);
-                    pos = bottomScrollBound;
-                } else if (pos > max) {
-                    pos = max;
-                }
-            }
-            sprite.y = pos;
-            move = true;
+        if (moveX !== 0 || moveY !== 0) {
+            gameScrollBounds.moveActor(moveX, moveY);
         }
-
-        fadeBg.scrollBy(0.75 * (fadeBg.isHorizontal ? scrollX : scrollY));
-        bgPane.scrollBy(0.25 * scrollX, 0.25 * scrollY);
-
-        var unscrolled = levelPane.scrollBy(scrollX, scrollY);
-        if (unscrolled.x !== 0) {
-            sprite.x += unscrolled.x;
-            move = true;
-        }
-        if (unscrolled.y !== 0) {
-            sprite.y += unscrolled.y;
-            move = true;
-        }
-
-        if (move) {
-            playerPane.setSpritePos('player', sprite.x, sprite.y);
-        }
-
-        d('Sprite-Pos', sprite.x, ',', sprite.y);
     });
 
     this.addScreen(gameScreen);
@@ -342,8 +272,24 @@ const Turrican = new Game(320, 256, 2, function () {
 
     shadowScreen.addArea(sfgArea);
 
+    const beastScroller = new PaneScroller(shadowWorldPane);
+    beastScroller.addSubPane(patternBg, 0.5);
+    beastScroller.addSubPane(patternBg2, 0.3);
+    beastScroller.addSubPane(patternBg3, 0.2);
+    beastScroller.addSubPane(patternBg4, 0.15);
+    beastScroller.addSubPane(patternBg5, 0.1);
+    beastScroller.addSubPane(patternBg6, 0.25);
+    beastScroller.addSubPane(patternBg7, 1);
+    beastScroller.addSubPane(patternBg8, 1.2);
+    beastScroller.addSubPane(patternBg9, 1.5);
+    beastScroller.addSubPane(patternBg10, 1.8);
+    beastScroller.addSubPane(patternBg11, 2.2);
+    beastScroller.addSubPane(patternBg12, 3);
+    beastScroller.addSubPane(patternFg, 4);
+
     shadowScreen.setFrameHandler(function() {
     });
+
     shadowScreen.setKeyHandler(() => {
         let moveX = 0;
         const speed = 1.5;
@@ -360,20 +306,7 @@ const Turrican = new Game(320, 256, 2, function () {
         };
 
         if (moveX !== 0) {
-            shadowWorldPane.scrollBy(moveX * 1.2, 0);
-            patternBg.scrollBy(moveX * 0.5,0);
-            patternBg2.scrollBy(moveX * 0.3,0);
-            patternBg3.scrollBy(moveX * 0.2,0);
-            patternBg4.scrollBy(moveX * 0.15,0);
-            patternBg5.scrollBy(moveX * 0.1,0);
-            patternBg6.scrollBy(moveX * 0.25,0);
-            patternBg7.scrollBy(moveX * 1,0);
-            patternBg8.scrollBy(moveX * 1.2,0);
-            patternBg9.scrollBy(moveX * 1.5,0);
-            patternBg10.scrollBy(moveX * 1.8,0);
-            patternBg11.scrollBy(moveX * 2.2, 0);
-            patternBg12.scrollBy(moveX * 3, 0);
-            patternFg.scrollBy(moveX * 4, 0);
+            beastScroller.scrollBy(moveX * 1.2, 0);
         }
     });
 
@@ -412,5 +345,5 @@ const Turrican = new Game(320, 256, 2, function () {
         }
     });
 
-    return 'shadow-ingame';
+    return 'turrican-ingame';
 });

@@ -49,8 +49,8 @@ class Game {
         this.logs.push(values.join(' '));
     }
 
-    setZoom(value) {
-        if (value < 1 || value > 4 || this.zoom === value) {
+    setZoom(value, force = false) {
+        if (value < 1 || value > 4 || (!force && this.zoom === value)) {
             return;
         }
         this.log('setZoom', value);
@@ -247,7 +247,7 @@ class Game {
             '<div id="offscreen" style="display: none"></div>';
 
         if (this.zoom !== 1) {
-            this.setZoom(this.zoom);
+            this.setZoom(this.zoom, true);
         }
 
         debugElem = document.getElementById('d');
@@ -511,6 +511,117 @@ class Screen {
 //      P a n e s
 // #############################################
 
+class PaneScroller {
+
+    constructor(pane) {
+        this.pane = pane;
+        this.subPanes = [];
+    }
+
+    addSubPane(pane, factorX = 0, factorY = 0) {
+        this.subPanes.push([pane, factorX, factorY]);
+    }
+
+    scrollBy(sx, sy) {
+        const scrolled = this.pane.scrollBy(sx, sy);
+        if (scrolled.x !== 0 || scrolled.y !== 0) {
+            for (let pane of this.subPanes) {
+                pane[0].scrollBy(scrolled.x * pane[1], scrolled.y * pane[2]);
+            }
+        }
+        return scrolled;
+    }
+}
+
+
+class ScrollBounds {
+
+    constructor(spritePane, scroller, boundsSize) {
+        this.spritePane = spritePane;
+        this.scroller = scroller;
+        this.boundsSize = boundsSize;
+    }
+
+    moveActor(moveX = 0, moveY = 0) {
+        const scrollBoundsTop = {x: this.boundsSize.x, y: this.boundsSize.y};
+        const scrollBoundsBottom = {x: this.boundsSize.x, y: this.boundsSize.y};
+
+        const actor = this.spritePane.getActor();
+        if (actor === null) {
+            return;
+        }
+        const sprite = this.spritePane.getSpritePos(actor);
+
+        let move = false;
+        let scrollX = 0;
+        if (moveX !== 0) {
+            let pos = sprite.x + moveX;
+            if (pos < scrollBoundsTop.x) {
+                // new position is left of scrollbounds
+                if (sprite.x >= scrollBoundsTop.x) {
+                    scrollX = -Math.abs(scrollBoundsTop.x - pos);
+                    pos = scrollBoundsTop.x;
+                } else if (pos < 0) {
+                    pos = 0;
+                }
+            }
+
+            let max = this.spritePane.dimX - 1 - sprite.len;
+            let rightScrollBound = max - scrollBoundsBottom.x;
+            if (pos > rightScrollBound) {
+                if (sprite.x <= rightScrollBound) {
+                    scrollX = Math.abs(pos - rightScrollBound);
+                    pos = rightScrollBound;
+                } else if (pos > max) {
+                    pos = max;
+                }
+            }
+            sprite.x = pos;
+            move = true;
+        }
+
+        let scrollY = 0;
+        if (moveY !== 0) {
+            let pos = sprite.y + moveY;
+            if (pos < scrollBoundsTop.y) {
+
+                if (sprite.y >= scrollBoundsTop.y) {
+                    scrollY = -Math.abs(scrollBoundsTop.y - pos);
+                    pos = scrollBoundsTop.y;
+                } else if (pos < 0) {
+                    pos = 0;
+                }
+            }
+            let max = this.spritePane.dimY - 1 - sprite.len;
+            let bottomScrollBound = max - scrollBoundsBottom.y;
+            if (pos > bottomScrollBound) {
+                if (sprite.y <= bottomScrollBound) {
+                    scrollY = Math.abs(pos - bottomScrollBound);
+                    pos = bottomScrollBound;
+                } else if (pos > max) {
+                    pos = max;
+                }
+            }
+            sprite.y = pos;
+            move = true;
+        }
+
+        const unscrolled = this.scroller.scrollBy(scrollX, scrollY).unscrolled;
+        if (unscrolled.x !== 0) {
+            sprite.x += unscrolled.x;
+            move = true;
+        }
+        if (unscrolled.y !== 0) {
+            sprite.y += unscrolled.y;
+            move = true;
+        }
+
+        if (move) {
+            this.spritePane.setSpritePos(actor, sprite.x, sprite.y);
+        }
+    }
+}
+
 class EmptyPane {
     constructor() {}
 
@@ -601,6 +712,18 @@ class StackedPane {
 class SpritePane {
     constructor() {
         this.sprites = [];
+        this.actor = null;
+    }
+
+    setActor(id) {
+        if (!this.sprites[id]) {
+            throw Error('Sprite Actor "' + id + "' not found!");
+        }
+        this.actor = id;
+    }
+
+    getActor() {
+        return this.actor;
     }
 
     addSprite(id, img,  x, y) {
@@ -721,7 +844,6 @@ class WorldPane {
     }
 
     render(drawTarget) {
-        console.log('RENDER', this);
         var target = this.offCanvas !== null ? this.offCanvas.ctx : drawTarget;
         if (this.bgPane !== undefined) {
             this.bgPane.render(target);
@@ -772,7 +894,7 @@ class WorldPane {
     }
 
     scrollBy(Sx, Sy) {
-        var unscrolled = {
+        const unscrolled = {
             x: 0,
             y: 0
         };
@@ -845,7 +967,11 @@ class WorldPane {
             this.dirty = true;
         }
 
-        return unscrolled;
+        return {
+            x: (Sx - unscrolled.x),
+            y: (Sy - unscrolled.y),
+            unscrolled: unscrolled
+        };
     }
 }
 
@@ -922,7 +1048,9 @@ class LinearGradientPane {
         target.fillRect(0, 0, this.dimX, this.dimY);
     }
 
-    scrollBy(speed) {
+    scrollBy(speedX, speedY) {
+        const speed = this.isHorizontal ? speedX : speedY;
+
         if (speed === 0) {
             return;
         }
@@ -1050,6 +1178,8 @@ module.exports = {
     PatternPane,
     WorldPane,
     LinearGradientPane,
+    PaneScroller,
+    ScrollBounds,
     d,
     SpriteMap,
     getNewSpriteMap,
