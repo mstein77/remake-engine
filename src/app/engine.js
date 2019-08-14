@@ -484,7 +484,6 @@ class Screen {
                 elem.pane.setScrollElem(elem.canvas.elem);
             }
         }
-        console.log(dims);
         this.elems = dims;
     }
 

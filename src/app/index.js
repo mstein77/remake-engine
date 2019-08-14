@@ -270,10 +270,17 @@ const Turrican = new Game(320, 256, 2, function () {
         ]
     );
 
+    const beastSpritePane = new SpritePane();
+    beastSpritePane.addSprite('beast', beast, 160, 120);
+
     sfgArea.addPane(shadowWorldPane);
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
+
+    const beastArea = new Area();
+    beastArea.addPane(beastSpritePane);
+    shadowScreen.addArea(beastArea);
 
     const beastScroller = new PaneScroller(shadowWorldPane);
     beastScroller.addSubPane(patternBg, 0.5);
@@ -348,5 +355,5 @@ const Turrican = new Game(320, 256, 2, function () {
         }
     });
 
-    return 'turrican-ingame';
+    return 'shadow-ingame';
 });
