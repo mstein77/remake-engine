@@ -738,11 +738,11 @@ class BufferedScrollPane {
         this.bufferState = -1;
         this.maxSpeed = config.maxSpeed;
         this.maxBufferState = Math.floor(this.tileSize / this.maxSpeed);
+        this.endless = {
+            x: false, y: false
+        };
         this.activeBuffer = 1;
         this.dirty = true;
-
-        console.log('MAX-STATE', this.maxBufferState);
-
     }
 
     init(dimX, dimY) {
@@ -799,21 +799,12 @@ class BufferedScrollPane {
             sum += parts;
             remRows -= parts;
         }
-        this.partTileRows = Math.ceil(tileSteps);
-        this.partHeight = this.partTileRows * this.tileSize;
         this.mapX = 4;
         this.mapY = 2;
         this.copyX = this.mapX;
         this.copyY = this.mapY;
 
         this.copiedHeight = 0;
-
-        console.log('ViewTiles', viewTilesX, 'x', viewTilesY);
-        console.log('BufferTiles', this.bufferTilesX, this.bufferTilesY);
-        console.log('ScrollSize', this.scrollSizeX, 'x', this.scrollSizeY);
-        console.log('Center', this.centerX, 'x', this.centerY);
-        console.log('MaxTileRows', this.maxTileRows, 'partTileRows', this.partTileRows, 'partHeight', this.partHeight);
-        console.log('RowsInPart', this.rowsInPart);
     }
 
     setScrollElem(elem) {
@@ -845,26 +836,15 @@ class BufferedScrollPane {
     }
 
     copyViewRows(source, target) {
-        console.log('COPY ' + this.bufferState + ' of ' + this.rowsInPart.length);
 
         const copyRows = this.rowsInPart[this.bufferState - 1];
         if (copyRows > 0) {
             const copyHeight = copyRows * this.tileSize;
-            console.log('GET IMAGE', this.activeBuffer,
-                this.tileOffsetX * this.tileSize,
-                (this.bufferState - 1) * this.partHeight + (this.tileOffsetY * this.tileSize),
-                this.scrollSizeX,
-                copyHeight
-            );
             const srcImg = source.getImageData(
                 this.tileOffsetX * this.tileSize,
                 this.copiedHeight + (this.tileOffsetY * this.tileSize),
                 this.scrollSizeX,
                 copyHeight
-            );
-            console.log('PUT IMAGE',
-                this.targetOffsetX * this.tileSize,
-                this.targetOffsetY * this.tileSize + this.copiedHeight
             );
             target.putImageData(srcImg,
                 this.targetOffsetX * this.tileSize,
@@ -875,86 +855,49 @@ class BufferedScrollPane {
     }
 
     renderNewTiles(target) {
-        console.log('FILL LINE');
-        const fillX = this.targetOffsetX + this.moveX;
-        const fillY = this.targetOffsetY + this.moveY;
-        console.log('FILL', fillX, fillY);
-
         let addLen = 0;
         let offX = 0;
 
         if (this.moveX !== 0) {
             if (this.moveX < 0) {
-                console.log('NEW LEFT COLUMN',
-                    (this.targetOffsetX - 1) * this.tileSize,
-                    this.targetOffsetY * this.tileSize,
-                    this.tileSize,
-                    this.scrollSizeY
-                );
                 this.tilesMap.render(
                     target,
                     {
                         x: ((this.targetOffsetX - 1) * this.tileSize),
                         y: (this.targetOffsetY * this.tileSize)
-                    }, {width: 1, height: this.bufferTilesY, pos: {x: this.copyX - 1, y: this.copyY}}
+                    },
+                    {width: 1, height: this.bufferTilesY, pos: {x: this.copyX - 1, y: this.copyY}}
                 );
                 offX -= 1;
             } else {
-                console.log('NEW RIGHT COLUMN',
-                    (this.targetOffsetX * this.tileSize) + this.scrollSizeX,
-                    this.targetOffsetY * this.tileSize,
-                    this.tileSize,
-                    this.scrollSizeY
-                );
-                target.clearRect(
-                    (this.targetOffsetX * this.tileSize) + this.scrollSizeX,
-                    (this.targetOffsetY * this.tileSize),
-                    this.tileSize,
-                    this.scrollSizeY
-                );
                 this.tilesMap.render(
                     target,
                     {
-                        x: ((this.targetOffsetX * this.tileSize) + this.scrollSizeX),
-                        y: (this.targetOffsetY * this.tileSize)
+                        x: this.targetOffsetX * this.tileSize + this.scrollSizeX,
+                        y: this.targetOffsetY * this.tileSize,
                     }, {width: 1, height: this.bufferTilesY, pos: {x: (this.copyX + this.bufferTilesX), y: this.copyY}}
                 );
-                offX += 1;
             }
             addLen++;
         }
 
         if (this.moveY !== 0) {
-            console.log('Add row:', this.moveY < 0 ? 'TOP' : 'BOTTOM');
             if (this.moveY < 0) {
-                console.log('NEW TOP ROW',
-                    (this.targetOffsetX + offX) * this.tileSize,
-                    (this.targetOffsetY - 1) * this.tileSize,
-                    this.scrollSizeX + addLen * this.tileSize,
-                    this.tileSize
-                );
                 this.tilesMap.render(
                     target,
                     {
                         x: (this.targetOffsetX + offX) * this.tileSize,
                         y: (this.targetOffsetY - 1) * this.tileSize
-                    }, {width: this.bufferTilesX + offX, height: 1,
+                    }, {width: this.bufferTilesX + addLen, height: 1,
                         pos: {x: this.copyX + offX, y: this.copyY - 1}}
                 );
             } else {
-                console.log('NEW BOTTOM ROW',
-                    (this.targetOffsetX + offX) * this.tileSize,
-                    (this.targetOffsetY * this.tileSize) + this.scrollSizeY,
-                    this.scrollSizeX + addLen * this.tileSize,
-                    this.tileSize * 2
-                );
-
                 this.tilesMap.render(
                     target,
                     {
                         x: (this.targetOffsetX + offX) * this.tileSize,
                         y: (this.targetOffsetY * this.tileSize) + this.scrollSizeY
-                    }, {width: this.bufferTilesX + offX, height: 1,
+                    }, {width: this.bufferTilesX + addLen, height: 1,
                         pos: {x: this.copyX + offX, y: this.copyY + this.bufferTilesY}}
                 );
             }
@@ -964,7 +907,6 @@ class BufferedScrollPane {
     }
 
     switchBuffer() {
-        console.log('switch');
         this.scrollX -= this.moveX * this.tileSize;
         this.scrollY -= this.moveY * this.tileSize;
 
@@ -979,12 +921,14 @@ class BufferedScrollPane {
         this.copiedHeight = 0;
 
         // set scroll blocks
-        this.scrollBlock.left = this.mapX <= -1 ? 0 : null;
-        this.scrollBlock.right = this.mapX >= (this.tilesMap.width - this.bufferTilesX + 1) ? this.tileSize -1 : null;
-        this.scrollBlock.top = this.mapY <= -1 ? 0 : null;
-        this.scrollBlock.bottom = this.mapY >= (this.tilesMap.height - this.bufferTilesY + 1) ? this.tileSize -1 : null;
-
-        console.log([this.mapX, this.mapY],  this.scrollBlock);
+        if (!this.endless.x) {
+            this.scrollBlock.left = this.mapX <= -1 ? 0 : null;
+            this.scrollBlock.right = this.mapX >= (this.tilesMap.width - this.bufferTilesX + 1) ? this.tileSize -1 : null;
+        }
+        if (!this.endless.y) {
+            this.scrollBlock.top = this.mapY <= -1 ? 0 : null;
+            this.scrollBlock.bottom = this.mapY >= (this.tilesMap.height - this.bufferTilesY + 1) ? this.tileSize -1 : null;
+        }
 
         Game.instance.addDomOp(this.getScrollElem(), 'style.display', 'none');
         this.activeBuffer = (this.activeBuffer === 0) ? 1 : 0;
@@ -1030,15 +974,19 @@ class BufferedScrollPane {
     }
 
     scrollBy(Sx, Sy) {
-        d('ScrollPos', this.scrollX, 'x', this.scrollY);
-        d('Map', this.mapX, 'x', this.mapY);
-        d('World', this.tilesMap.width, 'x',  this.tilesMap.height);
-        d('BufferState', this.bufferState, 'of', this.maxBufferState);
-
         if (Math.max(this.maxSpeed, Math.abs(Sx), Math.abs(Sy)) > this.maxSpeed) {
             throw Error('Unallowed scroll speed above ' + this.maxSpeed);
         }
         const oldQuad = this.getQuadrant();
+
+        const scrolled = {
+            x: Sx,
+            y: Sy,
+            unscrolled: {
+                x: this.scrollX + Sx,
+                y: this.scrollY + Sy
+            }
+        };
 
         this.scrollX += Sx;
         if (this.scrollBlock.left !== null) {
@@ -1067,17 +1015,22 @@ class BufferedScrollPane {
             this.scrollY = this.sizeY - this.dimY;
         }
 
-        if (Sx === 0 && Sy === 0) {
-            return;
+        scrolled.unscrolled.x -= this.scrollX;
+        scrolled.unscrolled.y -= this.scrollY;
+        scrolled.x -= scrolled.unscrolled.x;
+        scrolled.y -= scrolled.unscrolled.y;
+
+        if (scrolled.x === 0 && scrolled.y === 0) {
+            this.isScrolling = false;
+            return scrolled;
         }
+
+        this.isScrolling = true;
 
         const newQuad = this.getQuadrant();
         if (oldQuad === newQuad) {
-            return;
+            return scrolled;
         }
-
-        console.log('Changed from ' + oldQuad + ' to ' + newQuad);
-        console.log('getQuadrant', [this.scrollX, this.scrollY]);
 
         if (newQuad === 4) {
             this.bufferState = 0;
@@ -1090,14 +1043,14 @@ class BufferedScrollPane {
                 this.moveY = vector.y;
                 this.targetOffsetX = 1 - vector.x;
                 this.targetOffsetY = 1 - vector.y;
+                this.copiedHeight = 0;
                 this.bufferState = 1;
-                console.log('TARGET OFFSET', [this.targetOffsetX, this.targetOffsetY], 'COPY', [this.copyX, this.copyY]);
             } else {
                 this.moveX += vector.x;
                 this.moveY += vector.y;
             }
-            console.log('Move', this.moveX, this.moveY);
         }
+        return scrolled;
     }
 
     render(target) {
@@ -1113,13 +1066,17 @@ class BufferedScrollPane {
                 break;
 
             case this.maxBufferState:
-                this.renderNewTiles(target);
-                this.switchBuffer();
+                if (this.isScrolling) {
+                    this.renderNewTiles(target);
+                    this.switchBuffer();
+                }
                 break;
 
             default:
-                this.copyViewRows(this.scrollElem[this.activeBuffer].ctx, target);
-                this.bufferState++;
+                if (this.isScrolling) {
+                    this.copyViewRows(this.scrollElem[this.activeBuffer].ctx, target);
+                    this.bufferState++;
+                }
                 break;
         }
 
