@@ -374,14 +374,14 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
         }
     );
 
-    const testPane = new BufferedScrollPane({tileBits: 5, maxSpeed: 5, tilesMap: buffTilesMap});
+    const testPane = new BufferedScrollPane({tileBits: 5, maxSpeed: 3, tilesMap: buffTilesMap});
     const testScreen = new Screen('test');
     testScreen.addPane(new ColorPane('#000000'));
     testScreen.addPane(testPane);
     testScreen.setKeyHandler(() => {
         let moveX = 0;
         let moveY = 0;
-        const speed = 5;
+        const speed = 3;
         for (var key in this.keysDown) {
             switch (key) {
                 case 'a':
