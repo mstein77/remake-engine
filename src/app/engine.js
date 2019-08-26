@@ -1,7 +1,7 @@
 
 class Game {
 
-    constructor(width, height, zoom, init) {
+    constructor(width, height, config, init) {
         // analyse the element?
         if (Game.instance) {
             throw new Error('There is already a running game instance!');
@@ -12,19 +12,36 @@ class Game {
         this.init = init.bind(this);
         this.screens = {};
         this.currentScreen = null;
-        this.debug = false;
+        this.debug = config.debug === true;
         this.globalKeyHandlers = [];
         this.timers = {};
         this.durations = {};
         this.frames = 0;
-        this.zoom = zoom;
+        this.zoom = config.zoom;
         this.elems = {};
         this.minFps = 100;
         this.logs = [];
+        this.domQueue = [];
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
         });
+    }
+
+    syncDom() {
+        while (this.domQueue.length > 0) {
+            const next = this.domQueue.shift();
+            const parts = next.key.split('.');
+            let elem = next.elem;
+            while (parts.length > 1) {
+                elem = elem[parts.shift()];
+            }
+            elem[parts[0]] = next.value;
+        }
+    }
+
+    addDomOp(elem, key, value) {
+        this.domQueue.push({elem, key, value});
     }
 
     getDomElem(id) {
@@ -183,18 +200,17 @@ class Game {
     }
 
     updateFrame() {
-        const screen = this.screens[this.currentScreen];
+        this.syncDom();
+        if (this.debug) {
+            this.printDebugs();
+        }
         this.handleKeys();
         if (this.running) {
             this.startTimer('render');
             this.render();
             this.addTimerDuration('render');
             this.frames++;
-        }
-        if (this.debug) {
-            this.printDebugs();
-        }
-        if (this.running) {
+            const screen = this.screens[this.currentScreen];
             if (screen.frameHandler !== null) {
                 screen.frameHandler();
             }
@@ -255,6 +271,9 @@ class Game {
         this.addTimerDuration('boot');
         this.gotoScreen(startScreen);
         this.setRunning(true);
+        if (this.debug) {
+            this.setDebug(true);
+        }
         this.updateFrame();
         this.log('...booting done');
     }
@@ -331,6 +350,37 @@ class CanvasManager {
         return canvas;
     }
 
+    getNewBufferedOverlayCanvas(dim, options = {}) {
+        const canvas = [];
+        const id = 'bufscroll_' + this.canvasElems.length;
+        const parentElem = this.getOverlayElem();
+        const opaque = options.opaque !== undefined ? options.opaque === true : false;
+        const container = document.createElement('div');
+
+        container.setAttribute(
+            'style',
+            'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + dim.view.width + 'px; height: ' + dim.view.height + 'px; top: ' + dim.offset.x + 'px; left: ' + dim.offset.y + 'px; overflow: hidden');
+
+        while(canvas.length < 2) {
+            const elem = document.createElement('canvas');
+            elem.id = id + '_' + (canvas.length + 1);
+            elem.setAttribute('width', dim.size.width);
+            elem.setAttribute('height', dim.size.height);
+            elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px; display: ' + (canvas.length === 0 ? 'block' : 'none'));
+            container.appendChild(elem);
+            const ctx = elem.getContext('2d', {alpha: !opaque});
+            ctx.imageSmoothingEnabled = false;
+            canvas.push({
+                id: elem.id,
+                elem,
+                ctx
+            });
+        }
+        parentElem.appendChild(container);
+
+        return canvas
+    }
+
     removeChildren(node) {
         while (node.firstChild) {
             node.removeChild(node.firstChild);
@@ -365,13 +415,18 @@ class Area {
                 pane.opaque = true;
             }
             pane.init(dimX, dimY);
-            const sizeX = pane.oversize ? pane.sizeX : dimX;
-            const sizeY = pane.oversize ? pane.sizeY : dimY;
+            let sizeX = dimX;
+            let sizeY = dimY;
+            if (pane.oversize) {
+                sizeX = pane.sizeX;
+                sizeY = pane.sizeY;
+            }
             dims.push({
                 pane,
                 off: {x: offX, y: offY},
                 dim: {x: dimX, y: dimY},
-                size: {x: sizeX, y: sizeY}
+                size: {x: sizeX, y: sizeY},
+                buffered: (pane.buffered === true)
             });
         }
         return dims;
@@ -467,6 +522,12 @@ class Screen {
         this.areas.push(area);
     }
 
+    addPane(pane) {
+        const area = new Area();
+        area.addPane(pane);
+        this.addArea(area);
+    }
+
     setDimension(dimX, dimY) {
         this.dimX = dimX;
         this.dimY = dimY;
@@ -474,14 +535,23 @@ class Screen {
         for (let i = 0; i < this.areas.length; i++) {
             this.areas[i].setDimension(dimX, dimY, 0, 0, dims);
         }
-
         for(let elem of dims) {
             const oversize = (elem.dim.y !== elem.size.y || elem.dim.x !== elem.size.x);
-            elem.canvas = oversize ?
-                OCM.getNewScrollCanvas(elem.dim.x, elem.dim.y, elem.size.x, elem.size.y, elem.off.x, elem.off.y, elem.pane.opaque === true) :
-                OCM.getNewOverlayCanvas(elem.dim.x, elem.dim.y, elem.off.x, elem.off.y, elem.pane.opaque === true);
-            if (oversize) {
-                elem.pane.setScrollElem(elem.canvas.elem);
+            if (elem.buffered) {
+                elem.canvas = OCM.getNewBufferedOverlayCanvas({
+                    view: {width: elem.dim.x, height: elem.dim.y},
+                    offset: {x: elem.off.x, y: elem.off.y},
+                    size: {width: elem.size.x, height: elem.size.y}
+                }, {opaque: elem.pane.opaque === true});
+                elem.pane.setScrollElem(elem.canvas);
+            } else {
+                elem.canvas = oversize ?
+                    OCM.getNewScrollCanvas(elem.dim.x, elem.dim.y, elem.size.x, elem.size.y, elem.off.x, elem.off.y, elem.pane.opaque === true) :
+                    OCM.getNewOverlayCanvas(elem.dim.x, elem.dim.y, elem.off.x, elem.off.y, elem.pane.opaque === true);
+
+                if (oversize) {
+                    elem.pane.setScrollElem(elem.canvas.elem);
+                }
             }
         }
         this.elems = dims;
@@ -491,7 +561,11 @@ class Screen {
         for(let elem of this.elems) {
             const isDirty = !(elem.pane.dirty === false);
             if (force || isDirty) {
-                elem.pane.render(elem.canvas.ctx);
+                if (elem.buffered) {
+                    elem.pane.render(elem.canvas[elem.pane.getInactiveBuffer()].ctx);
+                } else {
+                    elem.pane.render(elem.canvas.ctx);
+                }
             }
         }
     }
@@ -647,6 +721,410 @@ class ColorPane {
         target.fillStyle = this.color;
         target.fillRect(0, 0, this.dimX, this.dimY);
         this.dirty = false;
+    }
+}
+
+class BufferedScrollPane {
+
+    constructor(config) {
+        this.tileSize = 1 << config.tileBits;
+        this.maxSpeed = config.maxSpeed;
+        this.tilesMap = config.tilesMap;
+
+        this.buffered = true;
+        this.oversize = true;
+        this.scrollElem = null;
+        this.bufferState = -1;
+        this.maxSpeed = config.maxSpeed;
+        this.maxBufferState = Math.floor(this.tileSize / this.maxSpeed);
+        this.endless = {
+            x: (config.endless !== undefined && config.endless.x !== undefined) ? config.endless.x : false,
+            y: (config.endless !== undefined && config.endless.y !== undefined) ? config.endless.y : false,
+        };
+        this.activeBuffer = 1;
+        this.dirty = true;
+    }
+
+    init(dimX, dimY) {
+        let viewTilesX = Math.ceil(dimX/this.tileSize);
+        let viewTilesY = Math.ceil(dimY/this.tileSize);
+
+        this.bufferTiles = 2;
+        // 3 tiles are required in each direction for scrolling around the neutral quadrant
+        this.bufferTilesX = viewTilesX + 3;
+        this.bufferTilesY = viewTilesY + 3;
+
+        this.sizeX = (this.bufferTilesX + this.bufferTiles) * this.tileSize;
+        this.sizeY = (this.bufferTilesY + this.bufferTiles) * this.tileSize;
+
+        this.scrollSizeX = this.sizeX - this.bufferTiles * this.tileSize;
+        this.scrollSizeY = this.sizeY - this.bufferTiles * this.tileSize;
+
+        this.dimX = dimX;
+        this.dimY = dimY;
+
+        // scrolling is always relative to the top left corner of the neutral quadrant
+        this.scrollX = 0;
+        this.scrollY = 0;
+
+        this.scrollBlock = {
+            top: null,
+            bottom: null,
+            left: null,
+            right: null
+        };
+
+        this.tileOffsetX = 1;
+        this.tileOffsetY = 1;
+        this.targetOffsetX = 1;
+        this.targetOffsetY = 1;
+
+        this.moveX = 0;
+        this.moveY = 0;
+
+        // the center is the
+        this.centerX = (this.tileOffsetX + 1) * this.tileSize;
+        this.centerY = (this.tileOffsetY + 1) * this.tileSize;
+
+        this.maxTileRows = Math.ceil(this.scrollSizeY / this.tileSize);
+        const tileSteps = this.maxTileRows / (this.maxBufferState - 1);
+        this.rowsInPart = [];
+        let sum = 0;
+        let remRows = viewTilesY + 3;
+        while(remRows > 0) {
+            const pos = Math.round(tileSteps * (this.rowsInPart.length + 1));
+            const parts = pos - sum;
+            this.rowsInPart.push(parts);
+            sum += parts;
+            remRows -= parts;
+        }
+        this.mapX = 4;
+        this.mapY = 2;
+        this.copyX = this.mapX;
+        this.copyY = this.mapY;
+
+        this.copiedHeight = 0;
+    }
+
+    setScrollElem(elem) {
+        this.scrollElem = elem;
+    }
+
+    getScrollElem() {
+        return this.scrollElem[this.activeBuffer].elem;
+    }
+
+    getInactiveBuffer() {
+        return (this.activeBuffer === 0 ? 1 : 0);
+    }
+
+    renderAll(target) {
+        this.tilesMap.render(
+            target,
+            {
+                x: this.tileOffsetX * this.tileSize,
+                y: this.tileOffsetY * this.tileSize
+            },
+            {
+                width: this.bufferTilesX,
+                height: this.bufferTilesY,
+                pos: {x: this.mapX, y: this.mapY},
+                endless: this.endless
+            }
+        );
+    }
+
+    copyViewRows(source, target) {
+
+        const copyRows = this.rowsInPart[this.bufferState - 1];
+        if (copyRows > 0) {
+            const copyHeight = copyRows * this.tileSize;
+            const srcImg = source.getImageData(
+                this.tileOffsetX * this.tileSize,
+                this.copiedHeight + (this.tileOffsetY * this.tileSize),
+                this.scrollSizeX,
+                copyHeight
+            );
+            target.putImageData(srcImg,
+                this.targetOffsetX * this.tileSize,
+                this.targetOffsetY * this.tileSize + this.copiedHeight
+            );
+            this.copiedHeight += copyHeight;
+        }
+    }
+
+    renderNewTiles(target) {
+        let addLen = 0;
+        let offX = 0;
+
+        if (this.moveX !== 0) {
+            if (this.moveX < 0) {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: ((this.targetOffsetX - 1) * this.tileSize),
+                        y: (this.targetOffsetY * this.tileSize)
+                    },
+                    {
+                        width: 1,
+                        height: this.bufferTilesY,
+                        pos: {x: this.copyX - 1, y: this.copyY},
+                        endless: this.endless
+                    }
+                );
+                offX -= 1;
+            } else {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: this.targetOffsetX * this.tileSize + this.scrollSizeX,
+                        y: this.targetOffsetY * this.tileSize,
+                    }, {
+                        width: 1,
+                        height: this.bufferTilesY,
+                        pos: {x: (this.copyX + this.bufferTilesX), y: this.copyY},
+                        endless: this.endless
+                    }
+                );
+            }
+            addLen++;
+        }
+
+        if (this.moveY !== 0) {
+            if (this.moveY < 0) {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: (this.targetOffsetX + offX) * this.tileSize,
+                        y: (this.targetOffsetY - 1) * this.tileSize
+                    },
+                    {
+                        width: this.bufferTilesX + addLen,
+                        height: 1,
+                        pos: {x: this.copyX + offX, y: this.copyY - 1},
+                        endless: this.endless
+                    }
+                );
+            } else {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: (this.targetOffsetX + offX) * this.tileSize,
+                        y: (this.targetOffsetY * this.tileSize) + this.scrollSizeY
+                    },
+                    {
+                        width: this.bufferTilesX + addLen,
+                        height: 1,
+                        pos: {x: this.copyX + offX, y: this.copyY + this.bufferTilesY},
+                        endless: this.endless
+                    }
+                );
+            }
+        }
+        this.copyX += this.moveX;
+        this.copyY += this.moveY;
+    }
+
+    switchBuffer() {
+        this.scrollX -= this.moveX * this.tileSize;
+        this.scrollY -= this.moveY * this.tileSize;
+
+        this.tileOffsetX = this.targetOffsetX + this.moveX;
+        this.tileOffsetY = this.targetOffsetY + this.moveY;
+
+        this.centerX = (this.tileOffsetX + 1) * this.tileSize;
+        this.centerY = (this.tileOffsetY + 1) * this.tileSize;
+
+        this.mapX = this.copyX;
+        this.mapY = this.copyY;
+        this.copiedHeight = 0;
+
+        // set scroll blocks
+        if (!this.endless.x) {
+            this.scrollBlock.left = this.mapX <= -1 ? 0 : null;
+            this.scrollBlock.right = this.mapX >= (this.tilesMap.width - this.bufferTilesX + 1) ? this.tileSize -1 : null;
+        }
+        if (!this.endless.y) {
+            this.scrollBlock.top = this.mapY <= -1 ? 0 : null;
+            this.scrollBlock.bottom = this.mapY >= (this.tilesMap.height - this.bufferTilesY + 1) ? this.tileSize -1 : null;
+        }
+
+        Game.instance.addDomOp(this.getScrollElem(), 'style.display', 'none');
+        this.activeBuffer = (this.activeBuffer === 0) ? 1 : 0;
+        Game.instance.addDomOp(this.getScrollElem(), 'style.display', 'block');
+
+        this.bufferState = 0;
+    }
+
+    getQuadVector(from, to) {
+        const relDist = to - from;
+        const dist = Math.abs(relDist);
+        switch(dist) {
+            case 0:
+                return {x: 0, y: 0};
+
+            case 1:
+                return {x: relDist, y: 0};
+
+            case 2:
+                if (relDist < 0) {
+                    return {x: 1, y: -1};
+                }
+                return {x: -1, y: 1};
+
+            case 3:
+                return {x: 0, y: (relDist < 0 ? -1 : 1)};
+
+            case 4:
+                if (relDist < 0) {
+                    return {x: -1, y: -1};
+                }
+                return {x: 1, y: 1};
+
+            default:
+                throw 'Quadrant distance ' + dist + ' not supported';
+        }
+    }
+
+    getQuadrant() {
+        let qx = Math.floor((this.scrollX + this.tileSize) / this.tileSize);
+        let qy = Math.floor((this.scrollY + this.tileSize) / this.tileSize);
+        return qy * 3 + qx;
+    }
+
+    scrollBy(Sx, Sy) {
+        if (Math.max(this.maxSpeed, Math.abs(Sx), Math.abs(Sy)) > this.maxSpeed) {
+            throw Error('Unallowed scroll speed above ' + this.maxSpeed);
+        }
+        const oldQuad = this.getQuadrant();
+
+        const scrolled = {
+            x: Sx,
+            y: Sy,
+            unscrolled: {
+                x: this.scrollX + Sx,
+                y: this.scrollY + Sy
+            }
+        };
+
+        this.scrollX += Sx;
+        if (this.scrollBlock.left !== null) {
+            this.scrollX = Math.max(this.scrollX, this.scrollBlock.left);
+        }
+        if (this.scrollBlock.right !== null) {
+            this.scrollX = Math.min(this.scrollX, this.scrollBlock.right);
+        }
+        if (this.scrollX <= -this.tileSize) {
+            this.scrollX = -this.tileSize + 1;
+        } else if (this.scrollX >= (this.sizeX - this.dimX)) {
+            this.scrollX = this.sizeX - this.dimX;
+        }
+
+        this.scrollY += Sy;
+        if (this.scrollBlock.top !== null) {
+            this.scrollY = Math.max(this.scrollY, this.scrollBlock.top);
+        }
+        if (this.scrollBlock.bottom !== null) {
+            this.scrollY = Math.min(this.scrollY, this.scrollBlock.bottom);
+        }
+
+        if (this.scrollY <= -this.tileSize) {
+            this.scrollY = -this.tileSize + 1;
+        } else if (this.scrollY >= (this.sizeY - this.dimY)) {
+            this.scrollY = this.sizeY - this.dimY;
+        }
+
+        scrolled.unscrolled.x -= this.scrollX;
+        scrolled.unscrolled.y -= this.scrollY;
+        scrolled.x -= scrolled.unscrolled.x;
+        scrolled.y -= scrolled.unscrolled.y;
+
+        if (scrolled.x === 0 && scrolled.y === 0) {
+            this.isScrolling = false;
+            return scrolled;
+        }
+
+        this.isScrolling = true;
+
+        const newQuad = this.getQuadrant();
+        if (oldQuad === newQuad) {
+            return scrolled;
+        }
+
+        if (newQuad === 4) {
+            this.bufferState = 0;
+        } else {
+            const vector = this.getQuadVector(oldQuad, newQuad);
+            if (this.bufferState === 0)  {
+                this.copyX = this.mapX;
+                if (this.endless.x) {
+                    if (this.mapX === -this.bufferTilesX) {
+                        this.copyX += this.tilesMap.width;
+                    } else if (this.mapX === this.tilesMap.width) {
+                        this.copyX = 0;
+                    }
+
+                }
+                this.copyY = this.mapY;
+                if (this.endless.y) {
+                    if (this.mapY === -this.bufferTilesY) {
+                        this.copyY += this.tilesMap.height;
+                    } else if (this.mapY === this.tilesMap.height) {
+                        this.copyY = 0;
+                    }
+                }
+                this.moveX = vector.x;
+                this.moveY = vector.y;
+                this.targetOffsetX = 1 - vector.x;
+                this.targetOffsetY = 1 - vector.y;
+                this.copiedHeight = 0;
+                this.bufferState = 1;
+            } else {
+                this.moveX += vector.x;
+                this.moveY += vector.y;
+            }
+        }
+        return scrolled;
+    }
+
+    render(target) {
+
+        switch(this.bufferState) {
+
+            case 0:
+                break;
+
+            case -1:
+                this.renderAll(target);
+                this.switchBuffer();
+                break;
+
+            case this.maxBufferState:
+                if (this.isScrolling) {
+                    this.renderNewTiles(target);
+                    this.switchBuffer();
+                }
+                break;
+
+            default:
+                if (this.isScrolling) {
+                    this.copyViewRows(this.scrollElem[this.activeBuffer].ctx, target);
+                    this.bufferState++;
+                }
+                break;
+        }
+
+        // sync position
+        const elemStyle = this.getScrollElem().style;
+        const posLeft = -(this.centerX + this.scrollX) + 'px';
+        const posTop = -(this.centerY + this.scrollY) + 'px';
+
+        if (elemStyle.left !== posLeft) {
+            Game.instance.addDomOp(elemStyle, 'left', posLeft);
+        }
+        if (elemStyle.top !== posTop) {
+            Game.instance.addDomOp(elemStyle, 'top', posTop);
+        }
     }
 }
 
@@ -1149,6 +1627,102 @@ class SpriteMap {
     }
 }
 
+class TilesMap {
+
+    constructor(tiles, map, dim) {
+        this.tiles = tiles;
+        this.map = map;
+        this.tileBits = dim.tileBits;
+        this.tileSize = 1 << this.tileBits;
+        this.width = this.map[0].length;
+        this.height = this.map.length;
+    }
+
+    render(target, offset, dim = {}) {
+
+        const startTileX = dim.pos.x;
+        const endTileX = startTileX + dim.width;
+        const startTileY = dim.pos.y;
+        const endTileY = startTileY + dim.height;
+
+        target.clearRect(offset.x, offset.y, dim.width * this.tileSize, dim.height * this.tileSize);
+
+        const xIndices = [];
+        for(let x = startTileX; x <= endTileX; x++) {
+            let index = x;
+            if (index >= this.width) {
+                if (dim.endless.x) {
+                    while (index >= this.width) {
+                        index -= this.width;
+                    }
+                } else {
+                    index = null;
+                }
+            } else if (index < 0) {
+                if (dim.endless.x) {
+                    while (index < 0) {
+                        index += this.width;
+                    }
+                } else {
+                    index = null;
+                }
+            }
+            xIndices.push(index);
+        }
+
+        const yIndices = [];
+        for(let y = startTileY; y <= endTileY; y++) {
+            let index = y;
+            if (index >= this.height) {
+                if (dim.endless.y) {
+                    while (index >= this.height) {
+                        index -= this.height;
+                    }
+                } else {
+                    index = null;
+                }
+            } else if (index < 0) {
+                if (dim.endless.y) {
+                    while (index < 0) {
+                        index += this.height;
+                    }
+                } else {
+                    index = null;
+                }
+            }
+            yIndices.push(index);
+        }
+
+        for (let j = 0; j < yIndices.length; j++) {
+            const y = yIndices[j];
+            if (y === null) {
+                continue;
+            }
+            for (let i = 0; i < xIndices.length; i++) {
+                const x = xIndices[i];
+                if (x === null) {
+                    continue;
+                }
+                const tile = this.map[y][x];
+                if (tile === 0) {
+                    continue;
+                }
+                target.drawImage(
+                    this.tiles,
+                    tile << this.tileBits,
+                    0,
+                    this.tileSize,
+                    this.tileSize,
+                    offset.x + (i << this.tileBits),
+                    offset.y + (j << this.tileBits),
+                    this.tileSize,
+                    this.tileSize
+                );
+            }
+        }
+    }
+}
+
 function getNewSpriteMap(bits) {
     return new SpriteMap(bits);
 }
@@ -1176,6 +1750,7 @@ module.exports = {
     ColorPane,
     PatternPane,
     WorldPane,
+    BufferedScrollPane,
     LinearGradientPane,
     PaneScroller,
     ScrollBounds,
@@ -1183,5 +1758,7 @@ module.exports = {
     SpriteMap,
     getNewSpriteMap,
     getNewSprite,
-    spriteMaps
+    spriteMaps,
+    TilesMap,
+    OCM
 };
