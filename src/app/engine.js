@@ -1687,6 +1687,14 @@ class PatternPane {
                 Game.instance.addDomOp(elem, 'style.top', -this.scrollPos.y);
             }
         }
+        return {
+            x: Sx,
+            y: Sy,
+            unscrolled: {
+                x: 0,
+                y: 0
+            }
+        };
     }
 }
 
