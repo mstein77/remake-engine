@@ -161,6 +161,23 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
     const patternFg = new PatternPane(fence, 'repeat-x');
 
     // ##############################
+    //   Thunder Force 4
+    // ##############################
+
+    const tfScreen = new Screen('tf4');
+    const tfMainArea = new SplitArea('Y', [223, 33]);
+    const mountainPane = new PatternPane(tfMountains, 'repeat-x');
+    tfMainArea.addPane(mountainPane);
+    tfMainArea.addPane(new ColorPane('#506090'));
+    tfScreen.addPane(new LinearGradientPane('Y', ['#303070', 223, '#B060C0']));
+    tfScreen.addArea(tfMainArea);
+    tfScreen.setFrameHandler(function() {
+       mountainPane.scrollBy(1, 0);
+    });
+    this.addScreen(tfScreen);
+
+
+    // ##############################
     //   Turrican
     // ##############################
 
@@ -485,5 +502,5 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
         }
     });
 
-    return 'turrican-ingame';
+    return 'tf4';
 });
