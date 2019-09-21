@@ -1,3 +1,14 @@
+const TILE = {
+    DIM_1x1: 0,
+    DIM_2x2: 1,
+    DIM_4x4: 2,
+    DIM_8x8: 3,
+    DIM_16x16: 4,
+    DIM_32x32: 5,
+    DIM_64x64: 6,
+    DIM_128x128: 7,
+    DIM_256x256: 8
+};
 
 class Game {
 
@@ -28,20 +39,32 @@ class Game {
         });
     }
 
-    syncDom() {
+    updateDom() {
         while (this.domQueue.length > 0) {
             const next = this.domQueue.shift();
-            const parts = next.key.split('.');
-            let elem = next.elem;
-            while (parts.length > 1) {
-                elem = elem[parts.shift()];
+            switch(next.op) {
+                case 'set':
+                    const parts = next.key.split('.');
+                    let elem = next.elem;
+                    while (parts.length > 1) {
+                        elem = elem[parts.shift()];
+                    }
+                    elem[parts[0]] = next.value;
+                    break;
+
+                case 'add':
+                    next.target.appendChild(next.child);
+                    break;
             }
-            elem[parts[0]] = next.value;
         }
     }
 
     addDomOp(elem, key, value) {
-        this.domQueue.push({elem, key, value});
+        this.domQueue.push({op: 'set', elem, key, value});
+    }
+
+    addDomChild(target, child) {
+        this.domQueue.push({op: 'add', target, child});
     }
 
     getDomElem(id) {
@@ -117,9 +140,10 @@ class Game {
 
     gotoScreen(screenId) {
         this.log('gotoScreen', screenId);
-        OCM.clear();
+        OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
+
         screen.setDimension(this.width, this.height);
         screen.render(true);
     }
@@ -161,10 +185,10 @@ class Game {
             for (let k in debugs) {
                 out.push(k + ': ' + debugs[k])
             }
-            this.getDomElem('d').innerHTML = perfKpis + out.join("\n");
+            this.addDomOp(this.getDomElem('d'), 'innerHTML', perfKpis + out.join("\n"));
 
             if (this.logs.length > 0) {
-                this.getDomElem('log').innerHTML += this.logs.join("\n") + "\n";
+//                this.getDomElem('log').innerHTML += this.logs.join("\n") + "\n";
                 this.logs = [];
             }
         }
@@ -200,7 +224,7 @@ class Game {
     }
 
     updateFrame() {
-        this.syncDom();
+        this.updateDom();
         if (this.debug) {
             this.printDebugs();
         }
@@ -215,6 +239,10 @@ class Game {
                 screen.frameHandler();
             }
         }
+        this.waitForNextFrame();
+    }
+
+    waitForNextFrame() {
         this.lastAnimationFrame = requestAnimationFrame(this.updateFrame.bind(this));
     }
 
@@ -274,10 +302,14 @@ class Game {
         if (this.debug) {
             this.setDebug(true);
         }
-        this.updateFrame();
         this.log('...booting done');
+        this.waitForNextFrame();
     }
 }
+
+// ###############################
+//         M a n a g e r
+// ###############################
 
 class CanvasManager {
 
@@ -285,6 +317,20 @@ class CanvasManager {
         this.overlayElem = null;
         this.offscreenElem = null;
         this.canvasElems = [];
+    }
+
+    getCanvasElem(dimX, dimY, opaque) {
+        const elem = document.createElement('canvas');
+        elem.id = 'canvas_' + this.canvasElems.length;
+        elem.setAttribute('width', dimX);
+        elem.setAttribute('height', dimY);
+        elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px');
+
+        const ctx = elem.getContext('2d', {alpha: !opaque});
+        ctx.imageSmoothingEnabled = false;
+        const canvas = {elem, ctx};
+        this.canvasElems.push(canvas);
+        return canvas;
     }
 
     getOverlayElem() {
@@ -301,34 +347,14 @@ class CanvasManager {
         return this.offscreenElem;
     }
 
-
-    getNewOverlayCanvas(dimX, dimY, offX, offY, opaque = false) {
-        return this.getNewCanvas('overlay', dimX, dimY, offX, offY, opaque);
+    getContainerElem(viewPortX, viewPortY, offX, offY) {
+        const elem = document.createElement('div');
+        elem.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + viewPortX + 'px; height: ' + viewPortY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden');
+        return elem;
     }
 
     getNewOffscreenCanvas(dimX, dimY) {
         return this.getNewCanvas('offscreen', dimX, dimY);
-    }
-
-    getNewScrollCanvas(dimX, dimY, sizeX, sizeY, offX, offY, opaque = false) {
-        const id = 'scroll_' + this.canvasElems.length;
-        const parentElem = this.getOverlayElem();
-        const container = document.createElement('div');
-        container.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + dimX + 'px; height: ' + dimY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden');
-        const elem = document.createElement('canvas');
-        elem.id = id;
-        elem.setAttribute('width', sizeX);
-        elem.setAttribute('height', sizeY);
-        elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px');
-        container.appendChild(elem);
-        parentElem.appendChild(container);
-
-        const ctx = elem.getContext('2d', {alpha: !opaque});
-        ctx.imageSmoothingEnabled = false;
-        const canvas = {id, type: 'scroll', elem, ctx, width: sizeX, height: sizeY};
-        this.canvasElems.push(canvas);
-
-        return canvas;
     }
 
     getNewCanvas(type, dimX, dimY, offX = 0, offY = 0, opaque = false) {
@@ -350,35 +376,13 @@ class CanvasManager {
         return canvas;
     }
 
-    getNewBufferedOverlayCanvas(dim, options = {}) {
-        const canvas = [];
-        const id = 'bufscroll_' + this.canvasElems.length;
-        const parentElem = this.getOverlayElem();
-        const opaque = options.opaque !== undefined ? options.opaque === true : false;
-        const container = document.createElement('div');
-
-        container.setAttribute(
-            'style',
-            'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + dim.view.width + 'px; height: ' + dim.view.height + 'px; top: ' + dim.offset.x + 'px; left: ' + dim.offset.y + 'px; overflow: hidden');
-
-        while(canvas.length < 2) {
-            const elem = document.createElement('canvas');
-            elem.id = id + '_' + (canvas.length + 1);
-            elem.setAttribute('width', dim.size.width);
-            elem.setAttribute('height', dim.size.height);
-            elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px; display: ' + (canvas.length === 0 ? 'block' : 'none'));
-            container.appendChild(elem);
-            const ctx = elem.getContext('2d', {alpha: !opaque});
-            ctx.imageSmoothingEnabled = false;
-            canvas.push({
-                id: elem.id,
-                elem,
-                ctx
-            });
+    discard(canvas) {
+        canvas.elem.parentNode.removeChild(canvas.elem);
+        canvas.elem = null;
+        const index = this.canvasElems.indexOf(canvas);
+        if (index !== -1) {
+            this.canvasElems.splice(index, 1);
         }
-        parentElem.appendChild(container);
-
-        return canvas
     }
 
     removeChildren(node) {
@@ -394,42 +398,50 @@ class CanvasManager {
     }
 }
 
+// ########################################
+//       A r e a s
+// ########################################
+
 class Area {
 
     constructor() {
         this.panes = [];
-        this.dimX = null;
-        this.dimY = null;
     }
 
     addPane(pane) {
         this.panes.push(pane);
     }
 
-    setDimension(dimX, dimY, offX, offY, dims) {
-        this.dimX = dimX;
-        this.dimY = dimY;
+    addViewNodesToTree(tree, dimX, dimY, offX = 0, offY = 0) {
+        const areaNode = {
+            type: 'area',
+            dim: {
+                x: dimX,
+                y: dimY
+            },
+            offset: {
+                x: offX,
+                y: offY
+            },
+            children: []
+        };
         for (let i = 0; i < this.panes.length; i++) {
             const pane = this.panes[i];
             if (this.firstArea === true && i === 0) {
                 pane.opaque = true;
             }
-            pane.init(dimX, dimY);
-            let sizeX = dimX;
-            let sizeY = dimY;
-            if (pane.oversize) {
-                sizeX = pane.sizeX;
-                sizeY = pane.sizeY;
-            }
-            dims.push({
+            const node = {
+                type: 'pane',
                 pane,
-                off: {x: offX, y: offY},
-                dim: {x: dimX, y: dimY},
-                size: {x: sizeX, y: sizeY},
-                buffered: (pane.buffered === true)
-            });
+                container: pane.init(dimX, dimY),
+                children: []
+            };
+            areaNode.children.push(node);
+            if (node.container) {
+                node.container.setViewPort(dimX, dimY, offX, offY);
+            }
         }
-        return dims;
+        tree.children.push(areaNode);
     }
 }
 
@@ -438,12 +450,31 @@ class SplitArea {
     constructor(axis, areaSizes) {
         this.axis = axis;
         this.areaSizes = areaSizes;
+        this.areaLength = 0;
         this.areas = [];
+        this.scrollElem = null;
+        this.scrollPos = 0;
+        this.maxScrollPos = 0;
         let i = 0;
         while (i < areaSizes.length) {
+            this.areaLength += this.areaSizes[i];
             this.areas.push(null);
             i++;
         }
+    }
+
+    scrollBy(sx, sy) {
+        if (!this.scrollElem) {
+            return;
+        }
+        const move = this.axis === 'X' ? sx : sy;
+        this.scrollPos += move;
+        if (this.scrollPos < 0) {
+            this.scrollPos = 0;
+        } else if (this.scrollPos > this.maxScrollPos) {
+            this.scrollPos = this.maxScrollPos;
+        }
+        Game.instance.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos);
     }
 
     addArea(area, pos = null) {
@@ -468,11 +499,36 @@ class SplitArea {
         this.addArea(area, pos);
     }
 
-    setDimension(dimX, dimY, offX, offY, dims) {
-
+    addViewNodesToTree(tree, dimX, dimY, offX = 0, offY = 0) {
+        const areaNode = {
+            type: 'area',
+            dim: {
+                x: dimX,
+                y: dimY
+            },
+            offset: {
+                x: offX,
+                y: offY
+            },
+            children: []
+        };
+        const oversize = (this.axis === 'X') ? (dimX < this.areaLength) : (dimY < this.areaLength);
+        if (oversize) {
+            const container = OCM.getContainerElem(dimX, dimY, offX, offY);
+            this.scrollElem = document.createElement('div');
+            this.scrollElem.setAttribute(
+                'style',
+                'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' +
+                (this.axis === 'X' ? this.areaLength : dimX) + 'px; height: ' +
+                (this.axis !== 'X' ? this.areaLength : dimY) + 'px; top: 0px; left: 0px;'
+            );
+            container.appendChild(this.scrollElem);
+            areaNode.parents = [container, this.scrollElem];
+            offX = 0;
+            offY = 0;
+            this.maxScrollPos = this.areaLength - (this.axis === 'X' ? dimX : dimY);
+        }
         let pos = 0;
-        let pos_max = (this.axis === 'X') ? dimX : dimY;
-
         for (let i = 0; i < this.areas.length; i++) {
             if (this.areas[i] === null) {
                 continue;
@@ -480,39 +536,34 @@ class SplitArea {
             const size = this.areaSizes[i];
             let x = (this.axis === 'X') ? size : dimX;
             let y = (this.axis !== 'X') ? size : dimY;
-            const oldPos = pos;
             pos += size;
-            if (pos > pos_max) {
-                if (this.axis === 'X') {
-                    x = pos_max - oldPos;
-                } else {
-                    y = pos_max - oldPos;
-                }
-            }
             if (this.firstArea === true) {
                 this.areas[i].firstArea = true;
             }
-            this.areas[i].setDimension(x, y, offX, offY, dims);
-            if (pos >= pos_max) {
-                break;
-            }
+            this.areas[i].addViewNodesToTree(areaNode, x, y, offX, offY);
+
             if (this.axis === 'X') {
                 offX += size;
             } else {
                 offY += size;
             }
         }
+        tree.children.push(areaNode);
     }
 }
 
+// ########################################
+//       S c r e e n
+// ########################################
+
 class Screen {
+
     constructor(id) {
         this.id = id;
         this.areas = [];
-        this.dimX = null;
-        this.dimY = null;
         this.keyHandler = null;
         this.frameHandler = null;
+        this.tree = null;
     }
 
     addArea(area) {
@@ -529,45 +580,49 @@ class Screen {
     }
 
     setDimension(dimX, dimY) {
-        this.dimX = dimX;
-        this.dimY = dimY;
-        const dims = [];
-        for (let i = 0; i < this.areas.length; i++) {
-            this.areas[i].setDimension(dimX, dimY, 0, 0, dims);
-        }
-        for(let elem of dims) {
-            const oversize = (elem.dim.y !== elem.size.y || elem.dim.x !== elem.size.x);
-            if (elem.buffered) {
-                elem.canvas = OCM.getNewBufferedOverlayCanvas({
-                    view: {width: elem.dim.x, height: elem.dim.y},
-                    offset: {x: elem.off.x, y: elem.off.y},
-                    size: {width: elem.size.x, height: elem.size.y}
-                }, {opaque: elem.pane.opaque === true});
-                elem.pane.setScrollElem(elem.canvas);
-            } else {
-                elem.canvas = oversize ?
-                    OCM.getNewScrollCanvas(elem.dim.x, elem.dim.y, elem.size.x, elem.size.y, elem.off.x, elem.off.y, elem.pane.opaque === true) :
-                    OCM.getNewOverlayCanvas(elem.dim.x, elem.dim.y, elem.off.x, elem.off.y, elem.pane.opaque === true);
+        this.tree = {
+            type: 'screen',
+            dim: {x: dimX, y: dimY},
+            children: []
+        };
 
-                if (oversize) {
-                    elem.pane.setScrollElem(elem.canvas.elem);
-                }
+        for (let i = 0; i < this.areas.length; i++) {
+            this.areas[i].addViewNodesToTree(this.tree, dimX, dimY);
+        }
+
+        function buildNodeDom(node, containerParent) {
+            let parent = containerParent;
+            if (node.parents)  {
+                parent = node.parents[node.parents.length - 1];
+            }
+
+            if (node.container) {
+                node.container.buildDom(parent);
+            }
+            for (let child of node.children) {
+                buildNodeDom(child, parent);
+            }
+            if (parent !== containerParent) {
+                Game.instance.addDomChild(containerParent, node.parents[0]);
             }
         }
-        this.elems = dims;
+        buildNodeDom(this.tree, Game.instance.getDomElem('overlay'));
     }
 
     render(force = false) {
-        for(let elem of this.elems) {
-            const isDirty = !(elem.pane.dirty === false);
-            if (force || isDirty) {
-                if (elem.buffered) {
-                    elem.pane.render(elem.canvas[elem.pane.getInactiveBuffer()].ctx);
-                } else {
-                    elem.pane.render(elem.canvas.ctx);
+        function renderPanes(tree) {
+            for (let child of tree.children) {
+                if (child.type === 'pane' && child.pane !== null) {
+                    const isDirty = !(child.pane.dirty === false);
+                    if (force || isDirty) {
+                        child.pane.render();
+                    }
                 }
+                renderPanes(child);
             }
         }
+
+        renderPanes(this.tree);
     }
 
     setKeyHandler(handler) {
@@ -579,27 +634,1344 @@ class Screen {
     }
 }
 
+// #####################################
+//   DOM Container
+// #####################################
+
+class DivContainer {
+    constructor(child = null) {
+        this.child = child;
+    }
+
+    setViewPort(viewPortX, viewPortY, offsetX, offsetY) {
+        this.viewPortDim = {
+            x: viewPortX,
+            y: viewPortY
+        };
+        this.viewPortOffsetPos = {
+            x: offsetX,
+            y: offsetY
+        }
+    }
+
+    buildDom(parent) {
+        this.containerElem = OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        if (this.child !== null) {
+            this.containerElem.appendChild(this.child);
+        }
+        Game.instance.addDomChild(parent, this.containerElem);
+    }
+
+    getChild() {
+        return this.child;
+    }
+
+    setBackgroundColor(color) {
+        Game.instance.addDomOp(this.containerElem, 'style.backgroundColor', color);
+    }
+
+    setViewPortOffset(x, y) {
+    }
+}
+
+class ImageContainer {
+    constructor(dimX, dimY) {
+        this.dim = {
+            x: dimX,
+            y: dimY
+        };
+        this.image = new Image();
+        this.image.style.left = 0;
+        this.image.style.right = 0;
+        this.image.style.position = 'absolute';
+    }
+
+    setViewPort(viewPortX, viewPortY, offsetX, offsetY) {
+        this.viewPortDim = {
+            x: viewPortX,
+            y: viewPortY
+        };
+        this.viewPortOffsetPos = {
+            x: offsetX,
+            y: offsetY
+        }
+    }
+
+    buildDom(parent) {
+        this.containerElem = OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        this.containerElem.appendChild(this.image);
+        Game.instance.addDomChild(parent, this.containerElem);
+    }
+
+    setImageData(data) {
+        Game.instance.updateDom(this.image, 'src', data);
+    }
+
+    getImageElem() {
+        return this.image;
+    }
+
+    setViewPortOffset(x, y) {
+        Game.instance.addDomOp(this.image, 'style.left', x);
+        Game.instance.addDomOp(this.image, 'style.right', y);
+    }
+}
+
+class BufferedCanvasContainer {
+
+    constructor(dimX, dimY, opaque) {
+        this.dim = {
+            x: dimX,
+            y: dimY
+        };
+        this.opaque = opaque;
+    }
+
+    setViewPort(viewPortX, viewPortY, offsetX, offsetY) {
+        this.viewPortDim = {
+            x: viewPortX,
+            y: viewPortY
+        };
+        this.viewPortOffsetPos = {
+            x: offsetX,
+            y: offsetY
+        }
+    }
+
+    buildDom(parent) {
+        this.containerElem = OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        this.buffers = [
+            OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque),
+            OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque)
+        ];
+        this.containerElem.appendChild(this.buffers[0].elem);
+        this.containerElem.appendChild(this.buffers[1].elem);
+        Game.instance.addDomChild(parent, this.containerElem);
+    }
+
+    setViewPortOffset(x, y) {
+        const activeElem = this.getActiveElem();
+        Game.instance.addDomOp(activeElem, 'style.left', x);
+        Game.instance.addDomOp(activeElem, 'style.right', y);
+    }
+
+    getBufferCtx() {
+        return this.buffers[this.active === 1 ? 0 : 1].ctx;
+    }
+
+    getActiveCtx() {
+        return this.buffers[this.active].ctx;
+    }
+
+    getBufferElem() {
+        return this.buffers[this.active === 1 ? 0 : 1].elem;
+    }
+
+    getActiveElem() {
+        return this.buffers[this.active].elem;
+    }
+
+    switchBuffer() {
+        Game.instance.addDomOp(this.getBufferElem(), 'style.display', 'block');
+        this.active = this.active === 1 ? 0 : 1;
+        Game.instance.addDomOp(this.getBufferElem(), 'style.display', 'none');
+    }
+}
+
+class CanvasContainer {
+
+    constructor(dimX, dimY, opaque) {
+        this.dim = {
+            x: dimX,
+            y: dimY
+        };
+        this.opaque = opaque;
+    }
+
+    setViewPort(viewPortX, viewPortY, offsetX, offsetY) {
+        this.viewPortDim = {
+            x: viewPortX,
+            y: viewPortY
+        };
+        this.viewPortOffsetPos = {
+            x: offsetX,
+            y: offsetY
+        };
+        this.canvas = OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque);
+        this.elem = null;
+
+        if ((this.dim.x !== this.viewPortDim.x) || (this.dim.y !== this.viewPortDim.y)) {
+            this.elem = OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, offsetX, offsetY);
+        } else {
+            this.canvas.elem.style.left = offsetX;
+            this.canvas.elem.style.top = offsetY;
+        }
+    }
+
+    buildDom(parent) {
+        if (this.elem) {
+            this.elem.appendChild(this.canvas.elem);
+            Game.instance.addDomChild(parent, this.elem);
+        } else {
+            Game.instance.addDomChild(parent, this.canvas.elem);
+        }
+    }
+
+    setViewPortOffset(x, y) {
+    }
+
+    getCanvasCtx() {
+        return this.canvas.ctx;
+    }
+
+    getCanvasElem() {
+        return this.canvas.elem;
+    }
+}
 
 // #############################################
 //      P a n e s
 // #############################################
 
-class PaneScroller {
+class EmptyPane {
+    constructor() {}
 
-    constructor(pane) {
-        this.pane = pane;
-        this.subPanes = [];
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = this.viewPortDim;
     }
 
-    addSubPane(pane, factorX = 0, factorY = 0) {
-        this.subPanes.push([pane, factorX, factorY]);
+    render() {
+        this.dirty = false;
+    }
+}
+
+class ColorPane {
+    constructor(color) {
+        this.color = color;
+        this.dirty = true;
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = this.viewPortDim;
+        this.container = new DivContainer();
+        return this.container;
+    }
+
+    render() {
+        this.container.setBackgroundColor(this.color);
+        this.dirty = false;
+    }
+}
+
+class TilesPane {
+
+    constructor(tilesMap, config = {}) {
+
+        this.tilesMap = tilesMap;
+
+        this.endless = {
+            x: (config.endless && config.endless.x === true),
+            y: (config.endless && config.endless.y === true)
+        };
+        this.scrollPos = {
+            x: 0,
+            y: 0
+        };
+        this.mapTilePos = {
+            x: 0,
+            y: 0
+        };
+
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        const viewPortTiles = {
+            x: Math.ceil(viewPortDimX / this.tilesMap.tileSize),
+            y: Math.ceil(viewPortDimY / this.tilesMap.tileSize)
+        };
+
+        this.canvasTiles = {
+            x: viewPortTiles.x + 1,
+            y: viewPortTiles.y + 1
+        };
+        this.paneDim = {
+            x: this.canvasTiles.x * this.tilesMap.tileSize,
+            y: this.canvasTiles.y * this.tilesMap.tileSize
+        };
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.scrollStop = {
+            top: null,
+            bottom: null,
+            left: null,
+            right: null
+        };
+        this.dirty = true;
+        this.container = new CanvasContainer(this.paneDim.x, this.paneDim.y);
+        return this.container;
+    }
+
+    setMapTilePos(mapTilePosX, mapTilePosY) {
+        this.mapTilePos.x = mapTilePosX;
+        this.mapTilePos.y = mapTilePosY;
+        this.scrollPos.x = 0;
+        this.scrollPos.y = 0;
+    }
+
+    render() {
+        const target = this.container.getCanvasCtx();
+        this.tilesMap.render(
+            target,
+            {
+                x: 0,
+                y: 0
+            },
+            {
+                width: this.canvasTiles.x,
+                height: this.canvasTiles.y,
+                pos: {
+                    x: this.mapTilePos.x,
+                    y: this.mapTilePos.y
+                },
+                endless: this.endless
+            }
+        );
+
+        this.dirty = false;
+    }
+
+    scrollBy(Sx, Sy) {
+        const scrolled = {
+            x: Sx,
+            y: Sy,
+            unscrolled: {
+                x: this.scrollPos.x + Sx,
+                y: this.scrollPos.y + Sy
+            }
+        };
+
+        this.scrollPos.x += Sx;
+        if (this.scrollStop.left !== null) {
+            this.scrollPos.x = Math.max(this.scrollPos.x, this.scrollStop.left);
+        }
+        if (this.scrollStop.right !== null) {
+            this.scrollPos.x = Math.min(this.scrollPos.x, this.scrollStop.right);
+        }
+        if (this.scrollPos.x <= -this.tilesMap.tileSize) {
+            this.scrollPos.x = -this.tilesMap.tileSize + 1;
+        } else if (this.scrollPos.x >= (this.paneDim.x - this.viewPortDim.x)) {
+            this.scrollPos.x = this.paneDim.x - this.viewPortDim.x;
+        }
+
+        this.scrollPos.y += Sy;
+        if (this.scrollStop.top !== null) {
+            this.scrollPos.y = Math.max(this.scrollPos.y, this.scrollStop.top);
+        }
+        if (this.scrollStop.bottom !== null) {
+            this.scrollPos.y = Math.min(this.scrollPos.y, this.scrollStop.bottom);
+        }
+
+        if (this.scrollPos.y <= -this.tilesMap.tileSize) {
+            this.scrollPos.y = -this.tilesMap.tileSize + 1;
+        } else if (this.scrollPos.y >= (this.paneDim.y - this.viewPortDim.y)) {
+            this.scrollPos.y = this.paneDim.y - this.viewPortDim.y;
+        }
+
+        scrolled.unscrolled.x -= this.scrollPos.x;
+        scrolled.unscrolled.y -= this.scrollPos.y;
+        scrolled.x -= scrolled.unscrolled.x;
+        scrolled.y -= scrolled.unscrolled.y;
+
+        if (scrolled.x === 0 && scrolled.y === 0) {
+            return scrolled;
+        }
+
+        const mapVector = {
+            x: 0, y: 0
+        };
+        if (this.scrollPos.x < 0) {
+            mapVector.x = -1;
+            this.scrollPos.x += this.tilesMap.tileSize;
+        } else if (this.scrollPos.x >= this.tilesMap.tileSize) {
+            mapVector.x = 1;
+            this.scrollPos.x -= this.tilesMap.tileSize;
+        }
+        if (this.scrollPos.y < 0) {
+            mapVector.y = -1;
+            this.scrollPos.y += this.tilesMap.tileSize;
+        } else if (this.scrollPos.y >= this.tilesMap.tileSize) {
+            mapVector.y = 1;
+            this.scrollPos.y -= this.tilesMap.tileSize;
+        }
+
+        if (mapVector.x !== 0 || mapVector.y !== 0) {
+            this.mapTilePos.x += mapVector.x;
+            this.mapTilePos.y += mapVector.y;
+
+            // set scroll blocks
+            if (!this.endless.x) {
+                this.scrollStop.left = this.mapTilePos.x <= -1 ? 0 : null;
+                this.scrollStop.right = this.mapTilePos.x >= (this.tilesMap.mapTiles.x - this.canvasTiles.x + 1) ? this.tilesMap.tileSize -1 : null;
+            }
+            if (!this.endless.y) {
+                this.scrollStop.top = this.mapTilePos.y <= -1 ? 0 : null;
+                this.scrollStop.bottom = this.mapTilePos.y >= (this.tilesMap.mapTiles.y - this.canvasTiles.y + 1) ? this.tilesMap.tileSize -1 : null;
+            }
+            this.dirty = true;
+        }
+
+        const elemStyle = this.container.getCanvasElem().style;
+        const posLeft = -this.scrollPos.x + 'px';
+        const posTop = -this.scrollPos.y + 'px';
+
+        if (elemStyle.left !== posLeft) {
+            elemStyle.left = posLeft;
+//            Game.instance.addDomOp(elemStyle, 'left', posLeft);
+        }
+        if (elemStyle.top !== posTop) {
+            elemStyle.top = posTop;
+//            Game.instance.addDomOp(elemStyle, 'top', posTop);
+        }
+
+        return scrolled;
+    }
+}
+
+
+class BufferedTilesPane {
+
+    constructor(tilesMap, config) {
+        this.tilesMap = tilesMap;
+
+        this.state = -1;
+        // mandatory
+        this.maxSpeed = config.maxSpeed;
+        this.maxState = Math.floor(this.tilesMap.tileSize / this.maxSpeed);
+        this.endless = {
+            x: (config.endless !== undefined && config.endless.x !== undefined) ? config.endless.x : false,
+            y: (config.endless !== undefined && config.endless.y !== undefined) ? config.endless.y : false,
+        };
+        // scrolling is always relative to the scrollPosOffset (=top left corner of the neutral quadrant)
+        this.scrollPos = {
+            x: 0,
+            y: 0
+        };
+        this.mapTilePos = {
+            x: 0,
+            y: 0
+        };
+
+        this.dirty = true;
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        const viewPortTiles = {
+            x: Math.ceil(viewPortDimX / this.tilesMap.tileSize),
+            y: Math.ceil(viewPortDimY / this.tilesMap.tileSize)
+        };
+
+        // 3 tiles are required in each direction for scrolling around the neutral quadrant
+        this.canvasTiles = {
+            x: viewPortTiles.x + 3,
+            y: viewPortTiles.y + 3
+        };
+        this.paneDim = {
+            x: (this.canvasTiles.x + 2) * this.tilesMap.tileSize,
+            y: (this.canvasTiles.y + 2) * this.tilesMap.tileSize
+        };
+
+        this.scrollAreaDim = {
+            x: this.paneDim.x - 2 * this.tilesMap.tileSize,
+            y: this.paneDim.y - 2 * this.tilesMap.tileSize
+        };
+
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+
+        this.scrollStop = {
+            top: null,
+            bottom: null,
+            left: null,
+            right: null
+        };
+
+        // this is where the scrollArea starts
+        this.canvasTileOffset = {
+            x: 1,
+            y: 1
+        };
+
+        this.bufferTileOffset = {
+            x: 1,
+            y: 1
+        };
+
+        this.tileMoveVector = {
+            x: 0,
+            y: 0
+        };
+
+        this.scrollPosOffset = {
+            x: (this.canvasTileOffset.x + 1) * this.tilesMap.tileSize,
+            y: (this.canvasTileOffset.y + 1) * this.tilesMap.tileSize
+        };
+
+        this.scrollAreaTileRows = Math.ceil(this.scrollAreaDim.y / this.tilesMap.tileSize);
+        const tileSteps = this.scrollAreaTileRows / (this.maxState - 1);
+
+        this.copyRowsInState = [];
+        let sum = 0;
+        let remRows = viewPortTiles.y + 3;
+        while(remRows > 0) {
+            const pos = Math.round(tileSteps * (this.copyRowsInState.length + 1));
+            const rows = pos - sum;
+            this.copyRowsInState.push(rows);
+            sum += rows;
+            remRows -= rows;
+        }
+        this.bufferTilePos = {
+            x: this.mapTilePos.x,
+            y: this.mapTilePos.y
+        };
+        this.copiedHeight = 0;
+
+        this.buffers = new BufferedCanvasContainer(this.paneDim.x, this.paneDim.y);
+        return this.buffers;
+    }
+
+    setMapTilePos(mapTilePosX, mapTilePosY) {
+        this.mapTilePos.x = mapTilePosX;
+        this.mapTilePos.y = mapTilePosY;
+        this.scrollPos.x = 0;
+        this.scrollPos.y = 0;
+    }
+
+    renderAll(target) {
+        this.tilesMap.render(
+            target,
+            {
+                x: this.canvasTileOffset.x * this.tilesMap.tileSize,
+                y: this.canvasTileOffset.y * this.tilesMap.tileSize
+            },
+            {
+                width: this.canvasTiles.x,
+                height: this.canvasTiles.y,
+                pos: {
+                    x: this.mapTilePos.x,
+                    y: this.mapTilePos.y
+                },
+                endless: this.endless
+            }
+        );
+    }
+
+    copyViewRows(source, target) {
+        const copyRows = this.copyRowsInState[this.state - 1];
+        if (copyRows > 0) {
+            const copyHeight = copyRows * this.tilesMap.tileSize;
+            const srcImg = source.getImageData(
+                this.canvasTileOffset.x * this.tilesMap.tileSize,
+                this.copiedHeight + (this.canvasTileOffset.y * this.tilesMap.tileSize),
+                this.scrollAreaDim.x,
+                copyHeight
+            );
+            target.putImageData(srcImg,
+                this.bufferTileOffset.x * this.tilesMap.tileSize,
+                this.bufferTileOffset.y * this.tilesMap.tileSize + this.copiedHeight
+            );
+            this.copiedHeight += copyHeight;
+        }
+    }
+
+    renderNewTiles(target) {
+        let addLen = 0;
+        let offX = 0;
+
+        if (this.tileMoveVector.x !== 0) {
+            if (this.tileMoveVector.x < 0) {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: ((this.bufferTileOffset.x - 1) * this.tilesMap.tileSize),
+                        y: (this.bufferTileOffset.y * this.tilesMap.tileSize)
+                    },
+                    {
+                        width: 1,
+                        height: this.canvasTiles.y,
+                        pos: {
+                            x: this.bufferTilePos.x - 1,
+                            y: this.bufferTilePos.y
+                        },
+                        endless: this.endless
+                    }
+                );
+                offX -= 1;
+            } else {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: this.bufferTileOffset.x * this.tilesMap.tileSize + this.scrollAreaDim.x,
+                        y: this.bufferTileOffset.y * this.tilesMap.tileSize,
+                    }, {
+                        width: 1,
+                        height: this.canvasTiles.y,
+                        pos: {
+                            x: (this.bufferTilePos.x + this.canvasTiles.x),
+                            y: this.bufferTilePos.y
+                        },
+                        endless: this.endless
+                    }
+                );
+            }
+            addLen++;
+        }
+
+        if (this.tileMoveVector.y !== 0) {
+            if (this.tileMoveVector.y < 0) {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: (this.bufferTileOffset.x + offX) * this.tilesMap.tileSize,
+                        y: (this.bufferTileOffset.y - 1) * this.tilesMap.tileSize
+                    },
+                    {
+                        width: this.canvasTiles.x + addLen,
+                        height: 1,
+                        pos: {
+                            x: this.bufferTilePos.x + offX,
+                            y: this.bufferTilePos.y - 1
+                        },
+                        endless: this.endless
+                    }
+                );
+            } else {
+                this.tilesMap.render(
+                    target,
+                    {
+                        x: (this.bufferTileOffset.x + offX) * this.tilesMap.tileSize,
+                        y: (this.bufferTileOffset.y * this.tilesMap.tileSize) + this.scrollAreaDim.y
+                    },
+                    {
+                        width: this.canvasTiles.x + addLen,
+                        height: 1,
+                        pos: {
+                            x: this.bufferTilePos.x + offX,
+                            y: this.bufferTilePos.y + this.canvasTiles.y
+                        },
+                        endless: this.endless
+                    }
+                );
+            }
+        }
+        this.bufferTilePos.x += this.tileMoveVector.x;
+        this.bufferTilePos.y += this.tileMoveVector.y;
+    }
+
+    switchBuffer() {
+
+        this.scrollPos.x -= this.tileMoveVector.x * this.tilesMap.tileSize;
+        this.scrollPos.y -= this.tileMoveVector.y * this.tilesMap.tileSize;
+
+        this.canvasTileOffset.x = this.bufferTileOffset.x + this.tileMoveVector.x;
+        this.canvasTileOffset.y = this.bufferTileOffset.y + this.tileMoveVector.y;
+
+        this.scrollPosOffset.x = (this.canvasTileOffset.x + 1) * this.tilesMap.tileSize;
+        this.scrollPosOffset.y = (this.canvasTileOffset.y + 1) * this.tilesMap.tileSize;
+
+        this.mapTilePos.x = this.bufferTilePos.x;
+        this.mapTilePos.y = this.bufferTilePos.y;
+        this.copiedHeight = 0;
+
+        // set scroll blocks
+        if (!this.endless.x) {
+            this.scrollStop.left = this.mapTilePos.x <= -1 ? 0 : null;
+            this.scrollStop.right = this.mapTilePos.x >= (this.tilesMap.mapTiles.x - this.canvasTiles.x + 1) ? this.tilesMap.tileSize -1 : null;
+        }
+        if (!this.endless.y) {
+            this.scrollStop.top = this.mapTilePos.y <= -1 ? 0 : null;
+            this.scrollStop.bottom = this.mapTilePos.y >= (this.tilesMap.mapTiles.y - this.canvasTiles.y + 1) ? this.tilesMap.tileSize -1 : null;
+        }
+
+        this.buffers.switchBuffer();
+        this.state = 0;
+    }
+
+    getQuadrantMoveVector(fromQuadrant, toQuadrant) {
+        const relDist = toQuadrant - fromQuadrant;
+        const dist = Math.abs(relDist);
+        switch(dist) {
+            case 0:
+                return {x: 0, y: 0};
+
+            case 1:
+                return {x: relDist, y: 0};
+
+            case 2:
+                if (relDist < 0) {
+                    return {x: 1, y: -1};
+                }
+                return {x: -1, y: 1};
+
+            case 3:
+                return {x: 0, y: (relDist < 0 ? -1 : 1)};
+
+            case 4:
+                if (relDist < 0) {
+                    return {x: -1, y: -1};
+                }
+                return {x: 1, y: 1};
+
+            default:
+                throw 'Quadrant distance ' + dist + ' not supported';
+        }
+    }
+
+    getCurrentQuadrant() {
+        const qx = Math.floor((this.scrollPos.x + this.tilesMap.tileSize) / this.tilesMap.tileSize);
+        const qy = Math.floor((this.scrollPos.y + this.tilesMap.tileSize) / this.tilesMap.tileSize);
+        return qy * 3 + qx;
+    }
+
+    scrollBy(Sx, Sy) {
+        if (Math.max(this.maxSpeed, Math.abs(Sx), Math.abs(Sy)) > this.maxSpeed) {
+            throw Error('Unallowed scroll speed above ' + this.maxSpeed);
+        }
+        const oldQuad = this.getCurrentQuadrant();
+
+        const scrolled = {
+            x: Sx,
+            y: Sy,
+            unscrolled: {
+                x: this.scrollPos.x + Sx,
+                y: this.scrollPos.y + Sy
+            }
+        };
+
+        this.scrollPos.x += Sx;
+        if (this.scrollStop.left !== null) {
+            this.scrollPos.x = Math.max(this.scrollPos.x, this.scrollStop.left);
+        }
+        if (this.scrollStop.right !== null) {
+            this.scrollPos.x = Math.min(this.scrollPos.x, this.scrollStop.right);
+        }
+        if (this.scrollPos.x <= -this.tilesMap.tileSize) {
+            this.scrollPos.x = -this.tilesMap.tileSize + 1;
+        } else if (this.scrollPos.x >= (this.paneDim.x - this.viewPortDim.x)) {
+            this.scrollPos.x = this.paneDim.x - this.viewPortDim.x;
+        }
+
+        this.scrollPos.y += Sy;
+        if (this.scrollStop.top !== null) {
+            this.scrollPos.y = Math.max(this.scrollPos.y, this.scrollStop.top);
+        }
+        if (this.scrollStop.bottom !== null) {
+            this.scrollPos.y = Math.min(this.scrollPos.y, this.scrollStop.bottom);
+        }
+
+        if (this.scrollPos.y <= -this.tilesMap.tileSize) {
+            this.scrollPos.y = -this.tilesMap.tileSize + 1;
+        } else if (this.scrollPos.y >= (this.paneDim.y - this.viewPortDim.y)) {
+            this.scrollPos.y = this.paneDim.y - this.viewPortDim.y;
+        }
+
+        scrolled.unscrolled.x -= this.scrollPos.x;
+        scrolled.unscrolled.y -= this.scrollPos.y;
+        scrolled.x -= scrolled.unscrolled.x;
+        scrolled.y -= scrolled.unscrolled.y;
+
+        if (scrolled.x === 0 && scrolled.y === 0) {
+            this.isScrolling = false;
+            return scrolled;
+        }
+
+        this.isScrolling = true;
+
+        const newQuad = this.getCurrentQuadrant();
+        if (oldQuad === newQuad) {
+            return scrolled;
+        }
+
+        if (newQuad === 4) {
+            this.state = 0;
+        } else {
+            const moveVector = this.getQuadrantMoveVector(oldQuad, newQuad);
+            if (this.state === 0)  {
+                this.bufferTilePos.x = this.mapTilePos.x;
+                if (this.endless.x) {
+                    if (this.mapTilePos.x === -this.canvasTiles.x) {
+                        this.bufferTilePos.x += this.tilesMap.mapTiles.x;
+                    } else if (this.mapTilePos.x === this.tilesMap.mapTiles.x) {
+                        this.bufferTilePos.x = 0;
+                    }
+
+                }
+                this.bufferTilePos.y = this.mapTilePos.y;
+                if (this.endless.y) {
+                    if (this.mapTilePos.y === -this.canvasTiles.y) {
+                        this.bufferTilePos.y += this.tilesMap.mapTiles.y;
+                    } else if (this.mapTilePos.y === this.tilesMap.mapTiles.y) {
+                        this.bufferTilePos.y = 0;
+                    }
+                }
+                this.tileMoveVector.x = moveVector.x;
+                this.tileMoveVector.y = moveVector.y;
+                this.bufferTileOffset.x = 1 - moveVector.x;
+                this.bufferTileOffset.y = 1 - moveVector.y;
+                this.copiedHeight = 0;
+                this.state = 1;
+            } else {
+                this.tileMoveVector.x += moveVector.x;
+                this.tileMoveVector.y += moveVector.y;
+            }
+        }
+        return scrolled;
+    }
+
+    render() {
+
+        const target = this.buffers.getBufferCtx();
+        switch(this.state) {
+
+            case 0:
+                break;
+
+            case -1:
+                this.renderAll(target);
+                this.switchBuffer();
+                break;
+
+            case this.maxState:
+                if (this.isScrolling) {
+                    this.renderNewTiles(target);
+                    this.switchBuffer();
+                }
+                break;
+
+            default:
+                if (this.isScrolling) {
+                    this.copyViewRows(this.buffers.getActiveCtx(), target);
+                    this.state++;
+                }
+                break;
+        }
+
+        // sync position
+        const elemStyle = this.buffers.getActiveElem().style;
+        const posLeft = -(this.scrollPosOffset.x + this.scrollPos.x) + 'px';
+        const posTop = -(this.scrollPosOffset.y + this.scrollPos.y) + 'px';
+
+        if (elemStyle.left !== posLeft) {
+            Game.instance.addDomOp(elemStyle, 'left', posLeft);
+        }
+        if (elemStyle.top !== posTop) {
+            Game.instance.addDomOp(elemStyle, 'top', posTop);
+        }
+    }
+}
+
+class SpritePane {
+
+    constructor() {
+        this.sprites = [];
+        this.actor = null;
+        this.activePixels = 0;
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.totalPixels = viewPortDimX * viewPortDimY;
+        this.pixelLimit = Math.round(this.totalPixels * 0.4);
+        this.paneDim = this.viewPortDim;
+        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
+        return this.container;
+    }
+
+    setActor(id) {
+        if (!this.sprites[id]) {
+            throw Error('Sprite Actor "' + id + "' not found!");
+        }
+        this.actor = id;
+    }
+
+    getActor() {
+        return this.actor;
+    }
+
+    addSprite(id, img,  x, y) {
+        this.sprites[id] = {id, img, x, y};
+        this.activePixels += x * y;
+        this.dirty = true;
+    }
+
+    getSpritePos(id) {
+        const sprite = this.sprites[id];
+        return {x: sprite.x, y: sprite.y, len: sprite.img.width};
+    }
+
+    setSpritePos(id, x, y) {
+        const sprite = this.sprites[id];
+        sprite.lastX = sprite.x;
+        sprite.lastY = sprite.y;
+        sprite.x = x;
+        sprite.y = y;
+        this.dirty = true;
+    }
+
+    render() {
+        const target = this.container.getCanvasCtx();
+        if (this.activePixels >= this.pixelLimit) {
+            target.clearRect(0, 0, this.viewPortDim.x, this.viewPortDim.y);
+        } else {
+            for (let id in this.sprites) {
+                const sprite = this.sprites[id];
+                target.clearRect(sprite.lastX, sprite.lastY, sprite.img.width, sprite.img.height);
+            }
+        }
+
+        for (let id in this.sprites) {
+            const sprite = this.sprites[id];
+            target.drawImage(sprite.img, sprite.x, sprite.y);
+            sprite.lastX = null;
+            sprite.lastY = null;
+        }
+        this.dirty = false;
+    }
+}
+
+class PatternPane2 {
+
+    constructor(pattern, repeat) {
+        this.canvas = null;
+        this.pattern = pattern;
+        this.repeat = repeat;
+        this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(repeat) !== -1);
+        this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(repeat) !== -1);
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.patternDim = {
+            x: this.pattern.width,
+            y: this.pattern.height
+        };
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.scrollPos = {
+            x: 0,
+            y: 0
+        };
+        this.paneDim = {
+            x: this.repeatX ? viewPortDimX + this.patternDim.x - 1 : viewPortDimX,
+            y: this.repeatY ? viewPortDimY + this.patternDim.y - 1 : viewPortDimY
+        };
+        this.container = new CanvasContainer(this.paneDim.x, this.paneDim.y, this.opaque);
+        return this.container;
+    }
+
+    render() {
+        const target = this.container.getCanvasCtx();
+        target.fillStyle = target.createPattern(this.pattern, this.repeat);
+        target.fillRect(0, 0, this.paneDim.x, this.paneDim.y);
+        this.dirty = false;
+    }
+
+    scrollBy(Sx, Sy) {
+        if (this.repeatX) {
+            this.scrollPos.x += Sx;
+        }
+        if (this.scrollPos.x < 0) {
+            this.scrollPos.x += this.patternDim.x;
+        } else if (this.scrollPos.x >= this.patternDim.x) {
+            this.scrollPos.x -= this.patternDim.x;
+        }
+        if (this.repeatY) {
+            this.scrollPos.y += Sy;
+        }
+        if (this.scrollPos.y < 0) {
+            this.scrollPos.y += this.patternDim.y;
+        } else if (this.scrollPos.y >= this.patternDim.y) {
+            this.scrollPos.y -= this.patternDim.y;
+        }
+        const elem = this.container.getCanvasElem();
+        if (elem) {
+            if (Sx !== 0) {
+                Game.instance.addDomOp(elem, 'style.left', -this.scrollPos.x);
+            }
+            if (Sy !== 0) {
+                Game.instance.addDomOp(elem, 'style.top', -this.scrollPos.y);
+            }
+        }
+    }
+}
+
+
+class PatternPane {
+
+    constructor(pattern, repeat) {
+        this.pattern = pattern;
+        this.repeat = repeat;
+        this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(repeat) !== -1);
+        this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(repeat) !== -1);
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.patternDim = {
+            x: this.pattern.width,
+            y: this.pattern.height
+        };
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.scrollPos = {
+            x: 0,
+            y: 0
+        };
+        this.paneDim = {
+            x: this.repeatX ? viewPortDimX + this.patternDim.x - 1 : viewPortDimX,
+            y: this.repeatY ? viewPortDimY + this.patternDim.y - 1 : viewPortDimY
+        };
+
+        this.container = new ImageContainer(this.paneDim.x, this.paneDim.y);
+        const tmpCanvas = OCM.getNewOffscreenCanvas(this.paneDim.x, this.paneDim.y);
+        tmpCanvas.ctx.fillStyle = tmpCanvas.ctx.createPattern(this.pattern, this.repeat);
+        tmpCanvas.ctx.fillRect(0, 0, this.paneDim.x, this.paneDim.y);
+        this.container.getImageElem().src = tmpCanvas.elem.toDataURL('image/png');
+        OCM.discard(tmpCanvas);
+        return this.container;
+    }
+
+    render() {
+        this.dirty = false;
+    }
+
+    scrollBy(Sx, Sy) {
+        if (this.repeatX) {
+            this.scrollPos.x += Sx;
+        }
+        if (this.scrollPos.x < 0) {
+            this.scrollPos.x += this.patternDim.x;
+        } else if (this.scrollPos.x >= this.patternDim.x) {
+            this.scrollPos.x -= this.patternDim.x;
+        }
+        if (this.repeatY) {
+            this.scrollPos.y += Sy;
+        }
+        if (this.scrollPos.y < 0) {
+            this.scrollPos.y += this.patternDim.y;
+        } else if (this.scrollPos.y >= this.patternDim.y) {
+            this.scrollPos.y -= this.patternDim.y;
+        }
+        const elem = this.container.getImageElem();
+        if (elem) {
+            if (Sx !== 0) {
+                Game.instance.addDomOp(elem, 'style.left', -this.scrollPos.x);
+            }
+            if (Sy !== 0) {
+                Game.instance.addDomOp(elem, 'style.top', -this.scrollPos.y);
+            }
+        }
+    }
+}
+
+
+class LinearGradientPane2 {
+
+    constructor(axis, colorStops) {
+        if (colorStops.length % 2 == 0) {
+            throw Error('ColorStops need to be in the format: [<color>, <len>, <color>, ..., <len>, <color>]');
+        }
+        this.colorStops = [];
+        for (let i = 0; i < colorStops.length; i += 2) {
+            this.colorStops.push([colorStops[i], (i === colorStops.length - 1) ? 0 : colorStops[i + 1]]);
+        }
+        this.colorStopIndex = null;
+        this.colorStopPosition = null;
+        this.viewPosition = null;
+        this.viewPositionMax = null;
+        this.isHorizontal = (axis === 'X');
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.colorStopIndex = 0;
+        this.colorStopPosition = 0;
+        this.viewPosition = 0;
+        let totalSize = 0;
+        for (let i = 0; i < this.colorStops.length; i++) {
+            totalSize += this.colorStops[i][1];
+        }
+        this.viewSize = this.isHorizontal ? viewPortDimX : viewPortDimY;
+        this.viewPositionMax = totalSize - (this.viewSize + 1);
+        this.container = new CanvasContainer(this.paneDim.x, this.paneDim.y, this.opaque);
+        return this.container;
+    }
+
+    render() {
+        const target = this.container.getCanvasCtx();
+        this.dirty = false;
+
+        let i = this.colorStopIndex;
+        const i_max = this.colorStops.length;
+        let pos = this.colorStopPosition - this.viewPosition;
+        const posStart = pos;
+        const posMax = this.viewPosition + this.viewSize - 1;
+
+        let len = 0;
+        // wir suche jetzt den letzten relevanten ColorStop für den View
+        while (pos < posMax && i < i_max) {
+            const stop = this.colorStops[i];
+            pos += stop[1];
+            len += stop[1];
+            i++;
+        }
+
+        if (len === 0) {
+            return;
+        }
+
+        const gradient = this.isHorizontal ?
+            target.createLinearGradient(posStart, 0, pos, 0) :
+            target.createLinearGradient(0, posStart, 0, pos);
+
+        const factor = 1 / len;
+        pos = 0;
+        for (let j = this.colorStopIndex; j <= i; j++) {
+            if (j >= i_max) {
+                break;
+            }
+            const stop = this.colorStops[j];
+            gradient.addColorStop(pos, stop[0]);
+            pos += stop[1] * factor;
+        }
+        target.fillStyle = gradient;
+        target.fillRect(0, 0, this.paneDim.x, this.paneDim.y);
+    }
+
+    scrollBy(speedX, speedY) {
+        const speed = this.isHorizontal ? speedX : speedY;
+
+        if (speed === 0) {
+            return;
+        }
+        let newPos = this.viewPosition + speed;
+        if (speed > 0) {
+            if (newPos > this.viewPositionMax) {
+                newPos = this.viewPositionMax;
+            }
+            if (newPos !== this.viewPosition) {
+                var posEnd = this.colorStopPosition + this.colorStops[this.colorStopIndex][1];
+                while(posEnd < newPos) {
+                    this.colorStopPosition = posEnd;
+                    this.colorStopIndex++;
+                    posEnd += this.colorStops[this.colorStopIndex][1];
+                }
+            }
+        } else {
+            if (newPos < 0) {
+                newPos = 0;
+            }
+
+            if (newPos !== this.viewPosition) {
+                while (this.colorStopPosition > newPos) {
+                    this.colorStopIndex--;
+                    this.colorStopPosition -= this.colorStops[this.colorStopIndex][1]
+                }
+            }
+
+        }
+        this.viewPosition = newPos;
+        if (speed !== 0) {
+            this.dirty = true;
+        }
+    }
+}
+
+class LinearGradientPane {
+
+    constructor(axis, colorStops) {
+        if (colorStops.length % 2 == 0) {
+            throw Error('ColorStops need to be in the format: [<color>, <len>, <color>, ..., <len>, <color>]');
+        }
+        this.colorStops = [];
+        for (let i = 0; i < colorStops.length; i += 2) {
+            this.colorStops.push([colorStops[i], (i === colorStops.length - 1) ? 0 : colorStops[i + 1]]);
+        }
+        this.viewPosition = null;
+        this.viewPositionMax = null;
+        this.isHorizontal = (axis === 'X');
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.lowerBoundPos = 0;
+        this.upperBoundPos = 0;
+        this.viewPosition = 0;
+        let totalSize = 0;
+        for (let i = 0; i < this.colorStops.length; i++) {
+            totalSize += this.colorStops[i][1];
+        }
+        this.viewSize = this.isHorizontal ? viewPortDimX : viewPortDimY;
+        this.viewPositionMax = Math.max(totalSize - this.viewSize, 0);
+        this.divPosition = 0;
+        this.fadeDiv = document.createElement('div');
+        this.fadeDiv.setAttribute(
+            'style',
+            'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + viewPortDimX + 'px; height: ' + viewPortDimY + 'px; top: 0px; left: 0px'
+        );
+        this.container = new DivContainer(this.fadeDiv);
+        return this.container;
+    }
+
+    render() {
+        let currPos = 0;
+        let currColorIndex = 0;
+
+        while (currPos + this.colorStops[currColorIndex][1] <= this.viewPosition) {
+            currPos += this.colorStops[currColorIndex][1];
+            currColorIndex++;
+        }
+        const startIndex = currColorIndex;
+        this.divPosition = currPos;
+
+        const top = Math.abs(currPos - this.viewPosition);
+        this.lowerBoundPos = currPos;
+        this.upperBoundPos = currPos + this.colorStops[currColorIndex][1];
+
+        const endPos = this.viewPosition + this.viewSize;
+        while (currPos + this.colorStops[currColorIndex][1] <= endPos) {
+            currPos += this.colorStops[currColorIndex][1];
+            currColorIndex++;
+            if (currColorIndex === this.colorStops.length) {
+                currPos = endPos;
+                break;
+            }
+        }
+        let lastIndex = currColorIndex;
+        const lastIndexPos =
+            1 - this.viewSize + (currPos === endPos ? currPos : currPos + this.colorStops[currColorIndex][1]);
+        this.upperBoundPos = Math.min(this.upperBoundPos, lastIndexPos);
+        this.lowerBoundPos = Math.max(this.lowerBoundPos, currPos - this.viewSize);
+
+        let bottom = 0;
+        if (currPos !== endPos) {
+            bottom = currPos + this.colorStops[currColorIndex][1] - endPos;
+            lastIndex++;
+        }
+
+        let gradient = 'to ' + (this.isHorizontal ? 'right' : 'bottom');
+        let pos = 0;
+        for (let i = startIndex; i <= lastIndex; i++) {
+            if (i === this.colorStops.length) {
+                gradient += ', ' + this.colorStops[i - 1][0];
+                break;
+            }
+            const stop = this.colorStops[i];
+            gradient += ', ' + stop[0];
+            if (pos > 0 && i < lastIndex) {
+                gradient += ' ' + pos + 'px';
+            }
+            pos += stop[1];
+        }
+
+        const div = this.container.getChild();
+        Game.instance.addDomOp(
+            div,
+            'style.' + (this.isHorizontal ? 'width' : 'height'),
+            top + this.viewSize + bottom
+        );
+        Game.instance.addDomOp(
+            div,
+            'style.' + (this.isHorizontal ? 'left' : 'top'),
+            -top
+        );
+        Game.instance.addDomOp(
+            div,
+            'style.background',
+            'linear-gradient(' + gradient + ')'
+        );
+        console.log(gradient);
+        this.dirty = false;
+    }
+
+    scrollBy(speedX, speedY) {
+        const speed = this.isHorizontal ? speedX : speedY;
+
+        if (speed === 0) {
+            return;
+        }
+        let newPos = this.viewPosition + speed;
+        if (newPos > this.viewPositionMax) {
+            newPos = this.viewPositionMax;
+        } else if (newPos < 0) {
+            newPos = 0;
+        }
+
+        if (this.viewPosition !== newPos) {
+            this.viewPosition = newPos;
+            if (newPos < this.lowerBoundPos || newPos > this.upperBoundPos) {
+                this.dirty = true;
+            } else {
+                Game.instance.addDomOp(
+                    this.container.getChild(),
+                    'style.' + (this.isHorizontal ? 'left' : 'top'),
+                    this.divPosition - newPos
+                );
+            }
+        }
+    }
+}
+
+// #################################
+//    Scroll Handler
+// #################################
+
+class MasterSlavesScrollHandler {
+
+    constructor(master) {
+        this.master = master;
+        this.slaves = [];
+    }
+
+    addSlave(slave, factorX = 0, factorY = 0) {
+        this.slaves.push([slave, factorX, factorY]);
     }
 
     scrollBy(sx, sy) {
-        const scrolled = this.pane.scrollBy(sx, sy);
+        const scrolled = this.master.scrollBy(sx, sy);
         if (scrolled.x !== 0 || scrolled.y !== 0) {
-            for (let pane of this.subPanes) {
-                pane[0].scrollBy(scrolled.x * pane[1], scrolled.y * pane[2]);
+            for (let slave of this.slaves) {
+                slave[0].scrollBy(scrolled.x * slave[1], scrolled.y * slave[2]);
             }
         }
         return scrolled;
@@ -607,7 +1979,7 @@ class PaneScroller {
 }
 
 
-class ScrollBounds {
+class BoundsScrollHandler {
 
     constructor(spritePane, scroller, boundsSize) {
         this.spritePane = spritePane;
@@ -639,7 +2011,7 @@ class ScrollBounds {
                 }
             }
 
-            let max = this.spritePane.dimX - 1 - sprite.len;
+            let max = this.spritePane.viewPortDim.x - 1 - sprite.len;
             let rightScrollBound = max - scrollBoundsBottom.x;
             if (pos > rightScrollBound) {
                 if (sprite.x <= rightScrollBound) {
@@ -665,7 +2037,7 @@ class ScrollBounds {
                     pos = 0;
                 }
             }
-            let max = this.spritePane.dimY - 1 - sprite.len;
+            let max = this.spritePane.viewPortDim.y - 1 - sprite.len;
             let bottomScrollBound = max - scrollBoundsBottom.y;
             if (pos > bottomScrollBound) {
                 if (sprite.y <= bottomScrollBound) {
@@ -695,876 +2067,6 @@ class ScrollBounds {
     }
 }
 
-class EmptyPane {
-    constructor() {}
-
-    init(dimX, dimY) {}
-
-    render(target) {
-        this.dirty = false;
-    }
-}
-
-class ColorPane {
-    constructor(color) {
-        this.color = color;
-        this.dimX = null;
-        this.dimY = null;
-    }
-
-    init(dimX, dimY) {
-        this.dimX = dimX;
-        this.dimY = dimY;
-    }
-
-    render(target) {
-        target.fillStyle = this.color;
-        target.fillRect(0, 0, this.dimX, this.dimY);
-        this.dirty = false;
-    }
-}
-
-class BufferedScrollPane {
-
-    constructor(config) {
-        this.tileSize = 1 << config.tileBits;
-        this.maxSpeed = config.maxSpeed;
-        this.tilesMap = config.tilesMap;
-
-        this.buffered = true;
-        this.oversize = true;
-        this.scrollElem = null;
-        this.bufferState = -1;
-        this.maxSpeed = config.maxSpeed;
-        this.maxBufferState = Math.floor(this.tileSize / this.maxSpeed);
-        this.endless = {
-            x: (config.endless !== undefined && config.endless.x !== undefined) ? config.endless.x : false,
-            y: (config.endless !== undefined && config.endless.y !== undefined) ? config.endless.y : false,
-        };
-        this.activeBuffer = 1;
-        this.dirty = true;
-    }
-
-    init(dimX, dimY) {
-        let viewTilesX = Math.ceil(dimX/this.tileSize);
-        let viewTilesY = Math.ceil(dimY/this.tileSize);
-
-        this.bufferTiles = 2;
-        // 3 tiles are required in each direction for scrolling around the neutral quadrant
-        this.bufferTilesX = viewTilesX + 3;
-        this.bufferTilesY = viewTilesY + 3;
-
-        this.sizeX = (this.bufferTilesX + this.bufferTiles) * this.tileSize;
-        this.sizeY = (this.bufferTilesY + this.bufferTiles) * this.tileSize;
-
-        this.scrollSizeX = this.sizeX - this.bufferTiles * this.tileSize;
-        this.scrollSizeY = this.sizeY - this.bufferTiles * this.tileSize;
-
-        this.dimX = dimX;
-        this.dimY = dimY;
-
-        // scrolling is always relative to the top left corner of the neutral quadrant
-        this.scrollX = 0;
-        this.scrollY = 0;
-
-        this.scrollBlock = {
-            top: null,
-            bottom: null,
-            left: null,
-            right: null
-        };
-
-        this.tileOffsetX = 1;
-        this.tileOffsetY = 1;
-        this.targetOffsetX = 1;
-        this.targetOffsetY = 1;
-
-        this.moveX = 0;
-        this.moveY = 0;
-
-        // the center is the
-        this.centerX = (this.tileOffsetX + 1) * this.tileSize;
-        this.centerY = (this.tileOffsetY + 1) * this.tileSize;
-
-        this.maxTileRows = Math.ceil(this.scrollSizeY / this.tileSize);
-        const tileSteps = this.maxTileRows / (this.maxBufferState - 1);
-        this.rowsInPart = [];
-        let sum = 0;
-        let remRows = viewTilesY + 3;
-        while(remRows > 0) {
-            const pos = Math.round(tileSteps * (this.rowsInPart.length + 1));
-            const parts = pos - sum;
-            this.rowsInPart.push(parts);
-            sum += parts;
-            remRows -= parts;
-        }
-        this.mapX = 4;
-        this.mapY = 2;
-        this.copyX = this.mapX;
-        this.copyY = this.mapY;
-
-        this.copiedHeight = 0;
-    }
-
-    setScrollElem(elem) {
-        this.scrollElem = elem;
-    }
-
-    getScrollElem() {
-        return this.scrollElem[this.activeBuffer].elem;
-    }
-
-    getInactiveBuffer() {
-        return (this.activeBuffer === 0 ? 1 : 0);
-    }
-
-    renderAll(target) {
-        this.tilesMap.render(
-            target,
-            {
-                x: this.tileOffsetX * this.tileSize,
-                y: this.tileOffsetY * this.tileSize
-            },
-            {
-                width: this.bufferTilesX,
-                height: this.bufferTilesY,
-                pos: {x: this.mapX, y: this.mapY},
-                endless: this.endless
-            }
-        );
-    }
-
-    copyViewRows(source, target) {
-
-        const copyRows = this.rowsInPart[this.bufferState - 1];
-        if (copyRows > 0) {
-            const copyHeight = copyRows * this.tileSize;
-            const srcImg = source.getImageData(
-                this.tileOffsetX * this.tileSize,
-                this.copiedHeight + (this.tileOffsetY * this.tileSize),
-                this.scrollSizeX,
-                copyHeight
-            );
-            target.putImageData(srcImg,
-                this.targetOffsetX * this.tileSize,
-                this.targetOffsetY * this.tileSize + this.copiedHeight
-            );
-            this.copiedHeight += copyHeight;
-        }
-    }
-
-    renderNewTiles(target) {
-        let addLen = 0;
-        let offX = 0;
-
-        if (this.moveX !== 0) {
-            if (this.moveX < 0) {
-                this.tilesMap.render(
-                    target,
-                    {
-                        x: ((this.targetOffsetX - 1) * this.tileSize),
-                        y: (this.targetOffsetY * this.tileSize)
-                    },
-                    {
-                        width: 1,
-                        height: this.bufferTilesY,
-                        pos: {x: this.copyX - 1, y: this.copyY},
-                        endless: this.endless
-                    }
-                );
-                offX -= 1;
-            } else {
-                this.tilesMap.render(
-                    target,
-                    {
-                        x: this.targetOffsetX * this.tileSize + this.scrollSizeX,
-                        y: this.targetOffsetY * this.tileSize,
-                    }, {
-                        width: 1,
-                        height: this.bufferTilesY,
-                        pos: {x: (this.copyX + this.bufferTilesX), y: this.copyY},
-                        endless: this.endless
-                    }
-                );
-            }
-            addLen++;
-        }
-
-        if (this.moveY !== 0) {
-            if (this.moveY < 0) {
-                this.tilesMap.render(
-                    target,
-                    {
-                        x: (this.targetOffsetX + offX) * this.tileSize,
-                        y: (this.targetOffsetY - 1) * this.tileSize
-                    },
-                    {
-                        width: this.bufferTilesX + addLen,
-                        height: 1,
-                        pos: {x: this.copyX + offX, y: this.copyY - 1},
-                        endless: this.endless
-                    }
-                );
-            } else {
-                this.tilesMap.render(
-                    target,
-                    {
-                        x: (this.targetOffsetX + offX) * this.tileSize,
-                        y: (this.targetOffsetY * this.tileSize) + this.scrollSizeY
-                    },
-                    {
-                        width: this.bufferTilesX + addLen,
-                        height: 1,
-                        pos: {x: this.copyX + offX, y: this.copyY + this.bufferTilesY},
-                        endless: this.endless
-                    }
-                );
-            }
-        }
-        this.copyX += this.moveX;
-        this.copyY += this.moveY;
-    }
-
-    switchBuffer() {
-        this.scrollX -= this.moveX * this.tileSize;
-        this.scrollY -= this.moveY * this.tileSize;
-
-        this.tileOffsetX = this.targetOffsetX + this.moveX;
-        this.tileOffsetY = this.targetOffsetY + this.moveY;
-
-        this.centerX = (this.tileOffsetX + 1) * this.tileSize;
-        this.centerY = (this.tileOffsetY + 1) * this.tileSize;
-
-        this.mapX = this.copyX;
-        this.mapY = this.copyY;
-        this.copiedHeight = 0;
-
-        // set scroll blocks
-        if (!this.endless.x) {
-            this.scrollBlock.left = this.mapX <= -1 ? 0 : null;
-            this.scrollBlock.right = this.mapX >= (this.tilesMap.width - this.bufferTilesX + 1) ? this.tileSize -1 : null;
-        }
-        if (!this.endless.y) {
-            this.scrollBlock.top = this.mapY <= -1 ? 0 : null;
-            this.scrollBlock.bottom = this.mapY >= (this.tilesMap.height - this.bufferTilesY + 1) ? this.tileSize -1 : null;
-        }
-
-        Game.instance.addDomOp(this.getScrollElem(), 'style.display', 'none');
-        this.activeBuffer = (this.activeBuffer === 0) ? 1 : 0;
-        Game.instance.addDomOp(this.getScrollElem(), 'style.display', 'block');
-
-        this.bufferState = 0;
-    }
-
-    getQuadVector(from, to) {
-        const relDist = to - from;
-        const dist = Math.abs(relDist);
-        switch(dist) {
-            case 0:
-                return {x: 0, y: 0};
-
-            case 1:
-                return {x: relDist, y: 0};
-
-            case 2:
-                if (relDist < 0) {
-                    return {x: 1, y: -1};
-                }
-                return {x: -1, y: 1};
-
-            case 3:
-                return {x: 0, y: (relDist < 0 ? -1 : 1)};
-
-            case 4:
-                if (relDist < 0) {
-                    return {x: -1, y: -1};
-                }
-                return {x: 1, y: 1};
-
-            default:
-                throw 'Quadrant distance ' + dist + ' not supported';
-        }
-    }
-
-    getQuadrant() {
-        let qx = Math.floor((this.scrollX + this.tileSize) / this.tileSize);
-        let qy = Math.floor((this.scrollY + this.tileSize) / this.tileSize);
-        return qy * 3 + qx;
-    }
-
-    scrollBy(Sx, Sy) {
-        if (Math.max(this.maxSpeed, Math.abs(Sx), Math.abs(Sy)) > this.maxSpeed) {
-            throw Error('Unallowed scroll speed above ' + this.maxSpeed);
-        }
-        const oldQuad = this.getQuadrant();
-
-        const scrolled = {
-            x: Sx,
-            y: Sy,
-            unscrolled: {
-                x: this.scrollX + Sx,
-                y: this.scrollY + Sy
-            }
-        };
-
-        this.scrollX += Sx;
-        if (this.scrollBlock.left !== null) {
-            this.scrollX = Math.max(this.scrollX, this.scrollBlock.left);
-        }
-        if (this.scrollBlock.right !== null) {
-            this.scrollX = Math.min(this.scrollX, this.scrollBlock.right);
-        }
-        if (this.scrollX <= -this.tileSize) {
-            this.scrollX = -this.tileSize + 1;
-        } else if (this.scrollX >= (this.sizeX - this.dimX)) {
-            this.scrollX = this.sizeX - this.dimX;
-        }
-
-        this.scrollY += Sy;
-        if (this.scrollBlock.top !== null) {
-            this.scrollY = Math.max(this.scrollY, this.scrollBlock.top);
-        }
-        if (this.scrollBlock.bottom !== null) {
-            this.scrollY = Math.min(this.scrollY, this.scrollBlock.bottom);
-        }
-
-        if (this.scrollY <= -this.tileSize) {
-            this.scrollY = -this.tileSize + 1;
-        } else if (this.scrollY >= (this.sizeY - this.dimY)) {
-            this.scrollY = this.sizeY - this.dimY;
-        }
-
-        scrolled.unscrolled.x -= this.scrollX;
-        scrolled.unscrolled.y -= this.scrollY;
-        scrolled.x -= scrolled.unscrolled.x;
-        scrolled.y -= scrolled.unscrolled.y;
-
-        if (scrolled.x === 0 && scrolled.y === 0) {
-            this.isScrolling = false;
-            return scrolled;
-        }
-
-        this.isScrolling = true;
-
-        const newQuad = this.getQuadrant();
-        if (oldQuad === newQuad) {
-            return scrolled;
-        }
-
-        if (newQuad === 4) {
-            this.bufferState = 0;
-        } else {
-            const vector = this.getQuadVector(oldQuad, newQuad);
-            if (this.bufferState === 0)  {
-                this.copyX = this.mapX;
-                if (this.endless.x) {
-                    if (this.mapX === -this.bufferTilesX) {
-                        this.copyX += this.tilesMap.width;
-                    } else if (this.mapX === this.tilesMap.width) {
-                        this.copyX = 0;
-                    }
-
-                }
-                this.copyY = this.mapY;
-                if (this.endless.y) {
-                    if (this.mapY === -this.bufferTilesY) {
-                        this.copyY += this.tilesMap.height;
-                    } else if (this.mapY === this.tilesMap.height) {
-                        this.copyY = 0;
-                    }
-                }
-                this.moveX = vector.x;
-                this.moveY = vector.y;
-                this.targetOffsetX = 1 - vector.x;
-                this.targetOffsetY = 1 - vector.y;
-                this.copiedHeight = 0;
-                this.bufferState = 1;
-            } else {
-                this.moveX += vector.x;
-                this.moveY += vector.y;
-            }
-        }
-        return scrolled;
-    }
-
-    render(target) {
-
-        switch(this.bufferState) {
-
-            case 0:
-                break;
-
-            case -1:
-                this.renderAll(target);
-                this.switchBuffer();
-                break;
-
-            case this.maxBufferState:
-                if (this.isScrolling) {
-                    this.renderNewTiles(target);
-                    this.switchBuffer();
-                }
-                break;
-
-            default:
-                if (this.isScrolling) {
-                    this.copyViewRows(this.scrollElem[this.activeBuffer].ctx, target);
-                    this.bufferState++;
-                }
-                break;
-        }
-
-        // sync position
-        const elemStyle = this.getScrollElem().style;
-        const posLeft = -(this.centerX + this.scrollX) + 'px';
-        const posTop = -(this.centerY + this.scrollY) + 'px';
-
-        if (elemStyle.left !== posLeft) {
-            Game.instance.addDomOp(elemStyle, 'left', posLeft);
-        }
-        if (elemStyle.top !== posTop) {
-            Game.instance.addDomOp(elemStyle, 'top', posTop);
-        }
-    }
-}
-
-/*
-class StackedPane {
-
-    constructor(axis, panes, len) {
-        this.isHorizontal = (axis === 'X');
-        this.panes = panes;
-        this.len = len;
-        this.subCanvas = [];
-    }
-
-    init(dimX, dimY) {
-        this.dimX = dimX;
-        this.dimY = dimY;
-        const subCanvas = [];
-
-        let pos = 0;
-        if (this.isHorizontal) {
-            let i = 0;
-            while(i < this.panes.length && pos < this.dimX) {
-                const width = this.len[i];
-                this.panes[i].init(width, this.dimY);
-                subCanvas.push(OCM.getNewOffscreenCanvas(width, this.dimY));
-                pos += width;
-                i++;
-            }
-        } else {
-            let i = 0;
-            while(i < this.panes.length && pos < this.dimY) {
-                const height = this.len[i];
-                this.panes[i].init(this.dimX, height);
-                subCanvas.push(OCM.getNewOffscreenCanvas(this.dimX, height));
-                pos += height;
-                i++;
-            }
-        }
-        this.subCanvas = subCanvas;
-    }
-
-    render(target) {
-        target.clearRect(0, 0, this.dimX, this.dimY);
-        let x = 0;
-        let y = 0;
-        const i_max = this.subCanvas.length;
-        for (let i = 0; i < i_max; i++) {
-            const pane = this.panes[i];
-            const c = this.subCanvas[i];
-            pane.render(c.ctx);
-            target.drawImage(c.elem, 0, 0, c.width, c.height, x, y, c.width, c.height);
-            if (this.isHorizontal) {
-                x += this.len[i];
-            } else {
-                y += this.len[i];
-            }
-        }
-    }
-}
-*/
-
-class SpritePane {
-    constructor() {
-        this.sprites = [];
-        this.actor = null;
-    }
-
-    setActor(id) {
-        if (!this.sprites[id]) {
-            throw Error('Sprite Actor "' + id + "' not found!");
-        }
-        this.actor = id;
-    }
-
-    getActor() {
-        return this.actor;
-    }
-
-    addSprite(id, img,  x, y) {
-        this.sprites[id] = {id, img, x, y};
-        this.dirty = true;
-    }
-
-    getSpritePos(id) {
-        const sprite = this.sprites[id];
-        return {x: sprite.x, y: sprite.y, len: sprite.img.width};
-    }
-
-    setSpritePos(id, x, y) {
-        const sprite = this.sprites[id];
-        sprite.x = x;
-        sprite.y = y;
-        this.dirty = true;
-    }
-
-    init(dimX, dimY) {
-        this.dimX = dimX;
-        this.dimY = dimY;
-    }
-
-    render(target) {
-        target.clearRect(0, 0, this.dimX, this.dimY);
-
-        for (let id in this.sprites) {
-            const sprite = this.sprites[id];
-            target.drawImage(sprite.img, sprite.x, sprite.y);
-        }
-        this.dirty = false;
-    }
-}
-
-class PatternPane {
-
-    constructor(pattern, repeat) {
-        this.canvas = null;
-        this.pattern = pattern;
-        this.repeat = repeat;
-        this.oversize = true;
-    }
-
-    init(width, height) {
-        this.patternDimX = this.pattern.width;
-        this.patternDimY = this.pattern.height;
-        const dimX = width + this.patternDimX;
-        const dimY = height + this.patternDimY;
-        this.width = width;
-        this.height = height;
-        this.scrollX = 0;
-        this.scrollY = 0;
-        this.sizeX = dimX;
-        this.sizeY = dimY;
-    }
-
-    setScrollElem(elem) {
-        this.scrollElem = elem;
-    }
-
-    render(target) {
-        target.fillStyle = target.createPattern(this.pattern, this.repeat);
-        target.fillRect(0, 0, this.sizeX, this.sizeY);
-        this.dirty = false;
-    }
-
-    scrollBy(Sx, Sy) {
-        this.scrollX += Sx;
-        if (this.scrollX < 0) {
-            this.scrollX += this.patternDimX;
-        } else if (this.scrollX >= this.patternDimX) {
-            this.scrollX -= this.patternDimX;
-        }
-        this.scrollY += Sy;
-        if (this.scrollY < 0) {
-            this.scrollY += this.patternDimY;
-        } else if (this.scrollY >= this.patternDimY) {
-            this.scrollY -= this.patternDimY;
-        }
-        if (this.scrollElem) {
-            if (Sx !== 0) {
-                this.scrollElem.style.left = -this.scrollX;
-            }
-            if (Sy !== 0) {
-                this.scrollElem.style.top = -this.scrollY;
-            }
-        }
-    }
-}
-
-class WorldPane {
-
-    constructor(tb, tiles, world, bgPane) {
-        this.tb = tb;
-        this.tl = 1 << tb;
-        this.spriteSheet = tiles;
-        this.world = world;
-        this.worldX = 0;
-        this.worldY = 0;
-        this.VOy = 0;
-        this.VOx = 0;
-        this.bgPane = bgPane;
-        this.canvas = null;
-    }
-
-    init(width, height, offscreen) {
-        this.dimX = width;
-        this.dimY = height;
-        this.viewWidth = Math.ceil(width / this.tl);
-        this.viewHeight = Math.ceil(height / this.tl);
-        this.worldMaxY = Math.max(this.world.length - this.viewHeight, 0);
-        this.worldMaxX = Math.max(this.world[0].length - this.viewWidth, 0);
-        this.VOMaxY = height % this.tl;
-        this.VOMaxX = width % this.tl;
-        this.offCanvas = (offscreen === true) ? OCM.getNewOffscreenCanvas(width, height) : null;
-        this.dirty = true;
-    }
-
-    render(drawTarget) {
-        var target = this.offCanvas !== null ? this.offCanvas.ctx : drawTarget;
-        if (this.bgPane !== undefined) {
-            this.bgPane.render(target);
-            target.fillRect(0, 0, this.dimX, this.dimY);
-        } else {
-            target.clearRect(0, 0, this.dimX, this.dimY);
-        }
-
-        var x_max = Math.min(this.worldX + this.viewWidth + 1, this.world[0].length);
-        var y_max = Math.min(this.worldY + this.viewHeight + 1, this.world.length);
-        d('View-Size', this.viewWidth, 'x', this.viewHeight);
-        d('VOMaxY', this.VOMaxY);
-        d('View-Offset', this.VOx, '/', this.VOy);
-        d('World-Size', this.world[0].length, 'x', this.world.length);
-        d('WorldMaxY', this.worldMaxY);
-        d('World-Pos', this.worldX, '/', this.worldY);
-
-        let j = 0;
-        for (let y = this.worldY; y < y_max; y++) {
-            let i = 0;
-            for (let x = this.worldX; x < x_max; x++) {
-                var tile = this.world[y][x];
-                if (tile === 0) {
-                    i++;
-                    continue;
-                }
-                target.drawImage(
-                    this.spriteSheet,
-                    tile << this.tb,
-                    0,
-                    this.tl,
-                    this.tl,
-                    -this.VOx + (i << this.tb),
-                    -this.VOy + (j << this.tb),
-                    this.tl,
-                    this.tl
-                );
-                i++
-            }
-            j++;
-        }
-
-        if (this.offCanvas !== null) {
-            var im = target.getImageData(0, 0, this.dimX, this.dimY);
-            drawTarget.putImageData(im, 0, 0);
-        }
-        this.dirty = false;
-    }
-
-    scrollBy(Sx, Sy) {
-        const unscrolled = {
-            x: 0,
-            y: 0
-        };
-        if (Sy > 0) {
-            // scroll down
-            this.VOy += Sy;
-
-            if (this.VOy >= this.tl) {
-                this.VOy -= this.tl;
-                if (this.worldY < this.worldMaxY) {
-                    this.worldY++;
-                }
-            }
-
-            if (this.worldY === this.worldMaxY) {
-                if (this.VOy > this.VOMaxY) {
-                    unscrolled.y = Math.abs(this.VOy - this.VOMaxY);
-                    this.VOy = this.VOMaxY;
-                }
-            }
-
-        } else if (Sy < 0) {
-            // scroll up
-            this.VOy += Sy;
-
-            if (this.VOy < 0) {
-                if (this.worldY > 0) {
-                    this.worldY--;
-                    this.VOy += this.tl;
-                } else {
-                    unscrolled.y = this.VOy;
-                    this.VOy = 0;
-                }
-            }
-        }
-
-        if (Sx > 0) {
-            // scroll right
-            this.VOx += Sx;
-
-            if (this.VOx >= this.tl) {
-                this.VOx -= this.tl;
-                if (this.worldX < this.worldMaxX) {
-                    this.worldX++;
-                }
-            }
-
-            if (this.worldX === this.worldMaxX) {
-                if (this.VOx > this.VOMaxX) {
-                    unscrolled.x = this.VOx - this.VOMaxX;
-                    this.VOx = this.VOMaxX;
-                }
-            }
-
-        } else if (Sx < 0) {
-            // scroll left
-            this.VOx += Sx;
-
-            if (this.VOx < 0) {
-                if (this.worldX > 0) {
-                    this.worldX--;
-                    this.VOx += this.tl;
-                } else {
-                    unscrolled.x = this.VOx;
-                    this.VOx = 0;
-                }
-            }
-        }
-        if (Sx !== 0 || Sy !== 0) {
-            this.dirty = true;
-        }
-
-        return {
-            x: (Sx - unscrolled.x),
-            y: (Sy - unscrolled.y),
-            unscrolled: unscrolled
-        };
-    }
-}
-
-class LinearGradientPane {
-
-    constructor(axis, pViewSize) {
-        this.colorStops = [];
-        this.colorStopIndex = null;
-        this.colorStopPosition = null;
-        this.viewPosition = null;
-        this.viewPositionMax = null;
-        this.viewSize = pViewSize;
-        this.isHorizontal = (axis === 'X');
-    }
-
-    addColorStop(color, size) {
-        this.colorStops.push([color, size]);
-    }
-
-    init(dimX, dimY) {
-        this.dimX = dimX;
-        this.dimY = dimY;
-        this.colorStopIndex = 0;
-        this.colorStopPosition = 0;
-        this.viewPosition = 0;
-        let totalSize = 0;
-
-        for (let i = 0; i < this.colorStops.length; i++) {
-            totalSize += this.colorStops[i][1];
-        }
-        this.viewPositionMax = totalSize - (this.viewSize + 1);
-    }
-
-    render(target) {
-        this.dirty = false;
-        d('Index', this.colorStopIndex, '| Position', this.colorStopPosition);
-        d('View: ', this.viewPosition, ' of ', this.viewPositionMax);
-
-        var i = this.colorStopIndex;
-        var i_max = this.colorStops.length;
-        var pos = this.colorStopPosition - this.viewPosition;
-        var posStart = pos;
-        var posMax = this.viewPosition + this.viewSize - 1;
-
-        var len = 0;
-        // wir suche jetzt den letzten relevanten ColorStop für den View
-        while (pos < posMax && i < i_max) {
-            var stop = this.colorStops[i];
-            pos += stop[1];
-            len += stop[1];
-            i++;
-        }
-
-        if (len === 0) {
-            return;
-        }
-
-        var gradient = this.isHorizontal ?
-            target.createLinearGradient(posStart, 0, pos, 0) :
-            target.createLinearGradient(0, posStart, 0, pos);
-
-        var faktor = 1 / len;
-        pos = 0;
-        for (var j = this.colorStopIndex; j <= i; j++) {
-            if (j >= i_max) {
-                break;
-            }
-            var stop = this.colorStops[j];
-            gradient.addColorStop(pos, stop[0]);
-            pos += stop[1] * faktor;
-        }
-
-        target.fillStyle = gradient;
-        target.fillRect(0, 0, this.dimX, this.dimY);
-    }
-
-    scrollBy(speedX, speedY) {
-        const speed = this.isHorizontal ? speedX : speedY;
-
-        if (speed === 0) {
-            return;
-        }
-        var newPos = this.viewPosition + speed;
-        if (speed > 0) {
-            if (newPos > this.viewPositionMax) {
-                newPos = this.viewPositionMax;
-            }
-
-            if (newPos !== this.viewPosition) {
-                var posEnd = this.colorStopPosition + this.colorStops[this.colorStopIndex][1];
-                while(posEnd < newPos) {
-                    this.colorStopPosition = posEnd;
-                    this.colorStopIndex++;
-                    posEnd += this.colorStops[this.colorStopIndex][1];
-                }
-            }
-
-        } else {
-            if (newPos < 0) {
-                newPos = 0;
-            }
-
-            if (newPos !== this.viewPosition) {
-                while (this.colorStopPosition > newPos) {
-                    this.colorStopIndex--;
-                    this.colorStopPosition -= this.colorStops[this.colorStopIndex][1]
-                }
-            }
-
-        }
-        this.viewPosition = newPos;
-        if (speed !== 0) {
-            this.dirty = true;
-        }
-    }
-}
 
 // ####################################
 //
@@ -1629,17 +2131,22 @@ class SpriteMap {
 
 class TilesMap {
 
-    constructor(tiles, map, dim) {
+    constructor(tileBits, tiles, map) {
         this.tiles = tiles;
         this.map = map;
-        this.tileBits = dim.tileBits;
-        this.tileSize = 1 << this.tileBits;
-        this.width = this.map[0].length;
-        this.height = this.map.length;
+        this.tileBits = tileBits;
+        this.tileSize = 1 << tileBits;
+        if (this.map.length === 0 || this.map[0].length === 0) {
+            throw Error('Map cannot be empty!');
+        }
+        this.mapTiles = {
+            x: this.map[0].length,
+            y: this.map.length
+        };
     }
 
     render(target, offset, dim = {}) {
-
+        // TODO refactor dim
         const startTileX = dim.pos.x;
         const endTileX = startTileX + dim.width;
         const startTileY = dim.pos.y;
@@ -1650,10 +2157,10 @@ class TilesMap {
         const xIndices = [];
         for(let x = startTileX; x <= endTileX; x++) {
             let index = x;
-            if (index >= this.width) {
+            if (index >= this.mapTiles.x) {
                 if (dim.endless.x) {
-                    while (index >= this.width) {
-                        index -= this.width;
+                    while (index >= this.mapTiles.x) {
+                        index -= this.mapTiles.x;
                     }
                 } else {
                     index = null;
@@ -1661,7 +2168,7 @@ class TilesMap {
             } else if (index < 0) {
                 if (dim.endless.x) {
                     while (index < 0) {
-                        index += this.width;
+                        index += this.mapTiles.x;
                     }
                 } else {
                     index = null;
@@ -1673,10 +2180,10 @@ class TilesMap {
         const yIndices = [];
         for(let y = startTileY; y <= endTileY; y++) {
             let index = y;
-            if (index >= this.height) {
+            if (index >= this.mapTiles.y) {
                 if (dim.endless.y) {
-                    while (index >= this.height) {
-                        index -= this.height;
+                    while (index >= this.mapTiles.y) {
+                        index -= this.mapTiles.y;
                     }
                 } else {
                     index = null;
@@ -1684,7 +2191,7 @@ class TilesMap {
             } else if (index < 0) {
                 if (dim.endless.y) {
                     while (index < 0) {
-                        index += this.height;
+                        index += this.mapTiles.y;
                     }
                 } else {
                     index = null;
@@ -1737,7 +2244,6 @@ function getNewSprite(mapKey, x, y) {
 const OCM = new CanvasManager();
 let debugElem = null;
 let debugs = [];
-
 var spriteMaps = [];
 
 module.exports = {
@@ -1749,16 +2255,18 @@ module.exports = {
     SpritePane,
     ColorPane,
     PatternPane,
-    WorldPane,
-    BufferedScrollPane,
+    PatternPane2,
+    TilesPane,
+    BufferedTilesPane,
     LinearGradientPane,
-    PaneScroller,
-    ScrollBounds,
+    MasterSlavesScrollHandler,
+    BoundsScrollHandler,
     d,
     SpriteMap,
     getNewSpriteMap,
     getNewSprite,
     spriteMaps,
     TilesMap,
+    TILE,
     OCM
 };

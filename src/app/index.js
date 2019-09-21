@@ -4,22 +4,27 @@ import {
     SplitArea,
     Screen,
     EmptyPane,
-    ColorPane,
     SpritePane,
+    ColorPane,
     PatternPane,
-    WorldPane,
+    PatternPane2,
+    TilesPane,
+    BufferedTilesPane,
     LinearGradientPane,
-    PaneScroller,
-    ScrollBounds,
-    BufferedScrollPane,
+    MasterSlavesScrollHandler,
+    BoundsScrollHandler,
+    d,
+    SpriteMap,
+    getNewSpriteMap,
+    getNewSprite,
+    spriteMaps,
     TilesMap,
-    d
-} from './engine.js';
-
-
+    TILE,
+    OCM
+} from './engine';
 
 const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
-    var tb = 4;
+    var tb = TILE.DIM_16x16;
     var spriteSheet = new Image();
     spriteSheet.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAQCAYAAABQrvyxAAAA9klEQVRIS2NkoBLYdejVf1KMcrUVBSt/oqNDijYMtYwU6YZqTsyc9P/tLzuSjdo4Rx/sAdmrV8lyx2Nt7f9kaUR3KcgDD58zkeQBHmEbhiHvgZx4KQbNTMfBEQOkJKEvb48wgGJgUHng/rHvRCUhPhN3hlEPQIOKqpkYFAMHLpbjLBQc9DvBxeygjwFcnhgyHgCFMjZPDAkPgJLHpzM7wSkU3RNDwgNVkxMZpix8htUTQ8ID+y+UMew+/BruCSZFbnBs7NuQwzgkPIBeEcA88O/+V7jUoCyFQK4DtYeIqsmQFM2fnscIKssHvDFHqsOR1YM8QIl+ALtc7JEpDo/lAAAAAElFTkSuQmCC";
     var world = [
@@ -51,16 +56,16 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ];
 
-    var levelPane = new WorldPane(tb, spriteSheet, world);
-    var fadeBg = new LinearGradientPane('Y', Turrican.height);
-    fadeBg.addColorStop('#000000', 100);
-    fadeBg.addColorStop('#400000', 100);
-    fadeBg.addColorStop('#000080', 100);
-    fadeBg.addColorStop('#F0F040', 100);
-    fadeBg.addColorStop('#802050', 100);
+    const worldTilesMap = new TilesMap(tb, spriteSheet, world);
+    var levelPane = new BufferedTilesPane(worldTilesMap, {maxSpeed: 4, endless: {x: true, y: false}});
+    var fadeBg = new LinearGradientPane(
+        'Y',
+        ['#000000', 100, '#400000', 100, '#000080', 40, '#F0F040'] //, 100, '#802050']
+    );
 
-    const bgPane = new WorldPane(
-        tb,
+
+    const bgTilesMap = new TilesMap(
+        TILE.DIM_16x16,
         spriteSheet,
         [
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -81,8 +86,8 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ]
-        , fadeBg
     );
+    const bgPane = new BufferedTilesPane(bgTilesMap, {maxSpeed: 4});
 
     const playerPane = new SpritePane();
     const player = new Image();
@@ -138,19 +143,19 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
     const beast = new Image();
     beast.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAxCAYAAADNyhlBAAADiklEQVRYR7VYAbGrMBBMHSABCZEQCZWABCQgAQlIqAQkRAIScNA/e2TzD5qEQPuY6dBpS/Zus7d36cPcuLpn98ZjTdNsT4fbOI6P2uWqf4gFCTi9JnnOWfcGOF9XArgEfMxmMubtuz5mvS7rxkJjzFn2XwMDFeDr+h/UrBv9JfCfAS/LItkigNa2wsKfAjNbDQxw0YBzZpzSgvsq477r3wDRL2RtrTV2Gs3YWuMXn8SoBgYIVYs9BBiyZHakGfe2bWOp4XtWgRZnFXAE3RiUCwt677NlyxJDECm6T4Gf7hlrVYOSXgaRigCgYCVFdzUwnYoURwWHxYWBsJ+2teJsIrCnS6q7CAyn0nuIhaheBtK0jYFxgPZjZgjgErDsadhHLgxAXKRPCwifz/OcVXBqGz4yRpa0PaqX+0kwZh2bBNzLezP7+XTrGEQSmDSifPy8KTc2g7YxCEhTDlAE9Zpf94GpYoKxVo9daPEb9bxy6s3VWzJCiCIaQdsYgLAJkF6qO6q3YI9Ve8wfERz2RzXHDhSop+CkMXxLtY4O4ADWItLtD/uvmci5VGTFOlkPTlYUg6a8H3ozTZPUrKY5Th8qYprLMA7y6TiMsZEwiSywdcPmPstLMrbOmq7rzDROkXqt7FgJIQAEh2dkiaARvEfG+C4tLoKqLGyzNXp90fy1Re62KuiDzYQtMwkcM4118oprIVpkiftVpzoq+yNjTTF/rEuI73G/YhhF4BKofhCgVw3jErBu5nq8wSIondRkkXOqU2A/Dw+WkS6Vo7Dg4yitu+C7PQbVBGZ5/BV4EljqLUwRu+YQrHI3HNzM/BRYK1sHkZpMrqg861w4kHFxLYzj6KrLKze8pwRXBMYDGpwzlT4l0jYRUNd34udnBzasmwXGQIDFYHcE18McwClAdig0hZ8B6050nKkITvP/WcZ6/3JHEdL+U6rpULiXhCPzs3Nio7XKTu4xBz6ONLlsqVZkzc51G5ii0nVayiRSjcP4WmZGl9VHxvoUIdPDshQH9R3wyb8AWWCdLbvR2engJxnzkEbQ3GleR/51xjwz0TBqQBEAa1kGu6t7rPc1ddw8a+6i6qvApJfHz9pyYDD6dCnj7xWvhqi40B1gevYty4x7FY4YZ/Tq7zk0gDVcNcHv6lj77plNHoH16bJGZB8GAnBGjsVrhjlkzAFB/5tQ8vfqE3yJeh3sxzSaaTD/AJw4wE2lsyxvAAAAAElFTkSuQmCC";
 
-    const patternBg = new PatternPane(clouds, 'repeat');
-    const patternBg2 = new PatternPane(clouds2, 'repeat');
-    const patternBg3 = new PatternPane(clouds3, 'repeat');
-    const patternBg4 = new PatternPane(clouds4, 'repeat');
-    const patternBg5 = new PatternPane(clouds5, 'repeat');
-    const patternBg6 = new PatternPane(mountains, 'repeat');
-    const patternBg7 = new PatternPane(green1, 'repeat');
-    const patternBg8 = new PatternPane(green2, 'repeat');
-    const patternBg9 = new PatternPane(green3, 'repeat');
-    const patternBg10 = new PatternPane(green4, 'repeat');
-    const patternBg11 = new PatternPane(green5, 'repeat');
-    const patternBg12 = new PatternPane(green6, 'repeat');
-    const patternFg = new PatternPane(fence, 'repeat');
+    const patternBg = new PatternPane(clouds, 'repeat-x');
+    const patternBg2 = new PatternPane(clouds2, 'repeat-x');
+    const patternBg3 = new PatternPane(clouds3, 'repeat-x');
+    const patternBg4 = new PatternPane(clouds4, 'repeat-x');
+    const patternBg5 = new PatternPane(clouds5, 'repeat-x');
+    const patternBg6 = new PatternPane(mountains, 'repeat-x');
+    const patternBg7 = new PatternPane(green1, 'repeat-x');
+    const patternBg8 = new PatternPane(green2, 'repeat-x');
+    const patternBg9 = new PatternPane(green3, 'repeat-x');
+    const patternBg10 = new PatternPane(green4, 'repeat-x');
+    const patternBg11 = new PatternPane(green5, 'repeat-x');
+    const patternBg12 = new PatternPane(green6, 'repeat-x');
+    const patternFg = new PatternPane(fence, 'repeat-x');
 
     // ##############################
     //   Turrican
@@ -182,11 +187,11 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
 
     gameScreen.addArea(mainArea);
 
-    const gamePanesScroller = new PaneScroller(levelPane);
-    gamePanesScroller.addSubPane(fadeBg, 0.75, 0.75);
-    gamePanesScroller.addSubPane(bgPane, 0.25, 0.25);
+    const gamePanesScroller = new MasterSlavesScrollHandler(levelPane);
+    gamePanesScroller.addSlave(fadeBg, 0.75, 0.75);
+    gamePanesScroller.addSlave(bgPane, 0.25, 0.25);
 
-    const gameScrollBounds = new ScrollBounds(playerPane, gamePanesScroller, {x: 130, y: 50});
+    const gameScrollBounds = new BoundsScrollHandler(playerPane, gamePanesScroller, {x: 130, y: 50});
 
     gameScreen.setKeyHandler(function() {
         let moveX = 0;
@@ -226,7 +231,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
     const shadowScreen = new Screen('shadow-ingame');
 
     class ColorAndMoonPane extends ColorPane {
-        render(target) {
+        xrender(target) {
             super.render(target);
             target.drawImage(moon, 220, 18);
         }
@@ -234,10 +239,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
 
     const scolArea = new SplitArea('Y', [74, 93]);
     scolArea.addPane(new ColorAndMoonPane('#607080'), 0);
-    const sbgFadeBg = new LinearGradientPane('Y', 70);
-    sbgFadeBg.addColorStop('#607080', 30);
-    sbgFadeBg.addColorStop('#967b96', 40);
-    sbgFadeBg.addColorStop('#ff7b96', 1);
+    const sbgFadeBg = new LinearGradientPane('Y', ['#607080', 30, '#967b96', 40, '#ff7b96']);
 
     scolArea.addPane(sbgFadeBg, 1);
     scolArea.addPane(new EmptyPane(), 2);
@@ -259,10 +261,13 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
     shadowScreen.addArea(sbgArea);
 
     const sfgArea = new SplitArea('Y', [176, 21]);
-    const shadowWorldPane = new WorldPane(
-        5,
+    const shadowTilesMap = new TilesMap(
+        TILE.DIM_32x32,
         shadowTiles,
         [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -271,31 +276,24 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ]
     );
-
-    const shadowTilesMap = new TilesMap(
-        shadowTiles,
-        [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 25, 26, 27, 28, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 31, 32, 33, 34, 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        ],
+    const shadowWorldPane = new TilesPane(
+        shadowTilesMap,
         {
-            tileBits: 5,
+            endless: {
+                x: true,
+                y: false
+            }
         }
     );
 
-    const shadowWorldPane2 = new BufferedScrollPane({tileBits: 5, maxSpeed: 6, tilesMap: shadowTilesMap, endless: {
+    const shadowWorldPane2 = new BufferedTilesPane(
+        shadowTilesMap,
+        {maxSpeed: 6, endless: {
             x: true,
             y: false
         }
     });
-
+    shadowWorldPane2.setMapTilePos(4, 2);
     const beastSpritePane = new SpritePane();
     beastSpritePane.addSprite('beast', beast, 160, 120);
 
@@ -308,26 +306,27 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
     beastArea.addPane(beastSpritePane);
     shadowScreen.addArea(beastArea);
 
-    const beastScroller = new PaneScroller(shadowWorldPane2);
-    beastScroller.addSubPane(patternBg, 0.5);
-    beastScroller.addSubPane(patternBg2, 0.3);
-    beastScroller.addSubPane(patternBg3, 0.2);
-    beastScroller.addSubPane(patternBg4, 0.15);
-    beastScroller.addSubPane(patternBg5, 0.1);
-    beastScroller.addSubPane(patternBg6, 0.25);
-    beastScroller.addSubPane(patternBg7, 1);
-    beastScroller.addSubPane(patternBg8, 1.2);
-    beastScroller.addSubPane(patternBg9, 1.5);
-    beastScroller.addSubPane(patternBg10, 1.8);
-    beastScroller.addSubPane(patternBg11, 2.2);
-    beastScroller.addSubPane(patternBg12, 3);
-    beastScroller.addSubPane(patternFg, 4);
+    const beastScroller = new MasterSlavesScrollHandler(shadowWorldPane2);
+    beastScroller.addSlave(patternBg, 0.5);
+    beastScroller.addSlave(patternBg2, 0.3);
+    beastScroller.addSlave(patternBg3, 0.2);
+    beastScroller.addSlave(patternBg4, 0.15);
+    beastScroller.addSlave(patternBg5, 0.1);
+    beastScroller.addSlave(patternBg6, 0.25);
+    beastScroller.addSlave(patternBg7, 1);
+    beastScroller.addSlave(patternBg8, 1.2);
+    beastScroller.addSlave(patternBg9, 1.5);
+    beastScroller.addSlave(patternBg10, 1.8);
+    beastScroller.addSlave(patternBg11, 2.2);
+    beastScroller.addSlave(patternBg12, 3);
+    beastScroller.addSlave(patternFg, 4);
 
     shadowScreen.setFrameHandler(function() {
     });
 
     shadowScreen.setKeyHandler(() => {
         let moveX = 0;
+        let moveY = 0;
         const speed = 1.5;
         for (var key in this.keysDown) {
             switch (key) {
@@ -338,11 +337,24 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
                 case 'd':
                     moveX += speed;
                     break;
+
+                case 'w':
+                    moveY -= speed;
+                    break;
+
+                case 's':
+                    moveY += speed;
+                    break;
+
             }
         };
 
         if (moveX !== 0) {
             beastScroller.scrollBy(moveX * 1.2, 0);
+        }
+        if (moveY !== 0) {
+            sbgArea.scrollBy(0, moveY);
+            sfgArea.scrollBy(0, moveY);
         }
     });
 
@@ -351,6 +363,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
 
     // ################################
     const buffTilesMap = new TilesMap(
+        TILE.DIM_32x32,
         shadowTiles,
         [
             [20, 20, 20, 20, 20,  20, 20, 20, 20, 20,  20, 20, 20, 20, 20,  20, 20, 20, 20, 20,   20, 20, 20, 20, 20,  20, 20, 20],
@@ -390,20 +403,17 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
             [20, 30, 31, 32, 33,  34, 35,  0,  0,  0,   0,  0, 24, 25, 26,  27, 28, 29,  0,  0,    0,  0,  0,  0,  0,   0, 0, 20],
 
             [20, 20, 20, 20, 20,  20, 20, 20, 20, 20,  20, 20, 20, 20, 20,  20, 20, 20, 20, 20,   20, 20, 20, 20, 20,   20, 20, 20],
-        ],
-        {
-            tileBits: 5
-        }
+        ]
     );
 
-    const testPane = new BufferedScrollPane({
-        tileBits: 5,
+    const testPane = new BufferedTilesPane(
+        buffTilesMap,
+        {
         maxSpeed: 6,
         endless: {
             x: true,
             y: true
-        },
-        tilesMap: buffTilesMap
+        }
     });
     const testScreen = new Screen('test');
     testScreen.addPane(new ColorPane('#000000'));
@@ -472,5 +482,5 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: true}, function () {
         }
     });
 
-    return 'test';
+    return 'turrican-ingame';
 });
