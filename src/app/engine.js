@@ -458,11 +458,9 @@ class SplitArea {
         let i = 0;
         while (i < areaSizes.length) {
             this.areaLength += this.areaSizes[i];
-            this.areas.push(null);
+            this.areas.push([]);
             i++;
         }
-        console.log(this.areaSizes);
-
     }
 
     scrollBy(sx, sy) {
@@ -500,7 +498,7 @@ class SplitArea {
     addArea(area, pos = null) {
         if (pos === null) {
             pos = 0;
-            while (pos < this.areas.length && this.areas[pos] !== null) {
+            while (pos < this.areas.length && this.areas[pos].length !== 0) {
                 pos++;
             }
             if (pos === this.areas.length) {
@@ -510,7 +508,7 @@ class SplitArea {
         if (pos >= this.areas.length) {
             return;
         }
-        this.areas[pos] = area;
+        this.areas[pos].push(area);
     }
 
     addPane(pane, pos = null) {
@@ -550,18 +548,25 @@ class SplitArea {
         }
         let pos = 0;
         for (let i = 0; i < this.areas.length; i++) {
-            if (this.areas[i] === null) {
+            // TODO check
+/*
+            if (this.areas[i].length === 0) {
                 continue;
             }
+
+ */
             const size = this.areaSizes[i];
             let x = (this.axis === 'X') ? size : dimX;
             let y = (this.axis !== 'X') ? size : dimY;
             pos += size;
-            if (this.firstArea === true) {
-                this.areas[i].firstArea = true;
+            let firstArea = (this.firstArea === true);
+            for (let area of this.areas[i]) {
+                if (firstArea) {
+                    area.firstArea = true;
+                    firstArea = false;
+                }
+                area.addViewNodesToTree(areaNode, x, y, offX, offY);
             }
-            this.areas[i].addViewNodesToTree(areaNode, x, y, offX, offY);
-
             if (this.axis === 'X') {
                 offX += size;
             } else {
