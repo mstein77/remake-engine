@@ -465,16 +465,34 @@ class SplitArea {
 
     scrollBy(sx, sy) {
         if (!this.scrollElem) {
-            return;
+            return {
+                x: 0,
+                y: 0,
+                unscrolled: {
+                    x: sx,
+                    y: sy
+                }
+            };
         }
         const move = this.axis === 'X' ? sx : sy;
+        const old = this.scrollPos;
         this.scrollPos += move;
         if (this.scrollPos < 0) {
             this.scrollPos = 0;
         } else if (this.scrollPos > this.maxScrollPos) {
             this.scrollPos = this.maxScrollPos;
         }
+        const unscrolled = old + move - this.scrollPos;
+
         Game.instance.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos);
+        return {
+            x: (this.axis === 'X') ? this.scrollPos - old : 0,
+            y: (this.axis !== 'X') ? this.scrollPos - old : 0,
+            unscrolled: {
+                x: (this.axis === 'X') ? unscrolled : sx,
+                y: (this.axis !== 'X') ? unscrolled : sy
+            }
+        };
     }
 
     addArea(area, pos = null) {

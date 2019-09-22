@@ -208,6 +208,10 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
     }
     tfScreen.addPane(new LinearGradientPane('Y', ['#303070', 223, '#B060C0']));
     tfScreen.addArea(tfMainArea);
+    const tfSprites = new SpritePane();
+    tfSprites.addSprite('player', tfShip, 30, 30);
+    tfSprites.setActor('player');
+    tfScreen.addPane(tfSprites);
 
     const tfScroller = new MasterSlavesScrollHandler(mountainPane);
     let factor = 1.2;
@@ -215,16 +219,16 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
         tfScroller.addSlave(pane, factor, 0);
         factor += 0.2;
     }
+    const tfScrollBounds = new BoundsScrollHandler(tfSprites, tfMainArea, {x: 0, y: 30});
     tfScreen.setFrameHandler(function() {
        tfScroller.scrollBy(1, 0);
     });
     tfScreen.setKeyHandler(function() {
         let moveX = 0;
         let moveY = 0;
-        const speed = 1;
+        const speed = 2;
         for (var key in this.keysDown) {
             switch (key) {
-/*
                 case 'a':
                     moveX -= speed;
                     break;
@@ -232,7 +236,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
                 case 'd':
                     moveX += speed;
                     break;
-*/
+
                 case 'w':
                     moveY -= speed;
                     break;
@@ -244,8 +248,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
         }
 
         if (moveX !== 0 || moveY !== 0) {
-            tfMainArea.scrollBy(0, moveY);
-            //            gameScrollBounds.moveActor(moveX, moveY);
+            tfScrollBounds.moveActor(moveX, moveY);
         }
     });
 
