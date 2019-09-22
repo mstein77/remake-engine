@@ -219,7 +219,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     const tfMain = new SplitArea('Y', [32, 192]);
     tfMain.addPane(new PatternPane(tfTopBar, 'no-repeat'));
 
-    const mainSizes = [223];
+    const mainSizes = [160, 223];
     const waterPanes = [];
     for (let i = 0; i < tfWaterImgs.length; i++) {
         mainSizes.push(4);
@@ -227,11 +227,13 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         waterPanes.push(waterPane);
     }
     const tfMainArea = new SplitArea('Y', mainSizes);
-    tfMain.addPane(new LinearGradientPane('Y', ['#303070', 223, '#B060C0']), 1);
+    tfMainArea.addPane(new LinearGradientPane('Y',['#101040', 160, '#303070']));
+
+    tfMainArea.addPane(new LinearGradientPane('Y', ['#303070', 223, '#B060C0']), 1);
     tfMain.addArea(tfMainArea, 1);
 
     const mountainPane = new PatternPane(tfMountains, 'repeat-x');
-    tfMainArea.addPane(mountainPane);
+    tfMainArea.addPane(mountainPane, 1);
     for (let pane of waterPanes) {
         tfMainArea.addPane(pane);
     }
@@ -241,7 +243,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfSprites.setActor('player');
     tfMain.addPane(tfSprites, 1);
 
-    const tfFgArea = new SplitArea('Y', [223 + tfWaterImgs.length * 4 - 53, 53]);
+    const tfFgArea = new SplitArea('Y', [160 + 223 + tfWaterImgs.length * 4 - 53, 53]);
     const tfBottomMountains = new PatternPane(tfFgMountains, 'repeat-x');
     tfFgArea.addPane(new EmptyPane());
     tfFgArea.addPane(tfBottomMountains);
