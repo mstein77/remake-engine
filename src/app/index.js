@@ -233,12 +233,19 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
     tfSprites.setActor('player');
     tfScreen.addPane(tfSprites);
 
+    const tfFgArea = new SplitArea('Y', [223 + tfWaterImgs.length * 4 - 53, 53]);
+    const tfBottomMountains = new PatternPane(tfFgMountains, 'repeat-x');
+    tfFgArea.addPane(new EmptyPane());
+    tfFgArea.addPane(tfBottomMountains);
+    tfScreen.addArea(tfFgArea);
+
     const tfScroller = new MasterSlavesScrollHandler(mountainPane);
     let factor = 1.2;
     for (let pane of waterPanes) {
         tfScroller.addSlave(pane, factor, 0);
         factor += 0.2;
     }
+    tfScroller.addSlave(tfBottomMountains, factor + 0.5, 0);
     const tfScrollBounds = new BoundsScrollHandler(tfSprites, tfMainArea, {x: 0, y: 30});
     tfScreen.setFrameHandler(function() {
        tfScroller.scrollBy(1, 0);
@@ -269,6 +276,7 @@ const Turrican = new Game(320, 256, {zoom: 2, debug: false}, function () {
 
         if (moveX !== 0 || moveY !== 0) {
             tfScrollBounds.moveActor(moveX, moveY);
+            tfFgArea.scrollBy(0, moveY);
         }
     });
 

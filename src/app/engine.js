@@ -461,6 +461,8 @@ class SplitArea {
             this.areas.push(null);
             i++;
         }
+        console.log(this.areaSizes);
+
     }
 
     scrollBy(sx, sy) {
