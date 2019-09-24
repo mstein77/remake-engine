@@ -229,6 +229,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         const waterPane = new PatternPane(tfWaterImgs[i], 'repeat-x');
         waterPanes.push(waterPane);
     }
+
     const tfMainArea = new SplitArea('Y', mainSizes);
     tfMainArea.addPane(new LinearGradientPane('Y',['#101040', 160, '#303070']));
 
@@ -240,6 +241,13 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     for (let pane of waterPanes) {
         tfMainArea.addPane(pane);
     }
+
+    const tfMainAreaFg = new SplitArea('Y', [160 + 223 - 96, 96, tfWaterImgs.length * 4]);
+    tfMainAreaFg.addPane(new EmptyPane());
+    const bottomCloudPane = new PatternPane(tfTopClouds, 'repeat-x');
+    tfMainAreaFg.addPane(bottomCloudPane);
+    tfMainAreaFg.addPane(new EmptyPane());
+    tfMain.addArea(tfMainAreaFg, 1);
 
     const tfSprites = new SpritePane();
     tfSprites.addSprite('player', tfShip, 30, 30);
@@ -253,11 +261,13 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfMain.addArea(tfFgArea, 1);
 
     const bgScroller = new MasterSlavesScrollHandler(tfMainArea);
+    bgScroller.addSlave(tfMainAreaFg, 0, 1);
     bgScroller.addSlave(tfFgArea, 0, 1);
 
     tfScreen.addArea(tfMain);
     const tfScroller = new MasterSlavesScrollHandler(mountainPane);
-    let factor = 1.2;
+    tfScroller.addSlave(bottomCloudPane, 1.2, 0);
+    let factor = 1.4;
     for (let pane of waterPanes) {
         tfScroller.addSlave(pane, factor, 0);
         factor += 0.2;
