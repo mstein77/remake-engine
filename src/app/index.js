@@ -333,13 +333,13 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfScroller.addSlave(bg1bPane, 2.5, 0);
     tfScroller.addSlave(bg2aPane, 1.5, 0);
     tfScroller.addSlave(bg3bPane, 1.5, 0);
-    tfScroller.addSlave(bg4aPane, 0.8, 0);
+    tfScroller.addSlave(bg4aPane, 1.2, 0);
 
 
     tfScroller.addSlave(bg1aPane, 2, 0);
     tfScroller.addSlave(bg2bPane, 2, 0);
     tfScroller.addSlave(bg3aPane, 1.2, 0);
-    tfScroller.addSlave(bg4aPane, 0.8, 0);
+ //   tfScroller.addSlave(bg4bPane, 0.8, 0);
 
     tfScroller.addSlave(mountMidPane, 1, 0);
     tfScroller.addSlave(mountBottomPane, 1, 0);
