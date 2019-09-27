@@ -244,11 +244,18 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     //   Thunder Force 4
     // ##############################
 
+    function getBgPane(data) {
+        const img = new Image();
+        img.src = data;
+        return new PatternPane(img, 'repeat-x');
+    }
+
+
     const tfScreen = new Screen('tf4');
     const tfMain = new SplitArea('Y', [32, 192]);
     tfMain.addPane(new PatternPane(tfTopBar, 'no-repeat'));
 
-    const mainSizes = [160, 31, 96, 96];
+    const mainSizes = [32, 64, 64, 32, 96, 96];
     const waterPanes = [];
     for (let i = 0; i < tfWaterImgs.length; i++) {
         mainSizes.push(4);
@@ -257,24 +264,44 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     }
 
     const tfMainArea = new SplitArea('Y', mainSizes);
-    tfMainArea.addPane(new LinearGradientPane('Y',['#101040', 160, '#303070']));
-    tfMainArea.addPane(new LinearGradientPane('Y', ['#303070', 31, '#404080']), 1);
-    tfMainArea.addPane(new LinearGradientPane('Y', ['#404080', 96, '#B060C0']), 2);
+    tfMainArea.addPane(new ColorPane('#84e4c7'), 0);
+    tfMainArea.addPane(new ColorPane('#84e4c7'), 1);
+    tfMainArea.addPane(new LinearGradientPane('Y',['#84e4c7', 64, '#303070']), 2);
+    tfMainArea.addPane(new LinearGradientPane('Y', ['#303070', 32, '#404080']), 3);
+    tfMainArea.addPane(new LinearGradientPane('Y', ['#404080', 96, '#B060C0']), 4);
     tfMain.addArea(tfMainArea, 1);
 
+    const bg1aPane = getBgPane(tfBgA[0]);
+    tfMainArea.addPane(bg1aPane, 0);
+    const bg2aPane = getBgPane(tfBgB[1]);
+    tfMainArea.addPane(bg2aPane, 1);
+    const bg3aPane = getBgPane(tfBgA[2]);
+    tfMainArea.addPane(bg3aPane, 2);
+
+    const bg1bPane = getBgPane(tfBgB[0]);
+    tfMainArea.addPane(bg1bPane, 0);
+    const bg2bPane = getBgPane(tfBgA[1]);
+    tfMainArea.addPane(bg2bPane, 1);
+    const bg3bPane = getBgPane(tfBgB[2]);
+    tfMainArea.addPane(bg3bPane, 2);
+
     const mountTopPane = new PatternPane(tfMountTop, 'repeat-x');
-    tfMainArea.addPane(mountTopPane, 1);
+    tfMainArea.addPane(mountTopPane, 3);
+
+    const bg4aPane = getBgPane(tfBgA[3]);
+    tfMainArea.addPane(bg4aPane, 3);
+
     const cloudMidPane = new PatternPane(tfCloudMid, 'repeat-x');
-    tfMainArea.addPane(cloudMidPane, 2);
+    tfMainArea.addPane(cloudMidPane, 4);
     const mountMidPane = new PatternPane(tfMountMid, 'repeat-x');
-    tfMainArea.addPane(mountMidPane, 2);
+    tfMainArea.addPane(mountMidPane, 4);
     const mountBottomPane = new PatternPane(tfMountBottom, 'repeat-x');
-    tfMainArea.addPane(mountBottomPane, 3);
+    tfMainArea.addPane(mountBottomPane, 5);
     for (let pane of waterPanes) {
         tfMainArea.addPane(pane);
     }
 
-    const tfMainAreaFg = new SplitArea('Y', [160 + 223 - 96, 96, tfWaterImgs.length * 4]);
+    const tfMainAreaFg = new SplitArea('Y', [160 + 224 - 96, 96, tfWaterImgs.length * 4]);
     tfMainAreaFg.addPane(new EmptyPane());
     const bottomCloudPane = new PatternPane(tfTopClouds, 'repeat-x');
     tfMainAreaFg.addPane(bottomCloudPane);
@@ -286,7 +313,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfSprites.setActor('player');
     tfMain.addPane(tfSprites, 1);
 
-    const tfFgArea = new SplitArea('Y', [160 + 223 + tfWaterImgs.length * 4 - 53, 53]);
+    const tfFgArea = new SplitArea('Y', [160 + 224 + tfWaterImgs.length * 4 - 53, 53]);
     const tfBottomMountains = new PatternPane(tfFgMountains, 'repeat-x');
     tfFgArea.addPane(new EmptyPane());
     tfFgArea.addPane(tfBottomMountains);
@@ -298,6 +325,17 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     tfScreen.addArea(tfMain);
     const tfScroller = new MasterSlavesScrollHandler(mountTopPane);
+    tfScroller.addSlave(bg1bPane, 2.5, 0);
+    tfScroller.addSlave(bg2aPane, 1.5, 0);
+    tfScroller.addSlave(bg3bPane, 1.5, 0);
+    tfScroller.addSlave(bg4aPane, 0.8, 0);
+
+
+    tfScroller.addSlave(bg1aPane, 2, 0);
+    tfScroller.addSlave(bg2bPane, 2, 0);
+    tfScroller.addSlave(bg3aPane, 1.2, 0);
+    tfScroller.addSlave(bg4aPane, 0.8, 0);
+
     tfScroller.addSlave(mountMidPane, 1, 0);
     tfScroller.addSlave(mountBottomPane, 1, 0);
     tfScroller.addSlave(cloudMidPane, 0.8, 0);
