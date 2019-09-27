@@ -234,7 +234,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     const tfMain = new SplitArea('Y', [32, 192]);
     tfMain.addPane(new PatternPane(tfTopBar, 'no-repeat'));
 
-    const mainSizes = [160, 223];
+    const mainSizes = [160, 31, 96, 96];
     const waterPanes = [];
     for (let i = 0; i < tfWaterImgs.length; i++) {
         mainSizes.push(4);
@@ -244,12 +244,18 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     const tfMainArea = new SplitArea('Y', mainSizes);
     tfMainArea.addPane(new LinearGradientPane('Y',['#101040', 160, '#303070']));
-
-    tfMainArea.addPane(new LinearGradientPane('Y', ['#303070', 223, '#B060C0']), 1);
+    tfMainArea.addPane(new LinearGradientPane('Y', ['#303070', 31, '#404080']), 1);
+    tfMainArea.addPane(new LinearGradientPane('Y', ['#404080', 96, '#B060C0']), 2);
     tfMain.addArea(tfMainArea, 1);
 
-    const mountainPane = new PatternPane(tfMountains, 'repeat-x');
-    tfMainArea.addPane(mountainPane, 1);
+    const mountTopPane = new PatternPane(tfMountTop, 'repeat-x');
+    tfMainArea.addPane(mountTopPane, 1);
+    const cloudMidPane = new PatternPane(tfCloudMid, 'repeat-x');
+    tfMainArea.addPane(cloudMidPane, 2);
+    const mountMidPane = new PatternPane(tfMountMid, 'repeat-x');
+    tfMainArea.addPane(mountMidPane, 2);
+    const mountBottomPane = new PatternPane(tfMountBottom, 'repeat-x');
+    tfMainArea.addPane(mountBottomPane, 3);
     for (let pane of waterPanes) {
         tfMainArea.addPane(pane);
     }
@@ -277,7 +283,10 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     bgScroller.addSlave(tfFgArea, 0, 1);
 
     tfScreen.addArea(tfMain);
-    const tfScroller = new MasterSlavesScrollHandler(mountainPane);
+    const tfScroller = new MasterSlavesScrollHandler(mountTopPane);
+    tfScroller.addSlave(mountMidPane, 1, 0);
+    tfScroller.addSlave(mountBottomPane, 1, 0);
+    tfScroller.addSlave(cloudMidPane, 0.8, 0);
     tfScroller.addSlave(bottomCloudPane, 1.2, 0);
     let factor = 1.4;
     for (let pane of waterPanes) {
