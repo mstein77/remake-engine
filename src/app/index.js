@@ -305,7 +305,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfMainArea.addPane(cloudMidPane, 4);
     const mountMidPane = getBgPane(tfBgB[4]);
     tfMainArea.addPane(mountMidPane, 4);
-    const mountBottomPane = new PatternPane(tfMountBottom, 'repeat-x');
+    const mountBottomPane = getBgPane(tfBgB[5]);
     tfMainArea.addPane(mountBottomPane, 5);
     for (let pane of waterPanes) {
         tfMainArea.addPane(pane);
@@ -313,7 +313,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     const tfMainAreaFg = new SplitArea('Y', [160 + 224 - 96, 96, tfWaterImgs.length * 4]);
     tfMainAreaFg.addPane(new EmptyPane());
-    const bottomCloudPane = new PatternPane(tfTopClouds, 'repeat-x');
+    const bottomCloudPane = getBgPane(tfBgA[5]);
     tfMainAreaFg.addPane(bottomCloudPane);
     tfMainAreaFg.addPane(new EmptyPane());
     tfMain.addArea(tfMainAreaFg, 1);
