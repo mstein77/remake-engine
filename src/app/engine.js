@@ -1508,10 +1508,12 @@ class BufferedTilesPane {
 
 class SpritePane {
 
-    constructor() {
-        this.sprites = [];
+    constructor(spriteSheet) {
+        this.spriteSheet = spriteSheet;
+        this.sprites = {};
         this.actor = null;
         this.activePixels = 0;
+        this.uid = 0;
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -1520,7 +1522,7 @@ class SpritePane {
             y: viewPortDimY
         };
         this.totalPixels = viewPortDimX * viewPortDimY;
-        this.pixelLimit = Math.round(this.totalPixels * 0.4);
+        this.pixelLimit = 0; //Math.round(this.totalPixels * 0.4);
         this.paneDim = this.viewPortDim;
         this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
         return this.container;
@@ -1537,15 +1539,74 @@ class SpritePane {
         return this.actor;
     }
 
-    addSprite(id, img,  x, y) {
-        this.sprites[id] = {id, img, x, y};
-        this.activePixels += x * y;
+    addSprite(id, name,  x, y) {
+        const sprite = {id, x, y, animSpeed: 1};
+        this.sprites[id] = this.initSpriteObj(sprite, name);
+        this.activePixels += sprite.dim.x * sprite.dim.y;
+        this.dirty = true;
+    }
+
+    setAnimationSpeed(id, speed) {
+        const sprite = this.getSprite(id);
+        sprite.animSpeed = speed;
+        if (sprite.isAnimation) {
+            sprite.animation.speed = speed;
+        }
+    }
+
+    getSprite(id) {
+        return this.sprites[id];
+    }
+
+    initSpriteObj(obj, sheetId) {
+        obj.name = sheetId;
+        obj.isAnimation = this.spriteSheet.isAnimation(sheetId);
+        obj.animation = obj.isAnimation ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null;
+        obj.dim = this.spriteSheet.getSpriteDim(sheetId);
+        return obj;
+    }
+
+    assignSprite(id, sheetId) {
+        const sprite = this.sprites[id];
+        this.initSpriteObj(sprite, sheetId);
+        this.dirty = true;
+    }
+
+    updateFrames() {
+        for (let id in this.sprites) {
+            const sprite = this.sprites[id];
+            if (sprite.isAnimation) {
+                const ani = sprite.animation;
+                ani.nextFrame();
+            }
+        }
         this.dirty = true;
     }
 
     getSpritePos(id) {
         const sprite = this.sprites[id];
-        return {x: sprite.x, y: sprite.y, len: sprite.img.width};
+        return {id, x: sprite.x, y: sprite.y, dim: sprite.dim};
+    }
+
+    getAllSpritePos(match) {
+        const result = [];
+        const matchLen = match.length;
+        for(let sprite in this.sprites) {
+            if (sprite.substr(0, matchLen) === match) {
+                result.push(this.sprites[sprite]);
+            }
+        }
+        return result;
+    }
+
+    getUid(name) {
+        this.uid++;
+        return name + '.' + this.uid;
+    }
+
+    removeSprite(id) {
+        delete this.sprites[id];
+
     }
 
     setSpritePos(id, x, y) {
@@ -1564,13 +1625,17 @@ class SpritePane {
         } else {
             for (let id in this.sprites) {
                 const sprite = this.sprites[id];
-                target.clearRect(sprite.lastX, sprite.lastY, sprite.img.width, sprite.img.height);
+                target.clearRect(sprite.lastX, sprite.lastY, sprite.dim.x, sprite.dim.y);
             }
         }
-
         for (let id in this.sprites) {
             const sprite = this.sprites[id];
-            target.drawImage(sprite.img, sprite.x, sprite.y);
+            if (sprite.isAnimation) {
+                const frameSprite = sprite.animation.getFrame();
+                this.spriteSheet.drawSprite(target, frameSprite.id, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y);
+            } else {
+                this.spriteSheet.drawSprite(target, sprite.name, sprite.x, sprite.y);
+            }
             sprite.lastX = null;
             sprite.lastY = null;
         }
@@ -1953,7 +2018,6 @@ class LinearGradientPane {
             'style.background',
             'linear-gradient(' + gradient + ')'
         );
-        console.log(gradient);
         this.dirty = false;
     }
 
@@ -2044,7 +2108,7 @@ class BoundsScrollHandler {
                 }
             }
 
-            let max = this.spritePane.viewPortDim.x - 1 - sprite.len;
+            let max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x;
             let rightScrollBound = max - scrollBoundsBottom.x;
             if (pos > rightScrollBound) {
                 if (sprite.x <= rightScrollBound) {
@@ -2070,7 +2134,7 @@ class BoundsScrollHandler {
                     pos = 0;
                 }
             }
-            let max = this.spritePane.viewPortDim.y - 1 - sprite.len;
+            let max = this.spritePane.viewPortDim.y - 1 - sprite.dim.y;
             let bottomScrollBound = max - scrollBoundsBottom.y;
             if (pos > bottomScrollBound) {
                 if (sprite.y <= bottomScrollBound) {
@@ -2263,6 +2327,298 @@ class TilesMap {
     }
 }
 
+
+/**
+ *  Animation-Modes
+ * ----------------------------
+ *
+ *   DIR: forward, backwards, forward-backward, backward-forward
+ *   END: loop, stop, delete
+ *
+ * ----------------------------
+ *
+ */
+
+const ANIMATION = {
+    DIR: {
+        FORWARD: 0,
+        BACKWARD: 1,
+        FORWARD_BACKWARD: 2,
+        BACKWARD_FORWARD: 3
+    },
+    END: {
+        LOOP: 0,
+        STOP: 1,
+        DELETE: 2
+    },
+    STATE: {
+        WAITING: 0,
+        RUNNING: 1,
+        DONE: 2,
+        DESTROYED: 3
+    }
+};
+
+class Animation {
+
+    constructor(frames, speed = 1, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+        this.frames = frames;
+        this.frameNo = 0;
+        this.direction = dir;
+        this.end = end;
+        this.speed = speed;
+        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
+        this.time = 0;
+        this.frameNo = this.isForward ? 0 : frames.length - 1;
+        this.state = ANIMATION.STATE.WAITING;
+    }
+
+    getState() {
+        return this.state;
+    }
+
+    handleForward() {
+        let frame = this.getFrame();
+        while (this.time >= frame.duration) {
+            this.time -= frame.duration;
+            this.frameNo++;
+            if (this.frameNo === this.frames.length) {
+                this.frameNo--;
+                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                    this.frameNo--;
+                    this.isForward = false;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else {
+                            this.frameNo = 0;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    handleBackward() {
+        let frame = this.getFrame();
+        while (this.time >= frame.duration) {
+            this.time -= frame.duration;
+            this.frameNo--;
+            if (this.frameNo < 0) {
+                this.frameNo = 0;
+                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                    this.frameNo++;
+                    this.isForward = true;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else {
+                            this.frameNo = this.frames.length - 1;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    nextFrame() {
+        if (this.frameNo === null) {
+            return;
+        }
+        this.state = ANIMATION.STATE.RUNNING;
+        this.time += this.speed;
+        if (this.isForward) {
+            this.handleForward();
+            if (!this.isForward) {
+                this.handleBackward();
+            }
+        } else {
+            this.handleBackward();
+            if (this.isForward) {
+                this.handleForward();
+            }
+        }
+    }
+
+    getFrame() {
+        if (this.frameNo === null) {
+            return null;
+        }
+        return this.frames[this.frameNo];
+    }
+
+    pause() {
+        // TODO
+    }
+
+    reverse() {
+        switch(this.dir) {
+            case ANIMATION.DIR.FORWARD:
+                this.dir = ANIMATION.DIR.BACKWARD;
+                break;
+            case ANIMATION.DIR.BACKWARD:
+                this.dir = ANIMATION.DIR.FORWARD;
+                break;
+        }
+        if (this.state === ANIMATION.STATE.DONE) {
+            this.state = ANIMATION.STATE.WAITING;
+        }
+        this.isForward = !this.isForward;
+    }
+}
+
+
+class SpriteSheet {
+
+    constructor(data) {
+        this.sheet = new Image();
+        this.sheet.src = data;
+        this.sprites = {};
+        this.animations = {};
+    }
+
+    addSprite(name, offX, offY, width, height) {
+        this.sprites[name] = {
+            off: {x: offX, y: offY},
+            dim: {x: width, y: height}
+        };
+    }
+
+    addAnimation(name, frames, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+        let maxX = 0;
+        let maxY = 0;
+        let sameSize = true;
+        let dims = [];
+        const frameDetails = [];
+        for (let frame of frames) {
+            const dim = this.getSpriteDim(frame);
+            maxX = Math.max(maxX, dim.x);
+            maxY = Math.max(maxY, dim.y);
+            sameSize = sameSize && (maxX === dim.x || maxY === dim.y);
+            dims.push(dim);
+            frameDetails.push({
+                duration: 1,
+                id: frame,
+                padding: {x: 0, y: 0}
+            });
+        }
+
+        const animation = {
+            dim: {x: maxX, y: maxY},
+            frames: frameDetails,
+            dir,
+            end
+        };
+        if (!sameSize) {
+            for (let i = 0; i < dims.length; i++) {
+                const frame = animation.frames[i];
+                const dim = dims[i];
+                // TODO multiple auto padding strategies per axis
+                // (V-CENTERING, V-TOP, V-BOTTOM, H-CENTERING, H-LEFT, H-RIGHT)
+                const offX = (maxX - dim.x) >> 1;
+                const offY = (maxY - dim.y) >> 1;
+                frame.padding = {x: offX, y: offY};
+            }
+        }
+        this.animations[name] = animation;
+    }
+
+    isAnimation(name) {
+        return this.animations[name] ? true : false;
+    };
+
+    getSpriteDim(name) {
+        if (this.isAnimation(name)) {
+            return this.animations[name].dim;
+        }
+        const sprite = this.getSprite(name);
+        return sprite.dim;
+    }
+
+    getSprite(name) {
+        if (!this.sprites[name]) {
+            throw Error('No sprite with id "' + name + '" found in spritesheet!');
+        }
+        return this.sprites[name];
+    }
+
+    getAnimation(name, speed = 1) {
+        if (!this.animations[name]) {
+            throw Error('No animations with id "' + name + '" found in spritesheet!');
+        }
+        const animation = this.animations[name];
+        return new Animation(animation.frames, speed, animation.dir, animation.end);
+    }
+
+    drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
+        const sprite = this.getSprite(name);
+        ctx.drawImage(this.sheet, sprite.off.x, sprite.off.y, sprite.dim.x, sprite.dim.y, posX + paddX, posY + paddY, sprite.dim.x, sprite.dim.y);
+    }
+}
+
+class States {
+    constructor(states) {
+        if (states.length === 0) {
+            throw Error("No states given!");
+        }
+        this.states = {};
+        this.transitions = [];
+        this.currState = states[0];
+        for (let state of states) {
+            this.states[state] = {};
+        }
+    }
+
+    assertExists(state) {
+        if (this.states[state] === undefined) {
+            throw Error('State "' + state + '" does not exist in machine!');
+        }
+    }
+
+    addTransition(from, event, to) {
+        this.assertExists(from);
+        this.assertExists(to);
+        this.states[from][event] = to;
+    }
+
+    doEvent(event) {
+        const newState = this.states[this.currState][event];
+        if (newState === undefined) {
+            return;
+        }
+        this.transitions.push({event, from: this.currState, to: newState});
+        this.currState = newState;
+    }
+
+    popTransitions() {
+        const popped = this.transitions;
+        this.transitions = [];
+        return popped;
+    }
+
+    setState(state) {
+        this.assertExists(state);
+        this.popTransitions();
+        this.currState = state;
+    }
+}
+
 function getNewSpriteMap(bits) {
     return new SpriteMap(bits);
 }
@@ -2294,12 +2650,16 @@ module.exports = {
     LinearGradientPane,
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
+    Animation,
     d,
+    SpriteSheet,
     SpriteMap,
     getNewSpriteMap,
     getNewSprite,
     spriteMaps,
     TilesMap,
+    States,
     TILE,
+    ANIMATION,
     OCM
 };
