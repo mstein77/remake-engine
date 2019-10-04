@@ -146,6 +146,10 @@ class Game {
 
         screen.setDimension(this.width, this.height);
         screen.render(true);
+        if (screen.audio !== null) {
+            const audio = new Audio(screen.audio);
+            // audio.play();
+        }
     }
 
     resetFps() {
@@ -589,6 +593,7 @@ class Screen {
         this.keyHandler = null;
         this.frameHandler = null;
         this.tree = null;
+        this.audio = null;
     }
 
     addArea(area) {
@@ -656,6 +661,10 @@ class Screen {
 
     setFrameHandler(handler) {
         this.frameHandler = handler.bind(Game.instance);
+    }
+
+    addAudio(src) {
+        this.audio = src;
     }
 }
 

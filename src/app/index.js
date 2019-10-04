@@ -497,6 +497,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
+    tfScreen.addAudio('audio/tf4-metalsquad.mp3');
     this.addScreen(tfScreen);
 
 
@@ -565,8 +566,6 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             gameScrollBounds.moveActor(moveX, moveY);
         }
     });
-
-    this.addScreen(gameScreen);
 
     // #################################
     //   Shadow of the Beast
