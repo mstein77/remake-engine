@@ -642,16 +642,24 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     );
     
     beastSpriteSheet.addSprite('beast', 3, 2, 32, 52);
+    beastSpriteSheet.addTransformedSprite('beast-rev', 'beast', 'flip-x');
     beastSpriteSheet.addSprite('beast-run1', 3, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run2', 33, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run3', 66, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run4', 98, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run5', 130, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run6', 163, 66, 32, 52);
-
+    beastSpriteSheet.addAnimation(
+        'beast-run',
+        ['beast-run1', 'beast-run2', 'beast-run3', 'beast-run4', 'beast-run5', 'beast-run6'],
+        ANIMATION.DIR.FORWARD, ANIMATION.END.LOOP
+    );
+    beastSpriteSheet.addTransformedAnimation('beast-run-rev', 'beast-run', 'flip-x');
+    beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
-    beastSpritePane.addSprite('beast', 'beast', 160, 120);
+    beastSpritePane.addSprite('beast', 'beast', 160, 118);
+    beastSpritePane.setAnimationSpeed('beast', 0.15);
 
     sfgArea.addPane(shadowWorldPane2);
     sfgArea.addPane(patternFg, 1);
@@ -678,7 +686,18 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastScroller.addSlave(patternFg, 4);
 
     shadowScreen.setFrameHandler(function() {
+        beastSpritePane.updateFrames();
     });
+
+    const beastStates = new States(['stand-right', 'stand-left', 'run-right', 'run-left']);
+    beastStates.addTransition('stand-right', 'move-right', 'run-right');
+    beastStates.addTransition('stand-right', 'move-left', 'run-left');
+    beastStates.addTransition('stand-left', 'move-right', 'run-right');
+    beastStates.addTransition('stand-left', 'move-left', 'run-left');
+    beastStates.addTransition('run-right', 'move-left', 'run-left');
+    beastStates.addTransition('run-right', 'stand', 'stand-right');
+    beastStates.addTransition('run-left', 'stand', 'stand-left');
+    beastStates.addTransition('run-left', 'move-right', 'run-right');
 
     shadowScreen.setKeyHandler(() => {
         let moveX = 0;
@@ -705,13 +724,43 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             }
         };
 
+        let event = 'stand';
+        if (moveX !== 0) {
+            event = 'move-' + (moveX > 0 ? 'right' : 'left');
+        }
+        beastStates.doEvent(event);
+        const transitions = beastStates.popTransitions();
+        for (let transition of transitions) {
+            let target = null;
+            switch(transition.to) {
+                case 'stand-left':
+                    target = 'beast-rev';
+                    break;
+                case 'stand-right':
+                    target = 'beast';
+                    break;
+                case 'run-left':
+                    target = 'beast-run-rev';
+                    break;
+                case 'run-right':
+                    target = 'beast-run';
+                    break;
+            }
+            if (target !== null) {
+                beastSpritePane.assignSprite('beast', target);
+            }
+        }
+
         if (moveX !== 0) {
             beastScroller.scrollBy(moveX * 1.2, 0);
         }
+        /*
         if (moveY !== 0) {
             sbgArea.scrollBy(0, moveY);
             sfgArea.scrollBy(0, moveY);
         }
+
+         */
     });
 
     this.addScreen(shadowScreen);

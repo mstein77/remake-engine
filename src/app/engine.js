@@ -33,6 +33,7 @@ class Game {
         this.minFps = 100;
         this.logs = [];
         this.domQueue = [];
+        this.sound = false;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -146,9 +147,9 @@ class Game {
 
         screen.setDimension(this.width, this.height);
         screen.render(true);
-        if (screen.audio !== null) {
+        if (this.sound && screen.audio !== null) {
             const audio = new Audio(screen.audio);
-            // audio.play();
+            audio.play();
         }
     }
 
@@ -2175,63 +2176,171 @@ class BoundsScrollHandler {
 
 
 // ####################################
-//
+//    Sheets
 // ####################################
 
-function d() {
-    if (arguments.length === 0) {
-        return;
-    }
-    const key = arguments[0];
-    const values = [];
-    for (let i = 1; i < arguments.length; i++) {
-        values.push('' + arguments[i]);
-    }
-    debugs[key] = values.join(' ');
-}
+class SpriteSheet {
 
-class SpriteMap {
-
-    static getCtx() {
-        if (SpriteMap.ctx === undefined) {
-            const canvas = OCM.getNewOffscreenCanvas(1, 1);
-            SpriteMap.ctx = canvas.ctx;
-        }
-        return SpriteMap.ctx;
+    constructor(data) {
+        this.sheet = new Image();
+        this.sheet.src = data;
+        this.sprites = {};
+        this.animations = {};
+        this.customImages = [];
+        this.transformer = {
+            'flip-x': 'TODO',
+            'flip-y': 'TODO'
+        };
     }
 
-    constructor(bits) {
-        const len = 1 << (bits - 1);
-        const sprite = SpriteMap.getCtx().createImageData(len, len);
-        this.im = sprite;
-        this.len = len;
-        this.bits = bits;
-        this.row = len << 2;
-        this.cols = [];
-    }
-
-    makeTransparent() {
-        let i = 3;
-        var d = this.im.data;
-        let i_max = d.length;
-        while(i < i_max) {
-            d[i] = 0;
-            i += 4;
+    assertSprite(id) {
+        if (!this.sprites[id]) {
+            throw Error('No sprite with id "' + id + '" found in spritesheet!');
         }
     }
 
-    addCol(r, g, b, a) {
-        this.cols.push([r, g, b, a]);
+    assertTransformer(id) {
+        if (!this.transformer[id]) {
+            throw Error('No transformer with id "' + id + '" found in spritesheet!');
+        }
     }
 
-    set(x, y, col) {
-        let i = y * this.row + (x << 2);
-        const c = this.cols[col];
-        const d = this.im.data;
-        d[i] = c[0];
-        d[++i] = c[1];
-        d[++i] = c[2];
-        d[++i] = c[3];
+    assertAnimation(id) {
+        if (!this.animations[id]) {
+            throw Error('No animation with id "' + id + '" found in spritesheet!');
+        }
+    }
+
+    addTransformedSprite(id, base, transformers) {
+        this.assertSprite(base);
+        const parts = transformers.split(':');
+        for (let part of parts) {
+            this.assertTransformer(part);
+        }
+        this.customImages.push({
+            id,
+            base,
+            transformers: parts
+        });
+    }
+
+    addTransformedAnimation(id, base, transformers) {
+        this.assertAnimation(base);
+        const baseAnimation = this.animations[base];
+        const newFrames = [];
+        for (let i = 0; i < baseAnimation.frames.length; i++) {
+            const frame = baseAnimation.frames[i];
+            const newId = id + '_' + i;
+            this.addTransformedSprite(newId, frame.id, transformers);
+            newFrames.push({
+                id: newId, duration: frame.duration, padding: {x: frame.padding.x, y: frame.padding.y}
+            });
+        }
+        this.animations[id] = {
+            dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
+            frames: newFrames,
+            dir: baseAnimation.dir,
+            end: baseAnimation.end
+        };
+    }
+
+    build() {
+        for (let image of this.customImages) {
+            let base = this.getSprite(image.base);
+            const canvas = OCM.getNewOffscreenCanvas(base.dim.x, base.dim.y);
+            //
+            canvas.ctx.translate(base.dim.x, 0);
+            canvas.ctx.scale(-1, 1);
+            this.drawSprite(canvas.ctx, image.base,0, 0);
+
+            const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
+
+            sprite.img = new Image();
+            sprite.img.src = canvas.elem.toDataURL('image/png');
+            OCM.discard(canvas);
+        }
+    }
+
+    addSprite(name, offX, offY, width, height) {
+        const sprite = {
+            off: {x: offX, y: offY},
+            dim: {x: width, y: height}
+        };
+        this.sprites[name] = sprite;
+        return sprite;
+    }
+
+    addAnimation(name, frames, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+        let maxX = 0;
+        let maxY = 0;
+        let sameSize = true;
+        let dims = [];
+        const frameDetails = [];
+        for (let rawFrame of frames) {
+            const frame = (typeof rawFrame === 'string' || rawFrame instanceof String) ?
+                {
+                    duration: 1,
+                    id: rawFrame,
+                    padding: {x: 0, y: 0}
+                } : rawFrame;
+
+            const dim = this.getSpriteDim(frame.id);
+            maxX = Math.max(maxX, dim.x);
+            maxY = Math.max(maxY, dim.y);
+            sameSize = sameSize && (maxX === dim.x || maxY === dim.y);
+            dims.push(dim);
+            frameDetails.push(frame);
+        }
+
+        const animation = {
+            dim: {x: maxX, y: maxY},
+            frames: frameDetails,
+            dir,
+            end
+        };
+        if (!sameSize) {
+            for (let i = 0; i < dims.length; i++) {
+                const frame = animation.frames[i];
+                const dim = dims[i];
+                // TODO multiple auto padding strategies per axis
+                // (V-CENTERING, V-TOP, V-BOTTOM, H-CENTERING, H-LEFT, H-RIGHT)
+                const offX = (maxX - dim.x) >> 1;
+                const offY = (maxY - dim.y) >> 1;
+                frame.padding = {x: offX, y: offY};
+            }
+        }
+        this.animations[name] = animation;
+        return animation;
+    }
+
+    isAnimation(name) {
+        return this.animations[name] ? true : false;
+    };
+
+    getSpriteDim(name) {
+        if (this.isAnimation(name)) {
+            return this.animations[name].dim;
+        }
+        const sprite = this.getSprite(name);
+        return sprite.dim;
+    }
+
+    getSprite(name) {
+        this.assertSprite(name);
+        return this.sprites[name];
+    }
+
+    getAnimation(name, speed = 1) {
+        if (!this.animations[name]) {
+            throw Error('No animations with id "' + name + '" found in spritesheet!');
+        }
+        const animation = this.animations[name];
+        return new Animation(animation.frames, speed, animation.dir, animation.end);
+    }
+
+    drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
+        const sprite = this.getSprite(name);
+        ctx.drawImage(sprite.img === undefined ? this.sheet : sprite.img, sprite.off.x, sprite.off.y, sprite.dim.x, sprite.dim.y, posX + paddX, posY + paddY, sprite.dim.x, sprite.dim.y);
     }
 }
 
@@ -2492,95 +2601,6 @@ class Animation {
     }
 }
 
-
-class SpriteSheet {
-
-    constructor(data) {
-        this.sheet = new Image();
-        this.sheet.src = data;
-        this.sprites = {};
-        this.animations = {};
-    }
-
-    addSprite(name, offX, offY, width, height) {
-        this.sprites[name] = {
-            off: {x: offX, y: offY},
-            dim: {x: width, y: height}
-        };
-    }
-
-    addAnimation(name, frames, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
-        let maxX = 0;
-        let maxY = 0;
-        let sameSize = true;
-        let dims = [];
-        const frameDetails = [];
-        for (let frame of frames) {
-            const dim = this.getSpriteDim(frame);
-            maxX = Math.max(maxX, dim.x);
-            maxY = Math.max(maxY, dim.y);
-            sameSize = sameSize && (maxX === dim.x || maxY === dim.y);
-            dims.push(dim);
-            frameDetails.push({
-                duration: 1,
-                id: frame,
-                padding: {x: 0, y: 0}
-            });
-        }
-
-        const animation = {
-            dim: {x: maxX, y: maxY},
-            frames: frameDetails,
-            dir,
-            end
-        };
-        if (!sameSize) {
-            for (let i = 0; i < dims.length; i++) {
-                const frame = animation.frames[i];
-                const dim = dims[i];
-                // TODO multiple auto padding strategies per axis
-                // (V-CENTERING, V-TOP, V-BOTTOM, H-CENTERING, H-LEFT, H-RIGHT)
-                const offX = (maxX - dim.x) >> 1;
-                const offY = (maxY - dim.y) >> 1;
-                frame.padding = {x: offX, y: offY};
-            }
-        }
-        this.animations[name] = animation;
-    }
-
-    isAnimation(name) {
-        return this.animations[name] ? true : false;
-    };
-
-    getSpriteDim(name) {
-        if (this.isAnimation(name)) {
-            return this.animations[name].dim;
-        }
-        const sprite = this.getSprite(name);
-        return sprite.dim;
-    }
-
-    getSprite(name) {
-        if (!this.sprites[name]) {
-            throw Error('No sprite with id "' + name + '" found in spritesheet!');
-        }
-        return this.sprites[name];
-    }
-
-    getAnimation(name, speed = 1) {
-        if (!this.animations[name]) {
-            throw Error('No animations with id "' + name + '" found in spritesheet!');
-        }
-        const animation = this.animations[name];
-        return new Animation(animation.frames, speed, animation.dir, animation.end);
-    }
-
-    drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
-        const sprite = this.getSprite(name);
-        ctx.drawImage(this.sheet, sprite.off.x, sprite.off.y, sprite.dim.x, sprite.dim.y, posX + paddX, posY + paddY, sprite.dim.x, sprite.dim.y);
-    }
-}
-
 class States {
     constructor(states) {
         if (states.length === 0) {
@@ -2628,19 +2648,22 @@ class States {
     }
 }
 
-function getNewSpriteMap(bits) {
-    return new SpriteMap(bits);
+function d() {
+    if (arguments.length === 0) {
+        return;
+    }
+    const key = arguments[0];
+    const values = [];
+    for (let i = 1; i < arguments.length; i++) {
+        values.push('' + arguments[i]);
+    }
+    debugs[key] = values.join(' ');
 }
 
-function getNewSprite(mapKey, x, y) {
-    if (spriteMaps[mapKey] === undefined) {
-        throw Error('Unknown SpriteMap key ' + mapKey);
-    }
-    return {im: spriteMaps[mapKey].im, x: x, y: y, len: spriteMaps[mapKey].len};
-}
+
 
 const OCM = new CanvasManager();
-let debugElem = null;
+// let debugElem = null;
 let debugs = [];
 var spriteMaps = [];
 
@@ -2662,9 +2685,6 @@ module.exports = {
     Animation,
     d,
     SpriteSheet,
-    SpriteMap,
-    getNewSpriteMap,
-    getNewSprite,
     spriteMaps,
     TilesMap,
     States,
