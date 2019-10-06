@@ -705,6 +705,14 @@ class DivContainer {
         Game.instance.addDomOp(this.containerElem, 'style.backgroundColor', color);
     }
 
+    setBackgroundImage(data, posX, posY) {
+        Game.instance.addDomOp(this.containerElem, 'style.background-image', 'url(' + data + ')' );
+        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', 'no-repeat');
+        Game.instance.addDomOp(this.containerElem, 'style.background-position', posX + 'px ' + posY + 'px');
+    }
+
+
+
     setViewPortOffset(x, y) {
     }
 }
@@ -887,7 +895,13 @@ class EmptyPane {
 class ColorPane {
     constructor(color) {
         this.color = color;
+        this.image = null;
         this.dirty = true;
+    }
+
+    setImage(image, posX, posY) {
+        this.image = image;
+        this.imagePos = {x: posX, y: posY};
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -902,6 +916,9 @@ class ColorPane {
 
     render() {
         this.container.setBackgroundColor(this.color);
+        if (this.image !== null) {
+            this.container.setBackgroundImage(this.image, this.imagePos.x, this.imagePos.y);
+        }
         this.dirty = false;
     }
 }
@@ -1569,9 +1586,10 @@ class SpritePane {
     }
 
     initSpriteObj(obj, sheetId) {
+        const isAni = this.spriteSheet.isAnimation(sheetId);
         obj.name = sheetId;
-        obj.isAnimation = this.spriteSheet.isAnimation(sheetId);
-        obj.animation = obj.isAnimation ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null;
+        obj.isAnimation = isAni;
+        obj.animation = (isAni ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null);
         obj.dim = this.spriteSheet.getSpriteDim(sheetId);
         return obj;
     }
@@ -2314,7 +2332,7 @@ class SpriteSheet {
     }
 
     isAnimation(name) {
-        return this.animations[name] ? true : false;
+        return !(this.animations[name] === undefined);
     };
 
     getSpriteDim(name) {
@@ -2602,6 +2620,7 @@ class Animation {
 }
 
 class States {
+
     constructor(states) {
         if (states.length === 0) {
             throw Error("No states given!");
@@ -2639,6 +2658,10 @@ class States {
         const popped = this.transitions;
         this.transitions = [];
         return popped;
+    }
+
+    getState() {
+        return this.currState;
     }
 
     setState(state) {

@@ -579,9 +579,11 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             target.drawImage(moon, 220, 18);
         }
     }
+    const colorAndMoonPane = new ColorPane('#607080');
+    colorAndMoonPane.setImage(moon.src, 220, 18);
 
     const scolArea = new SplitArea('Y', [74, 93]);
-    scolArea.addPane(new ColorAndMoonPane('#607080'), 0);
+    scolArea.addPane(colorAndMoonPane, 0);
     const sbgFadeBg = new LinearGradientPane('Y', ['#607080', 30, '#967b96', 40, '#ff7b96']);
 
     scolArea.addPane(sbgFadeBg, 1);
@@ -643,18 +645,37 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     
     beastSpriteSheet.addSprite('beast', 3, 2, 32, 52);
     beastSpriteSheet.addTransformedSprite('beast-rev', 'beast', 'flip-x');
-    beastSpriteSheet.addSprite('beast-run1', 3, 66, 32, 52);
+    beastSpriteSheet.addSprite('beast-run1', 2, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run2', 33, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run3', 66, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run4', 98, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run5', 130, 66, 32, 52);
     beastSpriteSheet.addSprite('beast-run6', 163, 66, 32, 52);
+    beastSpriteSheet.addSprite('beast-down1', 133, 2, 32, 52);
+    beastSpriteSheet.addSprite('beast-down2', 163, 2, 32, 52);
+    beastSpriteSheet.addSprite('beast-turn1', 66, 2, 32, 52);
+    beastSpriteSheet.addSprite('beast-turn2', 101, 2, 32, 52);
+    beastSpriteSheet.addSprite('beast-jump', 35, 2, 32, 52);
+    beastSpriteSheet.addTransformedSprite('beast-jump-rev', 'beast-jump', 'flip-x');
+    beastSpriteSheet.addTransformedSprite('beast-down-rev', 'beast-down2', 'flip-x');
     beastSpriteSheet.addAnimation(
         'beast-run',
         ['beast-run1', 'beast-run2', 'beast-run3', 'beast-run4', 'beast-run5', 'beast-run6'],
         ANIMATION.DIR.FORWARD, ANIMATION.END.LOOP
     );
     beastSpriteSheet.addTransformedAnimation('beast-run-rev', 'beast-run', 'flip-x');
+    beastSpriteSheet.addAnimation(
+        'beast-down',
+        ['beast-down1', 'beast-down2'],
+        ANIMATION.DIR.FORWARD, ANIMATION.END.STOP
+    );
+    beastSpriteSheet.addTransformedAnimation('beast-down-rev', 'beast-down', 'flip-x');
+    beastSpriteSheet.addAnimation(
+        'beast-turn',
+        ['beast-turn1', 'beast-turn2'],
+        ANIMATION.DIR.FORWARD, ANIMATION.END.STOP
+    );
+    beastSpriteSheet.addTransformedAnimation('beast-turn-rev', 'beast-turn', 'flip-x');
     beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
@@ -689,15 +710,66 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         beastSpritePane.updateFrames();
     });
 
-    const beastStates = new States(['stand-right', 'stand-left', 'run-right', 'run-left']);
+    const beastStates = new States([
+        'stand-right', 'stand-left', 'run-right', 'run-left', 'go-down-right', 'go-down-left', 'down-right', 'down-left',
+        'go-up-right', 'go-up-left', 'turn-right', 'turn-left', 'jump-right-top', 'jump-left-top', 'jump-right', 'jump-left'
+    ]);
     beastStates.addTransition('stand-right', 'move-right', 'run-right');
-    beastStates.addTransition('stand-right', 'move-left', 'run-left');
-    beastStates.addTransition('stand-left', 'move-right', 'run-right');
+    beastStates.addTransition('stand-right', 'move-left', 'turn-left');
+    beastStates.addTransition('stand-right', 'move-down', 'go-down-right');
+    beastStates.addTransition('stand-right', 'move-down-right', 'go-down-right');
+    beastStates.addTransition('stand-right', 'move-up', 'jump-right-top');
+    beastStates.addTransition('stand-right', 'move-up-right', 'jump-right');
+    beastStates.addTransition('stand-right', 'move-up-left', 'jump-left');
+
+    beastStates.addTransition('jump-right-top', 'landing', 'stand-right');
+    beastStates.addTransition('jump-left-top', 'landing', 'stand-left');
+    beastStates.addTransition('jump-right', 'landing', 'stand-right');
+    beastStates.addTransition('jump-left', 'landing', 'stand-left');
+
+    beastStates.addTransition('stand-left', 'move-right', 'turn-right');
     beastStates.addTransition('stand-left', 'move-left', 'run-left');
+    beastStates.addTransition('stand-left', 'move-down', 'go-down-left');
+    beastStates.addTransition('stand-left', 'move-down-left', 'go-down-left');
+    beastStates.addTransition('stand-left', 'move-up', 'jump-left-top');
+    beastStates.addTransition('stand-left', 'move-up-right', 'jump-right');
+    beastStates.addTransition('stand-left', 'move-up-left', 'jump-left');
+
     beastStates.addTransition('run-right', 'move-left', 'run-left');
     beastStates.addTransition('run-right', 'stand', 'stand-right');
+    beastStates.addTransition('run-right', 'move-down', 'go-down-right');
+    beastStates.addTransition('run-right', 'move-down-right', 'go-down-right');
+    beastStates.addTransition('run-right', 'move-up-right', 'jump-right');
+    beastStates.addTransition('run-right', 'move-up-left', 'jump-left');
+
     beastStates.addTransition('run-left', 'stand', 'stand-left');
     beastStates.addTransition('run-left', 'move-right', 'run-right');
+    beastStates.addTransition('run-left', 'move-down', 'go-down-left');
+    beastStates.addTransition('run-left', 'move-down-left', 'go-down-left');
+    beastStates.addTransition('run-left', 'move-up-right', 'jump-right');
+    beastStates.addTransition('run-left', 'move-up-left', 'jump-left');
+
+    beastStates.addTransition('go-down-right', 'eoa', 'down-right');
+    beastStates.addTransition('go-down-left', 'eoa', 'down-left');
+    beastStates.addTransition('go-up-right', 'eoa', 'stand-right');
+    beastStates.addTransition('go-up-left', 'eoa', 'stand-left');
+
+    beastStates.addTransition('down-right', 'stand', 'go-up-right');
+    beastStates.addTransition('down-right', 'move-up', 'go-up-right');
+    beastStates.addTransition('down-right', 'move-right', 'go-up-right');
+    beastStates.addTransition('down-right', 'move-left', 'go-up-right');
+
+    beastStates.addTransition('down-left', 'stand', 'go-up-left');
+    beastStates.addTransition('down-left', 'move-up', 'go-up-left');
+    beastStates.addTransition('down-left', 'move-right', 'go-up-left');
+    beastStates.addTransition('down-left', 'move-left', 'go-up-left');
+
+    beastStates.addTransition('turn-left', 'eoa', 'stand-left');
+    beastStates.addTransition('turn-right', 'eoa', 'stand-right');
+
+    let jumpIndex = null;
+    let jumpMoveX = 0;
+    const jumpPos = [-6,  -6, -5, -5, -4, -4, -3, -3, 0, -2, 0, -2, 0, -1, 0, -1, 0, -1,  0, 0, 1, 0, 1, 0,  1, 0,  2, 0,  2, 0,  3, 3, 4, 4, 5, 5, 6, 6];
 
     shadowScreen.setKeyHandler(() => {
         let moveX = 0;
@@ -723,15 +795,37 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             }
         };
-
         let event = 'stand';
-        if (moveX !== 0) {
+        if (moveY > 0) {
+            if (moveX !== 0) {
+                event = 'move-down-' + (moveX > 0 ? 'right' : 'left');
+            } else {
+                event = 'move-down';
+            }
+        } else if (moveY < 0) {
+            if (moveX !== 0) {
+                event = 'move-up-' + (moveX > 0 ? 'right' : 'left');
+            } else {
+                event = 'move-up';
+            }
+        } else if (moveX !== 0) {
             event = 'move-' + (moveX > 0 ? 'right' : 'left');
         }
+        if (jumpIndex !== null && jumpIndex === jumpPos.length) {
+            jumpIndex = null;
+            event = 'landing';
+        };
         beastStates.doEvent(event);
+
+        const beastSprite = beastSpritePane.getSprite('beast');
+        if (beastSprite.isAnimation && beastSprite.animation.getState() === ANIMATION.STATE.DONE) {
+            beastStates.doEvent('eoa');
+        }
+
         const transitions = beastStates.popTransitions();
         for (let transition of transitions) {
             let target = null;
+            let doReverse = false;
             switch(transition.to) {
                 case 'stand-left':
                     target = 'beast-rev';
@@ -745,13 +839,60 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                 case 'run-right':
                     target = 'beast-run';
                     break;
+                case 'go-down-right':
+                    target = 'beast-down';
+                    break;
+                case 'go-down-left':
+                    target = 'beast-down-rev';
+                    break;
+                case 'go-up-right':
+                    target = 'beast-down';
+                    doReverse = true;
+                    break;
+                case 'go-up-left':
+                    target = 'beast-down-rev';
+                    doReverse = true;
+                    break;
+                case 'down-right':
+                    target = 'beast-down2';
+                    break;
+                case 'down-left':
+                    target = 'beast-down-rev_1';
+                    break;
+                case 'turn-left':
+                    target = 'beast-turn';
+                    break;
+                case 'turn-right':
+                    target = 'beast-turn-rev';
+                    break;
+                case 'jump-right':
+                case 'jump-right-top':
+                    target = 'beast-jump';
+                    jumpIndex = 0;
+                    jumpMoveX = moveX;
+                    break;
+                case 'jump-left':
+                case 'jump-left-top':
+                    target = 'beast-jump-rev';
+                    jumpIndex = 0;
+                    jumpMoveX = moveX;
+                    break;
             }
             if (target !== null) {
                 beastSpritePane.assignSprite('beast', target);
+                if (doReverse) {
+                    beastSprite.animation.reverse();
+                }
             }
         }
 
-        if (moveX !== 0) {
+        if (jumpIndex !== null) {
+            const pos = beastSpritePane.getSpritePos('beast');
+            beastSpritePane.setSpritePos('beast', pos.x, pos.y + jumpPos[jumpIndex]);
+            beastScroller.scrollBy(jumpMoveX * 1.2, 0);
+            jumpIndex++;
+        }
+        if (['run-left', 'run-right'].indexOf(beastStates.getState()) !== -1 && moveX !== 0) {
             beastScroller.scrollBy(moveX * 1.2, 0);
         }
         /*
