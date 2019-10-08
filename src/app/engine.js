@@ -33,7 +33,7 @@ class Game {
         this.minFps = 100;
         this.logs = [];
         this.domQueue = [];
-        this.sound = false;
+        this.sound = true;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -705,13 +705,34 @@ class DivContainer {
         Game.instance.addDomOp(this.containerElem, 'style.backgroundColor', color);
     }
 
-    setBackgroundImage(data, posX, posY) {
-        Game.instance.addDomOp(this.containerElem, 'style.background-image', 'url(' + data + ')' );
-        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', 'no-repeat');
-        Game.instance.addDomOp(this.containerElem, 'style.background-position', posX + 'px ' + posY + 'px');
+    setBackgroundImages(dataElems, pos) {
+        const urls = [];
+        const noRepeats = [];
+        for (data of dataElems) {
+            urls.push('url(' + data + ')');
+            noRepeats.push('no-repeat');
+        }
+        Game.instance.addDomOp(this.containerElem, 'style.background-image', urls.join(', '));
+        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', noRepeats.join(', '));
     }
 
+    setBackgroundImage(data, posX, posY) {
+        this.setBackgroundImages([data]);
+        Game.instance.addDomOp(this.containerElem, 'style.background-image', 'url(' + data + ')' );
+        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', 'no-repeat');
+    }
 
+    setBackgroundPositions(positions) {
+        const pos = [];
+        for (let position of positions) {
+            pos.push(position.x + 'px ' + position.y + 'px');
+        }
+        Game.instance.addDomOp(this.containerElem, 'style.background-position', pos.join(', '));
+    }
+
+    setBackgroundPosition(posX, posY) {
+        this.setBackgroundPositions([{x: posX, y: posY}]);
+    }
 
     setViewPortOffset(x, y) {
     }
@@ -895,13 +916,27 @@ class EmptyPane {
 class ColorPane {
     constructor(color) {
         this.color = color;
-        this.image = null;
+        this.images = [];
+        this.imgPos = [];
         this.dirty = true;
     }
 
-    setImage(image, posX, posY) {
-        this.image = image;
-        this.imagePos = {x: posX, y: posY};
+    addImage(image, posX, posY) {
+        this.images.push(image);
+        this.imgPos.push({x: posX, y: posY});
+        this.dirty = false;
+    }
+
+    setImagePosition(index, posX, posY) {
+        const pos = this.imgPos[index];
+        pos.x = posX;
+        pos.y = posY;
+        this.dirty = true;
+    }
+
+    getImagePosition(index) {
+        const pos = this.imgPos[index];
+        return {x: pos.x, y: pos.y};
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -916,8 +951,9 @@ class ColorPane {
 
     render() {
         this.container.setBackgroundColor(this.color);
-        if (this.image !== null) {
-            this.container.setBackgroundImage(this.image, this.imagePos.x, this.imagePos.y);
+        if (this.images.length > 0) {
+            this.container.setBackgroundImages(this.images);
+            this.container.setBackgroundPositions(this.imgPos);
         }
         this.dirty = false;
     }
@@ -1564,6 +1600,10 @@ class SpritePane {
 
     getActor() {
         return this.actor;
+    }
+
+    hasSprite(id) {
+        return (this.sprites[id] !== undefined);
     }
 
     addSprite(id, name,  x, y) {
