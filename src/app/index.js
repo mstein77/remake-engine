@@ -4,10 +4,10 @@ import {
     SplitArea,
     Screen,
     EmptyPane,
+    CanvasPane,
     SpritePane,
     ColorPane,
     PatternPane,
-    PatternPane2,
     TilesPane,
     BufferedTilesPane,
     LinearGradientPane,
@@ -15,16 +15,25 @@ import {
     BoundsScrollHandler,
     d,
     SpriteSheet,
-    SpriteMap,
-    getNewSpriteMap,
-    getNewSprite,
-    spriteMaps,
     TilesMap,
     States,
     TILE,
-    OCM,
     ANIMATION
 } from './engine';
+
+const iMax = 40;
+const degree90 = Math.PI/2;
+const bowStep = degree90/iMax;
+let last = null;
+let fallMoves = [];
+for (let i = (iMax >> 3) * bowStep; i >= -degree90 + 10 * bowStep; i -= bowStep) {
+    const pos = {x: Math.round(80 * Math.sin(i)), y: Math.round(100 * Math.cos(i))};
+    if (last !== null) {
+        const move = {x: (last.x - pos.x), y: (last.y - pos.y)};
+        fallMoves.unshift(move);
+    }
+    last = pos;
+}
 
 const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     var tb = TILE.DIM_16x16;
@@ -657,14 +666,11 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.addSprite('beast-turn2', 101, 2, 32, 52);
     beastSpriteSheet.addSprite('beast-jump', 35, 2, 32, 52);
 
-    beastSpriteSheet.addSprite('bat-1', 0, 226, 32, 64);
-    beastSpriteSheet.addSprite('bat-2', 40, 226, 32, 64);
-    beastSpriteSheet.addSprite('bat-3', 80, 226, 32, 64);
-    beastSpriteSheet.addSprite('bat-4', 120, 226, 32, 64);
-    beastSpriteSheet.addSprite('bat-5', 160, 226, 32, 64);
-
-
-    
+    beastSpriteSheet.addSprite('bat1', 0, 226, 32, 64);
+    beastSpriteSheet.addSprite('bat2', 40, 226, 32, 64);
+    beastSpriteSheet.addSprite('bat3', 80, 226, 32, 64);
+    beastSpriteSheet.addSprite('bat4', 120, 226, 32, 64);
+    beastSpriteSheet.addSprite('bat5', 160, 226, 32, 64);
 
     beastSpriteSheet.addSprite('beast-kick1', 1, 120, 32, 52);
     beastSpriteSheet.addSprite('beast-kick-hold', 35, 120, 32, 52);
@@ -677,6 +683,13 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.addSprite('beast-down-punch2', 30, 171, 32, 52);
     beastSpriteSheet.addSprite('beast-down-punch-hold', 64, 171, 32, 52);
     beastSpriteSheet.addSprite('beast-down-fist', 96, 172, 12, 30);
+
+    beastSpriteSheet.addAnimation(
+        'bat',
+        ['bat1', 'bat2', 'bat3', 'bat4', 'bat5'],
+        ANIMATION.DIR.BACKWARD_FORWARD, ANIMATION.END.LOOP
+    );
+    beastSpriteSheet.addTransformedAnimation('bat-rev', 'bat', 'flip-x');
 
     beastSpriteSheet.addAnimation(
         'beast-punch',
@@ -702,21 +715,6 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.addTransformedSprite('beast-fist-rev', 'beast-fist', 'flip-x');
     beastSpriteSheet.addTransformedSprite('beast-feet-rev', 'beast-feet', 'flip-x');
 
-    /*
-    beast-kick1:  1x120 (32x52)
-beast-kick2: 35x120 (32x52)
-beast-feet:  67x120 (11x29) 
-beast-punch1: 81x120 (32x52)
-beast-punch2: 113x120 (32x52)
-beast-punch3: 151x120 (32x52)
-beast-fist: 183x120 (12x17)
-beast-down-punch1:  0x171 (32x52)
-beast-down-punch2: 30x171 (32x52)
-beast-down-punch3: 64x171 (32x52)
-beast-down-fist: 96x172 (12x30) y+13
-    */
-
-
     beastSpriteSheet.addTransformedSprite('beast-jump-rev', 'beast-jump', 'flip-x');
     beastSpriteSheet.addTransformedSprite('beast-down-rev', 'beast-down2', 'flip-x');
     beastSpriteSheet.addAnimation(
@@ -736,21 +734,39 @@ beast-down-fist: 96x172 (12x30) y+13
         ['beast-turn1', 'beast-turn2'],
         ANIMATION.DIR.FORWARD, ANIMATION.END.STOP
     );
+    beastSpriteSheet.addAnimation(
+        'beast-turn2-rev',
+        ['beast-turn2', 'beast-turn1'],
+        ANIMATION.DIR.FORWARD, ANIMATION.END.STOP
+    );
     beastSpriteSheet.addTransformedAnimation('beast-turn-rev', 'beast-turn', 'flip-x');
+    beastSpriteSheet.addTransformedAnimation('beast-turn2', 'beast-turn2-rev', 'flip-x');
     beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
-    beastSpritePane.addSprite('beast', 'beast', 160, 118);
+    beastSpritePane.addSprite('beast', 'beast', 144, 118);
     beastSpritePane.setAnimationSpeed('beast', 0.15);
+    beastSpritePane.setAttachDefault(shadowWorldPane2);
 
-    sfgArea.addPane(shadowWorldPane2);
+    sfgArea.addPane(shadowWorldPane2,0);
+    sfgArea.addPane(beastSpritePane, 0);
+
+    const beastCanvas = new CanvasPane();
+    sfgArea.addPane(beastCanvas, 0);
+    function drawRect(dim) {
+/*
+        const ctx = beastCanvas.getCtx();
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(dim.x1, dim.y1, (dim.x2 - dim.x1), (dim.y2 - dim.y1));
+
+ */
+        return dim;
+    }
+
     sfgArea.addPane(patternFg, 1);
 
     shadowScreen.addArea(sfgArea);
-
-    const beastArea = new Area();
-    beastArea.addPane(beastSpritePane);
-    shadowScreen.addArea(beastArea);
 
     const beastScroller = new MasterSlavesScrollHandler(shadowWorldPane2);
     beastScroller.addSlave(patternBg, 0.5);
@@ -766,6 +782,7 @@ beast-down-fist: 96x172 (12x30) y+13
     beastScroller.addSlave(patternBg11, 2.2);
     beastScroller.addSlave(patternBg12, 3);
     beastScroller.addSlave(patternFg, 4);
+    beastScroller.addSpriteSlave(beastSpritePane);
 
     let shipTimer = 0;
 
@@ -796,16 +813,16 @@ beast-down-fist: 96x172 (12x30) y+13
 
     const beastStates = new States([
         'stand-right', 'stand-left', 'run-right', 'run-left', 'go-down-right', 'go-down-left', 'down-right', 'down-left',
-        'go-up-right', 'go-up-left', 'turn-right', 'turn-left', 'jump-right-top', 'jump-left-top', 'jump-right', 'jump-left',
+        'go-up-right', 'go-up-left', 'turn-right', 'turn-right2', 'turn-left', 'turn-left2', 'jump-right-top', 'jump-left-top', 'jump-right', 'jump-left',
         'punch-right', 'punch-hold-right', 'punch-back-right', 'punch-left', 'punch-hold-left', 'punch-back-left',
         'down-punch-right', 'down-punch-hold-right', 'down-punch-back-right',
         'down-punch-left', 'down-punch-hold-left', 'down-punch-back-left',
         'kick-right', 'kick-hold-right', 'kick-left', 'kick-hold-left'
     ]);
+
     beastStates.addTransition('stand-right', 'move-right', 'run-right');
     beastStates.addTransition('stand-right', 'move-left', 'turn-left');
     beastStates.addTransition('stand-right', 'move-down', 'go-down-right');
-    beastStates.addTransition('stand-right', 'move-down-right', 'go-down-right');
     beastStates.addTransition('stand-right', 'move-up', 'jump-right-top');
     beastStates.addTransition('stand-right', 'move-up-right', 'jump-right');
     beastStates.addTransition('stand-right', 'move-up-left', 'jump-left');
@@ -832,7 +849,6 @@ beast-down-fist: 96x172 (12x30) y+13
     beastStates.addTransition('stand-left', 'move-right', 'turn-right');
     beastStates.addTransition('stand-left', 'move-left', 'run-left');
     beastStates.addTransition('stand-left', 'move-down', 'go-down-left');
-    beastStates.addTransition('stand-left', 'move-down-left', 'go-down-left');
     beastStates.addTransition('stand-left', 'move-up', 'jump-left-top');
     beastStates.addTransition('stand-left', 'move-up-right', 'jump-right');
     beastStates.addTransition('stand-left', 'move-up-left', 'jump-left');
@@ -842,7 +858,7 @@ beast-down-fist: 96x172 (12x30) y+13
     beastStates.addTransition('punch-hold-left', 'button-released', 'punch-back-left');
     beastStates.addTransition('punch-back-left', 'eoa', 'stand-left');
 
-    beastStates.addTransition('run-right', 'move-left', 'run-left');
+    beastStates.addTransition('run-right', 'move-left', 'turn-left');
     beastStates.addTransition('run-right', 'stand', 'stand-right');
     beastStates.addTransition('run-right', 'move-down', 'go-down-right');
     beastStates.addTransition('run-right', 'move-down-right', 'go-down-right');
@@ -851,7 +867,7 @@ beast-down-fist: 96x172 (12x30) y+13
     beastStates.addTransition('run-right', 'button-pressed', 'punch-right');
 
     beastStates.addTransition('run-left', 'stand', 'stand-left');
-    beastStates.addTransition('run-left', 'move-right', 'run-right');
+    beastStates.addTransition('run-left', 'move-right', 'turn-right');
     beastStates.addTransition('run-left', 'move-down', 'go-down-left');
     beastStates.addTransition('run-left', 'move-down-left', 'go-down-left');
     beastStates.addTransition('run-left', 'move-up-right', 'jump-right');
@@ -863,108 +879,219 @@ beast-down-fist: 96x172 (12x30) y+13
     beastStates.addTransition('go-up-right', 'eoa', 'stand-right');
     beastStates.addTransition('go-up-left', 'eoa', 'stand-left');
 
-    beastStates.addTransition('down-right', 'stand', 'go-up-right');
-    beastStates.addTransition('down-right', 'move-up', 'go-up-right');
-    beastStates.addTransition('down-right', 'move-right', 'go-up-right');
-    beastStates.addTransition('down-right', 'move-left', 'go-up-right');
+    beastStates.addTransition('down-right', 'not-move-down', 'go-up-right');
     beastStates.addTransition('down-right', 'button-pressed', 'down-punch-right');
 
     beastStates.addTransition('down-punch-right', 'eoa', 'down-punch-hold-right');
     beastStates.addTransition('down-punch-hold-right', 'button-released', 'down-punch-back-right');
     beastStates.addTransition('down-punch-back-right', 'eoa', 'down-right');
 
-    beastStates.addTransition('down-left', 'stand', 'go-up-left');
-    beastStates.addTransition('down-left', 'move-up', 'go-up-left');
-    beastStates.addTransition('down-left', 'move-right', 'go-up-left');
-    beastStates.addTransition('down-left', 'move-left', 'go-up-left');
+    beastStates.addTransition('down-left', 'not-move-down', 'go-up-left');
     beastStates.addTransition('down-left', 'button-pressed', 'down-punch-left');
 
     beastStates.addTransition('down-punch-left', 'eoa', 'down-punch-hold-left');
     beastStates.addTransition('down-punch-hold-left', 'button-released', 'down-punch-back-left');
     beastStates.addTransition('down-punch-back-left', 'eoa', 'down-left');
 
-    beastStates.addTransition('turn-left', 'eoa', 'stand-left');
-    beastStates.addTransition('turn-right', 'eoa', 'stand-right');
+    beastStates.addTransition('turn-left', 'eoa', 'turn-left2');
+    beastStates.addTransition('turn-left2', 'eoa', 'stand-left');
+    beastStates.addTransition('turn-right', 'eoa', 'turn-right2');
+    beastStates.addTransition('turn-right2', 'eoa', 'stand-right');
+
+    beastStates.setEventPrios(
+        ['eoa', 'button-pressed', 'button-released', 'move-up-right', 'move-up-left', 'move-down', 'not-move-down', 'move-up', 'move-left', 'move-right', 'landing', 'stand']
+    );
 
     let jumpIndex = null;
+    let invisible = 0;
     let jumpMoveX = 0;
     const jumpPos = [-6,  -6, -5, -5, -4, -4, -3, -3, 0, -2, 0, -2, 0, -1, 0, -1, 0, -1,  0, 0, 1, 0, 1, 0,  1, 0,  2, 0,  2, 0,  3, 3, 4, 4, 5, 5, 6, 6];
     let isPunching = false;
+    let isHitting = 0;
+    let kills = 0;
+
+    let storyPos = 0;
+
+    let currEnemies = [];
+    const enemies = {
+        'bat': {
+            speed: 3,
+            damage: 2,
+            animSpeed: 0.34,
+            invincible: false,
+            variants: {
+                'left': {
+                    sprite: 'bat',
+                    dir: 1,
+                    x: -32,
+                    y: 90
+
+                },
+                'right': {
+                    sprite: 'bat-rev',
+                    dir: -1,
+                    x: 352,
+                    y: 90
+                }
+            }
+        }
+    };
+
+    const story = {
+        '-100': {type: 'enemy', id: 'bat.left'},
+        '50': {type: 'enemy', id: 'bat.right'}
+    };
 
     shadowScreen.setKeyHandler(() => {
+
         let moveX = 0;
-        let moveY = 0;
         const speed = 1.5;
-        for (var key in this.keysDown) {
-            switch (key) {
-                case 'a':
+        const allTransitions = beastStates.getPossibleTransitions();
+        const beastSprite = beastSpritePane.getSprite('beast');
+
+        // key vars
+        let dirX = 0;
+        if (this.keysDown['a']) {
+            dirX--;
+        }
+        if (this.keysDown['d']) {
+            dirX++;
+        }
+        let dirY = 0;
+        if (this.keysDown['w']) {
+            dirY--;
+        }
+        if (this.keysDown['s']) {
+            dirY++;
+        }
+        let buttonDown = (this.keysDown['Enter'] !== undefined);
+
+        if (isPunching && !buttonDown) {
+            isPunching = false;
+        }
+        if (isHitting === 2) {
+            isHitting = 0;
+            hitRegion = null;
+        }
+        if (invisible > 0) {
+            invisible--;
+            if (invisible === 0) {
+                beastSpritePane.unhideSprite('beast');
+                if (beastSpritePane.hasSprite('hit')) {
+                    beastSpritePane.unhideSprite('hit');
+                }
+            } else if (invisible % 5 === 0) {
+                beastSpritePane.toggleSpriteVisiblity('beast');
+                if (beastSpritePane.hasSprite('hit')) {
+                    beastSpritePane.toggleSpriteVisiblity('hit');
+                }
+            }
+        }
+
+        // determine next event
+        let nextEvent = null;
+        for (let transition of allTransitions) {
+            switch(transition) {
+                case 'eoa':
+                    if (beastSprite.animation.getState() !== ANIMATION.STATE.DONE) {
+                        continue;
+                    }
+                    break;
+
+                case 'move-left':
+                    if (dirX >= 0) {
+                        continue;
+                    }
                     moveX -= speed;
                     break;
 
-                case 'd':
+                case 'move-right':
+                    if (dirX <= 0) {
+                        continue;
+                    }
                     moveX += speed;
                     break;
 
-                case 'w':
-                    moveY -= speed;
+                case 'move-down':
+                    if (dirY <= 0) {
+                        continue;
+                    }
                     break;
 
-                case 's':
-                    moveY += speed;
+                case 'move-up':
+                    if (dirY >= 0) {
+                        continue;
+                    }
                     break;
 
-                case 'Enter':
+                case 'move-up-right':
+                    if (dirY >= 0 || dirX <= 0) {
+                        continue;
+                    }
+                    moveX += speed;
                     break;
+
+                case 'move-up-left':
+                    if (dirY >= 0 || dirX >= 0) {
+                        continue;
+                    }
+                    moveX -= speed;
+                    break;
+
+                case 'not-move-down':
+                    if (dirY > 0) {
+                        continue;
+                    }
+                    break;
+
+                case 'landing':
+                    if (jumpIndex === null || jumpIndex < jumpPos.length) {
+                        continue;
+                    }
+                    jumpIndex = null;
+                    if (beastSpritePane.hasSprite('hit')) {
+                        beastSpritePane.removeSprite('hit');
+                    }
+                    break;
+
+                case 'button-pressed':
+                    if (!buttonDown) {
+                        continue;
+                    }
+                    if (jumpIndex !== null && (jumpIndex < 12  || jumpIndex > 24)) {
+                        continue;
+                    }
+                    break;
+
+                case 'button-released':
+                    if (isPunching) {
+                        continue;
+                    }
+                    break;
+
+                case 'stand':
+                    if (!(dirX === 0 && dirY === 0)) {
+                        continue;
+                    }
+                    break;
+
+                default:
+                    continue;
             }
-        };
-        let event = null;
-        if (isPunching && !this.keysDown['Enter']) {
-            isPunching = false;
+            nextEvent = transition;
         }
 
-        if (this.keysDown['Enter']) {
-            if (jumpIndex === null || (jumpIndex >= 12  && jumpIndex <= 24)) {
-                event = 'button-pressed';
-            }
-        } else if (moveY > 0) {
-            if (moveX !== 0) {
-                event = 'move-down-' + (moveX > 0 ? 'right' : 'left');
-            } else {
-                event = 'move-down';
-            }
-        } else if (moveY < 0) {
-            if (moveX !== 0) {
-                event = 'move-up-' + (moveX > 0 ? 'right' : 'left');
-            } else {
-                event = 'move-up';
-            }
-        } else if (moveX !== 0) {
-            event = 'move-' + (moveX > 0 ? 'right' : 'left');
-        }
-        if (jumpIndex !== null && jumpIndex === jumpPos.length) {
-            jumpIndex = null;
-            event = 'landing';
-            if (beastSpritePane.hasSprite('hit')) {
-                beastSpritePane.removeSprite('hit');
-            }
-        };
-        if (event === null) {
-            event = 'stand';
-        }
-        beastStates.doEvent(event);
+        // get next transition
 
-        const beastSprite = beastSpritePane.getSprite('beast');
-        if (beastSprite.isAnimation && beastSprite.animation.getState() === ANIMATION.STATE.DONE) {
-            beastStates.doEvent('eoa');
-        }
-
-        if (['punch-hold-right', 'punch-hold-left', 'down-punch-hold-right', 'down-punch-hold-left'].indexOf(beastStates.getState()) !== -1 && !isPunching) {
-            beastStates.doEvent('button-released');
+        if (nextEvent !== null) {
+            beastStates.doEvent(nextEvent);
         }
 
         const transitions = beastStates.popTransitions();
+        let hitRegion = null;
         for (let transition of transitions) {
             let target = null;
+            let subTarget = null;
             let doReverse = false;
             switch(transition.to) {
                 case 'stand-left':
@@ -1004,48 +1131,62 @@ beast-down-fist: 96x172 (12x30) y+13
                     target = 'beast-down-rev_1';
                     break;
                 case 'turn-left':
-                    beastSpritePane.setAnimationSpeed('beast', 0.25);
+                    beastSpritePane.setAnimationSpeed('beast', 0.35);
                     target = 'beast-turn';
                     break;
                 case 'turn-right':
-                    beastSpritePane.setAnimationSpeed('beast', 0.25);
+                    beastSpritePane.setAnimationSpeed('beast', 0.35);
                     target = 'beast-turn-rev';
+                    break;
+                case 'turn-left2':
+                    target = 'beast-turn2';
+                    break;
+                case 'turn-right2':
+                    target = 'beast-turn2-rev';
                     break;
                 case 'punch-right':
                     target = 'beast-punch';
-                    beastSpritePane.setAnimationSpeed('beast', 0.25);
+                    beastSpritePane.setAnimationSpeed('beast', 0.35);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'punch-left':
                     target = 'beast-punch-rev';
-                    beastSpritePane.setAnimationSpeed('beast', 0.25);
+                    beastSpritePane.setAnimationSpeed('beast', 0.35);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'down-punch-right':
                     target = 'beast-down-punch';
                     beastSpritePane.setAnimationSpeed('beast', 0.25);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'down-punch-left':
                     target = 'beast-down-punch-rev';
                     beastSpritePane.setAnimationSpeed('beast', 0.25);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'punch-hold-right':
                     target = 'beast-punch-hold';
-                    beastSpritePane.addSprite('hit', 'beast-fist', 192, 118);
+                    subTarget = ['beast-fist', 176, 118];
+                    hitRegion = drawRect({x1: 170, y1: 130, x2: 189, y2: 140});
                     break;
                 case 'punch-hold-left':
                     target = 'beast-punch-hold-rev';
-                    beastSpritePane.addSprite('hit', 'beast-fist-rev', 148, 118);
+                    subTarget = ['beast-fist-rev', 132, 118];
+                    hitRegion = drawRect({x1: 132, y1: 130, x2: 148, y2: 140});
                     break;
                 case 'down-punch-hold-right':
                     target = 'beast-down-punch-hold';
-                    beastSpritePane.addSprite('hit', 'beast-fist', 192, 130);
+                    subTarget = ['beast-fist', 176, 130];
+                    hitRegion = drawRect({x1: 170, y1: 130, x2: 189, y2: 150});
                     break;
                 case 'down-punch-hold-left':
                     target = 'beast-down-punch-hold-rev';
-                    beastSpritePane.addSprite('hit', 'beast-fist-rev', 148, 130);
+                    subTarget = ['beast-fist-rev', 132, 130];
+                    hitRegion = drawRect({x1: 132, y1: 130, x2: 148, y2: 150});
                     break;
                 case 'punch-back-right':
                     target = 'beast-punch';
@@ -1083,19 +1224,21 @@ beast-down-fist: 96x172 (12x30) y+13
                     target = 'beast-kick';
                     beastSpritePane.setAnimationSpeed('beast', 0.25);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'kick-hold-right':
                     target = 'beast-kick-hold';
-                    beastSpritePane.addSprite('hit', 'beast-feet', 192, 130);
+                    subTarget = ['beast-feet', 176, 130];
                     break;
                 case 'kick-left':
                     target = 'beast-kick-rev';
                     beastSpritePane.setAnimationSpeed('beast', 0.25);
                     isPunching = true;
+                    isHitting = 1;
                     break;
                 case 'kick-hold-left':
                     target = 'beast-kick-hold-rev';
-                    beastSpritePane.addSprite('hit', 'beast-feet-rev', 150, 130);
+                    subTarget = ['beast-feet-rev', 134, 130];
                     break;
             }
             if (target !== null) {
@@ -1104,8 +1247,17 @@ beast-down-fist: 96x172 (12x30) y+13
                     beastSprite.animation.reverse();
                 }
             }
+            if (subTarget !== null) {
+                beastSpritePane.addSprite('hit', subTarget[0], subTarget[1], subTarget[2]);
+                beastSpritePane.attachSpriteTo('hit', null);
+                if (beastSpritePane.isHidden('beast')) {
+                    beastSpritePane.hideSprite('hit');
+                }
+                isHitting = 2;
+            }
         }
 
+        let scrolled = null;
         if (jumpIndex !== null) {
             const pos = beastSpritePane.getSpritePos('beast');
             const newY = pos.y + jumpPos[jumpIndex];
@@ -1114,12 +1266,93 @@ beast-down-fist: 96x172 (12x30) y+13
                 const hitPos = beastSpritePane.getSpritePos('hit');
                 beastSpritePane.setSpritePos('hit', hitPos.x, newY);
             }
-            beastScroller.scrollBy(jumpMoveX * 1.2, 0);
+            scrolled = beastScroller.scrollBy(jumpMoveX * 1.2, 0);
             jumpIndex++;
         }
-        if (['run-left', 'run-right'].indexOf(beastStates.getState()) !== -1 && moveX !== 0) {
-            beastScroller.scrollBy(moveX * 1.2, 0);
+        const state = beastStates.getState();
+        if (state === 'run-left') {
+            scrolled = beastScroller.scrollBy(-speed * 1.2, 0);
+        } else if (state === 'run-right') {
+            scrolled = beastScroller.scrollBy(speed * 1.2, 0);
         }
+
+        if (scrolled !== null && scrolled.x !== 0) {
+            if (scrolled.x < 0) {
+                storyPos--;
+            } else {
+                storyPos++;
+            }
+            const action = story[storyPos];
+            if (action !== undefined) {
+                switch(action.type) {
+                    case 'enemy':
+                        const parts = action.id.split('.');
+                        const newEnemy = enemies[parts[0]];
+                        const variant = newEnemy.variants[parts[1]];
+
+                        const spriteId = beastSpritePane.getUid(parts[0]);
+                        beastSpritePane.addSprite(spriteId, variant.sprite, variant.x, variant.y);
+                        beastSpritePane.setAnimationSpeed(spriteId, newEnemy.animSpeed);
+                        currEnemies.push({
+                            id: spriteId, moveX: (newEnemy.speed * variant.dir), fallIndex: -1, state: 0, dim: beastSpritePane.getSpritePos(spriteId).dim
+                        });
+
+                        break;
+                }
+            }
+        }
+
+        if (isHitting === 1 && hitRegion === null) {
+            hitRegion = drawRect({x1: 144, y1: 118, x2: 176, y2: 150});
+        }
+
+        const activeEnemies = [];
+        for (let enemy of currEnemies) {
+            let isHit = false;
+
+            let bat = beastSpritePane.getSpritePos(enemy.id);
+            if (enemy.state === 0 && hitRegion !== null) {
+                isHit = (bat.x > hitRegion.x1 && bat.x < hitRegion.x2);
+                if (!isHit) {
+                    const batEnd = bat.x + 31;
+                    isHit = (batEnd > hitRegion.x1 && batEnd.x < hitRegion.x2)
+                }
+                if (isHit) {
+                    enemy.fallIndex = 0;
+                    enemy.state = 1;
+                    const eneSprite = beastSpritePane.getSprite(enemy.id);
+                    if (eneSprite.isAnimation) {
+                        eneSprite.animation.pause();
+                    }
+                    kills++;
+                }
+            }
+
+            if (bat.x > 640 || bat.x < -32) {
+                enemy.state = -1;
+            } else if (enemy.state === 0) {
+                if (!invisible && bat.x >= 148 && bat.x <= 172) {
+                    invisible = 200;
+                    beastSpritePane.hideSprite('beast');
+                }
+                beastSpritePane.setSpritePos(bat.id, bat.x + enemy.moveX, bat.y);
+            } else if (enemy.state === 1) {
+                enemy.fallIndex++;
+                if (enemy.fallIndex === fallMoves.length) {
+                    enemy.state = -1;
+                } else {
+                    const move = fallMoves[enemy.fallIndex];
+                    beastSpritePane.setSpritePos(bat.id, bat.x + move.y, bat.y + move.x);
+                }
+            }
+
+            if (enemy.state === -1) {
+                 beastSpritePane.removeSprite(enemy.id);
+            } else {
+                activeEnemies.push(enemy);
+            }
+        }
+        currEnemies = activeEnemies;
     });
 
     shadowScreen.addAudio('audio/sotb-ingame.mp3');
