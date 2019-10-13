@@ -364,6 +364,8 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     tfSprites.addSprite('player', 'ship', 30, 30);
     tfSprites.setAnimationSpeed('player', 0.15);
     tfSprites.setActor('player');
+    tfSprites.setAttachDefault(tfMainArea);
+
     tfMain.addPane(tfSprites, 1);
 
     const tfFgArea = new SplitArea('Y', [160 + 224 + tfWaterImgs.length * 4 - 64, 64]);
@@ -375,6 +377,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     const bgScroller = new MasterSlavesScrollHandler(tfMainArea);
     bgScroller.addSlave(tfMainAreaFg, 0, 1);
     bgScroller.addSlave(tfFgArea, 0, 1);
+    bgScroller.addSpriteSlave(tfSprites);
 
     tfScreen.addArea(tfMain);
     const tfScroller = new MasterSlavesScrollHandler(mountTopPane);
@@ -805,10 +808,10 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.addSprite('demon3', 64, 343, 32, 75);
     beastSpriteSheet.addSprite('demon4', 96, 343, 32, 75);
     beastSpriteSheet.addSprite('demon5', 128, 343, 32, 75);
-    beastSpriteSheet.addSprite('demon5', 160, 343, 32, 75);
+    beastSpriteSheet.addSprite('demon6', 160, 343, 32, 75);
     beastSpriteSheet.addAnimation(
         'demon',
-        ['demon1', 'demon2', 'demon3', 'demon4', 'demon5', 'demom6'],
+        ['demon1', 'demon2', 'demon3', 'demon4', 'demon5', 'demon6'],
         ANIMATION.DIR.FORWARD,
         ANIMATION.END.LOOP
     );
@@ -816,6 +819,12 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
+    beastSpritePane.addSprite('ekg', 'ekg', 10, 4);
+
+    beastSpritePane.addSprite('num1', '1', 30, 4);
+    beastSpritePane.addSprite('num2', '2', 48, 4);
+
+    beastSpritePane.setAnimationSpeed('ekg', 0.12);
     beastSpritePane.addSprite('beast', 'beast', 144, 118);
     beastSpritePane.setAnimationSpeed('beast', 0.15);
     beastSpritePane.setAttachDefault(shadowWorldPane2);
@@ -982,6 +991,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     let isPunching = false;
     let isHitting = 0;
     let kills = 0;
+    let health = 12;
 
     let storyPos = 0;
 
@@ -1007,12 +1017,42 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     y: 90
                 }
             }
+        },
+        'demon': {
+            speed: 2,
+            damage: 2,
+            animSpeed: 0.15,
+            invincible: false,
+            variants: {
+                'right': {
+                    sprite: 'demon',
+                    dir: -1,
+                    x: 352,
+                    y: 92
+                }
+            }
+        },
+        'thorn': {
+            speed: 0,
+            damage: 3,
+            animSpeed: 0,
+            invincible: true,
+            variants: {
+                'mid': {
+                    sprite: 'thorn',
+                    dir: -1,
+                    x: 352,
+                    y: 45
+                }
+            }
         }
     };
 
     const story = {
         '-100': {type: 'enemy', id: 'bat.left'},
-        '50': {type: 'enemy', id: 'bat.right'}
+        '50': {type: 'enemy', id: 'bat.right'},
+        '120': {type: 'enemy', id: 'demon.right'},
+        '150': {type: 'enemy', id: 'thorn.mid'}
     };
 
     shadowScreen.setKeyHandler(() => {
@@ -1370,7 +1410,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                         beastSpritePane.addSprite(spriteId, variant.sprite, variant.x, variant.y);
                         beastSpritePane.setAnimationSpeed(spriteId, newEnemy.animSpeed);
                         currEnemies.push({
-                            id: spriteId, moveX: (newEnemy.speed * variant.dir), fallIndex: -1, state: 0, dim: beastSpritePane.getSpritePos(spriteId).dim
+                            id: spriteId, moveX: (newEnemy.speed * variant.dir), fallIndex: -1, damage: newEnemy.damage, state: 0, dim: beastSpritePane.getSpritePos(spriteId).dim
                         });
 
                         break;
@@ -1412,6 +1452,28 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     invisible = 200;
                     beastSpritePane.hideSprite('beast');
                     audioFx.ouch.play();
+                    health -= enemy.damage;
+                    if (health < 1) {
+                        health = 1;
+                    }
+                    beastSpritePane.assignSprite('num1', Math.floor(health / 10));
+                    beastSpritePane.assignSprite('num2', health % 10);
+
+                    let ekgSpeed;
+                    if (health > 10) {
+                        ekgSpeed = 0.12;
+                    } else if (health > 8) {
+                        ekgSpeed = 0.15;
+                    } else if (health > 6) {
+                        ekgSpeed = 0.2;
+                    } else if (health > 4) {
+                        ekgSpeed = 0.25;
+                    } else if (health > 2) {
+                        ekgSpeed = 0.34;
+                    } else {
+                        ekgSpeed = 0.5;
+                    }
+                    beastSpritePane.setAnimationSpeed('ekg', ekgSpeed);
                 }
                 beastSpritePane.setSpritePos(bat.id, bat.x + enemy.moveX, bat.y);
             } else if (enemy.state === 1) {
@@ -1560,5 +1622,5 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
-    return 'shadow-ingame';
+    return 'tf4'; // 'shadow-ingame';
 });
