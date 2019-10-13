@@ -149,7 +149,12 @@ class Game {
         screen.render(true);
         if (this.sound && screen.audio !== null) {
             const audio = new Audio(screen.audio);
-            audio.play();
+            audio.addEventListener("canplaythrough", event => {
+                audio.play();
+            });
+            audio.addEventListener('ended', event => {
+                audio.play();
+            });
         }
     }
 
