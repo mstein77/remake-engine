@@ -816,6 +816,17 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         ANIMATION.END.LOOP
     );
 
+    beastSpriteSheet.addSprite('stone1', 0, 310, 32, 32);
+    beastSpriteSheet.addSprite('stone2', 36, 310, 32, 32);
+    beastSpriteSheet.addSprite('stone3', 72, 310, 32, 32);
+    beastSpriteSheet.addSprite('stone4', 108, 310, 32, 32);
+    beastSpriteSheet.addAnimation(
+        'stone',
+        ['stone1', 'stone2', 'stone3', 'stone4'],
+        ANIMATION.DIR.FORWARD,
+        ANIMATION.END.LOOP
+    );
+
     beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
