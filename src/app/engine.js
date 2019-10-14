@@ -34,6 +34,7 @@ class Game {
         this.logs = [];
         this.domQueue = [];
         this.sound = true;
+        this.audioPlaying = [];
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -141,6 +142,7 @@ class Game {
 
     gotoScreen(screenId) {
         this.log('gotoScreen', screenId);
+        this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
@@ -149,12 +151,31 @@ class Game {
         screen.render(true);
         if (this.sound && screen.audio !== null) {
             const audio = new Audio(screen.audio);
-            audio.addEventListener("canplaythrough", event => {
-                audio.play();
+            audio.addEventListener('canplaythrough', event => {
+                this.playAudio(audio);
             });
             audio.addEventListener('ended', event => {
-                audio.play();
+                for (let i = 0; i < this.audioPlaying.length; i++) {
+                    if (this.audioPlaying[i] === audio) {
+                        this.audioPlaying.splice(i, 1);
+                        break;
+                    }
+                }
             });
+        }
+    }
+
+    stopAllAudio() {
+        for (let audio of this.audioPlaying) {
+            audio.pause();
+        }
+        this.audioPlaying = [];
+    }
+
+    playAudio(audio) {
+        if (audio.readyState >= 2) {
+            this.audioPlaying.push(audio);
+            audio.play();
         }
     }
 
@@ -2688,6 +2709,9 @@ class SpriteSheet {
         const sprite = this.getSprite(name);
         width = Math.min(offX + sprite.dim.x, width);
         height = Math.min(offY + sprite.dim.y, height);
+        if (width === 0 || height === 0) {
+            return;
+        }
         ctx.drawImage(
             sprite.img === undefined ? this.sheet : sprite.img,
             sprite.off.x + offX, sprite.off.y + offY,

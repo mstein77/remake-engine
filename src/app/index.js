@@ -834,7 +834,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     sfgArea.addPane(beastSpritePane, 0);
 
     const beastCanvas = new CanvasPane();
-    sfgArea.addPane(beastCanvas, 0);
+//    sfgArea.addPane(beastCanvas, 0);
     function drawRect(dim) {
 /*
         const ctx = beastCanvas.getCtx();
@@ -1613,7 +1613,8 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             this.setZoom(this.zoom - 1);
         }
         if (this.keys['1']) {
-            this.gotoScreen('turrican-ingame');
+            this.gotoScreen('tf4');
+            //    this.gotoScreen('turrican-ingame');
             return true;
         } else if (this.keys['2']) {
             this.gotoScreen('shadow-ingame');
@@ -1622,5 +1623,5 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
-    return 'tf4'; // 'shadow-ingame';
+    return 'shadow-ingame';
 });
