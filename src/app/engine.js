@@ -814,6 +814,7 @@ class BufferedCanvasContainer {
             x: dimX,
             y: dimY
         };
+        this.active = 1;
         this.opaque = opaque;
     }
 
@@ -859,6 +860,10 @@ class BufferedCanvasContainer {
 
     getActiveElem() {
         return this.buffers[this.active].elem;
+    }
+
+    getActiveIndex() {
+        return this.active;
     }
 
     switchBuffer() {
@@ -1407,7 +1412,6 @@ class BufferedTilesPane {
             x: 0,
             y: 0
         };
-
         this.dirty = true;
     }
 
@@ -1818,14 +1822,25 @@ class BufferedTilesPane {
     }
 }
 
+/**
+ * TODO:
+ *  - groups
+ *  - filters
+ *  - animPlayer
+ */
 class SpritePane {
 
     constructor(spriteSheet) {
         this.spriteSheet = spriteSheet;
         this.sprites = {};
-        this.actor = null;
-        this.activePixels = 0;
+        this.actorId = null;
+        this.groups = {};
+        this.bufferClearRects = {
+            0: [],
+            1: []
+        };
         this.uid = 0;
+        this.zOrdering = false;
         this.attachDefault = null;
     }
 
@@ -1834,10 +1849,16 @@ class SpritePane {
             x: viewPortDimX,
             y: viewPortDimY
         };
+
         this.totalPixels = viewPortDimX * viewPortDimY;
-        this.pixelLimit = 0; //Math.round(this.totalPixels * 0.4);
-        this.paneDim = this.viewPortDim;
-        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
+        this.pixelLimit = Math.round(this.totalPixels * 0.25);
+
+        this.paneDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+
+        this.container = new BufferedCanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
         return this.container;
     }
 
@@ -1845,37 +1866,50 @@ class SpritePane {
         this.attachDefault = value;
     }
 
-    setActor(id) {
+    setActorId(id) {
         if (!this.sprites[id]) {
             throw Error('Sprite Actor "' + id + "' not found!");
         }
-        this.actor = id;
+        this.actorId = id;
     }
 
-    getActor() {
-        return this.actor;
+    getActorId() {
+        return this.actorId;
     }
 
     hasSprite(id) {
         return (this.sprites[id] !== undefined);
     }
 
-    addSprite(id, name,  x, y) {
-        const sprite = {id, x, y, animSpeed: 1, attached: this.attachDefault, hidden: false};
+    addSprite(id, name,  x = 0, y = 0, z = 0) {
+        if (!this.zOrdering && z !== 0) {
+            this.zOrdering = true;
+        }
+        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
-        this.activePixels += sprite.dim.x * sprite.dim.y;
         this.dirty = true;
     }
 
     hideSprite(id) {
         const sprite = this.getSprite(id);
+        if (!this.dirty) {
+            this.dirty = sprite.hidden === false;
+        }
         sprite.hidden = true;
     }
 
     unhideSprite(id) {
         const sprite = this.getSprite(id);
+        if (!this.dirty) {
+            this.dirty = sprite.hidden === true;
+        }
         sprite.hidden = false;
+    }
 
+    toggleSpriteVisiblity(id) {
+        const sprite = this.getSprite(id);
+        sprite.hidden = !sprite.hidden;
+        this.dirty = true;
     }
 
     isHidden(id) {
@@ -1885,11 +1919,6 @@ class SpritePane {
 
     hasSprite(id) {
         return !(this.sprites[id] === undefined);
-    }
-
-    toggleSpriteVisiblity(id) {
-        const sprite = this.getSprite(id);
-        sprite.hidden = !sprite.hidden;
     }
 
     setAnimationSpeed(id, speed) {
@@ -1924,15 +1953,20 @@ class SpritePane {
             const sprite = this.sprites[id];
             if (sprite.isAnimation) {
                 const ani = sprite.animation;
-                ani.nextFrame();
+                if (this.dirty) {
+                    ani.nextFrame();
+                } else {
+                    const oldFrame = ani.getFrame().id;
+                    ani.nextFrame();
+                    this.dirty = oldFrame !== ani.getFrame().id;
+                }
             }
         }
-        this.dirty = true;
     }
 
     getSpritePos(id) {
         const sprite = this.sprites[id];
-        return {id, x: sprite.x, y: sprite.y, dim: sprite.dim};
+        return {id, x: sprite.x, y: sprite.y, z: sprite.z, dim: sprite.dim};
     }
 
     getAllSpritePos(match) {
@@ -1953,7 +1987,7 @@ class SpritePane {
 
     removeSprite(id) {
         delete this.sprites[id];
-
+        this.dirty = true;
     }
 
     moveSpritesAttachedTo(attached, moveX, moveY) {
@@ -1970,38 +2004,70 @@ class SpritePane {
         sprite.attached = attach;
     }
 
-    setSpritePos(id, x, y) {
+    setSpritePos(id, x, y, z = null) {
         const sprite = this.sprites[id];
-        sprite.lastX = sprite.x;
-        sprite.lastY = sprite.y;
+        if (!this.dirty) {
+            this.dirty = (sprite.x !== x || sprite.y !== y);
+        }
         sprite.x = x;
         sprite.y = y;
-        this.dirty = true;
+        if (z !== null) {
+            this.zOrdering = true;
+            if (!this.dirty) {
+                this.dirty = sprite.z !== z;
+            }
+            sprite.z = z;
+        }
     }
 
     render() {
-        const target = this.container.getCanvasCtx();
-        if (this.activePixels >= this.pixelLimit) {
-            target.clearRect(0, 0, this.viewPortDim.x, this.viewPortDim.y);
+        const target = this.container.getBufferCtx();
+        const clearRects = this.bufferClearRects[this.container.getActiveIndex()];
+        if (clearRects.length === 0) {
+            target.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
         } else {
-            for (let id in this.sprites) {
-                const sprite = this.sprites[id];
-                target.clearRect(sprite.lastX, sprite.lastY, sprite.dim.x, sprite.dim.y);
+            for (let rect of clearRects) {
+                target.clearRect(rect.x, rect.y, rect.width, rect.height);
             }
         }
-        for (let id in this.sprites) {
+
+        const drawRects = [];
+        let pixels = 0;
+
+        const ids = Object.keys(this.sprites);
+        if (this.zOrdering) {
+            ids.sort((id1, id2) => {
+                const z1 = this.sprites[id1].z;
+                const z2 = this.sprites[id2].z;
+                if (z1 < z2) {
+                    return -1;
+                } else if (z1 > z2) {
+                    return 1;
+                }
+                return 0;
+            });
+        }
+
+        for (let id of ids) {
             const sprite = this.sprites[id];
-            if (!sprite.hidden) {
+            if (!sprite.hidden && sprite.x < this.paneDim.x && sprite.x > -sprite.dim.x && sprite.y < this.paneDim.y && sprite.y > -sprite.dim.y) {
+                let clearRect;
                 if (sprite.isAnimation) {
                     const frameSprite = sprite.animation.getFrame();
-                    this.spriteSheet.drawSprite(target, frameSprite.id, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters);
+                    clearRect = this.spriteSheet.drawSprite(
+                        target, frameSprite.id, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
+                    );
                 } else {
-                    this.spriteSheet.drawSprite(target, sprite.name, sprite.x, sprite.y, 0, 0, sprite.filters);
+                    clearRect = this.spriteSheet.drawSprite(
+                        target, sprite.name, sprite.x, sprite.y, 0, 0, sprite.filters
+                    );
                 }
+                drawRects.push(clearRect);
+                pixels += clearRect.width * clearRect.height;
             }
-            sprite.lastX = null;
-            sprite.lastY = null;
         }
+        this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : [];
+        this.container.switchBuffer();
         this.dirty = false;
     }
 }
@@ -2460,7 +2526,7 @@ class BoundsScrollHandler {
         const scrollBoundsTop = {x: this.boundsSize.x, y: this.boundsSize.y};
         const scrollBoundsBottom = {x: this.boundsSize.x, y: this.boundsSize.y};
 
-        const actor = this.spritePane.getActor();
+        const actor = this.spritePane.getActorId();
         if (actor === null) {
             return;
         }
@@ -2702,7 +2768,18 @@ class SpriteSheet {
 
     drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
         const sprite = this.getSprite(name);
-        ctx.drawImage(sprite.img === undefined ? this.sheet : sprite.img, sprite.off.x, sprite.off.y, sprite.dim.x, sprite.dim.y, posX + paddX, posY + paddY, sprite.dim.x, sprite.dim.y);
+        const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
+        ctx.drawImage(
+            sprite.img === undefined ?
+                this.sheet : sprite.img,
+            sprite.off.x, sprite.off.y,
+            sprite.dim.x, sprite.dim.y,
+            draw.x,
+            draw.y,
+            draw.width,
+            draw.height
+        );
+        return draw;
     }
 
     drawSpritePart(ctx, name, posX, posY, width, height, offX = 0, offY = 0) {
