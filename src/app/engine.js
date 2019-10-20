@@ -1824,7 +1824,6 @@ class BufferedTilesPane {
 
 /**
  * TODO:
- *  - groups
  *  - filters
  *  - animPlayer
  */
@@ -1891,25 +1890,31 @@ class SpritePane {
     }
 
     hideSprite(id) {
-        const sprite = this.getSprite(id);
-        if (!this.dirty) {
-            this.dirty = sprite.hidden === false;
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            if (!this.dirty) {
+                this.dirty = sprite.hidden === false;
+            }
+            sprite.hidden = true;
         }
-        sprite.hidden = true;
     }
 
     unhideSprite(id) {
-        const sprite = this.getSprite(id);
-        if (!this.dirty) {
-            this.dirty = sprite.hidden === true;
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            if (!this.dirty) {
+                this.dirty = sprite.hidden === true;
+            }
+            sprite.hidden = false;
         }
-        sprite.hidden = false;
     }
 
     toggleSpriteVisiblity(id) {
-        const sprite = this.getSprite(id);
-        sprite.hidden = !sprite.hidden;
-        this.dirty = true;
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            sprite.hidden = !sprite.hidden;
+            this.dirty = true;
+        }
     }
 
     isHidden(id) {
@@ -1922,11 +1927,17 @@ class SpritePane {
     }
 
     setAnimationSpeed(id, speed) {
-        const sprite = this.getSprite(id);
-        sprite.animSpeed = speed;
-        if (sprite.isAnimation) {
-            sprite.animation.speed = speed;
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            sprite.animSpeed = speed;
+            if (sprite.isAnimation) {
+                sprite.animation.speed = speed;
+            }
         }
+    }
+
+    getSpritesById(id) {
+        return id[0] === ':' ? this.getGroupSprites(id) : [this.getSprite(id)];
     }
 
     getSprite(id) {
@@ -1934,7 +1945,7 @@ class SpritePane {
     }
 
     initSpriteObj(obj, sheetId) {
-        const isAni = this.spriteSheet.isAnimation(sheetId);
+        const isAni = sheetId !== null && this.spriteSheet.isAnimation(sheetId);
         obj.name = sheetId;
         obj.isAnimation = isAni;
         obj.animation = (isAni ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null);
@@ -1986,8 +1997,11 @@ class SpritePane {
     }
 
     removeSprite(id) {
-        delete this.sprites[id];
-        this.dirty = true;
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            delete this.sprites[sprite.id];
+            this.dirty = true;
+        }
     }
 
     moveSpritesAttachedTo(attached, moveX, moveY) {
@@ -2000,8 +2014,11 @@ class SpritePane {
     }
 
     attachSpriteTo(id, attach) {
-        const sprite = this.getSprite(id);
-        sprite.attached = attach;
+        const sprites = this.getSpritesById(id);
+        for (let spriteId of sprites) {
+            const sprite = this.getSprite(spriteId);
+            sprite.attached = attach;
+        }
     }
 
     setSpritePos(id, x, y, z = null) {
@@ -2017,6 +2034,33 @@ class SpritePane {
                 this.dirty = sprite.z !== z;
             }
             sprite.z = z;
+        }
+    }
+
+    addGroup(id, spriteIds) {
+        this.groups[':' + id] = spriteIds;
+    }
+
+    deleteGroup(id) {
+        delete this.groups[':' + id];
+    }
+
+    getGroupSprites(id) {
+        const result = [];
+        if (this.groups[id]) {
+            for (let sprite of this.groups[id]) {
+                if (this.hasSprite(sprite)) {
+                    result.push(this.getSprite(sprite));
+                }
+            }
+        }
+        return result;
+    }
+
+    moveSprite(id, moveX, moveY) {
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            this.setSpritePos(sprite.id, sprite.x + moveX, sprite.y + moveY);
         }
     }
 
@@ -2050,7 +2094,7 @@ class SpritePane {
 
         for (let id of ids) {
             const sprite = this.sprites[id];
-            if (!sprite.hidden && sprite.x < this.paneDim.x && sprite.x > -sprite.dim.x && sprite.y < this.paneDim.y && sprite.y > -sprite.dim.y) {
+            if (sprite.name !== null && !sprite.hidden && sprite.x < this.paneDim.x && sprite.x > -sprite.dim.x && sprite.y < this.paneDim.y && sprite.y > -sprite.dim.y) {
                 let clearRect;
                 if (sprite.isAnimation) {
                     const frameSprite = sprite.animation.getFrame();
@@ -2746,6 +2790,9 @@ class SpriteSheet {
     };
 
     getSpriteDim(name) {
+        if (name === null) {
+            return {x: 0, y: 0};
+        }
         if (this.isAnimation(name)) {
             return this.animations[name].dim;
         }

@@ -843,8 +843,10 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpritePane.addSprite('num2', '2', 48, 4, 9);
 
     beastSpritePane.setAnimationSpeed('ekg', 0.12);
-    beastSpritePane.addSprite('beast', 'beast', 144, 118, 4);
+    beastSpritePane.addSprite('beast', 'beast', 144, 118);
+    beastSpritePane.addSprite('hit', null, 0, 0);
     beastSpritePane.setAnimationSpeed('beast', 0.15);
+    beastSpritePane.addGroup('beast', ['beast', 'hit']);
     beastSpritePane.setAttachDefault(shadowWorldPane2);
 
     sfgArea.addPane(shadowWorldPane2,0);
@@ -1237,15 +1239,9 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         if (invisible > 0) {
             invisible--;
             if (invisible === 0) {
-                beastSpritePane.unhideSprite('beast');
-                if (beastSpritePane.hasSprite('hit')) {
-                    beastSpritePane.unhideSprite('hit');
-                }
+                beastSpritePane.unhideSprite(':beast');
             } else if (invisible % 5 === 0) {
-                beastSpritePane.toggleSpriteVisiblity('beast');
-                if (beastSpritePane.hasSprite('hit')) {
-                    beastSpritePane.toggleSpriteVisiblity('hit');
-                }
+                beastSpritePane.toggleSpriteVisiblity(':beast');
             }
         }
 
@@ -1310,9 +1306,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                         continue;
                     }
                     jumpIndex = null;
-                    if (beastSpritePane.hasSprite('hit')) {
-                        beastSpritePane.removeSprite('hit');
-                    }
+                    beastSpritePane.assignSprite('hit', null);
                     break;
 
                 case 'button-pressed':
@@ -1451,22 +1445,22 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     break;
                 case 'punch-back-right':
                     target = 'beast-punch';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'punch-back-left':
                     target = 'beast-punch-rev';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'down-punch-back-right':
                     target = 'beast-down-punch';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'down-punch-back-left':
                     target = 'beast-down-punch-rev';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'jump-right':
@@ -1512,24 +1506,15 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             }
             if (subTarget !== null) {
-                beastSpritePane.addSprite('hit', subTarget[0], subTarget[1], subTarget[2]);
-                beastSpritePane.attachSpriteTo('hit', null);
-                if (beastSpritePane.isHidden('beast')) {
-                    beastSpritePane.hideSprite('hit');
-                }
+                beastSpritePane.assignSprite('hit', subTarget[0]);
+                beastSpritePane.setSpritePos('hit', subTarget[1], subTarget[2]);
                 isHitting = 2;
             }
         }
 
         let scrolled = null;
         if (jumpIndex !== null) {
-            const pos = beastSpritePane.getSpritePos('beast');
-            const newY = pos.y + jumpPos[jumpIndex];
-            beastSpritePane.setSpritePos('beast', pos.x, newY);
-            if (beastSpritePane.hasSprite('hit')) {
-                const hitPos = beastSpritePane.getSpritePos('hit');
-                beastSpritePane.setSpritePos('hit', hitPos.x, newY);
-            }
+            beastSpritePane.moveSprite(':beast', 0, jumpPos[jumpIndex]);
             scrolled = beastScroller.scrollBy(jumpMoveX * 1.2, 0);
             jumpIndex++;
         }
@@ -1628,7 +1613,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             } else if (enemy.state === 0) {
                 if (!invisible && bat.x >= 148 && bat.x <= 172 && bat.y < beastBottom) {
                     invisible = 200;
-                    beastSpritePane.hideSprite('beast');
+                    beastSpritePane.hideSprite(':beast');
                     audioFx.ouch.play();
                     health -= enemy.damage;
                     if (health < 1) {
@@ -1662,7 +1647,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                 } else {
                     const move = fallMoves[enemy.fallIndex];
                     const moveX = (bat.x + (enemy.dim.x >> 1) < 160) ? -move.x : move.x;
-                    beastSpritePane.setSpritePos(bat.id, bat.x + moveX, bat.y - move.y);
+                    beastSpritePane.moveSprite(bat.id, moveX, -move.y);
                 }
             }
 
