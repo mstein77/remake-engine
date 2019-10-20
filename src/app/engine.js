@@ -1013,6 +1013,13 @@ class ColorPane {
     }
 }
 
+/**
+ * TODO:
+ *   - Multi-Font
+ *   - Monochrome + Color
+ *   - CaseInsensitive
+ *   - Scrolling (Buffering?)
+ */
 class TextPane {
 
     constructor(font) {
@@ -1056,6 +1063,15 @@ class TextPane {
     }
 }
 
+/**
+ * TODO:
+ *   - Y-Scrolling
+ *   - Endless-Scrolling
+ *   - Events
+ *   - Rastering
+ *   - Oversize/Scrolling
+ *   - Z-Ordering / MultiBitmaps
+ */
 class BitmapScrollPane {
 
     constructor(spriteSheet, axis, map, min, max) {
@@ -1256,6 +1272,12 @@ class BitmapScrollPane {
     }
 }
 
+/**
+ * TODO:
+ *   - Filters
+ *   - Events
+ *   - Animated Tiles
+ */
 class TilesPane {
 
     constructor(tilesMap, config = {}) {
@@ -1433,6 +1455,12 @@ class TilesPane {
 }
 
 
+/**
+ * TODO:
+ *   - Filters
+ *   - Events
+ *   - Animated Tiles
+ */
 class BufferedTilesPane {
 
     constructor(tilesMap, config) {
@@ -1868,7 +1896,7 @@ class BufferedTilesPane {
 /**
  * TODO:
  *  - filters
- *  - animPlayer
+ *  - global animations
  */
 class SpritePane {
 
@@ -1927,7 +1955,7 @@ class SpritePane {
         if (!this.zOrdering && z !== 0) {
             this.zOrdering = true;
         }
-        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, hidden: false};
+        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, animation: null, hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
         this.dirty = true;
     }
@@ -1974,7 +2002,7 @@ class SpritePane {
         for (let sprite of sprites) {
             sprite.animSpeed = speed;
             if (sprite.isAnimation) {
-                sprite.animation.speed = speed;
+                sprite.animation.setSpeed(speed);
             }
         }
     }
@@ -1991,8 +2019,13 @@ class SpritePane {
         const isAni = sheetId !== null && this.spriteSheet.isAnimation(sheetId);
         obj.name = sheetId;
         obj.isAnimation = isAni;
-        obj.animation = (isAni ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null);
         obj.dim = this.spriteSheet.getSpriteDim(sheetId);
+        if (isAni && obj.animation === null) {
+            obj.animation = new BitmapPlayer();
+        }
+        if (isAni) {
+            this.spriteSheet.loadAnimation(obj.animation, sheetId, obj.animSpeed);
+        }
         return obj;
     }
 
@@ -2008,10 +2041,10 @@ class SpritePane {
             if (sprite.isAnimation) {
                 const ani = sprite.animation;
                 if (this.dirty) {
-                    ani.nextFrame();
+                    ani.nextStep();
                 } else {
                     const oldFrame = ani.getFrame().id;
-                    ani.nextFrame();
+                    ani.nextStep();
                     this.dirty = oldFrame !== ani.getFrame().id;
                 }
             }
@@ -2424,6 +2457,11 @@ class LinearGradientPane2 {
     }
 }
 
+/**
+ * TODO:
+ *   - endless Scrolling
+ *   - Use CSS Background-Property?
+ */
 class LinearGradientPane {
 
     constructor(axis, colorStops) {
@@ -2581,8 +2619,8 @@ class MasterSlavesScrollHandler {
         this.slaves.push([slave, factorX, factorY]);
     }
 
-    addSpriteSlave(slave) {
-        this.spriteSlaves.push(slave);
+    addSpriteSlave(slave, factorX = 0, factorY = 0) {
+        this.spriteSlaves.push([slave, factorX, factorY]);
     }
 
     scrollBy(sx, sy) {
@@ -2592,7 +2630,7 @@ class MasterSlavesScrollHandler {
                 slave[0].scrollBy(scrolled.x * slave[1], scrolled.y * slave[2]);
             }
             for (let slave of this.spriteSlaves) {
-                slave.moveSpritesAttachedTo(this.master, -scrolled.x, -scrolled.y);
+                slave[0].moveSpritesAttachedTo(this.master, scrolled.x * slave[1], scrolled.y * slave[2]);
             }
 
         }
@@ -2785,7 +2823,7 @@ class SpriteSheet {
         return sprite;
     }
 
-    addAnimation(name, frames, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -2848,12 +2886,13 @@ class SpriteSheet {
         return this.sprites[name];
     }
 
-    getAnimation(name, speed = 1) {
+    loadAnimation(player, name, speed = 1) {
         if (!this.animations[name]) {
             throw Error('No animations with id "' + name + '" found in spritesheet!');
         }
         const animation = this.animations[name];
-        return new Animation(animation.frames, speed, animation.dir, animation.end);
+        player.loadAnimation(animation.frames, animation.end, animation.dir);
+        player.setSpeed(speed);
     }
 
     drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
@@ -3024,7 +3063,7 @@ class FontMap {
 
 
 /**
- *  Animation-Modes
+ *  BitmapPlayer-Modes
  * ----------------------------
  *
  *   DIR: forward, backwards, forward-backward, backward-forward
@@ -3047,6 +3086,7 @@ const ANIMATION = {
         DELETE: 2
     },
     STATE: {
+        EMPTY: -1,
         WAITING: 0,
         RUNNING: 1,
         DONE: 2,
@@ -3055,18 +3095,27 @@ const ANIMATION = {
     }
 };
 
-class Animation {
+class BitmapPlayer {
 
-    constructor(frames, speed = 1, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+    constructor() {
+        this.speed = 1;
+        this.state = ANIMATION.STATE.EMPTY;
+        this.frameNo = null;
+        this.pauseState = null;
+    }
+
+    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
         this.frames = frames;
-        this.frameNo = 0;
         this.direction = dir;
         this.end = end;
-        this.speed = speed;
         this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
-        this.time = 0;
+        this.step = 0;
         this.frameNo = this.isForward ? 0 : frames.length - 1;
         this.state = ANIMATION.STATE.WAITING;
+    }
+
+    setSpeed(speed) {
+        this.speed = speed;
     }
 
     getState() {
@@ -3075,8 +3124,8 @@ class Animation {
 
     handleForward() {
         let frame = this.getFrame();
-        while (this.time >= frame.duration) {
-            this.time -= frame.duration;
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
             this.frameNo++;
             if (this.frameNo === this.frames.length) {
                 this.frameNo--;
@@ -3105,8 +3154,8 @@ class Animation {
 
     handleBackward() {
         let frame = this.getFrame();
-        while (this.time >= frame.duration) {
-            this.time -= frame.duration;
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
             this.frameNo--;
             if (this.frameNo < 0) {
                 this.frameNo = 0;
@@ -3133,12 +3182,12 @@ class Animation {
         }
     }
 
-    nextFrame() {
+    nextStep() {
         if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
             return;
         }
         this.state = ANIMATION.STATE.RUNNING;
-        this.time += this.speed;
+        this.step += this.speed;
         if (this.isForward) {
             this.handleForward();
             if (!this.isForward) {
@@ -3160,7 +3209,14 @@ class Animation {
     }
 
     pause() {
+        this.pauseState = this.state;
         this.state = ANIMATION.STATE.PAUSED;
+    }
+
+    continue() {
+        if (this.state === ANIMATION.STATE.PAUSED) {
+            this.state = this.pauseState;
+        }
     }
 
     reverse() {
@@ -3179,6 +3235,11 @@ class Animation {
     }
 }
 
+/**
+ * TODO:
+ *   - MasterStates
+ *   - CloneStates
+ */
 class States {
 
     constructor(states) {
@@ -3259,8 +3320,6 @@ function d() {
     debugs[key] = values.join(' ');
 }
 
-
-
 const OCM = new CanvasManager();
 // let debugElem = null;
 let debugs = [];
@@ -3284,7 +3343,7 @@ module.exports = {
     LinearGradientPane,
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
-    Animation,
+    Animation: BitmapPlayer,
     d,
     FontMap,
     SpriteSheet,
