@@ -92,7 +92,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     mySpriteSheet.addSprite('player', 0, 0, 0, 0);
     const playerPane = new SpritePane(mySpriteSheet);
     playerPane.addSprite('player', 'player', 30, 20);
-    playerPane.setActor('player');
+    playerPane.setActorId('player');
 
     var tfShip = new Image();
     tfShip.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAPCAYAAACFgM0XAAABz0lEQVRIS8WUQW7CMBBFv29Rdri3KGoXcW/RqEjFHIOyCDlG3Uqt4BjJgooeI+zCLVz9CU4dikCoiM4CG5x43vz5g1ota39zewWllMI/hKoBP8nmsIkBQRiXhJGqc8BbbjKNCfKLwrSyE4IMMYjpGxTrQoAYQaFzqtTpOyFcYjHP8jbZ1+cGriwEIAY5V5uUzebeTVMB4f7l+QHj2QLu1cGOrKxaa1RV1UCMrIAM7nrinx7wJ/MqTgErjE14aBiUvhcgk5izeEV57z1lHjym7cUBgB5gaN3tfzi/NuMOiNIL+d60C3Bls+7ewXwUNB32lLSgKItG4nWB+XvzQjr80UEn9lfFsUobpRBGmb/zKpp3X7CoUNDiYwOlE+tD8u1ItpOAJwBvAKYVHIBJ45OO9JvZded8b9atkuEstLCqDBT6xrNyRs2PTEMSx0EIxrQxImHMsoYuB/uSn2RKPsz5l5VSU42aQATZVr5bFZVAVBUrkj73c2jNdlLmpqjwXxL8ZIY9xJMjtJyEdDpBVToECKqS72SWxIeCUITfkTx+JV8XbGWrUrvhNHDEeIG0AiBpJwJQfMExpmPnnX7RkKvSBcOJP4K8vKgq3Un9PZac599AQ8vGnDaSnQAAAABJRU5ErkJggg==";
@@ -349,7 +349,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     const tfSprites = new SpritePane(tfSpriteSheet);
     tfSprites.addSprite('player', 'ship', 30, 30);
     tfSprites.setAnimationSpeed('player', 0.15);
-    tfSprites.setActor('player');
+    tfSprites.setActorId('player');
     tfSprites.setAttachDefault(tfMainArea);
 
     tfMain.addPane(tfSprites, 1);
@@ -438,7 +438,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             event = moveY < 0 ? 'up' : 'down';
         }
         shipStates.doEvent(event);
-        const shipSprite = tfSprites.getSprite(tfSprites.getActor());
+        const shipSprite = tfSprites.getSprite(tfSprites.getActorId());
         if (shipSprite.isAnimation) {
             if (shipSprite.animation.getState() === ANIMATION.STATE.DONE) {
                 shipStates.doEvent('eoa');
@@ -468,14 +468,14 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     break;
             }
             if (target !== null) {
-                tfSprites.assignSprite(tfSprites.getActor(), target);
+                tfSprites.assignSprite(tfSprites.getActorId(), target);
             }
         }
 
         for (var key in this.keys) {
             switch (key) {
                 case 'Enter':
-                    const actor = tfSprites.getSpritePos(tfSprites.getActor());
+                    const actor = tfSprites.getSpritePos(tfSprites.getActorId());
                     if (isBlade) {
                         tfSprites.addSprite(tfSprites.getUid('shot'), 'bladeshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) - 16);
                     } else {
@@ -837,14 +837,16 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     beastSpriteSheet.build();
 
     const beastSpritePane = new SpritePane(beastSpriteSheet);
-    beastSpritePane.addSprite('ekg', 'ekg', 10, 4);
+    beastSpritePane.addSprite('ekg', 'ekg', 10, 4, 10);
 
-    beastSpritePane.addSprite('num1', '1', 30, 4);
-    beastSpritePane.addSprite('num2', '2', 48, 4);
+    beastSpritePane.addSprite('num1', '1', 30, 4, 8);
+    beastSpritePane.addSprite('num2', '2', 48, 4, 9);
 
     beastSpritePane.setAnimationSpeed('ekg', 0.12);
     beastSpritePane.addSprite('beast', 'beast', 144, 118);
+    beastSpritePane.addSprite('hit', null, 0, 0);
     beastSpritePane.setAnimationSpeed('beast', 0.15);
+    beastSpritePane.addGroup('beast', ['beast', 'hit']);
     beastSpritePane.setAttachDefault(shadowWorldPane2);
 
     sfgArea.addPane(shadowWorldPane2,0);
@@ -1237,15 +1239,9 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         if (invisible > 0) {
             invisible--;
             if (invisible === 0) {
-                beastSpritePane.unhideSprite('beast');
-                if (beastSpritePane.hasSprite('hit')) {
-                    beastSpritePane.unhideSprite('hit');
-                }
+                beastSpritePane.unhideSprite(':beast');
             } else if (invisible % 5 === 0) {
-                beastSpritePane.toggleSpriteVisiblity('beast');
-                if (beastSpritePane.hasSprite('hit')) {
-                    beastSpritePane.toggleSpriteVisiblity('hit');
-                }
+                beastSpritePane.toggleSpriteVisiblity(':beast');
             }
         }
 
@@ -1310,9 +1306,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                         continue;
                     }
                     jumpIndex = null;
-                    if (beastSpritePane.hasSprite('hit')) {
-                        beastSpritePane.removeSprite('hit');
-                    }
+                    beastSpritePane.assignSprite('hit', null);
                     break;
 
                 case 'button-pressed':
@@ -1451,22 +1445,22 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     break;
                 case 'punch-back-right':
                     target = 'beast-punch';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'punch-back-left':
                     target = 'beast-punch-rev';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'down-punch-back-right':
                     target = 'beast-down-punch';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'down-punch-back-left':
                     target = 'beast-down-punch-rev';
-                    beastSpritePane.removeSprite('hit');
+                    beastSpritePane.assignSprite('hit', null);
                     doReverse = true;
                     break;
                 case 'jump-right':
@@ -1512,24 +1506,15 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             }
             if (subTarget !== null) {
-                beastSpritePane.addSprite('hit', subTarget[0], subTarget[1], subTarget[2]);
-                beastSpritePane.attachSpriteTo('hit', null);
-                if (beastSpritePane.isHidden('beast')) {
-                    beastSpritePane.hideSprite('hit');
-                }
+                beastSpritePane.assignSprite('hit', subTarget[0]);
+                beastSpritePane.setSpritePos('hit', subTarget[1], subTarget[2]);
                 isHitting = 2;
             }
         }
 
         let scrolled = null;
         if (jumpIndex !== null) {
-            const pos = beastSpritePane.getSpritePos('beast');
-            const newY = pos.y + jumpPos[jumpIndex];
-            beastSpritePane.setSpritePos('beast', pos.x, newY);
-            if (beastSpritePane.hasSprite('hit')) {
-                const hitPos = beastSpritePane.getSpritePos('hit');
-                beastSpritePane.setSpritePos('hit', hitPos.x, newY);
-            }
+            beastSpritePane.moveSprite(':beast', 0, jumpPos[jumpIndex]);
             scrolled = beastScroller.scrollBy(jumpMoveX * 1.2, 0);
             jumpIndex++;
         }
@@ -1628,7 +1613,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             } else if (enemy.state === 0) {
                 if (!invisible && bat.x >= 148 && bat.x <= 172 && bat.y < beastBottom) {
                     invisible = 200;
-                    beastSpritePane.hideSprite('beast');
+                    beastSpritePane.hideSprite(':beast');
                     audioFx.ouch.play();
                     health -= enemy.damage;
                     if (health < 1) {
@@ -1662,7 +1647,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                 } else {
                     const move = fallMoves[enemy.fallIndex];
                     const moveX = (bat.x + (enemy.dim.x >> 1) < 160) ? -move.x : move.x;
-                    beastSpritePane.setSpritePos(bat.id, bat.x + moveX, bat.y - move.y);
+                    beastSpritePane.moveSprite(bat.id, moveX, -move.y);
                 }
             }
 
