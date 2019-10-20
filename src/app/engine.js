@@ -1013,6 +1013,49 @@ class ColorPane {
     }
 }
 
+class TextPane {
+
+    constructor(font) {
+        this.font = font;
+        this.blocks = [];
+        this.lineSpacing = 0;
+    }
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
+        return this.container;
+    }
+
+    setLineSpacing(value) {
+        this.lineSpacing = value;
+    }
+
+    addTextBlock(posX, posY, text) {
+        this.blocks.push({x: posX, y: posY, text});
+    }
+
+    render() {
+        const ctx = this.container.getCanvasCtx();
+        for (let block of this.blocks) {
+            let parts = block.text.split("\n");
+            let y = block.y;
+            for (part of parts) {
+                this.font.drawTextLine(ctx, part, block.x, y);
+                y += this.font.height + this.lineSpacing;
+            }
+        }
+        this.dirty = false;
+    }
+}
+
 class BitmapScrollPane {
 
     constructor(spriteSheet, axis, map, min, max) {
@@ -2947,6 +2990,38 @@ class TilesMap {
     }
 }
 
+class FontMap {
+
+    constructor(data, width, height) {
+        this.image = new Image();
+        this.image.src = data;
+        this.width = width;
+        this.height = height;
+        this.map = [];
+    }
+
+    addChar(posX, posY, char) {
+        this.map[char] = {x: posX, y: posY};
+    }
+
+    addRange(posX, posY, from, to) {
+        for (let i = from.charCodeAt(0); i <= to.charCodeAt(0); i++) {
+            this.addChar(posX, posY, String.fromCharCode(i));
+            posX += this.width;
+        }
+    }
+
+    drawTextLine(ctx, text, posX, posY) {
+        for (let i = 0; i <= text.length; i++) {
+            const char = this.map[text[i]];
+            if (char !== undefined) {
+                ctx.drawImage(this.image, char.x, char.y, this.width, this.height, posX, posY, this.width, this.height);
+            }
+            posX += this.width;
+        }
+    }
+}
+
 
 /**
  *  Animation-Modes
@@ -3201,6 +3276,7 @@ module.exports = {
     BitmapScrollPane,
     SpritePane,
     ColorPane,
+    TextPane,
     PatternPane,
     PatternPane2,
     TilesPane,
@@ -3210,6 +3286,7 @@ module.exports = {
     BoundsScrollHandler,
     Animation,
     d,
+    FontMap,
     SpriteSheet,
     spriteMaps,
     TilesMap,

@@ -8,6 +8,7 @@ import {
     BitmapScrollPane,
     SpritePane,
     ColorPane,
+    TextPane,
     PatternPane,
     TilesPane,
     BufferedTilesPane,
@@ -18,11 +19,46 @@ import {
     SpriteSheet,
     TilesMap,
     States,
+    FontMap,
     TILE,
     ANIMATION
 } from './engine';
 
+
+
+
 const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
+
+    let demoScreen = new Screen('demo');
+
+    const turricanFont =
+        new FontMap(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASgAAAAICAYAAABK3GKbAAADhElEQVRoQ+1Z0XXCQAxLN2AURmAERmGEjMAojMAIjMIG9Dmv6lNc3clHSvvR9oeA47Mt27KTvt3v98c0TdP1ep0Oh0NcLtfH4/Etrp0c94RO/MUZI/rqfPbByePey+XygO/Kf/aH/c0xMg5KZwnwA5/4DH32j8+DvpLjHOVL/s2dz/dvzd8r9Rk7tpPrRcXfy1/g82o551xhxPlU1/Cxp1upE8YQtVbpP4eP8jn3cI8fuPeVjy7+LI8zdrvdwj+fJMQNBYOq4UAI3KAZgCAMyFsF15Ln81UT8/lbC9SRRU7ed9rLxQXCa+GvMFf+9PDfmr9RffaPr8PH2+02nU6n1UD7CYKC7XmelwHjGlg1KxNEj6Dy+fjO9Q995Qvw4KZtYarOGY1vNL+MJew7fF3/svwLQVUJIoqrleDsdAbJNVCFFFxSe/JeIeRirfjCE+B8Pi+4VImPdUFM0M0DAtsGbx3PEpTLnxsgPf1Ww7pmqTbYSIGrhuMc5VrE/YiPY1H39shJDddnCKpaS0wQaphV5aP2MkaMXas+q/W3NBJPs/gejcJGlBzNoxg0Jy3f0/qupmn2T21rChD8Blv7/X71CNsqQPV7LwHsX9hQk7WHEcviOvR7eCHhOT4mxZZ++Bd/KrdV/SDHTMLzPD8yvlUc3ATeKs9NqfLL/ufaV1uBI6VWvUTu4tGlVQ+ul1qDNRNKJuCIuVX/rj9acpXf8E8NaIevqh/kaUVQKNIqocT9CtTs6Mh5KvnVBlfF5ArckU+egr3zQAA5eVv8VxM9k1puOoe3i9npu0YaaUCXnxF5iwAcXo6EXLw9wuIGd0O9Z6fV/Mq2u9fF4/D6zvy6fn8JQY1sAK4BlXykwVyBu7OyfXeek48QXmVgVOxVCZIndEy1in3VDM8UMLbPvCEGXpiweEenNgRs38gnP0Lkqf6Mf7xhVjaZTHq8XY/YR71wDPkdVDU+RcQuf5X66hG803fyz5eErbUfAYQTKII8sXsrHBec0m/JPwpz5V/rEapn3wGAAohPrPdqEwob4X8uBtVQbJPlWLP5MaLin9to4BtiiM/8/gprvlrNMwGol8Ksj5pAPtwKz6Ss/KjoBwbq8dLh5+RoLpVHJgfOXfzuXgXw4HPx8XspfhzDf7J4C8P7R7bvzs9bSsbE6Tu520Cdfk++epnbW1X/ZX8HAfcI8HeQ+I/0txF4B1/LAa5iP5tGAAAAAElFTkSuQmCC",
+            8,
+            8
+        );
+    turricanFont.addRange(0, 0, 'A', 'Z');
+    turricanFont.addChar(208, 0, ' ');
+    turricanFont.addRange(216, 0, '0', '9');
+
+    demoScreen.addPane(new ColorPane('#000000'));
+    const demoTextPane = new TextPane(turricanFont);
+    demoTextPane.setLineSpacing(4);
+    demoTextPane.addTextBlock(70, 30,
+    '   RAPID FIRE ENGINE\n\n' +
+         '       SHOWCASES\n\n\n' +
+         'PLEASE SELECT:\n\n' +
+        '  1 THUNDER FORCE 4\n' +
+        '  2 SHADOW OF THE BEAST\n' +
+        '  3 TURRICAN 2\n' +
+        '  4 SUPER MARIO BROS'
+
+    );
+    demoScreen.addPane(demoTextPane);
+
+    this.addScreen(demoScreen);
+
+
     var tb = TILE.DIM_16x16;
     var spriteSheet = new Image();
     spriteSheet.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAQCAYAAABQrvyxAAAA9klEQVRIS2NkoBLYdejVf1KMcrUVBSt/oqNDijYMtYwU6YZqTsyc9P/tLzuSjdo4Rx/sAdmrV8lyx2Nt7f9kaUR3KcgDD58zkeQBHmEbhiHvgZx4KQbNTMfBEQOkJKEvb48wgGJgUHng/rHvRCUhPhN3hlEPQIOKqpkYFAMHLpbjLBQc9DvBxeygjwFcnhgyHgCFMjZPDAkPgJLHpzM7wSkU3RNDwgNVkxMZpix8htUTQ8ID+y+UMew+/BruCSZFbnBs7NuQwzgkPIBeEcA88O/+V7jUoCyFQK4DtYeIqsmQFM2fnscIKssHvDFHqsOR1YM8QIl+ALtc7JEpDo/lAAAAAElFTkSuQmCC";
@@ -54,8 +90,6 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     ];
-
-    const turricanFont = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASgAAAAICAYAAABK3GKbAAADhElEQVRoQ+1Z0XXCQAxLN2AURmAERmGEjMAojMAIjMIG9Dmv6lNc3clHSvvR9oeA47Mt27KTvt3v98c0TdP1ep0Oh0NcLtfH4/Etrp0c94RO/MUZI/rqfPbByePey+XygO/Kf/aH/c0xMg5KZwnwA5/4DH32j8+DvpLjHOVL/s2dz/dvzd8r9Rk7tpPrRcXfy1/g82o551xhxPlU1/Cxp1upE8YQtVbpP4eP8jn3cI8fuPeVjy7+LI8zdrvdwj+fJMQNBYOq4UAI3KAZgCAMyFsF15Ln81UT8/lbC9SRRU7ed9rLxQXCa+GvMFf+9PDfmr9RffaPr8PH2+02nU6n1UD7CYKC7XmelwHjGlg1KxNEj6Dy+fjO9Q995Qvw4KZtYarOGY1vNL+MJew7fF3/svwLQVUJIoqrleDsdAbJNVCFFFxSe/JeIeRirfjCE+B8Pi+4VImPdUFM0M0DAtsGbx3PEpTLnxsgPf1Ww7pmqTbYSIGrhuMc5VrE/YiPY1H39shJDddnCKpaS0wQaphV5aP2MkaMXas+q/W3NBJPs/gejcJGlBzNoxg0Jy3f0/qupmn2T21rChD8Blv7/X71CNsqQPV7LwHsX9hQk7WHEcviOvR7eCHhOT4mxZZ++Bd/KrdV/SDHTMLzPD8yvlUc3ATeKs9NqfLL/ufaV1uBI6VWvUTu4tGlVQ+ul1qDNRNKJuCIuVX/rj9acpXf8E8NaIevqh/kaUVQKNIqocT9CtTs6Mh5KvnVBlfF5ArckU+egr3zQAA5eVv8VxM9k1puOoe3i9npu0YaaUCXnxF5iwAcXo6EXLw9wuIGd0O9Z6fV/Mq2u9fF4/D6zvy6fn8JQY1sAK4BlXykwVyBu7OyfXeek48QXmVgVOxVCZIndEy1in3VDM8UMLbPvCEGXpiweEenNgRs38gnP0Lkqf6Mf7xhVjaZTHq8XY/YR71wDPkdVDU+RcQuf5X66hG803fyz5eErbUfAYQTKII8sXsrHBec0m/JPwpz5V/rEapn3wGAAohPrPdqEwob4X8uBtVQbJPlWLP5MaLin9to4BtiiM/8/gprvlrNMwGol8Ksj5pAPtwKz6Ss/KjoBwbq8dLh5+RoLpVHJgfOXfzuXgXw4HPx8XspfhzDf7J4C8P7R7bvzs9bSsbE6Tu520Cdfk++epnbW1X/ZX8HAfcI8HeQ+I/0txF4B1/LAa5iP5tGAAAAAElFTkSuQmCC";
 
     const worldTilesMap = new TilesMap(tb, spriteSheet, world);
     var levelPane = new BufferedTilesPane(worldTilesMap, {maxSpeed: 4, endless: {x: true, y: false}});
@@ -506,13 +540,6 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
     //   Turrican
     // ##############################
 
-    let gameScreen = new Screen('turrican-ingame');
-
-    gameScreen.addPane(new ColorPane('#000000'));
-
-    this.addScreen(gameScreen);
-
-    console.log('Turrican');
 /*
     let gameArea = new Area();
     gameArea.addPane(fadeBg);
@@ -715,15 +742,15 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     beastSpriteSheet.addSprite('beast-kick1', 1, 120, 32, 52);
     beastSpriteSheet.addSprite('beast-kick-hold', 35, 120, 32, 52);
-    beastSpriteSheet.addSprite('beast-feet', 67, 120, 11, 29);
+    beastSpriteSheet.addSprite('beast-feet', 67, 120, 12, 52);
     beastSpriteSheet.addSprite('beast-punch1', 81, 119, 32, 52);
     beastSpriteSheet.addSprite('beast-punch2', 113, 119, 32, 52);
     beastSpriteSheet.addSprite('beast-punch-hold', 151, 119, 32, 52);
-    beastSpriteSheet.addSprite('beast-fist', 183, 119, 12, 17);
+    beastSpriteSheet.addSprite('beast-fist', 183, 119, 12, 52);
     beastSpriteSheet.addSprite('beast-down-punch1', 0, 171, 32, 52);
     beastSpriteSheet.addSprite('beast-down-punch2', 30, 171, 32, 52);
     beastSpriteSheet.addSprite('beast-down-punch-hold', 64, 171, 32, 52);
-    beastSpriteSheet.addSprite('beast-down-fist', 96, 172, 12, 30);
+    beastSpriteSheet.addSprite('beast-down-fist', 96, 171, 12, 52);
 
     beastSpriteSheet.addAnimation(
         'bat',
@@ -731,6 +758,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         ANIMATION.DIR.BACKWARD_FORWARD, ANIMATION.END.LOOP
     );
     beastSpriteSheet.addTransformedAnimation('bat-rev', 'bat', 'flip-x');
+    beastSpriteSheet.addTransformedSprite('beast-down-fist-rev', 'beast-down-fist', 'flip-x');
 
     beastSpriteSheet.addAnimation(
         'beast-punch',
@@ -1437,12 +1465,12 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
                     break;
                 case 'down-punch-hold-right':
                     target = 'beast-down-punch-hold';
-                    subTarget = ['beast-fist', 176, 130];
+                    subTarget = ['beast-down-fist', 176, 130];
                     hitRegion = drawRect({x1: 170, y1: 130, x2: 189, y2: 150});
                     break;
                 case 'down-punch-hold-left':
                     target = 'beast-down-punch-hold-rev';
-                    subTarget = ['beast-fist-rev', 132, 130];
+                    subTarget = ['beast-down-fist-rev', 132, 130];
                     hitRegion = drawRect({x1: 132, y1: 130, x2: 148, y2: 150});
                     break;
                 case 'punch-back-right':
@@ -1509,7 +1537,7 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
             }
             if (subTarget !== null) {
                 beastSpritePane.assignSprite('hit', subTarget[0]);
-                beastSpritePane.setSpritePos('hit', subTarget[1], subTarget[2]);
+                beastSpritePane.setSpritePos('hit', subTarget[1], beastSprite.y);
                 isHitting = 2;
             }
         }
@@ -1801,5 +1829,5 @@ const Turrican = new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
-    return 'turrican-ingame'; // 'shadow-ingame';
+    return 'demo';
 });
