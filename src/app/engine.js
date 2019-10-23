@@ -1896,7 +1896,6 @@ class BufferedTilesPane {
 /**
  * TODO:
  *  - filters
- *  - global animations
  */
 class SpritePane {
 
@@ -1955,7 +1954,7 @@ class SpritePane {
         if (!this.zOrdering && z !== 0) {
             this.zOrdering = true;
         }
-        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, animation: null, hidden: false};
+        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
         this.dirty = true;
     }
@@ -2020,11 +2019,12 @@ class SpritePane {
         obj.name = sheetId;
         obj.isAnimation = isAni;
         obj.dim = this.spriteSheet.getSpriteDim(sheetId);
-        if (isAni && obj.animation === null) {
-            obj.animation = new BitmapPlayer();
-        }
         if (isAni) {
-            this.spriteSheet.loadAnimation(obj.animation, sheetId, obj.animSpeed);
+            if (obj.animation === undefined) {
+                obj.animation = new PlayerProxy();
+            }
+            this.spriteSheet.loadAnimationToProxy(sheetId, obj.animation);
+            obj.animation.setSpeed(obj.animSpeed);
         }
         return obj;
     }
@@ -2036,16 +2036,23 @@ class SpritePane {
     }
 
     updateFrames() {
+        const synced = [];
         for (let id in this.sprites) {
             const sprite = this.sprites[id];
             if (sprite.isAnimation) {
                 const ani = sprite.animation;
-                if (this.dirty) {
-                    ani.nextStep();
+                if (ani.isSynchronous()) {
+                    if (synced.indexOf(sprite.name) === -1) {
+                        ani.nextStep();
+                        synced.push(sprite.name);
+                    } else {
+                        continue;
+                    }
                 } else {
-                    const oldFrame = ani.getFrame().id;
                     ani.nextStep();
-                    this.dirty = oldFrame !== ani.getFrame().id;
+                }
+                if (!this.dirty && ani.isDirty()) {
+                    this.dirty = true;
                 }
             }
         }
@@ -2740,6 +2747,7 @@ class SpriteSheet {
         this.sprites = {};
         this.animations = {};
         this.customImages = [];
+        this.players = {};
         this.transformer = {
             'flip-x': 'TODO',
             'flip-y': 'TODO'
@@ -2777,7 +2785,7 @@ class SpriteSheet {
         });
     }
 
-    addTransformedAnimation(id, base, transformers) {
+    addTransformedAnimation(id, base, transformers, synchronous = false) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -2789,12 +2797,19 @@ class SpriteSheet {
                 id: newId, duration: frame.duration, padding: {x: frame.padding.x, y: frame.padding.y}
             });
         }
-        this.animations[id] = {
+        const animation = {
+            synchronous,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
             dir: baseAnimation.dir,
             end: baseAnimation.end
         };
+        this.animations[id] = animation;
+        if (synchronous) {
+            const player = new BitmapPlayer();
+            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            this.players[id] = player;
+        }
     }
 
     build() {
@@ -2810,6 +2825,7 @@ class SpriteSheet {
 
             sprite.img = new Image();
             sprite.img.src = canvas.elem.toDataURL('image/png');
+
             OCM.discard(canvas);
         }
     }
@@ -2823,7 +2839,7 @@ class SpriteSheet {
         return sprite;
     }
 
-    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -2846,11 +2862,13 @@ class SpriteSheet {
         }
 
         const animation = {
+            synchronous,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
             dir,
             end
         };
+
         if (!sameSize) {
             for (let i = 0; i < dims.length; i++) {
                 const frame = animation.frames[i];
@@ -2862,8 +2880,14 @@ class SpriteSheet {
                 frame.padding = {x: offX, y: offY};
             }
         }
+
         this.animations[name] = animation;
-        return animation;
+
+        if (synchronous) {
+            const player = new BitmapPlayer();
+            player.loadAnimation(animation.frames, end, dir);
+            this.players[name] = player;
+        }
     }
 
     isAnimation(name) {
@@ -2886,15 +2910,25 @@ class SpriteSheet {
         return this.sprites[name];
     }
 
-    loadAnimation(player, name, speed = 1) {
-        if (!this.animations[name]) {
-            throw Error('No animations with id "' + name + '" found in spritesheet!');
+    loadAnimationToProxy(name, proxy) {
+        this.assertAnimation(name);
+        let animation = this.animations[name];
+        if (animation.synchronous) {
+            proxy.setPlayer(this.players[name]);
+        } else {
+            // creates a new player by lazy loading in the proxy
+            proxy.loadAnimation(animation.frames, animation.end, animation.dir);
         }
-        const animation = this.animations[name];
+    }
+
+/*
+    loadAnimation(player, name, speed = 1) {
+        this.assertTransformer(name);
+        let animation = this.animations[name];
         player.loadAnimation(animation.frames, animation.end, animation.dir);
         player.setSpeed(speed);
     }
-
+*/
     drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
         const sprite = this.getSprite(name);
         const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
@@ -3051,13 +3085,30 @@ class FontMap {
     }
 
     drawTextLine(ctx, text, posX, posY) {
+        const tmpCanvas = OCM.getNewOffscreenCanvas(this.width, this.height);
+
         for (let i = 0; i <= text.length; i++) {
             const char = this.map[text[i]];
             if (char !== undefined) {
-                ctx.drawImage(this.image, char.x, char.y, this.width, this.height, posX, posY, this.width, this.height);
+                tmpCanvas.ctx.clearRect(0, 0, this.width, this.height);
+                tmpCanvas.ctx.drawImage(this.image, char.x, char.y, this.width, this.height, 0, 0, this.width, this.height);
+                const imgData = tmpCanvas.ctx.getImageData(0, 0, this.width, this.height);
+                for(let i = 0; i < this.width * this.height; i++) {
+                    const pos = i << 2;
+                    const rgba = imgData.data;
+                    if (rgba[pos] > 0 || rgba[pos+1] > 0 || rgba[pos+2] > 0) {
+                        rgba[pos] = 255;
+                        rgba[pos+1] = 0;
+                        rgba[pos+2] = 155;
+                    }
+                }
+                tmpCanvas.ctx.putImageData(imgData, 0, 0);
+                ctx.drawImage(tmpCanvas.elem, 0, 0, this.width, this.height, posX, posY, this.width, this.height);
             }
             posX += this.width;
         }
+        OCM.discard(tmpCanvas);
+
     }
 }
 
@@ -3095,6 +3146,67 @@ const ANIMATION = {
     }
 };
 
+class PlayerProxy {
+
+    constructor() {
+        this.players = [
+            null, // non-synchronous player
+            null  // synchronous player
+        ];
+        this.active = 0;
+    }
+
+    setPlayer(player) {
+        this.active = 1;
+        this.players[1] = player;
+    }
+
+    isSynchronous() {
+        return this.active === 1;
+    }
+
+    loadAnimation(frames, end, dir) {
+        this.active = 0;
+        if (this.players[0] === null) {
+            this.players[0] = new BitmapPlayer();
+        }
+        this.players[0].loadAnimation(frames, end, dir);
+        this.players[1] = null;
+    }
+
+    getFrame() {
+        return this.players[this.active].getFrame();
+    }
+
+    setSpeed(speed) {
+        this.players[this.active].setSpeed(speed);
+    }
+
+    getState() {
+        return this.players[this.active].getState();
+    }
+
+    nextStep() {
+        this.players[this.active].nextStep();
+    }
+
+    isDirty() {
+        return this.players[this.active].isDirty();
+    }
+
+    pause() {
+        this.players[this.active].pause();
+    }
+
+    continue() {
+        this.players[this.active].continue();
+    }
+
+    reverse() {
+        this.players[this.active].reverse();
+    }
+}
+
 class BitmapPlayer {
 
     constructor() {
@@ -3102,6 +3214,7 @@ class BitmapPlayer {
         this.state = ANIMATION.STATE.EMPTY;
         this.frameNo = null;
         this.pauseState = null;
+        this.dirty = false;
     }
 
     loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
@@ -3112,6 +3225,7 @@ class BitmapPlayer {
         this.step = 0;
         this.frameNo = this.isForward ? 0 : frames.length - 1;
         this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
     }
 
     setSpeed(speed) {
@@ -3184,8 +3298,10 @@ class BitmapPlayer {
 
     nextStep() {
         if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
+            this.dirty = false;
             return;
         }
+        const oldFrameNo = this.frameNo;
         this.state = ANIMATION.STATE.RUNNING;
         this.step += this.speed;
         if (this.isForward) {
@@ -3199,6 +3315,7 @@ class BitmapPlayer {
                 this.handleForward();
             }
         }
+        this.dirty = (oldFrameNo !== this.frameNo);
     }
 
     getFrame() {
@@ -3211,6 +3328,7 @@ class BitmapPlayer {
     pause() {
         this.pauseState = this.state;
         this.state = ANIMATION.STATE.PAUSED;
+        this.dirty = false;
     }
 
     continue() {
@@ -3232,6 +3350,10 @@ class BitmapPlayer {
             this.state = ANIMATION.STATE.WAITING;
         }
         this.isForward = !this.isForward;
+    }
+
+    isDirty() {
+        return this.dirty;
     }
 }
 
