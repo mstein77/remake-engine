@@ -26,6 +26,8 @@ import {
 
 new Game(320, 224, {zoom: 2, debug: false}, function () {
 
+
+
     // ##############################
     //   D e m o - S c r e e n
     // ##############################
@@ -44,19 +46,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     demoScreen.addPane(new ColorPane('#000000'));
     const demoTextPane = new TextPane(turricanFont);
-    demoTextPane.setLineSpacing(4);
-    demoTextPane.addTextBlock(70, 30,
+    demoTextPane.addTextBlock('screentext', 70, 30,
     '   RAPID FIRE ENGINE\n\n' +
          '       SHOWCASES\n\n\n' +
          'PLEASE SELECT:\n\n' +
         '  1 THUNDER FORCE 4\n' +
         '  2 SHADOW OF THE BEAST\n' +
         '  3 TURRICAN 2\n' +
-        '  4 SUPER MARIO BROS'
-
+        '  4 SUPER MARIO BROS',4
     );
-    demoScreen.addPane(demoTextPane);
 
+    demoScreen.addPane(demoTextPane);
     this.addScreen(demoScreen);
 
 
@@ -1429,6 +1429,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 if (!invisible && bat.x >= 148 && bat.x <= 172 && bat.y < beastBottom) {
                     invisible = 200;
                     beastSpritePane.hideSprite(':beast');
+                    beastSpritePane.setSpriteFilters(':beast', 'monochrome(#FFFFFF)', 10);
                     audioFx.ouch.play();
                     health -= enemy.damage;
                     if (health < 1) {

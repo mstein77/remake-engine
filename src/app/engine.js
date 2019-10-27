@@ -1024,7 +1024,7 @@ class TextPane {
 
     constructor(font) {
         this.font = font;
-        this.blocks = [];
+        this.blocks = {};
         this.lineSpacing = 0;
     }
 
@@ -1041,22 +1041,47 @@ class TextPane {
         return this.container;
     }
 
-    setLineSpacing(value) {
-        this.lineSpacing = value;
+    drawTextBlockToCtx(ctx, block) {
+        let parts = block.text.split("\n");
+        let y = 0;
+        for (let part of parts) {
+            this.font.drawTextLine(ctx, part, 0, y);
+            y += this.font.height + block.lineSpacing;
+        }
     }
 
-    addTextBlock(posX, posY, text) {
-        this.blocks.push({x: posX, y: posY, text});
+    addTextBlock(id, posX, posY, text, lineSpacing = 0) {
+        let width = 0;
+        let height = 0;
+        const lines = text.split('\n');
+        for (let line of lines) {
+            width = Math.max(width, line.length);
+            height += this.font.height;
+        }
+        width *= this.font.width;
+        height += lineSpacing * lines.length;
+
+        const canvas = OCM.getNewOffscreenCanvas(width, height);
+        const block = {x: posX, y: posY, filter: '', height, width, text, lineSpacing, canvas};
+        this.drawTextBlockToCtx(canvas.ctx, block);
+        this.blocks[id] = block;
+    }
+
+    setTextBlockFilter(id, filter) {
+        this.blocks[id].filter = filter;
+        this.dirty = true;
     }
 
     render() {
         const ctx = this.container.getCanvasCtx();
-        for (let block of this.blocks) {
-            let parts = block.text.split("\n");
-            let y = block.y;
-            for (part of parts) {
-                this.font.drawTextLine(ctx, part, block.x, y);
-                y += this.font.height + this.lineSpacing;
+        ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
+        for (let id in this.blocks) {
+            const block = this.blocks[id];
+            if (block.filter === '') {
+                ctx.drawImage(block.canvas.elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
+            } else {
+                const result = filterer.getCanvasWithFiltersApplied(block.filter, block.canvas, 0, 0, block.width, block.height);
+                ctx.drawImage(result[0].elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
             }
         }
         this.dirty = false;
@@ -1895,7 +1920,7 @@ class BufferedTilesPane {
 
 /**
  * TODO:
- *  - filters
+ *  - addFilter, removeFilter, clearFilter
  */
 class SpritePane {
 
@@ -1954,7 +1979,7 @@ class SpritePane {
         if (!this.zOrdering && z !== 0) {
             this.zOrdering = true;
         }
-        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, hidden: false};
+        const sprite = {id, x, y, z, animSpeed: 1, filterDuration: -1, attached: this.attachDefault, filters: '', hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
         this.dirty = true;
     }
@@ -2039,6 +2064,15 @@ class SpritePane {
         const synced = [];
         for (let id in this.sprites) {
             const sprite = this.sprites[id];
+            if (sprite.filterDuration !== -1) {
+                if (sprite.filterDuration === 0) {
+                    sprite.filters = '';
+                    if (!sprite.hidden) {
+                        this.dirty = true;
+                    }
+                }
+                sprite.filterDuration--;
+            }
             if (sprite.isAnimation) {
                 const ani = sprite.animation;
                 if (ani.isSynchronous()) {
@@ -2140,6 +2174,16 @@ class SpritePane {
         return result;
     }
 
+    setSpriteFilters(id, filters, duration = -1) {
+
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            sprite.filters = filters;
+            sprite.filterDuration = duration;
+        }
+        this.dirty = true;
+    }
+
     moveSprite(id, moveX, moveY) {
         const sprites = this.getSpritesById(id);
         for (let sprite of sprites) {
@@ -2181,12 +2225,12 @@ class SpritePane {
                 let clearRect;
                 if (sprite.isAnimation) {
                     const frameSprite = sprite.animation.getFrame();
-                    clearRect = this.spriteSheet.drawSprite(
-                        target, frameSprite.id, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
+                    clearRect = this.spriteSheet.drawFilteredSprite(
+                        target, frameSprite.id, sprite.filters, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
                     );
                 } else {
-                    clearRect = this.spriteSheet.drawSprite(
-                        target, sprite.name, sprite.x, sprite.y, 0, 0, sprite.filters
+                    clearRect = this.spriteSheet.drawFilteredSprite(
+                        target, sprite.name, sprite.filters, sprite.x, sprite.y, 0, 0, sprite.filters
                     );
                 }
                 drawRects.push(clearRect);
@@ -2734,6 +2778,236 @@ class BoundsScrollHandler {
     }
 }
 
+// ####################################
+//    Bitmap Filter
+// ####################################
+
+const FILTER = {
+   TYPE: {
+       CANVAS: 0,
+       IMAGEDATA: 1
+   },
+    PARAM: {
+       STRING: 0,
+       FLOAT: 1,
+       COLOR: 2
+    }
+};
+
+class BitmapFilterer {
+
+    constructor() {
+        this.filters = {};
+    }
+
+    addFilter(id, type, callback, params = []) {
+        const paramClosures = [];
+        let minParams = 0;
+        let isMandatory = true;
+        for (let index = 0; index < params.length; index++) {
+            if (isMandatory) {
+                if (params.default === undefined) {
+                    minParams++;
+                } else {
+                    isMandatory = false;
+                }
+            }
+            const param = params[index];
+            let parser = null;
+            switch(param.type) {
+
+                case FILTER.PARAM.COLOR:
+                    parser = function(rawValue) {
+                        const color = {};
+                        if (rawValue[0] === '#') {
+                            if (rawValue.length === 7) {
+                                color.r = parseInt(rawValue.substr(1, 2), 16);
+                                color.g = parseInt(rawValue.substr(3, 2), 16);
+                                color.b = parseInt(rawValue.substr(5, 2), 16);
+                                return color;
+                            }
+                        }
+                        return null;
+                    };
+                    break;
+
+                case FILTER.PARAM.FLOAT:
+                    parser = function(rawValue) {
+                        return parseFloat(rawValue);
+                    };
+                    break;
+            }
+
+            paramClosures.push(
+                function(rawValue, params) {
+                    params[param.key] = (rawValue === '') ? param.default : parser(rawValue);
+                }
+            );
+        }
+
+        this.filters[id] = {
+            type,
+            callback,
+            minParams,
+            params: paramClosures
+        }
+    }
+
+    /**
+     * Returns either the original canvas or a new one with the filters applied on the original one
+     *
+     * @param filters
+     * @param canvas
+     * @param offX
+     * @param offY
+     * @param width
+     * @param height
+     * @return {*[]}
+     */
+    getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
+        let data = [canvas, offX, offY, width, height];
+        let lastType = FILTER.TYPE.CANVAS;
+        let imageData = null;
+        let isSourceCanvas = true;
+
+        const filterParts = filters.split('|');
+        for (let filterPart of filterParts) {
+            let rawParams = [];
+            if (filterPart[filterPart.length - 1] === ')') {
+                const subExpr = filterPart.slice(0, -1).split('(', 2);
+                filterPart = subExpr[0];
+                rawParams = subExpr[1].split(',');
+            }
+            if (filterPart === '') {
+                continue;
+            }
+            const filter = this.filters[filterPart];
+            const filterParams = {};
+            if (rawParams.length < filter.minParams) {
+                throw Error(`Filter "${filterPart}" requires ${filter.minParams} parameters but got ${rawParams.length}!`);
+            }
+            for (let i = 0; i < filter.params.length; i++) {
+                if (i < rawParams.length) {
+                    filter.params[i](rawParams[i], filterParams);
+                } else {
+                    filterParams[filter.key] = filter.default;
+                }
+            }
+
+            switch(filter.type) {
+
+                case FILTER.TYPE.CANVAS:
+                    if (lastType === FILTER.TYPE.IMAGEDATA) {
+                        if (isSourceCanvas) {
+                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                            isSourceCanvas = false;
+                        }
+                        data[0].ctx.putImageData(imageData, 0, 0);
+                    }
+                    data = filter.callback(data, filterParams);
+                    break;
+
+                case FILTER.TYPE.IMAGEDATA:
+                    if (lastType === FILTER.TYPE.CANVAS) {
+                        imageData = data[0].ctx.getImageData(data[1], data[2], data[3], data[4]);
+                    }
+                    imageData = filter.callback(imageData, filterParams);
+                    break;
+
+                default:
+                    throw Error(`Unknown filter type ${filter.type} given!`);
+            }
+            lastType = filter.type;
+        }
+
+        if (lastType === FILTER.TYPE.IMAGEDATA) {
+            if (isSourceCanvas) {
+                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+            }
+            data[0].ctx.putImageData(imageData, 0, 0);
+        }
+        return data;
+    }
+}
+
+const filterer = new BitmapFilterer();
+
+filterer.addFilter(
+    'flip-x',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(data[3], 0);
+        newCanvas.ctx.scale(-1, 1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'flip-y',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(0, data[4]);
+        newCanvas.ctx.scale(1, -1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'flip-xy',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(data[3], data[4]);
+        newCanvas.ctx.scale(-1, -1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'monochrome',
+    FILTER.TYPE.IMAGEDATA,
+    function(imageData, params) {
+        const rgba = imageData.data;
+        for(let i = 0; i < imageData.width * imageData.height; i++) {
+            const pos = i << 2;
+            if (rgba[pos] > 0 || rgba[pos+1] > 0 || rgba[pos+2] > 0) {
+                rgba[pos] = params.color.r;
+                rgba[pos+1] = params.color.g;
+                rgba[pos+2] = params.color.b;
+            }
+        }
+        return imageData;
+    },
+    [
+        {type: FILTER.PARAM.COLOR, key: 'color'}
+    ]
+);
+
+filterer.addFilter(
+    'transparent',
+    FILTER.TYPE.IMAGEDATA,
+    function(imageData, params) {
+        const rgba = imageData.data;
+        for(let i = 0; i < imageData.width * imageData.height; i++) {
+            const pos = (i << 2) + 3;
+            rgba[pos] = rgba[pos] * params.factor;
+        };
+        return imageData;
+    },
+    [
+        {key: 'factor', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 0.5}
+    ]
+);
+
+// @TODO: colorReplace-Filter
 
 // ####################################
 //    Sheets
@@ -2742,27 +3016,17 @@ class BoundsScrollHandler {
 class SpriteSheet {
 
     constructor(data) {
-        this.sheet = new Image();
-        this.sheet.src = data;
+        this.sheet = new ImageResource(data);
+        this.sheet = this.sheet.getCanvas();
         this.sprites = {};
         this.animations = {};
         this.customImages = [];
         this.players = {};
-        this.transformer = {
-            'flip-x': 'TODO',
-            'flip-y': 'TODO'
-        };
     }
 
     assertSprite(id) {
         if (!this.sprites[id]) {
             throw Error('No sprite with id "' + id + '" found in spritesheet!');
-        }
-    }
-
-    assertTransformer(id) {
-        if (!this.transformer[id]) {
-            throw Error('No transformer with id "' + id + '" found in spritesheet!');
         }
     }
 
@@ -2774,14 +3038,10 @@ class SpriteSheet {
 
     addTransformedSprite(id, base, transformers) {
         this.assertSprite(base);
-        const parts = transformers.split(':');
-        for (let part of parts) {
-            this.assertTransformer(part);
-        }
         this.customImages.push({
             id,
             base,
-            transformers: parts
+            transformers
         });
     }
 
@@ -2815,18 +3075,9 @@ class SpriteSheet {
     build() {
         for (let image of this.customImages) {
             let base = this.getSprite(image.base);
-            const canvas = OCM.getNewOffscreenCanvas(base.dim.x, base.dim.y);
-            //
-            canvas.ctx.translate(base.dim.x, 0);
-            canvas.ctx.scale(-1, 1);
-            this.drawSprite(canvas.ctx, image.base,0, 0);
-
+            const trans = filterer.getCanvasWithFiltersApplied(image.transformers, this.sheet, base.off.x, base.off.y, base.dim.x, base.dim.y);
             const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
-
-            sprite.img = new Image();
-            sprite.img.src = canvas.elem.toDataURL('image/png');
-
-            OCM.discard(canvas);
+            sprite.img = trans[0];
         }
     }
 
@@ -2921,22 +3172,38 @@ class SpriteSheet {
         }
     }
 
-/*
-    loadAnimation(player, name, speed = 1) {
-        this.assertTransformer(name);
-        let animation = this.animations[name];
-        player.loadAnimation(animation.frames, animation.end, animation.dir);
-        player.setSpeed(speed);
-    }
-*/
     drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
         const sprite = this.getSprite(name);
         const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
         ctx.drawImage(
             sprite.img === undefined ?
-                this.sheet : sprite.img,
+                this.sheet.elem : sprite.img.elem,
             sprite.off.x, sprite.off.y,
             sprite.dim.x, sprite.dim.y,
+            draw.x,
+            draw.y,
+            draw.width,
+            draw.height
+        );
+        return draw;
+    }
+
+    drawFilteredSprite(ctx, name, filters, posX, posY, paddX = 0, paddY = 0) {
+        if (filters === '') {
+            return this.drawSprite(ctx, name, posX, posY, paddX, paddY);
+        }
+        const sprite = this.getSprite(name);
+        const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
+        const transformed = filterer.getCanvasWithFiltersApplied(
+            filters,
+            sprite.img === undefined ? this.sheet : sprite.img,
+            sprite.off.x, sprite.off.y,
+            draw.width, draw.height
+        );
+        ctx.drawImage(
+            transformed[0].elem,
+            transformed[1], transformed[2],
+            transformed[3], transformed[4],
             draw.x,
             draw.y,
             draw.width,
@@ -2953,7 +3220,7 @@ class SpriteSheet {
             return;
         }
         ctx.drawImage(
-            sprite.img === undefined ? this.sheet : sprite.img,
+            sprite.img === undefined ? this.sheet.elem : sprite.img.elem,
             sprite.off.x + offX, sprite.off.y + offY,
             width, height,
             posX, posY,
@@ -3066,8 +3333,8 @@ class TilesMap {
 class FontMap {
 
     constructor(data, width, height) {
-        this.image = new Image();
-        this.image.src = data;
+        this.image = new ImageResource(data);
+        this.image = this.image.getCanvasElem();
         this.width = width;
         this.height = height;
         this.map = [];
@@ -3085,30 +3352,13 @@ class FontMap {
     }
 
     drawTextLine(ctx, text, posX, posY) {
-        const tmpCanvas = OCM.getNewOffscreenCanvas(this.width, this.height);
-
         for (let i = 0; i <= text.length; i++) {
             const char = this.map[text[i]];
             if (char !== undefined) {
-                tmpCanvas.ctx.clearRect(0, 0, this.width, this.height);
-                tmpCanvas.ctx.drawImage(this.image, char.x, char.y, this.width, this.height, 0, 0, this.width, this.height);
-                const imgData = tmpCanvas.ctx.getImageData(0, 0, this.width, this.height);
-                for(let i = 0; i < this.width * this.height; i++) {
-                    const pos = i << 2;
-                    const rgba = imgData.data;
-                    if (rgba[pos] > 0 || rgba[pos+1] > 0 || rgba[pos+2] > 0) {
-                        rgba[pos] = 255;
-                        rgba[pos+1] = 0;
-                        rgba[pos+2] = 155;
-                    }
-                }
-                tmpCanvas.ctx.putImageData(imgData, 0, 0);
-                ctx.drawImage(tmpCanvas.elem, 0, 0, this.width, this.height, posX, posY, this.width, this.height);
+                ctx.drawImage(this.image, char.x, char.y, this.width, this.height, posX, posY, this.width, this.height);
             }
             posX += this.width;
         }
-        OCM.discard(tmpCanvas);
-
     }
 }
 
@@ -3427,6 +3677,31 @@ class States {
         this.assertExists(state);
         this.popTransitions();
         this.currState = state;
+    }
+}
+
+class ImageResource {
+
+    constructor(data) {
+        this.image = new Image();
+        this.image.src = data;
+        this.canvas = null;
+    }
+
+    getCanvas() {
+        if (this.canvas === null) {
+            this.canvas = OCM.getNewOffscreenCanvas(this.image.width, this.image.height);
+            this.canvas.ctx.drawImage(this.image, 0, 0);
+        }
+        return this.canvas;
+    }
+
+    getCanvasElem() {
+        return this.getCanvas().elem;
+    }
+
+    getImage() {
+        return this.image;
     }
 }
 
