@@ -111,7 +111,7 @@ class Game {
     }
 
     render(force = false) {
-        if (this.currentScreen !== null) {
+        if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
             this.screens[this.currentScreen].render(force);
         }
     }
@@ -146,24 +146,10 @@ class Game {
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
-
-        screen.setDimension(this.width, this.height);
-        screen.render(true);
-        if (this.sound && screen.audio !== null) {
-            const audio = new Audio(screen.audio);
-            audio.addEventListener('canplaythrough', event => {
-                this.playAudio(audio);
-            });
-            audio.addEventListener('ended', event => {
-                for (let i = 0; i < this.audioPlaying.length; i++) {
-                    if (this.audioPlaying[i] === audio) {
-                        this.audioPlaying.splice(i, 1);
-                        break;
-                    }
-                }
-            });
-        }
+        const callback = screen.init();
+        this.build = callback.bind(this);
     }
+
 
     stopAllAudio() {
         for (let audio of this.audioPlaying) {
@@ -255,26 +241,52 @@ class Game {
     }
 
     updateFrame() {
-        this.updateDom();
-        if (this.debug) {
-            this.printDebugs();
-        }
-        this.handleKeys();
-        if (this.running) {
-            this.startTimer('render');
-            this.render();
-            this.addTimerDuration('render');
-            this.frames++;
-            const screen = this.screens[this.currentScreen];
-            if (screen.frameHandler !== null) {
-                screen.frameHandler();
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() === 'READY') {
+            this.updateDom();
+            if (this.debug) {
+                this.printDebugs();
+            }
+            this.handleKeys();
+            if (this.running) {
+                this.startTimer('render');
+                this.render();
+                this.addTimerDuration('render');
+                this.frames++;
+                if (screen.frameHandler !== null) {
+                    screen.frameHandler();
+                }
             }
         }
         this.waitForNextFrame();
     }
 
     waitForNextFrame() {
-        this.lastAnimationFrame = requestAnimationFrame(this.updateFrame.bind(this));
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() !== 'READY') {
+            if (!screen.hasAllDependencies()) {
+                requestAnimationFrame(this.waitForNextFrame.bind(this));
+                return;
+            }
+            this.build(screen.resources);
+            screen.setDimension(this.width, this.height);
+            screen.render(true);
+            if (this.sound && screen.audio !== null) {
+                const audio = new Audio(screen.audio);
+                audio.addEventListener('canplaythrough', event => {
+                    this.playAudio(audio);
+                });
+                audio.addEventListener('ended', event => {
+                    for (let i = 0; i < this.audioPlaying.length; i++) {
+                        if (this.audioPlaying[i] === audio) {
+                            this.audioPlaying.splice(i, 1);
+                            break;
+                        }
+                    }
+                });
+            }
+        }
+        requestAnimationFrame(this.updateFrame.bind(this));
     }
 
     setRunning(value) {
@@ -618,9 +630,17 @@ class Screen {
         this.id = id;
         this.areas = [];
         this.keyHandler = null;
+        this.initHandler = null;
+        this.resources = {};
         this.frameHandler = null;
         this.tree = null;
         this.audio = null;
+        this.dependencies = 0;
+        this.state = 'NEW';
+    }
+
+    getState() {
+        return this.state;
     }
 
     addArea(area) {
@@ -666,6 +686,22 @@ class Screen {
         buildNodeDom(this.tree, Game.instance.getDomElem('overlay'));
     }
 
+    hasAllDependencies() {
+        const hasAll = (this.dependencies === 0);
+        if (this.state === 'INIT' && hasAll) {
+            this.state = 'READY';
+        }
+        return hasAll;
+    }
+
+    init() {
+        if (this.initHandler !== null) {
+            this.state = 'INIT';
+            return this.initHandler();
+        }
+        this.state = 'READY';
+    }
+
     render(force = false) {
         function renderPanes(tree) {
             for (let child of tree.children) {
@@ -678,7 +714,6 @@ class Screen {
                 renderPanes(child);
             }
         }
-
         renderPanes(this.tree);
     }
 
@@ -688,6 +723,34 @@ class Screen {
 
     setFrameHandler(handler) {
         this.frameHandler = handler.bind(Game.instance);
+    }
+
+    addImageResource(id, data) {
+        if (Array.isArray(data)) {
+            const resources = [];
+            for (let item of data) {
+                this.dependencies++;
+                const resource = new ImageResource(item);
+                resources.push(resource);
+                resource.getNewDecodePromise().then(() => {this.dependencies--});
+            }
+            this.resources[id] = resources;
+        } else {
+            this.dependencies++;
+            const resource = new ImageResource(data);
+            this.resources[id] = resource;
+            resource.getNewDecodePromise().then(() => {this.dependencies--});
+        }
+    }
+
+    addImageResources(dataObj) {
+        for (let id in dataObj) {
+            this.addImageResource(id, dataObj[id]);
+        }
+    }
+
+    setInitHandler(handler) {
+        this.initHandler = handler.bind(this);
     }
 
     addAudio(src) {
@@ -1013,11 +1076,18 @@ class ColorPane {
     }
 }
 
+/**
+ * TODO:
+ *   - Multi-Font
+ *   - Monochrome + Color
+ *   - CaseInsensitive
+ *   - Scrolling (Buffering?)
+ */
 class TextPane {
 
     constructor(font) {
         this.font = font;
-        this.blocks = [];
+        this.blocks = {};
         this.lineSpacing = 0;
     }
 
@@ -1034,28 +1104,62 @@ class TextPane {
         return this.container;
     }
 
-    setLineSpacing(value) {
-        this.lineSpacing = value;
+    drawTextBlockToCtx(ctx, block) {
+        let parts = block.text.split("\n");
+        let y = 0;
+        for (let part of parts) {
+            this.font.drawTextLine(ctx, part, 0, y);
+            y += this.font.height + block.lineSpacing;
+        }
     }
 
-    addTextBlock(posX, posY, text) {
-        this.blocks.push({x: posX, y: posY, text});
+    addTextBlock(id, posX, posY, text, lineSpacing = 0) {
+        let width = 0;
+        let height = 0;
+        const lines = text.split('\n');
+        for (let line of lines) {
+            width = Math.max(width, line.length);
+            height += this.font.height;
+        }
+        width *= this.font.width;
+        height += lineSpacing * lines.length;
+
+        const canvas = OCM.getNewOffscreenCanvas(width, height);
+        const block = {x: posX, y: posY, filter: '', height, width, text, lineSpacing, canvas};
+        this.drawTextBlockToCtx(canvas.ctx, block);
+        this.blocks[id] = block;
+    }
+
+    setTextBlockFilter(id, filter) {
+        this.blocks[id].filter = filter;
+        this.dirty = true;
     }
 
     render() {
         const ctx = this.container.getCanvasCtx();
-        for (let block of this.blocks) {
-            let parts = block.text.split("\n");
-            let y = block.y;
-            for (part of parts) {
-                this.font.drawTextLine(ctx, part, block.x, y);
-                y += this.font.height + this.lineSpacing;
+        ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
+        for (let id in this.blocks) {
+            const block = this.blocks[id];
+            if (block.filter === '') {
+                ctx.drawImage(block.canvas.elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
+            } else {
+                const result = filterer.getCanvasWithFiltersApplied(block.filter, block.canvas, 0, 0, block.width, block.height);
+                ctx.drawImage(result[0].elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
             }
         }
         this.dirty = false;
     }
 }
 
+/**
+ * TODO:
+ *   - Y-Scrolling
+ *   - Endless-Scrolling
+ *   - Events
+ *   - Rastering
+ *   - Oversize/Scrolling
+ *   - Z-Ordering / MultiBitmaps
+ */
 class BitmapScrollPane {
 
     constructor(spriteSheet, axis, map, min, max) {
@@ -1256,6 +1360,12 @@ class BitmapScrollPane {
     }
 }
 
+/**
+ * TODO:
+ *   - Filters
+ *   - Events
+ *   - Animated Tiles
+ */
 class TilesPane {
 
     constructor(tilesMap, config = {}) {
@@ -1433,6 +1543,12 @@ class TilesPane {
 }
 
 
+/**
+ * TODO:
+ *   - Filters
+ *   - Events
+ *   - Animated Tiles
+ */
 class BufferedTilesPane {
 
     constructor(tilesMap, config) {
@@ -1867,8 +1983,7 @@ class BufferedTilesPane {
 
 /**
  * TODO:
- *  - filters
- *  - animPlayer
+ *  - addFilter, removeFilter, clearFilter
  */
 class SpritePane {
 
@@ -1927,7 +2042,7 @@ class SpritePane {
         if (!this.zOrdering && z !== 0) {
             this.zOrdering = true;
         }
-        const sprite = {id, x, y, z, animSpeed: 1, attached: this.attachDefault, hidden: false};
+        const sprite = {id, x, y, z, animSpeed: 1, filterDuration: -1, attached: this.attachDefault, filters: '', hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
         this.dirty = true;
     }
@@ -1974,7 +2089,7 @@ class SpritePane {
         for (let sprite of sprites) {
             sprite.animSpeed = speed;
             if (sprite.isAnimation) {
-                sprite.animation.speed = speed;
+                sprite.animation.setSpeed(speed);
             }
         }
     }
@@ -1991,8 +2106,14 @@ class SpritePane {
         const isAni = sheetId !== null && this.spriteSheet.isAnimation(sheetId);
         obj.name = sheetId;
         obj.isAnimation = isAni;
-        obj.animation = (isAni ? this.spriteSheet.getAnimation(sheetId, obj.animSpeed) : null);
         obj.dim = this.spriteSheet.getSpriteDim(sheetId);
+        if (isAni) {
+            if (obj.animation === undefined) {
+                obj.animation = new PlayerProxy();
+            }
+            this.spriteSheet.loadAnimationToProxy(sheetId, obj.animation);
+            obj.animation.setSpeed(obj.animSpeed);
+        }
         return obj;
     }
 
@@ -2003,16 +2124,32 @@ class SpritePane {
     }
 
     updateFrames() {
+        const synced = [];
         for (let id in this.sprites) {
             const sprite = this.sprites[id];
+            if (sprite.filterDuration !== -1) {
+                if (sprite.filterDuration === 0) {
+                    sprite.filters = '';
+                    if (!sprite.hidden) {
+                        this.dirty = true;
+                    }
+                }
+                sprite.filterDuration--;
+            }
             if (sprite.isAnimation) {
                 const ani = sprite.animation;
-                if (this.dirty) {
-                    ani.nextFrame();
+                if (ani.isSynchronous()) {
+                    if (synced.indexOf(sprite.name) === -1) {
+                        ani.nextStep();
+                        synced.push(sprite.name);
+                    } else {
+                        continue;
+                    }
                 } else {
-                    const oldFrame = ani.getFrame().id;
-                    ani.nextFrame();
-                    this.dirty = oldFrame !== ani.getFrame().id;
+                    ani.nextStep();
+                }
+                if (!this.dirty && ani.isDirty()) {
+                    this.dirty = true;
                 }
             }
         }
@@ -2100,6 +2237,16 @@ class SpritePane {
         return result;
     }
 
+    setSpriteFilters(id, filters, duration = -1) {
+
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            sprite.filters = filters;
+            sprite.filterDuration = duration;
+        }
+        this.dirty = true;
+    }
+
     moveSprite(id, moveX, moveY) {
         const sprites = this.getSpritesById(id);
         for (let sprite of sprites) {
@@ -2141,12 +2288,12 @@ class SpritePane {
                 let clearRect;
                 if (sprite.isAnimation) {
                     const frameSprite = sprite.animation.getFrame();
-                    clearRect = this.spriteSheet.drawSprite(
-                        target, frameSprite.id, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
+                    clearRect = this.spriteSheet.drawFilteredSprite(
+                        target, frameSprite.id, sprite.filters, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
                     );
                 } else {
-                    clearRect = this.spriteSheet.drawSprite(
-                        target, sprite.name, sprite.x, sprite.y, 0, 0, sprite.filters
+                    clearRect = this.spriteSheet.drawFilteredSprite(
+                        target, sprite.name, sprite.filters, sprite.x, sprite.y, 0, 0, sprite.filters
                     );
                 }
                 drawRects.push(clearRect);
@@ -2230,7 +2377,7 @@ class PatternPane2 {
 class PatternPane {
 
     constructor(pattern, repeat) {
-        this.pattern = pattern;
+        this.pattern = pattern.getImage();
         this.repeat = repeat;
         this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(repeat) !== -1);
         this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(repeat) !== -1);
@@ -2424,6 +2571,11 @@ class LinearGradientPane2 {
     }
 }
 
+/**
+ * TODO:
+ *   - endless Scrolling
+ *   - Use CSS Background-Property?
+ */
 class LinearGradientPane {
 
     constructor(axis, colorStops) {
@@ -2581,8 +2733,8 @@ class MasterSlavesScrollHandler {
         this.slaves.push([slave, factorX, factorY]);
     }
 
-    addSpriteSlave(slave) {
-        this.spriteSlaves.push(slave);
+    addSpriteSlave(slave, factorX = 0, factorY = 0) {
+        this.spriteSlaves.push([slave, factorX, factorY]);
     }
 
     scrollBy(sx, sy) {
@@ -2592,7 +2744,7 @@ class MasterSlavesScrollHandler {
                 slave[0].scrollBy(scrolled.x * slave[1], scrolled.y * slave[2]);
             }
             for (let slave of this.spriteSlaves) {
-                slave.moveSpritesAttachedTo(this.master, -scrolled.x, -scrolled.y);
+                slave[0].moveSpritesAttachedTo(this.master, scrolled.x * slave[1], scrolled.y * slave[2]);
             }
 
         }
@@ -2689,6 +2841,236 @@ class BoundsScrollHandler {
     }
 }
 
+// ####################################
+//    Bitmap Filter
+// ####################################
+
+const FILTER = {
+   TYPE: {
+       CANVAS: 0,
+       IMAGEDATA: 1
+   },
+    PARAM: {
+       STRING: 0,
+       FLOAT: 1,
+       COLOR: 2
+    }
+};
+
+class BitmapFilterer {
+
+    constructor() {
+        this.filters = {};
+    }
+
+    addFilter(id, type, callback, params = []) {
+        const paramClosures = [];
+        let minParams = 0;
+        let isMandatory = true;
+        for (let index = 0; index < params.length; index++) {
+            if (isMandatory) {
+                if (params.default === undefined) {
+                    minParams++;
+                } else {
+                    isMandatory = false;
+                }
+            }
+            const param = params[index];
+            let parser = null;
+            switch(param.type) {
+
+                case FILTER.PARAM.COLOR:
+                    parser = function(rawValue) {
+                        const color = {};
+                        if (rawValue[0] === '#') {
+                            if (rawValue.length === 7) {
+                                color.r = parseInt(rawValue.substr(1, 2), 16);
+                                color.g = parseInt(rawValue.substr(3, 2), 16);
+                                color.b = parseInt(rawValue.substr(5, 2), 16);
+                                return color;
+                            }
+                        }
+                        return null;
+                    };
+                    break;
+
+                case FILTER.PARAM.FLOAT:
+                    parser = function(rawValue) {
+                        return parseFloat(rawValue);
+                    };
+                    break;
+            }
+
+            paramClosures.push(
+                function(rawValue, params) {
+                    params[param.key] = (rawValue === '') ? param.default : parser(rawValue);
+                }
+            );
+        }
+
+        this.filters[id] = {
+            type,
+            callback,
+            minParams,
+            params: paramClosures
+        }
+    }
+
+    /**
+     * Returns either the original canvas or a new one with the filters applied on the original one
+     *
+     * @param filters
+     * @param canvas
+     * @param offX
+     * @param offY
+     * @param width
+     * @param height
+     * @return {*[]}
+     */
+    getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
+        let data = [canvas, offX, offY, width, height];
+        let lastType = FILTER.TYPE.CANVAS;
+        let imageData = null;
+        let isSourceCanvas = true;
+
+        const filterParts = filters.split('|');
+        for (let filterPart of filterParts) {
+            let rawParams = [];
+            if (filterPart[filterPart.length - 1] === ')') {
+                const subExpr = filterPart.slice(0, -1).split('(', 2);
+                filterPart = subExpr[0];
+                rawParams = subExpr[1].split(',');
+            }
+            if (filterPart === '') {
+                continue;
+            }
+            const filter = this.filters[filterPart];
+            const filterParams = {};
+            if (rawParams.length < filter.minParams) {
+                throw Error(`Filter "${filterPart}" requires ${filter.minParams} parameters but got ${rawParams.length}!`);
+            }
+            for (let i = 0; i < filter.params.length; i++) {
+                if (i < rawParams.length) {
+                    filter.params[i](rawParams[i], filterParams);
+                } else {
+                    filterParams[filter.key] = filter.default;
+                }
+            }
+
+            switch(filter.type) {
+
+                case FILTER.TYPE.CANVAS:
+                    if (lastType === FILTER.TYPE.IMAGEDATA) {
+                        if (isSourceCanvas) {
+                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                            isSourceCanvas = false;
+                        }
+                        data[0].ctx.putImageData(imageData, 0, 0);
+                    }
+                    data = filter.callback(data, filterParams);
+                    break;
+
+                case FILTER.TYPE.IMAGEDATA:
+                    if (lastType === FILTER.TYPE.CANVAS) {
+                        imageData = data[0].ctx.getImageData(data[1], data[2], data[3], data[4]);
+                    }
+                    imageData = filter.callback(imageData, filterParams);
+                    break;
+
+                default:
+                    throw Error(`Unknown filter type ${filter.type} given!`);
+            }
+            lastType = filter.type;
+        }
+
+        if (lastType === FILTER.TYPE.IMAGEDATA) {
+            if (isSourceCanvas) {
+                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+            }
+            data[0].ctx.putImageData(imageData, 0, 0);
+        }
+        return data;
+    }
+}
+
+const filterer = new BitmapFilterer();
+
+filterer.addFilter(
+    'flip-x',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(data[3], 0);
+        newCanvas.ctx.scale(-1, 1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'flip-y',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(0, data[4]);
+        newCanvas.ctx.scale(1, -1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'flip-xy',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.translate(data[3], data[4]);
+        newCanvas.ctx.scale(-1, -1);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        newCanvas.ctx.resetTransform();
+        return [newCanvas, 0, 0, data[3], data[4]];
+    }
+);
+
+filterer.addFilter(
+    'monochrome',
+    FILTER.TYPE.IMAGEDATA,
+    function(imageData, params) {
+        const rgba = imageData.data;
+        for(let i = 0; i < imageData.width * imageData.height; i++) {
+            const pos = i << 2;
+            if (rgba[pos] > 0 || rgba[pos+1] > 0 || rgba[pos+2] > 0) {
+                rgba[pos] = params.color.r;
+                rgba[pos+1] = params.color.g;
+                rgba[pos+2] = params.color.b;
+            }
+        }
+        return imageData;
+    },
+    [
+        {type: FILTER.PARAM.COLOR, key: 'color'}
+    ]
+);
+
+filterer.addFilter(
+    'transparent',
+    FILTER.TYPE.IMAGEDATA,
+    function(imageData, params) {
+        const rgba = imageData.data;
+        for(let i = 0; i < imageData.width * imageData.height; i++) {
+            const pos = (i << 2) + 3;
+            rgba[pos] = rgba[pos] * params.factor;
+        };
+        return imageData;
+    },
+    [
+        {key: 'factor', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 0.5}
+    ]
+);
+
+// @TODO: colorReplace-Filter
 
 // ####################################
 //    Sheets
@@ -2696,27 +3078,17 @@ class BoundsScrollHandler {
 
 class SpriteSheet {
 
-    constructor(data) {
-        this.sheet = new Image();
-        this.sheet.src = data;
+    constructor(imageRsrc) {
+        this.sheet = imageRsrc.getCanvas();
         this.sprites = {};
         this.animations = {};
         this.customImages = [];
-        this.transformer = {
-            'flip-x': 'TODO',
-            'flip-y': 'TODO'
-        };
+        this.players = {};
     }
 
     assertSprite(id) {
         if (!this.sprites[id]) {
             throw Error('No sprite with id "' + id + '" found in spritesheet!');
-        }
-    }
-
-    assertTransformer(id) {
-        if (!this.transformer[id]) {
-            throw Error('No transformer with id "' + id + '" found in spritesheet!');
         }
     }
 
@@ -2728,18 +3100,14 @@ class SpriteSheet {
 
     addTransformedSprite(id, base, transformers) {
         this.assertSprite(base);
-        const parts = transformers.split(':');
-        for (let part of parts) {
-            this.assertTransformer(part);
-        }
         this.customImages.push({
             id,
             base,
-            transformers: parts
+            transformers
         });
     }
 
-    addTransformedAnimation(id, base, transformers) {
+    addTransformedAnimation(id, base, transformers, synchronous = false) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -2751,28 +3119,27 @@ class SpriteSheet {
                 id: newId, duration: frame.duration, padding: {x: frame.padding.x, y: frame.padding.y}
             });
         }
-        this.animations[id] = {
+        const animation = {
+            synchronous,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
             dir: baseAnimation.dir,
             end: baseAnimation.end
         };
+        this.animations[id] = animation;
+        if (synchronous) {
+            const player = new BitmapPlayer();
+            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            this.players[id] = player;
+        }
     }
 
     build() {
         for (let image of this.customImages) {
             let base = this.getSprite(image.base);
-            const canvas = OCM.getNewOffscreenCanvas(base.dim.x, base.dim.y);
-            //
-            canvas.ctx.translate(base.dim.x, 0);
-            canvas.ctx.scale(-1, 1);
-            this.drawSprite(canvas.ctx, image.base,0, 0);
-
+            const trans = filterer.getCanvasWithFiltersApplied(image.transformers, this.sheet, base.off.x, base.off.y, base.dim.x, base.dim.y);
             const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
-
-            sprite.img = new Image();
-            sprite.img.src = canvas.elem.toDataURL('image/png');
-            OCM.discard(canvas);
+            sprite.img = trans[0];
         }
     }
 
@@ -2785,7 +3152,7 @@ class SpriteSheet {
         return sprite;
     }
 
-    addAnimation(name, frames, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -2808,11 +3175,13 @@ class SpriteSheet {
         }
 
         const animation = {
+            synchronous,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
             dir,
             end
         };
+
         if (!sameSize) {
             for (let i = 0; i < dims.length; i++) {
                 const frame = animation.frames[i];
@@ -2824,8 +3193,14 @@ class SpriteSheet {
                 frame.padding = {x: offX, y: offY};
             }
         }
+
         this.animations[name] = animation;
-        return animation;
+
+        if (synchronous) {
+            const player = new BitmapPlayer();
+            player.loadAnimation(animation.frames, end, dir);
+            this.players[name] = player;
+        }
     }
 
     isAnimation(name) {
@@ -2848,12 +3223,15 @@ class SpriteSheet {
         return this.sprites[name];
     }
 
-    getAnimation(name, speed = 1) {
-        if (!this.animations[name]) {
-            throw Error('No animations with id "' + name + '" found in spritesheet!');
+    loadAnimationToProxy(name, proxy) {
+        this.assertAnimation(name);
+        let animation = this.animations[name];
+        if (animation.synchronous) {
+            proxy.setPlayer(this.players[name]);
+        } else {
+            // creates a new player by lazy loading in the proxy
+            proxy.loadAnimation(animation.frames, animation.end, animation.dir);
         }
-        const animation = this.animations[name];
-        return new Animation(animation.frames, speed, animation.dir, animation.end);
     }
 
     drawSprite(ctx, name, posX, posY, paddX = 0, paddY = 0) {
@@ -2861,9 +3239,33 @@ class SpriteSheet {
         const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
         ctx.drawImage(
             sprite.img === undefined ?
-                this.sheet : sprite.img,
+                this.sheet.elem : sprite.img.elem,
             sprite.off.x, sprite.off.y,
             sprite.dim.x, sprite.dim.y,
+            draw.x,
+            draw.y,
+            draw.width,
+            draw.height
+        );
+        return draw;
+    }
+
+    drawFilteredSprite(ctx, name, filters, posX, posY, paddX = 0, paddY = 0) {
+        if (filters === '') {
+            return this.drawSprite(ctx, name, posX, posY, paddX, paddY);
+        }
+        const sprite = this.getSprite(name);
+        const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
+        const transformed = filterer.getCanvasWithFiltersApplied(
+            filters,
+            sprite.img === undefined ? this.sheet : sprite.img,
+            sprite.off.x, sprite.off.y,
+            draw.width, draw.height
+        );
+        ctx.drawImage(
+            transformed[0].elem,
+            transformed[1], transformed[2],
+            transformed[3], transformed[4],
             draw.x,
             draw.y,
             draw.width,
@@ -2880,7 +3282,7 @@ class SpriteSheet {
             return;
         }
         ctx.drawImage(
-            sprite.img === undefined ? this.sheet : sprite.img,
+            sprite.img === undefined ? this.sheet.elem : sprite.img.elem,
             sprite.off.x + offX, sprite.off.y + offY,
             width, height,
             posX, posY,
@@ -2992,9 +3394,8 @@ class TilesMap {
 
 class FontMap {
 
-    constructor(data, width, height) {
-        this.image = new Image();
-        this.image.src = data;
+    constructor(imageRsrc, width, height) {
+        this.image = imageRsrc.getCanvasElem();
         this.width = width;
         this.height = height;
         this.map = [];
@@ -3024,7 +3425,7 @@ class FontMap {
 
 
 /**
- *  Animation-Modes
+ *  BitmapPlayer-Modes
  * ----------------------------
  *
  *   DIR: forward, backwards, forward-backward, backward-forward
@@ -3047,6 +3448,7 @@ const ANIMATION = {
         DELETE: 2
     },
     STATE: {
+        EMPTY: -1,
         WAITING: 0,
         RUNNING: 1,
         DONE: 2,
@@ -3055,18 +3457,90 @@ const ANIMATION = {
     }
 };
 
-class Animation {
+class PlayerProxy {
 
-    constructor(frames, speed = 1, dir = ANIMATION.DIR.FORWARD, end = ANIMATION.END.STOP) {
+    constructor() {
+        this.players = [
+            null, // non-synchronous player
+            null  // synchronous player
+        ];
+        this.active = 0;
+    }
+
+    setPlayer(player) {
+        this.active = 1;
+        this.players[1] = player;
+    }
+
+    isSynchronous() {
+        return this.active === 1;
+    }
+
+    loadAnimation(frames, end, dir) {
+        this.active = 0;
+        if (this.players[0] === null) {
+            this.players[0] = new BitmapPlayer();
+        }
+        this.players[0].loadAnimation(frames, end, dir);
+        this.players[1] = null;
+    }
+
+    getFrame() {
+        return this.players[this.active].getFrame();
+    }
+
+    setSpeed(speed) {
+        this.players[this.active].setSpeed(speed);
+    }
+
+    getState() {
+        return this.players[this.active].getState();
+    }
+
+    nextStep() {
+        this.players[this.active].nextStep();
+    }
+
+    isDirty() {
+        return this.players[this.active].isDirty();
+    }
+
+    pause() {
+        this.players[this.active].pause();
+    }
+
+    continue() {
+        this.players[this.active].continue();
+    }
+
+    reverse() {
+        this.players[this.active].reverse();
+    }
+}
+
+class BitmapPlayer {
+
+    constructor() {
+        this.speed = 1;
+        this.state = ANIMATION.STATE.EMPTY;
+        this.frameNo = null;
+        this.pauseState = null;
+        this.dirty = false;
+    }
+
+    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
         this.frames = frames;
-        this.frameNo = 0;
         this.direction = dir;
         this.end = end;
-        this.speed = speed;
         this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
-        this.time = 0;
+        this.step = 0;
         this.frameNo = this.isForward ? 0 : frames.length - 1;
         this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
+    }
+
+    setSpeed(speed) {
+        this.speed = speed;
     }
 
     getState() {
@@ -3075,8 +3549,8 @@ class Animation {
 
     handleForward() {
         let frame = this.getFrame();
-        while (this.time >= frame.duration) {
-            this.time -= frame.duration;
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
             this.frameNo++;
             if (this.frameNo === this.frames.length) {
                 this.frameNo--;
@@ -3105,8 +3579,8 @@ class Animation {
 
     handleBackward() {
         let frame = this.getFrame();
-        while (this.time >= frame.duration) {
-            this.time -= frame.duration;
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
             this.frameNo--;
             if (this.frameNo < 0) {
                 this.frameNo = 0;
@@ -3133,12 +3607,14 @@ class Animation {
         }
     }
 
-    nextFrame() {
+    nextStep() {
         if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
+            this.dirty = false;
             return;
         }
+        const oldFrameNo = this.frameNo;
         this.state = ANIMATION.STATE.RUNNING;
-        this.time += this.speed;
+        this.step += this.speed;
         if (this.isForward) {
             this.handleForward();
             if (!this.isForward) {
@@ -3150,6 +3626,7 @@ class Animation {
                 this.handleForward();
             }
         }
+        this.dirty = (oldFrameNo !== this.frameNo);
     }
 
     getFrame() {
@@ -3160,7 +3637,15 @@ class Animation {
     }
 
     pause() {
+        this.pauseState = this.state;
         this.state = ANIMATION.STATE.PAUSED;
+        this.dirty = false;
+    }
+
+    continue() {
+        if (this.state === ANIMATION.STATE.PAUSED) {
+            this.state = this.pauseState;
+        }
     }
 
     reverse() {
@@ -3177,8 +3662,17 @@ class Animation {
         }
         this.isForward = !this.isForward;
     }
+
+    isDirty() {
+        return this.dirty;
+    }
 }
 
+/**
+ * TODO:
+ *   - MasterStates
+ *   - CloneStates
+ */
 class States {
 
     constructor(states) {
@@ -3247,6 +3741,35 @@ class States {
     }
 }
 
+class ImageResource {
+
+    constructor(data) {
+        this.image = new Image();
+        this.image.src = data;
+        this.canvas = null;
+    }
+
+    getCanvas() {
+        if (this.canvas === null) {
+            this.canvas = OCM.getNewOffscreenCanvas(this.image.width, this.image.height);
+            this.canvas.ctx.drawImage(this.image, 0, 0);
+        }
+        return this.canvas;
+    }
+
+    getCanvasElem() {
+        return this.getCanvas().elem;
+    }
+
+    getNewDecodePromise() {
+        return this.image.decode();
+    }
+
+    getImage() {
+        return this.image;
+    }
+}
+
 function d() {
     if (arguments.length === 0) {
         return;
@@ -3258,8 +3781,6 @@ function d() {
     }
     debugs[key] = values.join(' ');
 }
-
-
 
 const OCM = new CanvasManager();
 // let debugElem = null;
@@ -3284,7 +3805,7 @@ module.exports = {
     LinearGradientPane,
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
-    Animation,
+    Animation: BitmapPlayer,
     d,
     FontMap,
     SpriteSheet,

@@ -23,12 +23,12 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return null in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return null in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), null);
             });
 
-            it('should return DESTROYED as state after first nextFrame()', function() {
+            it('should return DESTROYED as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.DESTROYED);
             });
 
@@ -50,12 +50,12 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 1, duration: 1});
             });
 
-            it('should return DONE as state after first nextFrame()', function() {
+            it('should return DONE as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.DONE);
             });
         });
@@ -75,12 +75,12 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 1, duration: 1});
             });
 
-            it('should return RUNNING as state after first nextFrame()', function() {
+            it('should return RUNNING as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.RUNNING);
             });
         });
@@ -101,23 +101,23 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return second frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return second frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 2, duration: 1});
             });
 
-            it('should return RUNNING as state after first nextFrame()', function() {
+            it('should return RUNNING as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return second frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return second frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 2, duration: 1});
             });
 
-            it('should return DONE as state after second nextFrame()', function() {
+            it('should return DONE as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.DONE);
             });
         });
@@ -133,13 +133,13 @@ describe('Engine', function() {
             }
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return null in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return null in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), null);
             });
 
-            it('should return DESTROYED as state after second nextFrame()', function() {
+            it('should return DESTROYED as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.DESTROYED);
             });
 
@@ -156,13 +156,13 @@ describe('Engine', function() {
             }
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return first frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return first frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 1, duration: 1});
             });
 
-            it('should return RUNNING as state after second nextFrame()', function() {
+            it('should return RUNNING as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.RUNNING);
             });
         });
@@ -186,21 +186,21 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return first frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return first frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 1, duration: 1});
             });
-            it('should return RUNNING as state after first nextFrame()', function() {
+            it('should return RUNNING as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return second frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return second frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 2, duration: 1});
             });
-            it('should return RUNNING as state after second nextFrame()', function() {
+            it('should return RUNNING as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
@@ -217,12 +217,12 @@ describe('Engine', function() {
             }
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return first frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return first frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 1, duration: 1});
             });
-            it('should return DONE as state after second nextFrame()', function() {
+            it('should return DONE as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.DONE);
             });
 
@@ -239,12 +239,12 @@ describe('Engine', function() {
             }
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return null in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return null in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), null);
             });
-            it('should return DESTROYED as state after second nextFrame()', function() {
+            it('should return DESTROYED as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.DESTROYED);
             });
 
@@ -266,32 +266,32 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return second frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return second frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 2, duration: 1});
             });
-            it('should return RUNNING as state after first nextFrame()', function() {
+            it('should return RUNNING as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return first frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return first frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 1, duration: 1});
             });
-            it('should return RUNNING as state after second nextFrame()', function() {
+            it('should return RUNNING as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.DONE);
             });
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return first frame in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return first frame in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), {id: 1, duration: 1});
             });
-            it('should return DONE as state after third nextFrame()', function() {
+            it('should return DONE as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.DONE);
             });
 
@@ -308,13 +308,13 @@ describe('Engine', function() {
             }
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return null in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return null in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), null);
             });
-            it('should return DESTROYED as state after third nextFrame()', function() {
+            it('should return DESTROYED as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.DESTROYED);
             });
 
@@ -331,13 +331,13 @@ describe('Engine', function() {
             }
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return second frame in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return second frame in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), {id: 2, duration: 1});
             });
-            it('should return DONE as state after third nextFrame()', function() {
+            it('should return DONE as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
@@ -359,34 +359,34 @@ describe('Engine', function() {
             });
 
             let ani2 = getAnimation();
-            ani2.nextFrame();
-            it('should return first frame in getFrame() after first nextFrame()', function() {
+            ani2.nextStep();
+            it('should return first frame in getFrame() after first nextStep()', function() {
                 assert.deepEqual(ani2.getFrame(), {id: 1, duration: 1});
             });
-            it('should return RUNNING as state after first nextFrame()', function() {
+            it('should return RUNNING as state after first nextStep()', function() {
                 assert.equal(ani2.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
 
             let ani3 = getAnimation();
-            ani3.nextFrame();
-            ani3.nextFrame();
-            it('should return second frame in getFrame() after second nextFrame()', function() {
+            ani3.nextStep();
+            ani3.nextStep();
+            it('should return second frame in getFrame() after second nextStep()', function() {
                 assert.deepEqual(ani3.getFrame(), {id: 2, duration: 1});
             });
-            it('should return RUNNING as state after second nextFrame()', function() {
+            it('should return RUNNING as state after second nextStep()', function() {
                 assert.equal(ani3.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return null in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return null in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), null);
             });
-            it('should return DESTROYED as state after third nextFrame()', function() {
+            it('should return DESTROYED as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.DESTROYED);
             });
 
@@ -403,13 +403,13 @@ describe('Engine', function() {
             }
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return null in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return null in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), {id: 2, duration: 1});
             });
-            it('should return DONE as state after third nextFrame()', function() {
+            it('should return DONE as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.DONE);
             });
         });
@@ -425,13 +425,13 @@ describe('Engine', function() {
             }
 
             let ani4 = getAnimation();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            ani4.nextFrame();
-            it('should return first frame in getFrame() after third nextFrame()', function() {
+            ani4.nextStep();
+            ani4.nextStep();
+            ani4.nextStep();
+            it('should return first frame in getFrame() after third nextStep()', function() {
                 assert.deepEqual(ani4.getFrame(), {id: 1, duration: 1});
             });
-            it('should return RUNNING as state after third nextFrame()', function() {
+            it('should return RUNNING as state after third nextStep()', function() {
                 assert.equal(ani4.getState(), engine.ANIMATION.STATE.RUNNING);
             });
 
