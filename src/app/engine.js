@@ -1656,6 +1656,7 @@ class BufferedTilesPane {
         this.mapTilePos.y = mapTilePosY;
         this.scrollPos.x = 0;
         this.scrollPos.y = 0;
+        this.dirty = true;
     }
 
     renderAll(target) {
@@ -2758,13 +2759,36 @@ class BoundsScrollHandler {
     constructor(spritePane, scroller, boundsSize) {
         this.spritePane = spritePane;
         this.scroller = scroller;
-        this.boundsSize = boundsSize;
+        const bounds = {
+            left: null,
+            right: null,
+            top: null,
+            bottom: null
+        };
+        if (boundsSize.x !== undefined) {
+            bounds.left = boundsSize.x;
+            bounds.right = boundsSize.x;
+        }
+        if (boundsSize.y !== undefined) {
+            bounds.top = boundsSize.y;
+            bounds.bottom = boundsSize.y;
+        }
+        if (boundsSize.left !== undefined) {
+            bounds.left = boundsSize.left;
+        }
+        if (boundsSize.right !== undefined) {
+            bounds.right = boundsSize.right;
+        }
+        if (boundsSize.top !== undefined) {
+            bounds.top = boundsSize.top;
+        }
+        if (boundsSize.bottom !== undefined) {
+            bounds.bottom = boundsSize.bottom;
+        }
+        this.bounds = bounds;
     }
 
     moveActor(moveX = 0, moveY = 0) {
-        const scrollBoundsTop = {x: this.boundsSize.x, y: this.boundsSize.y};
-        const scrollBoundsBottom = {x: this.boundsSize.x, y: this.boundsSize.y};
-
         const actor = this.spritePane.getActorId();
         if (actor === null) {
             return;
@@ -2775,19 +2799,27 @@ class BoundsScrollHandler {
         let scrollX = 0;
         if (moveX !== 0) {
             let pos = sprite.x + moveX;
-            if (pos < scrollBoundsTop.x) {
+            if (this.bounds.left === null) {
+                if (pos < 0) {
+                    pos = 0;
+                }
+            } else if (pos < this.bounds.left) {
                 // new position is left of scrollbounds
-                if (sprite.x >= scrollBoundsTop.x) {
-                    scrollX = -Math.abs(scrollBoundsTop.x - pos);
-                    pos = scrollBoundsTop.x;
+                if (sprite.x >= this.bounds.left) {
+                    scrollX = -Math.abs(this.bounds.left - pos);
+                    pos = this.bounds.left;
                 } else if (pos < 0) {
                     pos = 0;
                 }
             }
 
             let max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x;
-            let rightScrollBound = max - scrollBoundsBottom.x;
-            if (pos > rightScrollBound) {
+            let rightScrollBound = (this.bounds.right === null) ? null : max - this.bounds.right;
+            if (rightScrollBound === null) {
+                if (pos > max) {
+                    pos = max;
+                }
+            } else if (pos > rightScrollBound) {
                 if (sprite.x <= rightScrollBound) {
                     scrollX = Math.abs(pos - rightScrollBound);
                     pos = rightScrollBound;
@@ -2802,18 +2834,25 @@ class BoundsScrollHandler {
         let scrollY = 0;
         if (moveY !== 0) {
             let pos = sprite.y + moveY;
-            if (pos < scrollBoundsTop.y) {
-
-                if (sprite.y >= scrollBoundsTop.y) {
-                    scrollY = -Math.abs(scrollBoundsTop.y - pos);
-                    pos = scrollBoundsTop.y;
+            if (this.bounds.top === null) {
+                if (pos < 0) {
+                    pos = 0;
+                }
+            } else if (pos < this.bounds.top) {
+                if (sprite.y >= this.bounds.top) {
+                    scrollY = -Math.abs(this.bounds.top - pos);
+                    pos = this.bounds.top;
                 } else if (pos < 0) {
                     pos = 0;
                 }
             }
             let max = this.spritePane.viewPortDim.y - 1 - sprite.dim.y;
-            let bottomScrollBound = max - scrollBoundsBottom.y;
-            if (pos > bottomScrollBound) {
+            let bottomScrollBound = (this.bounds.bottom === null) ? null : max - this.bounds.bottom;
+            if (bottomScrollBound === null) {
+                if (pos > max) {
+                    pos = max;
+                }
+            } else if (pos > bottomScrollBound) {
                 if (sprite.y <= bottomScrollBound) {
                     scrollY = Math.abs(pos - bottomScrollBound);
                     pos = bottomScrollBound;
@@ -3293,11 +3332,21 @@ class SpriteSheet {
 
 class TilesMap {
 
-    constructor(tileBits, tiles, map) {
-        this.tiles = tiles;
-        this.map = map;
+    constructor(tileBits, imageResource, map) {
         this.tileBits = tileBits;
         this.tileSize = 1 << tileBits;
+
+        const srcCanvas = imageResource.getCanvas();
+        const tilesPerLine = Math.floor(srcCanvas.elem.width / this.tileSize);
+        const lines = Math.floor(srcCanvas.elem.height / this.tileSize);
+        const tgtCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * this.tileSize, this.tileSize);
+        for (let i = 0; i < lines; i++) {
+            const width = tilesPerLine * this.tileSize;
+            tgtCanvas.ctx.drawImage(srcCanvas.elem, 0, i*this.tileSize, width, this.tileSize, i*width, 0, width, this.tileSize);
+        }
+        this.tiles = tgtCanvas;
+
+        this.map = map;
         if (this.map.length === 0 || this.map[0].length === 0) {
             throw Error('Map cannot be empty!');
         }
@@ -3377,7 +3426,7 @@ class TilesMap {
                     continue;
                 }
                 target.drawImage(
-                    this.tiles,
+                    this.tiles.elem,
                     tile << this.tileBits,
                     0,
                     this.tileSize,
