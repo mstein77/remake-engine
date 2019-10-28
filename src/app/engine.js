@@ -111,7 +111,7 @@ class Game {
     }
 
     render(force = false) {
-        if (this.currentScreen !== null) {
+        if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
             this.screens[this.currentScreen].render(force);
         }
     }
@@ -146,24 +146,10 @@ class Game {
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
-
-        screen.setDimension(this.width, this.height);
-        screen.render(true);
-        if (this.sound && screen.audio !== null) {
-            const audio = new Audio(screen.audio);
-            audio.addEventListener('canplaythrough', event => {
-                this.playAudio(audio);
-            });
-            audio.addEventListener('ended', event => {
-                for (let i = 0; i < this.audioPlaying.length; i++) {
-                    if (this.audioPlaying[i] === audio) {
-                        this.audioPlaying.splice(i, 1);
-                        break;
-                    }
-                }
-            });
-        }
+        const callback = screen.init();
+        this.build = callback.bind(this);
     }
+
 
     stopAllAudio() {
         for (let audio of this.audioPlaying) {
@@ -255,26 +241,52 @@ class Game {
     }
 
     updateFrame() {
-        this.updateDom();
-        if (this.debug) {
-            this.printDebugs();
-        }
-        this.handleKeys();
-        if (this.running) {
-            this.startTimer('render');
-            this.render();
-            this.addTimerDuration('render');
-            this.frames++;
-            const screen = this.screens[this.currentScreen];
-            if (screen.frameHandler !== null) {
-                screen.frameHandler();
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() === 'READY') {
+            this.updateDom();
+            if (this.debug) {
+                this.printDebugs();
+            }
+            this.handleKeys();
+            if (this.running) {
+                this.startTimer('render');
+                this.render();
+                this.addTimerDuration('render');
+                this.frames++;
+                if (screen.frameHandler !== null) {
+                    screen.frameHandler();
+                }
             }
         }
         this.waitForNextFrame();
     }
 
     waitForNextFrame() {
-        this.lastAnimationFrame = requestAnimationFrame(this.updateFrame.bind(this));
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() !== 'READY') {
+            if (!screen.hasAllDependencies()) {
+                requestAnimationFrame(this.waitForNextFrame.bind(this));
+                return;
+            }
+            this.build(screen.resources);
+            screen.setDimension(this.width, this.height);
+            screen.render(true);
+            if (this.sound && screen.audio !== null) {
+                const audio = new Audio(screen.audio);
+                audio.addEventListener('canplaythrough', event => {
+                    this.playAudio(audio);
+                });
+                audio.addEventListener('ended', event => {
+                    for (let i = 0; i < this.audioPlaying.length; i++) {
+                        if (this.audioPlaying[i] === audio) {
+                            this.audioPlaying.splice(i, 1);
+                            break;
+                        }
+                    }
+                });
+            }
+        }
+        requestAnimationFrame(this.updateFrame.bind(this));
     }
 
     setRunning(value) {
@@ -618,9 +630,17 @@ class Screen {
         this.id = id;
         this.areas = [];
         this.keyHandler = null;
+        this.initHandler = null;
+        this.resources = {};
         this.frameHandler = null;
         this.tree = null;
         this.audio = null;
+        this.dependencies = 0;
+        this.state = 'NEW';
+    }
+
+    getState() {
+        return this.state;
     }
 
     addArea(area) {
@@ -666,6 +686,22 @@ class Screen {
         buildNodeDom(this.tree, Game.instance.getDomElem('overlay'));
     }
 
+    hasAllDependencies() {
+        const hasAll = (this.dependencies === 0);
+        if (this.state === 'INIT' && hasAll) {
+            this.state = 'READY';
+        }
+        return hasAll;
+    }
+
+    init() {
+        if (this.initHandler !== null) {
+            this.state = 'INIT';
+            return this.initHandler();
+        }
+        this.state = 'READY';
+    }
+
     render(force = false) {
         function renderPanes(tree) {
             for (let child of tree.children) {
@@ -678,7 +714,6 @@ class Screen {
                 renderPanes(child);
             }
         }
-
         renderPanes(this.tree);
     }
 
@@ -688,6 +723,34 @@ class Screen {
 
     setFrameHandler(handler) {
         this.frameHandler = handler.bind(Game.instance);
+    }
+
+    addImageResource(id, data) {
+        if (Array.isArray(data)) {
+            const resources = [];
+            for (let item of data) {
+                this.dependencies++;
+                const resource = new ImageResource(item);
+                resources.push(resource);
+                resource.getNewDecodePromise().then(() => {this.dependencies--});
+            }
+            this.resources[id] = resources;
+        } else {
+            this.dependencies++;
+            const resource = new ImageResource(data);
+            this.resources[id] = resource;
+            resource.getNewDecodePromise().then(() => {this.dependencies--});
+        }
+    }
+
+    addImageResources(dataObj) {
+        for (let id in dataObj) {
+            this.addImageResource(id, dataObj[id]);
+        }
+    }
+
+    setInitHandler(handler) {
+        this.initHandler = handler.bind(this);
     }
 
     addAudio(src) {
@@ -2314,7 +2377,7 @@ class PatternPane2 {
 class PatternPane {
 
     constructor(pattern, repeat) {
-        this.pattern = pattern;
+        this.pattern = pattern.getImage();
         this.repeat = repeat;
         this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(repeat) !== -1);
         this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(repeat) !== -1);
@@ -3015,9 +3078,8 @@ filterer.addFilter(
 
 class SpriteSheet {
 
-    constructor(data) {
-        this.sheet = new ImageResource(data);
-        this.sheet = this.sheet.getCanvas();
+    constructor(imageRsrc) {
+        this.sheet = imageRsrc.getCanvas();
         this.sprites = {};
         this.animations = {};
         this.customImages = [];
@@ -3332,9 +3394,8 @@ class TilesMap {
 
 class FontMap {
 
-    constructor(data, width, height) {
-        this.image = new ImageResource(data);
-        this.image = this.image.getCanvasElem();
+    constructor(imageRsrc, width, height) {
+        this.image = imageRsrc.getCanvasElem();
         this.width = width;
         this.height = height;
         this.map = [];
@@ -3698,6 +3759,10 @@ class ImageResource {
 
     getCanvasElem() {
         return this.getCanvas().elem;
+    }
+
+    getNewDecodePromise() {
+        return this.image.decode();
     }
 
     getImage() {
