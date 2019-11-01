@@ -1082,6 +1082,7 @@ class ColorPane {
  *   - Monochrome + Color
  *   - CaseInsensitive
  *   - Scrolling (Buffering?)
+ *   - Proper Dirty-Handling (update)
  */
 class TextPane {
 
@@ -1135,6 +1136,14 @@ class TextPane {
         this.dirty = true;
     }
 
+    updateTextBlock(id, text) {
+        const block = this.blocks[id];
+        block.text = text;
+        block.canvas = OCM.getNewOffscreenCanvas(block.width, block.height);
+        this.drawTextBlockToCtx(block.canvas.ctx, block);
+        this.dirty = true;
+    }
+
     render() {
         const ctx = this.container.getCanvasCtx();
         ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
@@ -1148,6 +1157,14 @@ class TextPane {
             }
         }
         this.dirty = false;
+    }
+
+    static padStart(value, char, len) {
+        value = '' + value;
+        while (value.length < len) {
+            value = char + value;
+        }
+        return value;
     }
 }
 
@@ -1547,13 +1564,12 @@ class TilesPane {
  * TODO:
  *   - Filters
  *   - Events
- *   - Animated Tiles
  */
 class BufferedTilesPane {
 
     constructor(tilesMap, config) {
         this.tilesMap = tilesMap;
-
+        this.defaultTile = null;
         this.state = -1;
         // mandatory
         this.maxSpeed = config.maxSpeed;
@@ -1651,11 +1667,102 @@ class BufferedTilesPane {
         return this.buffers;
     }
 
+    hasBufferSwitchInNextFrame() {
+        return (this.state === -1 || this.state === this.maxState);
+    }
+
+    replaceTile(x, y, newTile) {
+        this.tilesMap.replaceTile(x, y, newTile);
+        this.renderTile(x, y, this.state === -1, this.hasBufferSwitchInNextFrame());
+    }
+
+    updateAnimatedTiles() {
+        const animTiles = this.tilesMap.getAnimatedTiles(this.mapTilePos.x, this.mapTilePos.y, this.canvasTiles.x, this.canvasTiles.y);
+        for (let tilePos of animTiles) {
+            this.renderTile(tilePos[0], tilePos[1], this.hasBufferSwitchInNextFrame());
+        }
+    }
+
+    getTilesInXLine(y, x1, x2) {
+        const origin = {
+            x: this.mapTilePos.x + this.canvasTileOffset.x,
+            y: this.mapTilePos.y + this.canvasTileOffset.y
+        };
+
+        const realStart = x1 + this.scrollPos.x;
+        const realEnd = x2 + this.scrollPos.x;
+        const relPos = {
+            x1: realStart >> this.tilesMap.tileBits,
+            x2: realEnd >> this.tilesMap.tileBits,
+            y: (y + this.scrollPos.y) >> this.tilesMap.tileBits
+        };
+        let touchStart = realStart % this.tilesMap.tileSize;
+        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
+        let touchEnd = realEnd % this.tilesMap.tileSize;
+        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+
+        const mapY = origin.y + relPos.y;
+        const start = origin.x + relPos.x1;
+        const end = origin.x + relPos.x2;
+        const lineTiles = this.tilesMap.getTilesAtXLine(mapY, start, end);
+        const result = [];
+        let i = 0;
+        for (let x = start; x <= end; x++) {
+            let touch = this.tilesMap.tileSize;
+            if (x === start) {
+                touch = touchStart;
+            } else if (x === end) {
+                touch = touchEnd;
+            }
+            result.push({x, y: mapY, touch, obj: lineTiles[i]});
+            i++;
+        }
+        return result;
+    }
+
+    getTilesInYLine(x, y1, y2) {
+        const origin = {
+            x: this.mapTilePos.x + this.canvasTileOffset.x,
+            y: this.mapTilePos.y + this.canvasTileOffset.y
+        };
+
+        const realStart = y1 + this.scrollPos.y;
+        const realEnd = y2 + this.scrollPos.y;
+        const relPos = {
+            x: (x + this.scrollPos.x) >> this.tilesMap.tileBits,
+            y1: realStart >> this.tilesMap.tileBits,
+            y2: realEnd >> this.tilesMap.tileBits
+        };
+        let touchStart = realStart % this.tilesMap.tileSize;
+        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
+        let touchEnd = realEnd % this.tilesMap.tileSize;
+        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+
+        const mapX = origin.x + relPos.x;
+        const start = origin.y + relPos.y1;
+        const end = origin.y + relPos.y2;
+        const lineTiles = this.tilesMap.getTilesAtYLine(mapX, start, end);
+        const result = [];
+        let i = 0;
+        for (let y = start; y <= end; y++) {
+            let touch = this.tilesMap.tileSize;
+            if (y === start) {
+                touch = touchStart;
+            } else if (y === end) {
+                touch = touchEnd;
+            }
+            result.push({x: mapX, y, touch, obj: lineTiles[i]});
+            i++;
+        }
+        return result;
+    }
+
     setMapTilePos(mapTilePosX, mapTilePosY) {
         this.mapTilePos.x = mapTilePosX;
         this.mapTilePos.y = mapTilePosY;
         this.scrollPos.x = 0;
         this.scrollPos.y = 0;
+        this.state = -1;
         this.dirty = true;
     }
 
@@ -1676,6 +1783,45 @@ class BufferedTilesPane {
                 endless: this.endless
             }
         );
+    }
+
+    renderTile(x, y, onlyInBuffer = false) {
+        const targets = [];
+        if (!onlyInBuffer) {
+            targets.push({
+                ctx: this.buffers.getActiveCtx(),
+                offX: this.canvasTileOffset.x + x - this.mapTilePos.x,
+                offY: this.canvasTileOffset.y + y - this.mapTilePos.y
+            });
+        };
+        if (this.state > 0) {
+            targets.push(
+                {
+                    ctx: this.buffers.getBufferCtx(),
+                    offX: this.bufferTileOffset.x + x  - this.mapTilePos.x,
+                    offY: this.bufferTileOffset.y + y - this.mapTilePos.y
+                }
+            );
+        }
+
+        for(let target of targets) {
+            this.tilesMap.render(
+                target.ctx,
+                {
+                    x: target.offX * this.tilesMap.tileSize,
+                    y: target.offY * this.tilesMap.tileSize
+                },
+                {
+                    width: 1,
+                    height: 1,
+                    pos: {
+                        x,
+                        y
+                    },
+                    endless: this.endless
+                }
+            );
+        }
     }
 
     copyViewRows(source, target) {
@@ -2756,7 +2902,7 @@ class MasterSlavesScrollHandler {
 
 class BoundsScrollHandler {
 
-    constructor(spritePane, scroller, boundsSize) {
+    constructor(spritePane, scroller, boundsSize, maxOut = {}) {
         this.spritePane = spritePane;
         this.scroller = scroller;
         const bounds = {
@@ -2765,6 +2911,7 @@ class BoundsScrollHandler {
             top: null,
             bottom: null
         };
+        this.maxOut = Object.assign({top: 0, bottom: 0, left: 0, right: 0}, maxOut);
         if (boundsSize.x !== undefined) {
             bounds.left = boundsSize.x;
             bounds.right = boundsSize.x;
@@ -2788,6 +2935,10 @@ class BoundsScrollHandler {
         this.bounds = bounds;
     }
 
+    setMaxOut(maxOut) {
+        this.maxOut = Object.assign(this.maxOut, maxOut);
+    }
+
     moveActor(moveX = 0, moveY = 0) {
         const actor = this.spritePane.getActorId();
         if (actor === null) {
@@ -2799,22 +2950,23 @@ class BoundsScrollHandler {
         let scrollX = 0;
         if (moveX !== 0) {
             let pos = sprite.x + moveX;
+            const min = -this.maxOut.left;
             if (this.bounds.left === null) {
-                if (pos < 0) {
-                    pos = 0;
+                if (pos < min) {
+                    pos = min;
                 }
             } else if (pos < this.bounds.left) {
                 // new position is left of scrollbounds
                 if (sprite.x >= this.bounds.left) {
                     scrollX = -Math.abs(this.bounds.left - pos);
                     pos = this.bounds.left;
-                } else if (pos < 0) {
-                    pos = 0;
+                } else if (pos < min) {
+                    pos = min;
                 }
             }
 
-            let max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x;
-            let rightScrollBound = (this.bounds.right === null) ? null : max - this.bounds.right;
+            const max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x + this.maxOut.right;
+            const rightScrollBound = (this.bounds.right === null) ? null : max - this.bounds.right;
             if (rightScrollBound === null) {
                 if (pos > max) {
                     pos = max;
@@ -2834,20 +2986,21 @@ class BoundsScrollHandler {
         let scrollY = 0;
         if (moveY !== 0) {
             let pos = sprite.y + moveY;
+            const min = -this.maxOut.top;
             if (this.bounds.top === null) {
-                if (pos < 0) {
-                    pos = 0;
+                if (pos < min) {
+                    pos = min;
                 }
             } else if (pos < this.bounds.top) {
                 if (sprite.y >= this.bounds.top) {
                     scrollY = -Math.abs(this.bounds.top - pos);
                     pos = this.bounds.top;
-                } else if (pos < 0) {
-                    pos = 0;
+                } else if (pos < min) {
+                    pos = min;
                 }
             }
-            let max = this.spritePane.viewPortDim.y - 1 - sprite.dim.y;
-            let bottomScrollBound = (this.bounds.bottom === null) ? null : max - this.bounds.bottom;
+            const max = this.spritePane.viewPortDim.y - 1 - sprite.dim.y + this.maxOut.bottom;
+            const bottomScrollBound = (this.bounds.bottom === null) ? null : max - this.bounds.bottom;
             if (bottomScrollBound === null) {
                 if (pos > max) {
                     pos = max;
@@ -3146,6 +3299,12 @@ class SpriteSheet {
         });
     }
 
+    addTransformedSprites(postfix, baseIds, transformers) {
+        for (let id of baseIds) {
+            this.addTransformedSprite(id + postfix, id, transformers);
+        }
+    }
+
     addTransformedAnimation(id, base, transformers, synchronous = false) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
@@ -3189,6 +3348,13 @@ class SpriteSheet {
         };
         this.sprites[name] = sprite;
         return sprite;
+    }
+
+    addSpriteSeq(name, offX, offY, width, height, length, spacing = 0) {
+        for (let i = 1; i <= length; i++) {
+            this.addSprite(name + i, offX, offY, width, height);
+            offX += width + spacing;
+        }
     }
 
     addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
@@ -3330,9 +3496,155 @@ class SpriteSheet {
     };
 }
 
+class SpriteAndTilesCollider {
+
+    static defaultCheck(tile) {
+        return (tile.obj === null || tile.obj.block);
+    }
+
+    constructor(spriteId, spritePane, tilesPane, collides) {
+        this.spriteId = spriteId;
+        this.spritePane = spritePane;
+        this.tilesPane = tilesPane;
+        this.collides = {};
+        for (let id in collides) {
+            this.addCollide(id, collides[id]);
+        }
+        this.spriteOffset = {x: 0, y: 0};
+        this.tileSize = tilesPane.tilesMap.tileSize;
+    }
+
+    addCollide(id, collide) {
+        const margin = {
+            dir: 0,
+            start: 0,
+            end: 0
+        };
+        if (collide.margin) {
+            Object.assign(margin, collide.margin);
+        };
+        if (collide.check === undefined) {
+            collide.check = SpriteAndTilesCollider.defaultCheck
+        }
+        collide.margin = margin;
+        this.collides[id] = collide;
+    }
+
+    setSpriteOffset(x, y) {
+        this.spriteOffset = {x, y};
+    }
+
+    getCollideLines() {
+        const pos = this.spritePane.getSpritePos(this.spriteId);
+        pos.x += this.spriteOffset.x;
+        pos.y += this.spriteOffset.y;
+
+        const lines = {};
+        for (let collideId in this.collides) {
+            const collide = this.collides[collideId];
+            let dist = collide.lookahead;
+            let first = 0;
+            let dir = 1;
+            let axis = 'x';
+            switch (collide.dir) {
+                case 'down':
+                    dir = -1;
+                    first = pos.dim.y;
+                case 'up':
+                    break;
+
+                case 'right':
+                    dir = -1;
+                    first = pos.dim.x;
+                case 'left':
+                    axis = 'y';
+                    break;
+            }
+            const oppAxis = axis === 'x' ? 'y' : 'x';
+            first += pos[oppAxis] + dir * collide.margin.dir;
+            const dStart = pos[axis] + collide.margin.start;
+            const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+
+            lines[collideId] = (axis === 'x' ?
+                [dStart, first, dEnd - dStart, 1] :
+                [first, dStart, 1, dEnd - dStart]
+            );
+        }
+        return lines;
+    }
+
+    getCollides(collideIds) {
+        const result = {};
+        const pos = this.spritePane.getSpritePos(this.spriteId);
+        pos.x += this.spriteOffset.x;
+        pos.y += this.spriteOffset.y;
+
+        for (let collideId of collideIds) {
+            const collide = this.collides[collideId];
+            let dist = collide.lookahead;
+            let first = 0;
+            let dir = 1;
+            let axis = 'x';
+            switch(collide.dir) {
+                case 'down':
+                    dir  = -1;
+                    first = pos.dim.y;
+                case 'up':
+                    break;
+
+                case 'right':
+                    dir = -1;
+                    first = pos.dim.x;
+                case 'left':
+                    axis = 'y';
+                    break;
+            }
+            const oppAxis = axis === 'x' ? 'y' : 'x';
+            first += pos[oppAxis] + dir * collide.margin.dir;
+            const dStart = pos[axis] + collide.margin.start;
+            const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+
+            let tiles = axis === 'x' ?
+                this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
+                this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+
+            for(let tile of tiles) {
+                if (collide.check(tile)) {
+                    dist = 0;
+
+                    break;
+                }
+            }
+            if (dist > 0) {
+                const remBlock = (this.tileSize - (first % this.tileSize)) - collide.lookahead;
+                if (remBlock < 0) {
+                    first -= dir * this.tileSize;
+                    tiles = axis === 'x' ?
+                        this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
+                        this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                    for (let tile of tiles) {
+                        if (collide.check(tile)) {
+                            dist = collide.lookahead + remBlock;
+                            break;
+                        }
+                    }
+                }
+            }
+            const obj = {
+                dist: dist
+            };
+            if (dist === 0 && collide.saveContacts) {
+                obj.tiles = tiles;
+            }
+            result[collideId] = obj;
+        }
+        return result;
+    }
+}
+
 class TilesMap {
 
-    constructor(tileBits, imageResource, map) {
+    constructor(tileBits, imageResource, tiles, map, defaultTile = null) {
         this.tileBits = tileBits;
         this.tileSize = 1 << tileBits;
 
@@ -3344,7 +3656,7 @@ class TilesMap {
             const width = tilesPerLine * this.tileSize;
             tgtCanvas.ctx.drawImage(srcCanvas.elem, 0, i*this.tileSize, width, this.tileSize, i*width, 0, width, this.tileSize);
         }
-        this.tiles = tgtCanvas;
+        this.tilesImg = tgtCanvas;
 
         this.map = map;
         if (this.map.length === 0 || this.map[0].length === 0) {
@@ -3354,6 +3666,96 @@ class TilesMap {
             x: this.map[0].length,
             y: this.map.length
         };
+        this.tiles = tiles;
+        this.animatedIndices = [];
+        this.players = {};
+        this.defaultTile = defaultTile;
+    }
+
+    getTileObj(x, y) {
+        if (this.map[y] === undefined || this.map[y][x] === undefined) {
+            return null;
+        }
+        const tile = this.map[y][x];
+        let obj = this.tiles[tile];
+        if (obj === undefined) {
+            if (this.defaultTile === null) {
+
+                throw new Error('Unknown tile "' + tile + '" given in map at position (' + x + ', ' + y + ')!');
+            }
+            obj = this.defaultTile;
+        }
+        obj.index = tile;
+        return obj;
+    }
+
+    replaceTile(x, y, newTile) {
+        if (this.map[y] === undefined || this.map[y][x] === undefined) {
+            return;
+        }
+        this.map[y][x] = newTile;
+    }
+
+    getTileAtPos(x, y) {
+        return this.getTileObj(x, y);
+    }
+
+    getTilesAtXLine(y, x1, x2) {
+        const tiles = [];
+        for (let x = x1; x <= x2; x++) {
+            tiles.push(this.getTileObj(x, y));
+        }
+        return tiles;
+    }
+
+    getTilesAtYLine(x, y1, y2) {
+        const tiles = [];
+        for (let y = y1; y <= y2; y++) {
+            tiles.push(this.getTileObj(x, y));
+        }
+        return tiles;
+    }
+
+    getTileIndex(x, y) {
+        const tile = this.getTileObj(x, y);
+        if (tile.animation === undefined) {
+            return tile.index;
+        }
+        if (tile.animation.synchronous === true) {
+            if (this.players[tile.index] === undefined) {
+                const player = new BitmapPlayer();
+                player.loadAnimation(tile.animation.frames, tile.animation.end, tile.animation.dir);
+                this.players[tile.index] = player;
+                this.animatedIndices.push(tile.index);
+            }
+            const frame = this.players[tile.index].getFrame();
+            return frame.id;
+        }
+        throw Error('NOT YET IMPLEMENTED');
+    }
+
+    updateFrames() {
+        for (let index in this.players) {
+            this.players[index].nextStep();
+        }
+    }
+
+    getAnimatedTiles(posX, posY, width, height) {
+        const result = [];
+        if (this.animatedIndices.length > 0) {
+            const x_min = Math.max(posX, 0);
+            const y_min = Math.max(posY, 0);
+            const x_max = Math.min(posX + width, this.map[0].length);
+            const y_max = Math.min(posY + height, this.map.length);
+            for (let y = y_min; y < y_max; y++) {
+                for (let x = x_min; x < x_max; x++) {
+                    if (this.animatedIndices.indexOf(this.map[y][x]) !== -1) {
+                        result.push([x, y]);
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     render(target, offset, dim = {}) {
@@ -3421,13 +3823,13 @@ class TilesMap {
                 if (x === null) {
                     continue;
                 }
-                const tile = this.map[y][x];
-                if (tile === 0) {
+                const index = this.getTileIndex(x, y);
+                if (index === 0) {
                     continue;
                 }
                 target.drawImage(
-                    this.tiles.elem,
-                    tile << this.tileBits,
+                    this.tilesImg.elem,
+                    index << this.tileBits,
                     0,
                     this.tileSize,
                     this.tileSize,
@@ -3732,6 +4134,7 @@ class States {
         this.transitions = [];
         this.currState = states[0];
         this.eventPrios = [];
+        this.possibleEvents = null;
         for (let state of states) {
             this.states[state] = {};
         }
@@ -3743,21 +4146,66 @@ class States {
         }
     }
 
-    getPossibleTransitions() {
-        const keys = Object.keys(this.states[this.currState]);
-        const events = [];
-        for (let event of this.eventPrios) {
-            if (keys.indexOf(event) !== -1) {
-                events.push(event);
+    getPossibleEvents() {
+        if (this.possibleEvents === null) {
+            const keys = Object.keys(this.states[this.currState]);
+            const events = [];
+            for (let event of this.eventPrios) {
+                if (keys.indexOf(event) !== -1) {
+                    events.push(event);
+                }
             }
+            this.possibleEvents = events;
         }
-        return events;
+        return this.possibleEvents;
     }
 
-    addTransition(from, event, to) {
+    hasPossibleEvent() {
+        const events = this.getPossibleEvents();
+        for(let event of arguments) {
+            if (events.indexOf(event) !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    addTransition(from, events, to) {
         this.assertExists(from);
         this.assertExists(to);
-        this.states[from][event] = to;
+        if (!Array.isArray(events)) {
+            events = [events];
+        }
+        for (let event of events) {
+            this.states[from][event] = to;
+        }
+    }
+
+    cloneStatesAndTransitions(postfix, states) {
+        for (let state of states) {
+            const newState = state + '_' + postfix;
+            this.states[newState] = {};
+            const transitions = this.states[state];
+            for (let event in transitions) {
+                const targetState = transitions[event];
+                if (states.indexOf(targetState) !== -1) {
+                    this.states[newState][event] = targetState + '_' + postfix;
+                }
+            }
+        }
+    }
+
+    replaceEventForStates(states, event, newEvent) {
+        if (!Array.isArray(states)) {
+            states = [states];
+        }
+        for (let state of states) {
+            const target = this.states[state][event];
+            if (target !== undefined) {
+                this.states[state][newEvent] = target;
+                delete this.states[state][event];
+            }
+        }
     }
 
     setEventPrios(events) {
@@ -3769,6 +4217,7 @@ class States {
         if (newState === undefined || newState === null) {
             return;
         }
+        this.possibleEvents = null;
         this.transitions.push({event, from: this.currState, to: newState});
         this.currState = newState;
     }
@@ -3786,6 +4235,7 @@ class States {
     setState(state) {
         this.assertExists(state);
         this.popTransitions();
+        this.possibleEvents = null;
         this.currState = state;
     }
 }
@@ -3854,6 +4304,7 @@ module.exports = {
     LinearGradientPane,
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
+    SpriteAndTilesCollider,
     Animation: BitmapPlayer,
     d,
     FontMap,

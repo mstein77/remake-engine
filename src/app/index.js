@@ -15,6 +15,7 @@ import {
     LinearGradientPane,
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
+    SpriteAndTilesCollider,
     d,
     SpriteSheet,
     TilesMap,
@@ -1024,7 +1025,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 let moveX = 0;
                 const speed = 1.5;
-                const allTransitions = beastStates.getPossibleTransitions();
+                const allTransitions = beastStates.getPossibleEvents();
                 const beastSprite = beastSpritePane.getSprite('beast');
 
                 // key vars
@@ -1519,20 +1520,49 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const gameArea = new SplitArea('Y', [24, 216]);
             const statusPane = new TextPane(font);
             statusPane.addTextBlock('status', 24, 8,
-                "MARIO         WORLD  TIME\n" +
-                "535400   *83   8-3    115"
+                "MARIO         WORLD  TIME"
             );
+            let score = 0;
+            let world = '1-1';
+            let coins = 0;
+            let time = 120;
+
+            statusPane.addTextBlock('score', 3 * 8, 16, TextPane.padStart(score, '0', 6));
+            statusPane.addTextBlock('coins', 12 * 8, 16, '*' + TextPane.padStart(coins, '0', 2));
+            statusPane.addTextBlock('world', 18 * 8, 16, '' + world);
+            statusPane.addTextBlock('time', 25 * 8, 16, '' + TextPane.padStart(time, '0', 3));
             gameArea.addPane(statusPane, 0);
             const bgTilesMap = new TilesMap(
                 TILE.DIM_16x16,
                 resource.tiles,
+                {
+                    2: {block: true, hitEvent: 'destroy'},
+                    27: {block: true},
+                    28: {block: true},
+                    24: {
+                        block: true,
+                        hitEvent: 'mushroom',
+                        animation: {
+                            frames: [
+                                {id: 25, duration: 30},
+                                {id: 24, duration: 30}
+                            ],
+                            end: ANIMATION.END.LOOP,
+                            synchronous: true
+                        }
+                    },
+                    264: {block: true},
+                    265: {block: true},
+                    297: {block: true},
+                    298: {block: true}
+                },
                 [
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 660, 661, 662, 0, 0, 0, 28, 28, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 693, 694, 695, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 28, 28, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 24, 2, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -1540,52 +1570,340 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, 0, 0, 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
-                ]
+                    [28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 0, 28, 28, 28, 28, 28, 28],
+                    [28, 28, 1, 1, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28]
+                ],
+                {
+                    block: false
+                }
             );
             const tilesPane = new BufferedTilesPane(bgTilesMap, {maxSpeed: 4});
             tilesPane.setMapTilePos(-1, -1);
             gameArea.addPane(tilesPane, 1);
+              const canvasPane = new CanvasPane();
+              gameArea.addPane(canvasPane, 1);
 
             vSplitArea.addArea(gameArea, 1);
             const spriteSheet = new SpriteSheet(resource.sprites);
             spriteSheet.addSprite('mario', 1, 1, 16, 32);
+            spriteSheet.addSprite('mario-jump', 86, 1, 16, 32);
+            spriteSheet.addSprite('mario-duck', 103, 1, 16, 32);
+            spriteSheet.addTransformedSprite('mario-rev', 'mario', 'flip-x');
+            spriteSheet.addTransformedSprites('-rev', ['mario', 'mario-jump', 'mario-duck'], 'flip-x');
+            spriteSheet.addSpriteSeq('mario-run', 18, 1, 16, 32, 3, 1);
+            spriteSheet.addAnimation('mario-run', ['mario-run1', 'mario-run2', 'mario-run3'], ANIMATION.END.LOOP);
+            spriteSheet.addTransformedAnimation('mario-run-rev', 'mario-run', 'flip-x');
+            spriteSheet.build();
+
             const spritePane = new SpritePane(spriteSheet);
-            spritePane.addSprite('mario', 'mario', 100, 170);
-            spritePane.setActorId('mario');
+            spritePane.addSprite('player', 'mario', 100, 40);
+            spritePane.setAnimationSpeed('player', 0.2);
+            spritePane.setActorId('player');
             vSplitArea.addPane(spritePane, 1);
 
-            const gameScrollBounds = new BoundsScrollHandler(spritePane, tilesPane, {right: 100});
+            const gameScrollBounds = new BoundsScrollHandler(spritePane, tilesPane, {right: 100}, {top: 33, bottom: 33});
 
-            marioScreen.setKeyHandler(function() {
+            const marioStates = new States(
+                ['stand', 'jump', 'fall', 'run', 'duck']
+            );
+            marioStates.addTransition('stand', 'move-up', 'jump');
+            marioStates.addTransition('stand', 'no-floor', 'fall');
+            marioStates.addTransition('stand', 'move-right', 'run');
+            marioStates.addTransition('stand', 'move-down', 'duck');
+            marioStates.addTransition('jump', ['hit-ceiling', 'not-move-up', 'end-of-jump'], 'fall');
+            marioStates.addTransition( 'fall', 'hit-bottom', 'stand');
+            marioStates.addTransition('run', 'no-floor', 'fall');
+            marioStates.addTransition('run', 'not-move-right', 'stand');
+            marioStates.addTransition('run', 'move-up', 'jump');
+            marioStates.addTransition('duck', 'no-floor', 'fall');
+            marioStates.addTransition('duck', 'not-move-down', 'stand');
+            marioStates.cloneStatesAndTransitions('rev', ['stand', 'jump', 'fall', 'run', 'duck']);
+            marioStates.replaceEventForStates('stand_rev', 'move-right', 'move-left');
+            marioStates.replaceEventForStates('run_rev', 'not-move-right', 'not-move-left');
+            marioStates.addTransition('stand', 'move-left', 'stand_rev');
+            marioStates.addTransition('stand_rev', 'move-right', 'stand');
+
+            marioStates.setEventPrios([
+                'hit-ceiling', 'end-of-jump', 'hit-bottom', 'no-floor', 'move-up', 'not-move-up', 'not-move-right',
+                'not-move-left', 'not-move-down', 'move-left', 'move-right', 'move-down']
+            );
+            marioStates.setState('stand');
+
+            const collideCheck = function(tile) {
+                return (tile.obj !== null && tile.obj.block);
+            };
+            const marioCollider = new SpriteAndTilesCollider('player', spritePane, tilesPane, {
+                ceiling: {
+                    dir: 'up',
+                    lookahead: 4,
+                    saveContacts: true,
+                    check: collideCheck,
+                    margin: {
+                        start: 1,
+                        end: 1
+                    }
+                },
+                floor: {
+                    dir: 'down',
+                    lookahead: 4,
+                    saveContacts: true,
+                    check: collideCheck,
+                    margin: {
+                        start: 1,
+                        end: 1
+                    }
+                },
+                left: {
+                    dir: 'left',
+                    check: collideCheck,
+                    lookahead: 4,
+                    margin: {
+                        dir: -1,
+                        start: 2,
+                        end: 2
+                    }
+                },
+                right: {
+                    dir: 'right',
+                    check: collideCheck,
+                    lookahead: 4,
+                    margin: {
+                        dir: -1,
+                        start: 2,
+                        end: 2
+                    }
+                }
+            });
+            marioCollider.setSpriteOffset(0, -24);
+
+            const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
+            let jumpIndex = null;
+
+            let frameCount = 0;
+            marioScreen.setFrameHandler(function () {
+                if (time > 0) {
+                    frameCount++;
+                    if (frameCount % 60 === 0) {
+                        time--;
+                        statusPane.updateTextBlock('time', TextPane.padStart(time, '0', 3));
+                    }
+                }
+                spritePane.updateFrames();
+                bgTilesMap.updateFrames();
+
+                /* calc required tile collisions
+                const collideIds = [];
+                //if (marioStates.hasPossibleEvent('no-floor', 'hit-bottom')) {
+                    collideIds.push('floor');
+                //}
+                if (marioStates.hasPossibleEvent('move-right', 'not-move-right')) {
+                    collideIds.push('right');
+                }
+                if (marioStates.hasPossibleEvent('hit-ceiling')) {
+                    collideIds.push('ceiling');
+                }
+                 */
+                const collides = marioCollider.getCollides(['floor', 'left', 'right', 'ceiling']);
+
+                // get keyboard actions
+                let dirX = 0;
+                if (this.keysDown['a']) {
+                    dirX--;
+                }
+                if (this.keysDown['d']) {
+                    dirX++;
+                }
+                let dirY = 0;
+                if (this.keysDown['w']) {
+                    dirY--;
+                }
+                if (this.keysDown['s']) {
+                    dirY++;
+                }
+
+                // TODO remove...just for debugging
+                if (this.keysDown['q']) {
+                    const lines = marioCollider.getCollideLines();
+                    console.log('COLLIDE LINES', lines, collides);
+                    const ctx = canvasPane.getCtx();
+                    ctx.clearRect(0, 0, canvasPane.paneDim.x, canvasPane.paneDim.y);
+                    ctx.fillStyle = 'red';
+                    for (let id in lines) {
+                        const line = lines[id];
+                        ctx.fillRect(line[0], line[1], line[2], line[3]);
+                    }
+                }
+
+                // find event matching current state
+                let currEvent = null;
+                const events = marioStates.getPossibleEvents();
+                for (let event of events) {
+                    switch (event) {
+
+                        case 'no-floor':
+                            if (collides.floor.dist <= 0) continue;
+                            break;
+
+                        case 'move-up':
+                            if (dirY !== -1) continue;
+                            break;
+
+                        case 'move-down':
+                            if (dirY !== 1) continue;
+                            break;
+
+                        case 'not-move-down':
+                            if (dirY === 1) continue;
+                            break;
+
+                        case 'not-move-up':
+                            if (dirY === -1) continue;
+                            break;
+
+                        case 'move-right':
+                            if (dirX !== 1 || collides.right.dist <= 0) continue;
+                            break;
+
+                        case 'move-left':
+                            if (dirX !== -1 || collides.left.dist <= 0) continue;
+                            break;
+
+                        case 'not-move-right':
+                            if (dirX === 1 && collides.right.dist > 0) continue;
+                            break;
+
+                        case 'not-move-left':
+                            if (dirX === -1 && collides.left.dist > 0) continue;
+                            break;
+
+                        case 'hit-ceiling':
+                            if (collides.ceiling.dist > 0) continue;
+                            let i = 1;
+                            for (let tile of collides.ceiling.tiles) {
+                                if (tile.touch > 7 && tile.obj.hitEvent !== undefined) {
+                                    console.log(tile.obj.hitEvent, 'HIT BOTTOM ' + tile.touch + ' / ', i + ' of ' + collides.ceiling.tiles.length, tile);
+                                    switch (tile.obj.hitEvent) {
+                                        case 'destroy':
+                                            tilesPane.replaceTile(tile.x, tile.y, 0);
+                                            break;
+                                        case 'mushroom':
+                                            tilesPane.replaceTile(tile.x, tile.y, 27);
+                                            break;
+
+                                    }
+
+                                }
+                                i++;
+                            }
+                            break;
+
+                        case 'end-of-jump':
+                            if (jumpIndex === null || jumpIndex < jumpPos.length) continue;
+                            break;
+
+                        case 'hit-bottom':
+                            if (collides.floor.dist > 0) continue;
+                            break;
+
+                        default:
+                            console.log('Unknown event ' + event);
+                            continue;
+                    }
+                    currEvent = event;
+                }
+
+                if (currEvent !== null) {
+                    marioStates.doEvent(currEvent);
+
+                    const transitions = marioStates.popTransitions();
+                    for (let transition of transitions) {
+                        let newSprite = null;
+                        switch(transition.to) {
+                            case 'stand':
+                                newSprite = 'mario';
+                                break;
+
+                            case 'stand_rev':
+                                newSprite = 'mario-rev';
+                                break;
+
+                            case 'fall':
+                                jumpIndex = null;
+                                newSprite = 'mario-jump';
+                                break;
+
+                            case 'fall_rev':
+                                jumpIndex = null;
+                                newSprite = 'mario-jump-rev';
+                                break;
+
+                            case 'jump':
+                                jumpIndex = 0;
+                                newSprite = 'mario-jump';
+                                break;
+
+                            case 'jump_rev':
+                                jumpIndex = 0;
+                                newSprite = 'mario-jump-rev';
+                                break;
+
+                            case 'run':
+                                newSprite = 'mario-run';
+                                break;
+
+                            case 'run_rev':
+                                newSprite = 'mario-run-rev';
+                                break;
+
+                            case 'duck':
+                                newSprite = 'mario-duck';
+                                break;
+
+                            case 'duck_rev':
+                                newSprite = 'mario-duck-rev';
+                                break;
+                        }
+                        if (newSprite !== null) {
+                            spritePane.assignSprite('player', newSprite)
+                        }
+                    }
+                }
+
+                // move player
+                let speed = 2;
+                const state = marioStates.getState();
                 let moveX = 0;
                 let moveY = 0;
-                const speed = 2;
-                for (var key in this.keysDown) {
-                    switch (key) {
-                        case 'a':
-                            moveX -= speed;
-                            break;
 
-                        case 'd':
-                            moveX += speed;
-                            break;
+                switch (state) {
+                    case 'fall_rev':
+                    case 'fall':
+                        moveY = Math.min(3, collides.floor.dist);
+                        break;
 
-                        case 'w':
-                            // moveY -= speed;
-                            break;
+                    case 'jump_rev':
+                    case 'jump':
+                        moveY = Math.min(jumpPos[jumpIndex], collides.ceiling.dist);
+                        jumpIndex++;
+                        break;
+                }
 
-                        case 's':
-                            // moveY += speed;
-                            break;
-
-                    }
+                if (dirX === 1 && collides.right.dist > 0) {
+                    moveX = Math.min(speed, collides.right.dist);
+                } else if (dirX === -1 && collides.left.dist > 0) {
+                    moveX = -Math.min(speed, collides.left.dist);
+                }
+                if (['duck', 'duck_rev'].indexOf(state) !== -1) {
+                    moveX = 0;
                 }
 
                 if (moveX !== 0 || moveY !== 0) {
                     gameScrollBounds.moveActor(moveX, moveY);
                 }
+
+                // update animated tiles
+                tilesPane.updateAnimatedTiles();
+
             });
         }
     });
