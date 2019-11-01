@@ -26,6 +26,7 @@ class Game {
         this.debug = config.debug === true;
         this.globalKeyHandlers = [];
         this.timers = {};
+        this.frameEvents = {};
         this.durations = {};
         this.frames = 0;
         this.zoom = config.zoom;
@@ -240,6 +241,20 @@ class Game {
         return Math.round(value * f) / f;
     }
 
+    addFrameEvent(type, event) {
+        if (this.frameEvents[type] === undefined) {
+            this.frameEvents[type] = [];
+        }
+        this.frameEvents[type].push(event);
+    }
+
+    getEvents(type) {
+        if (this.frameEvents[type] === undefined) {
+            return [];
+        }
+        return this.frameEvents[type];
+    }
+
     updateFrame() {
         const screen = this.screens[this.currentScreen];
         if (screen.getState() === 'READY') {
@@ -252,6 +267,7 @@ class Game {
                 this.startTimer('render');
                 this.render();
                 this.addTimerDuration('render');
+                this.frameEvents = {};
                 this.frames++;
                 if (screen.frameHandler !== null) {
                     screen.frameHandler();
@@ -1683,6 +1699,49 @@ class BufferedTilesPane {
         }
     }
 
+    getTilesInRect(x1, y1, x2, y2) {
+        const origin = {
+            x: this.mapTilePos.x + this.canvasTileOffset.x,
+            y: this.mapTilePos.y + this.canvasTileOffset.y
+        };
+
+        const realStart = x1 + this.scrollPos.x;
+        const realEnd = x2 + this.scrollPos.x;
+        const relPos = {
+            x1: realStart >> this.tilesMap.tileBits,
+            x2: realEnd >> this.tilesMap.tileBits,
+            y: (y1 + this.scrollPos.y) >> this.tilesMap.tileBits
+        };
+        let touchStart = realStart % this.tilesMap.tileSize;
+        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
+        let touchEnd = realEnd % this.tilesMap.tileSize;
+        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+
+        const mapY = origin.y + relPos.y;
+        const start = origin.x + relPos.x1;
+        const end = origin.x + relPos.x2;
+
+        const lines = 1 + Math.floor((y2 - y1)/this.tilesMap.tileSize);
+
+        const tiles = this.tilesMap.getTilesAtXLine(mapY, start, end, lines);
+        let i = 0;
+        const result = [];
+        const maxLine = mapY + lines - 1;
+        for (let y = mapY; y <= maxLine; y++) {
+            for (let x = start; x <= end; x++) {
+                let touch = this.tilesMap.tileSize;
+                if (x === start) {
+                    touch = touchStart;
+                } else if (x === end) {
+                    touch = touchEnd;
+                }
+                result.push({x, y, touch, obj: tiles[i]});
+                i++;
+            }
+        }
+        return result;
+    }
+
     getTilesInXLine(y, x1, x2) {
         const origin = {
             x: this.mapTilePos.x + this.canvasTileOffset.x,
@@ -1787,13 +1846,11 @@ class BufferedTilesPane {
 
     renderTile(x, y, onlyInBuffer = false) {
         const targets = [];
-        if (!onlyInBuffer) {
-            targets.push({
-                ctx: this.buffers.getActiveCtx(),
-                offX: this.canvasTileOffset.x + x - this.mapTilePos.x,
-                offY: this.canvasTileOffset.y + y - this.mapTilePos.y
-            });
-        };
+        targets.push({
+            ctx: this.buffers.getActiveCtx(),
+            offX: this.canvasTileOffset.x + x - this.mapTilePos.x,
+            offY: this.canvasTileOffset.y + y - this.mapTilePos.y
+        });
         if (this.state > 0) {
             targets.push(
                 {
@@ -3045,7 +3102,8 @@ const FILTER = {
     PARAM: {
        STRING: 0,
        FLOAT: 1,
-       COLOR: 2
+       COLOR: 2,
+       MAPPING: 3
     }
 };
 
@@ -3074,6 +3132,7 @@ class BitmapFilterer {
                 case FILTER.PARAM.COLOR:
                     parser = function(rawValue) {
                         const color = {};
+                        // TODO use helper function
                         if (rawValue[0] === '#') {
                             if (rawValue.length === 7) {
                                 color.r = parseInt(rawValue.substr(1, 2), 16);
@@ -3091,6 +3150,25 @@ class BitmapFilterer {
                         return parseFloat(rawValue);
                     };
                     break;
+
+                case FILTER.PARAM.STRING:
+                    parser = function(rawValue) {
+                        return rawValue;
+                    };
+                    break;
+
+                case FILTER.PARAM.MAPPING:
+                    parser = function(rawValue) {
+                        const result = {};
+                        const assigns = rawValue.split(';');
+                        for(let assign of assigns) {
+                            const parts = assign.split(':', 2);
+                            result[parts[0]] = parts[1];
+                        }
+                        return result;
+                    };
+                    break;
+
             }
 
             paramClosures.push(
@@ -3227,6 +3305,45 @@ filterer.addFilter(
 );
 
 filterer.addFilter(
+    'shift-y',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const shiftedSize = data[4] - Math.abs(params.pixels);
+        let sourceY = data[2];
+        if (params.pixels < 0) {
+            sourceY -= params.pixels;
+        }
+        const targetY = params.pixels < 0 ? 0 : params.pixels;
+        newCanvas.ctx.drawImage(data[0].elem, data[1], sourceY, data[3], shiftedSize, 0, targetY, data[3], shiftedSize);
+        return [newCanvas, 0, 0, data[3], data[4]];
+    },
+    [
+        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+    ]
+);
+
+
+filterer.addFilter(
+    'shift-x',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const shiftedSize = data[3] - Math.abs(params.pixels);
+        let sourceX = data[1];
+        if (params.pixels < 0) {
+            sourceX -= params.pixels;
+        }
+        const targetX = params.pixels < 0 ? 0 : params.pixels;
+        newCanvas.ctx.drawImage(data[0].elem, sourceX, data[2], shiftedSize, data[4], targetX, 0, shiftedSize, data[4]);
+        return [newCanvas, 0, 0, data[3], data[4]];
+    },
+    [
+        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+    ]
+);
+
+filterer.addFilter(
     'monochrome',
     FILTER.TYPE.IMAGEDATA,
     function(imageData, params) {
@@ -3259,6 +3376,41 @@ filterer.addFilter(
     },
     [
         {key: 'factor', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 0.5}
+    ]
+);
+
+function getRgbFromHexColor(hex) {
+    const result = [];
+    result.push(parseInt(hex.substr(1, 2), 16));
+    result.push(parseInt(hex.substr(3, 2), 16));
+    result.push(parseInt(hex.substr(5, 2), 16));
+    return result;
+}
+
+filterer.addFilter(
+    'color-replace',
+    FILTER.TYPE.IMAGEDATA,
+    function(imageData, params) {
+        const colors = [];
+        for (let find in params.replace) {
+            colors.push([getRgbFromHexColor(find), getRgbFromHexColor(params.replace[find])]);
+        };
+        const rgba = imageData.data;
+        for(let i = 0; i < imageData.width * imageData.height; i++) {
+            const pos = i << 2;
+            for (let s of colors) {
+                if (s[0][0] === rgba[pos] && s[0][1] === rgba[pos+1] && s[0][2] === rgba[pos+2]) {
+                    rgba[pos] = s[1][0];
+                    rgba[pos+1] = s[1][1];
+                    rgba[pos+2] = s[1][2];
+                    break;
+                }
+            }
+        };
+        return imageData;
+    },
+    [
+        {key: 'replace', type: FILTER.PARAM.MAPPING}
     ]
 );
 
@@ -3305,6 +3457,12 @@ class SpriteSheet {
         }
     }
 
+    addTransformedSpritesFromObj(transformers, obj) {
+        for (let target in obj) {
+            this.addTransformedSprite(target, obj[target], transformers);
+        }
+    }
+
     addTransformedAnimation(id, base, transformers, synchronous = false) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
@@ -3335,7 +3493,14 @@ class SpriteSheet {
     build() {
         for (let image of this.customImages) {
             let base = this.getSprite(image.base);
-            const trans = filterer.getCanvasWithFiltersApplied(image.transformers, this.sheet, base.off.x, base.off.y, base.dim.x, base.dim.y);
+            const trans = filterer.getCanvasWithFiltersApplied(
+                image.transformers,
+                base.img ? base.img : this.sheet,
+                base.off.x,
+                base.off.y,
+                base.dim.x,
+                base.dim.y
+            );
             const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
             sprite.img = trans[0];
         }
@@ -3515,18 +3680,28 @@ class SpriteAndTilesCollider {
     }
 
     addCollide(id, collide) {
-        const margin = {
-            dir: 0,
-            start: 0,
-            end: 0
-        };
+        if (collide.dir === undefined || ['up', 'down', 'left', 'right', 'center'].indexOf(collide.dir) === -1) {
+            throw Error(`Collide "${id}" must have dir property with an allowed value!`)
+        }
+        const margin = collide.dir === 'center' ?
+            {
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0
+            } :
+            {
+                dir: 0,
+                start: 0,
+                end: 0
+            };
         if (collide.margin) {
             Object.assign(margin, collide.margin);
         };
+        collide.margin = margin;
         if (collide.check === undefined) {
             collide.check = SpriteAndTilesCollider.defaultCheck
         }
-        collide.margin = margin;
         this.collides[id] = collide;
     }
 
@@ -3542,33 +3717,43 @@ class SpriteAndTilesCollider {
         const lines = {};
         for (let collideId in this.collides) {
             const collide = this.collides[collideId];
-            let dist = collide.lookahead;
-            let first = 0;
-            let dir = 1;
-            let axis = 'x';
-            switch (collide.dir) {
-                case 'down':
-                    dir = -1;
-                    first = pos.dim.y;
-                case 'up':
-                    break;
+            if (collide.dir === 'center') {
+                const xStart = pos.x + collide.margin.left;
+                const yStart = pos.y + collide.margin.top;
+                lines[collideId] = [
+                    xStart,
+                    yStart,
+                    pos.x + pos.dim.x - collide.margin.right - xStart,
+                    pos.y + pos.dim.y - collide.margin.bottom - yStart
+                ];
+            } else {
+                let first = 0;
+                let dir = 1;
+                let axis = 'x';
+                switch (collide.dir) {
+                    case 'down':
+                        dir = -1;
+                        first = pos.dim.y;
+                    case 'up':
+                        break;
 
-                case 'right':
-                    dir = -1;
-                    first = pos.dim.x;
-                case 'left':
-                    axis = 'y';
-                    break;
+                    case 'right':
+                        dir = -1;
+                        first = pos.dim.x;
+                    case 'left':
+                        axis = 'y';
+                        break;
+                }
+                const oppAxis = axis === 'x' ? 'y' : 'x';
+                first += pos[oppAxis] + dir * collide.margin.dir;
+                const dStart = pos[axis] + collide.margin.start;
+                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+
+                lines[collideId] = (axis === 'x' ?
+                        [dStart, first, dEnd - dStart, 1] :
+                        [first, dStart, 1, dEnd - dStart]
+                );
             }
-            const oppAxis = axis === 'x' ? 'y' : 'x';
-            first += pos[oppAxis] + dir * collide.margin.dir;
-            const dStart = pos[axis] + collide.margin.start;
-            const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
-
-            lines[collideId] = (axis === 'x' ?
-                [dStart, first, dEnd - dStart, 1] :
-                [first, dStart, 1, dEnd - dStart]
-            );
         }
         return lines;
     }
@@ -3581,59 +3766,76 @@ class SpriteAndTilesCollider {
 
         for (let collideId of collideIds) {
             const collide = this.collides[collideId];
-            let dist = collide.lookahead;
-            let first = 0;
-            let dir = 1;
-            let axis = 'x';
-            switch(collide.dir) {
-                case 'down':
-                    dir  = -1;
-                    first = pos.dim.y;
-                case 'up':
-                    break;
+            const obj = {};
 
-                case 'right':
-                    dir = -1;
-                    first = pos.dim.x;
-                case 'left':
-                    axis = 'y';
-                    break;
-            }
-            const oppAxis = axis === 'x' ? 'y' : 'x';
-            first += pos[oppAxis] + dir * collide.margin.dir;
-            const dStart = pos[axis] + collide.margin.start;
-            const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+            if (collide.dir !== 'center') {
+                let dist = collide.lookahead;
+                let first = 0;
+                let dir = 1;
+                let axis = 'x';
+                switch(collide.dir) {
+                    case 'down':
+                        dir  = -1;
+                        first = pos.dim.y;
+                    case 'up':
+                        break;
 
-            let tiles = axis === 'x' ?
-                this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
-                this.tilesPane.getTilesInYLine(first, dStart, dEnd);
-
-            for(let tile of tiles) {
-                if (collide.check(tile)) {
-                    dist = 0;
-
-                    break;
+                    case 'right':
+                        dir = -1;
+                        first = pos.dim.x;
+                    case 'left':
+                        axis = 'y';
+                        break;
                 }
-            }
-            if (dist > 0) {
-                const remBlock = (this.tileSize - (first % this.tileSize)) - collide.lookahead;
-                if (remBlock < 0) {
-                    first -= dir * this.tileSize;
-                    tiles = axis === 'x' ?
-                        this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
-                        this.tilesPane.getTilesInYLine(first, dStart, dEnd);
-                    for (let tile of tiles) {
-                        if (collide.check(tile)) {
-                            dist = collide.lookahead + remBlock;
-                            break;
+                const oppAxis = axis === 'x' ? 'y' : 'x';
+                first += pos[oppAxis] + dir * collide.margin.dir;
+                const dStart = pos[axis] + collide.margin.start;
+                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+
+                let tiles = axis === 'x' ?
+                    this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
+                    this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+
+                for(let tile of tiles) {
+                    if (collide.check(tile)) {
+                        dist = 0;
+
+                        break;
+                    }
+                }
+                if (dist > 0) {
+                    const remBlock = (this.tileSize - (first % this.tileSize)) - collide.lookahead;
+                    if (remBlock < 0) {
+                        first -= dir * this.tileSize;
+                        tiles = axis === 'x' ?
+                            this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
+                            this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                        for (let tile of tiles) {
+                            if (collide.check(tile)) {
+                                dist = collide.lookahead + remBlock;
+                                break;
+                            }
                         }
                     }
                 }
-            }
-            const obj = {
-                dist: dist
-            };
-            if (dist === 0 && collide.saveContacts) {
+                obj.dist = dist;
+
+                if (dist === 0 && collide.saveContacts) {
+                    obj.tiles = tiles;
+                }
+            } else {
+                const tiles = this.tilesPane.getTilesInRect(
+                    pos.x + collide.margin.left,
+                    pos.y + collide.margin.top,
+                    pos.x + pos.dim.x - collide.margin.right,
+                    pos.y + pos.dim.y - collide.margin.bottom
+                );
+
+                for (let tile of tiles) {
+                    if (collide.check(tile)) {
+                        Game.instance.addFrameEvent('collide', tile);
+                    }
+                }
                 obj.tiles = tiles;
             }
             result[collideId] = obj;
@@ -3700,10 +3902,14 @@ class TilesMap {
         return this.getTileObj(x, y);
     }
 
-    getTilesAtXLine(y, x1, x2) {
+    getTilesAtXLine(y, x1, x2, lines = 1) {
         const tiles = [];
-        for (let x = x1; x <= x2; x++) {
-            tiles.push(this.getTileObj(x, y));
+        while (lines > 0) {
+            for (let x = x1; x <= x2; x++) {
+                tiles.push(this.getTileObj(x, y));
+            }
+            y++;
+            lines--;
         }
         return tiles;
     }

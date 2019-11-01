@@ -1528,9 +1528,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let time = 120;
 
             statusPane.addTextBlock('score', 3 * 8, 16, TextPane.padStart(score, '0', 6));
-            statusPane.addTextBlock('coins', 12 * 8, 16, '*' + TextPane.padStart(coins, '0', 2));
+            statusPane.addTextBlock('coins', 12 * 8, 16, '   ');
             statusPane.addTextBlock('world', 18 * 8, 16, '' + world);
-            statusPane.addTextBlock('time', 25 * 8, 16, '' + TextPane.padStart(time, '0', 3));
+            statusPane.addTextBlock('time', 25 * 8, 16, '   ');
+
+            function updateCoins() {
+                statusPane.updateTextBlock('coins', '*' + TextPane.padStart(coins, '0', 2));
+            }
+
+            function updateTime() {
+                statusPane.updateTextBlock('time', TextPane.padStart(time, '0', 3));
+            }
+
+            updateCoins();
+            updateTime();
+
             gameArea.addPane(statusPane, 0);
             const bgTilesMap = new TilesMap(
                 TILE.DIM_16x16,
@@ -1544,10 +1556,25 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         hitEvent: 'mushroom',
                         animation: {
                             frames: [
-                                {id: 25, duration: 30},
-                                {id: 24, duration: 30}
+                                {id: 24, duration: 25},
+                                {id: 25, duration: 10},
+                                {id: 26, duration: 10}
                             ],
                             end: ANIMATION.END.LOOP,
+                            dir: ANIMATION.DIR.FORWARD_BACKWARD,
+                            synchronous: true
+                        }
+                    },
+                    57: {
+                        hitEvent: 'coin',
+                        animation: {
+                            frames: [
+                                {id: 57, duration: 25},
+                                {id: 58, duration: 10},
+                                {id: 59, duration: 10}
+                            ],
+                            end: ANIMATION.END.LOOP,
+                            dir: ANIMATION.DIR.FORWARD_BACKWARD,
                             synchronous: true
                         }
                     },
@@ -1560,11 +1587,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 660, 661, 662, 0, 0, 0, 28, 28, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 693, 694, 695, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
                     [0, 0, 0, 0, 0, 0, 28, 28, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 24, 2, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
@@ -1585,18 +1612,48 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             vSplitArea.addArea(gameArea, 1);
             const spriteSheet = new SpriteSheet(resource.sprites);
-            spriteSheet.addSprite('mario', 1, 1, 16, 32);
-            spriteSheet.addSprite('mario-jump', 86, 1, 16, 32);
-            spriteSheet.addSprite('mario-duck', 103, 1, 16, 32);
-            spriteSheet.addTransformedSprite('mario-rev', 'mario', 'flip-x');
-            spriteSheet.addTransformedSprites('-rev', ['mario', 'mario-jump', 'mario-duck'], 'flip-x');
-            spriteSheet.addSpriteSeq('mario-run', 18, 1, 16, 32, 3, 1);
-            spriteSheet.addAnimation('mario-run', ['mario-run1', 'mario-run2', 'mario-run3'], ANIMATION.END.LOOP);
-            spriteSheet.addTransformedAnimation('mario-run-rev', 'mario-run', 'flip-x');
+
+            const marioTypes = [{prefix: '', offY: 1, height: 32}, {prefix: 'small-', offY: 34, height: 16}];
+            for (let type of marioTypes) {
+                spriteSheet.addSprite(type.prefix + 'mario', 1, type.offY, 16, type.height);
+                spriteSheet.addSprite(type.prefix + 'mario-jump', 86, type.offY, 16, type.height);
+                spriteSheet.addSprite(type.prefix + 'mario-duck', 103, type.offY, 16, type.height);
+                spriteSheet.addTransformedSprite(type.prefix + 'mario-rev', type.prefix + 'mario', 'flip-x');
+                spriteSheet.addTransformedSprites('-rev',
+                    [type.prefix + 'mario', type.prefix + 'mario-jump', type.prefix + 'mario-duck'], 'flip-x');
+                spriteSheet.addSpriteSeq(type.prefix + 'mario-run', 18, type.offY, 16, type.height, 3, 1);
+                spriteSheet.addAnimation(
+                    type.prefix + 'mario-run',
+                    [type.prefix + 'mario-run1', type.prefix + 'mario-run2', type.prefix + 'mario-run3'],
+                    ANIMATION.END.LOOP
+                );
+                spriteSheet.addTransformedAnimation(type.prefix + 'mario-run-rev', type.prefix + 'mario-run', 'flip-x');
+            }
+            spriteSheet.build();
+            spriteSheet.addTransformedSpritesFromObj(
+                'color-replace(#b13425:#f7d6a4;#6a6b04:#b53121)',
+                {
+                    'fire-mario': 'mario',
+                    'fire-mario-jump': 'mario-jump',
+                    'fire-mario-duck': 'mario-duck',
+                    'fire-mario-run1': 'mario-run1',
+                    'fire-mario-run2': 'mario-run2',
+                    'fire-mario-run3': 'mario-run3',
+                });
+            spriteSheet.build();
+
+            spriteSheet.addAnimation(
+                'fire-mario-run',
+                ['fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'],
+                ANIMATION.END.LOOP
+            );
+            spriteSheet.addTransformedSprites('-rev',
+                ['fire-mario', 'fire-mario-jump', 'fire-mario-duck', 'fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'], 'flip-x');
+            spriteSheet.addTransformedAnimation('fire-mario-run-rev', 'fire-mario-run', 'flip-x');
             spriteSheet.build();
 
             const spritePane = new SpritePane(spriteSheet);
-            spritePane.addSprite('player', 'mario', 100, 40);
+            spritePane.addSprite('player', 'small-mario', 100, 40);
             spritePane.setAnimationSpeed('player', 0.2);
             spritePane.setActorId('player');
             vSplitArea.addPane(spritePane, 1);
@@ -1672,22 +1729,31 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         start: 2,
                         end: 2
                     }
+                },
+                center: {
+                    dir: 'center',
+                    check: function (tile) {
+                        if (tile.obj !== null && tile.obj.hitEvent && tile.obj.hitEvent === 'coin') {
+                            return true;
+                        }
+                        return false;
+                    }
                 }
             });
             marioCollider.setSpriteOffset(0, -24);
 
             const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
             let jumpIndex = null;
-
             let frameCount = 0;
             marioScreen.setFrameHandler(function () {
                 if (time > 0) {
                     frameCount++;
                     if (frameCount % 60 === 0) {
                         time--;
-                        statusPane.updateTextBlock('time', TextPane.padStart(time, '0', 3));
+                        updateTime();
                     }
                 }
+
                 spritePane.updateFrames();
                 bgTilesMap.updateFrames();
 
@@ -1703,7 +1769,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     collideIds.push('ceiling');
                 }
                  */
-                const collides = marioCollider.getCollides(['floor', 'left', 'right', 'ceiling']);
+                const collides = marioCollider.getCollides(['floor', 'left', 'right', 'ceiling', 'center']);
+
+                const collEvents = this.getEvents('collide');
+                for (let event of collEvents) {
+                    switch(event.obj.hitEvent) {
+                        case 'coin':
+                            tilesPane.replaceTile(event.x, event.y, 0);
+                            coins++;
+                            updateCoins();
+                            break;
+
+                        default:
+                            console.log('WHAT?', event);
+                    }
+                }
 
                 // get keyboard actions
                 let dirX = 0;
@@ -1781,7 +1861,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             let i = 1;
                             for (let tile of collides.ceiling.tiles) {
                                 if (tile.touch > 7 && tile.obj.hitEvent !== undefined) {
-                                    console.log(tile.obj.hitEvent, 'HIT BOTTOM ' + tile.touch + ' / ', i + ' of ' + collides.ceiling.tiles.length, tile);
                                     switch (tile.obj.hitEvent) {
                                         case 'destroy':
                                             tilesPane.replaceTile(tile.x, tile.y, 0);
@@ -1864,7 +1943,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 break;
                         }
                         if (newSprite !== null) {
-                            spritePane.assignSprite('player', newSprite)
+                            spritePane.assignSprite('player', 'small-' + newSprite)
                         }
                     }
                 }
