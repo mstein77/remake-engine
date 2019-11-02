@@ -1816,6 +1816,18 @@ class BufferedTilesPane {
         return result;
     }
 
+    getRelativePositionOfTile(x, y) {
+        const origin = {
+            x: this.mapTilePos.x + this.canvasTileOffset.x,
+            y: this.mapTilePos.y + this.canvasTileOffset.y
+        };
+
+        return {
+            x: ((x - origin.x) << this.tilesMap.tileBits) - this.scrollPos.x,
+            y: ((y - origin.y) << this.tilesMap.tileBits) + this.scrollPos.y
+        };
+    }
+
     setMapTilePos(mapTilePosX, mapTilePosY) {
         this.mapTilePos.x = mapTilePosX;
         this.mapTilePos.y = mapTilePosY;
@@ -2240,6 +2252,26 @@ class SpritePane {
 
     hasSprite(id) {
         return (this.sprites[id] !== undefined);
+    }
+
+    isAxisCollide(aStart, aEnd, bStart, bEnd) {
+        return (bStart >= aEnd && aEnd <= bEnd) ||
+            (bStart >= aStart && aStart <= bEnd) ||
+            (aStart <= bStart && aEnd >= bEnd);
+    }
+
+    isCollidingActor(id) {
+        const actorId = this.getActorId();
+        if (actorId === null) {
+            return false;
+        }
+        const actorPos = this.getSpritePos(actorId);
+        const spritePos = this.getSpritePos(id);
+
+        return (
+            this.isAxisCollide(actorPos.x, actorPos.x + actorPos.dim.x, spritePos.x, spritePos.x + spritePos.dim.x) &&
+            this.isAxisCollide(actorPos.y, actorPos.y + actorPos.dim.y, spritePos.y, spritePos.y + spritePos.dim.y)
+        );
     }
 
     addSprite(id, name,  x = 0, y = 0, z = 0) {
@@ -4475,6 +4507,63 @@ class ImageResource {
     }
 }
 
+class ObjectController {
+
+    constructor(spritePane, controllerFactory, objects) {
+        this.controllerFactory = controllerFactory;
+        this.spritePane = spritePane;
+        this.objects = objects;
+        this.activeObjects = [];
+    }
+
+    getObject(id) {
+        if (this.objects[id] === undefined) {
+            console.log('Unknown object id ' + id + ' given!');
+            return null;
+        }
+        return this.objects[id];
+    }
+
+    doActions() {
+        const removeIds = [];
+        // controll existing sprites
+        const active = [];
+        for (let obj of this.activeObjects) {
+            if (obj.controller.getNextActions() !== false) {
+                active.push(obj);
+            };
+        }
+        this.activeObjects = active;
+
+        // add new sprite
+        let objectEvents = Game.instance.getEvents('object');
+        for (let objectEvent of objectEvents) {
+            console.log('HAS EVENT', objectEvent);
+            const obj = this.getObject(objectEvent.object);
+            if (obj === null) {
+                continue;
+            }
+            const activeObject = {
+                id:  this.spritePane.getUid(objectEvent.object),
+                controller: this.controllerFactory.get(obj.controller)
+            };
+            this.activeObjects.push(activeObject);
+            activeObject.controller.init(activeObject.id, objectEvent);
+            // create sprite (variant)
+/*
+            this.getObject()
+
+
+            const spriteId = spritePane.getUid(sprite.sheetId);
+            // get new controller instance
+            const id = controller.init(sprite, spriteEvent.detail);
+            this.currentSprites[id] = controllerInstance;
+ */
+        }
+    }
+
+}
+
 function d() {
     if (arguments.length === 0) {
         return;
@@ -4511,6 +4600,7 @@ module.exports = {
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
     SpriteAndTilesCollider,
+    ObjectController,
     Animation: BitmapPlayer,
     d,
     FontMap,

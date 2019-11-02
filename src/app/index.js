@@ -11,6 +11,7 @@ import {
     TextPane,
     PatternPane,
     TilesPane,
+    ObjectController,
     BufferedTilesPane,
     LinearGradientPane,
     MasterSlavesScrollHandler,
@@ -1548,12 +1549,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 TILE.DIM_16x16,
                 resource.tiles,
                 {
-                    2: {block: true, hitEvent: 'destroy'},
+                    2: {block: true, hitEvent: 'breaking-block'},
                     27: {block: true},
                     28: {block: true},
                     24: {
                         block: true,
-                        hitEvent: 'mushroom',
+                        hitEvent: 'power-up',
                         animation: {
                             frames: [
                                 {id: 24, duration: 25},
@@ -1640,6 +1641,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     'fire-mario-run2': 'mario-run2',
                     'fire-mario-run3': 'mario-run3',
                 });
+            spriteSheet.addSprite('mushroom', 1, 1, 16, 16);
+            spriteSheet.addSprite('fireflower', 1, 16, 16, 16);
             spriteSheet.build();
 
             spriteSheet.addAnimation(
@@ -1656,9 +1659,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spritePane.addSprite('player', 'small-mario', 100, 40);
             spritePane.setAnimationSpeed('player', 0.2);
             spritePane.setActorId('player');
+            spritePane.setAttachDefault(tilesPane);
             vSplitArea.addPane(spritePane, 1);
 
-            const gameScrollBounds = new BoundsScrollHandler(spritePane, tilesPane, {right: 100}, {top: 33, bottom: 33});
+            const masterSlaveScroller = new MasterSlavesScrollHandler(tilesPane);
+            masterSlaveScroller.addSpriteSlave(spritePane, -1);
+            const gameScrollBounds = new BoundsScrollHandler(spritePane, masterSlaveScroller, {right: 100}, {top: 33, bottom: 33});
 
             const marioStates = new States(
                 ['stand', 'jump', 'fall', 'run', 'duck']
@@ -1740,11 +1746,94 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
             });
+
+            let marioLevel = 0;
+            const marioLevels = ['small-', '', 'fire-'];
+
+            const ControllerFactory = {
+                get: function(controller) {
+                    switch(controller) {
+                        case 'breaking-block':
+                            return {
+                                init: function (id, event) {
+                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
+                                },
+
+                                getNextActions: function () {
+                                    return false;
+                                }
+                            };
+
+                        case 'power-up':
+                            return {
+                                id: null,
+                                state: 0,
+                                speed: 3,
+                                tile: null,
+                                powerUps: {
+                                    0: 'mushroom',
+                                    1: 'fireflower',
+                                    2: 'star'
+                                },
+
+                                init: function (id, event) {
+                                    this.id = id;
+                                    this.tile = {x: event.tile.x, y: event.tile.y};
+                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y - 1);
+                                    const targetSprite = this.powerUps[marioLevel];
+                                    const dim = spriteSheet.getSpriteDim(targetSprite);
+                                    this.state = dim.y * this.speed;
+                                    spritePane.addSprite(id, targetSprite, pos.x, pos.y + 24);
+                                    this.shiftUp();
+                                },
+
+                                shiftUp: function () {
+                                    spritePane.setSpriteFilters(this.id,'shift-y(' + Math.floor(this.state / this.speed) + ')');
+                                    tilesPane.replaceTile(this.tile.x, this.tile.y, 27);
+                                },
+
+                                getNextActions: function () {
+                                    if (spritePane.isCollidingActor(this.id)) {
+                                        if (marioLevel === 0) {
+                                            spritePane.moveSprite('player', 0, -18);
+                                        }
+                                        if (marioLevel < marioLevels.length - 1) {
+                                            marioLevel++;
+                                        }
+                                        spritePane.removeSprite(this.id);
+                                        return false;
+                                    }
+                                    if (this.state > 0) {
+                                        this.state--;
+                                    } else if (this.state === 0) {
+                                        spritePane.setSpriteFilters(this.id, '');
+                                        //this.state = spritePane.getSpritePos(this.id).dim.y * this.speed;
+                                    }
+                                    if (this.state % this.speed === 0) {
+                                        this.shiftUp();
+                                    }
+                                }
+                            }
+                    }
+                }
+            };
+            const objectController = new ObjectController(spritePane, ControllerFactory, {
+                'breaking-block': {
+                    controller: 'breaking-block'
+                },
+                'power-up': {
+                    controller: 'power-up'
+                }
+            });
+
             marioCollider.setSpriteOffset(0, -24);
 
             const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
             let jumpIndex = null;
             let frameCount = 0;
+
+            // ###################################################
+
             marioScreen.setFrameHandler(function () {
                 if (time > 0) {
                     frameCount++;
@@ -1753,6 +1842,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         updateTime();
                     }
                 }
+                // ctrl.getNextActions();
 
                 spritePane.updateFrames();
                 bgTilesMap.updateFrames();
@@ -1774,6 +1864,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 const collEvents = this.getEvents('collide');
                 for (let event of collEvents) {
                     switch(event.obj.hitEvent) {
+
                         case 'coin':
                             tilesPane.replaceTile(event.x, event.y, 0);
                             coins++;
@@ -1861,6 +1952,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             let i = 1;
                             for (let tile of collides.ceiling.tiles) {
                                 if (tile.touch > 7 && tile.obj.hitEvent !== undefined) {
+                                    Game.instance.addFrameEvent(
+                                        'object', {
+                                            object: tile.obj.hitEvent,
+                                            tile
+                                    });
+/*
                                     switch (tile.obj.hitEvent) {
                                         case 'destroy':
                                             tilesPane.replaceTile(tile.x, tile.y, 0);
@@ -1870,7 +1967,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                             break;
 
                                     }
-
+*/
                                 }
                                 i++;
                             }
@@ -1943,10 +2040,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 break;
                         }
                         if (newSprite !== null) {
-                            spritePane.assignSprite('player', 'small-' + newSprite)
+                            spritePane.assignSprite('player', marioLevels[marioLevel] + newSprite)
                         }
                     }
                 }
+
+                objectController.doActions();
 
                 // move player
                 let speed = 2;
