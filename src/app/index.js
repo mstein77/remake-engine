@@ -1700,7 +1700,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             const inputController = new InputController();
             inputController.setDirInputs(null, 's', 'a', 'd');
-            inputController.addInput('button-a', 'w', INPUT.TYPE.PRESSED_DOWN);
+            inputController.addInput('button-a', 'w', INPUT.TYPE.PRESS_AND_RELEASE);
 
             const collideCheck = function(tile) {
                 return (tile.obj !== null && tile.obj.block);
@@ -1966,8 +1966,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
 
                 // get keyboard actions
-                inputController.update();
-
                 // TODO remove...just for debugging
                 if (this.keysDown['q']) {
                     const lines = marioCollider.getCollideLines();
@@ -1984,9 +1982,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 // find event matching current state
                 let currEvent = null;
                 const events = marioStates.getPossibleEvents();
-                if (events.indexOf('move-up') !== -1) {
+
+                if (marioStates.hasPossibleEvent('move-up')) {
                     inputController.awaitInput('button-a');
                 }
+                inputController.update();
 
                 for (let event of events) {
                     switch (event) {

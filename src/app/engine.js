@@ -4381,8 +4381,7 @@ class BitmapPlayer {
 
 /**
  * TODO:
- *   - MasterStates
- *   - CloneStates
+ *   - MasterStates (?)
  */
 class States {
 
@@ -4659,7 +4658,7 @@ class InputController {
 
         for (let name in this.inputs) {
             const input = this.inputs[name];
-            const keyDown = game.keysDown[input.key];
+            const keyDown = game.keysDown[input.key] === input.key;
             switch(input.type) {
                 case INPUT.TYPE.PRESSED_DOWN:
                     input.state = keyDown ? INPUT.STATE.PRESSED : INPUT.STATE.NOTPRESSED;
@@ -4675,7 +4674,7 @@ class InputController {
 
                         case INPUT.STATE.AWAIT_PRESSED:
                             if (keyDown) {
-                                input.state = INPUT.STATE.AWAIT_PRESSED;
+                                input.state = INPUT.STATE.PRESSED;
                             }
                             break;
 
@@ -4696,7 +4695,7 @@ class InputController {
     awaitInput(name) {
         const input = this.inputs[name];
         if (input.type === INPUT.TYPE.PRESS_AND_RELEASE) {
-            if (input.state !== INPUT.STATE.AWAIT_PRESSED) {
+            if (input.state === INPUT.STATE.NOTPRESSED || input.state === INPUT.STATE.PRESSED) {
                 input.state = INPUT.STATE.AWAIT_NOTPRESSED;
             }
         }
