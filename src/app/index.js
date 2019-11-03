@@ -1585,21 +1585,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     298: {block: true}
                 },
                 [
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 660, 661, 662, 0, 0, 0, 28, 28, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 693, 694, 695, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-                    [0, 0, 0, 0, 0, 0, 28, 28, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 24, 2, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 24, 2, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0],
 
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, 0, 0, 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 0, 28, 28, 28, 28, 28, 28],
-                    [28, 28, 1, 1, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28]
+                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, 0, 0, 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
                 {
                     block: false
@@ -1641,8 +1641,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     'fire-mario-run2': 'mario-run2',
                     'fire-mario-run3': 'mario-run3',
                 });
-            spriteSheet.addSprite('mushroom', 1, 1, 16, 16);
-            spriteSheet.addSprite('fireflower', 1, 16, 16, 16);
+            spriteSheet.addSprite('mushroom', 0, 51, 16, 16);
+            spriteSheet.addSpriteSeq('fireflower', 0, 83, 16, 16, 3, 0);
+            spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3'], ANIMATION.DIR.LOOP);
+            spriteSheet.addSprite('star', 0, 99, 16, 16);
+            spriteSheet.addSprite('mini-block1', 64, 51, 8, 8);
+            spriteSheet.addSprite('mini-block2', 72, 51, 8, 8);
             spriteSheet.build();
 
             spriteSheet.addAnimation(
@@ -1656,7 +1660,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.build();
 
             const spritePane = new SpritePane(spriteSheet);
-            spritePane.addSprite('player', 'small-mario', 100, 40);
+            spritePane.addSprite('player', 'small-mario', 40, 184);
             spritePane.setAnimationSpeed('player', 0.2);
             spritePane.setActorId('player');
             spritePane.setAttachDefault(tilesPane);
@@ -1748,19 +1752,26 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             });
 
             let marioLevel = 0;
-            const marioLevels = ['small-', '', 'fire-'];
+            const marioLevels = ['small-', '', 'fire-', ''];
 
             const ControllerFactory = {
                 get: function(controller) {
                     switch(controller) {
+
                         case 'breaking-block':
                             return {
                                 init: function (id, event) {
+                                    this.id = id;
                                     tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
+                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
+                                    spritePane.addSprite(id + '_1', 'mini-block1', pos.x - 5, pos.y + 19);
+                                    spritePane.addSprite(id + '_2', 'mini-block2', pos.x + 5, pos.y + 19);
+                                    return [id + '_1', id + '_2'];
                                 },
 
-                                getNextActions: function () {
-                                    return false;
+                                getNextActions: function (id) {
+                                    spritePane.moveSprite(id + '_1', -1, 3);
+                                    spritePane.moveSprite( id + '_2', 1, 3);
                                 }
                             };
 
@@ -1770,6 +1781,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 state: 0,
                                 speed: 3,
                                 tile: null,
+                                dir: 1,
                                 powerUps: {
                                     0: 'mushroom',
                                     1: 'fireflower',
@@ -1780,11 +1792,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                     this.id = id;
                                     this.tile = {x: event.tile.x, y: event.tile.y};
                                     const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y - 1);
-                                    const targetSprite = this.powerUps[marioLevel];
-                                    const dim = spriteSheet.getSpriteDim(targetSprite);
+                                    this.type = this.powerUps[marioLevel];
+                                    const dim = spriteSheet.getSpriteDim(this.type);
                                     this.state = dim.y * this.speed;
-                                    spritePane.addSprite(id, targetSprite, pos.x, pos.y + 24);
+                                    spritePane.addSprite(id, this.type, pos.x, pos.y + 24);
                                     this.shiftUp();
+                                    return id;
                                 },
 
                                 shiftUp: function () {
@@ -1792,25 +1805,62 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                     tilesPane.replaceTile(this.tile.x, this.tile.y, 27);
                                 },
 
-                                getNextActions: function () {
-                                    if (spritePane.isCollidingActor(this.id)) {
+                                getNextActions: function (id) {
+                                    if (spritePane.isCollidingActor(id)) {
                                         if (marioLevel === 0) {
-                                            spritePane.moveSprite('player', 0, -18);
+                                            cutscene = 'grow';
+                                        } else if (marioLevel === 1) {
+                                            cutscene = 'fire';
                                         }
                                         if (marioLevel < marioLevels.length - 1) {
-                                            marioLevel++;
+                                            // marioLevel++;
                                         }
-                                        spritePane.removeSprite(this.id);
                                         return false;
                                     }
                                     if (this.state > 0) {
                                         this.state--;
+                                        if (this.state % this.speed === 0) {
+                                            this.shiftUp();
+                                        }
                                     } else if (this.state === 0) {
                                         spritePane.setSpriteFilters(this.id, '');
-                                        //this.state = spritePane.getSpritePos(this.id).dim.y * this.speed;
-                                    }
-                                    if (this.state % this.speed === 0) {
-                                        this.shiftUp();
+                                        if (this.type === 'mushroom') {
+                                            this.collider = new SpriteAndTilesCollider(this.id, spritePane, tilesPane, {
+                                                floor: {
+                                                    dir: 'down',
+                                                    lookahead: 2,
+                                                    margin: {
+                                                        dir: 0
+                                                    }
+                                                },
+                                                right: {
+                                                    dir: 'right',
+                                                    lookahead: 1,
+                                                    margin: {
+                                                        end: 1
+                                                    }
+                                                },
+                                                left: {
+                                                    dir: 'left',
+                                                    lookahead: 1,
+                                                    margin: {
+                                                        end: 1
+                                                    }
+                                                },
+
+                                            });
+                                            this.collider.setSpriteOffset(0, -24);
+                                            this.state--;
+                                        }
+                                    } else {
+                                        const collides = this.collider.getCollides(['floor', 'left', 'right']);
+                                        if (this.dir === 1 && collides.right.dist === 0) {
+                                            this.dir = (collides.left.dist === 0 ? 0 : -1);
+                                            console.log(collides);
+                                        } else if (collides.left.dist === 0) {
+                                            this.dir = (collides.right.dist === 0 ? 0 : 1);
+                                        }
+                                        spritePane.moveSprite(this.id, this.dir, collides.floor.dist > 0 ? Math.min(2, collides.floor.dist) : 0);
                                     }
                                 }
                             }
@@ -1831,7 +1881,34 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
             let jumpIndex = null;
             let frameCount = 0;
+            let cutscene = null;
+            let cutsceneFrame = 0;
+            let flickerFrames = [];
 
+            function flickerCutScene(level) {
+                if (cutsceneFrame === 0) {
+                    const currSheetId = spritePane.getSpriteSheetId('player');
+                    const newSheetId = marioLevels[level] + currSheetId.substr(marioLevels[level - 1].length);
+                    flickerFrames = [
+                        newSheetId, currSheetId
+                    ];
+                }
+                if (cutsceneFrame === 55) {
+                    marioLevel = level;
+                    return true;
+                }
+                if (cutsceneFrame % 5 === 0) {
+                    const oldPos = spritePane.getSpritePos('player');
+                    const bottomY = oldPos.y + oldPos.dim.y;
+                    spritePane.assignSprite(
+                        'player',
+                        spritePane.hasSpriteSheetId('player', flickerFrames[1]) ? flickerFrames[0] : flickerFrames[1]
+                    );
+                    const pos = spritePane.getSpritePos('player');
+                    spritePane.setSpritePos('player', oldPos.x, bottomY - pos.dim.y);
+                }
+                return false;
+            }
             // ###################################################
 
             marioScreen.setFrameHandler(function () {
@@ -1842,10 +1919,29 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         updateTime();
                     }
                 }
-                // ctrl.getNextActions();
+
+                bgTilesMap.updateFrames();
+                if (cutscene !== null) {
+                    let done = false;
+                    switch(cutscene) {
+                        case 'grow':
+                            done = flickerCutScene(1);
+                            break;
+
+                        case 'fire':
+                            done = flickerCutScene(2);
+                            break;
+                    }
+                    if (!done) {
+                        cutsceneFrame++;
+                        return;
+                    }
+                    cutscene = null;
+                    cutsceneFrame = 0;
+                }
+
 
                 spritePane.updateFrames();
-                bgTilesMap.updateFrames();
 
                 /* calc required tile collisions
                 const collideIds = [];

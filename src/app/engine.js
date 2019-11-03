@@ -2255,9 +2255,7 @@ class SpritePane {
     }
 
     isAxisCollide(aStart, aEnd, bStart, bEnd) {
-        return (bStart >= aEnd && aEnd <= bEnd) ||
-            (bStart >= aStart && aStart <= bEnd) ||
-            (aStart <= bStart && aEnd >= bEnd);
+        return !(aStart > bEnd || bStart > aEnd);
     }
 
     isCollidingActor(id) {
@@ -2268,10 +2266,8 @@ class SpritePane {
         const actorPos = this.getSpritePos(actorId);
         const spritePos = this.getSpritePos(id);
 
-        return (
-            this.isAxisCollide(actorPos.x, actorPos.x + actorPos.dim.x, spritePos.x, spritePos.x + spritePos.dim.x) &&
-            this.isAxisCollide(actorPos.y, actorPos.y + actorPos.dim.y, spritePos.y, spritePos.y + spritePos.dim.y)
-        );
+        return (this.isAxisCollide(actorPos.x, actorPos.x + actorPos.dim.x, spritePos.x, spritePos.x + spritePos.dim.x) &&
+            this.isAxisCollide(actorPos.y, actorPos.y + actorPos.dim.y, spritePos.y, spritePos.y + spritePos.dim.y));
     }
 
     addSprite(id, name,  x = 0, y = 0, z = 0) {
@@ -2359,6 +2355,16 @@ class SpritePane {
         this.dirty = true;
     }
 
+    hasSpriteSheetId(id, sheetId) {
+        const sprite = this.sprites[id];
+        return (sprite.name === sheetId);
+    }
+
+    getSpriteSheetId(id) {
+        const sprite = this.sprites[id];
+        return sprite.name;
+    }
+
     updateFrames() {
         const synced = [];
         for (let id in this.sprites) {
@@ -2412,11 +2418,19 @@ class SpritePane {
         return name + '.' + this.uid;
     }
 
+    removeSprites(ids) {
+        for (let id of ids) {
+            this.removeSprite(id);
+        }
+    }
+
     removeSprite(id) {
         const sprites = this.getSpritesById(id);
         for (let sprite of sprites) {
-            delete this.sprites[sprite.id];
-            this.dirty = true;
+            if (sprite) {
+                delete this.sprites[sprite.id];
+                this.dirty = true;
+            }
         }
     }
 
@@ -2427,6 +2441,14 @@ class SpritePane {
                 this.setSpritePos(sprite.id, sprite.x + moveX, sprite.y + moveY);
             }
         }
+    }
+
+    isSpriteInBounds(id) {
+        const pos = this.getSpritePos(id);
+        return (
+            pos.x + pos.dim.x >= 0 && pos.x < this.viewPortDim.x &&
+            pos.y + pos.dim.y >= 0 && pos.y < this.viewPortDim.y
+        );
     }
 
     attachSpriteTo(id, attach) {
@@ -4513,6 +4535,7 @@ class ObjectController {
         this.controllerFactory = controllerFactory;
         this.spritePane = spritePane;
         this.objects = objects;
+        this.uid = 0;
         this.activeObjects = [];
     }
 
@@ -4524,44 +4547,197 @@ class ObjectController {
         return this.objects[id];
     }
 
+    getUid(name) {
+        name += '_' + this.uid;
+        this.uid++;
+        return name;
+    }
+
     doActions() {
-        const removeIds = [];
-        // controll existing sprites
+
+        // controll existing objects
         const active = [];
         for (let obj of this.activeObjects) {
-            if (obj.controller.getNextActions() !== false) {
+            let result = obj.controller.getNextActions(obj.id);
+            if (result !== false && obj.object.autoRemove !== false && obj.spriteIds !== undefined) {
+                result = false;
+                for (let spriteId of obj.spriteIds) {
+                    if (this.spritePane.isSpriteInBounds(spriteId)) {
+                        result = true;
+                        break;
+                    }
+
+                }
+            }
+            if (result !== false) {
                 active.push(obj);
-            };
+            } else if (obj.spriteIds !== undefined) {
+                this.spritePane.removeSprite(obj.spriteIds);
+            }
         }
         this.activeObjects = active;
 
-        // add new sprite
+        // add new objects
         let objectEvents = Game.instance.getEvents('object');
         for (let objectEvent of objectEvents) {
-            console.log('HAS EVENT', objectEvent);
             const obj = this.getObject(objectEvent.object);
             if (obj === null) {
                 continue;
             }
             const activeObject = {
-                id:  this.spritePane.getUid(objectEvent.object),
+                id:  this.getUid(objectEvent.object),
+                object: obj,
                 controller: this.controllerFactory.get(obj.controller)
             };
             this.activeObjects.push(activeObject);
-            activeObject.controller.init(activeObject.id, objectEvent);
-            // create sprite (variant)
-/*
-            this.getObject()
-
-
-            const spriteId = spritePane.getUid(sprite.sheetId);
-            // get new controller instance
-            const id = controller.init(sprite, spriteEvent.detail);
-            this.currentSprites[id] = controllerInstance;
- */
+            let spriteIds = activeObject.controller.init(activeObject.id, objectEvent);
+            if (spriteIds !== undefined) {
+                if (!Array.isArray(spriteIds)) {
+                    spriteIds = [spriteIds];
+                }
+                activeObject.spriteIds = spriteIds;
+            }
         }
     }
 
+}
+
+const INPUT = {
+    TYPE: {
+        PRESSED_DOWN: 0,
+        PRESS_AND_RELEASE: 1
+    },
+    STATE: {
+        NOTPRESSED: 0,
+        PRESSED: 1,
+        AWAIT_NOTPRESSED: 2,
+        AWAIT_PRESSED: 3
+    }
+};
+
+class InputController {
+
+    constructor() {
+        this.xDir = 0;
+        this.yDir = 0;
+        this.inputs = {};
+        this.dirInputs = {};
+    }
+
+    setDirInputs(up, down, left, right) {
+        this.dirInputs['up'] = up;
+        this.dirInputs['down'] = down;
+        this.dirInputs['left'] = left;
+        this.dirInputs['right'] = right;
+    }
+
+    update() {
+        const game = Game.instance;
+        this.xDir = 0;
+        if (game.keysDown[this.dirInputs['up']]) {
+            this.xDir--;
+        }
+        if (game.keysDown[this.dirInputs['down']]) {
+            this.xDir++;
+        }
+        this.dirY = 0;
+        if (game.keysDown[this.dirInputs['left']]) {
+            this.yDir--;
+        }
+        if (game.keysDown[this.dirInputs['right']]) {
+            this.yDir++;
+        }
+
+        for (let name in this.inputs) {
+            const input = this.inputs[name];
+            const keyDown = game.keysDown[input.key];
+            switch(input.type) {
+                case INPUT.TYPE.PRESSED_DOWN:
+                    input.state = keyDown ? INPUT.STATE.PRESSED : INPUT.STATE.NOTPRESSED;
+                    break;
+
+                case INPUT.TYPE.PRESS_AND_RELEASE:
+                    switch(input.state) {
+                        case INPUT.STATE.AWAIT_NOTPRESSED:
+                            if (!keyDown) {
+                                input.state = INPUT.STATE.AWAIT_PRESSED;
+                            }
+                            break;
+
+                        case INPUT.STATE.AWAIT_PRESSED:
+                            if (keyDown) {
+                                input.state = INPUT.STATE.AWAIT_PRESSED;
+                            }
+                            break;
+
+                        case INPUT.STATE.PRESSED:
+                            if (!keyDown) {
+                                input.state = INPUT.STATE.NOTPRESSED;
+                            }
+                    }
+                    break;
+            }
+        }
+    }
+
+    hasInput(name) {
+        return this.inputs[name].state === INPUT.STATE.PRESSED;
+    }
+
+    awaitInput(name) {
+        const input = this.inputs[name];
+        if (input.type === INPUT.TYPE.PRESS_AND_RELEASE) {
+            input.state = INPUT.STATE.AWAIT_NOTPRESSED;
+        }
+    }
+
+    addInput(name, key, type = INPUT.TYPE.PRESSED_DOWN) {
+        this.inputs[name] = {key, type};
+    }
+
+    noXDir() {
+        return this.xDir === 0
+    }
+
+    noYDir() {
+        return this.yDir === 0
+    }
+
+    noDir() {
+        return this.xDir === 0 && this.yDir === 0;
+    }
+
+    isDownDir() {
+        return this.yDir === 1;
+    }
+
+    isUpDir() {
+        return this.yDir === -1;
+    }
+
+    isRightDir() {
+        return this.xDir === 1;
+    }
+
+    isLeftDir() {
+        return this.xDir === -1;
+    }
+
+    isDown() {
+        return this.yDir === 1 && this.xDir === 0;
+    }
+
+    isUp() {
+        return this.yDir === -1 && this.xDir === 0;
+    }
+
+    isLeft() {
+        return this.yDir === 0 && this.xDir === -1;
+    }
+
+    isRight() {
+        return this.yDir === 0 && this.xDir === 1;
+    }
 }
 
 function d() {
