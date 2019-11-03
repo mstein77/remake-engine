@@ -17,12 +17,14 @@ import {
     MasterSlavesScrollHandler,
     BoundsScrollHandler,
     SpriteAndTilesCollider,
+    InputController,
     d,
     SpriteSheet,
     TilesMap,
     States,
     FontMap,
     TILE,
+    INPUT,
     ANIMATION
 } from './engine';
 
@@ -1696,6 +1698,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             );
             marioStates.setState('stand');
 
+            const inputController = new InputController();
+            inputController.setDirInputs(null, 's', 'a', 'd');
+            inputController.addInput('button-a', 'w', INPUT.TYPE.PRESSED_DOWN);
+
             const collideCheck = function(tile) {
                 return (tile.obj !== null && tile.obj.block);
             };
@@ -1940,21 +1946,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     cutsceneFrame = 0;
                 }
 
-
                 spritePane.updateFrames();
 
-                /* calc required tile collisions
-                const collideIds = [];
-                //if (marioStates.hasPossibleEvent('no-floor', 'hit-bottom')) {
-                    collideIds.push('floor');
-                //}
-                if (marioStates.hasPossibleEvent('move-right', 'not-move-right')) {
-                    collideIds.push('right');
-                }
-                if (marioStates.hasPossibleEvent('hit-ceiling')) {
-                    collideIds.push('ceiling');
-                }
-                 */
                 const collides = marioCollider.getCollides(['floor', 'left', 'right', 'ceiling', 'center']);
 
                 const collEvents = this.getEvents('collide');
@@ -1973,20 +1966,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
 
                 // get keyboard actions
-                let dirX = 0;
-                if (this.keysDown['a']) {
-                    dirX--;
-                }
-                if (this.keysDown['d']) {
-                    dirX++;
-                }
-                let dirY = 0;
-                if (this.keysDown['w']) {
-                    dirY--;
-                }
-                if (this.keysDown['s']) {
-                    dirY++;
-                }
+                inputController.update();
 
                 // TODO remove...just for debugging
                 if (this.keysDown['q']) {
@@ -2004,6 +1984,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 // find event matching current state
                 let currEvent = null;
                 const events = marioStates.getPossibleEvents();
+                if (events.indexOf('move-up') !== -1) {
+                    inputController.awaitInput('button-a');
+                }
+
                 for (let event of events) {
                     switch (event) {
 
@@ -2012,35 +1996,35 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'move-up':
-                            if (dirY !== -1) continue;
+                            if (!inputController.hasInput('button-a')) continue;
                             break;
 
                         case 'move-down':
-                            if (dirY !== 1) continue;
+                            if (!inputController.isDownDir()) continue;
                             break;
 
                         case 'not-move-down':
-                            if (dirY === 1) continue;
+                            if (inputController.isDownDir()) continue;
                             break;
 
                         case 'not-move-up':
-                            if (dirY === -1) continue;
+                            if (inputController.hasInput('button-a')) continue;
                             break;
 
                         case 'move-right':
-                            if (dirX !== 1 || collides.right.dist <= 0) continue;
+                            if (!inputController.isRightDir() || collides.right.dist <= 0) continue;
                             break;
 
                         case 'move-left':
-                            if (dirX !== -1 || collides.left.dist <= 0) continue;
+                            if (!inputController.isLeftDir() || collides.left.dist <= 0) continue;
                             break;
 
                         case 'not-move-right':
-                            if (dirX === 1 && collides.right.dist > 0) continue;
+                            if (inputController.isRightDir() && collides.right.dist > 0) continue;
                             break;
 
                         case 'not-move-left':
-                            if (dirX === -1 && collides.left.dist > 0) continue;
+                            if (inputController.isLeftDir() && collides.left.dist > 0) continue;
                             break;
 
                         case 'hit-ceiling':
@@ -2053,17 +2037,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                             object: tile.obj.hitEvent,
                                             tile
                                     });
-/*
-                                    switch (tile.obj.hitEvent) {
-                                        case 'destroy':
-                                            tilesPane.replaceTile(tile.x, tile.y, 0);
-                                            break;
-                                        case 'mushroom':
-                                            tilesPane.replaceTile(tile.x, tile.y, 27);
-                                            break;
-
-                                    }
-*/
                                 }
                                 i++;
                             }
@@ -2162,9 +2135,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         break;
                 }
 
-                if (dirX === 1 && collides.right.dist > 0) {
+                if (inputController.isRightDir() && collides.right.dist > 0) {
                     moveX = Math.min(speed, collides.right.dist);
-                } else if (dirX === -1 && collides.left.dist > 0) {
+                } else if (inputController.isLeftDir() && collides.left.dist > 0) {
                     moveX = -Math.min(speed, collides.left.dist);
                 }
                 if (['duck', 'duck_rev'].indexOf(state) !== -1) {

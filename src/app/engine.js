@@ -4621,31 +4621,40 @@ class InputController {
         this.xDir = 0;
         this.yDir = 0;
         this.inputs = {};
-        this.dirInputs = {};
+        this.dirInputs = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
     }
 
     setDirInputs(up, down, left, right) {
-        this.dirInputs['up'] = up;
-        this.dirInputs['down'] = down;
-        this.dirInputs['left'] = left;
-        this.dirInputs['right'] = right;
+        this.dirInputs['up'] = (up !== undefined) ? up : null;
+        this.dirInputs['down'] = (down !== undefined) ? down : null;
+        this.dirInputs['left'] = (left !== undefined) ? left : null;
+        this.dirInputs['right'] = (right !== undefined) ? right : null;
     }
 
     update() {
         const game = Game.instance;
-        this.xDir = 0;
-        if (game.keysDown[this.dirInputs['up']]) {
-            this.xDir--;
-        }
-        if (game.keysDown[this.dirInputs['down']]) {
-            this.xDir++;
-        }
-        this.dirY = 0;
-        if (game.keysDown[this.dirInputs['left']]) {
+        this.yDir = 0;
+        let key = this.dirInputs['up'];
+        if (key !== null && game.keysDown[key]) {
             this.yDir--;
         }
-        if (game.keysDown[this.dirInputs['right']]) {
+        key = this.dirInputs['down'];
+        if (key !== null && game.keysDown[key]) {
             this.yDir++;
+        }
+        this.xDir = 0;
+        key = this.dirInputs['left'];
+        if (key !== null && game.keysDown[key]) {
+            this.xDir--;
+        }
+        key = this.dirInputs['right'];
+        if (key !== null && game.keysDown[key]) {
+            this.xDir++;
         }
 
         for (let name in this.inputs) {
@@ -4687,12 +4696,14 @@ class InputController {
     awaitInput(name) {
         const input = this.inputs[name];
         if (input.type === INPUT.TYPE.PRESS_AND_RELEASE) {
-            input.state = INPUT.STATE.AWAIT_NOTPRESSED;
+            if (input.state !== INPUT.STATE.AWAIT_PRESSED) {
+                input.state = INPUT.STATE.AWAIT_NOTPRESSED;
+            }
         }
     }
 
     addInput(name, key, type = INPUT.TYPE.PRESSED_DOWN) {
-        this.inputs[name] = {key, type};
+        this.inputs[name] = {key, type, state: INPUT.STATE.NOTPRESSED};
     }
 
     noXDir() {
@@ -4777,6 +4788,7 @@ module.exports = {
     BoundsScrollHandler,
     SpriteAndTilesCollider,
     ObjectController,
+    InputController,
     Animation: BitmapPlayer,
     d,
     FontMap,
@@ -4785,6 +4797,7 @@ module.exports = {
     TilesMap,
     States,
     TILE,
+    INPUT,
     ANIMATION,
     OCM
 };
