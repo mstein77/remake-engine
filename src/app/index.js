@@ -25,7 +25,8 @@ import {
     FontMap,
     TILE,
     INPUT,
-    ANIMATION
+    ANIMATION,
+    COLLISION
 } from './engine';
 
 new Game(320, 224, {zoom: 2, debug: false}, function () {
@@ -1530,7 +1531,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let coins = 0;
             let time = 120;
 
-            statusPane.addTextBlock('score', 3 * 8, 16, TextPane.padStart(score, '0', 6));
+            statusPane.addTextBlock('score', 3 * 8, 16, '      ');
             statusPane.addTextBlock('coins', 12 * 8, 16, '   ');
             statusPane.addTextBlock('world', 18 * 8, 16, '' + world);
             statusPane.addTextBlock('time', 25 * 8, 16, '   ');
@@ -1543,30 +1544,37 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 statusPane.updateTextBlock('time', TextPane.padStart(time, '0', 3));
             }
 
+            function updateScore() {
+                statusPane.updateTextBlock('score', TextPane.padStart(score, '0', 6));
+            }
+
+            updateScore();
             updateCoins();
             updateTime();
 
             gameArea.addPane(statusPane, 0);
+            const questionMarkAnimation = {
+                frames: [
+                    {id: 24, duration: 25},
+                    {id: 25, duration: 10},
+                    {id: 26, duration: 10}
+                ],
+                    end: ANIMATION.END.LOOP,
+                    dir: ANIMATION.DIR.FORWARD_BACKWARD,
+                    synchronous: true
+            };
             const bgTilesMap = new TilesMap(
                 TILE.DIM_16x16,
                 resource.tiles,
                 {
+                    1: {block: true, hitEvent: 'breaking-block'},
                     2: {block: true, hitEvent: 'breaking-block'},
                     27: {block: true},
                     28: {block: true},
                     24: {
                         block: true,
                         hitEvent: 'power-up',
-                        animation: {
-                            frames: [
-                                {id: 24, duration: 25},
-                                {id: 25, duration: 10},
-                                {id: 26, duration: 10}
-                            ],
-                            end: ANIMATION.END.LOOP,
-                            dir: ANIMATION.DIR.FORWARD_BACKWARD,
-                            synchronous: true
-                        }
+                        animation: questionMarkAnimation
                     },
                     57: {
                         hitEvent: 'coin',
@@ -1584,7 +1592,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     264: {block: true},
                     265: {block: true},
                     297: {block: true},
-                    298: {block: true}
+                    298: {block: true},
+                    'coin-block': {
+                        animation: questionMarkAnimation,
+                        hitEvent: 'one-coin',
+                        block: true
+                    },
+                    'coin-cache': {
+                        index: 1,
+                        hitEvent: 'coin-cache',
+                        block: true
+                    }
                 },
                 [
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -1595,11 +1613,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 24, 2, 24, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 1, 24, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0],
 
                     [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
-                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, 0, 0, 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
                     [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
                     [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
@@ -1645,10 +1663,24 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 });
             spriteSheet.addSprite('mushroom', 0, 51, 16, 16);
             spriteSheet.addSpriteSeq('fireflower', 0, 83, 16, 16, 3, 0);
-            spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3'], ANIMATION.DIR.LOOP);
+            spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3'], ANIMATION.END.LOOP);
             spriteSheet.addSprite('star', 0, 99, 16, 16);
+            spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
+            spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
+            spriteSheet.addSprite('evilmush-dead', 112, 59, 16, 16);
             spriteSheet.addSprite('mini-block1', 64, 51, 8, 8);
             spriteSheet.addSprite('mini-block2', 72, 51, 8, 8);
+            spriteSheet.addSprite('num_0', 0, 219, 4, 8);
+            spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
+            spriteSheet.addSpriteSeq('minicoin', 0, 211, 8, 8, 3, 0);
+            spriteSheet.addAnimation('minicoin',
+                [{id: 'minicoin1', duration: 40, padding: {x: 0, y: 0}}, {id: 'minicoin2', duration: 10, padding: {x: 0, y: 0}},
+                    {id: 'minicoin3', duration: 10, padding: {x: 0, y: 0}}],
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD_BACKWARD
+            );
+            spriteSheet.addSpriteSeq('coin-up', 0, 163, 16, 16, 4);
+            spriteSheet.addAnimation('coin-up', ['coin-up1', 'coin-up2', 'coin-up3', 'coin-up4'], ANIMATION.END.LOOP);
             spriteSheet.build();
 
             spriteSheet.addAnimation(
@@ -1664,6 +1696,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const spritePane = new SpritePane(spriteSheet);
             spritePane.addSprite('player', 'small-mario', 40, 184);
             spritePane.setAnimationSpeed('player', 0.2);
+            spritePane.addSprite('minicoin', 'minicoin', 87, 16);
             spritePane.setActorId('player');
             spritePane.setAttachDefault(tilesPane);
             vSplitArea.addPane(spritePane, 1);
@@ -1759,10 +1792,86 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             let marioLevel = 0;
             const marioLevels = ['small-', '', 'fire-', ''];
+            let invincibleTimer = null;
+            const coinCaches = {};
+
+            function coinUp(id, event) {
+                coins++;
+                updateCoins();
+                const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
+                addScore(100, pos.x, pos.y);
+                spritePane.addSprite(id, 'coin-up', pos.x, pos.y);
+                spritePane.setAnimationSpeed(id, 0.2);
+                return [id];
+            }
 
             const ControllerFactory = {
                 get: function(controller) {
                     switch(controller) {
+
+                        case 'evilmush':
+                            return {
+                                init: function (id, event) {
+                                    this.id = id;
+                                    this.dir = -1;
+                                    this.state = 0;
+                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
+                                    spritePane.addSprite(id, 'evilmush', pos.x, pos.y + 24);
+                                    spritePane.setAnimationSpeed(id, 0.1);
+                                    this.collider = new SpriteAndTilesCollider(this.id, spritePane, tilesPane, {
+                                        floor: {
+                                            dir: 'down',
+                                            lookahead: 2,
+                                            margin: {
+                                                dir: 0
+                                            }
+                                        },
+                                        right: {
+                                            dir: 'right',
+                                            lookahead: 1,
+                                            margin: {
+                                                end: 1
+                                            }
+                                        },
+                                        left: {
+                                            dir: 'left',
+                                            lookahead: 1,
+                                            margin: {
+                                                end: 1
+                                            }
+                                        },
+
+                                    });
+                                    this.collider.setSpriteOffset(0, -24);
+                                    return [id];
+                                },
+
+                                getNextActions: function (id) {
+                                    if (this.state === -1) {
+                                        return true;
+                                    }
+                                    const collision = spritePane.getActorCollision(id);
+                                    if (collision !== null) {
+                                        if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                                            this.state = -1;
+                                            spritePane.assignSprite(id, 'evilmush-dead');
+                                            addScoreForSprite(100, id);
+                                        } else {
+                                            cutscene = 'dead';
+                                            console.log(id, spritePane.getSpritePos(id), collision);
+                                        }
+                                        return;
+                                    } else if (this.state === 0) {
+                                        const collides = this.collider.getCollides(['floor', 'left', 'right']);
+                                        if (this.dir === 1 && collides.right.dist === 0) {
+                                            this.dir = (collides.left.dist === 0 ? 0 : -1);
+                                        } else if (collides.left.dist === 0) {
+                                            this.dir = (collides.right.dist === 0 ? 0 : 1);
+                                        }
+                                        spritePane.moveSprite(this.id, this.dir, collides.floor.dist > 0 ? Math.min(2, collides.floor.dist) : 0);
+                                    }
+                                }
+                            };
 
                         case 'breaking-block':
                             return {
@@ -1778,6 +1887,59 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 getNextActions: function (id) {
                                     spritePane.moveSprite(id + '_1', -1, 3);
                                     spritePane.moveSprite( id + '_2', 1, 3);
+                                }
+                            };
+
+                        case 'coin-cache':
+                            return {
+                                init: function(id, event) {
+                                    this.id = id;
+                                    const cacheId = event.tile.x + ' ' + event.tile.y;
+                                    if (coinCaches[cacheId] === undefined) {
+                                        coinCaches[cacheId] = {
+                                            time
+                                        }
+                                    }
+                                    const coinCache = coinCaches[cacheId];
+                                    if (coinCache.time - time > 4) {
+                                        tilesPane.replaceTile(event.tile.x, event.tile.y, 27);
+                                        delete coinCaches[cacheId];
+                                    }
+                                    this.state = 0;
+                                    return coinUp(id, event);
+                                },
+
+                                getNextActions: function (id) {
+                                    if (this.state === 30) {
+                                        return false;
+                                    }
+                                    let speed = 2;
+                                    if (this.state < 15) {
+                                        speed *= -1;
+                                    }
+                                    spritePane.moveSprite(id, 0, speed);
+                                    this.state++;
+                                }
+                            };
+
+                        case 'one-coin':
+                            return {
+                                init: function (id, event) {
+                                    this.id = id;
+                                    this.state = 0;
+                                    return coinUp(id, event);
+                                },
+
+                                getNextActions: function (id) {
+                                    if (this.state === 30) {
+                                        return false;
+                                    }
+                                    let speed = 2;
+                                    if (this.state < 15) {
+                                        speed *= -1;
+                                    }
+                                    spritePane.moveSprite(id, 0, speed);
+                                    this.state++;
                                 }
                             };
 
@@ -1817,9 +1979,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                             cutscene = 'grow';
                                         } else if (marioLevel === 1) {
                                             cutscene = 'fire';
-                                        }
-                                        if (marioLevel < marioLevels.length - 1) {
-                                            // marioLevel++;
+                                        } else if (marioLevel === 2) {
+                                            invincibleTimer = 500;
                                         }
                                         return false;
                                     }
@@ -1862,7 +2023,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                         const collides = this.collider.getCollides(['floor', 'left', 'right']);
                                         if (this.dir === 1 && collides.right.dist === 0) {
                                             this.dir = (collides.left.dist === 0 ? 0 : -1);
-                                            console.log(collides);
                                         } else if (collides.left.dist === 0) {
                                             this.dir = (collides.right.dist === 0 ? 0 : 1);
                                         }
@@ -1874,15 +2034,44 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             };
             const objectController = new ObjectController(spritePane, ControllerFactory, {
-                'breaking-block': {
-                    controller: 'breaking-block'
-                },
-                'power-up': {
-                    controller: 'power-up'
-                }
+                'breaking-block': {},
+                'power-up': {},
+                'evilmush': {},
+                'one-coin': {},
+                'coin-cache': {}
             });
 
             marioCollider.setSpriteOffset(0, -24);
+
+            function addScore(points, startX, startY) {
+                score += points;
+                points = '' + points;
+                updateScore(score);
+
+                const ids = [];
+                for (let i = 0; i < points.length; i++) {
+                    const id = spritePane.getUid('score');
+                    ids.push(id);
+                    spritePane.addSprite(id, 'num_' + points[i], startX + 4 * i, startY);
+                }
+                const objId = objectController.getUid('score');
+                const groupId = ':' + objId;
+                spritePane.addGroup(objId, ids);
+
+                let scoreTimer = 40;
+                objectController.addSpritesAsObject(objId, groupId, function (id) {
+                    if (scoreTimer === 0) {
+                        return false;
+                    }
+                    scoreTimer--;
+                    spritePane.moveSprite(groupId, 0, -1);
+                });
+            }
+
+            function addScoreForSprite(score, spriteId) {
+                const pos = spritePane.getSpritePos(spriteId);
+                addScore(score, pos.x, pos.y);
+            }
 
             const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
             let jumpIndex = null;
@@ -1918,15 +2107,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             // ###################################################
 
             marioScreen.setFrameHandler(function () {
-                if (time > 0) {
-                    frameCount++;
-                    if (frameCount % 60 === 0) {
-                        time--;
-                        updateTime();
-                    }
-                }
-
                 bgTilesMap.updateFrames();
+                // update animated tiles
+                tilesPane.updateAnimatedTiles();
+
                 if (cutscene !== null) {
                     let done = false;
                     switch(cutscene) {
@@ -1937,16 +2121,41 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'fire':
                             done = flickerCutScene(2);
                             break;
+
+                        case 'dead':
+                            let moveY = 0;
+                            if (cutsceneFrame === 0) {
+                                spritePane.assignSprite('player', 'small-mario-duck');
+                            } else if (cutsceneFrame < 20) {
+                                moveY = -2;
+                            } else if (cutsceneFrame < 200) {
+                                moveY = 2;
+                            }
+                            spritePane.moveSprite('player', 0, moveY);
+
+                            break;
                     }
                     if (!done) {
                         cutsceneFrame++;
-                        return;
+                        return true;
                     }
                     cutscene = null;
                     cutsceneFrame = 0;
                 }
 
+                if (time > 0) {
+                    frameCount++;
+                    if (frameCount % 25 === 0) {
+                        time--;
+                        updateTime();
+                        if (time === 0) {
+                            cutscene = 'dead';
+                        }
+                    }
+                }
+
                 spritePane.updateFrames();
+                spritePane.updateCollisions();
 
                 const collides = marioCollider.getCollides(['floor', 'left', 'right', 'ceiling', 'center']);
 
@@ -1959,6 +2168,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             coins++;
                             updateCoins();
                             break;
+
+
 
                         default:
                             console.log('WHAT?', event);
@@ -2148,9 +2359,33 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     gameScrollBounds.moveActor(moveX, moveY);
                 }
 
-                // update animated tiles
-                tilesPane.updateAnimatedTiles();
+                if (invincibleTimer !== null) {
+                    invincibleTimer--;
+                    let target = '';
+                    if (invincibleTimer === 0) {
+                        invincibleTimer = null;
+                        marioLevel = 2;
+                    } else {
+                        switch (invincibleTimer % 9) {
+                            case 0:
+                            case 1:
+                            case 2:
+                                target = 'color-replace(#f7d6a4:#b13425;#e39d25:#ffffff;#b53121:#e69c21)';
+                                break;
+                            case 3:
+                            case 4:
+                            case 5:
+                                target = 'color-replace(#f7d6a4:#000000;#e39d25:#ffcec5;#b53121:#9c4a00)';
+                                break;
 
+                            case 6:
+                            case 7:
+                            case 8:
+                                target = 'color-replace(#f7d6a4:#3a8400;#e39d25:#ffffff;#b53121:#e69c21)';
+                        }
+                    }
+                    spritePane.setSpriteFilters('player', target);
+                }
             });
         }
     });

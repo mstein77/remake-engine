@@ -145,6 +145,7 @@ class Game {
         this.log('gotoScreen', screenId);
         this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
+        this.frameEvents = {};
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
         const callback = screen.init();
@@ -252,7 +253,9 @@ class Game {
         if (this.frameEvents[type] === undefined) {
             return [];
         }
-        return this.frameEvents[type];
+        const events = this.frameEvents[type];
+        delete this.frameEvents[type];
+        return events;
     }
 
     updateFrame() {
@@ -267,7 +270,6 @@ class Game {
                 this.startTimer('render');
                 this.render();
                 this.addTimerDuration('render');
-                this.frameEvents = {};
                 this.frames++;
                 if (screen.frameHandler !== null) {
                     screen.frameHandler();
@@ -1396,8 +1398,6 @@ class BitmapScrollPane {
 /**
  * TODO:
  *   - Filters
- *   - Events
- *   - Animated Tiles
  */
 class TilesPane {
 
@@ -1579,7 +1579,8 @@ class TilesPane {
 /**
  * TODO:
  *   - Filters
- *   - Events
+ *   * ObjectEvents
+ *   - TileStates
  */
 class BufferedTilesPane {
 
@@ -1678,6 +1679,8 @@ class BufferedTilesPane {
             y: this.mapTilePos.y
         };
         this.copiedHeight = 0;
+
+        this.oldPos = this.getViewPortMapPos();
 
         this.buffers = new BufferedCanvasContainer(this.paneDim.x, this.paneDim.y);
         return this.buffers;
@@ -1821,10 +1824,31 @@ class BufferedTilesPane {
             x: this.mapTilePos.x + this.canvasTileOffset.x,
             y: this.mapTilePos.y + this.canvasTileOffset.y
         };
-
         return {
             x: ((x - origin.x) << this.tilesMap.tileBits) - this.scrollPos.x,
             y: ((y - origin.y) << this.tilesMap.tileBits) + this.scrollPos.y
+        };
+    }
+
+    getViewPortMapPos() {
+        const origin = {
+            x: this.mapTilePos.x + this.canvasTileOffset.x,
+            y: this.mapTilePos.y + this.canvasTileOffset.y
+        };
+
+        const absPosStart = {
+            x: (origin.x << this.tilesMap.tileBits) + this.scrollPos.x,
+            y: (origin.y << this.tilesMap.tileBits) + this.scrollPos.y
+        };
+
+        const absPosEnd = {
+            x: absPosStart.x + this.viewPortDim.x - 1,
+            y: absPosStart.y + this.viewPortDim.y - 1
+        };
+
+        return {
+            start: {x: absPosStart.x >> this.tilesMap.tileBits, y: absPosStart.y >> this.tilesMap.tileBits},
+            end: {x: absPosEnd.x >> this.tilesMap.tileBits, y: absPosEnd.y >> this.tilesMap.tileBits}
         };
     }
 
@@ -2156,7 +2180,6 @@ class BufferedTilesPane {
     }
 
     render() {
-
         const target = this.buffers.getBufferCtx();
         switch(this.state) {
 
@@ -2188,6 +2211,49 @@ class BufferedTilesPane {
         const posLeft = -(this.scrollPosOffset.x + this.scrollPos.x) + 'px';
         const posTop = -(this.scrollPosOffset.y + this.scrollPos.y) + 'px';
 
+        // TODO: trigger all events in viewPort when oldPos is null
+        const newPos = this.getViewPortMapPos();
+        const oldPos = this.oldPos;
+        if (oldPos.start.x !== newPos.start.x || oldPos.start.y !== newPos.start.y ||
+            oldPos.end.x !== newPos.end.x || oldPos.end.y !== newPos.end.y) {
+            const relStart = {
+                x: newPos.start.x - oldPos.start.x,
+                y: newPos.start.y - oldPos.start.y
+            };
+            const relEnd = {
+                x: newPos.end.x - oldPos.end.x,
+                y: newPos.end.y - oldPos.end.y
+            };
+
+            const columns = [];
+            if (relEnd.x > 0) {
+                for (let i = 1; i <= relEnd.x; i++) {
+                    columns.push(oldPos.end.x + i);
+                }
+            } else if (relEnd.x < 0) {
+                for (let i = 1; i <= -relEnd.x; i++) {
+                    columns.push(oldPos.start.x - i);
+                }
+            }
+            const rows = [];
+            if (relEnd.y > 0) {
+                for (let i = 1; i <= relEnd.y; i++) {
+                    rows.push(oldPos.end.y + i);
+                }
+            } else if (relEnd.x < 0) {
+                for (let i = 1; i <= -relEnd.y; i++) {
+                    rows.push(newPos.start.y - i);
+                }
+            }
+            // @TODO much rework and optimization needed here
+            if (columns.length > 0) {
+                for (let column of columns) {
+                    this.tilesMap.triggerEventsInXLine(column, newPos.start.y, newPos.end.y);
+                }
+            }
+        }
+        this.oldPos = newPos;
+
         if (elemStyle.left !== posLeft) {
             Game.instance.addDomOp(elemStyle, 'left', posLeft);
         }
@@ -2196,6 +2262,15 @@ class BufferedTilesPane {
         }
     }
 }
+
+const COLLISION = {
+    LEFT: 'left',
+    RIGHT: 'right',
+    TOP: 'top',
+    BOTTOM: 'bottom',
+    INCLUDE: 'include',
+    COVER: 'cover'
+};
 
 /**
  * TODO:
@@ -2215,6 +2290,15 @@ class SpritePane {
         this.uid = 0;
         this.zOrdering = false;
         this.attachDefault = null;
+        this.collisions = {};
+        this.posSort = function (x, y) {
+            if (x.pos < y.pos) {
+                return -1;
+            } else if (x.pos > y.pos) {
+                return 1;
+            }
+            return 0;
+        };
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -2233,6 +2317,147 @@ class SpritePane {
 
         this.container = new BufferedCanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
         return this.container;
+    }
+
+    getAxisPointCollisions(sprites, axis, detailed = false) {
+        const axisPoints = [];
+        for (let key in sprites) {
+            const sprite = sprites[key];
+            axisPoints.push({
+                sprite,
+                isStart: true,
+                key,
+                pos: sprite[axis]
+            });
+            axisPoints.push({
+                sprite,
+                isStart: false,
+                key,
+                pos: (sprite[axis] + sprite.dim[axis] - 1)
+            });
+        }
+
+        axisPoints.sort(this.posSort);
+
+        let i = 0;
+        let pos = null;
+        const opening = [];
+        let closing = [];
+        const found = detailed ? [] : {};
+
+        do {
+            if (i === axisPoints.length || axisPoints[i].pos !== pos) {
+                for (let o of opening) {
+                    for (let c of closing) {
+                        if (o !== c) {
+                            if (detailed) {
+                                found.push([o, c])
+                            } else {
+                                found[o.id] = o;
+                                found[c.id] = c;
+                            }
+                        }
+                    }
+                }
+                if (i === axisPoints.length) {
+                    break;
+                }
+
+                for (let c of closing) {
+                    const posClose = opening.indexOf(c);
+                    opening.splice(posClose, 1);
+                }
+                closing = [];
+            }
+            let point = axisPoints[i];
+            pos = point.pos;
+            if (point.isStart) {
+                opening.push(point.sprite)
+            } else {
+                closing.push(point.sprite)
+            }
+            i++
+        } while (true);
+
+        return found;
+    }
+
+    updateCollisions() {
+        const firstDim = (this.paneDim.x > this.paneDim.y ? 'x' : 'y');
+        const secondaryDim = firstDim === 'x' ? 'y' : 'x';
+        let found = this.getAxisPointCollisions(this.sprites, firstDim);
+        found = this.getAxisPointCollisions(found, secondaryDim, true);
+
+        const collisions = {};
+        for (let pair of found) {
+
+            const source = pair[0];
+            const target = pair[1];
+            if (collisions[source.id] === undefined) {
+                collisions[source.id] = [];
+            }
+
+            let sourceEnd = source.x + source.dim.x - 1;
+            let targetEnd = target.x + target.dim.x - 1;
+            let touch = 0;
+            let type;
+            const collision = {sprite: target};
+            if (source.x < target.x) {
+                if (sourceEnd > targetEnd) {
+                    type = COLLISION.COVER;
+                    touch = targetEnd - target.x + 1;
+                } else {
+                    type = COLLISION.LEFT;
+                    touch = sourceEnd - target.x + 1;
+                }
+            } else {
+                if (sourceEnd > targetEnd) {
+                    type = COLLISION.RIGHT;
+                    touch = targetEnd - source.x + 1;
+                } else {
+                    type = COLLISION.INCLUDE;
+                    touch = sourceEnd - source.x + 1;
+                }
+            }
+            if (touch < 0) {
+                continue;
+            }
+            collision.x = {type, touch};
+
+            sourceEnd = source.y + source.dim.y - 1;
+            targetEnd = target.y + target.dim.y - 1;
+            if (source.y < target.y) {
+                if (sourceEnd > targetEnd) {
+                    type = COLLISION.COVER;
+                    touch = targetEnd - target.y + 1;
+                } else {
+                    type = COLLISION.TOP;
+                    touch = sourceEnd - target.y + 1;
+                }
+            } else {
+                if (sourceEnd > targetEnd) {
+                    type = COLLISION.BOTTOM;
+                    touch = targetEnd - source.y + 1;
+                } else {
+                    type = COLLISION.INCLUDE;
+                    touch = sourceEnd - source.y + 1;
+                }
+            }
+            if (touch < 0) {
+                continue;
+            }
+            collision.y = {type, touch};
+
+            collisions[source.id].push(collision);
+        }
+        this.collisions = collisions;
+    }
+
+    getLastSpriteCollisions(id) {
+        if (this.collisions[id] === undefined) {
+            return [];
+        }
+        return this.collisions[id];
     }
 
     setAttachDefault(value) {
@@ -2258,16 +2483,32 @@ class SpritePane {
         return !(aStart > bEnd || bStart > aEnd);
     }
 
+    getActorCollision(id) {
+        const actorId = this.getActorId();
+        if (actorId === null) {
+            return false;
+        }
+        const colls = this.getLastSpriteCollisions(id);
+        for (let coll of colls) {
+            if (coll.sprite.id === actorId) {
+                return coll;
+            }
+        }
+        return null;
+    }
+
     isCollidingActor(id) {
         const actorId = this.getActorId();
         if (actorId === null) {
             return false;
         }
-        const actorPos = this.getSpritePos(actorId);
-        const spritePos = this.getSpritePos(id);
-
-        return (this.isAxisCollide(actorPos.x, actorPos.x + actorPos.dim.x, spritePos.x, spritePos.x + spritePos.dim.x) &&
-            this.isAxisCollide(actorPos.y, actorPos.y + actorPos.dim.y, spritePos.y, spritePos.y + spritePos.dim.y));
+        const colls = this.getLastSpriteCollisions(id);
+        for (let coll of colls) {
+            if (coll.sprite.id === actorId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     addSprite(id, name,  x = 0, y = 0, z = 0) {
@@ -3468,8 +3709,6 @@ filterer.addFilter(
     ]
 );
 
-// @TODO: colorReplace-Filter
-
 // ####################################
 //    Sheets
 // ####################################
@@ -3932,7 +4171,10 @@ class TilesMap {
         if (this.map[y] === undefined || this.map[y][x] === undefined) {
             return null;
         }
-        const tile = this.map[y][x];
+        let tile = this.map[y][x];
+        if (Array.isArray(tile)) {
+            tile = tile[0];
+        }
         let obj = this.tiles[tile];
         if (obj === undefined) {
             if (this.defaultTile === null) {
@@ -3941,7 +4183,10 @@ class TilesMap {
             }
             obj = this.defaultTile;
         }
-        obj.index = tile;
+        if (obj.index === undefined) {
+            obj.index = tile;
+        }
+
         return obj;
     }
 
@@ -3974,6 +4219,26 @@ class TilesMap {
             tiles.push(this.getTileObj(x, y));
         }
         return tiles;
+    }
+
+    triggerEventsInXLine(x, y1, y2) {
+        for (let y = y1; y < y2; y++) {
+            let tile = this.map[y][x];
+            if (Array.isArray(tile)) {
+                if (tile.length === 0) {
+                    tile = 0;
+                } else {
+                    while (tile.length > 1) {
+                        const event = tile.pop();
+                        const parts = event.split(':');
+                        Game.instance.addFrameEvent(parts[0], {object: parts[1], tile: {obj: this.getTileObj(x, y), x, y}});
+                    }
+                    tile = tile[0];
+                }
+                this.map[y][x] = tile;
+            }
+
+        }
     }
 
     getTileIndex(x, y) {
@@ -4552,12 +4817,20 @@ class ObjectController {
         return name;
     }
 
-    doActions() {
+    addSpritesAsObject(id, spriteIds, updateCallback) {
+        this.activeObjects.push({
+            id,
+            object: {autoRemove: false},
+            spriteIds: (Array.isArray(spriteIds) ? spriteIds : [spriteIds]),
+            updateCallback
+        });
+    }
 
+    doActions() {
         // controll existing objects
         const active = [];
         for (let obj of this.activeObjects) {
-            let result = obj.controller.getNextActions(obj.id);
+            let result = (obj.controller !== undefined) ? obj.controller.getNextActions(obj.id) : obj.updateCallback(obj.id);
             if (result !== false && obj.object.autoRemove !== false && obj.spriteIds !== undefined) {
                 result = false;
                 for (let spriteId of obj.spriteIds) {
@@ -4571,7 +4844,7 @@ class ObjectController {
             if (result !== false) {
                 active.push(obj);
             } else if (obj.spriteIds !== undefined) {
-                this.spritePane.removeSprite(obj.spriteIds);
+                this.spritePane.removeSprites(obj.spriteIds);
             }
         }
         this.activeObjects = active;
@@ -4586,7 +4859,7 @@ class ObjectController {
             const activeObject = {
                 id:  this.getUid(objectEvent.object),
                 object: obj,
-                controller: this.controllerFactory.get(obj.controller)
+                controller: this.controllerFactory.get(obj.controller !== undefined ? obj.controller : objectEvent.object)
             };
             this.activeObjects.push(activeObject);
             let spriteIds = activeObject.controller.init(activeObject.id, objectEvent);
@@ -4798,5 +5071,6 @@ module.exports = {
     TILE,
     INPUT,
     ANIMATION,
-    OCM
+    OCM,
+    COLLISION
 };
