@@ -184,6 +184,58 @@ class Game {
         return "=================================================\n";
     }
 
+    openEditorMode() {
+        console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
+
+        function extractEditablesFromAreas(areas, editables) {
+            console.log('----', areas);
+            if (!Array.isArray(areas)) {
+                return;
+            }
+            for (let area of areas) {
+                console.log('AREA', area);
+                if (area.panes !== undefined) {
+                    for (let pane of area.panes) {
+
+                        if (pane instanceof BufferedTilesPane) {
+                            editables.push(pane);
+                        }
+                    }
+                }
+                if (Array.isArray(area)) {
+                    extractEditablesFromAreas(area, editables);
+                } else if (area.areas !== undefined) {
+                    extractEditablesFromAreas(area.areas, editables);
+                }
+            }
+        }
+
+        const tilesPanes = [];
+        extractEditablesFromAreas(this.screens[this.currentScreen].areas, tilesPanes);
+
+        if (tilesPanes.length > 0) {
+            this.setRunning(false);
+            this.getDomElem('game').style.display = 'none';
+            const cssId = 'editorCss';
+            if (!document.getElementById(cssId)) {
+                console.log('CSS...');
+                const head  = document.getElementsByTagName('head')[0];
+                console.log(head);
+                const link  = document.createElement('link');
+                link.id   = cssId;
+                link.rel  = 'stylesheet';
+                link.type = 'text/css';
+                link.href = 'css/editor.css';
+                link.media = 'all';
+                head.appendChild(link);
+            }
+
+            const editor = this.getDomElem('editor');
+            editor.style.display = 'block';
+            const mapEditor = new TilesMapEditor(this, editor, tilesPanes[0]);
+        }
+    }
+
     printDebugs() {
 
         if (this.debug) {
@@ -336,7 +388,7 @@ class Game {
         document.onkeyup = keyUpHandler;
 
         document.body.innerHTML =
-            '<div style="display: flex; justify-content: center; margin-top: 20px">' +
+            '<div id="game" style="display: flex; justify-content: center; margin-top: 20px">' +
 
                 '<div id="log-div" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0">' +
                     '<pre id="log" style="float: right; margin: 0">' + this.line() + " Log\n" + this.line() + '</pre>' +
@@ -349,7 +401,8 @@ class Game {
                 '</div>' +
             '</div>' +
 
-            '<div id="offscreen" style="display: none"></div>';
+            '<div id="offscreen" style="display: none"></div>' +
+            '<div id="editor" style="display: none">Editor</div>';
 
         if (this.zoom !== 1) {
             this.setZoom(this.zoom, true);
@@ -1758,10 +1811,9 @@ class BufferedTilesPane {
             x2: realEnd >> this.tilesMap.tileBits,
             y: (y + this.scrollPos.y) >> this.tilesMap.tileBits
         };
-        let touchStart = realStart % this.tilesMap.tileSize;
-        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
-        let touchEnd = realEnd % this.tilesMap.tileSize;
-        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+        const xDiff = x2 - x1 + 1;
+        const touchStart = Math.min(xDiff, this.tilesMap.tileSize - (realStart % this.tilesMap.tileSize));
+        const touchEnd = Math.min(xDiff, (realEnd % this.tilesMap.tileSize) + 1);
 
         const mapY = origin.y + relPos.y;
         const start = origin.x + relPos.x1;
@@ -1795,10 +1847,9 @@ class BufferedTilesPane {
             y1: realStart >> this.tilesMap.tileBits,
             y2: realEnd >> this.tilesMap.tileBits
         };
-        let touchStart = realStart % this.tilesMap.tileSize;
-        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
-        let touchEnd = realEnd % this.tilesMap.tileSize;
-        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+        const yDiff = y2 - y1 + 1;
+        const touchStart = Math.min(yDiff, this.tilesMap.tileSize - (realStart % this.tilesMap.tileSize));
+        const touchEnd = Math.min(yDiff, (realEnd % this.tilesMap.tileSize) + 1);
 
         const mapX = origin.x + relPos.x;
         const start = origin.y + relPos.y1;
@@ -2483,10 +2534,15 @@ class SpritePane {
         return !(aStart > bEnd || bStart > aEnd);
     }
 
-    getActorCollision(id) {
+    getActorCollision(id = null) {
         const actorId = this.getActorId();
         if (actorId === null) {
             return false;
+        }
+
+        if (id === null) {
+            const actorCollisions = this.getLastSpriteCollisions(actorId);
+            return actorCollisions.length > 0 ? actorCollisions : null;
         }
         const colls = this.getLastSpriteCollisions(id);
         for (let coll of colls) {
@@ -3990,7 +4046,7 @@ class SpriteAndTilesCollider {
             };
         if (collide.margin) {
             Object.assign(margin, collide.margin);
-        };
+        }
         collide.margin = margin;
         if (collide.check === undefined) {
             collide.check = SpriteAndTilesCollider.defaultCheck
@@ -4016,8 +4072,8 @@ class SpriteAndTilesCollider {
                 lines[collideId] = [
                     xStart,
                     yStart,
-                    pos.x + pos.dim.x - collide.margin.right - xStart,
-                    pos.y + pos.dim.y - collide.margin.bottom - yStart
+                    pos.x + pos.dim.x - 1 - collide.margin.right - xStart,
+                    pos.y + pos.dim.y - 1 - collide.margin.bottom - yStart
                 ];
             } else {
                 let first = 0;
@@ -4026,13 +4082,13 @@ class SpriteAndTilesCollider {
                 switch (collide.dir) {
                     case 'down':
                         dir = -1;
-                        first = pos.dim.y;
+                        first = pos.dim.y - 1;
                     case 'up':
                         break;
 
                     case 'right':
                         dir = -1;
-                        first = pos.dim.x;
+                        first = pos.dim.x - 1;
                     case 'left':
                         axis = 'y';
                         break;
@@ -4040,7 +4096,7 @@ class SpriteAndTilesCollider {
                 const oppAxis = axis === 'x' ? 'y' : 'x';
                 first += pos[oppAxis] + dir * collide.margin.dir;
                 const dStart = pos[axis] + collide.margin.start;
-                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end - 1;
 
                 lines[collideId] = (axis === 'x' ?
                         [dStart, first, dEnd - dStart, 1] :
@@ -4083,7 +4139,7 @@ class SpriteAndTilesCollider {
                 const oppAxis = axis === 'x' ? 'y' : 'x';
                 first += pos[oppAxis] + dir * collide.margin.dir;
                 const dStart = pos[axis] + collide.margin.start;
-                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end;
+                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end - 1;
 
                 let tiles = axis === 'x' ?
                     this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
@@ -4092,7 +4148,6 @@ class SpriteAndTilesCollider {
                 for(let tile of tiles) {
                     if (collide.check(tile)) {
                         dist = 0;
-
                         break;
                     }
                 }
@@ -4120,8 +4175,8 @@ class SpriteAndTilesCollider {
                 const tiles = this.tilesPane.getTilesInRect(
                     pos.x + collide.margin.left,
                     pos.y + collide.margin.top,
-                    pos.x + pos.dim.x - collide.margin.right,
-                    pos.y + pos.dim.y - collide.margin.bottom
+                    pos.x + pos.dim.x - collide.margin.right - 1,
+                    pos.y + pos.dim.y - collide.margin.bottom - 1
                 );
 
                 for (let tile of tiles) {
@@ -4181,7 +4236,7 @@ class TilesMap {
 
                 throw new Error('Unknown tile "' + tile + '" given in map at position (' + x + ', ' + y + ')!');
             }
-            obj = this.defaultTile;
+            obj = Object.assign({}, this.defaultTile);
         }
         if (obj.index === undefined) {
             obj.index = tile;
@@ -4281,6 +4336,22 @@ class TilesMap {
             }
         }
         return result;
+    }
+
+    renderTileTo(target, index) {
+        target.clearRect(0, 0, this.tileSize, this.tileSize);
+        target.drawImage(
+            this.tilesImg.elem,
+            index << this.tileBits,
+            0,
+            this.tileSize,
+            this.tileSize,
+            0,
+            0,
+            this.tileSize,
+            this.tileSize
+        );
+
     }
 
     render(target, offset, dim = {}) {
@@ -5023,6 +5094,542 @@ class InputController {
     }
 }
 
+const DEGREE_90 = Math.PI / 2;
+
+const PATH = {
+    TYPE: {
+        STRAIGHT: 0,
+        ACCELERATED: 1,
+        DAMPED: 2
+    }
+};
+
+class Force {
+
+    constructor(v0, height, drag = 0) {
+        this.v0 = v0;
+        this.drag = drag;
+        this.gravity = Math.abs(v0 * v0 / (2 * height));
+        this.peakTime = Math.round(Math.abs(v0 / this.gravity));
+    }
+
+    getMoveForTimeVector(vector, lowerBound = null, upperBound = null) {
+        if (vector[0] === null) {
+            return 0;
+        }
+        let move = this.v0 + (this.v0 < 0 ? 1 : -1) * (this.gravity * vector[0]);
+        if (vector[1] !== null) {
+            move -= vector[1] * this.drag;
+        }
+        if (lowerBound !== null && move < 0) {
+            return -Math.min(-move, lowerBound);
+        } else if (upperBound !== null && move >= 0) {
+            return Math.min(move, upperBound);
+        }
+        return move;
+    }
+
+    incVector(vector) {
+        if (vector[0] !== null) {
+            vector[0]++;
+            if (vector[1] !== null) {
+                vector[1]++;
+            }
+        }
+    }
+
+    isTimeVectorAtPeak(vector) {
+        return vector[0] === this.peakTime;
+    }
+
+    getPeakTime() {
+        return this.peakTime;
+    }
+}
+
+
+class Gravity {
+
+    constructor(gravity = null, round = true) {
+        this.time = 0;
+        this.gravity = gravity;
+        this.v0 = null;
+        this.currHeight = 0;
+        this.maxHeight = null;
+        this.round = round;
+        this.dragTime = 0;
+        this.drag = null;
+    }
+
+
+
+    setSpeed(v0) {
+        this.v0 = v0;
+    }
+
+    setSpeedByHeight(targetHeight) {
+        if (this.gravity === null) {
+            throw Error('No gravity given!');
+        }
+        const height = targetHeight - this.currHeight;
+        this.speed = Math.sqrt(this.gravity * 2 * height);
+    }
+
+    reset() {
+        this.time = 0;
+    }
+
+    getMaxHeight() {
+        if (this.gravity === null || this.v0 === null) {
+            return null;
+        }
+        return this.v0 * this.v0 * this.gravity / 2;
+    }
+
+    setGravity(gravity) {
+        this.gravity = Math.abs(gravity);
+    }
+
+    setGravityByHeightAndSpeed(v0, height) {
+        this.setGravity(v0 * v0 / (2 * height));
+    }
+
+    getCurrentHeight() {
+        if (this.round) {
+            return Math.round(this.currHeight);
+        }
+        return this.currHeight;
+    }
+
+    setMaxHeight(height) {
+        this.maxHeight = height;
+    }
+
+    getTimeUntilMax() {
+        const tMax = Math.round(Math.abs(this.v0 / this.gravity));
+        return tMax;
+    }
+
+    setDrag(value) {
+        this.dragTime = this.time;
+        this.drag = value;
+    }
+
+    move() {
+        this.lastSpeed =  this.v0 + (this.v0 < 0 ? 1 : -1) * (this.gravity * this.time);
+        if (this.drag !== null) {
+            const dragTime = this.time - this.dragTime;
+            this.lastSpeed -= dragTime * this.drag;
+        }
+        this.currHeight += this.lastSpeed;
+        const move = this.round ? Math.round(this.lastSpeed) : this.lastSpeed;
+
+        if (this.maxHeight !== null && Math.abs(this.currHeight) >= this.maxHeight) {
+            this.currHeight = null;
+            this.lastSpeed = null;
+            return null;
+        } else {
+            this.time++;
+        }
+        return move;
+    }
+
+    getAllMovements(from = 0, to = null) {
+        if (this.maxHeight === null) {
+            return [];
+        }
+        this.reset();
+        console.log('START', 'Speed=',  this.v0, 'Gravity=', this.gravity);
+        const result = [];
+        let i = 0;
+        while (true) {
+            const move = this.move();
+            if (move === null) {
+                break;
+            }
+            if (to !== null && i > to) {
+                break;
+            }
+            if (from <= i) {
+                result.push(move);
+            }
+            i++;
+        }
+        return result;
+    }
+}
+
+class AxisPath {
+
+    constructor(start = 0) {
+        this.points = [start];
+        this.position = 0;
+        return this;
+    }
+
+    static new(start = 0) {
+        const path = new AxisPath(start);
+        return path;
+    }
+
+    getLastPoint() {
+        return this.points[this.points.length - 1];
+    }
+
+    addAbsolutePoint(point) {
+        this.points.push(point);
+    }
+
+    addRelativePoint(point) {
+        const lastPoint = this.getLastPoint();
+        this.points.push(lastPoint + point);
+    }
+
+    addRelativePoints(points) {
+        for (let point of points) {
+            this.addRelativePoint(point);
+        }
+        return this;
+    }
+
+    round() {
+        const rounded = [];
+        for (let point of this.points) {
+            rounded.push(Math.round(point));
+        }
+        this.points = rounded;
+        return this;
+    }
+
+    getPoints() {
+        return this.points;
+    }
+
+    throw(v0, maxHeight) {
+        const gravity = v0 * v0 / (2 * maxHeight);
+        console.log('GRAVITY', gravity);
+        let v = v0;
+        let i = 0;
+        let iMax = Math.round(v0 / gravity);
+        while (i !== (iMax * 2 + 1)) {
+            v = v0 - gravity * i;
+            i++;
+            this.addRelativePoint(v);
+        }
+        return this;
+    }
+
+    fall(v0, maxHeight) {
+        const gravity = v0 * v0 / (2 * maxHeight);
+        console.log('GRAVITY', gravity);
+        let v = v0;
+        let i = 0;
+        let iMax = Math.round(v0 / gravity);
+        while (i !== (iMax * 2)) {
+            v = v0 - gravity * (iMax - i);
+            i++;
+            this.addRelativePoint(v);
+        }
+        return this;
+    }
+
+    addTarget(target, steps, type = PATH.TYPE.STRAIGHT) {
+        let point = this.getLastPoint();
+        const dist = target - point;
+        const size = dist / steps;
+        let rad, start;
+
+        switch(type) {
+            case PATH.TYPE.STRAIGHT:
+                for (let i = 1; i <= steps; i++) {
+                    point += size;
+                    this.points.push(point);
+                }
+                break;
+
+            case PATH.TYPE.DAMPED:
+                start = point;
+                rad = DEGREE_90 / steps;
+                for (let i = 1; i <= steps; i++) {
+                    point = start + Math.sin(rad * i) * dist;
+                    this.points.push(point);
+                }
+                break;
+
+            case PATH.TYPE.ACCELERATED:
+                start = point;
+                rad = DEGREE_90 / steps;
+                for (let i = 1; i <= steps; i++) {
+                    point = start + (1 - Math.cos(rad * i)) * dist;
+                    this.points.push(point);
+                }
+                break;
+
+            default:
+                throw Error('Unknown type ' + type + ' given!');
+        }
+        return this;
+    }
+
+    getCount() {
+        return this.points.length;
+    }
+
+    isStart() {
+        return this.position === 0;
+    }
+
+    isEnd() {
+        return this.position === this.points.length - 1;
+    }
+
+    getCurrentPoint() {
+        return this.points[this.position];
+    }
+
+    forward(points = 1) {
+        let startPos = this.getCurrentPoint();
+        while (points > 0) {
+            if (!this.isEnd()) {
+                this.position++;
+            }
+            points--;
+        }
+        return this.getCurrentPoint() - startPos;
+    }
+
+    forwardFrom(from, steps = 1) {
+        const lastIndex = this.getCount() - 1;
+        if (from >= lastIndex) {
+            return null;
+        }
+        const fromPos = this.points[from];
+        while (steps > 0) {
+            if (from < lastIndex) {
+                from++;
+            } else {
+                return null;
+            }
+            steps--;
+        }
+        return this.points[from] - fromPos;
+    }
+
+    backward(points = 1) {
+        let startPos = this.getCurrentPoint();
+        while (points > 0) {
+            if (!this.isStart()) {
+                this.position--;
+            }
+            points--;
+        }
+        return this.getCurrentPoint() - startPos;
+    }
+
+    backwardFrom(from, steps = 1) {
+        // TODO implement
+    }
+
+    rewind() {
+        this.position = 0;
+    }
+
+    getDist(from, to) {
+        const max = this.getCount() - 1;
+        if (from > max || to > max) {
+            return null;
+        }
+        return this.points[to] - this.points[from];
+    }
+
+    getMaxDist(from = 0, to = null) {
+        let max = this.getCount() - 1;
+        if (to === null) {
+            to = max;
+        }
+        if (from > max || to > max) {
+            return null;
+        }
+        let min = this.points[from];
+        max = this.points[from];
+        for (let i = from; i <= to; i++) {
+            min = Math.min(min, this.points[i]);
+            max = Math.max(max, this.points[i]);
+        }
+        return max - min;
+    }
+
+    getRelativePath(offset = 0) {
+        this.rewind();
+        const relPath = [];
+        while (!this.isEnd()) {
+            let value = 0;
+            if (this.isStart()) {
+                value = offset;
+            }
+            value += this.forward();
+            relPath.push(value);
+        }
+        this.rewind();
+        return relPath;
+    }
+
+    limitToFirst(num) {
+        const points = [];
+        for(let i = 1; i <= num; i++) {
+            points.push(this.points[i]);
+        }
+        this.points = points;
+    }
+}
+
+class TilesMapEditor {
+
+    constructor(game, editor, tilesPane) {
+        this.tilesPane = tilesPane;
+        this.editor = editor;
+        this.game = game;
+
+        this.tileBits = tilesPane.tilesMap.tileBits;
+        const mapTiles = tilesPane.tilesMap.mapTiles;
+        this.mapDim = {x: mapTiles.x, y: mapTiles.y};
+        this.mapSize = {x: this.mapDim.x << this.tileBits, y: this.mapDim.y << this.tileBits};
+        const maxTileIndex = tilesPane.tilesMap.tilesImg.elem.width / tilesPane.tilesMap.tileSize;
+
+        editor.innerHTML =
+            '<div style="">' +
+            '   <h1>TilesMap Editor</h1>' +
+            '   <div id="map-edit-row">' +
+            '       <div class="content-block" style="width: 120px; flex-grow: 0"><div>Active Tile</div>' +
+            '<canvas id="active-tile-canvas" style="border: 1px solid #FF0000; transform: scale(3);' +
+            'transform-origin: left top; margin-left: 30px; margin-top: 5px" width="16" height="16"></canvas>' +
+            '<div style="margin-top: 50px">Index: <button id="btn-prev-tile">&nbsp;-&nbsp;</button> <kbd id="active-tile-index"></kbd> <button id="btn-next-tile">&nbsp;+&nbsp;</button></div>' +
+            '</div>' +
+            '       <div class="content-block" style="flex: 1">Map: Map-Size: ' +
+            '           <button id="btn-map-width-down">-</button><kbd>' + this.mapDim.x + '</kbd><button id="btn-map-width-up">+</button> x ' +
+            '           <button id="btn-map-height-down">-</button><kbd>' + this.mapDim.y + '</kbd><button id="btn-map-height-up">+</button>' +
+                    '   <div id="map-editor" class="content-div">' +
+                            '<canvas id="map-canvas" width="' + this.mapSize.x + '" height="' + this.mapSize.y + '"></canvas>' +
+                            '<div id="map-canvas-overlay" style="width: ' + this.mapSize.x + 'px; height: ' + this.mapSize.y + 'px">' +
+                            '<div id="tile-cursor" style="display: none; left: 0px; top: 0px; width: 16px; height: 16px"></div>' +
+                            '</div>' +
+                        '</div>' +
+            '       </div>' +
+            '   </div>' +
+            '   <div class="content-block">Tiles:<div id="tile_browser" class="content-div"></div></div>' +
+            '</div>';
+
+        const mapEncoded = btoa(JSON.stringify(tilesPane.tilesMap.map));
+
+        const overlay = game.getDomElem('map-canvas-overlay');
+        const cursor = game.getDomElem('tile-cursor');
+        const tileBits = this.tileBits;
+        const map = game.getDomElem('map-canvas');
+        const ctx = map.getContext('2d');
+        let activeTileIndex = 1;
+
+        const activeTileCtx = game.getDomElem('active-tile-canvas').getContext('2d');
+        const activeTileIndexElem = game.getDomElem('active-tile-index');
+
+        function updateActiveTile() {
+            tilesPane.tilesMap.renderTileTo(activeTileCtx, activeTileIndex);
+            activeTileIndexElem.innerHTML = activeTileIndex;
+        }
+
+        updateActiveTile();
+
+        game.getDomElem('btn-map-width-up').onclick = function () {
+            console.log('MAP-WIDTH+');
+        };
+
+        game.getDomElem('btn-map-width-down').onclick = function () {
+            console.log('MAP-WIDTH-');
+        };
+
+        game.getDomElem('btn-map-height-up').onclick = function () {
+            console.log('MAP-HEIGHT+');
+        };
+
+        game.getDomElem('btn-map-height-down').onclick = function () {
+            console.log('MAP-HEIGHT-');
+        };
+
+        game.getDomElem('btn-prev-tile').onclick = function () {
+            if (activeTileIndex > 0) {
+                activeTileIndex--;
+            }
+            updateActiveTile();
+        };
+
+        game.getDomElem('btn-next-tile').onclick = function () {
+            if (activeTileIndex < maxTileIndex) {
+                activeTileIndex++;
+            }
+            updateActiveTile();
+        };
+
+        function getRelMapPosFromEvent(e) {
+            let target = e.target;
+            while (target.id === undefined || target.id !== 'map-canvas-overlay') {
+                target = target.parentElement;
+            }
+
+            const rect = target.getBoundingClientRect();
+
+            return {
+                x: Math.round(e.clientX - rect.left - 5) >> tileBits,
+                y: Math.round(e.clientY - rect.top - 5) >> tileBits
+            };
+        }
+
+        function renderTilesMap() {
+            tilesPane.tilesMap.render(ctx, {
+                    x: 0,
+                    y: 0
+                },
+                {
+                    width: mapTiles.x,
+                    height: mapTiles.y,
+                    pos: {
+                        x: 0,
+                        y: 0
+                    },
+                    endless: false
+                }
+            );
+        }
+
+        function setActiveTileIndex(index) {
+            activeTileIndex = index;
+        }
+
+        overlay.onmouseenter = function(e) {
+            cursor.style.display = 'block';
+        };
+        overlay.onmouseleave = function(e) {
+            cursor.style.display = 'none';
+        };
+        overlay.onmousemove = function (e) {
+            const pos = getRelMapPosFromEvent(e);
+            cursor.style.left = (pos.x << tileBits) - 2;
+            cursor.style.top = (pos.y << tileBits) - 2;
+        };
+
+        overlay.onclick = function(e) {
+            const pos = getRelMapPosFromEvent(e);
+            tilesPane.tilesMap.replaceTile(pos.x, pos.y, activeTileIndex);
+            renderTilesMap();
+        };
+
+        renderTilesMap();
+
+        const tileBrowser = game.getDomElem('tile_browser');
+        tileBrowser.appendChild(tilesPane.tilesMap.tilesImg.elem);
+
+    }
+}
+
+
 function d() {
     if (arguments.length === 0) {
         return;
@@ -5054,6 +5661,7 @@ module.exports = {
     PatternPane,
     PatternPane2,
     TilesPane,
+    AxisPath,
     BufferedTilesPane,
     LinearGradientPane,
     MasterSlavesScrollHandler,
@@ -5068,9 +5676,12 @@ module.exports = {
     spriteMaps,
     TilesMap,
     States,
+    Gravity,
+    Force,
     TILE,
     INPUT,
     ANIMATION,
     OCM,
-    COLLISION
+    COLLISION,
+    PATH
 };

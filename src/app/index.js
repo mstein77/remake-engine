@@ -18,6 +18,9 @@ import {
     BoundsScrollHandler,
     SpriteAndTilesCollider,
     InputController,
+    AxisPath,
+    Gravity,
+    Force,
     d,
     SpriteSheet,
     TilesMap,
@@ -25,6 +28,7 @@ import {
     FontMap,
     TILE,
     INPUT,
+    PATH,
     ANIMATION,
     COLLISION
 } from './engine';
@@ -1529,7 +1533,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let score = 0;
             let world = '1-1';
             let coins = 0;
-            let time = 120;
+            let time = 400;
 
             statusPane.addTextBlock('score', 3 * 8, 16, '      ');
             statusPane.addTextBlock('coins', 12 * 8, 16, '   ');
@@ -1605,21 +1609,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 },
                 [
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
 
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 1, 24, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
-                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0, 308, 309, 309, 309, 310, 272, 305, 274, 0, [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
+                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
                 {
                     block: false
@@ -1639,9 +1643,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 spriteSheet.addSprite(type.prefix + 'mario', 1, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-jump', 86, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-duck', 103, type.offY, 16, type.height);
+                spriteSheet.addSprite(type.prefix + 'mario-slide', 69, type.offY, 16, type.height);
+                spriteSheet.addSprite(type.prefix + 'mario-fall', 35, type.offY, 16, type.height);
                 spriteSheet.addTransformedSprite(type.prefix + 'mario-rev', type.prefix + 'mario', 'flip-x');
                 spriteSheet.addTransformedSprites('-rev',
-                    [type.prefix + 'mario', type.prefix + 'mario-jump', type.prefix + 'mario-duck'], 'flip-x');
+                    [type.prefix + 'mario', type.prefix + 'mario-slide', type.prefix + 'mario-jump', type.prefix + 'mario-duck', type.prefix + 'mario-fall'], 'flip-x');
                 spriteSheet.addSpriteSeq(type.prefix + 'mario-run', 18, type.offY, 16, type.height, 3, 1);
                 spriteSheet.addAnimation(
                     type.prefix + 'mario-run',
@@ -1656,7 +1662,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 {
                     'fire-mario': 'mario',
                     'fire-mario-jump': 'mario-jump',
+                    'fire-mario-fall': 'mario-fall',
                     'fire-mario-duck': 'mario-duck',
+                    'fire-mario-slide': 'mario-slide',
+                    'fire-mario-slide-rev': 'mario-slide-rev',
+                    'fire-mario-fall-rev': 'mario-fall-rev',
+
                     'fire-mario-run1': 'mario-run1',
                     'fire-mario-run2': 'mario-run2',
                     'fire-mario-run3': 'mario-run3',
@@ -1705,31 +1716,41 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             masterSlaveScroller.addSpriteSlave(spritePane, -1);
             const gameScrollBounds = new BoundsScrollHandler(spritePane, masterSlaveScroller, {right: 100}, {top: 33, bottom: 33});
 
-            const marioStates = new States(
-                ['stand', 'jump', 'fall', 'run', 'duck']
-            );
-            marioStates.addTransition('stand', 'move-up', 'jump');
-            marioStates.addTransition('stand', 'no-floor', 'fall');
-            marioStates.addTransition('stand', 'move-right', 'run');
-            marioStates.addTransition('stand', 'move-down', 'duck');
-            marioStates.addTransition('jump', ['hit-ceiling', 'not-move-up', 'end-of-jump'], 'fall');
-            marioStates.addTransition( 'fall', 'hit-bottom', 'stand');
-            marioStates.addTransition('run', 'no-floor', 'fall');
-            marioStates.addTransition('run', 'not-move-right', 'stand');
-            marioStates.addTransition('run', 'move-up', 'jump');
-            marioStates.addTransition('duck', 'no-floor', 'fall');
-            marioStates.addTransition('duck', 'not-move-down', 'stand');
-            marioStates.cloneStatesAndTransitions('rev', ['stand', 'jump', 'fall', 'run', 'duck']);
-            marioStates.replaceEventForStates('stand_rev', 'move-right', 'move-left');
-            marioStates.replaceEventForStates('run_rev', 'not-move-right', 'not-move-left');
-            marioStates.addTransition('stand', 'move-left', 'stand_rev');
-            marioStates.addTransition('stand_rev', 'move-right', 'stand');
+            const actorYStates = new States([
+                'standing', 'ducking', 'jumping', 'falling', 'dead'
+            ]);
+            actorYStates.addTransition('standing', 'move-down', 'ducking');
+            actorYStates.addTransition('standing', 'move-up', 'jumping');
+            actorYStates.addTransition('standing', 'no-floor', 'falling');
+            actorYStates.addTransition('ducking', 'not-move-down', 'standing');
+            actorYStates.addTransition('ducking', 'move-up', 'jumping');
+            actorYStates.addTransition('ducking', 'no-floor', 'falling');
 
-            marioStates.setEventPrios([
-                'hit-ceiling', 'end-of-jump', 'hit-bottom', 'no-floor', 'move-up', 'not-move-up', 'not-move-right',
-                'not-move-left', 'not-move-down', 'move-left', 'move-right', 'move-down']
+            actorYStates.addTransition('jumping', ['end-of-jump', 'not-move-up', 'hit-ceiling', 'hit-enemy'], 'falling');
+            actorYStates.addTransition('falling', 'hit-bottom', 'standing');
+            actorYStates.addTransition('falling', ['hit-enemy', 'hit-ceiling'], 'falling');
+            actorYStates.addTransition('falling', 'disappear-bottom', 'dead');
+            actorYStates.setEventPrios([
+                'disappear-bottom', 'no-floor', 'hit-ceiling', 'hit-bottom', 'hit-enemy', 'not-move-up', 'not-move-down',
+                'move-up', 'move-down', 'end-of-jump'
+            ]);
+            actorYStates.setState('standing');
+
+            const actorXStates = new States([
+                'still', 'accelerating', 'sliding', 'turning'
+            ]);
+            actorXStates.addTransition('still', 'move-dir', 'accelerating');
+            actorXStates.addTransition('still', 'move-opp-dir', 'accelerating');
+            actorXStates.addTransition('accelerating', 'not-move-dir', 'sliding');
+            actorXStates.addTransition('sliding', ['blocked-dir', 'end-of-slide'], 'still');
+            actorXStates.addTransition('sliding', 'move-dir', 'accelerating');
+            actorXStates.addTransition('sliding', 'move-opp-dir', 'turning');
+            actorXStates.addTransition('turning', 'move-dir', 'accelerating');
+            actorXStates.addTransition('turning', ['blocked-dir', 'end-of-slide'], 'still');
+            actorXStates.setEventPrios(
+                ['not-move-dir', 'move-dir', 'move-opp-dir', 'blocked-dir', 'end-of-slide']
             );
-            marioStates.setState('stand');
+            actorXStates.setState('still');
 
             const inputController = new InputController();
             inputController.setDirInputs(null, 's', 'a', 'd');
@@ -1764,9 +1785,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     check: collideCheck,
                     lookahead: 4,
                     margin: {
-                        dir: -1,
+                        dir: 0,
                         start: 2,
-                        end: 2
+                        end: 0
                     }
                 },
                 right: {
@@ -1774,9 +1795,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     check: collideCheck,
                     lookahead: 4,
                     margin: {
-                        dir: -1,
+                        dir: 0,
                         start: 2,
-                        end: 2
+                        end: 0
                     }
                 },
                 center: {
@@ -1791,6 +1812,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             });
 
             let marioLevel = 0;
+            let marioLeft = false;
+            let hitEnemy = false;
             const marioLevels = ['small-', '', 'fire-', ''];
             let invincibleTimer = null;
             const coinCaches = {};
@@ -1803,6 +1826,55 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 spritePane.addSprite(id, 'coin-up', pos.x, pos.y);
                 spritePane.setAnimationSpeed(id, 0.2);
                 return [id];
+            }
+
+            function moveAlongBlocks(obj) {
+                if (obj.collider === undefined) {
+                    obj.yVector = [null, null];
+                    obj.collider = new SpriteAndTilesCollider(obj.id, spritePane, tilesPane, {
+                        floor: {
+                            dir: 'down',
+                            lookahead: 2,
+                            margin: {
+                                dir: 0
+                            }
+                        },
+                        right: {
+                            dir: 'right',
+                            lookahead: 1,
+                            margin: {
+                                end: 1
+                            }
+                        },
+                        left: {
+                            dir: 'left',
+                            lookahead: 1,
+                            margin: {
+                                end: 1
+                            }
+                        },
+
+                    });
+                    obj.collider.setSpriteOffset(0, -24);
+                }
+
+                const collides = obj.collider.getCollides(['floor', 'left', 'right']);
+                if (collides.floor.dist !== 0) {
+                    if (obj.yVector[0] === null) {
+                        obj.yVector[0] = jumpForce.getPeakTime();
+                        obj.yVector[1] = 0;
+                    }
+                } else {
+                    obj.yVector[0] = null;
+                    obj.yVector[1] = null;
+                }
+                if (obj.dir === 1 && collides.right.dist === 0) {
+                    obj.dir = (collides.left.dist === 0 ? 0 : -1);
+                } else if (collides.left.dist === 0) {
+                    obj.dir = (collides.right.dist === 0 ? 0 : 1);
+                }
+                spritePane.moveSprite(obj.id, obj.dir, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
+                jumpForce.incVector(obj.yVector);
             }
 
             const ControllerFactory = {
@@ -1818,57 +1890,27 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                     const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
                                     spritePane.addSprite(id, 'evilmush', pos.x, pos.y + 24);
                                     spritePane.setAnimationSpeed(id, 0.1);
-                                    this.collider = new SpriteAndTilesCollider(this.id, spritePane, tilesPane, {
-                                        floor: {
-                                            dir: 'down',
-                                            lookahead: 2,
-                                            margin: {
-                                                dir: 0
-                                            }
-                                        },
-                                        right: {
-                                            dir: 'right',
-                                            lookahead: 1,
-                                            margin: {
-                                                end: 1
-                                            }
-                                        },
-                                        left: {
-                                            dir: 'left',
-                                            lookahead: 1,
-                                            margin: {
-                                                end: 1
-                                            }
-                                        },
-
-                                    });
-                                    this.collider.setSpriteOffset(0, -24);
                                     return [id];
                                 },
 
                                 getNextActions: function (id) {
-                                    if (this.state === -1) {
-                                        return true;
+                                    if (this.state < 0) {
+                                        this.state++;
+                                        return (this.state < -1);
                                     }
                                     const collision = spritePane.getActorCollision(id);
-                                    if (collision !== null) {
+                                    if (collision !== null && hideCounter === 0) {
                                         if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
-                                            this.state = -1;
+                                            this.state = -100;
                                             spritePane.assignSprite(id, 'evilmush-dead');
+                                            hitEnemy = true;
                                             addScoreForSprite(100, id);
                                         } else {
-                                            cutscene = 'dead';
-                                            console.log(id, spritePane.getSpritePos(id), collision);
+                                            cutscene = marioLevel === 0 ? 'dead' : 'shrink';
                                         }
                                         return;
                                     } else if (this.state === 0) {
-                                        const collides = this.collider.getCollides(['floor', 'left', 'right']);
-                                        if (this.dir === 1 && collides.right.dist === 0) {
-                                            this.dir = (collides.left.dist === 0 ? 0 : -1);
-                                        } else if (collides.left.dist === 0) {
-                                            this.dir = (collides.right.dist === 0 ? 0 : 1);
-                                        }
-                                        spritePane.moveSprite(this.id, this.dir, collides.floor.dist > 0 ? Math.min(2, collides.floor.dist) : 0);
+                                        moveAlongBlocks(this);
                                     }
                                 }
                             };
@@ -1876,17 +1918,38 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'breaking-block':
                             return {
                                 init: function (id, event) {
+                                    if (marioLevel === 0) {
+                                        return false;
+                                    }
                                     this.id = id;
                                     tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
                                     const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
-                                    spritePane.addSprite(id + '_1', 'mini-block1', pos.x - 5, pos.y + 19);
-                                    spritePane.addSprite(id + '_2', 'mini-block2', pos.x + 5, pos.y + 19);
-                                    return [id + '_1', id + '_2'];
+                                    this.moves = [
+                                        [0, 0, -2],
+                                        [6, 0, -1],
+                                        [6, 0,  1],
+                                        [0, 0, 2]
+                                    ];
+                                    const ids = [];
+                                    let i = 1;
+                                    for(let move of this.moves) {
+                                        const subId = id + '_' + i;
+                                        spritePane.addSprite(subId, 'mini-block1', pos.x + move[2], pos.y + 19);
+                                        ids.push(subId);
+                                        i++;
+                                    }
+                                    return ids;
                                 },
 
                                 getNextActions: function (id) {
-                                    spritePane.moveSprite(id + '_1', -1, 3);
-                                    spritePane.moveSprite( id + '_2', 1, 3);
+                                    if (this.id === undefined) {
+                                        return false;
+                                    }
+                                    for (let i = 1; i <= 4; i++) {
+                                        const move = this.moves[i - 1];
+                                        jumpForce.incVector(move);
+                                        spritePane.moveSprite(id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                                    }
                                 }
                             };
 
@@ -1927,6 +1990,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 init: function (id, event) {
                                     this.id = id;
                                     this.state = 0;
+                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 27);
                                     return coinUp(id, event);
                                 },
 
@@ -1992,41 +2056,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                     } else if (this.state === 0) {
                                         spritePane.setSpriteFilters(this.id, '');
                                         if (this.type === 'mushroom') {
-                                            this.collider = new SpriteAndTilesCollider(this.id, spritePane, tilesPane, {
-                                                floor: {
-                                                    dir: 'down',
-                                                    lookahead: 2,
-                                                    margin: {
-                                                        dir: 0
-                                                    }
-                                                },
-                                                right: {
-                                                    dir: 'right',
-                                                    lookahead: 1,
-                                                    margin: {
-                                                        end: 1
-                                                    }
-                                                },
-                                                left: {
-                                                    dir: 'left',
-                                                    lookahead: 1,
-                                                    margin: {
-                                                        end: 1
-                                                    }
-                                                },
-
-                                            });
-                                            this.collider.setSpriteOffset(0, -24);
                                             this.state--;
                                         }
                                     } else {
-                                        const collides = this.collider.getCollides(['floor', 'left', 'right']);
-                                        if (this.dir === 1 && collides.right.dist === 0) {
-                                            this.dir = (collides.left.dist === 0 ? 0 : -1);
-                                        } else if (collides.left.dist === 0) {
-                                            this.dir = (collides.right.dist === 0 ? 0 : 1);
-                                        }
-                                        spritePane.moveSprite(this.id, this.dir, collides.floor.dist > 0 ? Math.min(2, collides.floor.dist) : 0);
+                                        moveAlongBlocks(this);
                                     }
                                 }
                             }
@@ -2073,23 +2106,38 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 addScore(score, pos.x, pos.y);
             }
 
-            const jumpPos = [-4, -4, -4, -4, -4, -3, -3, -3, -2, -2, -2, -1, -1, -1, -1, 0, -1, -1, 0, -1];
-            let jumpIndex = null;
+            const jumpForce = new Force(-4.35, -64, -0.22);
+            const yAxisVector = [null, null];
+            const deathPath =
+                new AxisPath()
+                    .addTarget(0, 16)
+                    .addTarget(-54, 26, PATH.TYPE.DAMPED)
+                    .addTarget(40, 36, PATH.TYPE.ACCELERATED)
+                    .round();
+
             let frameCount = 0;
+            let hideCounter = 0;
+            let forceMoveX = 0;
             let cutscene = null;
             let cutsceneFrame = 0;
             let flickerFrames = [];
+            const speedUp = [
+                0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 2, 2, 1, 1, 2, 0, 2, 1, 2, 1, 2
+            ];
 
-            function flickerCutScene(level) {
+            let speedIndex = 0;
+
+            function flickerCutScene(toLevel, fromLevel) {
                 if (cutsceneFrame === 0) {
                     const currSheetId = spritePane.getSpriteSheetId('player');
-                    const newSheetId = marioLevels[level] + currSheetId.substr(marioLevels[level - 1].length);
+                    const newSheetId = marioLevels[toLevel] + currSheetId.substr(marioLevels[fromLevel].length);
                     flickerFrames = [
                         newSheetId, currSheetId
                     ];
                 }
                 if (cutsceneFrame === 55) {
-                    marioLevel = level;
+                    marioLevel = toLevel;
                     return true;
                 }
                 if (cutsceneFrame % 5 === 0) {
@@ -2104,9 +2152,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
                 return false;
             }
+
+            function setActorSprite(name, rev = false) {
+                const doRev = rev ? !marioLeft : marioLeft;
+                if (doRev) {
+                    name += '-rev';
+                };
+                spritePane.assignSprite('player', marioLevels[marioLevel] + name);
+            }
+
             // ###################################################
 
             marioScreen.setFrameHandler(function () {
+
                 bgTilesMap.updateFrames();
                 // update animated tiles
                 tilesPane.updateAnimatedTiles();
@@ -2114,25 +2172,30 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 if (cutscene !== null) {
                     let done = false;
                     switch(cutscene) {
+                        case 'bottom-death':
+                            break;
+
                         case 'grow':
-                            done = flickerCutScene(1);
+                            done = flickerCutScene(1, 0);
+                            break;
+
+                        case 'shrink':
+                            done = flickerCutScene(0, 1);
+                            hideCounter = 100;
                             break;
 
                         case 'fire':
-                            done = flickerCutScene(2);
+                            done = flickerCutScene(2, 1);
                             break;
 
                         case 'dead':
-                            let moveY = 0;
                             if (cutsceneFrame === 0) {
                                 spritePane.assignSprite('player', 'small-mario-duck');
-                            } else if (cutsceneFrame < 20) {
-                                moveY = -2;
-                            } else if (cutsceneFrame < 200) {
-                                moveY = 2;
+                                deathPath.rewind();
+                            } else {
+                                spritePane.moveSprite('player', 0, deathPath.forward());
+                                done = deathPath.isEnd();
                             }
-                            spritePane.moveSprite('player', 0, moveY);
-
                             break;
                     }
                     if (!done) {
@@ -2153,7 +2216,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         }
                     }
                 }
-
                 spritePane.updateFrames();
                 spritePane.updateCollisions();
 
@@ -2168,8 +2230,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             coins++;
                             updateCoins();
                             break;
-
-
 
                         default:
                             console.log('WHAT?', event);
@@ -2190,20 +2250,69 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
 
-                // find event matching current state
+                let updateGroundSprite = false;
                 let currEvent = null;
-                const events = marioStates.getPossibleEvents();
-
-                if (marioStates.hasPossibleEvent('move-up')) {
+                const yEvents = actorYStates.getPossibleEvents();
+                if (yEvents.indexOf('move-up') !== -1) {
                     inputController.awaitInput('button-a');
                 }
+
                 inputController.update();
 
-                for (let event of events) {
+                for (let event of yEvents) {
                     switch (event) {
+                        case 'disappear-bottom':
+                            const pos = spritePane.getSpritePos('player');
+                            if (pos.y < spritePane.viewPortDim.y) continue;
+                            cutscene = 'bottom-death';
+                            break;
 
                         case 'no-floor':
                             if (collides.floor.dist <= 0) continue;
+                            break;
+
+                        case 'hit-ceiling':
+                            if (collides.ceiling.dist > 0) continue;
+                            let i = 0;
+                            let fullHit = null;
+                            let softHit = null;
+
+                            for (let tile of collides.ceiling.tiles) {
+                                if (tile.touch > 7 && tile.obj.block) {
+                                    fullHit = i;
+                                    if (tile.obj.hitEvent !== undefined) {
+                                        Game.instance.addFrameEvent(
+                                            'object', {
+                                                object: tile.obj.hitEvent,
+                                                tile
+                                            });
+                                    }
+                                } else if (tile.obj.hitEvent !== undefined && tile.touch <= 3) {
+                                    softHit = (i === 0 ? 1 : -1) * tile.touch;
+                                }
+                                i++;
+                            }
+
+                            if ((fullHit === null) && (softHit !== null)) {
+                                forceMoveX = softHit;
+                                continue;
+                            }
+                            break;
+
+                        case 'hit-bottom':
+                            if (collides.floor.dist > 0) continue;
+                            break;
+
+                        case 'hit-enemy':
+                            if (!hitEnemy) continue;
+                            break;
+
+                        case 'not-move-up':
+                            if (inputController.hasInput('button-a')) continue;
+                            break;
+
+                        case 'not-move-down':
+                            if (marioLevel > 0 && inputController.isDownDir()) continue;
                             break;
 
                         case 'move-up':
@@ -2211,154 +2320,187 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'move-down':
-                            if (!inputController.isDownDir()) continue;
-                            break;
-
-                        case 'not-move-down':
-                            if (inputController.isDownDir()) continue;
-                            break;
-
-                        case 'not-move-up':
-                            if (inputController.hasInput('button-a')) continue;
-                            break;
-
-                        case 'move-right':
-                            if (!inputController.isRightDir() || collides.right.dist <= 0) continue;
-                            break;
-
-                        case 'move-left':
-                            if (!inputController.isLeftDir() || collides.left.dist <= 0) continue;
-                            break;
-
-                        case 'not-move-right':
-                            if (inputController.isRightDir() && collides.right.dist > 0) continue;
-                            break;
-
-                        case 'not-move-left':
-                            if (inputController.isLeftDir() && collides.left.dist > 0) continue;
-                            break;
-
-                        case 'hit-ceiling':
-                            if (collides.ceiling.dist > 0) continue;
-                            let i = 1;
-                            for (let tile of collides.ceiling.tiles) {
-                                if (tile.touch > 7 && tile.obj.hitEvent !== undefined) {
-                                    Game.instance.addFrameEvent(
-                                        'object', {
-                                            object: tile.obj.hitEvent,
-                                            tile
-                                    });
-                                }
-                                i++;
-                            }
+                            if (marioLevel === 0 || !inputController.isDownDir()) continue;
                             break;
 
                         case 'end-of-jump':
-                            if (jumpIndex === null || jumpIndex < jumpPos.length) continue;
-                            break;
-
-                        case 'hit-bottom':
-                            if (collides.floor.dist > 0) continue;
+                            if (!jumpForce.isTimeVectorAtPeak(yAxisVector)) {
+                                continue;
+                            }
                             break;
 
                         default:
-                            console.log('Unknown event ' + event);
-                            continue;
+                            console.log('Unknown Y-Event', event);
+                    }
+                    currEvent = event;
+                }
+                hitEnemy = false;
+                if (currEvent !== null) {
+                    actorYStates.doEvent(currEvent);
+                    const transitions = actorYStates.popTransitions();
+                    for (let transition of transitions) {
+                        switch(transition.to) {
+                            case 'jumping':
+                                yAxisVector[0] = 0;
+                                setActorSprite(transition.from === 'ducking' ? 'mario-duck' : 'mario-jump');
+                                break;
+
+                            case 'ducking':
+                                setActorSprite('mario-duck');
+                                break;
+
+                            case 'falling':
+                                if (['standing', 'ducking'].indexOf(transition.from) !== -1) {
+                                    setActorSprite('mario-fall');
+                                    yAxisVector[0] = jumpForce.getPeakTime();
+                                }
+                                if (transition.event === 'hit-ceiling') {
+                                    yAxisVector[0] = jumpForce.getPeakTime() + 10;
+                                } else if (transition.event === 'hit-enemy') {
+                                    yAxisVector[0] = 0;
+
+                                }
+                                yAxisVector[1] = 0;
+                                break;
+
+                            case 'standing':
+                                yAxisVector[0] = null;
+                                yAxisVector[1] = null;
+                                updateGroundSprite = true;
+                                break;
+                        }
+                    }
+                }
+
+                const xEvents = actorXStates.getPossibleEvents();
+
+                for (let event of xEvents) {
+                    switch (event) {
+
+                        case 'move-dir':
+                            if (inputController.isDownDir() ||
+                                (!marioLeft && !inputController.isRightDir()) ||
+                                (marioLeft && !inputController.isLeftDir())) continue;
+                            break;
+
+                        case 'move-opp-dir':
+                            if (inputController.isDownDir() ||
+                                (marioLeft && !inputController.isRightDir()) ||
+                                (!marioLeft && !inputController.isLeftDir())) continue;
+                            marioLeft = !marioLeft;
+                            break;
+
+                        case 'not-move-dir':
+                            if (!inputController.isDownDir() && !((marioLeft && !inputController.isLeftDir()) ||
+                                (!marioLeft && !inputController.isRightDir()))) {
+                                if (speedIndex < speedUp.length - 1) {
+                                    speedIndex++;
+                                }
+                                continue;
+                            }
+                            break;
+
+                        case 'blocked-dir':
+                            if ((marioLeft && collides.left.dist > 0) || (!marioLeft && collides.right.dist > 0)) continue;
+                            break;
+
+                        case 'end-of-slide':
+                            if (speedIndex > 0) {
+                                speedIndex--;
+                                continue;
+                            }
+                            break;
                     }
                     currEvent = event;
                 }
 
                 if (currEvent !== null) {
-                    marioStates.doEvent(currEvent);
+                    actorXStates.doEvent(currEvent);
 
-                    const transitions = marioStates.popTransitions();
+                    const transitions = actorXStates.popTransitions();
                     for (let transition of transitions) {
-                        let newSprite = null;
-                        switch(transition.to) {
-                            case 'stand':
-                                newSprite = 'mario';
+                        let update = true;
+                        switch (transition.to) {
+
+                            case 'still':
+                                speedIndex = 0;
                                 break;
 
-                            case 'stand_rev':
-                                newSprite = 'mario-rev';
+                            case 'accelerating':
+                                if (transition.from === 'turning') {
+                                    marioLeft = !marioLeft;
+                                }
                                 break;
 
-                            case 'fall':
-                                jumpIndex = null;
-                                newSprite = 'mario-jump';
+                            case 'turning':
+                                marioLeft = !marioLeft;
                                 break;
 
-                            case 'fall_rev':
-                                jumpIndex = null;
-                                newSprite = 'mario-jump-rev';
-                                break;
-
-                            case 'jump':
-                                jumpIndex = 0;
-                                newSprite = 'mario-jump';
-                                break;
-
-                            case 'jump_rev':
-                                jumpIndex = 0;
-                                newSprite = 'mario-jump-rev';
-                                break;
-
-                            case 'run':
-                                newSprite = 'mario-run';
-                                break;
-
-                            case 'run_rev':
-                                newSprite = 'mario-run-rev';
-                                break;
-
-                            case 'duck':
-                                newSprite = 'mario-duck';
-                                break;
-
-                            case 'duck_rev':
-                                newSprite = 'mario-duck-rev';
+                            default:
+                                update = false;
                                 break;
                         }
-                        if (newSprite !== null) {
-                            spritePane.assignSprite('player', marioLevels[marioLevel] + newSprite)
+                        if (update && actorYStates.getState() === 'standing') {
+                            updateGroundSprite = true;
                         }
+                    }
+                }
+
+                if (updateGroundSprite) {
+                    let target = null;
+                    switch(actorXStates.getState()) {
+                        case 'still':
+                            target = 'mario';
+                            break;
+
+                        case 'accelerating':
+                        case 'sliding':
+                            target = 'mario-run';
+                            break;
+
+                        case 'turning':
+                            setActorSprite('mario-slide', true);
+                            break;
+                    }
+                    if (target !== null) {
+                        setActorSprite(target)
                     }
                 }
 
                 objectController.doActions();
 
                 // move player
-                let speed = 2;
-                const state = marioStates.getState();
+                const state = actorYStates.getState();
+                let speed = speedUp[speedIndex];
                 let moveX = 0;
-                let moveY = 0;
+                const moveY = jumpForce.getMoveForTimeVector(yAxisVector, forceMoveX !== 0 ? 4 : collides.ceiling.dist, collides.floor.dist);
+                jumpForce.incVector(yAxisVector);
 
-                switch (state) {
-                    case 'fall_rev':
-                    case 'fall':
-                        moveY = Math.min(3, collides.floor.dist);
-                        break;
-
-                    case 'jump_rev':
-                    case 'jump':
-                        moveY = Math.min(jumpPos[jumpIndex], collides.ceiling.dist);
-                        jumpIndex++;
-                        break;
-                }
-
-                if (inputController.isRightDir() && collides.right.dist > 0) {
+                if (!marioLeft) {
                     moveX = Math.min(speed, collides.right.dist);
-                } else if (inputController.isLeftDir() && collides.left.dist > 0) {
+                } else {
                     moveX = -Math.min(speed, collides.left.dist);
                 }
                 if (['duck', 'duck_rev'].indexOf(state) !== -1) {
                     moveX = 0;
                 }
 
+                moveX += forceMoveX;
                 if (moveX !== 0 || moveY !== 0) {
                     gameScrollBounds.moveActor(moveX, moveY);
                 }
+                forceMoveX = 0;
 
+                if (hideCounter > 0) {
+                    hideCounter--;
+                    if (hideCounter > 0) {
+                        if (hideCounter % 2 === 0) {
+                            spritePane.toggleSpriteVisiblity('player');
+                        }
+                    } else {
+                        spritePane.unhideSprite('player');
+                    }
+                }
                 if (invincibleTimer !== null) {
                     invincibleTimer--;
                     let target = '';
@@ -2624,6 +2766,116 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     // ################################
 */
+    const moveScreen = new Screen('move-it');
+    moveScreen.addPane(new ColorPane('#D0D0D0'));
+    const canPane = new CanvasPane();
+    moveScreen.addPane(canPane);
+    moveScreen.setInitHandler(function () {
+        return function () {
+        }
+    });
+    let frameCount = 0;
+    let jumpX = 2;
+    function drawPath(path, color, offset = 0) {
+        const ctx = canPane.getCtx();
+        ctx.fillStyle = color;
+        let posX = jumpX;
+        let posY = 100 + offset;
+        ctx.fillRect(posX, posY, 2, 2);
+        for (let point of path) {
+            posX += 2;
+            posY += point;
+            ctx.fillRect(posX, posY, 2, 2);
+        }
+        return posX - jumpX;
+    }
+
+    const jumps = [
+        [-4, -4, -4, -4, -3, -3, -2, -2, -1, -1, -1, 0, 0, 1, 1, 2, 2, 2, 3, 4, 4, 4, 4, 2],
+        [-4, -4, -4, -3, -3, -3, -2, -1, -1, -1, 0, 0, 0, 2, 1, 2, 2, 3, 3, 4, 4, 4, 1],
+        [-4, -4, -4, -4, -3, -4, -3 , -2, -2, -2, -1, -1, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 1],
+        [-4, -4, -4, -4, -3, -4, -3, -3, -3, -3, -3, -2, -3, -2, -2, -2, -2, 0, -1, 0, 0, 1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 4, 4, 4, 5, 3],
+        [-4, -4, -4, -4, -3, -4, -3, -3, -3, -3, -3, -2, -3, -2, -2, -2, -2, -2, -2,  -2, -1, -2, -1, -1, -1, 0, -1, -1, 0, -1, 0, 0,
+            1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 4, 4, 4, 5, 3]
+    ];
+
+    moveScreen.setFrameHandler(function () {
+
+
+
+        if (frameCount === 0) {
+
+            const jumpForce = new Force(-4.35, -64, -0.22);
+
+            function drawJump(dragTime = null, color) {
+                let height = 0;
+                const path = [];
+                let i = 0;
+                let j = null;
+                while (Math.abs(height) < 200) {
+                    if (i === dragTime) {
+                        j = 0;
+                    }
+                    const move = jumpForce.getMoveForTimeVector([i, j]);
+                    height += move;
+                    path.push(move);
+                    i++;
+                    if (j !== null) {
+                        j++;
+                    }
+                }
+                console.log(path);
+                drawPath(path, color, 0);
+            }
+
+            drawJump(jumpForce.getPeakTime(), '#00D000');
+            drawJump(0, '#00D000');
+            jumpX = 2;
+    //        drawPath(jumps[0], '#000000');
+            drawPath(jumps[4], '#000000');
+            /*
+            const vJump = [0, 0];
+
+
+
+
+
+            const xGravity = new Gravity();
+            let gravV0 = -4.35;
+            xGravity.setGravityByHeightAndSpeed(gravV0, -64); // 24
+            xGravity.setSpeed(gravV0);
+            xGravity.setMaxHeight(100);
+            console.log('STEPS', xGravity.gravity);
+
+            const gravPath = [];
+            const iMax = (xGravity.getTimeUntilMax() >> 1) - 2;
+            for (let i = 0; i < iMax; i++) {
+                gravPath.push(xGravity.move());
+            }
+
+            xGravity.setDrag(-0.22);
+
+            while(true) {
+                const move = xGravity.move();
+                if (move === null) {
+                    break;
+                }
+                gravPath.push(move);
+            }
+            console.log('GRAVITY', gravPath);
+
+            jumpX = 2;
+            jumpX += drawPath(jumps[3], '#000000');
+            jumpX = 2;
+
+            drawPath(gravPath, '#00FF00', 0);
+
+             */
+        }
+        frameCount++;
+    });
+    this.addScreen(moveScreen);
+
     this.addGlobalKeyHandler(() => {
         if (!this.running) {
             if (this.keys['Escape']) {
@@ -2636,6 +2888,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             this.setZoom(this.zoom + 0.01);
         } else if (this.keysDown['_']) {
             this.setZoom(this.zoom - 0.01);
+        }
+        if (this.keys['Dead']) {
+            this.openEditorMode();
         }
         if (this.keys['Escape']) {
             this.gotoScreen('demo');
