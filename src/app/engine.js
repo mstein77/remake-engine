@@ -4872,6 +4872,23 @@ class ObjectController {
         this.objects = objects;
         this.uid = 0;
         this.activeObjects = [];
+
+        this.classes = {};
+    }
+
+    addClass(name, handler, state = {}) {
+        this.classes[name] = {
+            handler,
+            state
+        };
+    }
+
+    addObject(cls, state = {}) {
+        if (this.classes[cls] === undefined) {
+            throw Error('No class with name "' + cls + '" found!');
+        }
+        const obj = Object.assign({id: this.getUid(cls), class: cls, sprites: []}, this.classes[cls].state, state);
+        this.activeObjects.push(obj);
     }
 
     getObject(id) {
@@ -4898,6 +4915,7 @@ class ObjectController {
     }
 
     doActions() {
+
         // controll existing objects
         const active = [];
         for (let obj of this.activeObjects) {

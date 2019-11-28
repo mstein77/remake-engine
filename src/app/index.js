@@ -1593,6 +1593,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             synchronous: true
                         }
                     },
+                    33: {block: true},
                     264: {block: true},
                     265: {block: true},
                     297: {block: true},
@@ -1602,6 +1603,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         hitEvent: 'one-coin',
                         block: true
                     },
+                    'star-block': {
+                        index: 1,
+                        block: true
+                    },
                     'coin-cache': {
                         index: 1,
                         hitEvent: 'coin-cache',
@@ -1609,21 +1614,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 },
                 [
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 'coin-block', 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 0, 0, 1, 'star-block', 0, 0, 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 33, 0, 0, 33, 0, 0, 0],
+                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 33, 0, 0],
 
-                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
+                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 33, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
                 {
                     block: false
@@ -1681,6 +1686,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSprite('evilmush-dead', 112, 59, 16, 16);
             spriteSheet.addSprite('mini-block1', 64, 51, 8, 8);
             spriteSheet.addSprite('mini-block2', 72, 51, 8, 8);
+            spriteSheet.addSprite('bump-block', 64, 131, 16, 16);
+            spriteSheet.addSprite('bump-box', 96, 131, 16, 16);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
             spriteSheet.addSpriteSeq('minicoin', 0, 211, 8, 8, 3, 0);
@@ -1816,6 +1823,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let hitEnemy = false;
             const marioLevels = ['small-', '', 'fire-', ''];
             let invincibleTimer = null;
+            const bumpPath = AxisPath.new().addRelativePoints([-1, -2, -1, -1, -1, 0, -1, 1, 0, 1, 1, 2, 2, 2, -1]);
             const coinCaches = {};
 
             function coinUp(id, event) {
@@ -1877,6 +1885,222 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 jumpForce.incVector(obj.yVector);
             }
 
+            function initBump(obj, event) {
+                const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
+                spritePane.addSprite(obj.id, 'bump-block', pos.x, pos.y + 24 - 1);
+                obj.bump = 0;
+                obj.tile = event.tile;
+                return [obj.id];
+            }
+
+            function moveBump(obj) {
+                if (obj.bump === 0) {
+                    tilesPane.replaceTile(obj.tile.x, obj.tile.y, 0);
+                }
+                const move = bumpPath.forwardFrom(obj.bump);
+                if (move === null) {
+                    tilesPane.replaceTile(obj.tile.x, obj.tile.y, 1);
+                    return false;
+                } else {
+                    spritePane.moveSprite(obj.id, 0, move);
+                    obj.bump++;
+                }
+
+            }
+
+            const objectController = new ObjectController(spritePane);
+
+            objectController.addClass(
+                'evilmush',
+                function (obj) {
+                    if (obj.state === -1) {
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                        spritePane.addSprite(obj.id, 'evilmush', pos.x, pos.y + 24);
+                        spritePane.setAnimationSpeed(id, 0.1);
+                        obj.sprites.push(obj.id);
+                        return;
+                    } else if (obj.state < 0) {
+                        obj.state++;
+                        return (obj.state < -1);
+                    }
+                    const collision = spritePane.getActorCollision(obj.id);
+                    if (collision !== null && hideCounter === 0) {
+                        if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                            obj.state = -100;
+                            spritePane.assignSprite(obj.id, 'evilmush-dead');
+                            hitEnemy = true;
+                            addScoreForSprite(100, obj.id);
+                        } else {
+                            cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                        }
+                        return;
+                    } else if (obj.state === 0) {
+                        moveAlongBlocks(obj);
+                    }
+                },
+                {
+                    state: -1,
+                    dir: 1
+                }
+            );
+
+            objectController.addClass(
+                'bumping-block',
+                function(obj) {
+                    if (obj.state === undefined) {
+                        obj.state = 0;
+                        obj.sprites.push(initBump(this, obj.event));
+                        return;
+                    }
+                    return moveBump(obj);
+                }
+            );
+
+            objectController.addClass(
+                'breaking-block',
+                function (obj) {
+                    if (obj.state === 0) {
+                        if (marioLevel === 0) {
+                            obj.sprites.push(initBump(obj, obj.event));
+                        }
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                        let i = 1;
+                        for(let move of obj.moves) {
+                            const subId = id + '_' + i;
+                            spritePane.addSprite(subId, 'mini-block1', pos.x + move[2], pos.y + 19);
+                            obj.sprites.push(subId);
+                            i++;
+                        }
+                        tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                        return;
+                    }
+                    if (obj.bump === undefined) {
+                        for (let i = 1; i <= 4; i++) {
+                            const move = obj.moves[i - 1];
+                            jumpForce.incVector(move);
+                            spritePane.moveSprite(id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                        }
+                    } else {
+                        return moveBump(obj);
+                    }
+                },
+                {
+                    state: 0,
+                    moves: [
+                        [0, 0, -2],
+                        [6, 0, -1],
+                        [6, 0,  1],
+                        [0, 0, 2]
+                    ]
+                }
+            );
+
+            objectController.addClass(
+                'coin-cache',
+                function (obj) {
+                    if (obj.state === undefined) {
+                        const cacheId = obj.event.tile.x + ' ' + obj.event.tile.y;
+                        if (coinCaches[cacheId] === undefined) {
+                            coinCaches[cacheId] = {
+                                time
+                            }
+                        }
+                        const coinCache = coinCaches[cacheId];
+                        if (coinCache.time - time > 4) {
+                            tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 27);
+                            delete coinCaches[cacheId];
+                        }
+                        obj.state = 0;
+                        obj.sprites.push(coinUp(obj.id, obj.event));
+                        return;
+                    }
+
+                    if (obj.state === 30) {
+                        return false;
+                    }
+                    let speed = 2;
+                    if (obj.state < 15) {
+                        speed *= -1;
+                    }
+                    spritePane.moveSprite(obj.id, 0, speed);
+                    this.state++;
+                }
+            );
+
+            objectController.addClass(
+                'one-coin',
+                function (obj) {
+                    if (obj.state === undefined) {
+                        obj.state = 0;
+                        tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 27);
+                        obj.sprites.push(coinUp(obj.id, obj.event));
+                        return;
+                    } else if (obj.state === 30) {
+                        return false;
+                    }
+                    let speed = 2;
+                    if (obj.state < 15) {
+                        speed *= -1;
+                    }
+                    spritePane.moveSprite(obj.id, 0, speed);
+                    obj.state++;
+                }
+            );
+
+            function shiftUp(obj) {
+                spritePane.setSpriteFilters(obj.id,'shift-y(' + Math.floor(obj.state / obj.speed) + ')');
+                tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 27);
+            }
+
+            objectController.addClass(
+                'power-up',
+                function (obj) {
+                        if (obj.state === undefined) {
+                            const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
+                            obj.type = obj.powerUps[marioLevel];
+                            const dim = spriteSheet.getSpriteDim(obj.type);
+                            obj.state = dim.y * this.speed;
+                            spritePane.addSprite(obj.id, obj.type, pos.x, pos.y + 24);
+                            shiftUp(obj);
+                            obj.sprites.push(obj.id);
+                            return;
+                        }
+
+                        if (spritePane.isCollidingActor(obj.id)) {
+                            if (marioLevel === 0) {
+                                cutscene = 'grow';
+                            } else if (marioLevel === 1) {
+                                cutscene = 'fire';
+                            } else if (marioLevel === 2) {
+                                invincibleTimer = 500;
+                            }
+                            return false;
+                        }
+                        if (obj.state > 0) {
+                            obj.state--;
+                            if (obj.state % obj.speed === 0) {
+                                shiftUp(obj);
+                            }
+                        } else if (obj.state === 0) {
+                            spritePane.setSpriteFilters(obj.id, '');
+                            if (obj.type === 'mushroom') {
+                                obj.state--;
+                            }
+                        } else {
+                            moveAlongBlocks(obj);
+                        }
+                },
+                {
+                    speed: 3,
+                    dir: 1,
+                    powerUps: {
+                        0: 'mushroom',
+                        1: 'fireflower'
+                    }
+                }
+            );
+
+/*
             const ControllerFactory = {
                 get: function(controller) {
                     switch(controller) {
@@ -1915,14 +2139,26 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 }
                             };
 
+                        case 'bumping-block':
+                            return {
+                                init: function (id, event) {
+                                    this.id = id;
+                                    return initBump(this, event);
+                                },
+
+                                getNextActions: function () {
+                                    return moveBump(this);
+                                }
+                            };
+
                         case 'breaking-block':
                             return {
                                 init: function (id, event) {
-                                    if (marioLevel === 0) {
-                                        return false;
-                                    }
                                     this.id = id;
-                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
+                                    if (marioLevel === 0) {
+                                        return initBump(this, event);
+                                    }
+                                    const ids = [];
                                     const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
                                     this.moves = [
                                         [0, 0, -2],
@@ -1930,7 +2166,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                         [6, 0,  1],
                                         [0, 0, 2]
                                     ];
-                                    const ids = [];
                                     let i = 1;
                                     for(let move of this.moves) {
                                         const subId = id + '_' + i;
@@ -1938,17 +2173,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                         ids.push(subId);
                                         i++;
                                     }
+                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
                                     return ids;
                                 },
 
                                 getNextActions: function (id) {
-                                    if (this.id === undefined) {
-                                        return false;
-                                    }
-                                    for (let i = 1; i <= 4; i++) {
-                                        const move = this.moves[i - 1];
-                                        jumpForce.incVector(move);
-                                        spritePane.moveSprite(id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                                    if (this.bump === undefined) {
+                                        for (let i = 1; i <= 4; i++) {
+                                            const move = this.moves[i - 1];
+                                            jumpForce.incVector(move);
+                                            spritePane.moveSprite(id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                                        }
+                                    } else {
+                                        return moveBump(this);
                                     }
                                 }
                             };
@@ -2066,13 +2303,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
             };
-            const objectController = new ObjectController(spritePane, ControllerFactory, {
-                'breaking-block': {},
-                'power-up': {},
-                'evilmush': {},
-                'one-coin': {},
-                'coin-cache': {}
-            });
+ */
 
             marioCollider.setSpriteOffset(0, -24);
 
