@@ -1882,6 +1882,10 @@ class BufferedTilesPane {
         return result;
     }
 
+    getTileAt(x, y) {
+        return this.tilesMap.getTileAtPos(x, y);
+    }
+
     getRelativePositionOfTile(x, y) {
         const origin = {
             x: this.mapTilePos.x + this.canvasTileOffset.x,
@@ -4036,7 +4040,7 @@ class SpriteSheet {
 class SpriteAndTilesCollider {
 
     static defaultCheck(tile) {
-        return (tile.obj === null || tile.obj.block);
+        return (tile.obj !== null && tile.obj.block);
     }
 
     constructor(spriteId, spritePane, tilesPane, collides) {
@@ -4939,20 +4943,38 @@ class ObjectController {
         return false;
     }
 
-    addObject(cls, state = {}) {
-        if (this.classes[cls] === undefined) {
-            throw Error('No class with name "' + cls + '" found!');
+    getClassParts(id) {
+        const parts = id.split('.', 2);
+        return {
+            main: parts[0],
+            variant: (parts.length === 2 ? parts[1] : null)
         }
-        const obj = Object.assign({autoRemove: true}, this.classes[cls].state, state);
-        obj.class = cls;
-        const id = Array.isArray(obj.idParts) ? this.getObjectIdFromIdParts(obj.idParts, obj) : this.getUid(cls);
+    }
+
+    addObject(clsId, state = {}) {
+
+        const cls = this.getClassParts(clsId);
+        if (this.classes[cls.main] === undefined) {
+            throw Error('No class with name "' + cls.main + '" found!');
+        }
+        const classState = this.classes[cls.main].state;
+        let varState = {};
+        if (cls.variant !== null) {
+            if (classState.variants[cls.variant] === undefined) {
+                throw Error('Class "' + cls.main + '" does not have variant "' + cls.variant +  '"!');
+            }
+            Object.assign(varState, classState.variants[cls.variant]);
+        }
+        const obj = Object.assign({autoRemove: true}, classState, varState, state);
+        obj.class = cls.main;
+        const id = Array.isArray(obj.idParts) ? this.getObjectIdFromIdParts(obj.idParts, obj) : this.getUid(cls.main);
         if (this.hasActiveObject(id)) {
             return;
         }
         obj.id = id;
         obj.frame = 0;
         obj.sprites = [];
-        console.log('NEW', cls, id);
+        console.log('NEW', clsId, id);
         this.activeObjects.push(obj);
     }
 
@@ -4967,11 +4989,6 @@ class ObjectController {
             const event = Game.instance.getNextEvent('object');
             if (event === null) {
                 break;
-            }
-            const cls = this.classes[event.object];
-            if (cls === undefined) {
-                console.error('Unknown class ' + event.object + ' given!');
-                continue;
             }
             this.addObject(event.object, {event})
         }
