@@ -1581,7 +1581,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         animation: questionMarkAnimation
                     },
                     57: {
-                        hitEvent: 'coin',
+                        collectEvent: 'coin',
                         animation: {
                             frames: [
                                 {id: 57, duration: 25},
@@ -1594,6 +1594,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         }
                     },
                     33: {block: true},
+                    237: {
+                        collectEvent: 'glide'
+                    },
                     264: {block: true},
                     265: {block: true},
                     297: {block: true},
@@ -1627,11 +1630,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'one-up', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 11, 11, 11, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 0, 0, 1, 'star-block', 0, 0, 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 12, 13, 14, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 'star-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 0, 0, 1, 'star-block', 0, 0, 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 12, 13, 14, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 11, 44, 44, 44, 11, 0, 0, 0, 0, 0, 0],
 
                     [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 13, 13, 45, 13, 13, 0, 0, 0, 0, 0, 0],
-                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush.left'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush.right'], [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 297, 298, 33, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 13, 13, 46, 13, 13, 0, 0, 0, 0, 0, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush.left'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush.right'], [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 297, 298, 33, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 13, 13, 46, 13, 13, 0, 0, 0, 0, 0, 0],
                     [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
                     [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
@@ -1664,7 +1667,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     [type.prefix + 'mario-run1', type.prefix + 'mario-run2', type.prefix + 'mario-run3'],
                     ANIMATION.END.LOOP
                 );
+                spriteSheet.addSpriteSeq(type.prefix + 'mario-glide', 120, type.offY, 16, type.height, 2, 1);
+                spriteSheet.addAnimation(type.prefix + 'mario-glide', [type.prefix + 'mario-glide1', type.prefix + 'mario-glide2'], ANIMATION.END.LOOP)
                 spriteSheet.addTransformedAnimation(type.prefix + 'mario-run-rev', type.prefix + 'mario-run', 'flip-x');
+                spriteSheet.addTransformedSprite(type.prefix + 'mario-glide-rev', type.prefix + 'mario-glide2', 'flip-x');
             }
             spriteSheet.build();
             spriteSheet.addTransformedSpritesFromObj(
@@ -1677,10 +1683,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     'fire-mario-slide': 'mario-slide',
                     'fire-mario-slide-rev': 'mario-slide-rev',
                     'fire-mario-fall-rev': 'mario-fall-rev',
-
+                    'fire-mario-glide1': 'mario-glide1',
+                    'fire-mario-glide2': 'mario-glide2',
                     'fire-mario-run1': 'mario-run1',
                     'fire-mario-run2': 'mario-run2',
                     'fire-mario-run3': 'mario-run3',
+                    'fire-mario-glide-rev': 'mario-glide-rev'
                 });
             spriteSheet.addSprite('mushroom', 0, 51, 16, 16);
             spriteSheet.addSprite('one-up', 16, 51, 16, 16);
@@ -1691,7 +1699,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
             spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
+            spriteSheet.addSprite('turtle-shell', 240, 51, 16, 24);
+            spriteSheet.addTransformedSprite('turtle-shell-rev', 'turtle-shell', 'flip-x');
             spriteSheet.addAnimation('turtle', ['turtle1', 'turtle2'], ANIMATION.END.LOOP);
+            spriteSheet.addTransformedAnimation('turtle-rev', 'turtle', 'flip-x');
             spriteSheet.addTransformedSprite('evilmush-flip', 'evilmush1', 'flip-y');
             spriteSheet.addSprite('evilmush-dead', 112, 59, 16, 16);
             spriteSheet.addSprite('mini-block1', 64, 51, 8, 8);
@@ -1714,6 +1725,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addAnimation(
                 'fire-mario-run',
                 ['fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'],
+                ANIMATION.END.LOOP
+            );
+            spriteSheet.addAnimation(
+                'fire-mario-glide',
+                ['fire-mario-glide1', 'fire-mario-glide2'],
                 ANIMATION.END.LOOP
             );
             spriteSheet.addTransformedSprites('-rev',
@@ -1823,8 +1839,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 center: {
                     dir: 'center',
                     check: function (tile) {
-                        if (tile.obj !== null && tile.obj.hitEvent && tile.obj.hitEvent === 'coin') {
-                            return true;
+                        if (tile.obj !== null && tile.obj.collectEvent) {
+                            switch (tile.obj.collectEvent) {
+                                case 'glide':
+                                    return (tile.touch > 7);
+                                case 'coin':
+                                    return true;
+                            }
                         }
                         return false;
                     }
@@ -1877,7 +1898,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 jumpForce.incVector(obj.yVector);
             }
 
-            function moveAlongBlocks(obj) {
+            function moveAlongBlocks(obj, speed = 1) {
                 if (obj.collider === undefined) {
                     obj.yVector = [null, null];
                     obj.collider = new SpriteAndTilesCollider(obj.id, spritePane, tilesPane, {
@@ -1890,14 +1911,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         },
                         right: {
                             dir: 'right',
-                            lookahead: 1,
+                            lookahead: Math.max(speed, 1),
                             margin: {
                                 end: 1
                             }
                         },
                         left: {
                             dir: 'left',
-                            lookahead: 1,
+                            lookahead: Math.max(speed, 1),
                             margin: {
                                 end: 1
                             }
@@ -1907,6 +1928,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     obj.collider.setSpriteOffset(0, -24);
                 }
 
+                const oldDir = obj.dir;
                 const spriteCollides = spritePane.getLastSpriteCollisions(obj.id);
                 let doBump = false;
                 let changeDir = false;
@@ -1942,8 +1964,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 } else if (changeDir || collides.left.dist === 0) {
                     obj.dir = (collides.right.dist === 0 ? 0 : 1);
                 }
-                spritePane.moveSprite(obj.id, obj.dir * 0.5, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
+                spritePane.moveSprite(obj.id, obj.dir * speed, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
                 jumpForce.incVector(obj.yVector);
+
+                return oldDir !== obj.dir;
             }
 
             function initBump(obj) {
@@ -2020,24 +2044,54 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     if (obj.state === -1) {
                         obj.state = 0;
                         const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
-                        spritePane.addSprite(obj.id, 'turtle', pos.x, pos.y + 24 - 8);
+                        spritePane.addSprite(obj.id, getEnemySprite(obj, 'turtle'), pos.x, pos.y + 24 - 8);
                         spritePane.setAnimationSpeed(obj.id, 0.1);
                         obj.sprites.push(obj.id);
                         return;
-                    } else if (obj.state < 0) {
-                        obj.state++;
-                        return (obj.state < -1);
                     }
+
                     const collision = spritePane.getActorCollision(obj.id);
-                    if (collision !== null && hideCounter === 0) {
+                    const isColliding = collision !== null && hideCounter === 0;
+                    if (obj.state === -2) {
+                        obj.killing = false;
+                        if (isColliding && !(collision.y.type === COLLISION.BOTTOM && collision.y.touch <= 8)) {
+                            switch (collision.x.type) {
+                                case COLLISION.LEFT:
+                                    obj.dir = -1;
+                                    break;
+
+                                case COLLISION.RIGHT:
+                                    obj.dir = 1;
+                                    break;
+
+                                default:
+                                    obj.dir = marioLeft ? -1 : 1;
+                                    break;
+                            }
+                            obj.state = -3;
+                        }
+                        return;
+                    } else if (obj.state === -3) {
+                        if (moveAlongBlocks(obj, 5)) {
+                            obj.killing = true;
+                        };
+                        if (isColliding) {
+                            if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                                obj.state = -2;
+                                hitEnemy = true;
+                            } else if (obj.killing) {
+                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                            }
+                        }
+                        return;
+                    } else if (isColliding) {
                         if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
-                            obj.state = -100;
-                            // spritePane.assignSprite(obj.id, 'evilmush-dead');
+                            obj.state = -2;
+                            spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle-shell'));
                             hitEnemy = true;
-                            addScoreForSprite(100, obj.id);
+                            addScoreForSprite(500, obj.id);
                         } else {
                             if (invincibleTimer !== null) {
-                                obj.state = -100;
                                 // spritePane.assignSprite(obj.id, 'evilmush-flip');
                                 spritePane.setNoCollision(obj.id, true);
                                 console.log('TODO: MOVE FLIPPED TURTLE');
@@ -2049,12 +2103,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         }
                         return;
                     } else if (obj.state === 0) {
-                        moveAlongBlocks(obj);
+                        if (moveAlongBlocks(obj, 0.5)) {
+                            spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle'));
+                        };
                     }
 
                 },
                 {
                     enemy: true,
+                    doRev: true,
                     variants: {
                         left: {dir: -1},
                         right: {dir: 1}
@@ -2063,7 +2120,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     state: -1,
                     dir: -1
                 }
-            )
+            );
 
             objectController.addClass(
                 'evilmush',
@@ -2078,6 +2135,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     } else if (obj.state < 0) {
                         obj.state++;
                         return (obj.state < -1);
+                    } else if (obj.state === 1) {
+                        if (obj.frame % 2 === 0) {
+                            spritePane.moveSprite(obj.id, obj.dir * 0.5, jumpForce.getMoveForTimeVector(obj.yVector));
+                            jumpForce.incVector(obj.yVector);
+                        }
+                        return;
                     }
                     const collision = spritePane.getActorCollision(obj.id);
                     if (collision !== null && hideCounter === 0) {
@@ -2088,19 +2151,20 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             addScoreForSprite(100, obj.id);
                         } else {
                             if (invincibleTimer !== null) {
-                                obj.state = -100;
                                 spritePane.assignSprite(obj.id, 'evilmush-flip');
                                 spritePane.setNoCollision(obj.id, true);
-                                console.log('TODO: MOVE FLIPPED EVILMUSH');
                                 hitEnemy = true;
                                 addScoreForSprite(100, obj.id);
+                                obj.dir = (marioLeft ? -1 : 1);
+                                obj.state = 1;
+                                obj.yVector = [0, 0];
                             } else {
                                 cutscene = marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
                         return;
                     } else if (obj.state === 0) {
-                        moveAlongBlocks(obj);
+                        moveAlongBlocks(obj, 0.5);
                     }
                 },
                 {
@@ -2340,7 +2404,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         spritePane.setSpriteFilters(obj.id, '');
                         obj.state--;
                     } else {
-                        moveAlongBlocks(obj);
+                        moveAlongBlocks(obj, 1);
                     }
                 },
                 {
@@ -2385,7 +2449,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 obj.state--;
                             }
                         } else {
-                            moveAlongBlocks(obj);
+                            moveAlongBlocks(obj, 1);
                         }
                 },
                 {
@@ -2460,8 +2524,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 const doRev = rev ? !marioLeft : marioLeft;
                 if (doRev) {
                     name += '-rev';
-                };
+                }
                 spritePane.assignSprite('player', marioLevels[marioLevel] + name);
+            }
+
+            function getEnemySprite(obj, name) {
+                if (obj.doRev === true && obj.dir === 1) {
+                    name += '-rev';
+                }
+                return name;
             }
 
             // ###################################################
@@ -2485,6 +2556,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'shrink':
                             done = flickerCutScene(0, 1);
                             hideCounter = 100;
+                            break;
+
+                        case 'glide':
+                            const pos = spritePane.getSpritePos('player', false, true);
+                            if (pos.y < spritePane.viewPortDim.y - 42) {
+                                spritePane.moveSprite('player', 0, 1);
+                                spritePane.updateFrames();
+                            } else {
+                                setActorSprite('mario-glide-rev');
+                                spritePane.moveSprite('player', 12, 0);
+                                cutscene = 'flagdown';
+                            }
+                            break;
+
+                        case 'flagdown':
                             break;
 
                         case 'fire':
@@ -2526,12 +2612,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 const collEvents = this.getEvents('collide');
                 for (let event of collEvents) {
-                    switch(event.obj.hitEvent) {
+                    switch(event.obj.collectEvent) {
 
                         case 'coin':
                             tilesPane.replaceTile(event.x, event.y, 0);
                             coins++;
                             updateCoins();
+                            break;
+
+                        case 'glide':
+                            cutscene = 'glide';
+                            setActorSprite('mario-glide');
                             break;
 
                         default:

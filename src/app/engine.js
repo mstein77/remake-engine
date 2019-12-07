@@ -1780,10 +1780,10 @@ class BufferedTilesPane {
             x2: realEnd >> this.tilesMap.tileBits,
             y: (y1 + this.scrollPos.y) >> this.tilesMap.tileBits
         };
-        let touchStart = realStart % this.tilesMap.tileSize;
-        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
-        let touchEnd = realEnd % this.tilesMap.tileSize;
-        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+
+        const xDiff = x2 - x1 + 1;
+        const touchStart = Math.min(xDiff, this.tilesMap.tileSize - (realStart % this.tilesMap.tileSize));
+        const touchEnd = Math.min(xDiff, (realEnd % this.tilesMap.tileSize) + 1);
 
         const mapY = origin.y + relPos.y;
         const start = origin.x + relPos.x1;
@@ -2721,9 +2721,17 @@ class SpritePane {
         }
     }
 
-    getSpritePos(id) {
+    getSpritePos(id, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
-        return {id, x: sprite.x, y: sprite.y, z: sprite.z, dim: sprite.dim};
+        let x = sprite.x;
+        if (xEnd) {
+            x += sprite.dim.x - 1;
+        }
+        let y = sprite.y;
+        if (yEnd) {
+            y += sprite.dim.y - 1;
+        }
+        return {id, x, y, z: sprite.z, dim: sprite.dim};
     }
 
     getAllSpritePos(match) {
@@ -4208,6 +4216,7 @@ class SpriteAndTilesCollider {
 
                 for (let tile of tiles) {
                     if (collide.check(tile)) {
+                        console.log('TILES', tiles, pos.x + collide.margin.left, pos.x + pos.dim.x - collide.margin.right - 1);
                         Game.instance.addFrameEvent('collide', tile);
                     }
                 }
