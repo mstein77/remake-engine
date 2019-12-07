@@ -1577,11 +1577,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     28: {block: true},
                     24: {
                         block: true,
-                        hitEvent: 'power-up',
+                        hitEvent: 'bump-power-up',
                         animation: questionMarkAnimation
                     },
                     57: {
-                        hitEvent: 'coin',
+                        collectEvent: 'coin',
                         animation: {
                             frames: [
                                 {id: 57, duration: 25},
@@ -1593,6 +1593,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             synchronous: true
                         }
                     },
+                    33: {block: true},
+                    237: {
+                        collectEvent: 'glide'
+                    },
                     264: {block: true},
                     265: {block: true},
                     297: {block: true},
@@ -1602,28 +1606,37 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         hitEvent: 'one-coin',
                         block: true
                     },
+                    'star-block': {
+                        index: 1,
+                        hitEvent: 'bump-star',
+                        block: true
+                    },
                     'coin-cache': {
                         index: 1,
                         hitEvent: 'coin-cache',
                         block: true
+                    },
+                    'one-up': {
+                        index: 0,
+                        hitEvent: 'bump-one-up'
                     }
                 },
                 [
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 'coin-block', 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 57, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'one-up', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 11, 11, 11, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 'star-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 0, 0, 1, 'star-block', 0, 0, 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 12, 13, 14, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 11, 44, 44, 44, 11, 0, 0, 0, 0, 0, 0],
 
-                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush'], [0, 'object:evilmush'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
-                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
+                    [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 13, 13, 45, 13, 13, 0, 0, 0, 0, 0, 0],
+                    [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, 0, 0, [0, 'object:evilmush.left'], 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0,  [0, 'object:evilmush.right'], [0, 'object:evilmush.right'], 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 297, 298, 33, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 13, 13, 46, 13, 13, 0, 0, 0, 0, 0, 0],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+                    [28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 0, 0, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28]
                 ],
                 {
                     block: false
@@ -1654,7 +1667,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     [type.prefix + 'mario-run1', type.prefix + 'mario-run2', type.prefix + 'mario-run3'],
                     ANIMATION.END.LOOP
                 );
+                spriteSheet.addSpriteSeq(type.prefix + 'mario-glide', 120, type.offY, 16, type.height, 2, 1);
+                spriteSheet.addAnimation(type.prefix + 'mario-glide', [type.prefix + 'mario-glide1', type.prefix + 'mario-glide2'], ANIMATION.END.LOOP)
                 spriteSheet.addTransformedAnimation(type.prefix + 'mario-run-rev', type.prefix + 'mario-run', 'flip-x');
+                spriteSheet.addTransformedSprite(type.prefix + 'mario-glide-rev', type.prefix + 'mario-glide2', 'flip-x');
             }
             spriteSheet.build();
             spriteSheet.addTransformedSpritesFromObj(
@@ -1667,20 +1683,32 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     'fire-mario-slide': 'mario-slide',
                     'fire-mario-slide-rev': 'mario-slide-rev',
                     'fire-mario-fall-rev': 'mario-fall-rev',
-
+                    'fire-mario-glide1': 'mario-glide1',
+                    'fire-mario-glide2': 'mario-glide2',
                     'fire-mario-run1': 'mario-run1',
                     'fire-mario-run2': 'mario-run2',
                     'fire-mario-run3': 'mario-run3',
+                    'fire-mario-glide-rev': 'mario-glide-rev'
                 });
             spriteSheet.addSprite('mushroom', 0, 51, 16, 16);
+            spriteSheet.addSprite('one-up', 16, 51, 16, 16);
             spriteSheet.addSpriteSeq('fireflower', 0, 83, 16, 16, 3, 0);
             spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3'], ANIMATION.END.LOOP);
-            spriteSheet.addSprite('star', 0, 99, 16, 16);
+            spriteSheet.addSpriteSeq('star', 0, 99, 16, 16, 4);
+            spriteSheet.addAnimation('star', ['star1', 'star2', 'star3', 'star4'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
             spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
+            spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
+            spriteSheet.addSprite('turtle-shell', 240, 51, 16, 24);
+            spriteSheet.addTransformedSprite('turtle-shell-rev', 'turtle-shell', 'flip-x');
+            spriteSheet.addAnimation('turtle', ['turtle1', 'turtle2'], ANIMATION.END.LOOP);
+            spriteSheet.addTransformedAnimation('turtle-rev', 'turtle', 'flip-x');
+            spriteSheet.addTransformedSprite('evilmush-flip', 'evilmush1', 'flip-y');
             spriteSheet.addSprite('evilmush-dead', 112, 59, 16, 16);
             spriteSheet.addSprite('mini-block1', 64, 51, 8, 8);
             spriteSheet.addSprite('mini-block2', 72, 51, 8, 8);
+            spriteSheet.addSprite('bump-block', 64, 131, 16, 16);
+            spriteSheet.addSprite('bump-box', 96, 131, 16, 16);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
             spriteSheet.addSpriteSeq('minicoin', 0, 211, 8, 8, 3, 0);
@@ -1699,6 +1727,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 ['fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'],
                 ANIMATION.END.LOOP
             );
+            spriteSheet.addAnimation(
+                'fire-mario-glide',
+                ['fire-mario-glide1', 'fire-mario-glide2'],
+                ANIMATION.END.LOOP
+            );
             spriteSheet.addTransformedSprites('-rev',
                 ['fire-mario', 'fire-mario-jump', 'fire-mario-duck', 'fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'], 'flip-x');
             spriteSheet.addTransformedAnimation('fire-mario-run-rev', 'fire-mario-run', 'flip-x');
@@ -1708,6 +1741,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spritePane.addSprite('player', 'small-mario', 40, 184);
             spritePane.setAnimationSpeed('player', 0.2);
             spritePane.addSprite('minicoin', 'minicoin', 87, 16);
+            spritePane.setNoCollision('minicoin', true);
             spritePane.setActorId('player');
             spritePane.setAttachDefault(tilesPane);
             vSplitArea.addPane(spritePane, 1);
@@ -1764,7 +1798,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     dir: 'up',
                     lookahead: 4,
                     saveContacts: true,
-                    check: collideCheck,
+                    check: function (tile) {
+                        return (tile.obj !== null && (tile.obj.block || tile.obj.hitEvent !== undefined))
+                    },
                     margin: {
                         start: 1,
                         end: 1
@@ -1803,8 +1839,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 center: {
                     dir: 'center',
                     check: function (tile) {
-                        if (tile.obj !== null && tile.obj.hitEvent && tile.obj.hitEvent === 'coin') {
-                            return true;
+                        if (tile.obj !== null && tile.obj.collectEvent) {
+                            switch (tile.obj.collectEvent) {
+                                case 'glide':
+                                    return (tile.touch > 7);
+                                case 'coin':
+                                    return true;
+                            }
                         }
                         return false;
                     }
@@ -1814,21 +1855,50 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let marioLevel = 0;
             let marioLeft = false;
             let hitEnemy = false;
-            const marioLevels = ['small-', '', 'fire-', ''];
+            const marioLevels = ['small-', '', 'fire-'];
             let invincibleTimer = null;
+            const bumpPath = AxisPath.new().addRelativePoints([-1, -2, -1, -1, -1, 0, -1, 1, 0, 1, 1, 2, 2, 2, -1]);
             const coinCaches = {};
 
-            function coinUp(id, event) {
+            function coinUp(obj) {
                 coins++;
                 updateCoins();
-                const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
+                const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
                 addScore(100, pos.x, pos.y);
-                spritePane.addSprite(id, 'coin-up', pos.x, pos.y);
-                spritePane.setAnimationSpeed(id, 0.2);
-                return [id];
+                spritePane.addSprite(obj.id, 'coin-up', pos.x, pos.y);
+                spritePane.setNoCollision(obj.id, true);
+                spritePane.setAnimationSpeed(obj.id, 0.2);
+                obj.sprites.push(obj.id);
             }
 
-            function moveAlongBlocks(obj) {
+            function jumpRightOnBlocks(obj) {
+                if (obj.collider === undefined) {
+                    obj.yVector = [null, null];
+                    obj.collider = new SpriteAndTilesCollider(obj.id, spritePane, tilesPane, {
+                        floor: {
+                            dir: 'down',
+                            lookahead: 4,
+                            margin: {
+                                dir: 0
+                            }
+                        }
+
+                    });
+                    obj.collider.setSpriteOffset(0, -24);
+                }
+                const collides = obj.collider.getCollides(['floor']);
+                if (collides.floor.dist > 0) {
+                    if (obj.yVector[0] === null) {
+                        obj.yVector[0] = jumpForce.getPeakTime();
+                    }
+                } else {
+                    obj.yVector[0] = 0;
+                }
+                spritePane.moveSprite(obj.id, 1, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
+                jumpForce.incVector(obj.yVector);
+            }
+
+            function moveAlongBlocks(obj, speed = 1) {
                 if (obj.collider === undefined) {
                     obj.yVector = [null, null];
                     obj.collider = new SpriteAndTilesCollider(obj.id, spritePane, tilesPane, {
@@ -1841,14 +1911,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         },
                         right: {
                             dir: 'right',
-                            lookahead: 1,
+                            lookahead: Math.max(speed, 1),
                             margin: {
                                 end: 1
                             }
                         },
                         left: {
                             dir: 'left',
-                            lookahead: 1,
+                            lookahead: Math.max(speed, 1),
                             margin: {
                                 end: 1
                             }
@@ -1858,247 +1928,544 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     obj.collider.setSpriteOffset(0, -24);
                 }
 
+                const oldDir = obj.dir;
+                const spriteCollides = spritePane.getLastSpriteCollisions(obj.id);
+                let doBump = false;
+                let changeDir = false;
+                for (let collide of spriteCollides) {
+                    const collideObj = objectController.getObjectWithSpriteId(collide.sprite.id);
+                    if (collideObj === null) {
+                        continue;
+                    }
+                    if (obj.enemy === true && collideObj.enemy === true) {
+                        changeDir = ((collide.x.type === 'left' && obj.dir === 1) || (collide.x.type === 'right' && obj.dir === -1));
+                    }
+                    if (['breaking-block', 'power-up'].indexOf(collideObj.class) !== -1) {
+                        if (obj.dir === -1 && collide.x.type === 'right' && collide.x.touch < 10) {
+                            obj.dir = 1;
+                        } else if (obj.dir === 1 && collide.x.type === 'left' && collide.x.touch < 10) {
+                            obj.dir = -1;
+                        }
+                        doBump = true;
+                    }
+                };
                 const collides = obj.collider.getCollides(['floor', 'left', 'right']);
-                if (collides.floor.dist !== 0) {
+                if (doBump || collides.floor.dist !== 0) {
                     if (obj.yVector[0] === null) {
-                        obj.yVector[0] = jumpForce.getPeakTime();
+                        obj.yVector[0] = doBump ? 2 : jumpForce.getPeakTime();
                         obj.yVector[1] = 0;
                     }
                 } else {
                     obj.yVector[0] = null;
                     obj.yVector[1] = null;
                 }
-                if (obj.dir === 1 && collides.right.dist === 0) {
+                if (obj.dir === 1 && (changeDir || collides.right.dist === 0)) {
                     obj.dir = (collides.left.dist === 0 ? 0 : -1);
-                } else if (collides.left.dist === 0) {
+                } else if (changeDir || collides.left.dist === 0) {
                     obj.dir = (collides.right.dist === 0 ? 0 : 1);
                 }
-                spritePane.moveSprite(obj.id, obj.dir, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
+                spritePane.moveSprite(obj.id, obj.dir * speed, jumpForce.getMoveForTimeVector(obj.yVector, null, collides.floor.dist));
                 jumpForce.incVector(obj.yVector);
+
+                return oldDir !== obj.dir;
             }
 
-            const ControllerFactory = {
-                get: function(controller) {
-                    switch(controller) {
+            function initBump(obj) {
+                const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                obj.bumpSprite = (obj.bumpTile === 27) ? 'bump-box' : 'bump-block';
+                spritePane.addSprite(obj.id, obj.bumpSprite, pos.x, pos.y + 24 - 1);
+                obj.bump = 0;
+                obj.sprites.push(obj.id);
+            }
 
-                        case 'evilmush':
-                            return {
-                                init: function (id, event) {
-                                    this.id = id;
-                                    this.dir = -1;
-                                    this.state = 0;
-                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
-                                    spritePane.addSprite(id, 'evilmush', pos.x, pos.y + 24);
-                                    spritePane.setAnimationSpeed(id, 0.1);
-                                    return [id];
-                                },
-
-                                getNextActions: function (id) {
-                                    if (this.state < 0) {
-                                        this.state++;
-                                        return (this.state < -1);
-                                    }
-                                    const collision = spritePane.getActorCollision(id);
-                                    if (collision !== null && hideCounter === 0) {
-                                        if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
-                                            this.state = -100;
-                                            spritePane.assignSprite(id, 'evilmush-dead');
-                                            hitEnemy = true;
-                                            addScoreForSprite(100, id);
-                                        } else {
-                                            cutscene = marioLevel === 0 ? 'dead' : 'shrink';
-                                        }
-                                        return;
-                                    } else if (this.state === 0) {
-                                        moveAlongBlocks(this);
-                                    }
-                                }
-                            };
-
-                        case 'breaking-block':
-                            return {
-                                init: function (id, event) {
-                                    if (marioLevel === 0) {
-                                        return false;
-                                    }
-                                    this.id = id;
-                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 0);
-                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y);
-                                    this.moves = [
-                                        [0, 0, -2],
-                                        [6, 0, -1],
-                                        [6, 0,  1],
-                                        [0, 0, 2]
-                                    ];
-                                    const ids = [];
-                                    let i = 1;
-                                    for(let move of this.moves) {
-                                        const subId = id + '_' + i;
-                                        spritePane.addSprite(subId, 'mini-block1', pos.x + move[2], pos.y + 19);
-                                        ids.push(subId);
-                                        i++;
-                                    }
-                                    return ids;
-                                },
-
-                                getNextActions: function (id) {
-                                    if (this.id === undefined) {
-                                        return false;
-                                    }
-                                    for (let i = 1; i <= 4; i++) {
-                                        const move = this.moves[i - 1];
-                                        jumpForce.incVector(move);
-                                        spritePane.moveSprite(id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
-                                    }
-                                }
-                            };
-
-                        case 'coin-cache':
-                            return {
-                                init: function(id, event) {
-                                    this.id = id;
-                                    const cacheId = event.tile.x + ' ' + event.tile.y;
-                                    if (coinCaches[cacheId] === undefined) {
-                                        coinCaches[cacheId] = {
-                                            time
-                                        }
-                                    }
-                                    const coinCache = coinCaches[cacheId];
-                                    if (coinCache.time - time > 4) {
-                                        tilesPane.replaceTile(event.tile.x, event.tile.y, 27);
-                                        delete coinCaches[cacheId];
-                                    }
-                                    this.state = 0;
-                                    return coinUp(id, event);
-                                },
-
-                                getNextActions: function (id) {
-                                    if (this.state === 30) {
-                                        return false;
-                                    }
-                                    let speed = 2;
-                                    if (this.state < 15) {
-                                        speed *= -1;
-                                    }
-                                    spritePane.moveSprite(id, 0, speed);
-                                    this.state++;
-                                }
-                            };
-
-                        case 'one-coin':
-                            return {
-                                init: function (id, event) {
-                                    this.id = id;
-                                    this.state = 0;
-                                    tilesPane.replaceTile(event.tile.x, event.tile.y, 27);
-                                    return coinUp(id, event);
-                                },
-
-                                getNextActions: function (id) {
-                                    if (this.state === 30) {
-                                        return false;
-                                    }
-                                    let speed = 2;
-                                    if (this.state < 15) {
-                                        speed *= -1;
-                                    }
-                                    spritePane.moveSprite(id, 0, speed);
-                                    this.state++;
-                                }
-                            };
-
-                        case 'power-up':
-                            return {
-                                id: null,
-                                state: 0,
-                                speed: 3,
-                                tile: null,
-                                dir: 1,
-                                powerUps: {
-                                    0: 'mushroom',
-                                    1: 'fireflower',
-                                    2: 'star'
-                                },
-
-                                init: function (id, event) {
-                                    this.id = id;
-                                    this.tile = {x: event.tile.x, y: event.tile.y};
-                                    const pos = tilesPane.getRelativePositionOfTile(event.tile.x, event.tile.y - 1);
-                                    this.type = this.powerUps[marioLevel];
-                                    const dim = spriteSheet.getSpriteDim(this.type);
-                                    this.state = dim.y * this.speed;
-                                    spritePane.addSprite(id, this.type, pos.x, pos.y + 24);
-                                    this.shiftUp();
-                                    return id;
-                                },
-
-                                shiftUp: function () {
-                                    spritePane.setSpriteFilters(this.id,'shift-y(' + Math.floor(this.state / this.speed) + ')');
-                                    tilesPane.replaceTile(this.tile.x, this.tile.y, 27);
-                                },
-
-                                getNextActions: function (id) {
-                                    if (spritePane.isCollidingActor(id)) {
-                                        if (marioLevel === 0) {
-                                            cutscene = 'grow';
-                                        } else if (marioLevel === 1) {
-                                            cutscene = 'fire';
-                                        } else if (marioLevel === 2) {
-                                            invincibleTimer = 500;
-                                        }
-                                        return false;
-                                    }
-                                    if (this.state > 0) {
-                                        this.state--;
-                                        if (this.state % this.speed === 0) {
-                                            this.shiftUp();
-                                        }
-                                    } else if (this.state === 0) {
-                                        spritePane.setSpriteFilters(this.id, '');
-                                        if (this.type === 'mushroom') {
-                                            this.state--;
-                                        }
-                                    } else {
-                                        moveAlongBlocks(this);
-                                    }
-                                }
-                            }
+            function moveBump(obj) {
+                if (obj.bump === 0) {
+                    tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                    const x = obj.event.tile.x;
+                    const y = obj.event.tile.y;
+                    const topTile = tilesPane.getTileAt(x, y - 1);
+                    if (topTile !== null) {
+                        if (topTile.index === 57) {
+                            objectController.addObject('bump-coin', {event: {tile: {x, y: y - 1}}});
+                        }
                     }
                 }
-            };
-            const objectController = new ObjectController(spritePane, ControllerFactory, {
-                'breaking-block': {},
-                'power-up': {},
-                'evilmush': {},
-                'one-coin': {},
-                'coin-cache': {}
-            });
+                const move = bumpPath.forwardFrom(obj.bump);
+                if (move === null) {
+                    const x = obj.event.tile.x;
+                    const y = obj.event.tile.y;
+                    tilesPane.replaceTile(x, y, obj.bumpTile);
+                    if (obj.next !== undefined) {
+                        objectController.addObject(obj.next, obj);
+                    }
+                    return false;
+                } else {
+                    spritePane.moveSprite(obj.id, 0, move);
+                    obj.bump++;
+                }
+            }
 
+            const eventTileIdParts = [['event', 'tile', 'x'], ['event', 'tile', 'y']];
+            const objectController = new ObjectController(spritePane);
+
+            objectController.addClass(
+                'bump-power-up',
+                function (obj) {
+                    obj.next = 'power-up';
+                    obj.bumpTile = 27;
+                    objectController.addObject('bumping-block', obj);
+                    return false;
+                }
+            );
+
+            objectController.addClass(
+                'bump-one-up',
+                function (obj) {
+                    obj.next = 'one-up';
+                    obj.bumpTile = 27;
+                    objectController.addObject('bumping-block', obj);
+                    return false;
+                }
+            );
+
+            objectController.addClass(
+                'bump-star',
+                function (obj) {
+                    obj.next = 'star';
+                    obj.bumpTile = 27;
+                    objectController.addObject('bumping-block', obj);
+                    return false;
+                }
+            );
+
+            objectController.addClass(
+                'turtle',
+                function (obj) {
+                    if (obj.state === -1) {
+                        obj.state = 0;
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                        spritePane.addSprite(obj.id, getEnemySprite(obj, 'turtle'), pos.x, pos.y + 24 - 8);
+                        spritePane.setAnimationSpeed(obj.id, 0.1);
+                        obj.sprites.push(obj.id);
+                        return;
+                    }
+
+                    const collision = spritePane.getActorCollision(obj.id);
+                    const isColliding = collision !== null && hideCounter === 0;
+                    if (obj.state === -2) {
+                        obj.killing = false;
+                        if (isColliding && !(collision.y.type === COLLISION.BOTTOM && collision.y.touch <= 8)) {
+                            switch (collision.x.type) {
+                                case COLLISION.LEFT:
+                                    obj.dir = -1;
+                                    break;
+
+                                case COLLISION.RIGHT:
+                                    obj.dir = 1;
+                                    break;
+
+                                default:
+                                    obj.dir = marioLeft ? -1 : 1;
+                                    break;
+                            }
+                            obj.state = -3;
+                        }
+                        return;
+                    } else if (obj.state === -3) {
+                        if (moveAlongBlocks(obj, 5)) {
+                            obj.killing = true;
+                        };
+                        if (isColliding) {
+                            if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                                obj.state = -2;
+                                hitEnemy = true;
+                            } else if (obj.killing) {
+                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                            }
+                        }
+                        return;
+                    } else if (isColliding) {
+                        if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                            obj.state = -2;
+                            spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle-shell'));
+                            hitEnemy = true;
+                            addScoreForSprite(500, obj.id);
+                        } else {
+                            if (invincibleTimer !== null) {
+                                // spritePane.assignSprite(obj.id, 'evilmush-flip');
+                                spritePane.setNoCollision(obj.id, true);
+                                console.log('TODO: MOVE FLIPPED TURTLE');
+                                hitEnemy = true;
+                                addScoreForSprite(100, obj.id);
+                            } else {
+                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                            }
+                        }
+                        return;
+                    } else if (obj.state === 0) {
+                        if (moveAlongBlocks(obj, 0.5)) {
+                            spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle'));
+                        };
+                    }
+
+                },
+                {
+                    enemy: true,
+                    doRev: true,
+                    variants: {
+                        left: {dir: -1},
+                        right: {dir: 1}
+                    },
+                    idParts: eventTileIdParts,
+                    state: -1,
+                    dir: -1
+                }
+            );
+
+            objectController.addClass(
+                'evilmush',
+                function (obj) {
+                    if (obj.state === -1) {
+                        obj.state = 0;
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                        spritePane.addSprite(obj.id, 'evilmush', pos.x, pos.y + 24);
+                        spritePane.setAnimationSpeed(obj.id, 0.1);
+                        obj.sprites.push(obj.id);
+                        return;
+                    } else if (obj.state < 0) {
+                        obj.state++;
+                        return (obj.state < -1);
+                    } else if (obj.state === 1) {
+                        if (obj.frame % 2 === 0) {
+                            spritePane.moveSprite(obj.id, obj.dir * 0.5, jumpForce.getMoveForTimeVector(obj.yVector));
+                            jumpForce.incVector(obj.yVector);
+                        }
+                        return;
+                    }
+                    const collision = spritePane.getActorCollision(obj.id);
+                    if (collision !== null && hideCounter === 0) {
+                        if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
+                            obj.state = -100;
+                            spritePane.assignSprite(obj.id, 'evilmush-dead');
+                            hitEnemy = true;
+                            addScoreForSprite(100, obj.id);
+                        } else {
+                            if (invincibleTimer !== null) {
+                                spritePane.assignSprite(obj.id, 'evilmush-flip');
+                                spritePane.setNoCollision(obj.id, true);
+                                hitEnemy = true;
+                                addScoreForSprite(100, obj.id);
+                                obj.dir = (marioLeft ? -1 : 1);
+                                obj.state = 1;
+                                obj.yVector = [0, 0];
+                            } else {
+                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                            }
+                        }
+                        return;
+                    } else if (obj.state === 0) {
+                        moveAlongBlocks(obj, 0.5);
+                    }
+                },
+                {
+                    enemy: true,
+                    variants: {
+                        left: {
+                            dir: -1
+                        },
+                        right: {
+                            dir: 1
+                        }
+                    },
+                    idParts: eventTileIdParts,
+                    state: -1,
+                    dir: -1
+                }
+            );
+
+            objectController.addClass(
+                'bumping-block',
+                function(obj) {
+                    if (obj.frame === 0) {
+                        obj.bumpTile = (obj.bumpTile === undefined ? 1 : obj.bumpTile);
+                        initBump(obj);
+                        return;
+                    }
+                    return moveBump(obj);
+                },
+                {
+                    idParts: eventTileIdParts
+                }
+            );
+
+            objectController.addClass(
+                'breaking-block',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        if (marioLevel === 0) {
+                            obj.bumpTile = 1;
+                            initBump(obj);
+                        } else {
+                            obj.moves = [
+                                [0, 0, -2],
+                                [6, 0, -1],
+                                [6, 0,  1],
+                                [0, 0, 2]
+                            ];
+                            const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                            let i = 1;
+                            for(let move of obj.moves) {
+                                const subId = obj.id + '_' + i;
+                                spritePane.addSprite(subId, 'mini-block1', pos.x + move[2], pos.y + 19);
+                                spritePane.setNoCollision(subId, true);
+                                obj.sprites.push(subId);
+                                i++;
+                            }
+                            tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                        }
+                        return;
+                    }
+                    if (obj.bump === undefined) {
+                        for (let i = 1; i <= 4; i++) {
+                            const move = obj.moves[i - 1];
+                            jumpForce.incVector(move);
+                            spritePane.moveSprite(obj.id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                        }
+                    } else {
+                        return moveBump(obj);
+                    }
+                },
+                {
+                    idParts: eventTileIdParts
+                }
+            );
+
+            objectController.addClass(
+                'coin-cache',
+                function (obj) {
+                        if (obj.frame === 0) {
+                            if (coinCaches[obj.id] === undefined) {
+                                coinCaches[obj.id] = {
+                                    time
+                                }
+                            }
+                            const coinCache = coinCaches[obj.id];
+                            if (coinCache.time - time > 10) {
+
+                                obj.bumpTile = 27;
+                                delete coinCaches[obj.id];
+                            } else {
+                                obj.bumpTile = 'coin-cache';
+                            }
+                            objectController.addObject('one-coin', obj)
+                        } else {
+                            return false;
+                        }
+
+                },
+                {
+                    idParts: eventTileIdParts
+                }
+            );
+
+            objectController.addClass(
+                'bump-coin',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                        coinUp(obj);
+                        return;
+                    } else if (obj.frame === 30) {
+                        return false;
+                    }
+                    let speed = 2;
+                    if (obj.frame < 15) {
+                        speed *= -1;
+                    }
+                    spritePane.moveSprite(obj.id, 0, speed);
+                },
+                {
+                    idParts: eventTileIdParts
+                }
+            );
+
+            objectController.addClass(
+                'one-coin',
+                function (obj) {
+                    if (obj.state === undefined) {
+                        obj.state = 0;
+                        coinUp(obj);
+                        objectController.addObject('bumping-block', {event: obj.event, bumpTile: (obj.bumpTile === undefined ? 27 : obj.bumpTile)});
+                        return;
+                    } else if (obj.state === 30) {
+                        return false;
+                    }
+                    let speed = 2;
+                    if (obj.state < 15) {
+                        speed *= -1;
+                    }
+                    spritePane.moveSprite(obj.id, 0, speed);
+                    obj.state++;
+                }
+            );
+
+            objectController.addClass(
+                'score',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        score += obj.points;
+                        const points = '' + obj.points;
+                        const ids = [];
+                        updateScore(score);
+                        for (let i = 0; i < points.length; i++) {
+                            const id = spritePane.getUid('score');
+                            ids.push(id);
+                            spritePane.addSprite(id, 'num_' + points[i], obj.startX + 4 * i, obj.startY);
+                        }
+                        const groupId = ':' + obj.id;
+                        spritePane.addGroup(obj.id, ids);
+                        spritePane.setNoCollision(groupId, true);
+                        obj.sprites.push(groupId);
+
+                        return;
+                    } else if (obj.frame === 40) {
+                        return false;
+                    }
+                    spritePane.moveSprite(obj.sprites[0], 0, -1);
+                },
+                {autoRemove: false}
+            );
+
+            function shiftUp(obj) {
+                spritePane.setSpriteFilters(obj.id,'shift-y(' + Math.floor(obj.state / obj.speed) + ')');
+                tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 27);
+            }
+
+            objectController.addClass(
+                'star',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
+                        const dim = spriteSheet.getSpriteDim('star');
+                        obj.state = dim.y * obj.speed;
+                        spritePane.addSprite(obj.id, 'star', pos.x, pos.y + 24);
+                        spritePane.setAnimationSpeed(obj.id, 0.5);
+                        shiftUp(obj);
+                        obj.sprites.push(obj.id);
+                        return;
+                    }
+
+                    if (spritePane.isCollidingActor(obj.id)) {
+                        invincibleTimer = 500;
+                        return false;
+                    }
+                    if (obj.state > 0) {
+                        obj.state--;
+                        if (obj.state % obj.speed === 0) {
+                            shiftUp(obj);
+                        }
+                    } else if (obj.state === 0) {
+                        spritePane.setSpriteFilters(obj.id, '');
+                        obj.state--;
+                    } else {
+                        jumpRightOnBlocks(obj);
+                    }
+                },
+                {
+                    idParts: eventTileIdParts,
+                    speed: 3,
+                    dir: 1
+                }
+            );
+
+            objectController.addClass(
+                'one-up',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
+                        const dim = spriteSheet.getSpriteDim('one-up');
+                        obj.state = dim.y * obj.speed;
+                        spritePane.addSprite(obj.id, 'one-up', pos.x, pos.y + 24);
+                        shiftUp(obj);
+                        obj.sprites.push(obj.id);
+                        return;
+                    }
+
+                    if (spritePane.isCollidingActor(obj.id)) {
+                        console.log('TODO', 'ONE-UP FADE-TEXT');
+                        return false;
+                    }
+                    if (obj.state > 0) {
+                        obj.state--;
+                        if (obj.state % obj.speed === 0) {
+                            shiftUp(obj);
+                        }
+                    } else if (obj.state === 0) {
+                        spritePane.setSpriteFilters(obj.id, '');
+                        obj.state--;
+                    } else {
+                        moveAlongBlocks(obj, 1);
+                    }
+                },
+                {
+                    idParts: eventTileIdParts,
+                    speed: 3,
+                    dir: 1
+                }
+            );
+
+            objectController.addClass(
+                'power-up',
+                function (obj) {
+                        if (obj.frame === 0) {
+                            const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
+                            obj.type = obj.powerUps[marioLevel];
+                            const dim = spriteSheet.getSpriteDim(obj.type);
+                            obj.state = dim.y * obj.speed;
+                            spritePane.addSprite(obj.id, obj.type, pos.x, pos.y + 24);
+                            shiftUp(obj);
+                            obj.sprites.push(obj.id);
+                            return;
+                        }
+
+                        if (spritePane.isCollidingActor(obj.id)) {
+                            if (marioLevel === 0) {
+                                cutscene = 'grow';
+                            } else if (marioLevel === 1) {
+                                cutscene = 'fire';
+                            } else if (marioLevel === 2) {
+                                invincibleTimer = 500;
+                            }
+                            return false;
+                        }
+                        if (obj.state > 0) {
+                            obj.state--;
+                            if (obj.state % obj.speed === 0) {
+                                shiftUp(obj);
+                            }
+                        } else if (obj.state === 0) {
+                            spritePane.setSpriteFilters(obj.id, '');
+                            if (obj.type === 'mushroom') {
+                                obj.state--;
+                            }
+                        } else {
+                            moveAlongBlocks(obj, 1);
+                        }
+                },
+                {
+                    idParts: eventTileIdParts,
+                    speed: 3,
+                    dir: 1,
+                    powerUps: {
+                        0: 'mushroom',
+                        1: 'fireflower'
+                    }
+                }
+            );
             marioCollider.setSpriteOffset(0, -24);
 
             function addScore(points, startX, startY) {
-                score += points;
-                points = '' + points;
-                updateScore(score);
-
-                const ids = [];
-                for (let i = 0; i < points.length; i++) {
-                    const id = spritePane.getUid('score');
-                    ids.push(id);
-                    spritePane.addSprite(id, 'num_' + points[i], startX + 4 * i, startY);
-                }
-                const objId = objectController.getUid('score');
-                const groupId = ':' + objId;
-                spritePane.addGroup(objId, ids);
-
-                let scoreTimer = 40;
-                objectController.addSpritesAsObject(objId, groupId, function (id) {
-                    if (scoreTimer === 0) {
-                        return false;
-                    }
-                    scoreTimer--;
-                    spritePane.moveSprite(groupId, 0, -1);
-                });
+                objectController.addObject('score', {points, startX, startY});
             }
 
             function addScoreForSprite(score, spriteId) {
@@ -2157,8 +2524,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 const doRev = rev ? !marioLeft : marioLeft;
                 if (doRev) {
                     name += '-rev';
-                };
+                }
                 spritePane.assignSprite('player', marioLevels[marioLevel] + name);
+            }
+
+            function getEnemySprite(obj, name) {
+                if (obj.doRev === true && obj.dir === 1) {
+                    name += '-rev';
+                }
+                return name;
             }
 
             // ###################################################
@@ -2182,6 +2556,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'shrink':
                             done = flickerCutScene(0, 1);
                             hideCounter = 100;
+                            break;
+
+                        case 'glide':
+                            const pos = spritePane.getSpritePos('player', false, true);
+                            if (pos.y < spritePane.viewPortDim.y - 42) {
+                                spritePane.moveSprite('player', 0, 1);
+                                spritePane.updateFrames();
+                            } else {
+                                setActorSprite('mario-glide-rev');
+                                spritePane.moveSprite('player', 12, 0);
+                                cutscene = 'flagdown';
+                            }
+                            break;
+
+                        case 'flagdown':
                             break;
 
                         case 'fire':
@@ -2223,12 +2612,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 const collEvents = this.getEvents('collide');
                 for (let event of collEvents) {
-                    switch(event.obj.hitEvent) {
+                    switch(event.obj.collectEvent) {
 
                         case 'coin':
                             tilesPane.replaceTile(event.x, event.y, 0);
                             coins++;
                             updateCoins();
+                            break;
+
+                        case 'glide':
+                            cutscene = 'glide';
+                            setActorSprite('mario-glide');
                             break;
 
                         default:
@@ -2278,7 +2672,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             let softHit = null;
 
                             for (let tile of collides.ceiling.tiles) {
-                                if (tile.touch > 7 && tile.obj.block) {
+                                if (tile.touch > 7 && (tile.obj.block || tile.obj.hitEvent)) {
                                     fullHit = i;
                                     if (tile.obj.hitEvent !== undefined) {
                                         Game.instance.addFrameEvent(
@@ -2467,7 +2861,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
 
-                objectController.doActions();
+                objectController.handleObjects();
 
                 // move player
                 const state = actorYStates.getState();
@@ -2506,7 +2900,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     let target = '';
                     if (invincibleTimer === 0) {
                         invincibleTimer = null;
-                        marioLevel = 2;
                     } else {
                         switch (invincibleTimer % 9) {
                             case 0:
@@ -2824,7 +3217,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         j++;
                     }
                 }
-                console.log(path);
                 drawPath(path, color, 0);
             }
 

@@ -310,6 +310,18 @@ class Game {
         return events;
     }
 
+    getNextEvent(type) {
+        const events = this.frameEvents[type];
+        if (events === undefined) {
+            return null;
+        }
+        const event = events.shift();
+        if (events.length === 0) {
+            delete this.frameEvents[type];
+        }
+        return event;
+    }
+
     updateFrame() {
         const screen = this.screens[this.currentScreen];
         if (screen.getState() === 'READY') {
@@ -1768,10 +1780,10 @@ class BufferedTilesPane {
             x2: realEnd >> this.tilesMap.tileBits,
             y: (y1 + this.scrollPos.y) >> this.tilesMap.tileBits
         };
-        let touchStart = realStart % this.tilesMap.tileSize;
-        touchStart = (touchStart === 0 ? this.tilesMap.tileSize : this.tilesMap.tileSize - touchStart);
-        let touchEnd = realEnd % this.tilesMap.tileSize;
-        touchEnd = (touchEnd === 0 ? this.tilesMap.tileSize : touchEnd);
+
+        const xDiff = x2 - x1 + 1;
+        const touchStart = Math.min(xDiff, this.tilesMap.tileSize - (realStart % this.tilesMap.tileSize));
+        const touchEnd = Math.min(xDiff, (realEnd % this.tilesMap.tileSize) + 1);
 
         const mapY = origin.y + relPos.y;
         const start = origin.x + relPos.x1;
@@ -1868,6 +1880,10 @@ class BufferedTilesPane {
             i++;
         }
         return result;
+    }
+
+    getTileAt(x, y) {
+        return this.tilesMap.getTileAtPos(x, y);
     }
 
     getRelativePositionOfTile(x, y) {
@@ -2374,6 +2390,9 @@ class SpritePane {
         const axisPoints = [];
         for (let key in sprites) {
             const sprite = sprites[key];
+            if (sprite.noCollision === true) {
+                continue;
+            }
             axisPoints.push({
                 sprite,
                 isStart: true,
@@ -2402,7 +2421,8 @@ class SpritePane {
                     for (let c of closing) {
                         if (o !== c) {
                             if (detailed) {
-                                found.push([o, c])
+                                found.push([o, c]);
+                                found.push([c, o]);
                             } else {
                                 found[o.id] = o;
                                 found[c.id] = c;
@@ -2470,7 +2490,7 @@ class SpritePane {
                     touch = sourceEnd - source.x + 1;
                 }
             }
-            if (touch < 0) {
+            if (touch <= 0) {
                 continue;
             }
             collision.x = {type, touch};
@@ -2494,7 +2514,7 @@ class SpritePane {
                     touch = sourceEnd - source.y + 1;
                 }
             }
-            if (touch < 0) {
+            if (touch <= 0) {
                 continue;
             }
             collision.y = {type, touch};
@@ -2571,9 +2591,16 @@ class SpritePane {
         if (!this.zOrdering && z !== 0) {
             this.zOrdering = true;
         }
-        const sprite = {id, x, y, z, animSpeed: 1, filterDuration: -1, attached: this.attachDefault, filters: '', hidden: false};
+        const sprite = {id, x, y, z, noCollision: false, animSpeed: 1, filterDuration: -1, attached: this.attachDefault, filters: '', hidden: false};
         this.sprites[id] = this.initSpriteObj(sprite, name);
         this.dirty = true;
+    }
+
+    setNoCollision(id, value) {
+        const sprites = this.getSpritesById(id);
+        for (let sprite of sprites) {
+            sprite.noCollision = value;
+        }
     }
 
     hideSprite(id) {
@@ -2694,9 +2721,17 @@ class SpritePane {
         }
     }
 
-    getSpritePos(id) {
+    getSpritePos(id, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
-        return {id, x: sprite.x, y: sprite.y, z: sprite.z, dim: sprite.dim};
+        let x = sprite.x;
+        if (xEnd) {
+            x += sprite.dim.x - 1;
+        }
+        let y = sprite.y;
+        if (yEnd) {
+            y += sprite.dim.y - 1;
+        }
+        return {id, x, y, z: sprite.z, dim: sprite.dim};
     }
 
     getAllSpritePos(match) {
@@ -4013,7 +4048,7 @@ class SpriteSheet {
 class SpriteAndTilesCollider {
 
     static defaultCheck(tile) {
-        return (tile.obj === null || tile.obj.block);
+        return (tile.obj !== null && tile.obj.block);
     }
 
     constructor(spriteId, spritePane, tilesPane, collides) {
@@ -4181,6 +4216,7 @@ class SpriteAndTilesCollider {
 
                 for (let tile of tiles) {
                     if (collide.check(tile)) {
+                        console.log('TILES', tiles, pos.x + collide.margin.left, pos.x + pos.dim.x - collide.margin.right - 1);
                         Game.instance.addFrameEvent('collide', tile);
                     }
                 }
@@ -4866,20 +4902,89 @@ class ImageResource {
 
 class ObjectController {
 
-    constructor(spritePane, controllerFactory, objects) {
-        this.controllerFactory = controllerFactory;
+    constructor(spritePane) {
         this.spritePane = spritePane;
-        this.objects = objects;
         this.uid = 0;
         this.activeObjects = [];
+        this.classes = {};
     }
 
-    getObject(id) {
-        if (this.objects[id] === undefined) {
-            console.log('Unknown object id ' + id + ' given!');
-            return null;
+    addClass(name, handler, state = {}) {
+        this.classes[name] = {
+            handler,
+            state
+        };
+    }
+
+    getObjectWithSpriteId(id) {
+        for (let obj of this.activeObjects) {
+            if (obj.sprites.indexOf(id) !== -1) {
+                return obj;
+            }
         }
-        return this.objects[id];
+        return null;
+    }
+
+    getObjectIdFromIdParts(idParts, obj) {
+        let subIds = [];
+        for (let part of idParts) {
+            let id = '';
+            if (Array.isArray(part)) {
+                let curr = obj;
+                for (let key of part) {
+                    curr = curr[key];
+                }
+                id = curr;
+            } else {
+                id = obj[part];
+            }
+            subIds.push(id);
+        }
+        return obj.class + '_' + subIds.join('_');
+    }
+
+    hasActiveObject(id) {
+        for (let obj of this.activeObjects) {
+            if (obj.id === id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getClassParts(id) {
+        const parts = id.split('.', 2);
+        return {
+            main: parts[0],
+            variant: (parts.length === 2 ? parts[1] : null)
+        }
+    }
+
+    addObject(clsId, state = {}) {
+
+        const cls = this.getClassParts(clsId);
+        if (this.classes[cls.main] === undefined) {
+            throw Error('No class with name "' + cls.main + '" found!');
+        }
+        const classState = this.classes[cls.main].state;
+        let varState = {};
+        if (cls.variant !== null) {
+            if (classState.variants[cls.variant] === undefined) {
+                throw Error('Class "' + cls.main + '" does not have variant "' + cls.variant +  '"!');
+            }
+            Object.assign(varState, classState.variants[cls.variant]);
+        }
+        const obj = Object.assign({autoRemove: true}, classState, varState, state);
+        obj.class = cls.main;
+        const id = Array.isArray(obj.idParts) ? this.getObjectIdFromIdParts(obj.idParts, obj) : this.getUid(cls.main);
+        if (this.hasActiveObject(id)) {
+            return;
+        }
+        obj.id = id;
+        obj.frame = 0;
+        obj.sprites = [];
+        console.log('NEW', clsId, id);
+        this.activeObjects.push(obj);
     }
 
     getUid(name) {
@@ -4888,61 +4993,46 @@ class ObjectController {
         return name;
     }
 
-    addSpritesAsObject(id, spriteIds, updateCallback) {
-        this.activeObjects.push({
-            id,
-            object: {autoRemove: false},
-            spriteIds: (Array.isArray(spriteIds) ? spriteIds : [spriteIds]),
-            updateCallback
-        });
-    }
+    handleObjects() {
+        while (true) {
+            const event = Game.instance.getNextEvent('object');
+            if (event === null) {
+                break;
+            }
+            this.addObject(event.object, {event})
+        }
 
-    doActions() {
-        // controll existing objects
-        const active = [];
-        for (let obj of this.activeObjects) {
-            let result = (obj.controller !== undefined) ? obj.controller.getNextActions(obj.id) : obj.updateCallback(obj.id);
-            if (result !== false && obj.object.autoRemove !== false && obj.spriteIds !== undefined) {
-                result = false;
-                for (let spriteId of obj.spriteIds) {
-                    if (this.spritePane.isSpriteInBounds(spriteId)) {
-                        result = true;
-                        break;
+        let i = 0;
+        const survivedObjects = [];
+        while (i < this.activeObjects.length) {
+            const obj = this.activeObjects[i];
+            const cls = this.classes[obj.class];
+            let remove = cls.handler(obj) === false;
+            if (!remove) {
+                if (obj.autoRemove === true) {
+                    remove = false;
+                    for (let spriteId of obj.sprites) {
+                        if (this.spritePane.isSpriteInBounds(spriteId)) {
+                            remove = false;
+                            break;
+                        } else {
+                            remove = true;
+                        }
                     }
-
+                };
+                if (!remove) {
+                    obj.frame++;
+                    survivedObjects.push(obj);
                 }
             }
-            if (result !== false) {
-                active.push(obj);
-            } else if (obj.spriteIds !== undefined) {
-                this.spritePane.removeSprites(obj.spriteIds);
+            if (remove) {
+                console.log('REMOVE', obj.id);
+                this.spritePane.removeSprites(obj.sprites);
             }
+            i++;
         }
-        this.activeObjects = active;
-
-        // add new objects
-        let objectEvents = Game.instance.getEvents('object');
-        for (let objectEvent of objectEvents) {
-            const obj = this.getObject(objectEvent.object);
-            if (obj === null) {
-                continue;
-            }
-            const activeObject = {
-                id:  this.getUid(objectEvent.object),
-                object: obj,
-                controller: this.controllerFactory.get(obj.controller !== undefined ? obj.controller : objectEvent.object)
-            };
-            this.activeObjects.push(activeObject);
-            let spriteIds = activeObject.controller.init(activeObject.id, objectEvent);
-            if (spriteIds !== undefined) {
-                if (!Array.isArray(spriteIds)) {
-                    spriteIds = [spriteIds];
-                }
-                activeObject.spriteIds = spriteIds;
-            }
-        }
+        this.activeObjects = survivedObjects;
     }
-
 }
 
 const INPUT = {
