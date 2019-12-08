@@ -1704,6 +1704,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
             spriteSheet.addSprite('turtle-shell', 240, 51, 16, 24);
             spriteSheet.addTransformedSprite('turtle-shell-rev', 'turtle-shell', 'flip-x');
+            spriteSheet.addTransformedSprite('turtle-shell-flipped', 'turtle-shell', 'flip-y');
             spriteSheet.addAnimation('turtle', ['turtle1', 'turtle2'], ANIMATION.END.LOOP);
             spriteSheet.addTransformedAnimation('turtle-rev', 'turtle', 'flip-x');
             spriteSheet.addTransformedSprite('evilmush-flip', 'evilmush1', 'flip-y');
@@ -1716,6 +1717,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSprite('fireball2', 298, 34, 8, 8);
             spriteSheet.addSprite('fireball3', 290, 42, 8, 8);
             spriteSheet.addSprite('fireball4', 298, 42, 8, 8);
+            spriteSheet.addSprite('explode', 310, 38, 8, 8);
             spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
@@ -1907,7 +1909,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 jumpForce.incVector(obj.yVector);
             }
 
-            function moveAlongBlocks(obj, speed = 1) {
+            function moveAlongBlocks(obj, speed = 1, bounce = null) {
                 if (obj.collider === undefined) {
                     obj.yVector = [null, null];
                     obj.collider = new SpriteAndTilesCollider(obj.id, spritePane, tilesPane, {
@@ -1965,8 +1967,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         obj.yVector[1] = 0;
                     }
                 } else {
-                    obj.yVector[0] = null;
-                    obj.yVector[1] = null;
+                    if (bounce !== null) {
+                        obj.yVector[0] = 0;
+                        obj.yVector[1] = bounce;
+                    } else {
+                        obj.yVector[0] = null;
+                        obj.yVector[1] = null;
+                    }
                 }
                 if (obj.dir === 1 && (changeDir || collides.right.dist === 0)) {
                     obj.dir = (collides.left.dist === 0 ? 0 : -1);
@@ -2011,6 +2018,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 } else {
                     spritePane.moveSprite(obj.id, 0, move);
                     obj.bump++;
+                }
+            }
+
+            function handleKickout(obj, sprite) {
+                if (obj.kickout !== undefined) {
+                    spritePane.assignSprite(obj.id, sprite);
+                    spritePane.setNoCollision(obj.id, true);
+                    addScoreForSprite(100, obj.id);
+                    obj.dir = obj.kickout;
+                    obj.state = 1;
+                    obj.yVector = [0, 0];
+                    obj.kickout = undefined;
                 }
             }
 
@@ -2066,8 +2085,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         spritePane.setAnimationSpeed(obj.id, 0.1);
                         obj.sprites.push(obj.id);
                         return;
+                    } else if (obj.state === 1) {
+                        if (obj.frame % 2 === 0) {
+                            spritePane.moveSprite(obj.id, obj.dir * 0.5, jumpForce.getMoveForTimeVector(obj.yVector));
+                            jumpForce.incVector(obj.yVector);
+                        }
+                        return;
                     }
-
                     const collision = spritePane.getActorCollision(obj.id);
                     const isColliding = collision !== null && hideCounter === 0;
                     if (obj.state === -2) {
@@ -2110,22 +2134,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             addScoreForSprite(500, obj.id);
                         } else {
                             if (invincibleTimer !== null) {
-                                // spritePane.assignSprite(obj.id, 'evilmush-flip');
-                                spritePane.setNoCollision(obj.id, true);
-                                console.log('TODO: MOVE FLIPPED TURTLE');
-                                hitEnemy = true;
-                                addScoreForSprite(100, obj.id);
+                                obj.kickout = (marioLeft ? -1 : 1);
                             } else {
                                 cutscene = marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
-                        return;
                     } else if (obj.state === 0) {
                         if (moveAlongBlocks(obj, 0.5)) {
                             spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle'));
-                        };
+                        }
                     }
-
+                    handleKickout(obj, 'turtle-shell-flipped');
                 },
                 {
                     enemy: true,
@@ -2169,21 +2188,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             addScoreForSprite(100, obj.id);
                         } else {
                             if (invincibleTimer !== null) {
-                                spritePane.assignSprite(obj.id, 'evilmush-flip');
-                                spritePane.setNoCollision(obj.id, true);
-                                hitEnemy = true;
-                                addScoreForSprite(100, obj.id);
-                                obj.dir = (marioLeft ? -1 : 1);
-                                obj.state = 1;
-                                obj.yVector = [0, 0];
+                                obj.kickout = (marioLeft ? -1 : 1);
                             } else {
                                 cutscene = marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
-                        return;
                     } else if (obj.state === 0) {
                         moveAlongBlocks(obj, 0.5);
                     }
+                    handleKickout(obj, 'evilmush-flip');
                 },
                 {
                     enemy: true,
@@ -2437,8 +2450,45 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 function (obj) {
                     if (obj.frame === 0) {
                         spritePane.addSprite(obj.id, 'fireball', obj.x, obj.y);
+                        spritePane.setAnimationSpeed(obj.id, 0.25);
+                        obj.sprites.push(obj.id);
+                    } else {
+                        const collides = spritePane.getLastSpriteCollisions(obj.id);
+                        let hit = false;
+                        if (collides.length > 0) {
+                            for (let collide of collides) {
+                                if (collide.sprite.id !== 'player') {
+                                    const hitObj = objectController.getObjectWithSpriteId(collide.sprite.id);
+                                    if (hitObj.enemy === true) {
+                                        hit = true;
+                                        hitObj.kickout = obj.dir;
+                                    }
+                                }
+                            }
+                        }
+                        if (!hit) {
+                            hit = moveAlongBlocks(obj, 3, 6);
+                        }
+                        if (hit) {
+                            const pos = spritePane.getSpritePos(obj.id);
+                            obj.x = pos.x - obj.dir * 8;
+                            obj.y = pos.y;
+                            objectController.addObject('fireball-hit', obj);
+                            return false;
+                        };
+                    }
+                }
+            );
+
+            objectController.addClass(
+                'fireball-hit',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        spritePane.addSprite(obj.id, 'explode', obj.x, obj.y);
+                        spritePane.setNoCollision(obj.id, true);
                         obj.sprites.push(obj.id);
                     }
+                    return (obj.frame < 10);
                 }
             );
 
@@ -2517,11 +2567,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let cutsceneFrame = 0;
             let flagScoreObj = null;
             let flickerFrames = [];
+            let fireBalls = [];
             const speedUp = [
                 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 2, 2, 1, 1, 2, 0, 2, 1, 2, 1, 2
             ];
-
             let speedIndex = 0;
 
             function flickerCutScene(toLevel, fromLevel) {
@@ -2729,10 +2779,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 inputController.update();
 
+                for (let i = 0; i < fireBalls.length; i++) {
+                    if (!objectController.hasActiveObject(fireBalls[i])) {
+                        fireBalls.splice(i, 1);
+                    }
+                }
                 if (inputController.hasInput('button-b')) {
-                    const pos = spritePane.getSpritePos('player');
-                    console.log('FIRE!!!');
-                    objectController.addObject('fireball', {x: pos.x, y: pos.y, dir: marioLeft ? -1 : 1});
+                    if (marioLevel === 2 && fireBalls.length < 2) {
+                        const pos = spritePane.getSpritePos('player');
+                        let dir = marioLeft ? -1 : 1;
+                        if (!inputController.noXDir()) {
+                            dir = inputController.isLeftDir() ? -1 : 1;
+                        }
+                        const obj = objectController.addObject('fireball', {x: pos.x, y: pos.y, dir});
+                        fireBalls.push(obj.id);
+                    }
                 }
 
                 for (let event of yEvents) {
