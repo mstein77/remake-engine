@@ -3382,7 +3382,7 @@ class BoundsScrollHandler {
         this.maxOut = Object.assign(this.maxOut, maxOut);
     }
 
-    moveActor(moveX = 0, moveY = 0) {
+    moveActor(moveX = 0, moveY = 0, forceScrollX = false, forceScrollY = false) {
         const actor = this.spritePane.getActorId();
         if (actor === null) {
             return;
@@ -3414,6 +3414,12 @@ class BoundsScrollHandler {
                 if (pos > max) {
                     pos = max;
                 }
+            } else if (forceScrollX) {
+                pos = sprite.x;
+                if (pos > max) {
+                    pos = max;
+                }
+                scrollX = moveX;
             } else if (pos > rightScrollBound) {
                 if (sprite.x <= rightScrollBound) {
                     scrollX = Math.abs(pos - rightScrollBound);
@@ -4216,7 +4222,6 @@ class SpriteAndTilesCollider {
 
                 for (let tile of tiles) {
                     if (collide.check(tile)) {
-                        console.log('TILES', tiles, pos.x + collide.margin.left, pos.x + pos.dim.x - collide.margin.right - 1);
                         Game.instance.addFrameEvent('collide', tile);
                     }
                 }
@@ -4985,6 +4990,7 @@ class ObjectController {
         obj.sprites = [];
         console.log('NEW', clsId, id);
         this.activeObjects.push(obj);
+        return obj;
     }
 
     getUid(name) {

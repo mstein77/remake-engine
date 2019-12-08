@@ -1623,7 +1623,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 },
                 [
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [237, 'object:flag'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 694, 694, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 'coin-block', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 'coin-block', 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
@@ -1643,7 +1643,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             );
             const tilesPane = new BufferedTilesPane(bgTilesMap, {maxSpeed: 4});
-            tilesPane.setMapTilePos(-1, -1);
+            tilesPane.setMapTilePos(160, -1);
             gameArea.addPane(tilesPane, 1);
               const canvasPane = new CanvasPane();
               gameArea.addPane(canvasPane, 1);
@@ -1696,6 +1696,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('star', 0, 99, 16, 16, 4);
             spriteSheet.addAnimation('star', ['star1', 'star2', 'star3', 'star4'], ANIMATION.END.LOOP);
+            spriteSheet.addSprite('flag', 239, 34, 16, 16);
             spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
             spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
@@ -2007,6 +2008,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             const eventTileIdParts = [['event', 'tile', 'x'], ['event', 'tile', 'y']];
             const objectController = new ObjectController(spritePane);
+
+            objectController.addClass(
+                'flag',
+                function (obj) {
+                    const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
+                    spritePane.addSprite('flag', 'flag', pos.x - 9, pos.y + 24);
+                    return false;
+                }
+            );
 
             objectController.addClass(
                 'bump-power-up',
@@ -2465,7 +2475,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             marioCollider.setSpriteOffset(0, -24);
 
             function addScore(points, startX, startY) {
-                objectController.addObject('score', {points, startX, startY});
+                return objectController.addObject('score', {points, startX, startY});
             }
 
             function addScoreForSprite(score, spriteId) {
@@ -2487,6 +2497,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let forceMoveX = 0;
             let cutscene = null;
             let cutsceneFrame = 0;
+            let flagScoreObj = null;
             let flickerFrames = [];
             const speedUp = [
                 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
@@ -2563,14 +2574,51 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             if (pos.y < spritePane.viewPortDim.y - 42) {
                                 spritePane.moveSprite('player', 0, 1);
                                 spritePane.updateFrames();
+                            }
+                            const flagPos = spritePane.getSpritePos('flag', false, true);
+                            if (flagPos.y < spritePane.viewPortDim.y - 42) {
+                                spritePane.moveSprite('flag', 0, 1);
+                                spritePane.moveSprite(flagScoreObj.sprites[0], 0, -1);
                             } else {
                                 setActorSprite('mario-glide-rev');
                                 spritePane.moveSprite('player', 12, 0);
+                                cutsceneFrame = 0;
+                                cutscene = 'glide-rev';
+                            }
+                            break;
+
+                        case 'glide-rev':
+                            if (cutsceneFrame === 60) {
                                 cutscene = 'flagdown';
+                                setActorSprite('mario-run');
+                                spritePane.setAnimationSpeed('player', 0.15);
+                                cutsceneFrame = 0;
                             }
                             break;
 
                         case 'flagdown':
+                            if (cutsceneFrame < 90) {
+                                spritePane.updateFrames();
+                                gameScrollBounds.moveActor(1, 0, true);
+                            } else {
+                                spritePane.hideSprite('player');
+                                cutscene = 'coinbonus';
+                            }
+                            break;
+
+                        case 'coinbonus':
+                            if (time === 0) {
+                                cutscene = 'flag-up';
+                                cutsceneFrame = 0;
+                            } else {
+                                time--;
+                                score += 50;
+                                updateTime();
+                                updateScore();
+                            }
+                            break;
+
+                        case 'flag-up':
                             break;
 
                         case 'fire':
@@ -2623,6 +2671,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'glide':
                             cutscene = 'glide';
                             setActorSprite('mario-glide');
+                            spritePane.setAnimationSpeed('player', 0.34);
+                            const pos = tilesPane.getRelativePositionOfTile(event.x, event.y);
+                            flagScoreObj = addScore(1000, pos.x + 16, 160);
                             break;
 
                         default:
