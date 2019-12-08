@@ -1712,6 +1712,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSprite('mini-block2', 72, 51, 8, 8);
             spriteSheet.addSprite('bump-block', 64, 131, 16, 16);
             spriteSheet.addSprite('bump-box', 96, 131, 16, 16);
+            spriteSheet.addSprite('fireball1', 290, 34, 8, 8);
+            spriteSheet.addSprite('fireball2', 298, 34, 8, 8);
+            spriteSheet.addSprite('fireball3', 290, 42, 8, 8);
+            spriteSheet.addSprite('fireball4', 298, 42, 8, 8);
+            spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
             spriteSheet.addSpriteSeq('minicoin', 0, 211, 8, 8, 3, 0);
