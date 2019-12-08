@@ -1099,7 +1099,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             }
                             break;
 
-                        case 'move-up':
+                        case 'button-a':
                             if (dirY >= 0) {
                                 continue;
                             }
@@ -1643,7 +1643,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             );
             const tilesPane = new BufferedTilesPane(bgTilesMap, {maxSpeed: 4});
-            tilesPane.setMapTilePos(160, -1);
+            tilesPane.setMapTilePos(-1, -1);
             gameArea.addPane(tilesPane, 1);
               const canvasPane = new CanvasPane();
               gameArea.addPane(canvasPane, 1);
@@ -1697,6 +1697,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSpriteSeq('star', 0, 99, 16, 16, 4);
             spriteSheet.addAnimation('star', ['star1', 'star2', 'star3', 'star4'], ANIMATION.END.LOOP);
             spriteSheet.addSprite('flag', 239, 34, 16, 16);
+            spriteSheet.addSprite('flag-up', 256, 34, 16, 16);
+            spriteSheet.addSprite('flag-up-fg', 273, 34, 16, 16);
             spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
             spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
@@ -1755,10 +1757,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 'standing', 'ducking', 'jumping', 'falling', 'dead'
             ]);
             actorYStates.addTransition('standing', 'move-down', 'ducking');
-            actorYStates.addTransition('standing', 'move-up', 'jumping');
+            actorYStates.addTransition('standing', 'button-a', 'jumping');
             actorYStates.addTransition('standing', 'no-floor', 'falling');
             actorYStates.addTransition('ducking', 'not-move-down', 'standing');
-            actorYStates.addTransition('ducking', 'move-up', 'jumping');
+            actorYStates.addTransition('ducking', 'button-a', 'jumping');
             actorYStates.addTransition('ducking', 'no-floor', 'falling');
 
             actorYStates.addTransition('jumping', ['end-of-jump', 'not-move-up', 'hit-ceiling', 'hit-enemy'], 'falling');
@@ -1767,7 +1769,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             actorYStates.addTransition('falling', 'disappear-bottom', 'dead');
             actorYStates.setEventPrios([
                 'disappear-bottom', 'no-floor', 'hit-ceiling', 'hit-bottom', 'hit-enemy', 'not-move-up', 'not-move-down',
-                'move-up', 'move-down', 'end-of-jump'
+                'button-a', 'move-down', 'end-of-jump'
             ]);
             actorYStates.setState('standing');
 
@@ -1788,8 +1790,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             actorXStates.setState('still');
 
             const inputController = new InputController();
-            inputController.setDirInputs(null, 's', 'a', 'd');
-            inputController.addInput('button-a', 'w', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.setDirInputs('w', 's', 'a', 'd');
+            inputController.addInput('button-a', 'k', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.addInput('button-b', 'j', INPUT.TYPE.PRESS_AND_RELEASE);
 
             const collideCheck = function(tile) {
                 return (tile.obj !== null && tile.obj.block);
@@ -2425,6 +2428,16 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             );
 
             objectController.addClass(
+                'fireball',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        spritePane.addSprite(obj.id, 'fireball', obj.x, obj.y);
+                        obj.sprites.push(obj.id);
+                    }
+                }
+            );
+
+            objectController.addClass(
                 'power-up',
                 function (obj) {
                         if (obj.frame === 0) {
@@ -2610,6 +2623,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             if (time === 0) {
                                 cutscene = 'flag-up';
                                 cutsceneFrame = 0;
+                                const playerPos = spritePane.getSpritePos('player');
+                                spritePane.addSprite('flag-up', 'flag-up', playerPos.x, 120);
+                                spritePane.addSprite('flag-up-fg', 'flag-up-fg', playerPos.x, 120);
                             } else {
                                 time--;
                                 score += 50;
@@ -2619,6 +2635,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'flag-up':
+                            if (cutsceneFrame < 17) {
+                                spritePane.moveSprite('flag-up', 0, -1);
+                            }
                             break;
 
                         case 'fire':
@@ -2698,11 +2717,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 let updateGroundSprite = false;
                 let currEvent = null;
                 const yEvents = actorYStates.getPossibleEvents();
-                if (yEvents.indexOf('move-up') !== -1) {
+                if (yEvents.indexOf('button-a') !== -1) {
                     inputController.awaitInput('button-a');
                 }
+                inputController.awaitInput('button-b');
 
                 inputController.update();
+
+                if (inputController.hasInput('button-b')) {
+                    const pos = spritePane.getSpritePos('player');
+                    console.log('FIRE!!!');
+                    objectController.addObject('fireball', {x: pos.x, y: pos.y, dir: marioLeft ? -1 : 1});
+                }
 
                 for (let event of yEvents) {
                     switch (event) {
@@ -2760,7 +2786,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             if (marioLevel > 0 && inputController.isDownDir()) continue;
                             break;
 
-                        case 'move-up':
+                        case 'button-a':
                             if (!inputController.hasInput('button-a')) continue;
                             break;
 
