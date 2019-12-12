@@ -2791,13 +2791,19 @@ class SpritePane {
         }
     }
 
-    setSpritePos(id, x, y, z = null) {
+    setSpritePos(id, x, y, z = null, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
         if (!this.dirty) {
             this.dirty = (sprite.x !== x || sprite.y !== y);
         }
         sprite.x = x;
+        if (xEnd) {
+            sprite.x -= sprite.dim.x - 1;
+        }
         sprite.y = y;
+        if (yEnd) {
+            sprite.y -= sprite.dim.y - 1;
+        }
         if (z !== null) {
             this.zOrdering = true;
             if (!this.dirty) {
@@ -4999,7 +5005,7 @@ class ObjectController {
         return name;
     }
 
-    handleObjects() {
+    handleObjects(onlyClasses = null) {
         while (true) {
             const event = Game.instance.getNextEvent('object');
             if (event === null) {
@@ -5013,27 +5019,31 @@ class ObjectController {
         while (i < this.activeObjects.length) {
             const obj = this.activeObjects[i];
             const cls = this.classes[obj.class];
-            let remove = cls.handler(obj) === false;
-            if (!remove) {
-                if (obj.autoRemove === true) {
-                    remove = false;
-                    for (let spriteId of obj.sprites) {
-                        if (this.spritePane.isSpriteInBounds(spriteId)) {
-                            remove = false;
-                            break;
-                        } else {
-                            remove = true;
-                        }
-                    }
-                };
+            let remove = false;
+            if (onlyClasses === null || onlyClasses.indexOf(obj.class) !== -1) {
+                remove = cls.handler(obj) === false;
                 if (!remove) {
-                    obj.frame++;
-                    survivedObjects.push(obj);
+                    if (obj.autoRemove === true) {
+                        remove = false;
+                        for (let spriteId of obj.sprites) {
+                            if (this.spritePane.isSpriteInBounds(spriteId)) {
+                                remove = false;
+                                break;
+                            } else {
+                                remove = true;
+                            }
+                        }
+                    };
+                    if (!remove) {
+                        obj.frame++;
+                    }
                 }
             }
             if (remove) {
                 console.log('REMOVE', obj.id);
                 this.spritePane.removeSprites(obj.sprites);
+            } else {
+                survivedObjects.push(obj);
             }
             i++;
         }
@@ -5126,6 +5136,11 @@ class InputController {
                     break;
             }
         }
+    }
+
+    isPressed(name) {
+        const input = this.inputs[name];
+        return (Game.instance.keysDown[input.key] === input.key);
     }
 
     hasInput(name) {

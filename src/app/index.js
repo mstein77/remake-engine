@@ -1652,24 +1652,40 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const spriteSheet = new SpriteSheet(resource.sprites);
 
             const marioTypes = [{prefix: '', offY: 1, height: 32}, {prefix: 'small-', offY: 34, height: 16}];
+            spriteSheet.addSprite('throwing-mario', 273, 1, 16, 32);
+            spriteSheet.addSpriteSeq('throwing-mario-run', 273, 1, 16, 32, 3, 1);
+            spriteSheet.addSprite('throwing-mario-slide', 307, 1, 16, 32);
+            spriteSheet.addSprite('throwing-mario-jump', 341, 1, 16, 32);
+            spriteSheet.addSprite('mid-mario', 256, 1, 16, 32);
+            spriteSheet.addTransformedSpritesFromObj(
+                'flip-x',
+                {
+                    'mid-mario-rev': 'mid-mario',
+                'throwing-mario-rev': 'throwing-mario',
+                'throwing-mario-run1-rev': 'throwing-mario-run1',
+                'throwing-mario-run2-rev': 'throwing-mario-run2',
+                'throwing-mario-run3-rev': 'throwing-mario-run3',
+                'throwing-mario-slide-rev': 'throwing-mario-slide',
+                'throwing-mario-jump-rev': 'throwing-mario-jump'
+            });
             for (let type of marioTypes) {
                 spriteSheet.addSprite(type.prefix + 'mario', 1, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-jump', 86, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-duck', 103, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-slide', 69, type.offY, 16, type.height);
                 spriteSheet.addSprite(type.prefix + 'mario-fall', 35, type.offY, 16, type.height);
+                spriteSheet.addSprite(type.prefix + 'mario-swim1', 154, type.offY, 16, type.height);
                 spriteSheet.addTransformedSprite(type.prefix + 'mario-rev', type.prefix + 'mario', 'flip-x');
                 spriteSheet.addTransformedSprites('-rev',
-                    [type.prefix + 'mario', type.prefix + 'mario-slide', type.prefix + 'mario-jump', type.prefix + 'mario-duck', type.prefix + 'mario-fall'], 'flip-x');
+                    [type.prefix + 'mario', type.prefix + 'mario-slide', type.prefix + 'mario-jump', type.prefix + 'mario-duck', type.prefix + 'mario-fall', type.prefix + 'mario-swim1'], 'flip-x');
                 spriteSheet.addSpriteSeq(type.prefix + 'mario-run', 18, type.offY, 16, type.height, 3, 1);
-                spriteSheet.addAnimation(
-                    type.prefix + 'mario-run',
-                    [type.prefix + 'mario-run1', type.prefix + 'mario-run2', type.prefix + 'mario-run3'],
-                    ANIMATION.END.LOOP
-                );
                 spriteSheet.addSpriteSeq(type.prefix + 'mario-glide', 120, type.offY, 16, type.height, 2, 1);
                 spriteSheet.addAnimation(type.prefix + 'mario-glide', [type.prefix + 'mario-glide1', type.prefix + 'mario-glide2'], ANIMATION.END.LOOP)
-                spriteSheet.addTransformedAnimation(type.prefix + 'mario-run-rev', type.prefix + 'mario-run', 'flip-x');
+                spriteSheet.addTransformedSpritesFromObj('flip-x', {
+                    [type.prefix + 'mario-run1-rev']: type.prefix + 'mario-run1',
+                    [type.prefix + 'mario-run2-rev']: type.prefix + 'mario-run2',
+                    [type.prefix + 'mario-run3-rev']: type.prefix + 'mario-run3'
+                });
                 spriteSheet.addTransformedSprite(type.prefix + 'mario-glide-rev', type.prefix + 'mario-glide2', 'flip-x');
             }
             spriteSheet.build();
@@ -1677,17 +1693,29 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 'color-replace(#b13425:#f7d6a4;#6a6b04:#b53121)',
                 {
                     'fire-mario': 'mario',
+                    'fire-throwing-mario': 'throwing-mario',
+                    'fire-throwing-mario-rev': 'throwing-mario-rev',
                     'fire-mario-jump': 'mario-jump',
+                    'fire-throwing-mario-jump': 'throwing-mario-jump',
+                    'fire-throwing-mario-jump-rev': 'throwing-mario-jump-rev',
                     'fire-mario-fall': 'mario-fall',
                     'fire-mario-duck': 'mario-duck',
                     'fire-mario-slide': 'mario-slide',
+                    'fire-throwing-mario-slide': 'throwing-mario-slide',
+                    'fire-throwing-mario-slide-rev': 'throwing-mario-slide-rev',
                     'fire-mario-slide-rev': 'mario-slide-rev',
                     'fire-mario-fall-rev': 'mario-fall-rev',
                     'fire-mario-glide1': 'mario-glide1',
                     'fire-mario-glide2': 'mario-glide2',
                     'fire-mario-run1': 'mario-run1',
+                    'fire-throwing-mario-run1': 'throwing-mario-run1',
+                    'fire-throwing-mario-run1-rev': 'throwing-mario-run1-rev',
                     'fire-mario-run2': 'mario-run2',
+                    'fire-throwing-mario-run2': 'throwing-mario-run2',
+                    'fire-throwing-mario-run2-rev': 'throwing-mario-run2-rev',
                     'fire-mario-run3': 'mario-run3',
+                    'fire-throwing-mario-run3': 'throwing-mario-run3',
+                    'fire-throwing-mario-run3-rev': 'throwing-mario-run3-rev',
                     'fire-mario-glide-rev': 'mario-glide-rev'
                 });
             spriteSheet.addSprite('mushroom', 0, 51, 16, 16);
@@ -1717,8 +1745,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSprite('fireball2', 298, 34, 8, 8);
             spriteSheet.addSprite('fireball3', 290, 42, 8, 8);
             spriteSheet.addSprite('fireball4', 298, 42, 8, 8);
-            spriteSheet.addSprite('explode', 310, 38, 8, 8);
+            spriteSheet.addSpriteSeq('explode', 307, 34, 16, 16, 3, 1);
+            spriteSheet.addAnimation('explode', ['explode1', 'explode2', 'explode3']);
             spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP);
+            spriteSheet.addSprite('1up', 32, 219, 16, 7);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
             spriteSheet.addSpriteSeq('minicoin', 0, 211, 8, 8, 3, 0);
@@ -1875,11 +1905,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 coins++;
                 updateCoins();
                 const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
-                addScore(100, pos.x, pos.y);
-                spritePane.addSprite(obj.id, 'coin-up', pos.x, pos.y);
-                spritePane.setNoCollision(obj.id, true);
-                spritePane.setAnimationSpeed(obj.id, 0.2);
-                obj.sprites.push(obj.id);
+                objectController.addObject('coin-jump', {x: pos.x, y: pos.y, points: 100});
             }
 
             function jumpRightOnBlocks(obj) {
@@ -2041,6 +2067,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 function (obj) {
                     const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
                     spritePane.addSprite('flag', 'flag', pos.x - 9, pos.y + 24);
+                    spritePane.setNoCollision('flag', true);
                     return false;
                 }
             );
@@ -2063,6 +2090,42 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     objectController.addObject('bumping-block', obj);
                     return false;
                 }
+            );
+
+            objectController.addClass(
+                'one-up-score',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        spritePane.addSprite(obj.id, '1up', obj.x, obj.y);
+                        obj.sprites.push(obj.id);
+                    } else if (obj.frame === 50) {
+                        return false;
+                    }
+                    spritePane.moveSprite(obj.id, 0, -1);
+                }
+            );
+
+            objectController.addClass(
+                'coin-jump',
+                function (obj) {
+                    if (obj.frame === 0) {
+                        spritePane.addSprite(obj.id, 'coin-up', obj.x, obj.y);
+                        spritePane.setNoCollision(obj.id, true);
+                        spritePane.setAnimationSpeed(obj.id, 0.2);
+                        obj.yVector = [6, null];
+                        obj.sprites.push(obj.id);
+                    } else if (obj.frame === 30) {
+                        const pos = spritePane.getSpritePos(obj.id);
+                        addScore(200, pos.x, pos.y);
+                        return false;
+                    }
+                    jumpForce.incVector(obj.yVector);
+                    if (obj.frame === 10) {
+                        obj.yVector[1] = 0;
+                    }
+                    spritePane.moveSprite(obj.id, 0, jumpForce.getMoveForTimeVector(obj.yVector));
+                }
+
             );
 
             objectController.addClass(
@@ -2248,7 +2311,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             for(let move of obj.moves) {
                                 const subId = obj.id + '_' + i;
                                 spritePane.addSprite(subId, 'mini-block1', pos.x + move[2], pos.y + 19);
-                                spritePane.setNoCollision(subId, true);
                                 obj.sprites.push(subId);
                                 i++;
                             }
@@ -2260,7 +2322,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         for (let i = 1; i <= 4; i++) {
                             const move = obj.moves[i - 1];
                             jumpForce.incVector(move);
-                            spritePane.moveSprite(obj.id + '_' + i, move[2], jumpForce.getMoveForTimeVector(move));
+                            const subId = obj.id + '_' + i;
+                            spritePane.moveSprite(subId, move[2], jumpForce.getMoveForTimeVector(move));
+                            if (obj.frame === 1) {
+                                const collides = spritePane.getLastSpriteCollisions(subId);
+                                for (let collide of collides) {
+                                    const obj = objectController.getObjectWithSpriteId(collide.sprite.id);
+                                    if (obj !== null && obj.enemy === true) {
+                                        obj.kickout = marioLeft ? 1 : -1;
+                                    }
+                                }
+                                spritePane.setNoCollision(subId, true);
+                            }
                         }
                     } else {
                         return moveBump(obj);
@@ -2302,41 +2375,24 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             objectController.addClass(
                 'bump-coin',
                 function (obj) {
-                    if (obj.frame === 0) {
-                        tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
-                        coinUp(obj);
-                        return;
-                    } else if (obj.frame === 30) {
-                        return false;
-                    }
-                    let speed = 2;
-                    if (obj.frame < 15) {
-                        speed *= -1;
-                    }
-                    spritePane.moveSprite(obj.id, 0, speed);
-                },
-                {
-                    idParts: eventTileIdParts
+                    tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                    coinUp(obj);
+                    return false;
                 }
             );
 
             objectController.addClass(
                 'one-coin',
                 function (obj) {
-                    if (obj.state === undefined) {
-                        obj.state = 0;
+                    if (obj.frame === 0) {
                         coinUp(obj);
                         objectController.addObject('bumping-block', {event: obj.event, bumpTile: (obj.bumpTile === undefined ? 27 : obj.bumpTile)});
                         return;
-                    } else if (obj.state === 30) {
-                        return false;
                     }
-                    let speed = 2;
-                    if (obj.state < 15) {
-                        speed *= -1;
-                    }
-                    spritePane.moveSprite(obj.id, 0, speed);
-                    obj.state++;
+                    return (obj.frame < 2);
+                },
+                {
+                    idParts: eventTileIdParts
                 }
             );
 
@@ -2387,7 +2443,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
 
                     if (spritePane.isCollidingActor(obj.id)) {
-                        invincibleTimer = 500;
+                        invincibleTimer = 0;
+                        addScoreForSprite(1000, obj.id);
                         return false;
                     }
                     if (obj.state > 0) {
@@ -2421,9 +2478,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         obj.sprites.push(obj.id);
                         return;
                     }
-
                     if (spritePane.isCollidingActor(obj.id)) {
-                        console.log('TODO', 'ONE-UP FADE-TEXT');
+                        const pos = spritePane.getSpritePos(obj.id);
+                        objectController.addObject('one-up-score', {x: pos.x, y: pos.y - 7});
                         return false;
                     }
                     if (obj.state > 0) {
@@ -2467,7 +2524,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             }
                         }
                         if (!hit) {
-                            hit = moveAlongBlocks(obj, 3, 6);
+                            hit = moveAlongBlocks(obj, 4, 6);
                         }
                         if (hit) {
                             const pos = spritePane.getSpritePos(obj.id);
@@ -2485,10 +2542,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 function (obj) {
                     if (obj.frame === 0) {
                         spritePane.addSprite(obj.id, 'explode', obj.x, obj.y);
+                        spritePane.setAnimationSpeed(obj.id, 0.5);
                         spritePane.setNoCollision(obj.id, true);
                         obj.sprites.push(obj.id);
                     }
-                    return (obj.frame < 10);
+                    return (obj.frame < 6);
                 }
             );
 
@@ -2497,7 +2555,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 function (obj) {
                         if (obj.frame === 0) {
                             const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
-                            obj.type = obj.powerUps[marioLevel];
+                            obj.type = obj.powerUps[marioLevel === 2 ? 1 : marioLevel];
                             const dim = spriteSheet.getSpriteDim(obj.type);
                             obj.state = dim.y * obj.speed;
                             spritePane.addSprite(obj.id, obj.type, pos.x, pos.y + 24);
@@ -2505,15 +2563,16 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             obj.sprites.push(obj.id);
                             return;
                         }
-
                         if (spritePane.isCollidingActor(obj.id)) {
-                            if (marioLevel === 0) {
-                                cutscene = 'grow';
-                            } else if (marioLevel === 1) {
-                                cutscene = 'fire';
-                            } else if (marioLevel === 2) {
-                                invincibleTimer = 500;
+                            switch (marioLevel) {
+                                case 0:
+                                    cutscene = 'grow';
+                                    break;
+                                case 1:
+                                    cutscene = 'fire';
+                                    break;
                             }
+                            addScoreForSprite(1000, obj.id);
                             return false;
                         }
                         if (obj.state > 0) {
@@ -2542,6 +2601,31 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             );
             marioCollider.setSpriteOffset(0, -24);
 
+            const marioBaseColors = [
+                ['b13425', 'e39d25', '6a6b04'],
+                ['b13425', 'e39d25', '6a6b04'],
+                ['f7d6a4', 'e39d25', 'b53121'],
+            ];
+
+            const marioTempColors = [
+                ['b13425', 'ffffff', 'e69c21'],
+                ['000000', 'ffcec5', '9c4a00'],
+                ['3a8400', 'ffffff', 'e69c21'],
+                ['f7d6a4', 'e39d25', 'b53121']
+            ];
+
+            function getColorReplaceFilters(index) {
+                if (index === null) {
+                    return '';
+                }
+                const base = marioBaseColors[marioLevel];
+                const temp = marioTempColors[index];
+                const filter = 'color-replace(#' + base[0] + ':#' + temp[0] + ';' +
+                    '#' + base[1] + ':#' + temp[1] + ';' +
+                    '#' + base[2] + ':#' + temp[2] + ')';
+                return filter;
+            }
+
             function addScore(points, startX, startY) {
                 return objectController.addObject('score', {points, startX, startY});
             }
@@ -2561,6 +2645,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     .round();
 
             let frameCount = 0;
+            let baseSprite = null;
             let hideCounter = 0;
             let forceMoveX = 0;
             let cutscene = null;
@@ -2568,39 +2653,77 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let flagScoreObj = null;
             let flickerFrames = [];
             let fireBalls = [];
+            let throwingTimer = 0;
+            let runDist = 0;
+            let currAcc = 0;
+            let jumpAcc = 0;
+            const invIndices = [null, 3, 1, 2];
+            let invIndex = 0;
+
             const speedUp = [
                 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 2, 2, 1, 1, 2, 0, 2, 1, 2, 1, 2
             ];
             let speedIndex = 0;
 
-            function flickerCutScene(toLevel, fromLevel) {
+            const growAni = {
+                9: 1, 13: 0, 17: 1, 21: 0, 25: 1, 29: 2, 33: 0, 37: 1, 41: 2, 42: 0, 43: null,
+                frames: ['small-mario', 'mid-mario', 'mario'],
+                level: 1
+            };
+
+            const shrinkAni = {
+                0: 0, 16: 1, 18: 2, 22: 1, 26: 2, 30: 1, 34: 2, 38: 1, 42: 2, 46: 1, 50: 2, 54: 1, 56: null,
+                frames: ['mario-jump', 'small-mario-swim1', 'mario-swim1'],
+                level: 0
+            };
+
+            const fireAni = {
+                0: 0, 3: 1, 7: 3, 11: 1, 12: 2, 15: 0, 19: 1, 23: 3, 27: 2, 31: 0, 35: 1, 39: 3, 43: 2, 45: 1, 47: 2,
+                48: 0, 52: 1, 56: 3, 60: 2, 63: null,
+                level: 2
+            };
+
+            function flickerCutScene(toLevel, fromLevel, ani) {
                 if (cutsceneFrame === 0) {
                     const currSheetId = spritePane.getSpriteSheetId('player');
                     const newSheetId = marioLevels[toLevel] + currSheetId.substr(marioLevels[fromLevel].length);
                     flickerFrames = [
-                        newSheetId, currSheetId
+                        newSheetId
                     ];
                 }
-                if (cutsceneFrame === 55) {
-                    marioLevel = toLevel;
-                    return true;
-                }
-                if (cutsceneFrame % 5 === 0) {
-                    const oldPos = spritePane.getSpritePos('player');
-                    const bottomY = oldPos.y + oldPos.dim.y;
-                    spritePane.assignSprite(
-                        'player',
-                        spritePane.hasSpriteSheetId('player', flickerFrames[1]) ? flickerFrames[0] : flickerFrames[1]
-                    );
-                    const pos = spritePane.getSpritePos('player');
-                    spritePane.setSpritePos('player', oldPos.x, bottomY - pos.dim.y);
+                let newId = ani[cutsceneFrame];
+                if (newId !== undefined) {
+                    const isLast = (newId === null);
+                    if (ani.frames) {
+                        const pos = spritePane.getSpritePos('player', false, true);
+                        let target;
+                        if (newId !== null && newId < ani.frames.length) {
+                            target = ani.frames[newId] + (marioLeft ? '-rev' : '');
+                        } else {
+                            target = flickerFrames[0];
+                        }
+                        spritePane.assignSprite('player', target);
+                        spritePane.setSpritePos('player', pos.x, pos.y, null, false, true);
+                    } else {
+                        const colorReplace = getColorReplaceFilters(newId === null ? 3 : newId);
+                        spritePane.setSpriteFilters('player', colorReplace);
+                    }
+
+                    if (isLast) {
+                        marioLevel = toLevel;
+                        spritePane.setSpriteFilters('player', '');
+                        return true;
+                    }
                 }
                 return false;
             }
 
             function setActorSprite(name, rev = false) {
                 const doRev = rev ? !marioLeft : marioLeft;
+                if (throwingTimer > 0) {
+                    name = 'throwing-' + name;
+                }
                 if (doRev) {
                     name += '-rev';
                 }
@@ -2629,12 +2752,16 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'grow':
-                            done = flickerCutScene(1, 0);
+                            done = flickerCutScene(1, 0, growAni);
                             break;
 
                         case 'shrink':
-                            done = flickerCutScene(0, 1);
+                            done = flickerCutScene(0, marioLevel, shrinkAni);
                             hideCounter = 100;
+                            break;
+
+                        case 'fire':
+                            done = flickerCutScene(2, 1, fireAni);
                             break;
 
                         case 'glide':
@@ -2695,10 +2822,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             }
                             break;
 
-                        case 'fire':
-                            done = flickerCutScene(2, 1);
-                            break;
-
                         case 'dead':
                             if (cutsceneFrame === 0) {
                                 spritePane.assignSprite('player', 'small-mario-duck');
@@ -2709,6 +2832,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             }
                             break;
                     }
+                    objectController.handleObjects(['score']);
+
                     if (!done) {
                         cutsceneFrame++;
                         return true;
@@ -2769,7 +2894,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
 
-                let updateGroundSprite = false;
                 let currEvent = null;
                 const yEvents = actorYStates.getPossibleEvents();
                 if (yEvents.indexOf('button-a') !== -1) {
@@ -2779,19 +2903,27 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 inputController.update();
 
+                let updateSprite = false;
+
+                if (throwingTimer > 0) {
+                    throwingTimer--;
+                    updateSprite = (throwingTimer === 0);
+                }
                 for (let i = 0; i < fireBalls.length; i++) {
                     if (!objectController.hasActiveObject(fireBalls[i])) {
                         fireBalls.splice(i, 1);
                     }
                 }
                 if (inputController.hasInput('button-b')) {
-                    if (marioLevel === 2 && fireBalls.length < 2) {
+                    if (marioLevel === 2 && fireBalls.length < 2 && throwingTimer === 0 && baseSprite !== 'mario-duck') {
                         const pos = spritePane.getSpritePos('player');
                         let dir = marioLeft ? -1 : 1;
                         if (!inputController.noXDir()) {
                             dir = inputController.isLeftDir() ? -1 : 1;
                         }
                         const obj = objectController.addObject('fireball', {x: pos.x, y: pos.y, dir});
+                        updateSprite = true;
+                        throwingTimer = 10;
                         fireBalls.push(obj.id);
                     }
                 }
@@ -2875,20 +3007,22 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 if (currEvent !== null) {
                     actorYStates.doEvent(currEvent);
                     const transitions = actorYStates.popTransitions();
+                    const oldBaseSprite = baseSprite;
                     for (let transition of transitions) {
                         switch(transition.to) {
                             case 'jumping':
                                 yAxisVector[0] = 0;
-                                setActorSprite(transition.from === 'ducking' ? 'mario-duck' : 'mario-jump');
+                                jumpAcc = currAcc;
+                                baseSprite = transition.from === 'ducking' ? 'mario-duck' : 'mario-jump';
                                 break;
 
                             case 'ducking':
-                                setActorSprite('mario-duck');
+                                baseSprite = 'mario-duck';
                                 break;
 
                             case 'falling':
                                 if (['standing', 'ducking'].indexOf(transition.from) !== -1) {
-                                    setActorSprite('mario-fall');
+                                    baseSprite = 'mario-run1';
                                     yAxisVector[0] = jumpForce.getPeakTime();
                                 }
                                 if (transition.event === 'hit-ceiling') {
@@ -2901,11 +3035,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 break;
 
                             case 'standing':
+                                baseSprite = null;
                                 yAxisVector[0] = null;
                                 yAxisVector[1] = null;
-                                updateGroundSprite = true;
                                 break;
                         }
+                    }
+                    if (oldBaseSprite !== baseSprite) {
+                        updateSprite = true;
                     }
                 }
 
@@ -2930,9 +3067,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'not-move-dir':
                             if (!inputController.isDownDir() && !((marioLeft && !inputController.isLeftDir()) ||
                                 (!marioLeft && !inputController.isRightDir()))) {
-                                if (speedIndex < speedUp.length - 1) {
-                                    speedIndex++;
-                                }
                                 continue;
                             }
                             break;
@@ -2942,10 +3076,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'end-of-slide':
-                            if (speedIndex > 0) {
-                                speedIndex--;
-                                continue;
-                            }
+                            if (currAcc > 0) continue;
                             break;
                     }
                     currEvent = event;
@@ -2961,6 +3092,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                             case 'still':
                                 speedIndex = 0;
+                                runDist = 0;
+                                currAcc = 0;
                                 break;
 
                             case 'accelerating':
@@ -2977,38 +3110,79 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 update = false;
                                 break;
                         }
-                        if (update && actorYStates.getState() === 'standing') {
-                            updateGroundSprite = true;
+                        if (update) {
+                            updateSprite = true;
                         }
                     }
                 }
 
-                if (updateGroundSprite) {
-                    let target = null;
-                    switch(actorXStates.getState()) {
-                        case 'still':
-                            target = 'mario';
-                            break;
+                const yState = actorYStates.getState();
 
-                        case 'accelerating':
-                        case 'sliding':
-                            target = 'mario-run';
-                            break;
-
-                        case 'turning':
-                            setActorSprite('mario-slide', true);
-                            break;
+                const xState = actorXStates.getState();
+                if (xState === 'accelerating') {
+                    const pressed = inputController.isPressed('button-b');
+                    let hasTurbo = ['jumping', 'standing'].indexOf(yState) !== -1 && pressed;
+                    let max = 2.5;
+                    if (yState === 'jump') {
+                        max = Math.max(jumpAcc, 1.5);
+                        if (jumpAcc < 1.5 || !pressed) {
+                            hasTurbo = false;
+                            jumpAcc = 0;
+                        }
                     }
-                    if (target !== null) {
-                        setActorSprite(target)
+                    const target = hasTurbo ? max : 1.5;
+
+                    const accFactor = hasTurbo ? 0.0538 : 0.0357;
+                    if (currAcc > target) {
+                        currAcc = Math.max(currAcc - accFactor, target);
+                    } else {
+                        currAcc = Math.min(currAcc + accFactor, target);
+                    }
+                } else if (xState === 'sliding') {
+                    currAcc -= 0.0357;
+                    currAcc = Math.max(currAcc, 0);
+                } else if (xState === 'turning') {
+                    currAcc -= 0.0538;
+                    currAcc = Math.max(currAcc, 0);
+                }
+                const speed = currAcc;
+                runDist += speed;
+
+                if (!updateSprite && yState === 'standing' && currAcc > 0) {
+                    const newBaseSprite = 'mario-run' + ((Math.round(runDist) >> 3) % 3 + 1);
+                    if (newBaseSprite !== baseSprite) {
+                        baseSprite = newBaseSprite;
+                        updateSprite = true;
                     }
                 }
 
+                if (updateSprite) {
+                    if (yState === 'standing') {
+                        switch(xState) {
+                            case 'still':
+                                setActorSprite('mario');
+                                break;
+
+                            case 'accelerating':
+                            case 'sliding':
+                                setActorSprite(baseSprite === null ? 'mario-run1' : baseSprite);
+                                break;
+
+                            case 'turning':
+                                setActorSprite('mario-slide', true);
+                                break;
+
+                            default:
+                                console.log('UNKNOWN', xState);
+                        }
+                    } else {
+                        setActorSprite(baseSprite);
+                    }
+                }
                 objectController.handleObjects();
 
                 // move player
                 const state = actorYStates.getState();
-                let speed = speedUp[speedIndex];
                 let moveX = 0;
                 const moveY = jumpForce.getMoveForTimeVector(yAxisVector, forceMoveX !== 0 ? 4 : collides.ceiling.dist, collides.floor.dist);
                 jumpForce.incVector(yAxisVector);
@@ -3039,30 +3213,30 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
                 if (invincibleTimer !== null) {
-                    invincibleTimer--;
-                    let target = '';
+                    const fastFlickering = 496;
+                    const lastFrame = fastFlickering + 4 + 5*16;
+                    let nextColor = false;
                     if (invincibleTimer === 0) {
+                        invIndex = 0;
+                    } else if (invincibleTimer === lastFrame) {
+                        invIndex = -1;
+                        nextColor = true;
                         invincibleTimer = null;
+                    } else if (invincibleTimer < fastFlickering) {
+                        nextColor = (invincibleTimer % 2 === 0);
+                    } else if (invincibleTimer < fastFlickering + 4) {
+                        nextColor = invincibleTimer === fastFlickering;
                     } else {
-                        switch (invincibleTimer % 9) {
-                            case 0:
-                            case 1:
-                            case 2:
-                                target = 'color-replace(#f7d6a4:#b13425;#e39d25:#ffffff;#b53121:#e69c21)';
-                                break;
-                            case 3:
-                            case 4:
-                            case 5:
-                                target = 'color-replace(#f7d6a4:#000000;#e39d25:#ffcec5;#b53121:#9c4a00)';
-                                break;
-
-                            case 6:
-                            case 7:
-                            case 8:
-                                target = 'color-replace(#f7d6a4:#3a8400;#e39d25:#ffffff;#b53121:#e69c21)';
-                        }
+                        nextColor = ((invincibleTimer - fastFlickering - 4) % 8 === 0);
                     }
-                    spritePane.setSpriteFilters('player', target);
+                    if (nextColor) {
+                        invIndex++;
+                        invIndex = invIndex % 4;
+                        spritePane.setSpriteFilters('player', getColorReplaceFilters(invIndices[invIndex]));
+                    }
+                    if (invincibleTimer !== null) {
+                        invincibleTimer++;
+                    }
                 }
             });
         }
@@ -3335,13 +3509,92 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             1, 2, 2, 3, 3, 3, 4, 4, 4, 5, 4, 4, 4, 5, 3]
     ];
 
+    const speedUp = [[
+        0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 2, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 2, 2, 1, 1, 2, 0, 2, 1, 2, 1, 2
+    ],
+        [
+            1, -1, 0, 0, 0,
+            1, 0, 0, 0, 1,
+            0, 1, 0, 1, 0,
+            2, 0, 1, 1, 0,
+            1, 1, 0, 2, 1,
+            1, 1, 1, 1, 1,
+            1, 1, 1, 2, 2,
+            1, 1, 1, 1, 2,
+            1, 2, 1, 2, 1,
+            3, 1, 2, 1, 1,
+            1, 2, 1, 2, 1,
+            2, 1, 3, 1, 2,
+            1, 1, 1, 2, 1,
+            2, 1, 2, 1, 3,
+            1, 2, 1, 1, 1,
+            2, 1
+        ],
+        [
+            1, -1, 0, 0, 0,
+            0, 1, 0, 1, 0,
+            1, 0, 1, 1, 0,
+            2, 1, 1, 1, 1,
+            1, 1, 1, 1, 1,
+            1, 2, 1, 2, 2,
+            2, 2, 2, 2, 0,
+            2, 2, 2, 4, 2,
+            1, 2, 2, 3, 3,
+            3, 1, 3, 2, 3,
+            3, 3, 1, 3, 2,
+            3
+        ]
+    ];
+
+
     moveScreen.setFrameHandler(function () {
 
 
 
         if (frameCount === 0) {
 
-            const jumpForce = new Force(-4.35, -64, -0.22);
+            const runGrav =  [0.03571428571428571, 0.0538563829787234];
+            let currAcc = 0;
+            let maxAcc = [1.5, 2.5];
+            let newPath = [];
+            let gravIndex = 0;
+            let i = 1;
+            // beschleunigungsphase
+            while (i < 80) {
+                if (currAcc < maxAcc[gravIndex]) {
+                    currAcc += runGrav[gravIndex];
+                    currAcc = Math.min(maxAcc[gravIndex], currAcc);
+                }
+                newPath.push(currAcc);
+                i++;
+                if (i === 60) {
+                    gravIndex++;
+                }
+            }
+            // bremsphase
+            const brakeFactor = 4;
+            while (currAcc > 0) {
+                currAcc -= brakeFactor * runGrav[gravIndex];
+                currAcc = Math.max(0, currAcc);
+                newPath.push(currAcc);
+            }
+
+            const jumpForce1 = new Force(-2.25, -47, -0.22);
+            const jumpForce2 = new Force(-1.00, -14, -0.05);
+            const vector1 = [jumpForce1.getPeakTime(), null];
+            const vector2 = [jumpForce2.getPeakTime(), null];
+            const path1 = [];
+            const path2 = [];
+            for (let i = 0; i < speedUp[1].length; i++) {
+                const move = Math.min(jumpForce1.getMoveForTimeVector(vector1), 2.5);
+                path1.push(move);
+                path2.push(Math.min(move - i * 0.015, 1.5));
+
+//                path2.push(jumpForce2.getMoveForTimeVector(vector2, null, 4));
+                jumpForce1.incVector(vector1);
+//                jumpForce2.incVector(vector2);
+            }
 
             function drawJump(dragTime = null, color) {
                 let height = 0;
@@ -3362,12 +3615,22 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
                 drawPath(path, color, 0);
             }
-
+/*
             drawJump(jumpForce.getPeakTime(), '#00D000');
             drawJump(0, '#00D000');
             jumpX = 2;
     //        drawPath(jumps[0], '#000000');
-            drawPath(jumps[4], '#000000');
+
+ */
+
+
+            drawPath(speedUp[1], '#6F006F');
+            drawPath(speedUp[2], '#000000');
+            //drawPath(path1, '#00FF00');
+            //drawPath(path2, '#004F80');
+
+
+            drawPath(newPath, '#FFFFFF');
             /*
             const vJump = [0, 0];
 
@@ -3458,5 +3721,5 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
-    return 'demo';
+    return 'demo'; // 'demo';
 });
