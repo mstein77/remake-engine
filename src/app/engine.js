@@ -843,6 +843,20 @@ class Screen {
         }
     }
 
+    addAudioResource(id, url) {
+        this.dependencies++;
+        const resource = new AudioResource(url, () => {
+            this.dependencies--;
+        });
+        this.resources[id] = resource;
+    }
+
+    addAudioResources(dataObj) {
+        for (let id in dataObj) {
+            this.addAudioResource(id, dataObj[id]);
+        }
+    }
+
     setInitHandler(handler) {
         this.initHandler = handler.bind(this);
     }
@@ -4412,12 +4426,12 @@ class TilesMap {
 
 
     triggerEventsInRect(x1, y1, width = 1, height = 1) {
-        console.log(x1, y1, width, height);
+//        console.log(x1, y1, width, height);
         const x2 = x1 + width;
         const y2 = y1 + height;
         for (let y = y1; y < y2; y++) {
             for (let x = x1; x < x2; x++) {
-                console.log(x, y, this.map.length, this.map[y]);
+//                console.log(x, y, this.map.length, this.map[y]);
                 let tile = this.map[y][x];
                 if (Array.isArray(tile)) {
                     if (tile.length === 0) {
@@ -4996,6 +5010,30 @@ class States {
         this.popTransitions();
         this.possibleEvents = null;
         this.currState = state;
+    }
+}
+
+class AudioResource {
+    constructor(url, readyCallback = null) {
+        this.audio = new Audio(url);
+        if (readyCallback !== null) {
+            this.audio.oncanplaythrough = readyCallback;
+        }
+    }
+
+    play() {
+        if (this.isPlaying()) {
+            this.audio.load();
+        }
+        this.audio.play();
+    }
+
+    isPlaying() {
+        return !this.audio.ended;
+    }
+
+    isLooping() {
+        return this.audio.loop;
     }
 }
 

@@ -47,6 +47,23 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             font: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAYCAYAAAAyC/XlAAAC/klEQVRoQ+1Z0U4DMQxj0v7/iyeBDtEpBDt2um4rMF6Yrm2aJo7j653evv4ul8v7+H0+n0/jd/w/5uTxuBbZQOPHvMrOGJtZG22z9WpO9E2d77DF4ncP/5VvMQfq/J+JPiblgDvJiQdHTiEguSBS/jjAdPxD/sRnajzvked313ftsXjmwmZFfXIcdI1VlcCS4R44M1IHIBVY1PmfMa7ArQCq1sfxZQDIVKPaBEugQjQDDAOIEwxF8RWNuwCZBfAq+2z/JQBQyc+bIwQjzeFoERUgxV7uegYk1WOVfQX4e6z/xgCImqMmUBXExE8V+OrQ3R6qArQaAPfwr7Kp9psB0A8AuL0b0YiqgGx72HCqOycv7q+UMGtBlTB17SvB6zBct0W6vuV5CiDwdQ/R8evZ34zAFQBMCDkUW4kk1EIiC3Tsu6+VSiUzWkVV5pytEpEz6xU7dOKn4nu9BziMzgRYaQRUN1WClMNMUA7/syZBGqUDEOXP6vGOPkL6LT9T/sG3AJVU5qTqN0iQqWSwQ1b6AFUIqxoVoGeMs2ajfFHxReM/AFBVEBKBCiwuA1Ti0KkKtM/BaEqkqqCuHq8YiQk9lDj3mWJEeQ+gAqAAoNZX/bM6JEN7TDr7PdNDGfgRg1UMxFqtiqND9yxeVYyhBlC03GkBLgBytapXrW4FoI9LGSAuhVbJyudlAKmuslfGF7XKGNuHvAVUCGQBi5XCaHw2gdWeuRU5uib7N/xC/q1uAZEZnBaShf7rHoAprn/yfIkGcGnPFZGVIPzNeXHY5NHnswEwKLmiMOcTLVo/aAxdgLAr40cH6tb9UJu41eaK9d8AcDip+haqzooBkGDKSnjsi5RuHFtx4Bkb2YcZn7YHAAoM++DifFCprjNZpaPAzgS7m+RKZEYVHcXdrXvswmzyoqSrMnN15/UMPCy4uwCAtakOELbWAKzH557Nejiibyf5ObConexQLbE9zvqzNQDYxQtyeuaiwmkxu4rAFRqgwxSPnLvVPcCuQmlVQnZkgA/VdyxzlcUF0AAAAABJRU5ErkJggg==",
             sprites: "data:image/png;base64,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"
         });
+        this.addAudioResources({
+            sfx_coin: 'audio/smb/coin.wav',
+            sfx_oneup: 'audio/smb/1-up.wav',
+            sfx_breakblock: 'audio/smb/breakblock.wav',
+            sfx_bump: 'audio/smb/bump.wav',
+            sfx_jump: 'audio/smb/jump-small.wav',
+            sfx_stomp: 'audio/smb/stomp.wav',
+            sfx_fireball: 'audio/smb/fireball.wav',
+            sfx_kick: 'audio/smb/kick.wav',
+            sfx_newpowerup: 'audio/smb/powerup-appears.wav',
+            sfx_powerup: 'audio/smb/powerup.wav',
+            sfx_flagpole: 'audio/smb/flagpole.wav',
+            sfx_die: 'audio/smb/mariodie.wav',
+            sfx_fireworks: 'audio/smb/fireworks.wav',
+            sfx_gameover: 'audio/smb/gameover.wav',
+            sfx_stageclear: 'audio/smb/stage-clear.wav',
+        });
         return function (resource, globals) {
             const font = new FontMap(resource.font, 8, 8);
             font.addRange(0, 0,'0', '9');
@@ -56,6 +73,24 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             font.addChar(88, 16,'!');
             font.addChar(64, 16,'-');
             font.addChar(72, 16,'*');
+
+            globals.sfx = {
+                coin: resource.sfx_coin,
+                oneup: resource.sfx_oneup,
+                breakblock: resource.sfx_breakblock,
+                bump: resource.sfx_bump,
+                jump: resource.sfx_jump,
+                stomp: resource.sfx_stomp,
+                fireball: resource.sfx_fireball,
+                powerup: resource.sfx_powerup,
+                newpowerup: resource.sfx_newpowerup,
+                kick: resource.sfx_kick,
+                flagpole: resource.sfx_flagpole,
+                die: resource.sfx_die,
+                fireworks: resource.sfx_fireworks,
+                gameover: resource.sfx_gameover,
+                stageclear: resource.sfx_stageclear
+            };
             globals.fontMap = font;
             globals.worlds = {
                 '1-1': {
@@ -1965,7 +2000,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
             });
 
-            let marioLevel = 0;
             let marioLeft = false;
             let hitEnemy = false;
             const marioLevels = ['small-', '', 'fire-'];
@@ -1980,6 +2014,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     globals.coins = 0;
                 }
                 globals.updateCoins();
+                globals.sfx.coin.play();
             }
 
             function coinUp(obj) {
@@ -2068,7 +2103,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         }
                     }
                     if (['breaking-block', 'bumping-block'].indexOf(collideObj.class) !== -1) {
-                        if (obj.enemy === true && marioLevel > 0) {
+                        if (obj.enemy === true && globals.marioLevel > 0) {
                             obj.kickout = -oldDir;
                         } else {
                             if (obj.dir === -1 && collide.x.type === 'right' && collide.x.touch < 10) {
@@ -2150,6 +2185,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     obj.state = 1;
                     obj.yVector = [0, 0];
                     obj.kickout = undefined;
+                    globals.sfx.kick.play();
                 }
             }
 
@@ -2207,6 +2243,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     obj.next = 'power-up';
                     obj.bumpTile = 27;
                     objectController.addObject('bumping-block', obj);
+                    globals.sfx.newpowerup.play();
                     return false;
                 }
             );
@@ -2217,6 +2254,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     obj.next = 'one-up';
                     obj.bumpTile = 27;
                     objectController.addObject('bumping-block', obj);
+                    globals.sfx.newpowerup.play();
                     return false;
                 }
             );
@@ -2320,7 +2358,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 obj.state = -2;
                                 hitEnemy = true;
                             } else if (obj.bounced === true && hideCounter === 0) {
-                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                                cutscene = globals.marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
                         return;
@@ -2335,7 +2373,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             if (invincibleTimer !== null) {
                                 obj.kickout = (marioLeft ? -1 : 1);
                             } else if (hideCounter === 0) {
-                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                                cutscene = globals.marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
                     } else if (obj.state === 0) {
@@ -2384,13 +2422,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         if (collision.y.type === COLLISION.BOTTOM && collision.y.touch > 0 && collision.y.touch < 6) {
                             obj.state = -100;
                             spritePane.assignSprite(obj.id, 'evilmush-dead');
+                            globals.sfx.stomp.play();
                             hitEnemy = true;
                             addScoreForSprite(100, obj.id);
                         } else {
                             if (invincibleTimer !== null) {
                                 obj.kickout = (marioLeft ? -1 : 1);
                             } else if (hideCounter === 0) {
-                                cutscene = marioLevel === 0 ? 'dead' : 'shrink';
+                                cutscene = globals.marioLevel === 0 ? 'dead' : 'shrink';
                             }
                         }
                     } else if (obj.state === 0) {
@@ -2433,9 +2472,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 'breaking-block',
                 function (obj) {
                     if (obj.frame === 0) {
-                        if (marioLevel === 0) {
+                        if (globals.marioLevel === 0) {
                             obj.bumpTile = 1;
                             initBump(obj);
+                            globals.sfx.bump.play();
                         } else {
                             obj.moves = [
                                 [0, 0, -2],
@@ -2452,6 +2492,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 i++;
                             }
                             tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                            globals.sfx.breakblock.play();
                         }
                         return;
                     }
@@ -2629,6 +2670,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         const pos = spritePane.getSpritePos(obj.id);
                         objectController.addObject('one-up-score', {x: pos.x, y: pos.y - 7});
                         globals.lifes++;
+                        globals.sfx.oneup.play();
                         return false;
                     }
                     if (obj.state > 0) {
@@ -2703,7 +2745,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 function (obj) {
                         if (obj.frame === 0) {
                             const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y - 1);
-                            obj.type = obj.powerUps[marioLevel === 2 ? 1 : marioLevel];
+                            obj.type = obj.powerUps[globals.marioLevel === 2 ? 1 : globals.marioLevel];
                             const dim = globals.spriteSheet.getSpriteDim(obj.type);
                             obj.state = dim.y * obj.speed;
                             spritePane.addSprite(obj.id, obj.type, pos.x, pos.y + 24);
@@ -2712,7 +2754,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             return;
                         }
                         if (spritePane.isCollidingActor(obj.id)) {
-                            switch (marioLevel) {
+                            switch (globals.marioLevel) {
                                 case 0:
                                     cutscene = 'grow';
                                     break;
@@ -2721,6 +2763,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                     break;
                             }
                             addScoreForSprite(1000, obj.id);
+                            globals.sfx.powerup.play();
                             return false;
                         }
                         if (obj.state > 0) {
@@ -2766,7 +2809,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 if (index === null) {
                     return '';
                 }
-                const base = marioBaseColors[marioLevel];
+                const base = marioBaseColors[globals.marioLevel];
                 const temp = marioTempColors[index];
                 const filter = 'color-replace(#' + base[0] + ':#' + temp[0] + ';' +
                     '#' + base[1] + ':#' + temp[1] + ';' +
@@ -2857,7 +2900,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
 
                     if (isLast) {
-                        marioLevel = toLevel;
+                        globals.marioLevel = toLevel;
                         spritePane.setSpriteFilters('player', '');
                         return true;
                     }
@@ -2873,7 +2916,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 if (doRev) {
                     name += '-rev';
                 }
-                spritePane.assignSprite('player', marioLevels[marioLevel] + name);
+                spritePane.assignSprite('player', marioLevels[globals.marioLevel] + name);
             }
 
             function getEnemySprite(obj, name) {
@@ -2897,6 +2940,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     switch(cutscene) {
                         case 'bottom-death':
                             nextScene = 'die';
+                            globals.sfx.die.play();
                             break;
 
                         case 'grow':
@@ -2904,7 +2948,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'shrink':
-                            done = flickerCutScene(0, marioLevel, shrinkAni);
+                            done = flickerCutScene(0, globals.marioLevel, shrinkAni);
                             hideCounter = 100;
                             break;
 
@@ -2925,6 +2969,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 setActorSprite('mario-glide-rev');
                                 spritePane.moveSprite('player', 12, 0);
                                 nextScene = 'glide-rev';
+                                globals.sfx.stageclear.play();
                             }
                             break;
 
@@ -2977,6 +3022,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             } else if (cutsceneFrame === 10) {
                                 const pos = fireworks[fireworkIndex];
                                 spritePane.addSprite('firework', 'explode1', pos.x, pos.y);
+                                globals.sfx.fireworks.play();
                             } else if (cutsceneFrame === 17) {
                                 spritePane.assignSprite('firework', 'explode2');
                             } else if (cutsceneFrame === 25) {
@@ -2995,11 +3041,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         case 'dead':
                             if (cutsceneFrame === 0) {
                                 let target = 'small-mario-duck';
-                                if (marioLevel === 2) {
+                                if (globals.marioLevel === 2) {
                                     target = 'fire-' + target;
                                 }
                                 spritePane.assignSprite('player', target);
                                 deathPath.rewind();
+                                globals.sfx.die.play();
                             } else {
                                 spritePane.moveSprite('player', 0, deathPath.forward());
                                 if (deathPath.isEnd()) {
@@ -3009,12 +3056,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'die':
+                            if (globals.sfx.die.isPlaying()) {
+                                break;
+                            }
                             globals.lifes--;
                             if (globals.lifes > 0) {
+                                globals.marioLevel = 0;
                                 this.gotoScreen('world');
                             } else {
                                 this.gotoScreen('game-over');
                             }
+                            break;
                     }
                     objectController.handleObjects(['score']);
 
@@ -3083,6 +3135,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
                     }
                     addScore(flagScore[glideEvent.y - 1], pos.x + 11, 165, true);
+                    globals.sfx.flagpole.play();
                 }
 
                 // get keyboard actions
@@ -3119,7 +3172,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
                 if (inputController.hasInput('button-b')) {
-                    if (marioLevel === 2 && fireBalls.length < 2 && throwingTimer === 0 && baseSprite !== 'mario-duck') {
+                    if (globals.marioLevel === 2 && fireBalls.length < 2 && throwingTimer === 0 && baseSprite !== 'mario-duck') {
                         const pos = spritePane.getSpritePos('player');
                         let dir = marioLeft ? -1 : 1;
                         if (!inputController.noXDir()) {
@@ -3129,6 +3182,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         updateSprite = true;
                         throwingTimer = 10;
                         fireBalls.push(obj.id);
+                        globals.sfx.fireball.play();
                     }
                 }
 
@@ -3185,7 +3239,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'not-move-down':
-                            if (marioLevel > 0 && inputController.isDownDir()) continue;
+                            if (globals.marioLevel > 0 && inputController.isDownDir()) continue;
                             break;
 
                         case 'button-a':
@@ -3193,7 +3247,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'move-down':
-                            if (marioLevel === 0 || !inputController.isDownDir()) continue;
+                            if (globals.marioLevel === 0 || !inputController.isDownDir()) continue;
                             break;
 
                         case 'end-of-jump':
@@ -3216,6 +3270,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 yAxisVector[0] = 0;
                                 jumpAcc = currAcc;
                                 baseSprite = transition.from === 'ducking' ? 'mario-duck' : 'mario-jump';
+                                globals.sfx.jump.play();
                                 break;
 
                             case 'ducking':
@@ -3481,6 +3536,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             gameOverScreen.addPane(demoTextPane);
             let timer = 0;
+            globals.sfx.gameover.play();
             gameOverScreen.setFrameHandler(function () {
                 timer++;
                 if (timer >= 60 * 6) {
@@ -3491,7 +3547,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
     this.addScreen(gameOverScreen);
-
 
     const worldScreen = new Screen('world');
     worldScreen.setInitHandler(function () {
@@ -4006,7 +4061,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             return true;
 
         } else if (this.keys['4']) {
-            this.gotoScreen('world', {lifes: 3, score: 0, coins: 0, world: '1-1', worldPos: null});
+            this.gotoScreen('world', {lifes: 3, score: 0, coins: 0, world: '1-1', worldPos: null, marioLevel: 0});
             return true;
 
         }
