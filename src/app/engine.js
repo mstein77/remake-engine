@@ -36,6 +36,7 @@ class Game {
         this.domQueue = [];
         this.sound = true;
         this.audioPlaying = [];
+        this.globals = {};
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -141,14 +142,15 @@ class Game {
         this.screens[screen.id] = screen;
     }
 
-    gotoScreen(screenId) {
+    gotoScreen(screenId, params = {}) {
         this.log('gotoScreen', screenId);
         this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.frameEvents = {};
         this.currentScreen = screenId;
         const screen = this.screens[screenId];
-        const callback = screen.init();
+        this.globals = Object.assign(this.globals, params);
+        const callback = screen.init(this.globals);
         this.build = callback.bind(this);
     }
 
@@ -185,6 +187,10 @@ class Game {
     }
 
     openEditorMode() {
+        if (gameEditor === null) {
+            console.log('NO GAME EDITOR found!');
+            return;
+        }
         console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
 
         function extractEditablesFromAreas(areas, editables) {
@@ -232,7 +238,7 @@ class Game {
 
             const editor = this.getDomElem('editor');
             editor.style.display = 'block';
-            const mapEditor = new TilesMapEditor(this, editor, tilesPanes[0]);
+            const mapEditor = new gameEditor.TilesMapEditor(this, editor, tilesPanes[0]);
         }
     }
 
@@ -350,7 +356,7 @@ class Game {
                 requestAnimationFrame(this.waitForNextFrame.bind(this));
                 return;
             }
-            this.build(screen.resources);
+            this.build(screen.resources, Game.instance.globals);
             screen.setDimension(this.width, this.height);
             screen.render(true);
             if (this.sound && screen.audio !== null) {
@@ -387,6 +393,10 @@ class Game {
         this.keysDown = {};
         this.keys = {};
 
+        if (window.gameEditor !== undefined) {
+            gameEditor = window.gameEditor;
+        }
+
         // register key handlers
         const keyDownHandler = (e) => {
             this.keysDown[e.key] = e.key;
@@ -414,6 +424,7 @@ class Game {
             '</div>' +
 
             '<div id="offscreen" style="display: none"></div>' +
+            '<div id="react-editor"></div>' +
             '<div id="editor" style="display: none">Editor</div>';
 
         if (this.zoom !== 1) {
@@ -777,10 +788,10 @@ class Screen {
         return hasAll;
     }
 
-    init() {
+    init(params) {
         if (this.initHandler !== null) {
             this.state = 'INIT';
-            return this.initHandler();
+            return this.initHandler(params);
         }
         this.state = 'READY';
     }
@@ -1222,7 +1233,11 @@ class TextPane {
     updateTextBlock(id, text) {
         const block = this.blocks[id];
         block.text = text;
-        block.canvas = OCM.getNewOffscreenCanvas(block.width, block.height);
+        if (block.canvas === undefined) {
+            block.canvas = OCM.getNewOffscreenCanvas(block.width, block.height);
+        } else {
+            block.canvas.ctx.clearRect(0, 0, block.width, block.height);
+        }
         this.drawTextBlockToCtx(block.canvas.ctx, block);
         this.dirty = true;
     }
@@ -1846,7 +1861,7 @@ class BufferedTilesPane {
         return result;
     }
 
-    getTilesInYLine(x, y1, y2) {
+    getTilesInYLine(x, y1, y2, dbg = false) {
         const origin = {
             x: this.mapTilePos.x + this.canvasTileOffset.x,
             y: this.mapTilePos.y + this.canvasTileOffset.y
@@ -1866,6 +1881,7 @@ class BufferedTilesPane {
         const mapX = origin.x + relPos.x;
         const start = origin.y + relPos.y1;
         const end = origin.y + relPos.y2;
+//        if (dbg && mapX >= 28) console.log('player MAP-X', x, relPos.x, mapX, this.scrollPos, this.mapTilePos);
         const lineTiles = this.tilesMap.getTilesAtYLine(mapX, start, end);
         const result = [];
         let i = 0;
@@ -2281,6 +2297,9 @@ class BufferedTilesPane {
         // TODO: trigger all events in viewPort when oldPos is null
         const newPos = this.getViewPortMapPos();
         const oldPos = this.oldPos;
+
+        if (oldPos === null) console.log('TRIGGER ALL', newPos);
+
         if (oldPos.start.x !== newPos.start.x || oldPos.start.y !== newPos.start.y ||
             oldPos.end.x !== newPos.end.x || oldPos.end.y !== newPos.end.y) {
             const relStart = {
@@ -2775,11 +2794,11 @@ class SpritePane {
         }
     }
 
-    isSpriteInBounds(id) {
+    isSpriteInBounds(id, top = 0, bottom = 0, left = 0, right = 0) {
         const pos = this.getSpritePos(id);
         return (
-            pos.x + pos.dim.x >= 0 && pos.x < this.viewPortDim.x &&
-            pos.y + pos.dim.y >= 0 && pos.y < this.viewPortDim.y
+            pos.x + pos.dim.x >= left && pos.x < (this.viewPortDim.x + right) &&
+            pos.y + pos.dim.y >= top && pos.y < (this.viewPortDim.y + bottom)
         );
     }
 
@@ -4114,6 +4133,7 @@ class SpriteAndTilesCollider {
         for (let collideId in this.collides) {
             const collide = this.collides[collideId];
             if (collide.dir === 'center') {
+/*
                 const xStart = pos.x + collide.margin.left;
                 const yStart = pos.y + collide.margin.top;
                 lines[collideId] = [
@@ -4122,6 +4142,8 @@ class SpriteAndTilesCollider {
                     pos.x + pos.dim.x - 1 - collide.margin.right - xStart,
                     pos.y + pos.dim.y - 1 - collide.margin.bottom - yStart
                 ];
+
+ */
             } else {
                 let first = 0;
                 let dir = 1;
@@ -4157,28 +4179,35 @@ class SpriteAndTilesCollider {
     getCollides(collideIds) {
         const result = {};
         const pos = this.spritePane.getSpritePos(this.spriteId);
+
+        const oPos = pos.x;
+
         pos.x += this.spriteOffset.x;
         pos.y += this.spriteOffset.y;
+
+        // pos hat die gerundete Position des Sprites inklusive eines möglichen Offsets
 
         for (let collideId of collideIds) {
             const collide = this.collides[collideId];
             const obj = {};
 
+            let dbg = false && collide.dir === 'right' && pos.id === 'player';
+            //if (dbg) console.log('Sprite-Pos', oPos + ' - ' +  (oPos + pos.dim.y - 1), ' [' + pos.y + ' - ' +  (pos.y + pos.dim.y - 1)  + ']');
             if (collide.dir !== 'center') {
                 let dist = collide.lookahead;
-                let first = 0;
+                let first = 0; //
                 let dir = 1;
                 let axis = 'x';
                 switch(collide.dir) {
                     case 'down':
                         dir  = -1;
-                        first = pos.dim.y;
+                        first = pos.dim.y - 1;
                     case 'up':
                         break;
 
                     case 'right':
                         dir = -1;
-                        first = pos.dim.x;
+                        first = pos.dim.x - 1;
                     case 'left':
                         axis = 'y';
                         break;
@@ -4186,34 +4215,64 @@ class SpriteAndTilesCollider {
                 const oppAxis = axis === 'x' ? 'y' : 'x';
                 first += pos[oppAxis] + dir * collide.margin.dir;
                 const dStart = pos[axis] + collide.margin.start;
-                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end - 1;
+                const dEnd = pos[axis] + pos.dim[axis] - 1 - collide.margin.end - 1;
+
 
                 let tiles = axis === 'x' ?
                     this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
-                    this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                    this.tilesPane.getTilesInYLine(first, dStart, dEnd, dbg);
+
+                //if (dbg) console.log('COLLIDE LINE', pos[axis], collide.margin.dir, ' => ',  first, dStart, dEnd);
 
                 for(let tile of tiles) {
+                    // auf der line liegen block-tiles, d.h. wir haben hier ein Collision und damit
+                    // ist die distance hier gleich 0
                     if (collide.check(tile)) {
                         dist = 0;
                         break;
                     }
                 }
+//                if (dbg && first >= 208) console.log('TILES', first, dStart, dEnd, tiles);
                 if (dist > 0) {
-                    const remBlock = (this.tileSize - (first % this.tileSize)) - collide.lookahead;
+                    // auf der line liegen keine block-tiles und die dist ist noch gleich dem lookahead
+                    const posTileDist = first % this.tileSize;
+                    const remBlock = (dir === 1 ? posTileDist + 1 :
+                        (this.tileSize - posTileDist)) - collide.lookahead;
+
+                    // first % this.tileSize => die Anzahl der Pixel wie weit die SpritePos von dem
+                    //   Tile-TL entfernt liegt
+                    // (this.tileSize - (first % this.tileSize)) => die Anzahl der Pixel, bis zum
+                    // nächsten Tile-TL
+
+                    /*
+                        Pos:  0 => dist = 16
+                        Pos:  1 => dist = 15
+                        ..
+                        Pos: 15 => dist = 1
+
+                        208 / 16 => 13
+                        208 % 16 => 0
+
+                        16 - 2 => 14
+                     */
+
                     if (remBlock < 0) {
-                        first -= dir * this.tileSize;
+                        const newFirst = first - dir * this.tileSize;
                         tiles = axis === 'x' ?
-                            this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
-                            this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                            this.tilesPane.getTilesInXLine(newFirst, dStart, dEnd) :
+                            this.tilesPane.getTilesInYLine(newFirst, dStart, dEnd);
                         for (let tile of tiles) {
                             if (collide.check(tile)) {
                                 dist = collide.lookahead + remBlock;
+                                if (dbg) console.log('DIST!', dist, collide.dir, pos[oppAxis], newFirst, '(' + collide.margin.dir + ')', remBlock);
                                 break;
                             }
                         }
                     }
+                    if (dbg && dist === 4) console.log('HERE!', dir, remBlock, posTileDist, first, pos[oppAxis]);
                 }
                 obj.dist = dist;
+                if (dbg && dist === 0) console.log('TOUCH!', collide.dir, pos[oppAxis]);
 
                 if (dist === 0 && collide.saveContacts) {
                     obj.tiles = tiles;
@@ -4241,7 +4300,7 @@ class SpriteAndTilesCollider {
 
 class TilesMap {
 
-    constructor(tileBits, imageResource, tiles, map, defaultTile = null) {
+    constructor(tileBits, imageResource, tiles, defaultTile = null) {
         this.tileBits = tileBits;
         this.tileSize = 1 << tileBits;
 
@@ -4255,18 +4314,46 @@ class TilesMap {
         }
         this.tilesImg = tgtCanvas;
 
-        this.map = map;
-        if (this.map.length === 0 || this.map[0].length === 0) {
-            throw Error('Map cannot be empty!');
-        }
+        this.map = [];
         this.mapTiles = {
-            x: this.map[0].length,
-            y: this.map.length
+            x: 0,
+            y: 0
         };
         this.tiles = tiles;
         this.animatedIndices = [];
         this.players = {};
         this.defaultTile = defaultTile;
+    }
+
+    setMap(map) {
+        if (!Array.isArray(map)) {
+            throw Error('Map must be an array of arrays!');
+        }
+        if (map.length === 0 || map[0].length === 0) {
+            throw Error('Map cannot be empty!');
+        }
+
+        this.map = [];
+        for (let row of map) {
+            const mapRow = [];
+            for (let item of row) {
+                if (Array.isArray(item)) {
+                    const eventItems = [];
+                    for (let event of item) {
+                        if (Array.isArray(event)) {
+                            throw 'Invalid event in map definition found!';
+                        }
+                        eventItems.push(event);
+                    }
+                    mapRow.push(eventItems);
+                } else {
+                    mapRow.push(item);
+                }
+            }
+            this.map.push(mapRow);
+        }
+        this.mapTiles.x = this.map[0].length;
+        this.mapTiles.y = this.map.length;
     }
 
     getTileObj(x, y) {
@@ -4323,7 +4410,35 @@ class TilesMap {
         return tiles;
     }
 
+
+    triggerEventsInRect(x1, y1, width = 1, height = 1) {
+        console.log(x1, y1, width, height);
+        const x2 = x1 + width;
+        const y2 = y1 + height;
+        for (let y = y1; y < y2; y++) {
+            for (let x = x1; x < x2; x++) {
+                console.log(x, y, this.map.length, this.map[y]);
+                let tile = this.map[y][x];
+                if (Array.isArray(tile)) {
+                    if (tile.length === 0) {
+                        tile = 0;
+                    } else {
+                        while (tile.length > 1) {
+                            const event = tile.pop();
+                            const parts = event.split(':');
+                            Game.instance.addFrameEvent(parts[0], {object: parts[1], tile: {obj: this.getTileObj(x, y), x, y}});
+                        }
+                        tile = tile[0];
+                    }
+                    this.map[y][x] = tile;
+                }
+            }
+        }
+    }
+
     triggerEventsInXLine(x, y1, y2) {
+        this.triggerEventsInRect(x, y1, 1, y2 - 1 - y1);
+        /*
         for (let y = y1; y < y2; y++) {
             let tile = this.map[y][x];
             if (Array.isArray(tile)) {
@@ -4341,6 +4456,8 @@ class TilesMap {
             }
 
         }
+
+         */
     }
 
     getTileIndex(x, y) {
@@ -4918,6 +5035,16 @@ class ObjectController {
         this.uid = 0;
         this.activeObjects = [];
         this.classes = {};
+        this.removeMargin = {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0
+        };
+    }
+
+    setRemoveMargin(key, value) {
+        this.removeMargin[key] = value;
     }
 
     addClass(name, handler, state = {}) {
@@ -4994,7 +5121,6 @@ class ObjectController {
         obj.id = id;
         obj.frame = 0;
         obj.sprites = [];
-        console.log('NEW', clsId, id);
         this.activeObjects.push(obj);
         return obj;
     }
@@ -5026,7 +5152,7 @@ class ObjectController {
                     if (obj.autoRemove === true) {
                         remove = false;
                         for (let spriteId of obj.sprites) {
-                            if (this.spritePane.isSpriteInBounds(spriteId)) {
+                            if (this.spritePane.isSpriteInBounds(spriteId, this.removeMargin.top, this.removeMargin.bottom, this.removeMargin.left, this.removeMargin.right)) {
                                 remove = false;
                                 break;
                             } else {
@@ -5040,7 +5166,6 @@ class ObjectController {
                 }
             }
             if (remove) {
-                console.log('REMOVE', obj.id);
                 this.spritePane.removeSprites(obj.sprites);
             } else {
                 survivedObjects.push(obj);
@@ -5070,6 +5195,7 @@ class InputController {
         this.xDir = 0;
         this.yDir = 0;
         this.inputs = {};
+        this.forced = null;
         this.dirInputs = {
             up: null,
             down: null,
@@ -5085,30 +5211,56 @@ class InputController {
         this.dirInputs['right'] = (right !== undefined) ? right : null;
     }
 
+    isForced() {
+        return this.forced !== null;
+    }
+
+    getDirKeys() {
+        return this.dirInputs;
+    }
+
+    setForcedInputs(keysDown) {
+        if (keysDown === null) {
+            this.forced = null;
+        } else {
+            this.forced = {};
+            for (let key of keysDown) {
+                this.forced[key] = key;
+            }
+        }
+    }
+
+    getKeysDown() {
+        if (this.forced !== null) {
+            return this.forced;
+        }
+        return Game.instance.keysDown;
+    }
+
     update() {
-        const game = Game.instance;
+        const keysDown = this.getKeysDown();
         this.yDir = 0;
         let key = this.dirInputs['up'];
-        if (key !== null && game.keysDown[key]) {
+        if (key !== null && keysDown[key]) {
             this.yDir--;
         }
         key = this.dirInputs['down'];
-        if (key !== null && game.keysDown[key]) {
+        if (key !== null && keysDown[key]) {
             this.yDir++;
         }
         this.xDir = 0;
         key = this.dirInputs['left'];
-        if (key !== null && game.keysDown[key]) {
+        if (key !== null && keysDown[key]) {
             this.xDir--;
         }
         key = this.dirInputs['right'];
-        if (key !== null && game.keysDown[key]) {
+        if (key !== null && keysDown[key]) {
             this.xDir++;
         }
 
         for (let name in this.inputs) {
             const input = this.inputs[name];
-            const keyDown = game.keysDown[input.key] === input.key;
+            const keyDown = keysDown[input.key] === input.key;
             switch(input.type) {
                 case INPUT.TYPE.PRESSED_DOWN:
                     input.state = keyDown ? INPUT.STATE.PRESSED : INPUT.STATE.NOTPRESSED;
@@ -5140,7 +5292,8 @@ class InputController {
 
     isPressed(name) {
         const input = this.inputs[name];
-        return (Game.instance.keysDown[input.key] === input.key);
+        const keysDown = this.getKeysDown();
+        return (keysDown[input.key] === input.key);
     }
 
     hasInput(name) {
@@ -5418,7 +5571,6 @@ class AxisPath {
 
     throw(v0, maxHeight) {
         const gravity = v0 * v0 / (2 * maxHeight);
-        console.log('GRAVITY', gravity);
         let v = v0;
         let i = 0;
         let iMax = Math.round(v0 / gravity);
@@ -5432,7 +5584,6 @@ class AxisPath {
 
     fall(v0, maxHeight) {
         const gravity = v0 * v0 / (2 * maxHeight);
-        console.log('GRAVITY', gravity);
         let v = v0;
         let i = 0;
         let iMax = Math.round(v0 / gravity);
@@ -5594,149 +5745,61 @@ class AxisPath {
     }
 }
 
-class TilesMapEditor {
+class Position {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
 
-    constructor(game, editor, tilesPane) {
-        this.tilesPane = tilesPane;
-        this.editor = editor;
-        this.game = game;
+    setMaxDist(xMin = null, xMax = null, yMin = null, yMax = null) {
+        const pos = this.getRounded();
+        this.xMin = xMin !== null ? pos - xMin : null;
+        this.xMax = xMax !== null ? pos + xMax : null;
+        this.yMin = yMin !== null ? pos - yMin : null;
+        this.yMax = yMax !== null ? pos + yMax : null;
+    }
 
-        this.tileBits = tilesPane.tilesMap.tileBits;
-        const mapTiles = tilesPane.tilesMap.mapTiles;
-        this.mapDim = {x: mapTiles.x, y: mapTiles.y};
-        this.mapSize = {x: this.mapDim.x << this.tileBits, y: this.mapDim.y << this.tileBits};
-        const maxTileIndex = tilesPane.tilesMap.tilesImg.elem.width / tilesPane.tilesMap.tileSize;
-
-        editor.innerHTML =
-            '<div style="">' +
-            '   <h1>TilesMap Editor</h1>' +
-            '   <div id="map-edit-row">' +
-            '       <div class="content-block" style="width: 120px; flex-grow: 0"><div>Active Tile</div>' +
-            '<canvas id="active-tile-canvas" style="border: 1px solid #FF0000; transform: scale(3);' +
-            'transform-origin: left top; margin-left: 30px; margin-top: 5px" width="16" height="16"></canvas>' +
-            '<div style="margin-top: 50px">Index: <button id="btn-prev-tile">&nbsp;-&nbsp;</button> <kbd id="active-tile-index"></kbd> <button id="btn-next-tile">&nbsp;+&nbsp;</button></div>' +
-            '</div>' +
-            '       <div class="content-block" style="flex: 1">Map: Map-Size: ' +
-            '           <button id="btn-map-width-down">-</button><kbd>' + this.mapDim.x + '</kbd><button id="btn-map-width-up">+</button> x ' +
-            '           <button id="btn-map-height-down">-</button><kbd>' + this.mapDim.y + '</kbd><button id="btn-map-height-up">+</button>' +
-                    '   <div id="map-editor" class="content-div">' +
-                            '<canvas id="map-canvas" width="' + this.mapSize.x + '" height="' + this.mapSize.y + '"></canvas>' +
-                            '<div id="map-canvas-overlay" style="width: ' + this.mapSize.x + 'px; height: ' + this.mapSize.y + 'px">' +
-                            '<div id="tile-cursor" style="display: none; left: 0px; top: 0px; width: 16px; height: 16px"></div>' +
-                            '</div>' +
-                        '</div>' +
-            '       </div>' +
-            '   </div>' +
-            '   <div class="content-block">Tiles:<div id="tile_browser" class="content-div"></div></div>' +
-            '</div>';
-
-        const mapEncoded = btoa(JSON.stringify(tilesPane.tilesMap.map));
-
-        const overlay = game.getDomElem('map-canvas-overlay');
-        const cursor = game.getDomElem('tile-cursor');
-        const tileBits = this.tileBits;
-        const map = game.getDomElem('map-canvas');
-        const ctx = map.getContext('2d');
-        let activeTileIndex = 1;
-
-        const activeTileCtx = game.getDomElem('active-tile-canvas').getContext('2d');
-        const activeTileIndexElem = game.getDomElem('active-tile-index');
-
-        function updateActiveTile() {
-            tilesPane.tilesMap.renderTileTo(activeTileCtx, activeTileIndex);
-            activeTileIndexElem.innerHTML = activeTileIndex;
+    move(x, y) {
+        const oldX = this.x;
+        this.x += x;
+        if (this.xMin !== null && this.x < this.xMin) {
+            this.x = this.xMin;
+        }
+        if (this.xMax !== null && this.x > this.xMax) {
+            this.x = this.xMax;
+        }
+        const oldY = this.y;
+        this.y += y;
+        if (this.yMin !== null && this.y < this.yMin) {
+            this.y = this.yMin;
+        }
+        if (this.yMax !== null && this.y > this.yMax) {
+            this.y = this.yMax;
         }
 
-        updateActiveTile();
+        return {x: Math.round(this.x) - Math.round(oldX), y: Math.round(this.y) - Math.round(oldY)};
+    }
 
-        game.getDomElem('btn-map-width-up').onclick = function () {
-            console.log('MAP-WIDTH+');
-        };
+    setFrom(obj) {
+        this.x = obj.x;
+        this.y = obj.y;
+    }
 
-        game.getDomElem('btn-map-width-down').onclick = function () {
-            console.log('MAP-WIDTH-');
-        };
+    getX() {
+        return this.x;
+    }
 
-        game.getDomElem('btn-map-height-up').onclick = function () {
-            console.log('MAP-HEIGHT+');
-        };
+    getY() {
+        return this.y;
+    }
 
-        game.getDomElem('btn-map-height-down').onclick = function () {
-            console.log('MAP-HEIGHT-');
-        };
+    set(x, y) {
+        this.x = x;
+        this.y = y;
+    }
 
-        game.getDomElem('btn-prev-tile').onclick = function () {
-            if (activeTileIndex > 0) {
-                activeTileIndex--;
-            }
-            updateActiveTile();
-        };
-
-        game.getDomElem('btn-next-tile').onclick = function () {
-            if (activeTileIndex < maxTileIndex) {
-                activeTileIndex++;
-            }
-            updateActiveTile();
-        };
-
-        function getRelMapPosFromEvent(e) {
-            let target = e.target;
-            while (target.id === undefined || target.id !== 'map-canvas-overlay') {
-                target = target.parentElement;
-            }
-
-            const rect = target.getBoundingClientRect();
-
-            return {
-                x: Math.round(e.clientX - rect.left - 5) >> tileBits,
-                y: Math.round(e.clientY - rect.top - 5) >> tileBits
-            };
-        }
-
-        function renderTilesMap() {
-            tilesPane.tilesMap.render(ctx, {
-                    x: 0,
-                    y: 0
-                },
-                {
-                    width: mapTiles.x,
-                    height: mapTiles.y,
-                    pos: {
-                        x: 0,
-                        y: 0
-                    },
-                    endless: false
-                }
-            );
-        }
-
-        function setActiveTileIndex(index) {
-            activeTileIndex = index;
-        }
-
-        overlay.onmouseenter = function(e) {
-            cursor.style.display = 'block';
-        };
-        overlay.onmouseleave = function(e) {
-            cursor.style.display = 'none';
-        };
-        overlay.onmousemove = function (e) {
-            const pos = getRelMapPosFromEvent(e);
-            cursor.style.left = (pos.x << tileBits) - 2;
-            cursor.style.top = (pos.y << tileBits) - 2;
-        };
-
-        overlay.onclick = function(e) {
-            const pos = getRelMapPosFromEvent(e);
-            tilesPane.tilesMap.replaceTile(pos.x, pos.y, activeTileIndex);
-            renderTilesMap();
-        };
-
-        renderTilesMap();
-
-        const tileBrowser = game.getDomElem('tile_browser');
-        tileBrowser.appendChild(tilesPane.tilesMap.tilesImg.elem);
-
+    getRounded() {
+        return {x: Math.round(this.x), y: Math.round(this.y)}
     }
 }
 
@@ -5757,6 +5820,8 @@ const OCM = new CanvasManager();
 // let debugElem = null;
 let debugs = [];
 var spriteMaps = [];
+
+let gameEditor = null;
 
 module.exports = {
     Game,
@@ -5780,6 +5845,7 @@ module.exports = {
     SpriteAndTilesCollider,
     ObjectController,
     InputController,
+    Position,
     Animation: BitmapPlayer,
     d,
     FontMap,
