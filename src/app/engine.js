@@ -37,6 +37,7 @@ class Game {
         this.sound = true;
         this.audioPlaying = [];
         this.globals = {};
+        this.audio = new AudioPlayer();
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -5013,7 +5014,98 @@ class States {
     }
 }
 
+class AudioPlayer {
+
+    constructor() {
+        this.audio = {};
+        this.channels = {};
+        this.masterVolume = 1;
+    }
+
+    addChannel(id) {
+        this.channels[id] = null;
+    }
+
+    addAudioResources(obj) {
+        this.audio = Object.assign(this.audio, obj);
+    }
+
+    setMasterVolume(volume) {
+        this.masterVolume = volume;
+    }
+
+    play(id, channel = null) {
+        const audio = this.audio[id];
+        if (channel !== null) {
+            if (this.channels[channel] !== undefined) {
+                if (this.channels[channel] !== null && this.channels[channel].isPlaying()) {
+                    this.channels[channel].reset();
+                    this.channels[channel].pause();
+                }
+            }
+            this.channels[channel] = audio;
+        } else {
+            if (audio.isPlaying()) {
+                audio.reset();
+            }
+        }
+        audio.setLoop(false);
+        audio.play();
+
+        return audio;
+    }
+
+    loop(id, channel = null) {
+        const audio = this.play(id, channel);
+        audio.setLoop(true);
+    }
+
+    pause() {
+        for (let id in this.audio) {
+            this.audio[id].pause();
+        }
+    }
+
+    isPlaying(id) {
+        return this.audio[id].isPlaying();
+    }
+
+    continue() {
+        // TODO we only want to restart what was paused
+    }
+
+    pauseChannel(id) {
+        const channel = this.channels[id];
+        if (channel !== null && channel.isPlaying()) {
+            channel.pause();
+        }
+    }
+
+    continueChannel(id, speed = null) {
+        const channel = this.channels[id];
+        if (speed !== null && channel !== null) {
+            channel.defaultPlaybackRate = speed;
+        }
+        if (channel !== null && !channel.isPlaying()) {
+            channel.play();
+        }
+
+    }
+
+    resetChannel(id) {
+        this.pauseChannel(id);
+        this.channels[id] = null;
+    }
+
+    resetChannels() {
+        for (let id in this.channels) {
+            this.resetChannel(id);
+        }
+    }
+}
+
 class AudioResource {
+
     constructor(url, readyCallback = null) {
         this.audio = new Audio(url);
         if (readyCallback !== null) {
@@ -5021,15 +5113,28 @@ class AudioResource {
         }
     }
 
-    play() {
-        if (this.isPlaying()) {
+    play(volume = 1, restart = true) {
+        if (restart && this.isPlaying()) {
             this.audio.load();
         }
+        this.audio.volume = volume;
         this.audio.play();
     }
 
+    setLoop(value) {
+        this.audio.loop = value;
+    }
+
+    pause() {
+        this.audio.pause();
+    }
+
+    reset() {
+        this.audio.load();
+    }
+
     isPlaying() {
-        return !this.audio.ended;
+        return !(this.audio.ended || this.audio.paused);
     }
 
     isLooping() {
