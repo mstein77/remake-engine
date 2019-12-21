@@ -64,6 +64,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             sfx_gameover: 'audio/smb/gameover.wav',
             sfx_stageclear: 'audio/smb/stage-clear.wav',
             sfx_warning: 'audio/smb/warning.wav',
+            sfx_invincible: 'audio/smb/invincible.wav',
+            sfx_tubedown: 'audio/smb/pipe.wav',
             sfx_overworld: 'audio/smb_overworld.mp3'
         });
         return function (resource, globals) {
@@ -93,6 +95,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 gameover: resource.sfx_gameover,
                 stageclear: resource.sfx_stageclear,
                 warning: resource.sfx_warning,
+                invincible: resource.sfx_invincible,
+                tubedown: resource.sfx_tubedown,
                 overworld: resource.sfx_overworld
             });
             this.audio.addChannel('bgm');
@@ -112,7 +116,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'one-up', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 11, [11, 'object:flag-up-fg'] , 11, 0, 0, 0, 0, 0, 0, 0],
                         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-block', 0, 0, 0, 1, 24, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'coin-cache', 0, 0, 0, 0, 0, 1, 'star-block', 0, 0, 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 'coin-block', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 'coin-block', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 0, 12, 13, 14, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 11, 44, 44, 44, 11, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'tube-down.1-1.uw', 265, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 11, 44, 44, 44, 11, 0, 0, 0, 0, 0, 0],
                         [0, 272, 305, 274, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 273, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 0, 0, 0, 0, 0, 264, 265, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 264, 265, 0, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 237, 0, 0, 0, 13, 13, 45, 13, 13, 0, 0, 0, 0, 0, 0],
 
                         [272, 305, 306, 307, 274, 0, 0, 0, 0, 0, 0 ,308, 309, 309, 309, 310, 272, 305, 274, [0, 'object:evilmush.left'], 0, 0, 0, 308, 309, 310, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 297, 298, 0, 0, [0, 'object:evilmush.right'], 0, 0, 0, 0, 297, 298, 0, 0, [0, 'object:evilmush.right'], [0, 'object:evilmush.right'], 0, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:store-position'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], 0, [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, [0, 'object:turtle.left'], 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 33, 33, 33, 33, 33, 0, 0, 33, 33, 33, 33, 0, 0, 0, 0, 297, 298, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [0, 'object:evilmush.left'], [0, 'object:evilmush.left'], 0, 0, 297, 298, 33, 33, 33, 33, 33, 33, 33, 33, 33, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 13, 13, 46, 13, 13, 0, 0, 0, 0, 0, 0],
@@ -121,25 +125,47 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     ],
                     next: '1-2'
                 },
+                '1-1.uw': {
+                    startPos: {x: 2, y: 1},
+                    bgColor: '#000000',
+                    map: [
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 57, 57, 57, 57, 57, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+
+                        [68, 0, 0, 0, 57, 57, 57, 57, 57, 57, 57, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 57, 57, 57, 57, 57, 57, 57, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 266, 267, 268],
+
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 299, 300, 301],
+                        [66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 'tube-right.1-1.ow', 66, 66, 66],
+                        [66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66]
+                    ],
+                    next: null
+                },
                 '1-2': {
                     startPos: {x: 2, y: 1},
                     bgColor: '#000000',
                     map: [
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 68, 68, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 68, 68, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 68, 68, 68, 68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 57, 57, 57, 57, 57, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
 
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68],
+                        [68, 0, 0, 0, 57, 57, 57, 57, 57, 57, 57, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 57, 57, 57, 57, 57, 57, 57, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 266, 267, 268],
 
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68],
-                        [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68],
-                        [68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68, 68]
+                        [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 299, 300, 301],
+                        [66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 'tube-right.1-1.ow', 66, 66, 66],
+                        [66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66]
                     ],
                     next: null
                 }
@@ -298,7 +324,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             };
 
             globals.updateWorld = function() {
-                statusPane.updateTextBlock('world', globals.world);
+                const parts = globals.world.split('.', 2);
+                statusPane.updateTextBlock('world', parts[0]);
             };
 
             globals.updateStatusPane = function() {
@@ -1796,7 +1823,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             marioScreen.addArea(vSplitArea);
 
             const gameArea = new SplitArea('Y', [24, 216]);
-            globals.time = 400;
+            if (!isSubWorld() && globals.pipeUp !== true) {
+                globals.time = 400;
+            }
+            globals.pipeUp = false;
 
             globals.updateStatusPane();
 
@@ -1838,14 +1868,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         }
                     },
                     33: {block: true},
+                    66: {block: true},
                     68: {block: true},
                     237: {
                         collectEvent: 'glide'
                     },
                     264: {block: true},
                     265: {block: true},
+                    266: {block: true},
+                    267: {block: true},
+                    268: {block: true},
                     297: {block: true},
                     298: {block: true},
+                    299: {block: true},
+                    300: {block: true},
+                    301: {block: true},
                     'coin-block': {
                         animation: questionMarkAnimation,
                         hitEvent: 'one-coin',
@@ -1864,7 +1901,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     'one-up': {
                         index: 0,
                         hitEvent: 'bump-one-up'
+                    },
+                    'tube-down.1-1.uw': {
+                        index: 264,
+                        block: true,
+                        downTarget: '1-1.uw'
+                    },
+                    'tube-right.1-1.ow': {
+                        index: 66,
+                        block: true,
+                        rightTarget: '1-1:164-8'
                     }
+
                 },
                 {
                     block: false
@@ -1905,12 +1953,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const gameScrollBounds = new BoundsScrollHandler(spritePane, masterSlaveScroller, {right: 100}, {top: 33, bottom: 33});
 
             const actorYStates = new States([
-                'standing', 'ducking', 'jumping', 'falling', 'dead'
+                'standing', 'ducking', 'jumping', 'falling', 'dead', 'piping'
             ]);
             actorYStates.addTransition('standing', 'move-down', 'ducking');
             actorYStates.addTransition('standing', 'button-a', 'jumping');
             actorYStates.addTransition('standing', 'no-floor', 'falling');
+            actorYStates.addTransition('standing', 'piping-down', 'piping');
+            actorYStates.addTransition('standing', 'piping-right', 'piping');
             actorYStates.addTransition('ducking', 'not-move-down', 'standing');
+            actorYStates.addTransition('ducking', 'piping-down', 'piping');
             actorYStates.addTransition('ducking', 'button-a', 'jumping');
             actorYStates.addTransition('ducking', 'no-floor', 'falling');
 
@@ -1920,7 +1971,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             actorYStates.addTransition('falling', 'disappear-bottom', 'dead');
             actorYStates.setEventPrios([
                 'disappear-bottom', 'no-floor', 'hit-ceiling', 'hit-bottom', 'hit-enemy', 'not-move-up', 'not-move-down',
-                'button-a', 'move-down', 'end-of-jump'
+                'button-a', 'move-down', 'end-of-jump', 'piping-down', 'piping-right'
             ]);
             actorYStates.setState('standing');
 
@@ -2015,6 +2066,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let invincibleTimer = null;
             const bumpPath = AxisPath.new().addRelativePoints([-1, -2, -1, -1, -1, 0, -1, 1, 0, 1, 1, 2, 2, 2, -1]);
             const coinCaches = {};
+
+            function isSubWorld() {
+                return globals.world.indexOf('.') !== -1;
+            }
+
+            function getMainWorld() {
+                const parts = globals.world.split('.', 2);
+                return parts[0];
+            }
 
             function incCoins() {
                 globals.coins++;
@@ -2156,6 +2216,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 spritePane.addSprite(obj.id, obj.bumpSprite, pos.x, pos.y + 24 - 1);
                 obj.bump = 0;
                 obj.sprites.push(obj.id);
+                audio.play('bump');
             }
 
             function moveBump(obj) {
@@ -2230,7 +2291,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 'flag',
                 function (obj) {
                     const pos = tilesPane.getRelativePositionOfTile(obj.event.tile.x, obj.event.tile.y);
-                    spritePane.addSprite('flag', 'flag', pos.x - 9, pos.y + 27);
+                    spritePane.addSprite('flag', 'flag', pos.x - 9, pos.y + 27, -1);
                     spritePane.setNoCollision('flag', true);
                     return false;
                 }
@@ -2356,11 +2417,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             obj.state = -3;
                             obj.killing = true;
                             obj.bounced = false;
+                            audio.play('kick');
                         }
                         return;
                     } else if (obj.state === -3) {
                         // killing shell state
                         if (moveAlongBlocks(obj, 4)) {
+                            audio.play('bump');
                             obj.bounced = true;
                         };
                         if (isColliding) {
@@ -2379,6 +2442,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             spritePane.assignSprite(obj.id, getEnemySprite(obj, 'turtle-shell'));
                             hitEnemy = true;
                             addScoreForSprite(500, obj.id);
+                            audio.play('kick');
                         } else {
                             if (invincibleTimer !== null) {
                                 obj.kickout = (marioLeft ? -1 : 1);
@@ -2485,7 +2549,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         if (globals.marioLevel === 0) {
                             obj.bumpTile = 1;
                             initBump(obj);
-                            audio.play('bump');
                         } else {
                             obj.moves = [
                                 [0, 0, -2],
@@ -2502,6 +2565,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                 i++;
                             }
                             tilesPane.replaceTile(obj.event.tile.x, obj.event.tile.y, 0);
+                            audio.play('bump');
                             audio.play('breakblock');
                         }
                         return;
@@ -2643,6 +2707,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     if (spritePane.isCollidingActor(obj.id)) {
                         invincibleTimer = 0;
                         addScoreForSprite(1000, obj.id);
+                        audio.loop('invincible', 'bgm');
                         return false;
                     }
                     if (obj.state > 0) {
@@ -2745,6 +2810,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         spritePane.setAnimationSpeed(obj.id, 0.5);
                         spritePane.setNoCollision(obj.id, true);
                         obj.sprites.push(obj.id);
+                        audio.play('bump');
                     }
                     return (obj.frame < 6);
                 }
@@ -2860,6 +2926,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             let timerRunning = true;
             const invIndices = [null, 3, 1, 2];
             let invIndex = 0;
+            let pipingFrame = null;
+            let pipingTarget = null;
+            let pipingDir = null;
             let isWarning = false;
 
             const fireworks = [
@@ -2921,6 +2990,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             function setActorSprite(name, rev = false) {
                 const doRev = rev ? !marioLeft : marioLeft;
+                if (name === null) {
+                    name = 'mario';
+                }
                 if (throwingTimer > 0) {
                     name = 'throwing-' + name;
                 }
@@ -2961,6 +3033,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             break;
 
                         case 'shrink':
+                            if (cutsceneFrame === 0) {
+                                audio.play('tubedown');
+                            }
                             done = flickerCutScene(0, globals.marioLevel, shrinkAni);
                             hideCounter = 100;
                             break;
@@ -3015,13 +3090,15 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                         case 'firework':
                             if (fireworkIndex === null) {
-                                inputController.setForcedInputs(null);
-                                this.gotoScreen('mario');
-                                globals.worldPos = null;
-                                if (world.next !== null) {
-                                    globals.world = world.next;
+                                if (!audio.isPlaying('stageclear')) {
+                                    inputController.setForcedInputs(null);
+                                    this.gotoScreen('mario');
+                                    globals.worldPos = null;
+                                    if (world.next !== null) {
+                                        globals.world = world.next;
+                                    }
+                                    this.gotoScreen(world.next !== null ? 'world' : 'demo');
                                 }
-                                this.gotoScreen(world.next !== null ?'world' : 'demo');
                             } else if (cutsceneFrame === 32) {
                                 globals.score += 500;
                                 globals.updateScore();
@@ -3075,7 +3152,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             globals.lifes--;
                             if (globals.lifes > 0) {
                                 globals.marioLevel = 0;
-                                this.gotoScreen('world');
+                                this.gotoScreen('world', {world: getMainWorld()});
                             } else {
                                 this.gotoScreen('game-over');
                             }
@@ -3108,13 +3185,11 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                             audio.play('warning');
                             isWarning = true;
                         } else if (isWarning && !audio.isPlaying('warning')) {
-                            console.log('continue...');
                             audio.continueChannel('bgm', 2);
                             isWarning = false;
                         }
                     }
                 }
-
 
                 spritePane.updateFrames();
                 spritePane.updateCollisions();
@@ -3183,7 +3258,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 inputController.awaitInput('button-b');
                 inputController.update();
 
-                let updateSprite = false;
+                let updateSprite = (frameCount <= 1);
+                if (frameCount <= 1) console.log(updateSprite);
 
                 if (throwingTimer > 0) {
                     throwingTimer--;
@@ -3211,6 +3287,40 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 for (let event of yEvents) {
                     switch (event) {
+
+                        case 'piping-down':
+                            if (!inputController.isDown() || (globals.marioLevel > 0 && actorYStates.getState() !== 'ducking')) {
+                                continue;
+                            }
+                            let standingOnDownPipe = false;
+                            const tiles = collides.floor.tiles;
+                            if (tiles.length === 2 && tiles[0].obj.downTarget !== undefined && tiles[0].touch > 4) {
+                                standingOnDownPipe = true;
+                                pipingTarget = tiles[0].obj.downTarget;
+                            }
+                            if (!standingOnDownPipe) continue;
+                            pipingDir = 'y';
+                            pipingFrame = 0;
+                            audio.play('tubedown');
+                            inputController.setForcedInputs([inputController.getDirKeys().down]);
+                            break;
+
+                        case 'piping-right':
+                            if (!inputController.isRight() || collides.right.dist !== 0 || collides.floor.dist !== 0) {
+                                continue;
+                            }
+                            let hasRightPipe = false;
+                            const tile = collides.floor.tiles[0];
+                            if (tile.obj.rightTarget === undefined) {
+                                continue;
+                            }
+                            pipingTarget = tile.obj.rightTarget;
+                            pipingDir = 'x';
+                            pipingFrame = 0;
+                            audio.play('tubedown');
+                            inputController.setForcedInputs([inputController.getDirKeys().right]);
+                            break;
+
                         case 'disappear-bottom':
                             const pos = spritePane.getSpritePos('player');
                             if (pos.y < spritePane.viewPortDim.y) continue;
@@ -3428,7 +3538,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 const speed = currAcc;
                 runDist += speed;
 
-                if (!updateSprite && yState === 'standing' && currAcc > 0) {
+                if (!updateSprite && ['standing', 'piping'].indexOf(yState) !== -1 && currAcc > 0) {
                     const newBaseSprite = 'mario-run' + ((Math.round(runDist) >> 3) % 3 + 1);
                     if (newBaseSprite !== baseSprite) {
                         baseSprite = newBaseSprite;
@@ -3462,7 +3572,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 // move player
                 const state = actorYStates.getState();
                 let moveX = 0;
-                const moveY = jumpForce.getMoveForTimeVector(yAxisVector, forceMoveX !== 0 ? 4 : collides.ceiling.dist, collides.floor.dist);
+                let moveY = jumpForce.getMoveForTimeVector(yAxisVector, forceMoveX !== 0 ? 4 : collides.ceiling.dist, collides.floor.dist);
                 jumpForce.incVector(yAxisVector);
 
                 if (!marioLeft) {
@@ -3470,13 +3580,35 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 } else {
                     moveX = -Math.min(speed, collides.left.dist);
                 }
-                if (['duck', 'duck_rev'].indexOf(state) !== -1) {
+                if (['duck', 'duck_rev', 'piping'].indexOf(state) !== -1) {
                     moveX = 0;
                 }
 
                 moveX += forceMoveX;
-                if (moveX !== 0 || moveY !== 0) {
-                    marioPosition.setMaxDist(collides.left.dist, collides.right.dist, collides.ceiling.dist, collides.floor.dist);
+                if (state === 'piping') {
+                    if (pipingFrame < 24 * 3) {
+                        pipingFrame++;
+                        if (pipingFrame % 3 === 0) {
+                            spritePane.setSpriteFilters('player', 'shift-' + pipingDir + '(' + Math.round(pipingFrame / 3) + ')')
+                        }
+                    } else {
+                        let parts = pipingTarget.split(':', 2);
+                        const params = {
+                            world: parts[0]
+                        };
+                        if (parts.length === 2) {
+                            parts = parts[1].split('-', 2);
+                            params.worldPos = {x: parts[0], y: parts[1]};
+                            params.pipeUp = true;
+                        }
+                        this.gotoScreen('mario', params);
+                    }
+                } else if (moveX !== 0 || moveY !== 0) {
+                    if (state === 'piping') {
+                        marioPosition.setMaxDist(0, 0, 0, 1);
+                    } else {
+                        marioPosition.setMaxDist(collides.left.dist, collides.right.dist, collides.ceiling.dist, collides.floor.dist);
+                    }
                     const delta = marioPosition.move(moveX, moveY);
                     //if (moveX > 0) console.log('MOVE', moveX, delta.x, collides.right.dist, forceMoveX, marioPosition.x);
 
@@ -3504,6 +3636,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         invIndex = -1;
                         nextColor = true;
                         invincibleTimer = null;
+                        audio.loop('overworld', 'bgm');
                     } else if (invincibleTimer < fastFlickering) {
                         nextColor = (invincibleTimer % 2 === 0);
                     } else if (invincibleTimer < fastFlickering + 4) {
@@ -3521,7 +3654,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
 
-                if (inputController.isForced()) {
+                if (inputController.isForced() && actorYStates.getState() !== 'piping') {
                     const playerPos = spritePane.getSpritePos('player');
                     const targetPos = spritePane.getSpritePos('flag-up-fg');
                     if (playerPos.x >= targetPos.x) {
@@ -3553,7 +3686,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             vSplitArea.addArea(gameArea, 1);
 
             const spritePane = new SpritePane(globals.spriteSheet);
-            spritePane.addSprite('minicoin', 'minicoin', 87, 16);
+            spritePane.addSprite('minicoin', 'minicoin', 87, 16, -1);
             spritePane.setNoCollision('minicoin', true);
             vSplitArea.addPane(spritePane, 1);
 
@@ -3574,6 +3707,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
     const worldScreen = new Screen('world');
     worldScreen.setInitHandler(function () {
         return function (resource, globals) {
+            this.audio.resetChannels();
             const vSplitArea = new SplitArea('X', [32, 256, 32]);
             vSplitArea.addPane(new ColorPane('#000000'), 1);
             worldScreen.addArea(vSplitArea);
