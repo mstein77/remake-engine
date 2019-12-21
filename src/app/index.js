@@ -66,7 +66,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             sfx_warning: 'audio/smb/warning.wav',
             sfx_invincible: 'audio/smb/invincible.wav',
             sfx_tubedown: 'audio/smb/pipe.wav',
-            sfx_overworld: 'audio/smb_overworld.mp3'
+            sfx_overworld: 'audio/smb_overworld.mp3',
+            sfx_underworld: 'audio/smb_underworld.mp3'
         });
         return function (resource, globals) {
             const font = new FontMap(resource.font, 8, 8);
@@ -97,15 +98,17 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 warning: resource.sfx_warning,
                 invincible: resource.sfx_invincible,
                 tubedown: resource.sfx_tubedown,
-                overworld: resource.sfx_overworld
+                overworld: resource.sfx_overworld,
+                underworld: resource.sfx_underworld
             });
             this.audio.addChannel('bgm');
 
             globals.fontMap = font;
             globals.worlds = {
                 '1-1': {
+                    theme: 'overworld',
                     startPos: {x: 5, y: 9},
-                    bgColor: '#5c94fc',
+//                    bgColor: '#5c94fc',
                     map: [
                         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         [0, 0, 0, 0, 0, 0, 0, 0, 660, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 693, 694, 695, 0, 0, 0, 0, 0, 660, 661, 661, 661, 662, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, [237, 'object:flag'], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -126,8 +129,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     next: '1-2'
                 },
                 '1-1.uw': {
+                    theme: 'underworld',
                     startPos: {x: 2, y: 1},
-                    bgColor: '#000000',
+//                    bgColor: '#000000',
                     map: [
                         [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
                         [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
@@ -148,8 +152,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     next: null
                 },
                 '1-2': {
+                    theme: 'underworld',
                     startPos: {x: 2, y: 1},
-                    bgColor: '#000000',
+//                    bgColor: '#000000',
                     map: [
                         [68, 0, 0, 0, 68, 68, 68, 68, 68, 68, 68, 0, 0, 0, 0, 297],
                         [68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 297],
@@ -1819,7 +1824,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const audio = this.audio;
             const vSplitArea = new SplitArea('X', [32, 256, 32]);
             const world = globals.worlds[globals.world];
-            vSplitArea.addPane(new ColorPane(world.bgColor), 1);
+            const themes = {
+                overworld: {
+                    bgColor: '#5c94fc',
+                    bgm: 'overworld'
+                },
+                underworld: {
+                    bgColor: '#000000',
+                    bgm: 'underworld'
+                }
+            };
+            const theme = themes[world.theme];
+
+            vSplitArea.addPane(new ColorPane(theme.bgColor), 1);
             marioScreen.addArea(vSplitArea);
 
             const gameArea = new SplitArea('Y', [24, 216]);
@@ -3009,7 +3026,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 return name;
             }
 
-            audio.loop('overworld', 'bgm');
+            audio.loop(theme.bgm, 'bgm');
 
             // ###################################################
 
@@ -3636,7 +3653,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         invIndex = -1;
                         nextColor = true;
                         invincibleTimer = null;
-                        audio.loop('overworld', 'bgm');
+                        audio.loop(theme.bgm, 'bgm');
                     } else if (invincibleTimer < fastFlickering) {
                         nextColor = (invincibleTimer % 2 === 0);
                     } else if (invincibleTimer < fastFlickering + 4) {
