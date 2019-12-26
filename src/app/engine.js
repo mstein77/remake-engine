@@ -790,6 +790,7 @@ class Screen {
     }
 
     init(params) {
+        this.areas = [];
         if (this.initHandler !== null) {
             this.state = 'INIT';
             return this.initHandler(params);
