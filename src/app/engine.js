@@ -1707,6 +1707,7 @@ class BufferedTilesPane {
             x: Math.ceil(viewPortDimX / this.tilesMap.tileSize),
             y: Math.ceil(viewPortDimY / this.tilesMap.tileSize)
         };
+        this.viewPortTiles = viewPortTiles;
 
         // 3 tiles are required in each direction for scrolling around the neutral quadrant
         this.canvasTiles = {
@@ -1943,11 +1944,11 @@ class BufferedTilesPane {
             x: absPosStart.x + this.viewPortDim.x - 1,
             y: absPosStart.y + this.viewPortDim.y - 1
         };
-
-        return {
+        const result = {
             start: {x: absPosStart.x >> this.tilesMap.tileBits, y: absPosStart.y >> this.tilesMap.tileBits},
             end: {x: absPosEnd.x >> this.tilesMap.tileBits, y: absPosEnd.y >> this.tilesMap.tileBits}
         };
+        return result;
     }
 
     setMapTilePos(mapTilePosX, mapTilePosY) {
@@ -2197,31 +2198,35 @@ class BufferedTilesPane {
             }
         };
 
-        this.scrollPos.x += Sx;
-        if (this.scrollStop.left !== null) {
-            this.scrollPos.x = Math.max(this.scrollPos.x, this.scrollStop.left);
-        }
-        if (this.scrollStop.right !== null) {
-            this.scrollPos.x = Math.min(this.scrollPos.x, this.scrollStop.right);
-        }
-        if (this.scrollPos.x <= -this.tilesMap.tileSize) {
-            this.scrollPos.x = -this.tilesMap.tileSize + 1;
-        } else if (this.scrollPos.x >= (this.paneDim.x - this.viewPortDim.x)) {
-            this.scrollPos.x = this.paneDim.x - this.viewPortDim.x;
-        }
-
-        this.scrollPos.y += Sy;
-        if (this.scrollStop.top !== null) {
-            this.scrollPos.y = Math.max(this.scrollPos.y, this.scrollStop.top);
-        }
-        if (this.scrollStop.bottom !== null) {
-            this.scrollPos.y = Math.min(this.scrollPos.y, this.scrollStop.bottom);
+        if (this.viewPortTiles.x < this.tilesMap.mapTiles.x) {
+            this.scrollPos.x += Sx;
+            if (this.scrollStop.left !== null) {
+                this.scrollPos.x = Math.max(this.scrollPos.x, this.scrollStop.left);
+            }
+            if (this.scrollStop.right !== null) {
+                this.scrollPos.x = Math.min(this.scrollPos.x, this.scrollStop.right);
+            }
+            if (this.scrollPos.x <= -this.tilesMap.tileSize) {
+                this.scrollPos.x = -this.tilesMap.tileSize + 1;
+            } else if (this.scrollPos.x >= (this.paneDim.x - this.viewPortDim.x)) {
+                this.scrollPos.x = this.paneDim.x - this.viewPortDim.x;
+            }
         }
 
-        if (this.scrollPos.y <= -this.tilesMap.tileSize) {
-            this.scrollPos.y = -this.tilesMap.tileSize + 1;
-        } else if (this.scrollPos.y >= (this.paneDim.y - this.viewPortDim.y)) {
-            this.scrollPos.y = this.paneDim.y - this.viewPortDim.y;
+        if (this.viewPortTiles.y < this.tilesMap.mapTiles.y) {
+            this.scrollPos.y += Sy;
+            if (this.scrollStop.top !== null) {
+                this.scrollPos.y = Math.max(this.scrollPos.y, this.scrollStop.top);
+            }
+            if (this.scrollStop.bottom !== null) {
+                this.scrollPos.y = Math.min(this.scrollPos.y, this.scrollStop.bottom);
+            }
+
+            if (this.scrollPos.y <= -this.tilesMap.tileSize) {
+                this.scrollPos.y = -this.tilesMap.tileSize + 1;
+            } else if (this.scrollPos.y >= (this.paneDim.y - this.viewPortDim.y)) {
+                this.scrollPos.y = this.paneDim.y - this.viewPortDim.y;
+            }
         }
 
         scrolled.unscrolled.x -= this.scrollPos.x;
@@ -2279,6 +2284,7 @@ class BufferedTilesPane {
 
     render() {
         const target = this.buffers.getBufferCtx();
+        let all = false;
         switch(this.state) {
 
             case 0:
@@ -2286,6 +2292,7 @@ class BufferedTilesPane {
 
             case -1:
                 this.renderAll(target);
+                all = true;
                 this.switchBuffer();
                 break;
 
@@ -2309,13 +2316,12 @@ class BufferedTilesPane {
         const posLeft = -(this.scrollPosOffset.x + this.scrollPos.x) + 'px';
         const posTop = -(this.scrollPosOffset.y + this.scrollPos.y) + 'px';
 
-        // TODO: trigger all events in viewPort when oldPos is null
         const newPos = this.getViewPortMapPos();
         const oldPos = this.oldPos;
 
-        if (oldPos === null) console.log('TRIGGER ALL', newPos);
-
-        if (oldPos.start.x !== newPos.start.x || oldPos.start.y !== newPos.start.y ||
+        if (all) {
+            this.tilesMap.triggerEventsInRect(newPos.start.x, newPos.start.y, newPos.end.x - newPos.start.x + 1, newPos.end.y - newPos.start.y + 1);
+        } else if (oldPos.start.x !== newPos.start.x || oldPos.start.y !== newPos.start.y ||
             oldPos.end.x !== newPos.end.x || oldPos.end.y !== newPos.end.y) {
             const relStart = {
                 x: newPos.start.x - oldPos.start.x,
@@ -4425,14 +4431,11 @@ class TilesMap {
         return tiles;
     }
 
-
     triggerEventsInRect(x1, y1, width = 1, height = 1) {
-//        console.log(x1, y1, width, height);
         const x2 = x1 + width;
         const y2 = y1 + height;
         for (let y = y1; y < y2; y++) {
             for (let x = x1; x < x2; x++) {
-//                console.log(x, y, this.map.length, this.map[y]);
                 let tile = this.map[y][x];
                 if (Array.isArray(tile)) {
                     if (tile.length === 0) {
@@ -4452,27 +4455,7 @@ class TilesMap {
     }
 
     triggerEventsInXLine(x, y1, y2) {
-        this.triggerEventsInRect(x, y1, 1, y2 - 1 - y1);
-        /*
-        for (let y = y1; y < y2; y++) {
-            let tile = this.map[y][x];
-            if (Array.isArray(tile)) {
-                if (tile.length === 0) {
-                    tile = 0;
-                } else {
-                    while (tile.length > 1) {
-                        const event = tile.pop();
-                        const parts = event.split(':');
-                        Game.instance.addFrameEvent(parts[0], {object: parts[1], tile: {obj: this.getTileObj(x, y), x, y}});
-                    }
-                    tile = tile[0];
-                }
-                this.map[y][x] = tile;
-            }
-
-        }
-
-         */
+        this.triggerEventsInRect(x, y1, 1, y2 - y1 + 1);
     }
 
     getTileIndex(x, y) {
@@ -5108,6 +5091,7 @@ class AudioResource {
 
     constructor(url, readyCallback = null) {
         this.audio = new Audio(url);
+        this.lastAction = null;
         if (readyCallback !== null) {
             this.audio.oncanplaythrough = readyCallback;
         }
@@ -5115,10 +5099,17 @@ class AudioResource {
 
     play(volume = 1, restart = true) {
         if (restart && this.isPlaying()) {
-            this.audio.load();
+            this.reset();
         }
         this.audio.volume = volume;
-        this.audio.play();
+        this.lastAction = 'load';
+        this.audio.play().then(() => {
+            if (this.lastAction === 'pause') {
+                this.audio.pause();
+            } else {
+                this.lastAction = 'play';
+            }
+        });
     }
 
     setLoop(value) {
@@ -5126,15 +5117,20 @@ class AudioResource {
     }
 
     pause() {
-        this.audio.pause();
+        this.lastAction = 'pause';
+        if (this.lastAction === 'play') {
+            this.audio.pause();
+        }
     }
 
     reset() {
-        this.audio.load();
+        if (this.lastAction !== 'load') {
+            this.audio.load();
+        }
     }
 
     isPlaying() {
-        return !(this.audio.ended || this.audio.paused);
+        return !(this.audio.ended || this.lastAction === 'pause');
     }
 
     isLooping() {
