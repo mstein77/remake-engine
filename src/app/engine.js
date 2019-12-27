@@ -2120,7 +2120,6 @@ class BufferedTilesPane {
     }
 
     switchBuffer() {
-
         this.scrollPos.x -= this.tileMoveVector.x * this.tilesMap.tileSize;
         this.scrollPos.y -= this.tileMoveVector.y * this.tilesMap.tileSize;
 
@@ -5073,12 +5072,14 @@ class AudioPlayer {
         if (channel !== null && !channel.isPlaying()) {
             channel.play();
         }
-
     }
 
     resetChannel(id) {
-        this.pauseChannel(id);
-        this.channels[id] = null;
+        const channel = this.channels[id];
+        if (channel !== null) {
+            channel.reset();
+            channel.pause();
+        }
     }
 
     resetChannels() {
