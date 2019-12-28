@@ -1878,7 +1878,7 @@ class BufferedTilesPane {
         return result;
     }
 
-    getTilesInYLine(x, y1, y2, dbg = false) {
+    getTilesInYLine(x, y1, y2) {
         const origin = {
             x: this.mapTilePos.x + this.canvasTileOffset.x,
             y: this.mapTilePos.y + this.canvasTileOffset.y
@@ -1898,7 +1898,6 @@ class BufferedTilesPane {
         const mapX = origin.x + relPos.x;
         const start = origin.y + relPos.y1;
         const end = origin.y + relPos.y2;
-//        if (dbg && mapX >= 28) console.log('player MAP-X', x, relPos.x, mapX, this.scrollPos, this.mapTilePos);
         const lineTiles = this.tilesMap.getTilesAtYLine(mapX, start, end);
         const result = [];
         let i = 0;
@@ -4201,8 +4200,6 @@ class SpriteAndTilesCollider {
         const result = {};
         const pos = this.spritePane.getSpritePos(this.spriteId);
 
-        const oPos = pos.x;
-
         pos.x += this.spriteOffset.x;
         pos.y += this.spriteOffset.y;
 
@@ -4212,8 +4209,6 @@ class SpriteAndTilesCollider {
             const collide = this.collides[collideId];
             const obj = {};
 
-            let dbg = false && collide.dir === 'right' && pos.id === 'player';
-            //if (dbg) console.log('Sprite-Pos', oPos + ' - ' +  (oPos + pos.dim.y - 1), ' [' + pos.y + ' - ' +  (pos.y + pos.dim.y - 1)  + ']');
             if (collide.dir !== 'center') {
                 let dist = collide.lookahead;
                 let first = 0; //
@@ -4238,12 +4233,9 @@ class SpriteAndTilesCollider {
                 const dStart = pos[axis] + collide.margin.start;
                 const dEnd = pos[axis] + pos.dim[axis] - 1 - collide.margin.end - 1;
 
-
                 let tiles = axis === 'x' ?
                     this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
-                    this.tilesPane.getTilesInYLine(first, dStart, dEnd, dbg);
-
-                //if (dbg) console.log('COLLIDE LINE', pos[axis], collide.margin.dir, ' => ',  first, dStart, dEnd);
+                    this.tilesPane.getTilesInYLine(first, dStart, dEnd);
 
                 for(let tile of tiles) {
                     // auf der line liegen block-tiles, d.h. wir haben hier ein Collision und damit
@@ -4253,29 +4245,11 @@ class SpriteAndTilesCollider {
                         break;
                     }
                 }
-//                if (dbg && first >= 208) console.log('TILES', first, dStart, dEnd, tiles);
                 if (dist > 0) {
                     // auf der line liegen keine block-tiles und die dist ist noch gleich dem lookahead
-                    const posTileDist = first % this.tileSize;
+                    const posTileDist = (first + this.tilesPane.scrollPos[oppAxis]) % this.tileSize;
                     const remBlock = (dir === 1 ? posTileDist + 1 :
                         (this.tileSize - posTileDist)) - collide.lookahead;
-
-                    // first % this.tileSize => die Anzahl der Pixel wie weit die SpritePos von dem
-                    //   Tile-TL entfernt liegt
-                    // (this.tileSize - (first % this.tileSize)) => die Anzahl der Pixel, bis zum
-                    // nächsten Tile-TL
-
-                    /*
-                        Pos:  0 => dist = 16
-                        Pos:  1 => dist = 15
-                        ..
-                        Pos: 15 => dist = 1
-
-                        208 / 16 => 13
-                        208 % 16 => 0
-
-                        16 - 2 => 14
-                     */
 
                     if (remBlock < 0) {
                         const newFirst = first - dir * this.tileSize;
@@ -4285,15 +4259,12 @@ class SpriteAndTilesCollider {
                         for (let tile of tiles) {
                             if (collide.check(tile)) {
                                 dist = collide.lookahead + remBlock;
-                                if (dbg) console.log('DIST!', dist, collide.dir, pos[oppAxis], newFirst, '(' + collide.margin.dir + ')', remBlock);
                                 break;
                             }
                         }
                     }
-                    if (dbg && dist === 4) console.log('HERE!', dir, remBlock, posTileDist, first, pos[oppAxis]);
                 }
                 obj.dist = dist;
-                if (dbg && dist === 0) console.log('TOUCH!', collide.dir, pos[oppAxis]);
 
                 if (dist === 0 && collide.saveContacts) {
                     obj.tiles = tiles;
