@@ -2042,46 +2042,46 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const marioCollider = new SpriteAndTilesCollider('player', spritePane, tilesPane, {
                 ceiling: {
                     dir: 'up',
-                    lookahead: 4,
+                    lookahead: 5,
                     saveContacts: true,
                     check: function (tile) {
                         return (tile.obj !== null && (tile.obj.block || tile.obj.hitEvent !== undefined))
                     },
                     margin: {
-                        start: 2,
+                        start: 3,
                         end: 2,
                         dir: 2
                     }
                 },
                 floor: {
                     dir: 'down',
-                    lookahead: 4,
+                    lookahead: 5,
                     saveContacts: true,
                     check: collideCheck,
                     margin: {
-                        dir: -1,
-                        start: 2,
+                        dir: 0,
+                        start: 3,
                         end: 2
                     }
                 },
                 left: {
                     dir: 'left',
                     check: collideCheck,
-                    lookahead: 4,
+                    lookahead: 5,
                     margin: {
-                        dir: 0,
+                        dir: 2,
                         start: 3,
-                        end: 1
+                        end: 0
                     }
                 },
                 right: {
                     dir: 'right',
                     check: collideCheck,
-                    lookahead: 4,
+                    lookahead: 5,
                     margin: {
-                        dir: 1,
+                        dir: 2,
                         start: 3,
-                        end: 1
+                        end: 0
                     }
                 },
                 center: {
@@ -3403,13 +3403,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                                                 tile
                                             });
                                     }
-                                } else if (tile.obj.hitEvent !== undefined && tile.touch <= 3) {
+                                } else if (tile.obj.hitEvent !== undefined && tile.touch <= 5) {
                                     softHit = (i === 0 ? 1 : -1) * tile.touch;
                                 }
                                 i++;
                             }
 
-                            if ((fullHit === null) && (softHit !== null)) {
+                            if ((fullHit === null) && (softHit !== null) && (currAcc + Math.abs(softHit)) < 3.3) {
                                 forceMoveX = softHit;
                                 continue;
                             }

@@ -383,7 +383,9 @@ class Game {
         this.running = value;
         if (value) {
             this.resetFps();
+            this.audio.continue();
         } else {
+            this.audio.resetChannels();
             this.addTimerDuration('game');
         }
     }
