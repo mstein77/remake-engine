@@ -144,7 +144,6 @@ class Game {
     }
 
     gotoScreen(screenId, params = {}) {
-        this.log('gotoScreen', screenId);
         this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.frameEvents = {};
@@ -154,7 +153,6 @@ class Game {
         const callback = screen.init(this.globals);
         this.build = callback.bind(this);
     }
-
 
     stopAllAudio() {
         for (let audio of this.audioPlaying) {
@@ -195,12 +193,10 @@ class Game {
         console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
 
         function extractEditablesFromAreas(areas, editables) {
-            console.log('----', areas);
             if (!Array.isArray(areas)) {
                 return;
             }
             for (let area of areas) {
-                console.log('AREA', area);
                 if (area.panes !== undefined) {
                     for (let pane of area.panes) {
 
@@ -225,9 +221,7 @@ class Game {
             this.getDomElem('game').style.display = 'none';
             const cssId = 'editorCss';
             if (!document.getElementById(cssId)) {
-                console.log('CSS...');
                 const head  = document.getElementsByTagName('head')[0];
-                console.log(head);
                 const link  = document.createElement('link');
                 link.id   = cssId;
                 link.rel  = 'stylesheet';
@@ -4327,7 +4321,17 @@ class TilesMap {
             throw Error('Map cannot be empty!');
         }
 
-        this.map = [];
+        this.map = this.getMapClone(map);
+        this.mapTiles.x = this.map[0].length;
+        this.mapTiles.y = this.map.length;
+    }
+
+    getMap() {
+        return this.getMapClone(this.map);
+    }
+
+    getMapClone(map) {
+        const clone = [];
         for (let row of map) {
             const mapRow = [];
             for (let item of row) {
@@ -4344,10 +4348,9 @@ class TilesMap {
                     mapRow.push(item);
                 }
             }
-            this.map.push(mapRow);
+            clone.push(mapRow);
         }
-        this.mapTiles.x = this.map[0].length;
-        this.mapTiles.y = this.map.length;
+        return clone;
     }
 
     getTileObj(x, y) {
@@ -5144,9 +5147,10 @@ class ImageResource {
 
 class ObjectController {
 
-    constructor(spritePane) {
+    constructor(spritePane, eventType = 'object') {
         this.spritePane = spritePane;
         this.uid = 0;
+        this.eventType = eventType;
         this.activeObjects = [];
         this.classes = {};
         this.removeMargin = {
@@ -5247,7 +5251,7 @@ class ObjectController {
 
     handleObjects(onlyClasses = null) {
         while (true) {
-            const event = Game.instance.getNextEvent('object');
+            const event = Game.instance.getNextEvent(this.eventType);
             if (event === null) {
                 break;
             }
@@ -5617,7 +5621,6 @@ class Gravity {
             return [];
         }
         this.reset();
-        console.log('START', 'Speed=',  this.v0, 'Gravity=', this.gravity);
         const result = [];
         let i = 0;
         while (true) {
