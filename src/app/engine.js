@@ -1211,6 +1211,15 @@ class TextPane {
         return this.container;
     }
 
+    getTextBlockIds() {
+        return Object.keys(this.blocks);
+    }
+
+    removeTextBlock(id) {
+        delete this.blocks[id];
+        this.dirty = true;
+    }
+
     drawTextBlockToCtx(ctx, block) {
         let parts = block.text.split("\n");
         let y = 0;
@@ -2820,8 +2829,7 @@ class SpritePane {
 
     attachSpriteTo(id, attach) {
         const sprites = this.getSpritesById(id);
-        for (let spriteId of sprites) {
-            const sprite = this.getSprite(spriteId);
+        for (let sprite of sprites) {
             sprite.attached = attach;
         }
     }
@@ -4192,7 +4200,7 @@ class SpriteAndTilesCollider {
         return lines;
     }
 
-    getCollides(collideIds) {
+    getCollides(collideIds, obstacleSprites = []) {
         const result = {};
         const pos = this.spritePane.getSpritePos(this.spriteId);
 
@@ -4232,6 +4240,35 @@ class SpriteAndTilesCollider {
                 let tiles = axis === 'x' ?
                     this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
                     this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                let obstDist = collide.lookahead;
+                obj.obstacles = [];
+                for (let sprite of obstacleSprites) {
+                    const obstPos = this.spritePane.getSpritePos(sprite);
+                    obstPos.x += this.spriteOffset.x;
+                    obstPos.y += this.spriteOffset.y;
+
+                    if (this.spritePane.isAxisCollide(dStart, dEnd, obstPos[axis], obstPos[axis] + obstPos.dim[axis] - 1)) {
+                        let dist = collide.lookahead;
+                        switch (collide.dir) {
+                            case 'down':
+                            case 'right':
+                                dist = obstPos[oppAxis] - first;
+                                break;
+
+                            case 'up':
+                            case 'left':
+                                dist = first - (obstPos[oppAxis] + obstPos.dim[oppAxis] - 1);
+                                break;
+
+                        }
+                        if (dist >= -1 && dist <= obstDist) {
+                            obstDist = Math.max(dist, 0);
+                            if (obstDist === 0) {
+                                obj.obstacles.push(sprite);
+                            }
+                        }
+                    }
+                }
 
                 for(let tile of tiles) {
                     // auf der line liegen block-tiles, d.h. wir haben hier ein Collision und damit
@@ -4242,29 +4279,47 @@ class SpriteAndTilesCollider {
                     }
                 }
                 if (dist > 0) {
-                    // auf der line liegen keine block-tiles und die dist ist noch gleich dem lookahead
-                    const posTileDist = (first + this.tilesPane.scrollPos[oppAxis]) % this.tileSize;
-                    const remBlock = (dir === 1 ? posTileDist + 1 :
-                        (this.tileSize - posTileDist)) - collide.lookahead;
+                    const pos = first + this.tilesPane.scrollPos[oppAxis];
+                    let blockDist;
+                    if (dir === -1) {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                this.tileSize - 1 - (pos % this.tileSize) + 1 :
+                                Math.min(Math.abs(pos) - 1 + 1)
+                        );
+                    } else {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                pos % this.tileSize + 1:
+                                this.tileSize - Math.abs(pos % this.tileSize) + 1
+                        );
+                    }
 
-                    if (remBlock < 0) {
+                    if (blockDist < collide.lookahead) {
                         const newFirst = first - dir * this.tileSize;
-                        tiles = axis === 'x' ?
+                        const tiles = axis === 'x' ?
                             this.tilesPane.getTilesInXLine(newFirst, dStart, dEnd) :
                             this.tilesPane.getTilesInYLine(newFirst, dStart, dEnd);
                         for (let tile of tiles) {
                             if (collide.check(tile)) {
-                                dist = collide.lookahead + remBlock;
+                                dist = blockDist;
                                 break;
                             }
                         }
                     }
                 }
-                obj.dist = dist;
 
                 if (dist === 0 && collide.saveContacts) {
                     obj.tiles = tiles;
                 }
+
+                obj.dist = Math.min(dist, obstDist);
+                if (obj.dist === 0 && obj.tiles === undefined) {
+                    obj.tiles = [];
+                }
+
             } else {
                 const tiles = this.tilesPane.getTilesInRect(
                     pos.x + collide.margin.left,
@@ -5179,6 +5234,26 @@ class ObjectController {
             }
         }
         return null;
+    }
+
+    getSpriteIdsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result = result.concat(obj.sprites);
+            }
+        }
+        return result;
+    }
+
+    getObjectsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result.push(obj);
+            }
+        }
+        return result;
     }
 
     getObjectIdFromIdParts(idParts, obj) {
