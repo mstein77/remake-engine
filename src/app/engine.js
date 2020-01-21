@@ -4261,11 +4261,13 @@ class SpriteAndTilesCollider {
                                 break;
 
                         }
-                        if (dist >= -1 && dist <= obstDist) {
-                            obstDist = Math.max(dist, 0);
-                            if (obstDist === 0) {
+                        if (dist > -collide.lookahead && dist <= obstDist) {
+                            if (dist <= 0 && obstDist >= dist) {
                                 obj.obstacles.push(sprite);
+                            } else {
+                                obj.obstacles = [];
                             }
+                            obstDist = dist;
                         }
                     }
                 }
@@ -4316,7 +4318,7 @@ class SpriteAndTilesCollider {
                 }
 
                 obj.dist = Math.min(dist, obstDist);
-                if (obj.dist === 0 && obj.tiles === undefined) {
+                if (obj.dist <= 0 && obj.tiles === undefined) {
                     obj.tiles = [];
                 }
 
@@ -4363,10 +4365,16 @@ class TilesMap {
             y: 0
         };
         this.tiles = tiles;
+        this.animations = {};
         this.animatedIndices = [];
-        this.players = {};
         this.defaultTile = defaultTile;
     }
+
+    addAnimation(id, animation) {
+        const player = new BitmapPlayer();
+        player.loadAnimation(animation.frames, animation.end, animation.dir);
+        this.animations[id] = player;
+    };
 
     setMap(map) {
         if (!Array.isArray(map)) {
@@ -4494,22 +4502,17 @@ class TilesMap {
         if (tile.animation === undefined) {
             return tile.index;
         }
-        if (tile.animation.synchronous === true) {
-            if (this.players[tile.index] === undefined) {
-                const player = new BitmapPlayer();
-                player.loadAnimation(tile.animation.frames, tile.animation.end, tile.animation.dir);
-                this.players[tile.index] = player;
-                this.animatedIndices.push(tile.index);
-            }
-            const frame = this.players[tile.index].getFrame();
-            return frame.id;
+        const frame = this.animations[tile.animation].getFrame();
+        if (tile.isRegistered !== true) {
+            this.animatedIndices.push(tile.index);
+            tile.isRegistered = true;
         }
-        throw Error('NOT YET IMPLEMENTED');
+        return frame.id;
     }
 
     updateFrames() {
-        for (let index in this.players) {
-            this.players[index].nextStep();
+        for (let index in this.animations) {
+            this.animations[index].nextStep();
         }
     }
 
@@ -4758,6 +4761,14 @@ class PlayerProxy {
     }
 }
 
+
+/**
+ * TODO: setSync(null|frameState)
+ *
+ *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
+ *   addStep(value) -> führt diesen auf frameState aus
+ *
+ */
 class BitmapPlayer {
 
     constructor() {
@@ -4834,8 +4845,11 @@ class BitmapPlayer {
                     } else if (this.end === ANIMATION.END.LOOP) {
                         if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
                             this.isForward = false;
+                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                            this.isForward = true;
+                            this.frameNo = 0;
                         } else {
-                            this.frameNo = this.frames.length - 1;
+                            this.frameNo =  this.frames.length - 1;
                         }
                     } else {
                         this.state = ANIMATION.STATE.DONE;
@@ -5734,11 +5748,13 @@ class AxisPath {
 
     addAbsolutePoint(point) {
         this.points.push(point);
+        return this;
     }
 
     addRelativePoint(point) {
         const lastPoint = this.getLastPoint();
         this.points.push(lastPoint + point);
+        return this;
     }
 
     addRelativePoints(points) {
@@ -5825,6 +5841,15 @@ class AxisPath {
         return this;
     }
 
+    applyFactor(factor) {
+        const points = [];
+        for (let point of this.points) {
+            points.push(point * factor);
+        }
+        this.points = points;
+        return this;
+    }
+
     getCount() {
         return this.points.length;
     }
@@ -5881,7 +5906,19 @@ class AxisPath {
     }
 
     backwardFrom(from, steps = 1) {
-        // TODO implement
+        if (from <= 0) {
+            return null;
+        }
+        const fromPos = this.points[from];
+        while (steps > 0) {
+            if (from > 0) {
+                from--;
+            } else {
+                return null;
+            }
+            steps--;
+        }
+        return this.points[from] - fromPos;
     }
 
     rewind() {
