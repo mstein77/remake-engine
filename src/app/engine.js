@@ -144,7 +144,6 @@ class Game {
     }
 
     gotoScreen(screenId, params = {}) {
-        this.log('gotoScreen', screenId);
         this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.frameEvents = {};
@@ -154,7 +153,6 @@ class Game {
         const callback = screen.init(this.globals);
         this.build = callback.bind(this);
     }
-
 
     stopAllAudio() {
         for (let audio of this.audioPlaying) {
@@ -195,12 +193,10 @@ class Game {
         console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
 
         function extractEditablesFromAreas(areas, editables) {
-            console.log('----', areas);
             if (!Array.isArray(areas)) {
                 return;
             }
             for (let area of areas) {
-                console.log('AREA', area);
                 if (area.panes !== undefined) {
                     for (let pane of area.panes) {
 
@@ -225,9 +221,7 @@ class Game {
             this.getDomElem('game').style.display = 'none';
             const cssId = 'editorCss';
             if (!document.getElementById(cssId)) {
-                console.log('CSS...');
                 const head  = document.getElementsByTagName('head')[0];
-                console.log(head);
                 const link  = document.createElement('link');
                 link.id   = cssId;
                 link.rel  = 'stylesheet';
@@ -1215,6 +1209,15 @@ class TextPane {
         };
         this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
         return this.container;
+    }
+
+    getTextBlockIds() {
+        return Object.keys(this.blocks);
+    }
+
+    removeTextBlock(id) {
+        delete this.blocks[id];
+        this.dirty = true;
     }
 
     drawTextBlockToCtx(ctx, block) {
@@ -2826,8 +2829,7 @@ class SpritePane {
 
     attachSpriteTo(id, attach) {
         const sprites = this.getSpritesById(id);
-        for (let spriteId of sprites) {
-            const sprite = this.getSprite(spriteId);
+        for (let sprite of sprites) {
             sprite.attached = attach;
         }
     }
@@ -4198,7 +4200,7 @@ class SpriteAndTilesCollider {
         return lines;
     }
 
-    getCollides(collideIds) {
+    getCollides(collideIds, obstacleSprites = []) {
         const result = {};
         const pos = this.spritePane.getSpritePos(this.spriteId);
 
@@ -4238,6 +4240,37 @@ class SpriteAndTilesCollider {
                 let tiles = axis === 'x' ?
                     this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
                     this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                let obstDist = collide.lookahead;
+                obj.obstacles = [];
+                for (let sprite of obstacleSprites) {
+                    const obstPos = this.spritePane.getSpritePos(sprite);
+                    obstPos.x += this.spriteOffset.x;
+                    obstPos.y += this.spriteOffset.y;
+
+                    if (this.spritePane.isAxisCollide(dStart, dEnd, obstPos[axis], obstPos[axis] + obstPos.dim[axis] - 1)) {
+                        let dist = collide.lookahead;
+                        switch (collide.dir) {
+                            case 'down':
+                            case 'right':
+                                dist = obstPos[oppAxis] - first;
+                                break;
+
+                            case 'up':
+                            case 'left':
+                                dist = first - (obstPos[oppAxis] + obstPos.dim[oppAxis] - 1);
+                                break;
+
+                        }
+                        if (dist > -collide.lookahead && dist <= obstDist) {
+                            if (dist <= 0 && obstDist >= dist) {
+                                obj.obstacles.push(sprite);
+                            } else {
+                                obj.obstacles = [];
+                            }
+                            obstDist = dist;
+                        }
+                    }
+                }
 
                 for(let tile of tiles) {
                     // auf der line liegen block-tiles, d.h. wir haben hier ein Collision und damit
@@ -4248,29 +4281,47 @@ class SpriteAndTilesCollider {
                     }
                 }
                 if (dist > 0) {
-                    // auf der line liegen keine block-tiles und die dist ist noch gleich dem lookahead
-                    const posTileDist = (first + this.tilesPane.scrollPos[oppAxis]) % this.tileSize;
-                    const remBlock = (dir === 1 ? posTileDist + 1 :
-                        (this.tileSize - posTileDist)) - collide.lookahead;
+                    const pos = first + this.tilesPane.scrollPos[oppAxis];
+                    let blockDist;
+                    if (dir === -1) {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                this.tileSize - 1 - (pos % this.tileSize) + 1 :
+                                Math.min(Math.abs(pos) - 1 + 1)
+                        );
+                    } else {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                pos % this.tileSize + 1:
+                                this.tileSize - Math.abs(pos % this.tileSize) + 1
+                        );
+                    }
 
-                    if (remBlock < 0) {
+                    if (blockDist < collide.lookahead) {
                         const newFirst = first - dir * this.tileSize;
-                        tiles = axis === 'x' ?
+                        const tiles = axis === 'x' ?
                             this.tilesPane.getTilesInXLine(newFirst, dStart, dEnd) :
                             this.tilesPane.getTilesInYLine(newFirst, dStart, dEnd);
                         for (let tile of tiles) {
                             if (collide.check(tile)) {
-                                dist = collide.lookahead + remBlock;
+                                dist = blockDist;
                                 break;
                             }
                         }
                     }
                 }
-                obj.dist = dist;
 
                 if (dist === 0 && collide.saveContacts) {
                     obj.tiles = tiles;
                 }
+
+                obj.dist = Math.min(dist, obstDist);
+                if (obj.dist <= 0 && obj.tiles === undefined) {
+                    obj.tiles = [];
+                }
+
             } else {
                 const tiles = this.tilesPane.getTilesInRect(
                     pos.x + collide.margin.left,
@@ -4314,10 +4365,16 @@ class TilesMap {
             y: 0
         };
         this.tiles = tiles;
+        this.animations = {};
         this.animatedIndices = [];
-        this.players = {};
         this.defaultTile = defaultTile;
     }
+
+    addAnimation(id, animation) {
+        const player = new BitmapPlayer();
+        player.loadAnimation(animation.frames, animation.end, animation.dir);
+        this.animations[id] = player;
+    };
 
     setMap(map) {
         if (!Array.isArray(map)) {
@@ -4327,7 +4384,17 @@ class TilesMap {
             throw Error('Map cannot be empty!');
         }
 
-        this.map = [];
+        this.map = this.getMapClone(map);
+        this.mapTiles.x = this.map[0].length;
+        this.mapTiles.y = this.map.length;
+    }
+
+    getMap() {
+        return this.getMapClone(this.map);
+    }
+
+    getMapClone(map) {
+        const clone = [];
         for (let row of map) {
             const mapRow = [];
             for (let item of row) {
@@ -4344,10 +4411,9 @@ class TilesMap {
                     mapRow.push(item);
                 }
             }
-            this.map.push(mapRow);
+            clone.push(mapRow);
         }
-        this.mapTiles.x = this.map[0].length;
-        this.mapTiles.y = this.map.length;
+        return clone;
     }
 
     getTileObj(x, y) {
@@ -4436,22 +4502,17 @@ class TilesMap {
         if (tile.animation === undefined) {
             return tile.index;
         }
-        if (tile.animation.synchronous === true) {
-            if (this.players[tile.index] === undefined) {
-                const player = new BitmapPlayer();
-                player.loadAnimation(tile.animation.frames, tile.animation.end, tile.animation.dir);
-                this.players[tile.index] = player;
-                this.animatedIndices.push(tile.index);
-            }
-            const frame = this.players[tile.index].getFrame();
-            return frame.id;
+        const frame = this.animations[tile.animation].getFrame();
+        if (tile.isRegistered !== true) {
+            this.animatedIndices.push(tile.index);
+            tile.isRegistered = true;
         }
-        throw Error('NOT YET IMPLEMENTED');
+        return frame.id;
     }
 
     updateFrames() {
-        for (let index in this.players) {
-            this.players[index].nextStep();
+        for (let index in this.animations) {
+            this.animations[index].nextStep();
         }
     }
 
@@ -4700,6 +4761,14 @@ class PlayerProxy {
     }
 }
 
+
+/**
+ * TODO: setSync(null|frameState)
+ *
+ *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
+ *   addStep(value) -> führt diesen auf frameState aus
+ *
+ */
 class BitmapPlayer {
 
     constructor() {
@@ -4776,8 +4845,11 @@ class BitmapPlayer {
                     } else if (this.end === ANIMATION.END.LOOP) {
                         if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
                             this.isForward = false;
+                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                            this.isForward = true;
+                            this.frameNo = 0;
                         } else {
-                            this.frameNo = this.frames.length - 1;
+                            this.frameNo =  this.frames.length - 1;
                         }
                     } else {
                         this.state = ANIMATION.STATE.DONE;
@@ -5144,9 +5216,10 @@ class ImageResource {
 
 class ObjectController {
 
-    constructor(spritePane) {
+    constructor(spritePane, eventType = 'object') {
         this.spritePane = spritePane;
         this.uid = 0;
+        this.eventType = eventType;
         this.activeObjects = [];
         this.classes = {};
         this.removeMargin = {
@@ -5175,6 +5248,26 @@ class ObjectController {
             }
         }
         return null;
+    }
+
+    getSpriteIdsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result = result.concat(obj.sprites);
+            }
+        }
+        return result;
+    }
+
+    getObjectsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result.push(obj);
+            }
+        }
+        return result;
     }
 
     getObjectIdFromIdParts(idParts, obj) {
@@ -5247,7 +5340,7 @@ class ObjectController {
 
     handleObjects(onlyClasses = null) {
         while (true) {
-            const event = Game.instance.getNextEvent('object');
+            const event = Game.instance.getNextEvent(this.eventType);
             if (event === null) {
                 break;
             }
@@ -5617,7 +5710,6 @@ class Gravity {
             return [];
         }
         this.reset();
-        console.log('START', 'Speed=',  this.v0, 'Gravity=', this.gravity);
         const result = [];
         let i = 0;
         while (true) {
@@ -5656,11 +5748,13 @@ class AxisPath {
 
     addAbsolutePoint(point) {
         this.points.push(point);
+        return this;
     }
 
     addRelativePoint(point) {
         const lastPoint = this.getLastPoint();
         this.points.push(lastPoint + point);
+        return this;
     }
 
     addRelativePoints(points) {
@@ -5747,6 +5841,15 @@ class AxisPath {
         return this;
     }
 
+    applyFactor(factor) {
+        const points = [];
+        for (let point of this.points) {
+            points.push(point * factor);
+        }
+        this.points = points;
+        return this;
+    }
+
     getCount() {
         return this.points.length;
     }
@@ -5803,7 +5906,19 @@ class AxisPath {
     }
 
     backwardFrom(from, steps = 1) {
-        // TODO implement
+        if (from <= 0) {
+            return null;
+        }
+        const fromPos = this.points[from];
+        while (steps > 0) {
+            if (from > 0) {
+                from--;
+            } else {
+                return null;
+            }
+            steps--;
+        }
+        return this.points[from] - fromPos;
     }
 
     rewind() {

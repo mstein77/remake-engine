@@ -3,12 +3,312 @@ import React from "react";
 import ReactDOM from "react-dom";
 import App from "./components/App.js";
 
+class TileCellProvider {
+
+    constructor(tilesPane) {
+        this.tilesPane = tilesPane;
+        this.dim = tilesPane.tilesMap.tileSize;
+        this.index = null;
+    }
+
+    getCellSize() {
+        return 1;
+    }
+
+    getColumns() {
+        return this.dim;
+    }
+
+    getRows() {
+        return this.dim;
+    }
+
+    setIndex(index) {
+        this.index = index;
+    }
+
+    isFixed() {
+        return true;
+    }
+
+    getCellImageData(x, y, context) {
+        if (x >= this.getColumns()) {
+            return null;
+        }
+        if (y >= this.getRows()) {
+            return null;
+        }
+        let index = 0;
+        if (this.index === null) {
+            return null;
+        }
+        const offX = this.index * this.dim + x;
+        return this.tilesPane.tilesMap.tilesImg.ctx.getImageData(offX, y, 1, 1);
+    }
+}
+
+class TilesIndexProvider {
+    constructor(tilesPane) {
+        this.tilesImg = tilesPane.tilesMap.tilesImg;
+        this.dim = tilesPane.tilesMap.tileSize;
+        this.maxIndex = this.tilesImg.width / this.dim - 1;
+        this.wrap = null;
+    }
+
+    isFixed() {
+        return true;
+    }
+
+    getCellSize() {
+        return this.dim;
+    }
+
+    setWrap(value) {
+        this.wrap = value;
+    }
+
+    getColumns() {
+        if (this.wrap !== null) {
+            return Math.min(this.wrap, this.maxIndex + 1);
+        }
+        return this.maxIndex + 1;
+    }
+
+    getRows() {
+        if (this.wrap !== null) {
+            return Math.ceil((this.maxIndex + 1)/this.wrap);
+        }
+        return 1;
+    }
+
+    getWrappedIndex(x, y) {
+        const index = y * this.wrap + x;
+        if (index >= this.maxIndex) {
+            return null;
+        }
+        return index;
+    }
+
+    getCellInfo(x, y) {
+        if (this.wrap !== null) {
+            return this.getWrappedIndex(x, y);
+        }
+        if (y !== 0 || x >= this.maxIndex) {
+            return null;
+        }
+        return x;
+    }
+
+    getCellImageData(x, y) {
+        if (this.wrap !== null) {
+            const index = this.getWrappedIndex(x, y);
+            if (index === null) {
+                return null;
+            }
+            return this.tilesImg.ctx.getImageData(index * this.dim, 0, this.dim, this.dim);
+        }
+        if (y !== 0 || x >= this.maxIndex) {
+            return null;
+        }
+        return this.tilesImg.ctx.getImageData(x * this.dim, 0, this.dim, this.dim);
+    }
+}
+
+class TilesCellProvider {
+
+    constructor(tilesPane) {
+        this.tilesPane = tilesPane;
+        this.dim = tilesPane.tilesMap.tileSize;
+        this.map = tilesPane.tilesMap.getMap();
+        this.tiles = tilesPane.tilesMap.tiles;
+    }
+
+    isFixed() {
+        return false;
+    }
+
+    getCellSize() {
+        return this.dim;
+    }
+
+    getColumns() {
+        if (this.map.length === 0) {
+            return 0;
+        }
+        return this.map[0].length;
+    }
+
+    getRows(value) {
+        return this.map.length;
+    }
+
+    appendRows(value) {
+        for (let i = 0; i < Math.abs(value); i++) {
+            const row = [];
+            for (let j = 0; j < this.getColumns(); j++) {
+                row.push(0);
+            }
+            if (value < 0) {
+                this.map.unshift(row);
+            } else {
+                this.map.push(row);
+            }
+        }
+    }
+
+    deleteRows(value) {
+        for (let i = 0; i < Math.abs(value); i++) {
+            if (this.map.length <= 1) {
+                break;
+            }
+            this.map.splice(value < 0 ? 0 : this.map.length  - 1, 1);
+        }
+    }
+
+    appendColumns(value) {
+        for (let i = 0; i < Math.abs(value); i++) {
+            for (let j = 0; j < this.getRows(); j++) {
+                if (value < 0) {
+                    this.map[j].unshift(0);
+                } else {
+                    this.map[j].push(0);
+                }
+            }
+        }
+    }
+
+    deleteColumns(value) {
+        for (let i = 0; i < Math.abs(value); i++) {
+            if (this.map[0].length <= 1) {
+                break;
+            }
+            for (let j = 0; j < this.getRows(); j++) {
+                this.map[j].splice(value < 0 ? 0 : this.map[j].length  - 1, 1);
+            }
+        }
+    }
+
+    setCellValue(x, y, value) {
+        const oldValue = this.map[y][x];
+        if (Array.isArray(oldValue)) {
+            this.map[y][x][0] = value;
+        } else {
+            this.map[y][x] = value;
+        }
+    }
+
+    getCellInfo(x, y) {
+        return this.getTileObj(x, y);
+    }
+
+    getTileObj(x, y) {
+        if (x >= this.getColumns()) {
+            return null;
+        }
+        if (y >= this.getRows()) {
+            return null;
+        }
+        const obj = {
+            isAnimation: false
+        };
+        let tile = this.map[y][x];
+        if (Array.isArray(tile)) {
+            obj.events = [];
+            for (let i = 1; i < tile.length; i++) {
+                obj.events.push(tile[i]);
+            }
+            tile = tile[0];
+        } else if (typeof tile === 'string' || tile instanceof String) {
+            obj.alias = tile;
+        }
+        if (this.tiles[tile] !== undefined) {
+            const tileObj = this.tiles[tile];
+            if (tileObj.animation !== undefined) {
+                obj.isAnimation = true;
+                obj.index = tileObj.animation.frames[0].id;
+            } else {
+                obj.index = (tileObj.index !== undefined) ? tileObj.index : tile;
+            }
+        } else {
+            obj.index = tile;
+        }
+        return obj;
+    }
+
+    getCellImageData(x, y) {
+        if (x >= this.getColumns()) {
+            return null;
+        }
+        if (y >= this.getRows()) {
+            return null;
+        }
+        let tile = this.map[y][x];
+        if (Array.isArray(tile)) {
+            tile = tile[0];
+        }
+        if (this.tiles[tile] !== undefined) {
+            const obj = this.tiles[tile];
+            if (obj.animation !== undefined) {
+                tile = obj.animation.frames[0].id;
+            } else {
+                tile = (obj.index !== undefined) ? obj.index : tile;
+            }
+        }
+        return this.tilesPane.tilesMap.tilesImg.ctx.getImageData(tile * this.dim, 0, this.dim, this.dim);
+    }
+
+    exportCells() {
+        function getArrayString(values) {
+            const subValues = [];
+            for (let value of values) {
+                let subValue = null;
+                if (Array.isArray(value)) {
+                    subValue = getArrayString(value)
+                } else if (typeof value === 'string' || value instanceof String) {
+                    subValue = JSON.stringify(value);
+                } else {
+                    subValue = '' + value;
+                }
+                while(subValue.length < 3) {
+                    subValue = ' ' + subValue;
+                }
+                subValues.push(subValue);
+            }
+            return '[' + subValues.join(', ') + ']';
+        }
+
+        let result = '[\n';
+        for (let i of this.map) {
+            result += '    ' + getArrayString(i) + ',\n';
+        }
+        result += ']';
+
+        return result;
+    }
+}
+
+class Selection {
+    constructor() {
+        this.selected = null;
+    }
+
+    setSelected(value) {
+        this.selected = value;
+    }
+
+    getSelected() {
+        return this.selected;
+    }
+}
+
 class TilesMapEditor {
 
     constructor(game, editor, tilesPane) {
 
-        ReactDOM.render(<App />, document.getElementById("react-editor"));
+        const cellProvider = [new TilesCellProvider(tilesPane), new TileCellProvider(tilesPane), new TilesIndexProvider(tilesPane), new TileCellProvider(tilesPane)];
 
+        ReactDOM.render(<App cellProvider={cellProvider} />, document.getElementById("react-editor"));
+/*
         this.tilesPane = tilesPane;
         this.editor = editor;
         this.game = game;
@@ -148,7 +448,9 @@ class TilesMapEditor {
         const tileBrowser = game.getDomElem('tile_browser');
         tileBrowser.appendChild(tilesPane.tilesMap.tilesImg.elem);
 
+ */
     }
+
 }
 
 window.gameEditor = {

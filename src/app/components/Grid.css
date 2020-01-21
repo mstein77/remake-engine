@@ -1,0 +1,63 @@
+.Grid {
+    background-color: #6060F0;
+    padding: 5px;
+}
+
+.grid-table {
+    border: 3px solid #000000;
+}
+
+.grid-table > div {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.grid-table > div:first-child {
+    height: 20px;
+}
+
+.grid-table > div > div:first-child {
+    width: 30px;
+    flex-grow: 0;
+}
+
+.grid-table > div > div:nth-child(2) {
+    flex-grow: 1;
+    text-align: center;
+}
+
+.grid-table > div:nth-child(3) {
+    height: 20px;
+}
+
+.grid-border-right {
+    width: 30px;
+    flex-grow: 0;
+}
+
+.grid-slider-right {
+    flex-grow: 0;
+}
+
+.grid-table button {
+    width: 22px;
+}
+
+.grid-container {
+    position: relative;
+}
+
+.grid-overlay {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+
+.grid-canvas {
+}
+
+.grid-cell-marker {
+    position: absolute;
+    border: 4px solid rgba(255, 0, 0, 0.5);
+}
