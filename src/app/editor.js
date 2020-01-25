@@ -121,6 +121,7 @@ class TilesCellProvider {
         this.dim = tilesPane.tilesMap.tileSize;
         this.map = tilesPane.tilesMap.getMap();
         this.tiles = tilesPane.tilesMap.tiles;
+        this.animations = tilesPane.tilesMap.getAnimations();
     }
 
     isFixed() {
@@ -225,7 +226,7 @@ class TilesCellProvider {
             const tileObj = this.tiles[tile];
             if (tileObj.animation !== undefined) {
                 obj.isAnimation = true;
-                obj.index = tileObj.animation.frames[0].id;
+                obj.index = this.animations[tileObj.animation].getFrame().id;
             } else {
                 obj.index = (tileObj.index !== undefined) ? tileObj.index : tile;
             }
@@ -249,7 +250,7 @@ class TilesCellProvider {
         if (this.tiles[tile] !== undefined) {
             const obj = this.tiles[tile];
             if (obj.animation !== undefined) {
-                tile = obj.animation.frames[0].id;
+                tile = this.animations[obj.animation].getFrame().id;
             } else {
                 tile = (obj.index !== undefined) ? obj.index : tile;
             }

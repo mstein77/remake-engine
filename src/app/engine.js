@@ -2836,17 +2836,17 @@ class SpritePane {
 
     setSpritePos(id, x, y, z = null, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
+        if (xEnd) {
+            x -= sprite.dim.x - 1;
+        }
+        if (yEnd) {
+            y -= sprite.dim.y - 1;
+        }
         if (!this.dirty) {
             this.dirty = (sprite.x !== x || sprite.y !== y);
         }
         sprite.x = x;
-        if (xEnd) {
-            sprite.x -= sprite.dim.x - 1;
-        }
         sprite.y = y;
-        if (yEnd) {
-            sprite.y -= sprite.dim.y - 1;
-        }
         if (z !== null) {
             this.zOrdering = true;
             if (!this.dirty) {
@@ -2854,6 +2854,10 @@ class SpritePane {
             }
             sprite.z = z;
         }
+    }
+
+    setSpriteBottomPos(id, x, y, z = null) {
+        this.setSpritePos(id, x, y, z, false, true);
     }
 
     addGroup(id, spriteIds) {
@@ -3707,6 +3711,25 @@ class BitmapFilterer {
 const filterer = new BitmapFilterer();
 
 filterer.addFilter(
+    'clear-y',
+    FILTER.TYPE.CANVAS,
+    function(data, params) {
+        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
+        if (params.pixels > 0) {
+            newCanvas.ctx.clearRect(0, 0, data[3], params.pixels);
+        } else if (params.pixels < 0) {
+            params.pixels = Math.abs(params.pixels);
+            newCanvas.ctx.clearRect(0, data[4] - params.pixels, data[3], params.pixels);
+        }
+        return [newCanvas, 0, 0, data[3], data[4]];
+    },
+    [
+        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+    ]
+);
+
+filterer.addFilter(
     'flip-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
@@ -4375,6 +4398,10 @@ class TilesMap {
         player.loadAnimation(animation.frames, animation.end, animation.dir);
         this.animations[id] = player;
     };
+
+    getAnimations() {
+        return this.animations;
+    }
 
     setMap(map) {
         if (!Array.isArray(map)) {
@@ -5211,6 +5238,49 @@ class ImageResource {
 
     getImage() {
         return this.image;
+    }
+}
+
+class SceneController {
+    constructor(defaultState = {}) {
+        this.scenes = {};
+        this.playing = null;
+        this.defaultState = defaultState;
+    }
+
+    addScene(id, handler) {
+        this.scenes[id] = handler;
+    }
+
+    getLastState() {
+        return this.lastState;
+    }
+
+    play(id, state = {}) {
+        if (this.scenes[id] !== undefined) {
+            throw 'Unknown scene with id "' + id + '" given!';
+        }
+        this.playing = id;
+        this.state = Object.assign({
+            frame: 0
+        }, this.defaultState, state);
+    }
+
+    handleScene() {
+        if (this.playing === null) {
+            this.lastState = null;
+            return false;
+        }
+        this.lastState = this.state;
+        const playScene = this.playing;
+        if (!this.scenes[this.playing].handler(this.state)) {
+            if (playScene === this.playing) {
+                this.playing = null;
+            }
+        } else {
+            this.lastState.frame++;
+        }
+        return true;
     }
 }
 
