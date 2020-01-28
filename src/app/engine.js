@@ -1244,6 +1244,7 @@ class TextPane {
         const block = {x: posX, y: posY, filter: '', height, width, text, lineSpacing, canvas};
         this.drawTextBlockToCtx(canvas.ctx, block);
         this.blocks[id] = block;
+        this.dirty = true;
     }
 
     setTextBlockFilter(id, filter) {
@@ -1680,7 +1681,6 @@ class TilesPane {
 /**
  * TODO:
  *   - Filters
- *   * ObjectEvents
  *   - TileStates
  */
 class BufferedTilesPane {
@@ -1705,6 +1705,8 @@ class BufferedTilesPane {
             x: 0,
             y: 0
         };
+        this.eventBounds = {top: 0, bottom: 0, left: 0, right: 0};
+        this.scrollLock = false;
         this.dirty = true;
     }
 
@@ -2187,11 +2189,34 @@ class BufferedTilesPane {
         return qy * 3 + qx;
     }
 
+    setScrollLock(value) {
+        this.scrollLock = value;
+    }
+
     scrollBy(Sx, Sy) {
-        if (Math.max(this.maxSpeed, Math.abs(Sx), Math.abs(Sy)) > this.maxSpeed) {
-            throw Error('Unallowed scroll speed above ' + this.maxSpeed);
-        }
         const oldQuad = this.getCurrentQuadrant();
+
+        let exceedX = 0;
+        if (Math.max(this.maxSpeed, Math.abs(Sx)) > this.maxSpeed) {
+            exceedX = Math.abs(Sx) - this.maxSpeed;
+            if (Sx < 0) {
+                exceedX *= -1;
+                Sx = -this.maxSpeed;
+            } else {
+                Sx = this.maxSpeed;
+            }
+        }
+
+        let exceedY = 0;
+        if (Math.max(this.maxSpeed, Math.abs(Sy)) > this.maxSpeed) {
+            exceedY = Math.abs(Sy) - this.maxSpeed;
+            if (Sy < 0) {
+                exceedY *= -1;
+                Sy = -this.maxSpeed;
+            } else {
+                Sy = this.maxSpeed;
+            }
+        }
 
         const scrolled = {
             x: Sx,
@@ -2202,7 +2227,12 @@ class BufferedTilesPane {
             }
         };
 
-        if (this.viewPortTiles.x < this.tilesMap.mapTiles.x) {
+        // do we need scrolling in x-dir at all?
+        if (!this.scrollLock && this.viewPortTiles.x < this.tilesMap.mapTiles.x) {
+            if (Math.max(this.maxSpeed, Math.abs(Sx)) > this.maxSpeed) {
+                throw Error('Unallowed scroll speed ' + Sx + ' above ' + this.maxSpeed);
+            }
+
             this.scrollPos.x += Sx;
             if (this.scrollStop.left !== null) {
                 this.scrollPos.x = Math.max(this.scrollPos.x, this.scrollStop.left);
@@ -2217,7 +2247,10 @@ class BufferedTilesPane {
             }
         }
 
-        if (this.viewPortTiles.y < this.tilesMap.mapTiles.y) {
+        if (!this.scrollLock && this.viewPortTiles.y < this.tilesMap.mapTiles.y) {
+            if (Math.max(this.maxSpeed, Math.abs(Sy)) > this.maxSpeed) {
+                throw Error('Unallowed scroll speed ' + Sy + ' above ' + this.maxSpeed);
+            }
             this.scrollPos.y += Sy;
             if (this.scrollStop.top !== null) {
                 this.scrollPos.y = Math.max(this.scrollPos.y, this.scrollStop.top);
@@ -2237,6 +2270,9 @@ class BufferedTilesPane {
         scrolled.unscrolled.y -= this.scrollPos.y;
         scrolled.x -= scrolled.unscrolled.x;
         scrolled.y -= scrolled.unscrolled.y;
+
+        scrolled.unscrolled.x += exceedX;
+        scrolled.unscrolled.y += exceedY;
 
         if (scrolled.x === 0 && scrolled.y === 0) {
             this.isScrolling = false;
@@ -2286,6 +2322,10 @@ class BufferedTilesPane {
         return scrolled;
     }
 
+    setEventBounds(bounds) {
+        this.eventBounds = Object.assign(this.eventBounds, bounds);
+    }
+
     render() {
         const target = this.buffers.getBufferCtx();
         let all = false;
@@ -2324,7 +2364,11 @@ class BufferedTilesPane {
         const oldPos = this.oldPos;
 
         if (all) {
-            this.tilesMap.triggerEventsInRect(newPos.start.x, newPos.start.y, newPos.end.x - newPos.start.x + 1, newPos.end.y - newPos.start.y + 1);
+            const startX = newPos.start.x - this.eventBounds.left;
+            const endX =  newPos.end.x + this.eventBounds.right;
+            const startY = newPos.start.y - this.eventBounds.top;
+            const endY = newPos.end.y + this.eventBounds.bottom;
+            this.tilesMap.triggerEventsInRect(startX, startY, endX - startX + 1, endY - startY + 1);
         } else if (oldPos.start.x !== newPos.start.x || oldPos.start.y !== newPos.start.y ||
             oldPos.end.x !== newPos.end.x || oldPos.end.y !== newPos.end.y) {
             const relStart = {
@@ -2339,21 +2383,21 @@ class BufferedTilesPane {
             const columns = [];
             if (relEnd.x > 0) {
                 for (let i = 1; i <= relEnd.x; i++) {
-                    columns.push(oldPos.end.x + i);
+                    columns.push(oldPos.end.x + i + this.eventBounds.right);
                 }
             } else if (relEnd.x < 0) {
                 for (let i = 1; i <= -relEnd.x; i++) {
-                    columns.push(oldPos.start.x - i);
+                    columns.push(oldPos.start.x - i - this.eventBounds.left);
                 }
             }
             const rows = [];
             if (relEnd.y > 0) {
                 for (let i = 1; i <= relEnd.y; i++) {
-                    rows.push(oldPos.end.y + i);
+                    rows.push(oldPos.end.y + i + this.eventBounds.bottom);
                 }
             } else if (relEnd.x < 0) {
                 for (let i = 1; i <= -relEnd.y; i++) {
-                    rows.push(newPos.start.y - i);
+                    rows.push(newPos.start.y - i - this.eventBounds.top);
                 }
             }
             // @TODO much rework and optimization needed here
@@ -3395,12 +3439,12 @@ class MasterSlavesScrollHandler {
     }
 }
 
-
 class BoundsScrollHandler {
 
     constructor(spritePane, scroller, boundsSize, maxOut = {}) {
         this.spritePane = spritePane;
         this.scroller = scroller;
+        this.usePushback = false;
         const bounds = {
             left: null,
             right: null,
@@ -3431,6 +3475,10 @@ class BoundsScrollHandler {
         this.bounds = bounds;
     }
 
+    setUsePushback(value) {
+        this.usePushback = value === true;
+    }
+
     setMaxOut(maxOut) {
         this.maxOut = Object.assign(this.maxOut, maxOut);
     }
@@ -3445,24 +3493,38 @@ class BoundsScrollHandler {
         let move = false;
         let scrollX = 0;
         if (moveX !== 0) {
+            // let's assume there is no scroll problem
             let pos = sprite.x + moveX;
+            // the minimal position of the player sprite on the left
             const min = -this.maxOut.left;
             if (this.bounds.left === null) {
+                // no scrollbound on left side
                 if (pos < min) {
+                    // player pos below allowed minimum => set to minimum
                     pos = min;
                 }
             } else if (pos < this.bounds.left) {
-                // new position is left of scrollbounds
-                if (sprite.x >= this.bounds.left) {
-                    scrollX = -Math.abs(this.bounds.left - pos);
-                    pos = this.bounds.left;
-                } else if (pos < min) {
-                    pos = min;
+                if (this.usePushback) {
+                    if (pos < min) {
+                        pos = min;
+                    }
+                    scrollX = -Math.abs(Math.min(this.bounds.left, sprite.x) - pos);
+                } else {
+                    // new position is left of scrollbounds
+                    if (sprite.x >= this.bounds.left) {
+                        scrollX = -Math.abs(this.bounds.left - pos);
+                        pos = this.bounds.left;
+                    } else if (pos < min) {
+                        // player pos below allowed minimum => set to minimum
+                        pos = min;
+                    }
+
                 }
             }
 
             const max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x + this.maxOut.right;
             const rightScrollBound = (this.bounds.right === null) ? null : max - this.bounds.right;
+
             if (rightScrollBound === null) {
                 if (pos > max) {
                     pos = max;
@@ -3474,11 +3536,18 @@ class BoundsScrollHandler {
                 }
                 scrollX = moveX;
             } else if (pos > rightScrollBound) {
-                if (sprite.x <= rightScrollBound) {
+                if (this.usePushback) {
+                    if (pos > max) {
+                        pos = max;
+                    }
                     scrollX = Math.abs(pos - rightScrollBound);
-                    pos = rightScrollBound;
-                } else if (pos > max) {
-                    pos = max;
+                } else {
+                    if (sprite.x <= rightScrollBound) {
+                        scrollX = Math.abs(pos - rightScrollBound);
+                        pos = rightScrollBound;
+                    } else if (pos > max) {
+                        pos = max;
+                    }
                 }
             }
             sprite.x = pos;
@@ -3519,14 +3588,32 @@ class BoundsScrollHandler {
             move = true;
         }
 
-        const unscrolled = this.scroller.scrollBy(scrollX, scrollY).unscrolled;
-        if (unscrolled.x !== 0) {
-            sprite.x += unscrolled.x;
+        const scrolled = this.scroller.scrollBy(scrollX, scrollY);
+        if (this.usePushback) {
             move = true;
-        }
-        if (unscrolled.y !== 0) {
-            sprite.y += unscrolled.y;
-            move = true;
+            if (scrollX < 0) {
+                sprite.x += scrolled.x;
+            } else if (scrollX > 0) {
+                sprite.x -= scrolled.x;
+            }
+
+            if (scrollY < 0) {
+                sprite.y += scrolled.y;
+            } else if (scrollY > 0) {
+                sprite.y -= scrolled.y;
+            }
+
+            move = (scrollY !== 0 || scrollX !== 0);
+        } else {
+            const unscrolled = scrolled.unscrolled;
+            if (unscrolled.x !== 0) {
+                sprite.x += unscrolled.x;
+                move = true;
+            }
+            if (unscrolled.y !== 0) {
+                sprite.y += unscrolled.y;
+                move = true;
+            }
         }
 
         if (move) {
@@ -4498,8 +4585,10 @@ class TilesMap {
     }
 
     triggerEventsInRect(x1, y1, width = 1, height = 1) {
-        const x2 = x1 + width;
-        const y2 = y1 + height;
+        x1 = Math.max(x1, 0);
+        y1 = Math.max(y1, 0);
+        const x2 = Math.min(x1 + width, this.map[0].length);
+        const y2 = Math.min(y1 + height, this.map.length);
         for (let y = y1; y < y2; y++) {
             for (let x = x1; x < x2; x++) {
                 let tile = this.map[y][x];
@@ -5142,7 +5231,7 @@ class AudioPlayer {
             channel.defaultPlaybackRate = speed;
         }
         if (channel !== null && !channel.isPlaying()) {
-            channel.play();
+            channel.continue();
         }
     }
 
@@ -5173,7 +5262,7 @@ class AudioResource {
 
     play(volume = 1, restart = true) {
         if (restart && this.isPlaying()) {
-            this.reset();
+            this.rewind();
         }
         this.audio.volume = volume;
         this.lastAction = 'load';
@@ -5186,21 +5275,30 @@ class AudioResource {
         });
     }
 
+    continue() {
+        if (this.lastAction === 'pause') {
+            this.lastAction = 'play';
+            this.play(1, false);
+        }
+    }
+
+    rewind() {
+        this.audio.currentTime = 0;
+    }
+
     setLoop(value) {
         this.audio.loop = value;
     }
 
     pause() {
-        this.lastAction = 'pause';
         if (this.lastAction === 'play') {
             this.audio.pause();
         }
+        this.lastAction = 'pause';
     }
 
     reset() {
-        if (this.lastAction !== 'load') {
-            this.audio.load();
-        }
+        this.rewind();
     }
 
     isPlaying() {
@@ -5376,7 +5474,6 @@ class ObjectController {
     }
 
     addObject(clsId, state = {}) {
-
         const cls = this.getClassParts(clsId);
         if (this.classes[cls.main] === undefined) {
             throw Error('No class with name "' + cls.main + '" found!');
