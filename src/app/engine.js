@@ -2761,9 +2761,14 @@ class SpritePane {
         return obj;
     }
 
-    assignSprite(id, sheetId) {
+    assignSprite(id, sheetId, alignStrategy = false) {
         const sprite = this.sprites[id];
+        const oldDim = alignStrategy === true ? sprite.dim : null;
         this.initSpriteObj(sprite, sheetId);
+        if (oldDim !== null && (oldDim.y !== sprite.dim.y || oldDim.x !== sprite.dim.x)) {
+            // @TODO implement different strategies
+            this.setSpriteBottomPos(id, sprite.x, sprite.y + oldDim.y - 1);
+        }
         this.dirty = true;
     }
 
@@ -3603,7 +3608,7 @@ class BoundsScrollHandler {
                 sprite.y -= scrolled.y;
             }
 
-            move = (scrollY !== 0 || scrollX !== 0);
+            //move = (scrollY !== 0 || scrollX !== 0);
         } else {
             const unscrolled = scrolled.unscrolled;
             if (unscrolled.x !== 0) {
@@ -5438,6 +5443,17 @@ class ObjectController {
         return result;
     }
 
+    deleteObjectsOfClass(cls) {
+        if (!Array.isArray(cls)) {
+            cls = [cls];
+        }
+        for (let obj of this.activeObjects) {
+            if (cls.indexOf(obj.class) !== -1) {
+                obj.deleted = true;
+            }
+        }
+    }
+
     getObjectIdFromIdParts(idParts, obj) {
         let subIds = [];
         for (let part of idParts) {
@@ -5458,7 +5474,7 @@ class ObjectController {
 
     hasActiveObject(id) {
         for (let obj of this.activeObjects) {
-            if (obj.id === id) {
+            if (obj.id === id && obj.deleted !== true) {
                 return true;
             }
         }
@@ -5484,7 +5500,7 @@ class ObjectController {
             if (classState.variants[cls.variant] === undefined) {
                 throw Error('Class "' + cls.main + '" does not have variant "' + cls.variant +  '"!');
             }
-            Object.assign(varState, classState.variants[cls.variant]);
+            Object.assign(varState, {variant: cls.variant}, classState.variants[cls.variant]);
         }
         const obj = Object.assign({autoRemove: true}, classState, varState, state);
         obj.class = cls.main;
@@ -5519,8 +5535,8 @@ class ObjectController {
         while (i < this.activeObjects.length) {
             const obj = this.activeObjects[i];
             const cls = this.classes[obj.class];
-            let remove = false;
-            if (onlyClasses === null || onlyClasses.indexOf(obj.class) !== -1) {
+            let remove = obj.deleted === true;
+            if (!remove && (onlyClasses === null || onlyClasses.indexOf(obj.class) !== -1)) {
                 remove = cls.handler(obj) === false;
                 if (!remove) {
                     if (obj.autoRemove === true) {
