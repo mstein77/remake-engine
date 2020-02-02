@@ -37,6 +37,7 @@ class Game {
         this.sound = true;
         this.audioPlaying = [];
         this.globals = {};
+        this.gamepads = [];
         this.audio = new AudioPlayer();
 
         document.addEventListener('DOMContentLoaded', function(event) {
@@ -166,6 +167,13 @@ class Game {
             this.audioPlaying.push(audio);
             audio.play();
         }
+    }
+
+    getGamepadPressed(no) {
+        if (no >= this.gamepads.length) {
+            return [];
+        }
+        return this.gamepads[no].pressed;
     }
 
     resetFps() {
@@ -323,6 +331,32 @@ class Game {
         return event;
     }
 
+    updateGamepads() {
+        if (this.gamepads.length === 0) {
+            return;
+        }
+        const buttonPressed = {};
+        const gamepads = navigator.getGamepads();
+        for (let gamepad of gamepads) {
+            if (gamepad !== null) {
+                const pressed = [];
+                let i = 0;
+                for (let button of gamepad.buttons) {
+                    if (button.pressed) {
+                        pressed.push(i);
+                    }
+                    i++;
+                }
+                buttonPressed[gamepad.index] = pressed;
+            }
+        }
+
+        for (let gamepad of this.gamepads) {
+            gamepad.pressed =
+                buttonPressed[gamepad.index] !== undefined ? buttonPressed[gamepad.index] : [];
+        }
+    }
+
     updateFrame() {
         const screen = this.screens[this.currentScreen];
         if (screen.getState() === 'READY') {
@@ -340,6 +374,7 @@ class Game {
                     screen.frameHandler();
                 }
             }
+            this.updateGamepads();
         }
         this.waitForNextFrame();
     }
@@ -405,6 +440,14 @@ class Game {
             this.keys[e.key] = e.key;
         };
         document.onkeyup = keyUpHandler;
+
+        const gamepadConnectHandler = (e) => {
+            this.gamepads.push({
+                index: e.gamepad.index,
+                pressed: []
+            });
+        };
+        window.addEventListener('gamepadconnected', gamepadConnectHandler);
 
         document.body.innerHTML =
             '<div id="game" style="display: flex; justify-content: center; margin-top: 20px">' +
@@ -5586,19 +5629,37 @@ class InputController {
         this.yDir = 0;
         this.inputs = {};
         this.forced = null;
-        this.dirInputs = {
+        this.dirInputsKeyboard = {
             up: null,
             down: null,
             left: null,
             right: null
         };
+        this.dirInputsGamepad = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
+        this.gamepadNo = 0;
     }
 
-    setDirInputs(up, down, left, right) {
-        this.dirInputs['up'] = (up !== undefined) ? up : null;
-        this.dirInputs['down'] = (down !== undefined) ? down : null;
-        this.dirInputs['left'] = (left !== undefined) ? left : null;
-        this.dirInputs['right'] = (right !== undefined) ? right : null;
+    assignGamepadNo(value) {
+        this.gamepadNo = value;
+    }
+
+    setDirInputsKeyboard(up, down, left, right) {
+        this.dirInputsKeyboard['up'] = (up !== undefined) ? up : null;
+        this.dirInputsKeyboard['down'] = (down !== undefined) ? down : null;
+        this.dirInputsKeyboard['left'] = (left !== undefined) ? left : null;
+        this.dirInputsKeyboard['right'] = (right !== undefined) ? right : null;
+    }
+
+    setDirInputsGamepad(up, down, left, right) {
+        this.dirInputsGamepad['up'] = (up !== undefined) ? up : null;
+        this.dirInputsGamepad['down'] = (down !== undefined) ? down : null;
+        this.dirInputsGamepad['left'] = (left !== undefined) ? left : null;
+        this.dirInputsGamepad['right'] = (right !== undefined) ? right : null;
     }
 
     isForced() {
@@ -5606,7 +5667,7 @@ class InputController {
     }
 
     getDirKeys() {
-        return this.dirInputs;
+        return this.dirInputsKeyboard;
     }
 
     setForcedInputs(keysDown) {
@@ -5627,30 +5688,48 @@ class InputController {
         return Game.instance.keysDown;
     }
 
-    update() {
+    getGamepadPressed() {
+        if (this.forced !== null) {
+            return [];
+        }
+        return Game.instance.getGamepadPressed(this.gamepadNo);
+    }
+
+    hasDirInput(dir) {
         const keysDown = this.getKeysDown();
-        this.yDir = 0;
-        let key = this.dirInputs['up'];
+        let key = this.dirInputsKeyboard[dir];
         if (key !== null && keysDown[key]) {
+            return true;
+        }
+        const gamepadPressed = this.getGamepadPressed();
+        let button = this.dirInputsGamepad[dir];
+        if (button !== null && gamepadPressed.indexOf(button) !== -1) {
+            return true;
+        }
+        return false;
+    }
+
+    update() {
+        //const keysDown = this.getKeysDown();
+        this.yDir = 0;
+        if (this.hasDirInput('up')) {
             this.yDir--;
         }
-        key = this.dirInputs['down'];
-        if (key !== null && keysDown[key]) {
+        if (this.hasDirInput('down')) {
             this.yDir++;
         }
         this.xDir = 0;
-        key = this.dirInputs['left'];
-        if (key !== null && keysDown[key]) {
+        if (this.hasDirInput('left')) {
             this.xDir--;
         }
-        key = this.dirInputs['right'];
-        if (key !== null && keysDown[key]) {
+        if (this.hasDirInput('right')) {
             this.xDir++;
         }
 
         for (let name in this.inputs) {
             const input = this.inputs[name];
-            const keyDown = keysDown[input.key] === input.key;
+            const keyDown = this.isPressed(name); // keysDown[input.map.key] === input.map.key;
+
             switch(input.type) {
                 case INPUT.TYPE.PRESSED_DOWN:
                     input.state = keyDown ? INPUT.STATE.PRESSED : INPUT.STATE.NOTPRESSED;
@@ -5683,7 +5762,14 @@ class InputController {
     isPressed(name) {
         const input = this.inputs[name];
         const keysDown = this.getKeysDown();
-        return (keysDown[input.key] === input.key);
+        if (input.map.key !== null && keysDown[input.map.key] === input.map.key) {
+            return true;
+        }
+        const buttonPressed = this.getGamepadPressed();
+        if (input.map.button !== null && buttonPressed.indexOf(input.map.button) !== -1) {
+            return true;
+        }
+        return false;
     }
 
     hasInput(name) {
@@ -5699,8 +5785,23 @@ class InputController {
         }
     }
 
-    addInput(name, key, type = INPUT.TYPE.PRESSED_DOWN) {
-        this.inputs[name] = {key, type, state: INPUT.STATE.NOTPRESSED};
+    addInput(name, type = INPUT.TYPE.PRESSED_DOWN) {
+        this.inputs[name] =
+            {
+                map:
+                    {'key': null, 'button': null},
+                type,
+                state:
+                    INPUT.STATE.NOTPRESSED
+            };
+    }
+
+    assignKeyToInput(name, key) {
+        this.inputs[name].map.key = key;
+    }
+
+    assignButtonToInput(name, button) {
+        this.inputs[name].map.button = button;
     }
 
     noXDir() {

@@ -534,18 +534,176 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             turricanFont.addChar(208, 0, ' ');
             turricanFont.addRange(216, 0, '0', '9');
 
-            demoScreen.addPane(new ColorPane('#000000'));
+            demoScreen.addPane(new LinearGradientPane('Y', ['#000000', 124, '#000000', 100, '#000060']));
+            const canvasPane = new CanvasPane();
             const demoTextPane = new TextPane(turricanFont);
-            demoTextPane.addTextBlock('screentext', 70, 30,
-                '     REMAKE ENGINE\n\n' +
-                '       SHOWCASES\n\n\n' +
-                'PLEASE SELECT:\n\n' +
-                '  1 THUNDER FORCE 4\n' +
-                '  2 SHADOW OF THE BEAST\n' +
-                '  3 TURRICAN 2\n' +
-                '  4 SUPER MARIO BROS',4
+            demoTextPane.addTextBlock('screentext', 70, 25,
+                '     REMAKE ENGINE\n' +
+                '       SHOWCASES', 4);
+
+            demoTextPane.addTextBlock(
+                'games', 30, 66,
+                '  GAME 1     GAME 2    GAME 3',4
             );
+
+            demoTextPane.addTextBlock(
+                'start', 83, 192,
+                'ESC=BACK RETURN=START'
+            );
+
+            demoTextPane.addTextBlock(
+                'controls', 100, 138,
+                '  W\n' +
+                'A   D      J   K\n' +
+                '  S', 10
+            );
+            demoScreen.addPane(canvasPane);
             demoScreen.addPane(demoTextPane);
+
+            const demos = [
+                {
+                    name: 'SUPER MARIO BROS',
+                    system: 'NINTENDO ENTERTAINMENT SYSTEM',
+                    cursorX: 44,
+                    goto: 'world',
+                    params: {
+                        lifes: 3, score: 0, coins: 0, world: '1-1', worldPos: null, marioLevel: 0
+                    }
+                },
+                {
+                    name: 'SHADOW OF THE BEAST',
+                    system: 'AMIGA 500',
+                    cursorX: 132,
+                    goto: 'shadow-ingame'
+                },
+                {
+                    name: 'THUNDERFORCE IV',
+                    system: 'SEGA MEGA DRIVE',
+                    cursorX: 212,
+                    goto: 'tf4'
+                }
+            ];
+            let activeDemo = 0;
+
+            let frames = 0;
+            let startX = 79;
+            let startY = 134;
+            let width = 177;
+            let height = 53;
+            let cursor = 0;
+
+            const inputController = new InputController();
+            inputController.addInput('next', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('next','d');
+            inputController.assignButtonToInput('next', 15);
+            inputController.addInput('prev', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('prev','a');
+            inputController.assignButtonToInput('prev', 14);
+            inputController.addInput('start');
+            inputController.assignKeyToInput('start', 'Enter');
+            inputController.assignButtonToInput('start', 9);
+            inputController.addInput('start1');
+            inputController.assignKeyToInput('start1', 'j');
+            inputController.assignButtonToInput('start1', 0);
+            inputController.addInput('start2');
+            inputController.assignKeyToInput('start1', 'k');
+            inputController.assignButtonToInput('start2', 2);
+
+            const drawBox = () => {
+                const ctx = canvasPane.getCtx();
+                ctx.strokeStyle = '#666666';
+                ctx.strokeRect(startX, startY, width, height);
+                ctx.strokeRect(startX, startY + height, width, 17);
+            };
+
+            const setDemo = function() {
+                demoTextPane.removeTextBlock('selected');
+                demoTextPane.removeTextBlock('system');
+                demoTextPane.addTextBlock(
+                    'selected', 30, 94,
+                    demos[activeDemo].name, 4
+                );
+                demoTextPane.setTextBlockFilter('selected', 'monochrome(#FFFFFF)')
+                demoTextPane.addTextBlock(
+                    'system', 30, 106,
+                    demos[activeDemo].system, 4
+                );
+            };
+
+            const minCol = 60;
+            const cursorPath = new AxisPath(minCol)
+                .addTarget(255, 60, PATH.TYPE.DAMPED)
+                .addTarget(minCol, 60, PATH.TYPE.ACCELERATED)
+                .round()
+                .getPoints();
+
+            setDemo();
+
+            demoScreen.setFrameHandler(() => {
+                if (frames === 0) {
+                    const ctx = canvasPane.getCtx();
+                    ctx.fillStyle = 'rgba(0,0,0,210)';
+                    ctx.fillRect(startX, startY, width, height + 16);
+
+                    ctx.strokeStyle = '#666666';
+                    ctx.fillStyle = '#666666';
+                    drawBox();
+
+                    ctx.beginPath();
+                    ctx.arc(120, startY + 26, 25, 0, Math.PI * 2, true);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(192, startY + 26, 12, 0, Math.PI * 2, true);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(223, startY + 26, 12, 0, Math.PI * 2, true);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#555555';
+                    ctx.fillRect(110, startY + 24, 19, 2);
+                    ctx.fillRect(119, startY + 15, 2, 21);
+                    ctx.fillRect( 150, startY + height, 2, 16);
+                }
+
+                inputController.awaitInput('next');
+                inputController.awaitInput('prev');
+                inputController.update();
+
+                if (inputController.hasInput('start') || inputController.hasInput('start1') || inputController.hasInput('start2')) {
+                    const params = demos[activeDemo].params;
+                    this.gotoScreen(demos[activeDemo].goto, params === undefined ? {} : params);
+                }
+
+                let demoChange = 0;
+                if (inputController.hasInput('next')) {
+                    demoChange++;
+                }
+                if (inputController.hasInput('prev')) {
+                    demoChange--;
+                }
+                if (demoChange !== 0) {
+                    activeDemo += demoChange;
+                    if (activeDemo < 0) {
+                        activeDemo = demos.length - 1;
+                    } else if (activeDemo >= demos.length) {
+                        activeDemo = 0;
+                    }
+                    setDemo();
+                }
+
+                const ctx = canvasPane.getCtx();
+                ctx.clearRect(0, 77, 320, 4);
+
+                if (cursor === cursorPath.length) {
+                    cursor = 0;
+                }
+                let currCol = cursorPath[cursor];
+                cursor++;
+                ctx.fillStyle = 'rgb(' + currCol + ', 0, 0)' ;
+                ctx.fillRect(demos[activeDemo].cursorX, 77, 50, 4);
+            });
         }
     });
     this.addScreen(demoScreen);
@@ -769,6 +927,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             tfScroller.addSlave(tfBottomMountains, factor + 1.5, 0);
             const tfScrollBounds = new BoundsScrollHandler(tfSprites, bgScroller, {x: 0, y: 30});
 
+            const inputController = new InputController();
+            inputController.setDirInputsKeyboard('w', 's', 'a', 'd');
+            inputController.setDirInputsGamepad(12, 13, 14, 15);
+            inputController.addInput('fire', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('fire', 'j');
+            inputController.assignButtonToInput('fire', 0);
+            inputController.addInput('change', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('change', 'k');
+            inputController.assignButtonToInput('change', 2);
+            inputController.addInput('back', INPUT.TYPE.PRESSED_DOWN);
+            inputController.assignButtonToInput('back', 8);
+
             tfScreen.setFrameHandler(function() {
 
                 tfScroller.scrollBy(1, 0);
@@ -783,32 +953,32 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 }
                 tfSprites.updateFrames();
 
-            });
+                inputController.awaitInput('fire');
+                inputController.awaitInput('change');
+                inputController.update();
 
-            tfScreen.setKeyHandler(function() {
+                if (inputController.hasInput('back')) {
+                    this.gotoScreen('demo');
+                }
+
                 let moveX = 0;
                 let moveY = 0;
                 const speed = 2;
-                for (var key in this.keysDown) {
-                    switch (key) {
-                        case 'a':
-                            moveX -= speed;
-                            break;
-
-                        case 'd':
-                            moveX += speed;
-                            break;
-
-                        case 'w':
-                            moveY -= speed;
-                            break;
-
-                        case 's':
-                            moveY += speed;
-                            break;
-
-                    }
+                if (inputController.isLeftDir()) {
+                    moveX--;
                 }
+                if (inputController.isRightDir()) {
+                    moveX++;
+                }
+                if (inputController.isUpDir()) {
+                    moveY--;
+                }
+                if (inputController.isDownDir()) {
+                    moveY++;
+                }
+                moveX *= speed;
+                moveY *= speed;
+
                 let event = 'wait';
                 if (moveY !== 0) {
                     event = moveY < 0 ? 'up' : 'down';
@@ -848,23 +1018,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     }
                 }
 
-                for (var key in this.keys) {
-                    switch (key) {
-                        case 'Enter':
-                            const actor = tfSprites.getSpritePos(tfSprites.getActorId());
-                            if (isBlade) {
-                                tfSprites.addSprite(tfSprites.getUid('shot'), 'bladeshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) - 16);
-                            } else {
-                                tfSprites.addSprite(tfSprites.getUid('shot'), 'twinshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) - 8);
-                                tfSprites.addSprite(tfSprites.getUid('shot'), 'twinshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) + 8);
+                if (inputController.hasInput('fire')) {
+                    const actor = tfSprites.getSpritePos(tfSprites.getActorId());
+                    if (isBlade) {
+                        tfSprites.addSprite(tfSprites.getUid('shot'), 'bladeshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) - 16);
+                    } else {
+                        tfSprites.addSprite(tfSprites.getUid('shot'), 'twinshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) - 8);
+                        tfSprites.addSprite(tfSprites.getUid('shot'), 'twinshot', actor.x + actor.dim.x, actor.y + (actor.dim.y >> 1) + 8);
 
-                            }
-                            break;
-
-                        case ' ':
-                            isBlade = !isBlade;
-                            break;
                     }
+                }
+                if (inputController.hasInput('change')) {
+                    isBlade = !isBlade;
                 }
 
                 if (moveX !== 0 || moveY !== 0) {
@@ -2286,9 +2451,16 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             actorXStates.setState('still');
 
             const inputController = new InputController();
-            inputController.setDirInputs('w', 's', 'a', 'd');
-            inputController.addInput('button-a', 'k', INPUT.TYPE.PRESS_AND_RELEASE);
-            inputController.addInput('button-b', 'j', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.setDirInputsKeyboard('w', 's', 'a', 'd');
+            inputController.setDirInputsGamepad(12, 13, 14, 15);
+            inputController.addInput('button-a', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('button-a', 'k');
+            inputController.assignButtonToInput('button-a', 0);
+            inputController.addInput('button-b', INPUT.TYPE.PRESS_AND_RELEASE);
+            inputController.assignKeyToInput('button-b', 'j');
+            inputController.assignButtonToInput('button-b', 2);
+            inputController.addInput('back', INPUT.TYPE.PRESSED_DOWN);
+            inputController.assignButtonToInput('back', 8);
 
             const collideCheck = function(tile) {
                 return (tile.obj !== null && tile.obj.block);
@@ -4026,6 +4198,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 // update animated tiles
                 tilesPane.updateAnimatedTiles();
 
+                if (inputController.hasInput('back')) {
+                    this.gotoScreen('demo');
+                }
+
                 if (cutscene !== null) {
                     let done = false;
                     let nextScene = null;
@@ -5356,7 +5532,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
         } else if (this.keys['-']) {
             this.setZoom(Math.floor(this.zoom - 1));
         }
-        if (this.keys['1']) {
+        if (this.keys['3']) {
             this.gotoScreen('tf4');
             //    this.gotoScreen('turrican-ingame');
             return true;
@@ -5364,7 +5540,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             this.gotoScreen('shadow-ingame');
             return true;
 
-        } else if (this.keys['4']) {
+        } else if (this.keys['1']) {
             this.gotoScreen('world', {lifes: 3, score: 0, coins: 0, world: '1-1', worldPos: null, marioLevel: 0});
             return true;
 
