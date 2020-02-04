@@ -8,7 +8,7 @@ module.exports = {
         editor: "./src/app/editor.js"
     }, // webpack entry point. Module to start building dependency graph
     output: {
-        path: path.resolve(__dirname + 'dist'), // Folder to store generated bundle
+        path: path.resolve(__dirname, 'dist'), // Folder to store generated bundle
         filename: '[name].bundle.js',  // Name of generated bundle after build
         publicPath: '/' // public URL of the output directory when referenced in a browser
     },
