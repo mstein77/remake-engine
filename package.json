@@ -10,6 +10,9 @@
     "test": "mocha",
     "heroku-prebuild": "npm install --dev"
   },
+  "engines": {
+    "node": "12.13.1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mstein77/2DFireEngine.git"
