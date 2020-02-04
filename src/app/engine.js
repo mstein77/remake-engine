@@ -5709,8 +5709,11 @@ class InputController {
         return false;
     }
 
+    getDirVector() {
+        return {x: this.xDir, y: this.yDir};
+    }
+
     update() {
-        //const keysDown = this.getKeysDown();
         this.yDir = 0;
         if (this.hasDirInput('up')) {
             this.yDir--;
@@ -5728,7 +5731,7 @@ class InputController {
 
         for (let name in this.inputs) {
             const input = this.inputs[name];
-            const keyDown = this.isPressed(name); // keysDown[input.map.key] === input.map.key;
+            const keyDown = this.isPressed(name);
 
             switch(input.type) {
                 case INPUT.TYPE.PRESSED_DOWN:
