@@ -429,7 +429,7 @@ class Game {
         const syncEventTouches = (touches, del = false) => {
             for(let touch of touches) {
                 const elem = document.elementFromPoint(touch.clientX, touch.clientY);
-                if (!del && elem.classList.contains('touch-dir-cell') && !elem.classList.contains('touch-dir-middle')) {
+                if (!del && elem !== null && elem.classList.contains('touch-dir-cell') && !elem.classList.contains('touch-dir-middle')) {
                     elem.classList.toggle('touching', true);
                     const parts = elem.id.substr(10).split('_');
                     for (let part of parts) {
@@ -458,7 +458,7 @@ class Game {
         };
 
         const onTouchMoveHandler = (e) => {
-            syncEventTouches(e.touches);
+            syncEventTouches(e.changedTouches);
             e.preventDefault();
         };
 
@@ -473,36 +473,19 @@ class Game {
         };
 
         let dirElem = touchDirs;
-/*
-        for (let dirElem of touchDirs.childNodes) {
-            if (dirElem.id !== '') {
+        dirElem.ontouchstart = onTouchStartHandler;
+        dirElem.ontouchmove = onTouchMoveHandler;
+        dirElem.ontouchcancel = onTouchCancelHandler;
+        dirElem.ontouchend = onTouchEndHandler;
 
- */
-                dirElem.ontouchstart = onTouchStartHandler;
-                dirElem.ontouchmove = onTouchMoveHandler;
-                dirElem.ontouchcancel = onTouchCancelHandler;
-                dirElem.ontouchend = onTouchEndHandler;
-                /*
-            }
-        }
-*/
         const touchButtons = document.getElementById('touch-input-buttons');
         touchButtons.style.display = 'grid';
 
         let buttonElem = touchButtons;
-        /*
-        for (let buttonElem of touchButtons.childNodes) {
-            if (buttonElem.id !== '') {
-
-         */
-                buttonElem.ontouchstart = onTouchStartHandler;
-                buttonElem.ontouchmove = onTouchMoveHandler;
-                buttonElem.ontouchcancel = onTouchCancelHandler;
-                buttonElem.ontouchend = onTouchEndHandler;
-                /*
-            }
-        }
-                 */
+        buttonElem.ontouchstart = onTouchStartHandler;
+        buttonElem.ontouchmove = onTouchMoveHandler;
+        buttonElem.ontouchcancel = onTouchCancelHandler;
+        buttonElem.ontouchend = onTouchEndHandler;
     }
 
     boot() {
@@ -516,7 +499,6 @@ class Game {
         }
 
         this.hasTouch = ('ontouchstart' in document.documentElement);
-        this.hasTouch = true;
 
         // register key handlers
         const keyDownHandler = (e) => {
@@ -568,6 +550,7 @@ class Game {
                 '<div id="touch-input-buttons" style="display: none">' +
                     '<div id="touch_btn_1" class="touch-dir-cell"></div>' +
                     '<div id="touch_btn_2" class="touch-dir-cell"></div>' +
+                    '<div class="touch-dir-cell touch-dir-middle"></div>' +
                     '<div id="touch_btn_3" class="touch-dir-cell"></div>' +
                 '</div>'
              : ''
