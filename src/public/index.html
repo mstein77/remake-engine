@@ -3,12 +3,16 @@
         <style>
             #touch-input-dir {
                 position: absolute;
-                top: 10px;
-                left: 10px;
+                top: 50px;
+                left: 50px;
                 display: grid;
-                grid-template-columns: repeat(3, 100px);
+                grid-template-columns: repeat(3, 50px);
                 grid-column-gap: 10px;
                 grid-row-gap: 10px;
+            }
+
+            #touch-input-dir > .touch-dir-cell {
+                height: 50px;
             }
 
             #touch-input-buttons {
@@ -21,8 +25,11 @@
                 grid-row-gap: 30px;
             }
 
-            .touch-dir-cell {
+            #touch-input-buttons > .touch-dir-cell {
                 height: 100px;
+            }
+
+            .touch-dir-cell {
                 border: 1px solid #000000
             }
 

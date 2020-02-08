@@ -40,6 +40,7 @@ class Game {
         this.touchInputs = [];
         this.gamepads = [];
         this.audio = new AudioPlayer();
+        this.lastTouches = {};
         this.hasTouch = false;
 
         document.addEventListener('DOMContentLoaded', function(event) {
@@ -425,30 +426,60 @@ class Game {
         const touchDirs = document.getElementById('touch-input-dir');
         touchDirs.style.display = 'grid';
 
-        const onTouchStartHandler = (e) => {
-            e.target.classList.toggle('touching');
-            const parts = e.target.id.substr(10).split('_');
-            for (let part of parts) {
-                this.touchInputs.push(part);
+        const syncEventTouches = (touches, del = false) => {
+            for(let touch of touches) {
+                const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (!del && elem.classList.contains('touch-dir-cell') && !elem.classList.contains('touch-dir-middle')) {
+                    elem.classList.toggle('touching', true);
+                    const parts = elem.id.substr(10).split('_');
+                    for (let part of parts) {
+                        if (this.touchInputs.indexOf(part) === -1) {
+                            this.touchInputs.push(part);
+                        }
+                    }
+                    this.lastTouches[touch.identifier] = elem;
+                } else {
+                    const lastElem = this.lastTouches[touch.identifier];
+                    if (lastElem !== undefined) {
+                        lastElem.classList.toggle('touching', false);
+                        const parts = lastElem.id.substr(10).split('_');
+                        for (let part of parts) {
+                            this.touchInputs.splice(this.touchInputs.indexOf(part), 1);
+                        }
+                        delete this.lastTouches[touch.identifier];
+                    }
+                }
             }
+        };
+
+        const onTouchStartHandler = (e) => {
+            syncEventTouches(e.touches);
+            e.preventDefault();
+        };
+
+        const onTouchMoveHandler = (e) => {
+            syncEventTouches(e.touches);
+            e.preventDefault();
+        };
+
+        const onTouchCancelHandler = (e) => {
+            syncEventTouches(e.changedTouches, true);
             e.preventDefault();
         };
 
         const onTouchEndHandler = (e) => {
-            e.target.classList.toggle('touching');
-            const parts = e.target.id.substr(10).split('_');
-            for (let part of parts) {
-                this.touchInputs.splice(this.touchInputs.indexOf(part), 1);
-            }
+            syncEventTouches(e.changedTouches, true);
             e.preventDefault();
         };
 
         for (let dirElem of touchDirs.childNodes) {
             if (dirElem.id !== '') {
                 dirElem.ontouchstart = onTouchStartHandler;
+                dirElem.ontouchmove = onTouchMoveHandler;
+                dirElem.ontouchcancel = onTouchCancelHandler;
                 dirElem.ontouchend = onTouchEndHandler;
             }
-        };
+        }
 
         const touchButtons = document.getElementById('touch-input-buttons');
         touchButtons.style.display = 'grid';
@@ -456,10 +487,11 @@ class Game {
         for (let buttonElem of touchButtons.childNodes) {
             if (buttonElem.id !== '') {
                 buttonElem.ontouchstart = onTouchStartHandler;
+                buttonElem.ontouchmove = onTouchMoveHandler;
+                buttonElem.ontouchcancel = onTouchCancelHandler;
                 buttonElem.ontouchend = onTouchEndHandler;
             }
-        };
-
+        }
     }
 
     boot() {
@@ -473,7 +505,7 @@ class Game {
         }
 
         this.hasTouch = ('ontouchstart' in document.documentElement);
-        console.log(this.hasTouch);
+        this.hasTouch = true;
 
         // register key handlers
         const keyDownHandler = (e) => {
