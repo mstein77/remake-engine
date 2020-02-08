@@ -37,8 +37,10 @@ class Game {
         this.sound = true;
         this.audioPlaying = [];
         this.globals = {};
+        this.touchInputs = [];
         this.gamepads = [];
         this.audio = new AudioPlayer();
+        this.hasTouch = false;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -419,6 +421,47 @@ class Game {
         }
     }
 
+    enableTouchInputs() {
+        const touchDirs = document.getElementById('touch-input-dir');
+        touchDirs.style.display = 'grid';
+
+        const onTouchStartHandler = (e) => {
+            e.target.classList.toggle('touching');
+            const parts = e.target.id.substr(10).split('_');
+            for (let part of parts) {
+                this.touchInputs.push(part);
+            }
+            e.preventDefault();
+        };
+
+        const onTouchEndHandler = (e) => {
+            e.target.classList.toggle('touching');
+            const parts = e.target.id.substr(10).split('_');
+            for (let part of parts) {
+                this.touchInputs.splice(this.touchInputs.indexOf(part), 1);
+            }
+            e.preventDefault();
+        };
+
+        for (let dirElem of touchDirs.childNodes) {
+            if (dirElem.id !== '') {
+                dirElem.ontouchstart = onTouchStartHandler;
+                dirElem.ontouchend = onTouchEndHandler;
+            }
+        };
+
+        const touchButtons = document.getElementById('touch-input-buttons');
+        touchButtons.style.display = 'grid';
+
+        for (let buttonElem of touchButtons.childNodes) {
+            if (buttonElem.id !== '') {
+                buttonElem.ontouchstart = onTouchStartHandler;
+                buttonElem.ontouchend = onTouchEndHandler;
+            }
+        };
+
+    }
+
     boot() {
         this.startTimer('boot');
         this.log('Boot game engine...');
@@ -428,6 +471,9 @@ class Game {
         if (window.gameEditor !== undefined) {
             gameEditor = window.gameEditor;
         }
+
+        this.hasTouch = ('ontouchstart' in document.documentElement);
+        console.log(this.hasTouch);
 
         // register key handlers
         const keyDownHandler = (e) => {
@@ -462,13 +508,35 @@ class Game {
                 '<div id="debugs" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0"><pre id="d" style="margin: 0"></pre>' +
                 '</div>' +
             '</div>' +
-
             '<div id="offscreen" style="display: none"></div>' +
             '<div id="react-editor"></div>' +
-            '<div id="editor" style="display: none">Editor</div>';
+            '<div id="editor" style="display: none">Editor</div>' + (this.hasTouch ?
+                '<div id="touch-input-dir" style="display: none">' +
+                    '<div id="touch_btn_left_up" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_up" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_right_up" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_left" class="touch-dir-cell"></div>' +
+                    '<div class="touch-dir-cell touch-dir-middle"></div>' +
+                    '<div id="touch_btn_right" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_left_down" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_down" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_right_down" class="touch-dir-cell"></div>' +
+                '</div>' +
+                '<div id="touch-input-buttons" style="display: none">' +
+                    '<div id="touch_btn_1" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_2" class="touch-dir-cell"></div>' +
+                    '<div id="touch_btn_3" class="touch-dir-cell"></div>' +
+                '</div>'
+             : ''
+            )
+        ;
 
         if (this.zoom !== 1) {
             this.setZoom(this.zoom, true);
+        }
+
+        if (this.hasTouch) {
+            this.enableTouchInputs();
         }
 
         debugElem = document.getElementById('d');
@@ -5641,6 +5709,13 @@ class InputController {
             left: null,
             right: null
         };
+        this.dirInputsTouch = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
+        this.touchPressed = [];
         this.gamepadNo = 0;
     }
 
@@ -5660,6 +5735,13 @@ class InputController {
         this.dirInputsGamepad['down'] = (down !== undefined) ? down : null;
         this.dirInputsGamepad['left'] = (left !== undefined) ? left : null;
         this.dirInputsGamepad['right'] = (right !== undefined) ? right : null;
+    }
+
+    setDirInputsTouch(up, down, left, right) {
+        this.dirInputsTouch['up'] = (up !== undefined) ? up : null;
+        this.dirInputsTouch['down'] = (down !== undefined) ? down : null;
+        this.dirInputsTouch['left'] = (left !== undefined) ? left : null;
+        this.dirInputsTouch['right'] = (right !== undefined) ? right : null;
     }
 
     isForced() {
@@ -5695,6 +5777,13 @@ class InputController {
         return Game.instance.getGamepadPressed(this.gamepadNo);
     }
 
+    getTouchPressed() {
+        if (this.forced !== null) {
+            return [];
+        }
+        return this.touchPressed;
+    }
+
     hasDirInput(dir) {
         const keysDown = this.getKeysDown();
         let key = this.dirInputsKeyboard[dir];
@@ -5706,6 +5795,11 @@ class InputController {
         if (button !== null && gamepadPressed.indexOf(button) !== -1) {
             return true;
         }
+        const touchId = this.dirInputsTouch[dir];
+        const touchPressed = this.getTouchPressed();
+        if (touchId !== null && touchPressed.indexOf(touchId) !== -1) {
+            return true;
+        }
         return false;
     }
 
@@ -5713,7 +5807,19 @@ class InputController {
         return {x: this.xDir, y: this.yDir};
     }
 
+    updateTouchInputs() {
+        const touchPressed = [];
+        for (let touchId of Game.instance.touchInputs) {
+            if (touchPressed.indexOf(touchId) === -1) {
+                touchPressed.push(touchId);
+            }
+        }
+        this.touchPressed = touchPressed;
+    }
+
     update() {
+        this.updateTouchInputs();
+
         this.yDir = 0;
         if (this.hasDirInput('up')) {
             this.yDir--;
@@ -5772,6 +5878,12 @@ class InputController {
         if (input.map.button !== null && buttonPressed.indexOf(input.map.button) !== -1) {
             return true;
         }
+
+        const touchPressed = this.getTouchPressed();
+        if (input.map.touch !== null && touchPressed.indexOf(input.map.touch) !== -1) {
+            return true;
+        }
+
         return false;
     }
 
@@ -5792,7 +5904,7 @@ class InputController {
         this.inputs[name] =
             {
                 map:
-                    {'key': null, 'button': null},
+                    {'key': null, 'button': null, 'touch': null},
                 type,
                 state:
                     INPUT.STATE.NOTPRESSED
@@ -5805,6 +5917,10 @@ class InputController {
 
     assignButtonToInput(name, button) {
         this.inputs[name].map.button = button;
+    }
+
+    assignTouchToInput(name, touchId) {
+        this.inputs[name].map.touch = touchId;
     }
 
     noXDir() {

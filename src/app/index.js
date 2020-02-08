@@ -596,18 +596,22 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             inputController.addInput('next', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('next','d');
             inputController.assignButtonToInput('next', 15);
+            inputController.assignTouchToInput('next', 'right');
             inputController.addInput('prev', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('prev','a');
             inputController.assignButtonToInput('prev', 14);
+            inputController.assignTouchToInput('prev', 'left');
             inputController.addInput('start');
             inputController.assignKeyToInput('start', 'Enter');
             inputController.assignButtonToInput('start', 9);
             inputController.addInput('start1');
             inputController.assignKeyToInput('start1', 'j');
             inputController.assignButtonToInput('start1', 0);
+            inputController.assignTouchToInput('start1', '1');
             inputController.addInput('start2');
-            inputController.assignKeyToInput('start1', 'k');
+            inputController.assignKeyToInput('start2', 'k');
             inputController.assignButtonToInput('start2', 2);
+            inputController.assignTouchToInput('start2', '2');
 
             const drawBox = () => {
                 const ctx = canvasPane.getCtx();
@@ -930,14 +934,18 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const inputController = new InputController();
             inputController.setDirInputsKeyboard('w', 's', 'a', 'd');
             inputController.setDirInputsGamepad(12, 13, 14, 15);
+            inputController.setDirInputsTouch('up', 'down', 'left', 'right');
             inputController.addInput('fire', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('fire', 'j');
             inputController.assignButtonToInput('fire', 0);
+            inputController.assignTouchToInput('fire', '1');
             inputController.addInput('change', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('change', 'k');
+            inputController.assignTouchToInput('change', '2');
             inputController.assignButtonToInput('change', 2);
             inputController.addInput('back', INPUT.TYPE.PRESSED_DOWN);
             inputController.assignButtonToInput('back', 8);
+            inputController.assignTouchToInput('back', '3');
 
             tfScreen.setFrameHandler(function() {
 
@@ -1360,15 +1368,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const inputController = new InputController();
             inputController.setDirInputsKeyboard('w', 's', 'a', 'd');
             inputController.setDirInputsGamepad(12, 13, 14, 15);
+            inputController.setDirInputsTouch('up', 'down', 'left', 'right');
             inputController.addInput('attack', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('attack', 'j');
             inputController.assignButtonToInput('attack', 0);
+            inputController.assignTouchToInput('attack', '1');
             inputController.addInput('jump', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('jump', 'k');
             inputController.assignButtonToInput('jump', 2);
+            inputController.assignTouchToInput('jump', '2');
             inputController.addInput('back');
             inputController.assignKeyToInput('back','Escape');
             inputController.assignButtonToInput('back', 8);
+            inputController.assignTouchToInput('back', '3');
 
             shadowScreen.setFrameHandler(function() {
                 beastSpritePane.updateFrames();
@@ -2466,14 +2478,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const inputController = new InputController();
             inputController.setDirInputsKeyboard('w', 's', 'a', 'd');
             inputController.setDirInputsGamepad(12, 13, 14, 15);
+            inputController.setDirInputsTouch('up', 'down', 'left', 'right');
             inputController.addInput('button-a', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('button-a', 'k');
             inputController.assignButtonToInput('button-a', 0);
+            inputController.assignTouchToInput('button-a', '1');
             inputController.addInput('button-b', INPUT.TYPE.PRESS_AND_RELEASE);
             inputController.assignKeyToInput('button-b', 'j');
             inputController.assignButtonToInput('button-b', 2);
+            inputController.assignTouchToInput('button-b', '2');
             inputController.addInput('back', INPUT.TYPE.PRESSED_DOWN);
             inputController.assignButtonToInput('back', 8);
+            inputController.assignTouchToInput('back', '3');
+
 
             const collideCheck = function(tile) {
                 return (tile.obj !== null && tile.obj.block);

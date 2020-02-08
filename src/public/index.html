@@ -1,5 +1,40 @@
 <html>
     <head>
+        <style>
+            #touch-input-dir {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                display: grid;
+                grid-template-columns: repeat(3, 100px);
+                grid-column-gap: 10px;
+                grid-row-gap: 10px;
+            }
+
+            #touch-input-buttons {
+                position: absolute;
+                top: 50px;
+                right: 30px;
+                display: grid;
+                grid-template-columns: repeat(2, 100px);
+                grid-column-gap: 30px;
+                grid-row-gap: 30px;
+            }
+
+            .touch-dir-cell {
+                height: 100px;
+                border: 1px solid #000000
+            }
+
+            .touch-dir-middle {
+                border: none;
+                background-color: transparent;
+            }
+
+            .touching {
+                background-color: #FF0000;
+            }
+        </style>
     </head>
 
     <body style="background-color: #444444">
