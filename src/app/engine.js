@@ -472,26 +472,37 @@ class Game {
             e.preventDefault();
         };
 
+        let dirElem = touchDirs;
+/*
         for (let dirElem of touchDirs.childNodes) {
             if (dirElem.id !== '') {
+
+ */
                 dirElem.ontouchstart = onTouchStartHandler;
                 dirElem.ontouchmove = onTouchMoveHandler;
                 dirElem.ontouchcancel = onTouchCancelHandler;
                 dirElem.ontouchend = onTouchEndHandler;
+                /*
             }
         }
-
+*/
         const touchButtons = document.getElementById('touch-input-buttons');
         touchButtons.style.display = 'grid';
 
+        let buttonElem = touchButtons;
+        /*
         for (let buttonElem of touchButtons.childNodes) {
             if (buttonElem.id !== '') {
+
+         */
                 buttonElem.ontouchstart = onTouchStartHandler;
                 buttonElem.ontouchmove = onTouchMoveHandler;
                 buttonElem.ontouchcancel = onTouchCancelHandler;
                 buttonElem.ontouchend = onTouchEndHandler;
+                /*
             }
         }
+                 */
     }
 
     boot() {
