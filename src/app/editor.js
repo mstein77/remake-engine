@@ -1,6 +1,8 @@
 import _ from 'lodash';
+import MyApp from "./test.js";
 import React from "react";
 import ReactDOM from "react-dom";
+
 import App from "./components/App.js";
 
 class TileCellProvider {

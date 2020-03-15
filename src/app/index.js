@@ -36,7 +36,10 @@ import {
 
 require('./editor.js');
 
-new Game(320, 224, {zoom: 2, debug: false}, function () {
+function XGame() {
+};
+
+new XGame(320, 224, {zoom: 2, debug: false}, function () {
 
     /**
      * GLOBALS

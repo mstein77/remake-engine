@@ -1,3 +1,17 @@
+<!--
+ TODO:
+   - Welche Touch-Gesten gibt es generell?
+   - Verhindern von Zoom/Swipe
+   - Positionierung (fixed oder absolute?)
+   - Pseudo-Fullscreen (navigation/menübar entfernen)
+   - Einpassen auf Auflösung
+   - Orientation-Change: Touch-Inputs umorganisieren
+   - Touch-Field-Überwachung
+   - Multi-Touch
+   - Inputs-Mover (evt. auch Resize)
+   - Runde-Touch-Elemente?
+   - Sinnvolle CSS-Größe finden
+-->
 <html>
     <head>
         <style>
@@ -42,10 +56,16 @@
                 background-color: #FF0000;
             }
         </style>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+              rel="stylesheet">
     </head>
 
-    <body style="background-color: #444444">
-        <canvas id="c" width="320" height="200"></canvas>
+    <body style="xbackground-color: #444444">
+
+        <xcanvas id="c" width="320" height="200"></xcanvas>
+
+        <div id="root"></div>
+        <div id="modals-container"></div>
     </body>
 
 </html>
