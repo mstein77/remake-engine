@@ -33,6 +33,9 @@
     --modal-overlay-bg-color: #000000a3;
 
     --default-padding: 5px;
+
+    --marker-width: 8px;
+    --marker-color: #FF474799;
 }
 
 body {
@@ -296,16 +299,90 @@ body {
     display: grid;
     grid-template-columns: 20px auto min-content;
     grid-template-rows: 20px auto min-content;
-    border: 1px solid red;
-
 }
 
-.grid-3x3 > div {
-    border: 1px solid green;
+.grid-2x2 {
+    display: grid;
+    grid-template-columns: auto min-content;
+    grid-template-rows: auto min-content;
 }
+
 
 input[type=range][orient=vertical] {
     writing-mode: bt-lr; /* IE */
     -webkit-appearance: slider-vertical; /* WebKit */
     width: 25px;
+}
+
+/* MARKER */
+
+.marker-space {
+    border: var(--marker-width) solid transparent;
+}
+
+.marker-top {
+    border-top: var(--marker-width) solid var(--marker-color);
+}
+
+.marker-bottom {
+    border-bottom: var(--marker-width) solid var(--marker-color);
+}
+
+.marker-left {
+    border-left: var(--marker-width) solid var(--marker-color);
+}
+
+.marker-right {
+    border-right: var(--marker-width) solid var(--marker-color);
+}
+
+.marker-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+}
+
+.cursor {
+    position: relative;
+    top: 59px;
+    left: 60px;
+    border: var(--marker-width) solid #FF0000A0;
+}
+
+.marker-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--marker-width) min-content var(--marker-width);
+    grid-template-rows: var(--marker-width) min-content var(--marker-width);
+}
+
+.marker-cell {
+    background-color: var(--marker-color);
+}
+
+.auto-scroll {
+    width: min-content;
+    display: inline-block;
+    overflow: auto;
+}
+
+.cursor-move {
+    cursor: move;
+}
+
+.cursor-neswresize {
+    cursor: nesw-resize;
+}
+
+.cursor-nwseresize {
+    cursor: nwse-resize;
+}
+
+.cursor-vresize {
+    cursor: ns-resize;
+}
+
+.cursor-hresize {
+    cursor: ew-resize;
 }
