@@ -399,14 +399,17 @@ class FullRaster extends React.Component {
                     };
                     const xStart = newRasterPos.x - offPos.x;
                     const yStart = newRasterPos.y - offPos.y;
+
+                    const markerPosX = this.state.posX + xStart;
+                    const markerPosY = this.state.posY + yStart;
                     const hasChanged =
-                        (xStart >= 0 && xStart + this.state.markerWidth <= this.state.viewX &&
-                         yStart >= 0 && yStart + this.state.markerHeight <= this.state.viewY) &&
+                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth() &&
+                         markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
                         (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y);
 
                     if (hasChanged) {
                         lastRasterPos = newRasterPos;
-                        this.setState({markerPosX: xStart, markerPosY: yStart});
+                        this.setState({markerPosX, markerPosY});
                     }
                     return hasChanged;
                 };
