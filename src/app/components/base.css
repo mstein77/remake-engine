@@ -35,7 +35,8 @@
     --default-padding: 5px;
 
     --marker-width: 8px;
-    --marker-color: #FF474799;
+    --marker-color-highlight: #FF474799;
+    --marker-color: #FFFFFF77;
 }
 
 body {
@@ -314,6 +315,23 @@ input[type=range][orient=vertical] {
     width: 25px;
 }
 
+.switch-div {
+    display: inline-block;
+    padding-left: var(--default-padding);
+    padding-right: var(--default-padding);
+    border: var(--action-border-width) var(--action-border-style) var(--action-border-color);
+}
+
+.switch-button {
+    background-color: var(--action-box-bg-color);
+}
+
+.switch-button-enabled {
+    border-color: var(--box-border-color);
+    background-color: var(--title-bg-color-active);
+    color: var(--title-text-color-active);
+}
+
 /* MARKER */
 
 .marker-space {
@@ -359,6 +377,10 @@ input[type=range][orient=vertical] {
 
 .marker-cell {
     background-color: var(--marker-color);
+}
+
+.marker-cell-highlight {
+    background-color: var(--marker-color-highlight);
 }
 
 .auto-scroll {

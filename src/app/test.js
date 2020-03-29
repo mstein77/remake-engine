@@ -1,4 +1,4 @@
-import React, {Component, Fragment, useState} from "react";
+import React, {Component, Fragment, useState, useEffect} from "react";
 import ReactDOM from 'react-dom';
 import './components/base.css';
 
@@ -138,10 +138,12 @@ class FullRaster extends React.Component {
             viewY: props.cellProvider.getHeight(),
             maxX: props.maxX && !props.full ? props.maxX : null,
             maxY: props.maxY && !props.full ? props.maxY : null,
-            markerPosX: 0,
-            markerPosY: 0,
+            markerPosX: null,
+            markerPosY: null,
             markerWidth: 1,
-            markerHeight: 1
+            markerHeight: 1,
+            markerMode: props.markerMode || 'display',
+            highlight: false
         };
 
         this.setBorder = this.setBorder.bind(this);
@@ -172,7 +174,7 @@ class FullRaster extends React.Component {
         if (this.props.full) {
             return this.canvasRef.current;
         }
-        return this.canvasRef.current.getCanvas();
+        return (this.canvasRef.current === null) ? null : this.canvasRef.current.getCanvas();
     }
 
     updateDims(newDims) {
@@ -256,15 +258,311 @@ class FullRaster extends React.Component {
         }
     }
 
+    getBoundingRect() {
+        const canvas = this.getCanvas();
+        if (!canvas) {
+            return null;
+        }
+        return canvas.getBoundingClientRect();
+    }
+
+    switchToMode(markerMode, data) {
+        const set = {
+            markerMode
+        };
+        const resetMarker = () => {
+            set.markerWidth = 1;
+            set.markerHeight = 1;
+            set.markerPosX = null;
+            set.markerPosY = null;
+        };
+
+        switch(markerMode) {
+            case 'scan':
+                resetMarker();
+                break;
+
+            case 'select-start':
+                resetMarker();
+                break;
+
+            case 'select':
+                if (this.state.markerMode === 'select-start') {
+                    this.modeSwitchData = data;
+                }
+                break;
+
+            default:
+                console.error('Unknown marker mode given: ', markerMode);
+                return;
+        }
+        this.setState(set);
+    }
+
+    getRasterPosFromEvent(e, outside = false) {
+        return this.getRasterPosFromClient({x: e.clientX, y: e.clientY}, outside);
+    }
+
+    getRasterPosFromClient(client, outside = false) {
+        const rect = this.getBoundingRect();
+        if (!rect) { console.log('no rect'); return null; }
+
+        const cellsize = this.props.cellProvider.getSize() * this.state.zoom  + this.state.border;
+        const rasterPos = {
+            x: Math.floor(Math.round(client.x - rect.left)/cellsize),
+            y: Math.floor(Math.round(client.y - rect.top)/cellsize),
+        };
+        if (!outside) {
+            if (rasterPos.x < 0) {
+                rasterPos.x = 0;
+            } else if (rasterPos.x >= this.state.viewX) {
+                rasterPos.x = this.state.viewX - 1;
+            }
+            if (rasterPos.y < 0) {
+                rasterPos.y = 0;
+            } else if (rasterPos.y >= this.state.viewY) {
+                rasterPos.y = this.state.viewY - 1;
+            }
+        }
+        return rasterPos;
+    }
+
     renderOverlays(width, height) {
         let marker = '';
-        if (this.state.markerPosX !== null && this.state.markerPosY !== null) {
-            const markerEndX = this.state.markerPosX + this.state.markerWidth - 1;
-            const viewEndX = this.state.posX + this.state.viewX - 1;
+        let mouseMoveCanvas = null;
+        let mouseLeaveCanvas = null;
+        let mouseDownCanvas = null;
+        let highlight = false;
+        let showMarker = true && (this.state.markerPosX !== null && this.state.markerPosY !== null);
+
+        let initResize = undefined;
+        let initMove = undefined;
+
+        switch (this.state.markerMode) {
+
+            case 'display':
+                break;
+
+            case 'scan':
+                let lastRasterPos = {x: null, y: null};
+                highlight = this.isDown;
+
+                const trackEventPosition = (e) => {
+                    const currRasterPos = this.getRasterPosFromEvent(e);
+                    const markerPosX = this.state.posX + currRasterPos.x;
+                    const markerPosY = this.state.posY + currRasterPos.y;
+                    console.log('OVERWRITE', markerPosX, markerPosY);
+                };
+
+                const mouseTrack = (e, force = false) => {
+                    const currRasterPos = this.getRasterPosFromEvent(e);
+                    if (force || currRasterPos.x !== lastRasterPos.x || currRasterPos.y !== lastRasterPos.y) {
+                        lastRasterPos = currRasterPos;
+                        const markerPosX = this.state.posX + currRasterPos.x;
+                        const markerPosY = this.state.posY + currRasterPos.y;
+                        this.setState({
+                            markerPosX,
+                            markerPosY
+                        });
+                        if (this.isDown) {
+                            trackEventPosition(e);
+                        }
+                    }
+                };
+
+                mouseDownCanvas = (e) => {
+                    this.isDown = true;
+                    trackEventPosition(e);
+                    this.setState({highlight: !this.state.highlight});
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.addEventListener('mouseup', (e) => {
+                        this.isDown = false;
+                        this.setState({highlight: !this.state.highlight});
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }, {once: true, capture: false});
+                };
+
+                mouseMoveCanvas = (e) => {
+                    mouseTrack(e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+
+                mouseLeaveCanvas = (e) => {
+                    this.setState({markerPosX: null, markerPosY: null});
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                break;
+
+            case 'select-start':
+                let lastRasterPos2 = {x: null, y: null};
+
+                const mouseTrack2 = (e, force = false) => {
+                    const currRasterPos = this.getRasterPosFromEvent(e);
+                    if (force || currRasterPos.x !== lastRasterPos2.x || currRasterPos.y !== lastRasterPos2.y) {
+                        lastRasterPos2 = currRasterPos;
+                        const markerPosX = this.state.posX + currRasterPos.x;
+                        const markerPosY = this.state.posY + currRasterPos.y;
+                        this.setState({
+                            markerPosX,
+                            markerPosY
+                        });
+                    }
+                };
+
+                mouseDownCanvas = (e) => {
+                    this.switchToMode('select', {clientX: e.clientX, clientY: e.clientY});
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+
+                mouseMoveCanvas = (e) => {
+                    mouseTrack2(e);
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+
+                mouseLeaveCanvas = (e) => {
+                    this.setState({markerPosX: null, markerPosY: null});
+                    e.preventDefault();
+                    e.stopPropagation();
+                };
+                break;
+
+            case 'select':
+                highlight = true;
+
+                initResize = (e, axis, startX, startY) => {
+                    const anchorPos = {
+                        x: this.state.markerPosX + (!startX ? 0 : this.state.markerWidth - 1),
+                        y: this.state.markerPosY + (!startY ? 0 : this.state.markerHeight - 1)
+                    };
+                    const resizeX = axis.indexOf('x') !== -1;
+                    const resizeY = axis.indexOf('y') !== -1;
+
+                    let lastRasterPos = this.getRasterPosFromEvent(e, true);
+
+                    const checkWithLastRasterPos = (e) => {
+                        const newRasterPos = this.getRasterPosFromEvent(e, true);
+                        const absWidth = newRasterPos.x + this.state.posX - anchorPos.x;
+                        const absHeight = newRasterPos.y + this.state.posY - anchorPos.y;
+
+                        const validX = (resizeX && absWidth !== 0 && newRasterPos.x + 1 >= 0 && newRasterPos.x <= this.state.viewX);
+                        const validY = (resizeY && absHeight !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= this.state.viewY);
+
+                        const hasChanged =
+                            (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
+                            (validX || validY);
+
+                        if (hasChanged) {
+                            lastRasterPos = newRasterPos;
+                            const change = {};
+
+                            if (validX) {
+                                if (absWidth > 0) {
+                                    change.markerWidth = absWidth;
+                                } else {
+                                    change.markerWidth = -absWidth;
+                                    change.markerPosX = anchorPos.x + absWidth + 1;
+                                }
+                            }
+                            if (validY) {
+                                if (absHeight > 0) {
+                                    change.markerHeight = absHeight;
+                                } else {
+                                    change.markerHeight = -absHeight;
+                                    change.markerPosY = anchorPos.y + absHeight + 1;
+                                }
+                            }
+                            this.setState(change);
+                        }
+                    };
+
+                    const mouseMove = (e) => {
+                        checkWithLastRasterPos(e);
+                        e.stopPropagation();
+                        e.preventDefault();
+                    };
+                    window.addEventListener('mousemove', mouseMove, false);
+
+                    window.addEventListener(
+                        'mouseup',
+                        (e) => {
+                            checkWithLastRasterPos(e);
+                            window.removeEventListener('mousemove', mouseMove, false);
+                            e.stopPropagation();
+                            e.preventDefault();
+                        },
+                        {capture: false, once: true}
+                    );
+                };
+
+            initMove = (e) => {
+                let lastRasterPos = this.getRasterPosFromEvent(e);
+                const offPos = {
+                    x: lastRasterPos.x - (this.state.markerPosX - this.state.posX),
+                    y: lastRasterPos.y - (this.state.markerPosY - this.state.posY)
+                };
+                const checkWithLastRasterPos = (e) => {
+                    const newRasterPos = this.getRasterPosFromEvent(e);
+                    const xStart = newRasterPos.x - offPos.x;
+                    const yStart = newRasterPos.y - offPos.y;
+
+                    const markerPosX = this.state.posX + xStart;
+                    const markerPosY = this.state.posY + yStart;
+                    const hasChanged =
+                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth() &&
+                            markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
+                        (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y);
+
+                    if (hasChanged) {
+                        lastRasterPos = newRasterPos;
+                        this.setState({markerPosX, markerPosY});
+                    }
+                };
+
+                const mouseMove = (e) => {
+                    checkWithLastRasterPos(e);
+                    e.stopPropagation();
+                    e.preventDefault();
+                };
+                window.addEventListener('mousemove', mouseMove, false);
+
+                window.addEventListener(
+                    'mouseup',
+                    (e) => {
+                        checkWithLastRasterPos(e);
+                        window.removeEventListener('mousemove', mouseMove, false);
+                        e.stopPropagation();
+                        e.preventDefault();
+                    },
+                    {capture: false, once: true}
+                );
+            };
+
+            if (this.modeSwitchData !== undefined) {
+                initResize(this.modeSwitchData, 'xy', false, false);
+                this.modeSwitchData = undefined;
+            }
+
+            break;
+        }
+
+        if (showMarker) {
             let offX = null;
             let offWidth = null;
             let hasLeft = false;
             let hasRight = false;
+            let offY = null;
+            let offHeight = null;
+            let hasTop = false;
+            let hasBottom = false;
+
+            const markerEndX = this.state.markerPosX + this.state.markerWidth - 1;
+            const viewEndX = this.state.posX + this.state.viewX - 1;
             if (this.state.posX <= markerEndX && this.state.markerPosX <= viewEndX) {
                 const lastX = Math.min(markerEndX, viewEndX);
                 offX = Math.max(this.state.posX, this.state.markerPosX);
@@ -275,10 +573,6 @@ class FullRaster extends React.Component {
             }
             const markerEndY = this.state.markerPosY + this.state.markerHeight - 1;
             const viewEndY = this.state.posY + this.state.viewY - 1;
-            let offY = null;
-            let offHeight = null;
-            let hasTop = false;
-            let hasBottom = false;
             if (this.state.posY <= markerEndY && this.state.markerPosY <= viewEndY) {
                 const lastY = Math.min(markerEndY, viewEndY);
                 offY = Math.max(this.state.posY, this.state.markerPosY);
@@ -287,151 +581,6 @@ class FullRaster extends React.Component {
                 hasBottom = (lastY === markerEndY);
                 offY -= this.state.posY;
             }
-            const cellsize = this.props.cellProvider.getSize() * this.state.zoom  + this.state.border;
-
-            const initResize = (e, axis, startX, startY) => {
-                const rect = this.getCanvas().getBoundingClientRect();
-                console.log('INIT RESIZE', axis, startX, startY);
-
-                const anchorPos = {
-                    x: startX ?
-                        Math.min(
-                            this.state.markerPosX + this.state.markerWidth - 1,
-                            this.state.posX + this.state.viewX - 1
-                        ) :
-                        Math.max(this.state.markerPosX, this.state.posX),
-                    y: startY ?
-                        Math.min(
-                            this.state.markerPosY + this.state.markerHeight - 1,
-                            this.state.posY + this.state.viewY - 1
-                        ) :
-                        Math.max(this.state.markerPosY, this.state.posY)
-                };
-                const resizeX = axis.indexOf('x') !== -1;
-                const resizeY = axis.indexOf('y') !== -1;
-                let minWidth = this.state.posX - anchorPos.x;
-                const maxWidth = minWidth + this.state.viewX;
-                if (minWidth < 0) {
-                    minWidth--;
-                }
-                let minHeight = this.state.posY - anchorPos.y;
-                const maxHeight = minHeight + this.state.viewY;
-                if (minHeight < 0) {
-                    minHeight--;
-                }
-                let lastRasterPos = {
-                    x: Math.floor(Math.round(e.clientX - rect.left)/cellsize),
-                    y: Math.floor(Math.round(e.clientY - rect.top)/cellsize)
-                };
-
-                const checkWithLastRasterPos = (e) => {
-                    const newRasterPos = {
-                        x: Math.floor(Math.round(e.clientX - rect.left)/cellsize),
-                        y: Math.floor(Math.round(e.clientY - rect.top)/cellsize)
-                    };
-                    const relWidth = newRasterPos.x - anchorPos.x;
-                    const relHeight = newRasterPos.y - anchorPos.y;
-
-                    const validX = (resizeX && relWidth !== 0 && minWidth <= relWidth && relWidth <= maxWidth);
-                    const validY = (resizeY && relHeight !== 0 && minHeight <= relHeight && relHeight <= maxHeight);
-
-                    const hasChanged =
-                        (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
-                        (validX || validY);
-
-                    if (hasChanged) {
-                        lastRasterPos = newRasterPos;
-                        const change = {};
-
-                        if (validX) {
-                            if (relWidth > 0) {
-                                change.markerWidth = relWidth;
-                            } else {
-                                change.markerWidth = -relWidth;
-                                change.markerPosX = anchorPos.x + relWidth + 1;
-                            }
-                        }
-                        if (validY) {
-                            if (relHeight > 0) {
-                                change.markerHeight = relHeight;
-                            } else {
-                                change.markerHeight = -relHeight;
-                                change.markerPosY = anchorPos.y + relHeight + 1;
-                            }
-                        }
-                        this.setState(change);
-                    }
-                };
-
-                const mouseMove = (e) => {
-                    checkWithLastRasterPos(e);
-                    e.stopPropagation();
-                    e.preventDefault();
-                };
-                window.addEventListener('mousemove', mouseMove, false);
-
-                window.addEventListener(
-                    'mouseup',
-                    (e) => {
-                        checkWithLastRasterPos(e);
-                        window.removeEventListener('mousemove', mouseMove, false);
-                        e.stopPropagation();
-                        e.preventDefault();
-                    },
-                    {capture: false, once: true}
-                );
-            };
-
-            const initMove = (e) => {
-                const rect = this.getCanvas().getBoundingClientRect();
-                let lastRasterPos = {
-                    x: Math.floor(Math.round(e.clientX - rect.left)/cellsize),
-                    y: Math.floor(Math.round(e.clientY - rect.top)/cellsize)
-                };
-                const offPos = {
-                    x: lastRasterPos.x - (this.state.markerPosX - this.state.posX),
-                    y: lastRasterPos.y - (this.state.markerPosY - this.state.posY)
-                };
-                const checkWithLastRasterPos = (e) => {
-                    const newRasterPos = {
-                        x: Math.floor(Math.round(e.clientX - rect.left)/cellsize),
-                        y: Math.floor(Math.round(e.clientY - rect.top)/cellsize)
-                    };
-                    const xStart = newRasterPos.x - offPos.x;
-                    const yStart = newRasterPos.y - offPos.y;
-
-                    const markerPosX = this.state.posX + xStart;
-                    const markerPosY = this.state.posY + yStart;
-                    const hasChanged =
-                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth() &&
-                         markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
-                        (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y);
-
-                    if (hasChanged) {
-                        lastRasterPos = newRasterPos;
-                        this.setState({markerPosX, markerPosY});
-                    }
-                    return hasChanged;
-                };
-
-                const mouseMove = (e) => {
-                    checkWithLastRasterPos(e);
-                    e.stopPropagation();
-                    e.preventDefault();
-                };
-                window.addEventListener('mousemove', mouseMove, false);
-
-                window.addEventListener(
-                    'mouseup',
-                    (e) => {
-                        checkWithLastRasterPos(e);
-                        window.removeEventListener('mousemove', mouseMove, false);
-                        e.stopPropagation();
-                        e.preventDefault();
-                    },
-                    {capture: false, once: true}
-                );
-            };
 
             marker = <CellMarker
                 initMove={initMove}
@@ -439,15 +588,23 @@ class FullRaster extends React.Component {
                 size={this.props.cellProvider.getSize()}
                 border={this.state.border}
                 zoom={this.state.zoom}
+                highlight={highlight}
                 posX={offX} posY={offY}
                 width={offWidth} height={offHeight}
                 top={hasTop} bottom={hasBottom} left={hasLeft} right={hasRight}
             />;
         }
 
-        return <div style={{width, height, top: 0, left: 0, position: 'absolute'}}>
-            {marker}
-        </div>;
+        return (
+            <div
+                onMouseMove={mouseMoveCanvas}
+                onMouseLeave={mouseLeaveCanvas}
+                onMouseDown={mouseDownCanvas}
+                style={{width, height, top: 0, left: 0, position: 'absolute'}}
+            >
+                {marker}
+            </div>
+        );
     }
 
     render() {
@@ -590,16 +747,25 @@ class FullRaster extends React.Component {
             </Fragment>;
         const zoomInput = props.maxZoom !== 1 ? <Int name="Zoom:" readOnly min="1" max={props.maxZoom} set={setZoom} value={this.state.zoom} size="1" buttons /> : '';
 
-        const selectionToolbar = (this.state.markerPosX !== null && this.state.markerPosY !== null) ?
+        let bottomTools = '';
+        if (this.state.markerMode === 'select') {
+            bottomTools =
+                <Fragment>
+                    <Dim name="Position:" buttons x={this.state.markerPosX} setX={setMarkerPosX} y={this.state.markerPosY} setY={setMarkerPosY} size="3" maxX={cellsX - this.state.markerWidth} maxY={cellsY - this.state.markerHeight} min="0" readOnly />
+                    <Dim name="Size:" buttons x={this.state.markerWidth} setX={setMarkerWidth} y={this.state.markerHeight} setY={setMarkerHeight} size="3" maxX={cellsX - this.state.markerPosX} maxY={cellsY - this.state.markerPosY} min="1" readOnly />
+                    <button onClick={() => {this.switchToMode('scan')}}>X</button>
+                </Fragment>
+        }
+        const selectionToolbar =
             <Toolbar>
-                <div>Mode: Cell-Selection</div>
-                <Dim name="Position:" buttons x={this.state.markerPosX} setX={setMarkerPosX} y={this.state.markerPosY} setY={setMarkerPosY} size="3" maxX={cellsX - this.state.markerWidth} maxY={cellsY - this.state.markerHeight} min="0" readOnly />
-                <Dim name="Size:" buttons x={this.state.markerWidth} setX={setMarkerWidth} y={this.state.markerHeight} setY={setMarkerHeight} size="3" maxX={cellsX - this.state.markerPosX} maxY={cellsY - this.state.markerPosY} min="1" readOnly />
-            </Toolbar> : '';
+                <div>Mode: {this.state.markerMode}</div>
+                {bottomTools}
+            </Toolbar>;
 
         return (
             <Stack dir="y" border full>
                 <Toolbar>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('select')} switch={(enabled) => {this.switchToMode(enabled ? 'select-start' : 'scan')}}>Select</SwitchButton>
                     {posSize}
                     {zoomInput}
                     <Int name="Border:" readOnly min="0" max="5" set={this.setBorder} value={this.state.border} size="1" buttons />
@@ -610,7 +776,7 @@ class FullRaster extends React.Component {
                         {topRow}
 
                         {leftMidCell}
-                        <div style={{border: '1px solid red', display: 'inline-block'}}>
+                        <div style={{display: 'inline-block'}}>
                             {canvas}
                         </div>
 
@@ -715,12 +881,13 @@ class FitCanvas extends React.Component {
     }
 }
 
-
-
 function CellMarker(props) {
     if (props.posX === null || props.posY === null) {
         return '';
     }
+
+    const hasResize = props.initResize !== undefined;
+    const hasMove = props.initMove !== undefined;
 
     const size = props.size * props.zoom;
     const offset = {
@@ -733,78 +900,110 @@ function CellMarker(props) {
         width: size * width + (width - 1) * props.border,
         height: size * height + (height - 1) * props.border
     };
-    const clsCenter = ['cursor-move'];
-    const centerClickHandler = (e) => {
-        props.initMove(e);
-    };
+
+    const markerCls = 'marker-cell' + (props.highlight ? '-highlight' : '');
+    const cls = ['marker-grid'];
+
+    const clsCenter = [];
+    let centerClickHandler = null;
+    if (hasMove) {
+        clsCenter.push('cursor-move');
+        centerClickHandler = (e) => {
+            props.initMove(e);
+        };
+    }
 
     const clsRight = [];
+    let rightClickHandler = null;
     if (props.right) {
-        clsRight.push('marker-cell');
-        clsRight.push('cursor-hresize');
+        clsRight.push(markerCls);
+        if (hasResize) {
+            clsRight.push('cursor-hresize');
+            rightClickHandler  = (e) => {
+                props.initResize(e, 'x', false);
+            };
+        }
     }
-    const rightClickHandler  = (e) => {
-        props.initResize(e, 'x', false);
-    };
     const clsTopLeft = [];
+    let topLeftClickHandler = null;
     if (props.left && props.top) {
-        clsTopLeft.push('marker-cell');
-        clsTopLeft.push('cursor-nwseresize');
+        clsTopLeft.push(markerCls);
+        if (hasResize) {
+            clsTopLeft.push('cursor-nwseresize');
+            topLeftClickHandler  = (e) => {
+                props.initResize(e, 'xy', true, true);
+            };
+        }
     }
-    const topLeftClickHandler  = (e) => {
-        props.initResize(e, 'xy', true, true);
-    };
     const clsTopRight = [];
+    let topRightClickHandler = null;
     if (props.right && props.top) {
-        clsTopRight.push('marker-cell');
-        clsTopRight.push('cursor-neswresize');
+        clsTopRight.push(markerCls);
+        if (hasResize) {
+            clsTopRight.push('cursor-neswresize');
+            topRightClickHandler  = (e) => {
+                props.initResize(e, 'xy', false, true);
+            };
+        }
     }
-    const topRightClickHandler  = (e) => {
-        props.initResize(e, 'xy', false, true);
-    };
     const clsLeft = [];
+    let leftClickHandler = null;
     if (props.left) {
-        clsLeft.push('marker-cell');
-        clsLeft.push('cursor-hresize');
+        clsLeft.push(markerCls);
+        if (hasResize) {
+            clsLeft.push('cursor-hresize');
+            leftClickHandler  = (e) => {
+                props.initResize(e, 'x', true);
+            };
+        }
     }
-    const leftClickHandler  = (e) => {
-        props.initResize(e, 'x', true);
-    };
     const clsTop = [];
+    let topClickHandler = null;
     if (props.top) {
-        clsTop.push('marker-cell');
-        clsTop.push('cursor-vresize');
+        clsTop.push(markerCls);
+        if (hasResize) {
+            clsTop.push('cursor-vresize');
+            topClickHandler  = (e) => {
+                props.initResize(e, 'y', null, true);
+            };
+        }
     }
-    const topClickHandler  = (e) => {
-        props.initResize(e, 'y', null, true);
-    };
     const clsBottom = [];
+    let bottomClickHandler = null;
     if (props.bottom) {
-        clsBottom.push('marker-cell');
-        clsBottom.push('cursor-vresize');
+        clsBottom.push(markerCls);
+        if (hasResize) {
+            clsBottom.push('cursor-vresize');
+            bottomClickHandler  = (e) => {
+                props.initResize(e, 'y', null, false);
+            };
+        }
     }
-    const bottomClickHandler  = (e) => {
-        props.initResize(e, 'y', null, false);
-    };
     const clsBottomLeft = [];
+    let bottomLeftClickHandler = null;
     if (props.left && props.bottom) {
-        clsBottomLeft.push('marker-cell');
-        clsBottomLeft.push('cursor-neswresize');
+        clsBottomLeft.push(markerCls);
+        if (hasResize) {
+            clsBottomLeft.push('cursor-neswresize');
+            bottomLeftClickHandler  = (e) => {
+                props.initResize(e, 'xy', true, false);
+            };
+        }
     }
-    const bottomLeftClickHandler  = (e) => {
-        props.initResize(e, 'xy', true, false);
-    };
     const clsBottomRight = [];
+    let bottomRightClickHandler = null;
     if (props.right && props.bottom) {
-        clsBottomRight.push('marker-cell');
-        clsBottomRight.push('cursor-nwseresize');
+        clsBottomRight.push(markerCls);
+        if (hasResize) {
+            clsBottomRight.push('cursor-nwseresize');
+            bottomRightClickHandler  = (e) => {
+                props.initResize(e, 'xy', false, false);
+            };
+        }
     }
-    const bottomRightClickHandler  = (e) => {
-        props.initResize(e, 'xy', false, false);
-    };
 
     return (
-        <div style={offset} className="marker-grid">
+        <div style={offset} className={cls.join(' ')}>
             <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>
             <div className={clsTop.join(' ')} onMouseDown={topClickHandler}></div>
             <div className={clsTopRight.join(' ')} onMouseDown={topRightClickHandler}></div>
@@ -824,6 +1023,17 @@ function MarkerArea(props) {
     return (
         <div className="marker-area" style={{width: props.width, height: props.height}}>
             <CellMarker top bottom left right width={props.markerWidth} height={props.markerHeight} zoom={props.zoom} size={props.size} border={props.border} posX={5} posY={5} />
+        </div>
+    );
+}
+
+function SwitchButton(props) {
+    const cls = ['switch-div switch-button' + (props.enabled ? '-enabled' : '')];
+    return (
+        <div>
+        <div onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
+            {props.children}
+        </div>
         </div>
     );
 }
@@ -1359,7 +1569,7 @@ class MyApp extends Component {
                     </Section>
 
                     <Section name="Second" flex>
-                        <FullRaster border={1} zoom={1} cellProvider={cellProvider} />
+                        <FullRaster markerMode="scan" border={1} zoom={1} cellProvider={cellProvider} />
                     </Section>
 
                     <Section name="Third" collapse="h">
