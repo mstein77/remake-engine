@@ -2,6 +2,56 @@ import React, {Component, Fragment, useState, useEffect} from "react";
 import ReactDOM from 'react-dom';
 import './components/base.css';
 
+class CellSelection {
+    constructor(type, cells) {
+        this.type = type;
+        this.cells = cells;
+    }
+
+    getWidth() {
+        return this.cells[0].length;
+    }
+
+    getHeight() {
+        return this.cells.length;
+    }
+
+    getRow(index, length = null) {
+        if (length === null) {
+            if (index > this.cells.length) {
+                return null;
+            }
+            return this.cells[index];
+        }
+        const result = [];
+        const row = this.cells[index % this.cells.length];
+        let pos = 0;
+        while(length > 0) {
+            result.push(row[pos]);
+            pos++;
+            pos %= row.length;
+            length--;
+        }
+        return result;
+    }
+
+    getType() {
+        return this.type;
+    }
+
+    isRect() {
+        return this.type === 'rect';
+    }
+
+    isRows() {
+        return this.type === 'rows';
+    }
+
+    isColumns() {
+        return this.type === 'columns';
+    }
+}
+
 class CellProvider {
 
     constructor(size, map = null) {
@@ -63,6 +113,19 @@ class CellProvider {
         }
     }
 
+    insertRowsAt(index, no) {
+        const rows = [];
+        while (no > 0) {
+            rows.push(this.getEmptyRow());
+            no--;
+        }
+        this.map.splice.call(this.map, index, 0, ...rows);
+    }
+
+    deleteRows(index, no) {
+        this.map.splice(index, no);
+    }
+
     addColumns(start, no) {
         if (no === 0) {
             return;
@@ -91,6 +154,73 @@ class CellProvider {
             }
             return -no;
         }
+    }
+
+    insertColumnsAt(index, no) {
+        const columns = [];
+        while (no > 0) {
+            columns.push(0);
+            no--;
+        }
+        for (let column of this.map) {
+            column.splice.call(column, index, 0, ...columns);
+        }
+    }
+
+    deleteColumns(index, no) {
+        for (let row of this.map) {
+            row.splice(index, no);
+        }
+    }
+
+    fillRect(posX, posY, width, height, elem) {
+        for (let y = posY, yMax = posY + height; y < yMax; y++) {
+            for (let x = posX, xMax = posX + width; x < xMax; x++) {
+                this.map[y][x] = elem;
+            }
+        }
+    }
+
+    fillRectWithSelection(posX, posY, width, height, selection) {
+        for (let y = 0; y < height; y++) {
+            const row = selection.getRow(y, width);
+            for (let x = 0; x < width; x++) {
+                this.map[posY + y][posX + x] = row[x];
+            }
+        }
+    }
+
+    writeSelection(posX, posY, selection) {
+        let i = 0;
+        let xMax = Math.min(selection.getWidth(), this.getWidth() - posX);
+        let iMax = Math.min(selection.getHeight(), this.getHeight() - posY);
+        let row;
+
+        while (i < iMax) {
+            row = selection.getRow(i);
+            for (let x = 0; x < xMax; x++) {
+                this.map[posY][posX + x] = row[x];
+            }
+            posY++;
+            i++;
+        }
+    }
+
+    reduceToRect(posX, posY, width, height) {
+        this.map = this.getRect(posX, posY, width, height);
+    }
+
+    getRect(posX, posY, width, height) {
+        const slice = this.map.slice(posY, posY + height);
+        const rowSlices = [];
+        for (let row of slice) {
+            rowSlices.push(row.slice(posX, posX + width));
+        }
+        return rowSlices;
+    }
+
+    getEmptyCell() {
+        return 0;
     }
 }
 
@@ -138,6 +268,7 @@ class FullRaster extends React.Component {
             viewY: props.cellProvider.getHeight(),
             maxX: props.maxX && !props.full ? props.maxX : null,
             maxY: props.maxY && !props.full ? props.maxY : null,
+            selection: null,
             markerPosX: null,
             markerPosY: null,
             markerWidth: 1,
@@ -209,17 +340,50 @@ class FullRaster extends React.Component {
             set.posY = _posY;
         }
 
+        let markerReset = false;
+
         if (this.state.markerPosX >= width) {
-            set.markerPosX = null;
-            set.markerPosY = null;
+            markerReset = true;
         } else if (this.state.markerPosX + this.state.markerWidth > width) {
             set.markerWidth = width - this.state.markerPosX;
         }
         if (this.state.markerPosY >= height) {
-            set.markerPosY = null;
-            set.markerPosX = null;
+            markerReset = true;
         } else if (this.state.markerPosY + this.state.markerHeight > height) {
             set.markerHeight = height - this.state.markerPosY;
+        }
+
+        if (this.state.markerMode === 'row-gap') {
+            if (width === 1 || this.state.markerPosX === width - 1) {
+                markerReset = true;
+            }
+        } else if (this.state.markerMode === 'column-gap') {
+            if (height === 1 || this.state.markerPosY === height - 1) {
+                markerReset = true;
+            }
+        }
+
+        if (this.state.selection) {
+            let selectionReset = (this.state.selection.getWidth() > width || this.state.selection.getHeight() > height);
+
+            if (this.state.selection.getType() === 'rows' && this.state.selection.getWidth() !== width) {
+                selectionReset = true;
+            }
+            if (this.state.selection.getType() === 'columns' && this.state.selection.getHeight() !== height) {
+                selectionReset = true;
+            }
+            if (selectionReset) {
+                set.selection = null;
+                markerReset = true;
+            }
+        }
+
+        if (markerReset) {
+            set.markerPosX = null;
+            set.markerPosY = null;
+            set.markerWidth = 1;
+            set.markerHeight = 1;
+            set.markerMode = 'write';
         }
         this.setState(set);
     };
@@ -278,18 +442,36 @@ class FullRaster extends React.Component {
         };
 
         switch(markerMode) {
-            case 'scan':
+            case 'write':
+                if (data && data.selection) {
+                    set.markerWidth = data.selection.getWidth();
+                    set.markerHeight = data.selection.getHeight();
+                    set.markerPosX = null;
+                    set.markerPosY = null;
+                    set.selection = data.selection;
+                } else {
+                    resetMarker();
+                }
+                break;
+
+            case 'rows-select':
+            case 'columns-select':
+            case 'rect-select':
+            case 'row-gap-select':
+            case 'column-gap-select':
                 resetMarker();
                 break;
 
-            case 'select-start':
-                resetMarker();
-                break;
-
-            case 'select':
-                if (this.state.markerMode === 'select-start') {
+            case 'rows':
+            case 'columns':
+            case 'rect':
+                if (this.state.markerMode === markerMode + '-select') {
                     this.modeSwitchData = data;
                 }
+                break;
+
+            case 'row-gap':
+            case 'column-gap':
                 break;
 
             default:
@@ -299,29 +481,33 @@ class FullRaster extends React.Component {
         this.setState(set);
     }
 
-    getRasterPosFromEvent(e, outside = false) {
-        return this.getRasterPosFromClient({x: e.clientX, y: e.clientY}, outside);
+    getRasterPosFromEvent(e, outside = false, isGap = false) {
+        return this.getRasterPosFromClient({x: e.clientX, y: e.clientY}, outside, isGap);
     }
 
-    getRasterPosFromClient(client, outside = false) {
+    getRasterPosFromClient(client, outside = false, gap = false) {
         const rect = this.getBoundingRect();
-        if (!rect) { console.log('no rect'); return null; }
+        if (!rect) {return null}
 
         const cellsize = this.props.cellProvider.getSize() * this.state.zoom  + this.state.border;
         const rasterPos = {
             x: Math.floor(Math.round(client.x - rect.left)/cellsize),
             y: Math.floor(Math.round(client.y - rect.top)/cellsize),
         };
+        const min = gap ? 1 : 0;
+        let maxX = this.state.viewX;
+        let maxY = this.state.viewY;
+
         if (!outside) {
-            if (rasterPos.x < 0) {
-                rasterPos.x = 0;
-            } else if (rasterPos.x >= this.state.viewX) {
-                rasterPos.x = this.state.viewX - 1;
+            if (rasterPos.x < min) {
+                rasterPos.x = min;
+            } else if (rasterPos.x >= maxX) {
+                rasterPos.x = maxX - 1;
             }
-            if (rasterPos.y < 0) {
-                rasterPos.y = 0;
-            } else if (rasterPos.y >= this.state.viewY) {
-                rasterPos.y = this.state.viewY - 1;
+            if (rasterPos.y < min) {
+                rasterPos.y = min;
+            } else if (rasterPos.y >= maxY) {
+                rasterPos.y = maxY - 1;
             }
         }
         return rasterPos;
@@ -329,6 +515,7 @@ class FullRaster extends React.Component {
 
     renderOverlays(width, height) {
         let marker = '';
+        let markerType = 'rect';
         let mouseMoveCanvas = null;
         let mouseLeaveCanvas = null;
         let mouseDownCanvas = null;
@@ -338,185 +525,158 @@ class FullRaster extends React.Component {
         let initResize = undefined;
         let initMove = undefined;
 
-        switch (this.state.markerMode) {
+        const initPositionTracking = (clickHandler) => {
+            const trackX = (markerType === 'rect' || markerType.startsWith('column'));
+            const trackY = (markerType === 'rect' || markerType.startsWith('row'));
+            const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
 
-            case 'display':
-                break;
+            let lastRasterPos = {x: null, y: null};
 
-            case 'scan':
-                let lastRasterPos = {x: null, y: null};
-                highlight = this.isDown;
+            const mouseTrack = (e, force = false) => {
+                const currRasterPos = this.getRasterPosFromEvent(e, false , isGap);
+                if (!trackX) {
+                    currRasterPos.x = 0;
+                }
+                if (!trackY) {
+                    currRasterPos.y = 0;
+                }
+                if (force || currRasterPos.x !== lastRasterPos.x || currRasterPos.y !== lastRasterPos.y) {
+                    lastRasterPos = currRasterPos;
+                    const markerPosX = trackX ? this.state.posX + currRasterPos.x : 0;
+                    const markerPosY = trackY ? this.state.posY + currRasterPos.y : 0;
+                    this.setState({
+                        markerPosX,
+                        markerPosY
+                    });
+                }
+            };
 
-                const trackEventPosition = (e) => {
-                    const currRasterPos = this.getRasterPosFromEvent(e);
-                    const markerPosX = this.state.posX + currRasterPos.x;
-                    const markerPosY = this.state.posY + currRasterPos.y;
-                    console.log('OVERWRITE', markerPosX, markerPosY);
+            mouseDownCanvas = (e) => {
+                clickHandler(e);
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            mouseMoveCanvas = (e) => {
+                mouseTrack(e);
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            mouseLeaveCanvas = (e) => {
+                this.setState({markerPosX: null, markerPosY: null});
+                e.preventDefault();
+                e.stopPropagation();
+            };
+        };
+
+        const initSelectionTracking = (targetMode) => {
+            initPositionTracking((e) => {
+                this.switchToMode(targetMode, {clientX: e.clientX, clientY: e.clientY});
+            });
+        };
+
+        const initResizeMoveTracking = (trackAxis) => {
+            highlight = true;
+            const trackX = trackAxis.indexOf('x') !== -1;
+            const trackY = trackAxis.indexOf('y') !== -1;
+            const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
+
+            initResize = isGap ? null : (e, axis, startX, startY) => {
+                const anchorPos = {
+                    x: this.state.markerPosX + (!startX ? 0 : this.state.markerWidth - 1),
+                    y: this.state.markerPosY + (!startY ? 0 : this.state.markerHeight - 1)
                 };
+                const resizeX = trackX && axis.indexOf('x') !== -1;
+                const resizeY = trackY && axis.indexOf('y') !== -1;
 
-                const mouseTrack = (e, force = false) => {
-                    const currRasterPos = this.getRasterPosFromEvent(e);
-                    if (force || currRasterPos.x !== lastRasterPos.x || currRasterPos.y !== lastRasterPos.y) {
-                        lastRasterPos = currRasterPos;
-                        const markerPosX = this.state.posX + currRasterPos.x;
-                        const markerPosY = this.state.posY + currRasterPos.y;
-                        this.setState({
-                            markerPosX,
-                            markerPosY
-                        });
-                        if (this.isDown) {
-                            trackEventPosition(e);
+                let lastRasterPos = this.getRasterPosFromEvent(e, true);
+
+                const checkWithLastRasterPos = (e) => {
+                    const newRasterPos = this.getRasterPosFromEvent(e, true);
+                    const absWidth = newRasterPos.x + this.state.posX - anchorPos.x;
+                    const absHeight = newRasterPos.y + this.state.posY - anchorPos.y;
+
+                    const validX = (resizeX && absWidth !== 0 && newRasterPos.x + 1 >= 0 && newRasterPos.x <= this.state.viewX);
+                    const validY = (resizeY && absHeight !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= this.state.viewY);
+
+                    const hasChanged =
+                        (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
+                        (validX || validY);
+
+                    if (hasChanged) {
+                        lastRasterPos = newRasterPos;
+                        const change = {};
+
+                        if (validX) {
+                            if (absWidth > 0) {
+                                change.markerWidth = absWidth;
+                            } else {
+                                change.markerWidth = -absWidth;
+                                change.markerPosX = anchorPos.x + absWidth + 1;
+                            }
                         }
+                        if (validY) {
+                            if (absHeight > 0) {
+                                change.markerHeight = absHeight;
+                            } else {
+                                change.markerHeight = -absHeight;
+                                change.markerPosY = anchorPos.y + absHeight + 1;
+                            }
+                        }
+                        this.setState(change);
                     }
                 };
 
-                mouseDownCanvas = (e) => {
-                    this.isDown = true;
-                    trackEventPosition(e);
-                    this.setState({highlight: !this.state.highlight});
-                    e.preventDefault();
+                const mouseMove = (e) => {
+                    checkWithLastRasterPos(e);
                     e.stopPropagation();
-                    window.addEventListener('mouseup', (e) => {
-                        this.isDown = false;
-                        this.setState({highlight: !this.state.highlight});
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }, {once: true, capture: false});
-                };
-
-                mouseMoveCanvas = (e) => {
-                    mouseTrack(e);
                     e.preventDefault();
-                    e.stopPropagation();
                 };
+                window.addEventListener('mousemove', mouseMove, false);
 
-                mouseLeaveCanvas = (e) => {
-                    this.setState({markerPosX: null, markerPosY: null});
-                    e.preventDefault();
-                    e.stopPropagation();
-                };
-                break;
-
-            case 'select-start':
-                let lastRasterPos2 = {x: null, y: null};
-
-                const mouseTrack2 = (e, force = false) => {
-                    const currRasterPos = this.getRasterPosFromEvent(e);
-                    if (force || currRasterPos.x !== lastRasterPos2.x || currRasterPos.y !== lastRasterPos2.y) {
-                        lastRasterPos2 = currRasterPos;
-                        const markerPosX = this.state.posX + currRasterPos.x;
-                        const markerPosY = this.state.posY + currRasterPos.y;
-                        this.setState({
-                            markerPosX,
-                            markerPosY
-                        });
-                    }
-                };
-
-                mouseDownCanvas = (e) => {
-                    this.switchToMode('select', {clientX: e.clientX, clientY: e.clientY});
-                    e.preventDefault();
-                    e.stopPropagation();
-                };
-
-                mouseMoveCanvas = (e) => {
-                    mouseTrack2(e);
-                    e.preventDefault();
-                    e.stopPropagation();
-                };
-
-                mouseLeaveCanvas = (e) => {
-                    this.setState({markerPosX: null, markerPosY: null});
-                    e.preventDefault();
-                    e.stopPropagation();
-                };
-                break;
-
-            case 'select':
-                highlight = true;
-
-                initResize = (e, axis, startX, startY) => {
-                    const anchorPos = {
-                        x: this.state.markerPosX + (!startX ? 0 : this.state.markerWidth - 1),
-                        y: this.state.markerPosY + (!startY ? 0 : this.state.markerHeight - 1)
-                    };
-                    const resizeX = axis.indexOf('x') !== -1;
-                    const resizeY = axis.indexOf('y') !== -1;
-
-                    let lastRasterPos = this.getRasterPosFromEvent(e, true);
-
-                    const checkWithLastRasterPos = (e) => {
-                        const newRasterPos = this.getRasterPosFromEvent(e, true);
-                        const absWidth = newRasterPos.x + this.state.posX - anchorPos.x;
-                        const absHeight = newRasterPos.y + this.state.posY - anchorPos.y;
-
-                        const validX = (resizeX && absWidth !== 0 && newRasterPos.x + 1 >= 0 && newRasterPos.x <= this.state.viewX);
-                        const validY = (resizeY && absHeight !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= this.state.viewY);
-
-                        const hasChanged =
-                            (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
-                            (validX || validY);
-
-                        if (hasChanged) {
-                            lastRasterPos = newRasterPos;
-                            const change = {};
-
-                            if (validX) {
-                                if (absWidth > 0) {
-                                    change.markerWidth = absWidth;
-                                } else {
-                                    change.markerWidth = -absWidth;
-                                    change.markerPosX = anchorPos.x + absWidth + 1;
-                                }
-                            }
-                            if (validY) {
-                                if (absHeight > 0) {
-                                    change.markerHeight = absHeight;
-                                } else {
-                                    change.markerHeight = -absHeight;
-                                    change.markerPosY = anchorPos.y + absHeight + 1;
-                                }
-                            }
-                            this.setState(change);
-                        }
-                    };
-
-                    const mouseMove = (e) => {
+                window.addEventListener(
+                    'mouseup',
+                    (e) => {
                         checkWithLastRasterPos(e);
+                        window.removeEventListener('mousemove', mouseMove, false);
                         e.stopPropagation();
                         e.preventDefault();
-                    };
-                    window.addEventListener('mousemove', mouseMove, false);
-
-                    window.addEventListener(
-                        'mouseup',
-                        (e) => {
-                            checkWithLastRasterPos(e);
-                            window.removeEventListener('mousemove', mouseMove, false);
-                            e.stopPropagation();
-                            e.preventDefault();
-                        },
-                        {capture: false, once: true}
-                    );
-                };
+                    },
+                    {capture: false, once: true}
+                );
+            };
 
             initMove = (e) => {
-                let lastRasterPos = this.getRasterPosFromEvent(e);
+                let lastRasterPos = this.getRasterPosFromEvent(e, false, isGap);
+                if (!trackX) {
+                    lastRasterPos.x = 0;
+                }
+                if (!trackY) {
+                    lastRasterPos.y = 0;
+                }
+
                 const offPos = {
                     x: lastRasterPos.x - (this.state.markerPosX - this.state.posX),
                     y: lastRasterPos.y - (this.state.markerPosY - this.state.posY)
                 };
                 const checkWithLastRasterPos = (e) => {
-                    const newRasterPos = this.getRasterPosFromEvent(e);
+                    const newRasterPos = this.getRasterPosFromEvent(e, false, isGap);
+                    if (!trackX) {
+                        newRasterPos.x = 0;
+                    }
+                    if (!trackY) {
+                        newRasterPos.y = 0;
+                    }
                     const xStart = newRasterPos.x - offPos.x;
                     const yStart = newRasterPos.y - offPos.y;
 
                     const markerPosX = this.state.posX + xStart;
                     const markerPosY = this.state.posY + yStart;
                     const hasChanged =
-                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth() &&
-                            markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
-                        (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y);
+                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth()
+                            && markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
+                        ((trackX && newRasterPos.x !== lastRasterPos.x) || (trackY && newRasterPos.y !== lastRasterPos.y));
 
                     if (hasChanged) {
                         lastRasterPos = newRasterPos;
@@ -544,11 +704,92 @@ class FullRaster extends React.Component {
             };
 
             if (this.modeSwitchData !== undefined) {
-                initResize(this.modeSwitchData, 'xy', false, false);
+                initResize(this.modeSwitchData, trackAxis, false, false);
                 this.modeSwitchData = undefined;
             }
+        };
 
-            break;
+        switch (this.state.markerMode) {
+
+            case 'display':
+                break;
+
+            case 'write':
+                if (this.state.selection) {
+                    markerType = this.state.selection.getType();
+                }
+                highlight = this.isDown;
+                const trackEventPosition = (e) => {
+                    const currRasterPos = this.getRasterPosFromEvent(e);
+                    const markerPosX = this.state.posX + currRasterPos.x;
+                    const markerPosY = this.state.posY + currRasterPos.y;
+                    if (this.state.selection !== null) {
+                        this.props.cellProvider.writeSelection(markerPosX, markerPosY, this.state.selection);
+                    } else {
+                        this.props.cellProvider.fillRect(markerPosX, markerPosY, 1, 1, this.props.cellProvider.getEmptyCell());
+                    }
+                };
+
+                initPositionTracking((e) => {
+                    this.isDown = true;
+                    trackEventPosition(e);
+                    this.setState({highlight: !this.state.highlight});
+                    window.addEventListener('mouseup', (e) => {
+                        this.isDown = false;
+                        this.setState({highlight: !this.state.highlight});
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }, {once: true, capture: false});
+                });
+                break;
+
+            case 'rows-select':
+                markerType = 'rows';
+                initSelectionTracking('rows');
+                break;
+
+            case 'rows':
+                markerType = 'rows';
+                initResizeMoveTracking('y');
+                break;
+
+            case 'columns-select':
+                markerType = 'columns';
+                initSelectionTracking('columns');
+                break;
+
+            case 'columns':
+                markerType = 'columns';
+                initResizeMoveTracking('x');
+                break;
+
+            case 'row-gap-select':
+                markerType = 'row-gap';
+                initSelectionTracking('row-gap');
+                break;
+
+            case 'row-gap':
+                markerType = 'row-gap';
+                initResizeMoveTracking('y');
+                break;
+
+            case 'column-gap-select':
+                markerType = 'column-gap';
+                initSelectionTracking('column-gap');
+                break;
+
+            case 'column-gap':
+                markerType = 'column-gap';
+                initResizeMoveTracking('x');
+                break;
+
+            case 'rect-select':
+                initSelectionTracking('rect');
+                break;
+
+            case 'rect':
+                initResizeMoveTracking('xy');
+                break;
         }
 
         if (showMarker) {
@@ -582,12 +823,39 @@ class FullRaster extends React.Component {
                 offY -= this.state.posY;
             }
 
+            if (markerType === 'columns') {
+                offY = 0;
+                offHeight = viewEndY + 1;
+                hasTop = false;
+                hasBottom = false;
+            } else if (markerType === 'rows') {
+                offX = 0;
+                offWidth = viewEndX + 1;
+                hasLeft = false;
+                hasRight = false;
+            } else if (markerType === 'row-gap') {
+                offX = 0;
+                offWidth = viewEndX + 1;
+                hasTop = false;
+                hasBottom = false;
+                hasLeft = false;
+                hasRight = false;
+            }  else if (markerType === 'column-gap') {
+                offY = 0;
+                offHeight = viewEndY + 1;
+                hasTop = false;
+                hasBottom = false;
+                hasLeft = false;
+                hasRight = false;
+            }
+
             marker = <CellMarker
                 initMove={initMove}
                 initResize={initResize}
                 size={this.props.cellProvider.getSize()}
                 border={this.state.border}
                 zoom={this.state.zoom}
+                type={markerType}
                 highlight={highlight}
                 posX={offX} posY={offY}
                 width={offWidth} height={offHeight}
@@ -747,25 +1015,185 @@ class FullRaster extends React.Component {
             </Fragment>;
         const zoomInput = props.maxZoom !== 1 ? <Int name="Zoom:" readOnly min="1" max={props.maxZoom} set={setZoom} value={this.state.zoom} size="1" buttons /> : '';
 
-        let bottomTools = '';
-        if (this.state.markerMode === 'select') {
-            bottomTools =
-                <Fragment>
-                    <Dim name="Position:" buttons x={this.state.markerPosX} setX={setMarkerPosX} y={this.state.markerPosY} setY={setMarkerPosY} size="3" maxX={cellsX - this.state.markerWidth} maxY={cellsY - this.state.markerHeight} min="0" readOnly />
-                    <Dim name="Size:" buttons x={this.state.markerWidth} setX={setMarkerWidth} y={this.state.markerHeight} setY={setMarkerHeight} size="3" maxX={cellsX - this.state.markerPosX} maxY={cellsY - this.state.markerPosY} min="1" readOnly />
-                    <button onClick={() => {this.switchToMode('scan')}}>X</button>
-                </Fragment>
+        let bottomTools = [];
+        const bottomActions = [];
+        if (['rect', 'columns', 'rows'].indexOf(this.state.markerMode) !== -1) {
+            bottomActions.push(
+                <button key="clear" onClick={() => {
+                    props.cellProvider.fillRect(
+                        this.state.markerPosX,
+                        this.state.markerPosY,
+                        this.state.markerMode === 'rows' ? props.cellProvider.getWidth() : this.state.markerWidth,
+                        this.state.markerMode === 'columns' ? props.cellProvider.getHeight() : this.state.markerHeight,
+                        props.cellProvider.getEmptyCell()
+                    );
+                    this.redrawCanvas();
+                }}>Clear</button>
+            );
+            if (this.state.markerMode === 'rect') {
+                bottomTools.push(
+                    <Dim key="pos" name="Position:" buttons x={this.state.markerPosX} setX={setMarkerPosX}
+                         y={this.state.markerPosY} setY={setMarkerPosY} size="3" maxX={cellsX - this.state.markerWidth}
+                         maxY={cellsY - this.state.markerHeight} min="0" readOnly/>
+                );
+                bottomActions.push(
+                    <button key="cutout" onClick={() => {
+                        props.cellProvider.reduceToRect(
+                            this.state.markerPosX,
+                            this.state.markerPosY,
+                            this.state.markerWidth,
+                            this.state.markerHeight
+                        );
+                        this.updateDims({});
+                        this.switchToMode('write');
+                    }}>Cut-Out</button>
+                );
+                bottomActions.push(
+                    <button key="copy" onClick={() => {
+                        const rect = props.cellProvider.getRect(
+                            this.state.markerPosX,
+                            this.state.markerPosY,
+                            this.state.markerWidth,
+                            this.state.markerHeight
+                        );
+                        this.switchToMode('write', {selection: new CellSelection('rect', rect)});
+                    }}>Copy</button>
+                );
+            } else if (this.state.markerMode !== 'write') {
+                bottomTools.push(
+                    <Int key="pos" name="Position:" buttons min="0" size="3"
+                         value={this.state[this.state.markerMode === 'rows' ? 'markerPosY' : 'markerPosX']}
+                         set={this.state.markerMode === 'rows' ? setMarkerPosY : setMarkerPosX}
+                         max={this.state.markerMode === 'rows' ? cellsY - this.state.markerHeight : cellsX - this.state.markerWidth}
+                    />
+                );
+                const disabled =
+                    (
+                        this.state.markerMode === 'rows' ?
+                            props.cellProvider.getHeight() === this.state.markerHeight :
+                            props.cellProvider.getWidth() === this.state.markerWidth
+                    );
+                bottomActions.push(
+                    <button key="del" onClick={() => {
+                        if (this.state.markerMode === 'rows') {
+                            props.cellProvider.deleteRows(this.state.markerPosY, this.state.markerHeight);
+                        } else {
+                            props.cellProvider.deleteColumns(this.state.markerPosX, this.state.markerWidth);
+                        }
+                        this.updateDims({});
+                        this.switchToMode('write');
+                    }} disabled={disabled}>Delete</button>
+                );
+                bottomActions.push(
+                    <button key="cutout" onClick={() => {
+                        if (this.state.markerMode === 'rows') {
+                            props.cellProvider.reduceToRect(
+                                0,
+                                this.state.markerPosY,
+                                props.cellProvider.getWidth(),
+                                this.state.markerHeight
+                            );
+                        } else {
+                            props.cellProvider.reduceToRect(
+                                this.state.markerPosX,
+                                0,
+                                this.state.markerWidth,
+                                props.cellProvider.getHeight()
+                            );
+                        }
+                        this.updateDims({});
+                        this.switchToMode('write');
+                    }}>Cut-Out</button>
+                );
+                bottomActions.push(
+                    <button key="copy" onClick={() => {
+                        const rect = props.cellProvider.getRect(
+                            this.state.markerPosX,
+                            this.state.markerPosY,
+                            this.state.markerMode === 'rows' ? this.props.cellProvider.getWidth() : this.state.markerWidth,
+                            this.state.markerMode === 'columns' ? this.props.cellProvider.getHeight() : this.state.markerHeight
+                        );
+                        this.switchToMode('write', {selection: new CellSelection(this.state.markerMode, rect)});
+                    }}>Copy</button>
+                );
+            }
+            bottomActions.push(
+                <button key="fill" onClick={() => {
+                    props.cellProvider.fillRectWithSelection(
+                        this.state.markerPosX,
+                        this.state.markerPosY,
+                        this.state.markerMode === 'rows' ? props.cellProvider.getWidth() : this.state.markerWidth,
+                        this.state.markerMode === 'columns' ? props.cellProvider.getHeight() : this.state.markerHeight,
+                        this.state.selection
+                    );
+                    this.redrawCanvas();
+                }}>Fill</button>
+            );
+        } else if (['row-gap', 'column-gap'].indexOf(this.state.markerMode) !== -1) {
+            bottomTools.push(
+                <Int key="pos" name="Position:" buttons min="1" size="3"
+                     value={this.state[this.state.markerMode === 'row-gap' ? 'markerPosY' : 'markerPosX']}
+                     set={this.state.markerMode === 'row-gap' ? setMarkerPosY : setMarkerPosX}
+                     max={this.state.markerMode === 'row-gap' ? cellsY - this.state.markerHeight : cellsX - this.state.markerWidth}
+                />
+            );
+            const insertGap = (no) => {
+                if (this.state.markerMode === 'row-gap') {
+                    props.cellProvider.insertRowsAt(this.state.markerPosY, no);
+                } else {
+                    props.cellProvider.insertColumnsAt(this.state.markerPosX, no);
+                }
+                this.updateDims({});
+            };
+            bottomActions.push(
+                <button key="add1" onClick={() => {
+                    insertGap(1);
+                }}>+</button>
+            );
+            bottomActions.push(
+                <button key="add10" onClick={() => {
+                    insertGap(10);
+                }}>++</button>
+            );
+        }
+
+        if (['rect', 'columns', 'rows'].indexOf(this.state.markerMode) !== -1) {
+            if (this.state.markerMode === 'rect') {
+                bottomTools.push(
+                    <Dim key="size" name="Size:" buttons x={this.state.markerWidth} setX={setMarkerWidth}
+                         y={this.state.markerHeight} setY={setMarkerHeight} size="3"
+                         maxX={cellsX - this.state.markerPosX} maxY={cellsY - this.state.markerPosY} min="1" readOnly/>
+                );
+            } else {
+                bottomTools.push(
+                    <Int key="size" name={this.state.markerMode === 'rows' ? 'Rows:' : 'Columns'} buttons min="1" size="3"
+                         value={this.state[this.state.markerMode === 'rows' ? 'markerHeight' : 'markerWidth']}
+                         set={this.state.markerMode === 'rows' ? setMarkerHeight : setMarkerWidth}
+                         max={this.state.markerMode === 'rows' ? cellsY - this.state.markerPosY : cellsX - this.state.markerPosX}
+                    />
+                );
+            }
+        }
+        if (['rect', 'columns', 'rows', 'row-gap', 'column-gap'].indexOf(this.state.markerMode) !== -1) {
+            bottomActions.push(
+                <button key="abort" onClick={() => {this.switchToMode('write')}}>X</button>
+            );
         }
         const selectionToolbar =
             <Toolbar>
                 <div>Mode: {this.state.markerMode}</div>
                 {bottomTools}
+                {bottomActions}
             </Toolbar>;
 
         return (
             <Stack dir="y" border full>
                 <Toolbar>
-                    <SwitchButton enabled={this.state.markerMode.startsWith('select')} switch={(enabled) => {this.switchToMode(enabled ? 'select-start' : 'scan')}}>Select</SwitchButton>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('rect')} switch={(enabled) => {this.switchToMode(enabled ? 'rect-select' : 'write')}}>Rect</SwitchButton>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('rows')} switch={(enabled) => {this.switchToMode(enabled ? 'rows-select' : 'write')}}>Rows</SwitchButton>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('columns')} switch={(enabled) => {this.switchToMode(enabled ? 'columns-select' : 'write')}}>Columns</SwitchButton>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('row-gap')} switch={(enabled) => {this.switchToMode(enabled ? 'row-gap-select' : 'write')}}>Row Gap</SwitchButton>
+                    <SwitchButton enabled={this.state.markerMode.startsWith('column-gap')} switch={(enabled) => {this.switchToMode(enabled ? 'column-gap-select' : 'write')}}>Column Gap</SwitchButton>
                     {posSize}
                     {zoomInput}
                     <Int name="Border:" readOnly min="0" max="5" set={this.setBorder} value={this.state.border} size="1" buttons />
@@ -890,21 +1318,35 @@ function CellMarker(props) {
     const hasMove = props.initMove !== undefined;
 
     const size = props.size * props.zoom;
+
     const offset = {
         top: props.border + (size + props.border) * props.posY  - 8,
         left: props.border + (size + props.border) * props.posX - 8
     };
+    if (props.type === 'row-gap') {
+        const baseline = Math.round(props.border / 2) + props.posY * (size + props.border) - 8;
+        offset.top =  baseline - 8 - props.border;
+        offset.left = -8;
+    } else if (props.type === 'column-gap') {
+        const baseline = Math.round(props.border / 2) + props.posX * (size + props.border) - 8;
+        offset.left =  baseline - 8 - props.border;
+        offset.top = -8;
+    }
+
     const width = props.width || 1;
     const height = props.height || 1;
     const centerStyle = {
-        width: size * width + (width - 1) * props.border,
-        height: size * height + (height - 1) * props.border
+        width: (props.type === 'column-gap' ? 16  : size * width + (width - 1) * props.border),
+        height: (props.type === 'row-gap' ? 16 : size * height + (height - 1) * props.border)
     };
 
     const markerCls = 'marker-cell' + (props.highlight ? '-highlight' : '');
     const cls = ['marker-grid'];
 
     const clsCenter = [];
+    if (['rows', 'columns', 'row-gap', 'column-gap'].indexOf(props.type) !== -1) {
+        clsCenter.push(markerCls);
+    }
     let centerClickHandler = null;
     if (hasMove) {
         clsCenter.push('cursor-move');
@@ -1569,7 +2011,7 @@ class MyApp extends Component {
                     </Section>
 
                     <Section name="Second" flex>
-                        <FullRaster markerMode="scan" border={1} zoom={1} cellProvider={cellProvider} />
+                        <FullRaster markerMode="write" border={1} zoom={1} cellProvider={cellProvider} />
                     </Section>
 
                     <Section name="Third" collapse="h">
