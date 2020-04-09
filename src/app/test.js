@@ -1,6 +1,8 @@
-import React, {Component, Fragment, useState, useEffect} from "react";
+import React, {Component, Fragment, useState, useEffect, useRef} from "react";
 import ReactDOM from 'react-dom';
 import './components/base.css';
+
+const CssContext = React.createContext();
 
 class CellSelection {
     constructor(type, cells) {
@@ -258,12 +260,15 @@ class FullRaster extends React.Component {
     constructor(props) {
         super(props);
         this.canvasRef = React.createRef();
+        this.hRulerRef = React.createRef();
+        this.vRulerRef = React.createRef();
 
         this.state = {
             border: props.border || 0,
             zoom: props.zoom || 1,
             posX: 0,
             posY: 0,
+            rulers: props.rulers,
             viewX: props.cellProvider.getWidth(),
             viewY: props.cellProvider.getHeight(),
             maxX: props.maxX && !props.full ? props.maxX : null,
@@ -276,6 +281,11 @@ class FullRaster extends React.Component {
             markerMode: props.markerMode || 'display',
             highlight: false
         };
+
+        this.rulerFontSize = 10;
+        this.rulerFontWidth = 8;
+        this.rulerPadding = 6;
+        this.rulerDist = 5;
 
         this.setBorder = this.setBorder.bind(this);
         this.setZoom = this.setZoom.bind(this);
@@ -299,6 +309,63 @@ class FullRaster extends React.Component {
     redrawCanvas() {
         const canvas = this.getCanvas();
         drawRaster(canvas, this.props.cellProvider, this.state.border, this.state.zoom);
+
+        const fullWidth = 13;
+        const smallWidth = 3;
+        const padding = this.rulerPadding;
+        const fontSize = this.rulerFontSize;
+        const border = 1;
+        const charWidth = this.rulerFontWidth;
+        const cellSize = this.state.zoom * this.props.cellProvider.getSize() + this.state.border;
+
+        const getRulerContext = (canvas) => {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = this.context.contentTextColor;
+            ctx.text = fontSize + 'px Monospace';
+            return ctx;
+        };
+
+        if (this.hRulerRef.current) {
+            const hRuler = this.hRulerRef.current;
+            const ctx = getRulerContext(hRuler);
+            ctx.fillRect(0, hRuler.height - border, hRuler.width, border);
+            const maxDigits = ('' + this.props.cellProvider.getWidth()).length;
+            const dist = Math.ceil((maxDigits * charWidth + 2 * padding) / cellSize);
+            for (let i = 0; i < this.state.viewX; i++) {
+                if (i % dist === 0) {
+                    if (i + dist - 1 < this.state.viewX) {
+                        ctx.fillText('' + (this.state.posX + i), cellSize * i + padding, fontSize);
+                    }
+                    ctx.fillRect(cellSize * i, hRuler.height - fullWidth, border, fullWidth);
+                } else {
+                    ctx.fillRect(cellSize * i, hRuler.height - smallWidth, border, smallWidth);
+                }
+            }
+        }
+
+        if (this.vRulerRef.current) {
+            const vRuler = this.vRulerRef.current;
+            const ctx = getRulerContext(vRuler);
+            ctx.fillRect(vRuler.width - border, 0, 1, vRuler.height);
+            const dist = Math.ceil((fontSize + 2 * padding) / cellSize);
+            for (let i = 0; i < this.state.viewY; i++) {
+                if (i % dist === 0) {
+                    if (i + dist - 1 < this.state.viewY) {
+                        const text = '' + (this.state.posY + i);
+                        const width = ctx.measureText(text).width;
+                        ctx.fillText(
+                            text,
+                            vRuler.width - padding - width,
+                            cellSize * i + fontSize + (padding >> 1)
+                        );
+                    }
+                    ctx.fillRect(vRuler.width - fullWidth,cellSize * i, fullWidth, border);
+                } else {
+                    ctx.fillRect(vRuler.width - smallWidth, cellSize * i, smallWidth, border);
+                }
+            }
+        }
     }
 
     getCanvas() {
@@ -391,8 +458,14 @@ class FullRaster extends React.Component {
     getCanvasSizeForDim(width, height, updateViewDim = false) {
         const props = this.props;
         const padding = 20;
-        const spaceX = width - (padding * 2) - this.state.border;
-        const spaceY = height - (padding * 2) - this.state.border;
+
+        let spaceX = width - (padding * 2) - this.state.border;
+        let spaceY = height - (padding * 2) - this.state.border;
+
+        if (this.state.rulers) {
+            spaceX -= this.rulerFontSize + this.rulerPadding + this.rulerDist + this.context.defaultPadding;
+            spaceY -= this.rulerFontWidth * ('' + this.props.cellProvider.getHeight()).length + this.rulerPadding + this.rulerDist + this.context.defaultPadding;
+        }
 
         const cellSize = this.state.zoom * props.cellProvider.getSize() + this.state.border;
         let viewX = props.full ? props.cellProvider.getWidth() : Math.floor(spaceX / cellSize);
@@ -525,14 +598,17 @@ class FullRaster extends React.Component {
         let initResize = undefined;
         let initMove = undefined;
 
+        if (!this.lastRasterPos) {
+            this.lastRasterPos = {x: null, y: null};
+        }
+
         const initPositionTracking = (clickHandler) => {
             const trackX = (markerType === 'rect' || markerType.startsWith('column'));
             const trackY = (markerType === 'rect' || markerType.startsWith('row'));
             const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
 
-            let lastRasterPos = {x: null, y: null};
-
             const mouseTrack = (e, force = false) => {
+                const lastRasterPos = this.lastRasterPos;
                 const currRasterPos = this.getRasterPosFromEvent(e, false , isGap);
                 if (!trackX) {
                     currRasterPos.x = 0;
@@ -541,7 +617,7 @@ class FullRaster extends React.Component {
                     currRasterPos.y = 0;
                 }
                 if (force || currRasterPos.x !== lastRasterPos.x || currRasterPos.y !== lastRasterPos.y) {
-                    lastRasterPos = currRasterPos;
+                    this.lastRasterPos = currRasterPos;
                     const markerPosX = trackX ? this.state.posX + currRasterPos.x : 0;
                     const markerPosY = trackY ? this.state.posY + currRasterPos.y : 0;
                     this.setState({
@@ -564,6 +640,7 @@ class FullRaster extends React.Component {
             };
 
             mouseLeaveCanvas = (e) => {
+                this.lastRasterPos = undefined;
                 this.setState({markerPosX: null, markerPosY: null});
                 e.preventDefault();
                 e.stopPropagation();
@@ -862,9 +939,23 @@ class FullRaster extends React.Component {
                 top={hasTop} bottom={hasBottom} left={hasLeft} right={hasRight}
             />;
         }
-
+        let rulers = '';
+        if (this.state.rulers) {
+            const hRulerHeight = this.rulerFontSize + this.rulerPadding;
+            const vRulerWidth = this.rulerFontWidth * ('' + this.props.cellProvider.getHeight()).length + this.rulerPadding;
+            rulers =
+                <Fragment>
+                    <div style={{width, height: hRulerHeight, top: -(hRulerHeight + this.rulerDist + 5), left: 0, position: 'absolute'}}>
+                        <canvas ref={this.hRulerRef} width={width} height={hRulerHeight}></canvas>
+                    </div>
+                    <div style={{width: vRulerWidth, height, top: 0, left: -(vRulerWidth + this.rulerDist + 5), position: 'absolute'}}>
+                        <canvas ref={this.vRulerRef} width={vRulerWidth} height={height}></canvas>
+                    </div>
+                </Fragment>;
+        }
         return (
-            <div
+            <Fragment>
+            <div className="leave"
                 onMouseMove={mouseMoveCanvas}
                 onMouseLeave={mouseLeaveCanvas}
                 onMouseDown={mouseDownCanvas}
@@ -872,6 +963,8 @@ class FullRaster extends React.Component {
             >
                 {marker}
             </div>
+                {rulers}
+            </Fragment>
         );
     }
 
@@ -883,8 +976,15 @@ class FullRaster extends React.Component {
             const cellSize = props.cellProvider.getSize() * this.state.zoom  + this.state.border;
             const width = cellSize * props.cellProvider.getWidth() + this.state.border;
             const height = cellSize * props.cellProvider.getHeight() + this.state.border;
+            const style = {};
+            if (this.state.rulers) {
+                // TODO calc these values
+                style.paddingLeft = 30;
+                style.paddingTop = 30;
+            }
+
             canvas =
-                <div className="auto-scroll">
+                <div className="auto-scroll" style={style}>
                     <div className="rel-canvas marker-space">
                         <canvas ref={this.canvasRef} width={width} height={height} />
                         {this.renderOverlays(width, height)}
@@ -936,13 +1036,25 @@ class FullRaster extends React.Component {
             const btnAddPageAttr = {};
             const btnSub1Attr = {};
             const btnSubPageAttr = {};
+            const btnJumpAttr = {};
+            const jumpChar = (start ? 'first' : 'last') + '_page';
+            const materialCls = ['material-icons md-18'];
+            if (vertical) {
+                materialCls.push('rotate-90');
+            }
 
             if (pos !== (start ? 0 : maxPos)) {
                 btnAdd1Attr.disabled = 'disabled';
                 btnSub1Attr.disabled = 'disabled';
                 btnAddPageAttr.disabled = 'disabled';
                 btnSubPageAttr.disabled = 'disabled';
+                btnJumpAttr.onClick = () => {
+                    const target = {};
+                    target[vertical ? 'posY' : 'posX'] = start ? 0 : maxPos;
+                    this.updateDims(target);
+                };
             } else {
+                btnJumpAttr.disabled = 'disabled';
                 btnAdd1Attr.onClick = () => {
                     callback(1, start);
                 };
@@ -961,13 +1073,44 @@ class FullRaster extends React.Component {
                     }
                 }
             }
+            const jumpBtn =  props.full ? '' : <button {...btnJumpAttr}><i className={materialCls.join(' ')}>{jumpChar}</i></button>;
+
             const br = vertical ? '' : <br />;
             return (<div>
                 <button {...btnSubPageAttr}>--</button>{br}
                 <button {...btnSub1Attr}>-</button>{br}
+                {jumpBtn}
                 <button {...btnAdd1Attr}>+</button>{br}
                 <button {...btnAddPageAttr}>++</button>
             </div>)
+        };
+
+        const getNavButton = (startX, startY, rotate) => {
+            if (props.full) {
+                return '';
+            }
+            const jumpChar = (startX ? 'first' : 'last') + '_page';
+            const materialCls = ['material-icons md-18'];
+            const endX = this.props.cellProvider.getWidth() - this.state.viewX;
+            const endY = this.props.cellProvider.getHeight() - this.state.viewY;
+            const btnAttr = {
+                onClick: () => {
+                    this.updateDims({
+                        posX: startX ? 0 : endX,
+                        posY: startY ? 0 : endY
+                    });
+                }
+            };
+            if (((startX && this.state.posX === 0) || (!startX && this.state.posX === endX)) && (
+                ((startY && this.state.posY === 0) || (!startY && this.state.posY === endY))
+            )) {
+                btnAttr.disabled = 'disabled';
+            };
+            return (
+                <button {...btnAttr}>
+                    <i className={materialCls.join(' ')} style={{transform: 'rotate(' + rotate + 'deg)'}}>{jumpChar}</i>
+                </button>
+            );
         };
 
         const sliderX = hiddenX ?
@@ -979,6 +1122,7 @@ class FullRaster extends React.Component {
         let topRow = '';
         let leftMidCell = '';
         let leftBottomCell = '';
+        let rightBottomCell = '';
         const fixed = !props.cellProvider.isResizeable();
         if (fixed) {
             gridCls.push('grid-2x2');
@@ -987,13 +1131,13 @@ class FullRaster extends React.Component {
             const topButtons = getSizeButtons(true, true);
             topRow =
                 <Fragment>
-                    <div></div>
+                    <div>{getNavButton(true, true, 45)}</div>
                     <div>
                         <Stack dir="y" center>{topButtons}</Stack>
                     </div>
-                    <div></div>
+                    <div>{getNavButton(false, true, -45)}</div>
                 </Fragment>;
-
+            rightBottomCell = getNavButton(false, false, 45);
 
             const leftButtons = getSizeButtons(true, false);
             leftMidCell =
@@ -1003,7 +1147,7 @@ class FullRaster extends React.Component {
                     </Stack>
                 </div>;
 
-            leftBottomCell = <div></div>;
+            leftBottomCell = <div>{getNavButton(true, false, -45)}</div>;
         }
         const rightButtons = fixed ? '' : getSizeButtons(false, false);
         const bottomButtons = fixed ? '' : getSizeButtons(false, true);
@@ -1186,6 +1330,11 @@ class FullRaster extends React.Component {
                 {bottomActions}
             </Toolbar>;
 
+
+        const canvasElem = this.getCanvas();
+        const scrollSizeX = canvasElem ? canvasElem.width : 10;
+        const scrollSizeY = canvasElem ? canvasElem.height : 10;
+
         return (
             <Stack dir="y" border full>
                 <Toolbar>
@@ -1197,6 +1346,9 @@ class FullRaster extends React.Component {
                     {posSize}
                     {zoomInput}
                     <Int name="Border:" readOnly min="0" max="5" set={this.setBorder} value={this.state.border} size="1" buttons />
+                    <Checkbox name="Rulers" value={this.state.rulers} set={(rulers) => {
+                        this.setState({rulers});
+                    }} />
                 </Toolbar>
 
                 <div className="padded flex">
@@ -1210,19 +1362,19 @@ class FullRaster extends React.Component {
 
                         <div>
                             <Stack dir="x" center full>
+                                <Scrollbar vertical auto size={scrollSizeY} set={(value) => {this.updateDims({posY: value})}} max={this.props.cellProvider.getHeight()} pos={this.state.posY} page={this.state.viewY} />
                                 {rightButtons}
-                                {sliderY}
                             </Stack>
                         </div>
 
                         {leftBottomCell}
                         <div>
                             <Stack dir="y" center>
+                                <Scrollbar auto size={scrollSizeX} set={(value) => {this.updateDims({posX: value})}} max={this.props.cellProvider.getWidth()} pos={this.state.posX} page={this.state.viewX} />
                                 {bottomButtons}
-                                {sliderX}
                             </Stack>
                         </div>
-                        <div></div>
+                        <div>{rightBottomCell}</div>
                     </div>
                 </div>
 
@@ -1232,15 +1384,15 @@ class FullRaster extends React.Component {
     }
 
     componentDidMount() {
-        // initial
         this.redrawCanvas();
     }
 
     componentDidUpdate() {
-        // Änderungen an state oder props
         this.redrawCanvas();
     }
 }
+FullRaster.contextType = CssContext;
+
 
 class FitCanvas extends React.Component {
 
@@ -1321,7 +1473,9 @@ function CellMarker(props) {
 
     const offset = {
         top: props.border + (size + props.border) * props.posY  - 8,
-        left: props.border + (size + props.border) * props.posX - 8
+        left: props.border + (size + props.border) * props.posX - 8,
+        width: 'min-content',
+        height: 'min-content'
     };
     if (props.type === 'row-gap') {
         const baseline = Math.round(props.border / 2) + props.posY * (size + props.border) - 8;
@@ -1461,10 +1615,100 @@ function CellMarker(props) {
     )
 }
 
-function MarkerArea(props) {
+function Scrollbar(props) {
+
+    const divRef = useRef(null);
+
+    const pagePerc = Math.round(props.page / props.max * 100);
+    if (props.auto && pagePerc === 100) {
+        return '';
+    }
+
+    const spacePerc = 100 - pagePerc;
+    const maxSteps = props.max - props.page;
+    const minPerc = maxSteps === 0 ? 0 : props.pos * (spacePerc / maxSteps);
+    const maxPerc = 100 - (pagePerc + minPerc);
+
+    const axis = props.vertical ? 'y' : 'x';
+    const axisKey = props.vertical ? 'height' : 'width';
+    const oppAxisKey = props.vertical ? 'width' : 'height';
+    const client = 'client' + axis.toUpperCase();
+    const dirKey = (axis === 'x' ? 'h' : 'v');
+
+    const dimMin = {
+        [axisKey]: minPerc + '%',
+        [oppAxisKey]: 20
+    };
+    const dimMax = {
+        [axisKey]: maxPerc + '%',
+        [oppAxisKey]: 20
+    };
+
+    const mouseDown = (e) => {
+        const rect = divRef.current.getBoundingClientRect();
+        const anchorPos =  e[client];
+        const pixelSteps = rect[axisKey] / props.max;
+        const maxDistRight = (maxSteps - props.pos) * pixelSteps;
+        const minDistLeft = -props.pos * pixelSteps;
+
+        const getOffset = (value) => {
+            const dist = value - anchorPos;
+            const relPos = Math.max(Math.min(dist, maxDistRight), minDistLeft);
+            return Math.round(relPos / pixelSteps);
+        };
+        let lastPos = 0;
+
+        const trackMouse = (e) => {
+            const relPos = getOffset(e[client]);
+            if (relPos !== lastPos) {
+                lastPos = relPos;
+                props.set(props.set(props.pos + relPos));
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        };
+        window.addEventListener('mousemove', trackMouse, false);
+
+        window.addEventListener('mouseup', (e) => {
+            window.removeEventListener('mousemove', trackMouse, false);
+            e.stopPropagation();
+            e.preventDefault();
+        }, {capture: false, once: true});
+
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const setMouseDown = (e) => {
+        const rect = divRef.current.getBoundingClientRect();
+        const pixelSteps = rect[axisKey] / props.max;
+        const pageSize = Math.round(props.page * pixelSteps / 2);
+        const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), props.max));
+        props.set(offPos);
+        e.preventDefault();
+        e.stopPropagation();
+    };
+    const cls = ['scrollbar-div'];
+    const dim = {[oppAxisKey]: 20};
+    if (props.size) {
+        dim[axisKey] = props.size;
+    } else {
+        cls.push('full-' + dirKey);
+    }
+
+    const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
+    const stackCls = ['stack-' + dirKey];
+    if (props.vertical) {
+        stackCls.push('full-v');
+    }
+
     return (
-        <div className="marker-area" style={{width: props.width, height: props.height}}>
-            <CellMarker top bottom left right width={props.markerWidth} height={props.markerHeight} zoom={props.zoom} size={props.size} border={props.border} posX={5} posY={5} />
+        <div style={dim} ref={divRef} className={cls.join(' ')}>
+            <div className={stackCls.join(' ')}>
+                <div onMouseDown={setMouseDown} style={dimMin}></div>
+                <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
+                <div onMouseDown={setMouseDown} style={dimMax}></div>
+            </div>
         </div>
     );
 }
@@ -1480,65 +1724,15 @@ function SwitchButton(props) {
     );
 }
 
-class AutoCanvas extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.divRef = React.createRef();
-        this.canvasRef = React.createRef();
-        this.state = {
-            width: null,
-            height: null
-        };
-    }
-
-    render() {
-        const cls = ['rel-canvas marker-space'];
-        const canvas = (this.state.width && this.state.height) ?
-            <div className={cls.join(' ')}>
-                <canvas ref={this.canvasRef} width={this.state.width} height={this.state.height} />
-                {this.props.children}
-            </div> : '';
-
-        return(
-            <div ref={this.divRef} className="full-v stack-h centered items-centered">
-                {canvas}
-            </div>
-        )
-    }
-
-    updateSize() {
-        if (this.divRef.current === null) {
-            return;
-        }
-        const sizes = this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight);
-        this.props.setViewDim(sizes.cellsX, sizes.cellsY);
-        this.setState(
-            {width: sizes.width, height: sizes.height}
-        );
-    }
-
-    getSnapshotBeforeUpdate() {
-        return this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight);
-    }
-
-    componentDidUpdate(a, b, snapshot) {
-        if (snapshot !== null) {
-            if (snapshot.width !== this.state.width || snapshot.height !== this.state.height) {
-                this.updateSize();
-                return;
-            }
-        }
-        this.props.redrawCanvas(this.canvasRef.current);
-    }
-
-    componentDidMount() {
-        this.updateSize();
-        const resizeObserver = new ResizeObserver(entries => {
-            this.updateSize();
-        });
-        resizeObserver.observe(this.divRef.current);
-    }
+function Checkbox(props) {
+    return (
+        <div className="stack-h">
+            <div>{props.name}</div>
+            <div><input onChange={(e) => {
+                props.set(e.target.checked);
+            }} type="checkbox" checked={!!props.value} /></div>
+        </div>
+    );
 }
 
 function Stack(props) {
@@ -1976,25 +2170,31 @@ class MyApp extends Component {
     }
 
     render() {
+        const style = getComputedStyle(document.body);
+        const css = {
+            contentTextColor: style.getPropertyValue('--content-text-color'),
+            defaultPadding: style.getPropertyValue('--default-padding')
+        };
 
         const cellProvider = new CellProvider(16,
         [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ]
         );
 
         return (
+            <CssContext.Provider value={css}>
             <Stack dir="y" full>
                 <Stack dir="x" full>
                     <Section name="First and Last of us" collapse="h">
@@ -2025,263 +2225,16 @@ class MyApp extends Component {
                     </Section>
                 </Stack>
 
-
                 <Section name="Fourth" collapse="v">
                     <div className="padded">
                         <button onClick={this.openModal}>Please open my modal!</button>
                     </div>
                 </Section>
             </Stack>
+            </CssContext.Provider>
         )
     }
 }
-
-function Raster(props) {
-
-    const zoom = props.zoom || 1;
-    const border = props.border || 0;
-    const padding = props.padding || 0;
-    const cellSize = zoom * props.size + border;
-
-    const cellsX = props.cellsX || null;
-    const cellsY = props.cellsY || null;
-
-    const getCanvasSizeForDim = (width, height) => {
-        // border + zoom
-        const spaceX = width - (padding * 2) - border;
-        const spaceY = height - (padding * 2) - border;
-
-        let maxX = Math.floor(spaceX / cellSize);
-        if (cellsX !== null) {
-            maxX = Math.min(maxX, cellsX);
-        }
-        let maxY = Math.floor(spaceY / cellSize);
-
-        if (cellsY !== null) {
-            maxY = Math.min(maxY, cellsY);
-        }
-        return {
-            width: maxX * cellSize + border,
-            height: maxY * cellSize + border,
-            cellsX: maxX,
-            cellsY: maxY
-        }
-    };
-
-    const drawRaster = (canvas) => {
-        const ctx = canvas.getContext('2d');
-
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const spaceX = canvas.width - border;
-        const spaceY = canvas.height - border;
-        const cellsX = spaceX / cellSize;
-        const cellsY = spaceY / cellSize;
-
-        ctx.fillStyle = '#FFFFFF';
-
-        let pos = 0;
-        for (let x = 0; x <= cellsX; x++) {
-            ctx.fillRect(pos, 0, border, canvas.height);
-            pos += cellSize;
-        }
-        pos = 0;
-        for (let y = 0; y <= cellsY; y++) {
-            ctx.fillRect(0, pos, canvas.width, border);
-            pos += cellSize;
-        }
-    };
-
-    return (
-        <AutoCanvas setViewDim={props.setViewDim} getCanvasSizeForDim={getCanvasSizeForDim} redrawCanvas={drawRaster}>
-            {props.children}
-        </AutoCanvas>
-    );
-}
-
-function MapRaster(props) {
-    const [zoom, setZoom] = useState(props.zoom || 1);
-    const [border, setBorder] = useState(props.border || 0);
-    const [cellsX, setCellsX] = useState(props.cellsX !== undefined ? props.cellsX : null);
-    const [cellsY, setCellsY] = useState(props.cellsY !== undefined ? props.cellsY : null);
-    const [viewX, setViewX] = useState(props.viewX !== undefined ? props.viewX : cellsX);
-    const [viewY, setViewY] = useState(props.viewY !== undefined ? props.viewY : cellsY);
-    const [posX, setPosX] = useState(0);
-    const [posY, setPosY] = useState(0);
-    const [markerWidth, setMarkerWidth] = useState(1);
-    const [markerHeight, setMarkerHeight] = useState(1);
-
-    const updateDims = (newDims) => {
-        const _cellsX = newDims.cellsX !== undefined ? newDims.cellsX : cellsX;
-        const _cellsY = newDims.cellsY !== undefined ? newDims.cellsY : cellsY;
-        const _viewX = newDims.viewX !== undefined ? newDims.viewX : viewX;
-        const _viewY = newDims.viewY !== undefined ? newDims.viewY : viewY;
-        const _posX = newDims.posX !== undefined ? newDims.posX : posX;
-        const _posY = newDims.posY !== undefined ? newDims.posY : posY;
-
-        const _hiddenX = Math.max(_cellsX - _viewX, 0);
-        const _hiddenY = Math.max(_cellsY - _viewY, 0);
-
-        setViewX(_viewX);
-        if (_posX >= _hiddenX || newDims.endX) {
-            setPosX(_hiddenX);
-        } else {
-            setPosX(_posX);
-        }
-        setViewY(_viewY);
-        if (_posY >= _hiddenY || newDims.endY) {
-            setPosY(_hiddenY);
-        } else {
-            setPosY(_posY);
-        }
-        setCellsX(_cellsX);
-        setCellsY(_cellsY);
-    };
-
-    const setViewDim = (viewX, viewY) => {
-        updateDims({viewX, viewY});
-    };
-
-    const hiddenX = cellsX - viewX;
-    const hiddenY = cellsY - viewY;
-
-    const addRows = (no, start) => {
-        const _posY = start ? 0 : Math.max(0, posY + no);
-        const _cellsY = Math.max(1, cellsY + no);
-        updateDims({posY: _posY, cellsY: _cellsY, endY: !start});
-    };
-
-    const addColumns = (no, start) => {
-        const _posX = start ? 0 : Math.max(0, posX + no);
-        const _cellsX = Math.max(1, cellsX + no);
-        updateDims({posX: _posX, cellsX: _cellsX, endX: !start});
-    };
-
-    const getSizeButtons = (start, vertical) => {
-        const callback = vertical ? addRows : addColumns;
-        const maxPos = vertical ? hiddenY : hiddenX;
-        const pos = vertical ? posY : posX;
-        const max = vertical ? cellsY : cellsX;
-        const btnAdd1Attr = {};
-        const btnAddPageAttr = {};
-        const btnSub1Attr = {};
-        const btnSubPageAttr = {};
-
-        if (pos !== (start ? 0 : maxPos)) {
-            btnAdd1Attr.disabled = 'disabled';
-            btnSub1Attr.disabled = 'disabled';
-            btnAddPageAttr.disabled = 'disabled';
-            btnSubPageAttr.disabled = 'disabled';
-        } else {
-            btnAdd1Attr.onClick = () => {
-                callback(1, start);
-            };
-            btnAddPageAttr.onClick = () => {
-                callback(max - maxPos, start);
-            };
-            if (max === 1) {
-                btnSub1Attr.disabled = 'disabled';
-                btnSubPageAttr.disabled = 'disabled';
-            } else {
-                btnSub1Attr.onClick = () => {
-                    callback(-1, start);
-                };
-                btnSubPageAttr.onClick = () => {
-                    callback(-(max - maxPos), start);
-                }
-            }
-        }
-        const br = vertical ? '' : <br />;
-        return (<div>
-            <button {...btnSubPageAttr}>--</button>{br}
-            <button {...btnSub1Attr}>-</button>{br}
-            <button {...btnAdd1Attr}>+</button>{br}
-            <button {...btnAddPageAttr}>++</button>
-        </div>)
-    };
-
-    const sliderX = hiddenX ?
-        <div className="full-h"><input onChange={(e) => {setPosX(parseInt(e.target.value, 10))}} max={hiddenX} value={posX} type="range" className="full-h" /></div> : '';
-    const sliderY = hiddenY ?
-        <div className="full-v"><input onChange={(e) => {setPosY(parseInt(e.target.max, 10) - parseInt(e.target.value, 10))}} max={hiddenY} value={hiddenY - posY} type="range" orient="vertical" className="full-v" /></div> : '';
-
-    const gridCls = ['full-v'];
-    let topRow = '';
-    let leftMidCell = '';
-    let leftBottomCell = '';
-    if (props.fixed) {
-        gridCls.push('grid-2x2');
-    } else {
-        gridCls.push('grid-3x3');
-        const topButtons = getSizeButtons(true, true);
-        topRow =
-            <Fragment>
-                <div></div>
-                <div>
-                    <Stack dir="y" center>{topButtons}</Stack>
-                </div>
-                <div></div>
-            </Fragment>;
-
-
-        const leftButtons = getSizeButtons(true, false);
-        leftMidCell =
-            <div>
-                <Stack dir="x" center full>
-                    {leftButtons}
-                </Stack>
-            </div>;
-
-        leftBottomCell = <div></div>;
-    }
-    const rightButtons = props.fixed ? '' : getSizeButtons(false, false);
-    const bottomButtons = props.fixed ? '' : getSizeButtons(false, true);
-
-    const zoomInput = props.maxZoom !== 1 ? <Int name="Zoom:" readOnly min="1" max={props.maxZoom} set={setZoom} value={zoom} size="1" buttons /> : '';
-
-    return (
-        <Stack dir="y" full border>
-            <Toolbar>
-                <Dim name="Size:" x={cellsX} setX={setCellsX} y={cellsY} setY={setCellsY} size="3" min="1" readOnly />
-                <Dim name="Position:" buttons x={posX} setX={setPosX} y={posY} setY={setPosY} size="3" maxX={hiddenX} maxY={hiddenY} min="0" readOnly />
-                {zoomInput}
-                <Int name="Border:" readOnly min="0" max="5" set={setBorder} value={border} size="1" buttons />
-            </Toolbar>
-            <div className="padded flex">
-                <div className={gridCls.join(' ')}>
-                    {topRow}
-
-                    {leftMidCell}
-                    <Raster posX={posX} posY={posY} setViewDim={setViewDim} size={props.size}  cellsX={cellsX} cellsY={cellsY} border={border} zoom={zoom}>
-                        <MarkerArea markerWidth={markerWidth} size={props.size} markerHeight={markerHeight} cellsX={cellsX} cellsY={cellsY} border={border} zoom={zoom} />
-                    </Raster>
-                    <div>
-                        <Stack dir="x" center full>
-                            {rightButtons}
-                            <div className="full-v">{sliderY}</div>
-                        </Stack>
-                    </div>
-
-                    {leftBottomCell}
-                    <div>
-                        <Stack dir="y" center>
-                            {bottomButtons}
-                            {sliderX}
-                        </Stack>
-                    </div>
-                    <div></div>
-                </div>
-            </div>
-            <Toolbar>
-                <div>Mode: Cell-Selection</div>
-                <Dim name="Position:" buttons x={posX} setX={setPosX} y={posY} setY={setPosY} size="3" maxX={hiddenX} maxY={hiddenY} min="0" readOnly />
-                <Dim name="Size:" buttons x={markerWidth} setX={setMarkerWidth} y={markerHeight} setY={setMarkerHeight} size="3" maxX={10} maxY={10} min="1" readOnly />
-            </Toolbar>
-        </Stack>
-    );
-}
-
 
 ReactDOM.render(<MyApp/>, document.getElementById('root'));
 

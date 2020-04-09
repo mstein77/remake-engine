@@ -408,3 +408,20 @@ input[type=range][orient=vertical] {
 .cursor-hresize {
     cursor: ew-resize;
 }
+
+.rotate-90 {
+    transform: rotate(90deg);
+}
+
+.scrollbar-div {
+    border: 2px inset #6060F0;
+    padding: 1px;
+    margin: 0px;
+    background-color: #303050;
+}
+
+.scrollbar-handle {
+    flex: 1;
+    border: 2px outset #6060F0;
+    background-color: #6060F0;
+}
