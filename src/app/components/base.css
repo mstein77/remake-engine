@@ -368,6 +368,19 @@ input[type=range][orient=vertical] {
     border: var(--marker-width) solid #FF0000A0;
 }
 
+@-webkit-keyframes blinker {
+    from {opacity: 1.0;}
+    to {opacity: 0.4;}
+}
+
+.blink {
+    -webkit-animation-name: blinker;
+    -webkit-animation-duration: 0.6s;
+    -webkit-animation-iteration-count:infinite;
+    -webkit-animation-timing-function:ease-in-out;
+    -webkit-animation-direction: alternate;
+}
+
 .marker-grid {
     position: relative;
     display: grid;

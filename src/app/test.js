@@ -56,9 +56,69 @@ class CellSelection {
 
 class CellProvider {
 
-    constructor(size, map = null) {
+    constructor(size, data) {
         this.size = size;
-        this.map = map === null ? [[0]] : map;
+        this.data = data;
+        this.map = [[this.getEmptyCell()]];
+    }
+
+    hasData() {
+        return this.data === null;
+    }
+
+    load(callback) {
+        if (this.hasData()) {
+            callback();
+            return;
+        }
+
+        this.convertURIToImageData(this.data).then(
+            (data) => {
+
+                this.map = [];
+                const toHex = function (value) {
+                    return  ('0' + (value & 0xFF).toString(16)).slice(-2);
+                };
+
+                let pos = 0;
+                for (let y = 0; y < data.height; y++) {
+                    const row = [];
+                    for (let x = 0; x < data.width; x++) {
+                        row.push(
+                            '#'
+                            + toHex(data.data[pos])
+                            + toHex(data.data[pos + 1])
+                            + toHex(data.data[pos + 2])
+                            + toHex(data.data[pos + 3])
+                        );
+                        pos += 4;
+                    }
+                    this.map.push(row);
+                }
+                this.data = null;
+                callback();
+            }
+        );
+    }
+
+    convertURIToImageData(URI) {
+        return new Promise(function(resolve, reject) {
+            if (URI == null) return reject();
+            var canvas = document.createElement('canvas'),
+                context = canvas.getContext('2d'),
+                image = new Image();
+            image.addEventListener('load', function() {
+                canvas.width = image.width;
+                canvas.height = image.height;
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                resolve(context.getImageData(0, 0, canvas.width, canvas.height));
+            }, false);
+            image.src = URI;
+        });
+    }
+
+    getCellType() {
+        return 'color';
     }
 
     isResizeable() {
@@ -81,7 +141,7 @@ class CellProvider {
         const row = [];
         let i = this.map[0].length;
         while (i > 0) {
-            row.push(0);
+            row.push(this.getEmptyCell());
             i--;
         }
         return row;
@@ -136,9 +196,9 @@ class CellProvider {
             while (no > 0) {
                 for (let i = 0, iMax = this.map.length; i < iMax; i++) {
                     if (start) {
-                        this.map[i].unshift(0);
+                        this.map[i].unshift(this.getEmptyCell());
                     } else {
-                        this.map[i].push(0);
+                        this.map[i].push(this.getEmptyCell());
                     }
                 }
                 no--;
@@ -161,7 +221,7 @@ class CellProvider {
     insertColumnsAt(index, no) {
         const columns = [];
         while (no > 0) {
-            columns.push(0);
+            columns.push(this.getEmptyCell());
             no--;
         }
         for (let column of this.map) {
@@ -192,7 +252,7 @@ class CellProvider {
         }
     }
 
-    writeSelection(posX, posY, selection) {
+    writeSelection(posX, posY, selection, overwrite = null) {
         let i = 0;
         let xMax = Math.min(selection.getWidth(), this.getWidth() - posX);
         let iMax = Math.min(selection.getHeight(), this.getHeight() - posY);
@@ -201,7 +261,7 @@ class CellProvider {
         while (i < iMax) {
             row = selection.getRow(i);
             for (let x = 0; x < xMax; x++) {
-                this.map[posY][posX + x] = row[x];
+                this.map[posY][posX + x] = overwrite !== null ? overwrite : row[x];
             }
             posY++;
             i++;
@@ -222,37 +282,48 @@ class CellProvider {
     }
 
     getEmptyCell() {
-        return 0;
+        return '#00000000';
     }
 }
 
-function drawRaster(canvas, cellProvider, border, zoom) {
-    if (canvas === null) {
-        return;
-    }
-    const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function getWindowEventManager() {
+    let windowListeners = [];
 
-    const spaceX = canvas.width - border;
-    const spaceY = canvas.height - border;
-    const cellSize = cellProvider.getSize() * zoom + border;
-    const cellsX = spaceX / cellSize;
-    const cellsY = spaceY / cellSize;
+    const removeListener = (event, listener, options) => {
+        const remainingListeners = [];
+        for (let item of windowListeners) {
+            let match = false;
+            if (item.event === event) {
+                match = JSON.stringify(options) === JSON.stringify(item.options);
+            }
+            if (match) {
+                window.removeEventListener(event, listener, options);
+            } else {
+                remainingListeners.push(item);
+            }
+        }
+        windowListeners = remainingListeners;
+    };
 
-    ctx.fillStyle = '#FFFFFF';
+    const addListener = (event, listener, options) => {
+        removeListener(event, listener, options);
+        window.addEventListener(event, listener, options);
+        windowListeners.push({event, listener, options});
+    };
 
-    let pos = 0;
-    for (let x = 0; x <= cellsX; x++) {
-        ctx.fillRect(pos, 0, border, canvas.height);
-        pos += cellSize;
-    }
-    pos = 0;
-    for (let y = 0; y <= cellsY; y++) {
-        ctx.fillRect(0, pos, canvas.width, border);
-        pos += cellSize;
-    }
+    const clearListeners = () => {
+        while(windowListeners.length > 0) {
+            const item = windowListeners.pop();
+            window.removeEventListener(item.event, item.listener, item.options);
+        }
+    };
+
+    return {
+        addListener,
+        removeListener,
+        clearListeners
+    };
 }
 
 class FullRaster extends React.Component {
@@ -262,6 +333,8 @@ class FullRaster extends React.Component {
         this.canvasRef = React.createRef();
         this.hRulerRef = React.createRef();
         this.vRulerRef = React.createRef();
+
+        this.windowEvents = getWindowEventManager();
 
         this.state = {
             border: props.border || 0,
@@ -281,6 +354,8 @@ class FullRaster extends React.Component {
             markerMode: props.markerMode || 'display',
             highlight: false
         };
+
+        this.addPage = this.props.page || 10;
 
         this.rulerFontSize = 10;
         this.rulerFontWidth = 8;
@@ -306,65 +381,112 @@ class FullRaster extends React.Component {
         });
     }
 
-    redrawCanvas() {
-        const canvas = this.getCanvas();
-        drawRaster(canvas, this.props.cellProvider, this.state.border, this.state.zoom);
+    drawRaster(canvas, cellProvider, border, zoom) {
+        if (canvas === null) {
+            return;
+        }
+        const ctx = canvas.getContext('2d');
 
-        const fullWidth = 13;
-        const smallWidth = 3;
-        const padding = this.rulerPadding;
-        const fontSize = this.rulerFontSize;
-        const border = 1;
-        const charWidth = this.rulerFontWidth;
-        const cellSize = this.state.zoom * this.props.cellProvider.getSize() + this.state.border;
+//        ctx.fillStyle = '#000000FF';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const getRulerContext = (canvas) => {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = this.context.contentTextColor;
-            ctx.text = fontSize + 'px Monospace';
-            return ctx;
-        };
+        const spaceX = canvas.width - border;
+        const spaceY = canvas.height - border;
+        const size = cellProvider.getSize() * zoom;
+        const cellSize = size + border;
+        const cellsX = spaceX / cellSize;
+        const cellsY = spaceY / cellSize;
 
-        if (this.hRulerRef.current) {
-            const hRuler = this.hRulerRef.current;
-            const ctx = getRulerContext(hRuler);
-            ctx.fillRect(0, hRuler.height - border, hRuler.width, border);
-            const maxDigits = ('' + this.props.cellProvider.getWidth()).length;
-            const dist = Math.ceil((maxDigits * charWidth + 2 * padding) / cellSize);
-            for (let i = 0; i < this.state.viewX; i++) {
-                if (i % dist === 0) {
-                    if (i + dist - 1 < this.state.viewX) {
-                        ctx.fillText('' + (this.state.posX + i), cellSize * i + padding, fontSize);
-                    }
-                    ctx.fillRect(cellSize * i, hRuler.height - fullWidth, border, fullWidth);
-                } else {
-                    ctx.fillRect(cellSize * i, hRuler.height - smallWidth, border, smallWidth);
-                }
-            }
+        ctx.fillStyle = '#FFFFFF';
+
+        let pos = 0;
+        for (let x = 0; x <= cellsX; x++) {
+            ctx.fillRect(pos, 0, border, canvas.height);
+            pos += cellSize;
+        }
+        pos = 0;
+        for (let y = 0; y <= cellsY; y++) {
+            ctx.fillRect(0, pos, canvas.width, border);
+            pos += cellSize;
         }
 
-        if (this.vRulerRef.current) {
-            const vRuler = this.vRulerRef.current;
-            const ctx = getRulerContext(vRuler);
-            ctx.fillRect(vRuler.width - border, 0, 1, vRuler.height);
-            const dist = Math.ceil((fontSize + 2 * padding) / cellSize);
-            for (let i = 0; i < this.state.viewY; i++) {
-                if (i % dist === 0) {
-                    if (i + dist - 1 < this.state.viewY) {
-                        const text = '' + (this.state.posY + i);
-                        const width = ctx.measureText(text).width;
-                        ctx.fillText(
-                            text,
-                            vRuler.width - padding - width,
-                            cellSize * i + fontSize + (padding >> 1)
-                        );
-                    }
-                    ctx.fillRect(vRuler.width - fullWidth,cellSize * i, fullWidth, border);
-                } else {
-                    ctx.fillRect(vRuler.width - smallWidth, cellSize * i, smallWidth, border);
-                }
+        const rows = cellProvider.getRect(this.state.posX, this.state.posY, cellsX, cellsY);
+        pos = border;
+        for (let row of rows) {
+            for (let x = 0; x < cellsX; x++) {
+                ctx.fillStyle = row[x];
+                ctx.fillRect(border + x * cellSize, pos, size, size);
             }
+            pos += cellSize;
+        }
+
+    }
+
+
+    redrawCanvas() {
+        if (!this.renderId) {
+            this.renderId = requestAnimationFrame(() => {
+                this.renderId = null;
+                const canvas = this.getCanvas();
+                this.drawRaster(canvas, this.props.cellProvider, this.state.border, this.state.zoom);
+
+                const fullWidth = 13;
+                const smallWidth = 3;
+                const padding = this.rulerPadding;
+                const fontSize = this.rulerFontSize;
+                const border = 1;
+                const charWidth = this.rulerFontWidth;
+                const cellSize = this.state.zoom * this.props.cellProvider.getSize() + this.state.border;
+
+                const getRulerContext = (canvas) => {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = this.context.contentTextColor;
+                    ctx.text = fontSize + 'px Monospace';
+                    return ctx;
+                };
+
+                if (this.hRulerRef.current) {
+                    const hRuler = this.hRulerRef.current;
+                    const ctx = getRulerContext(hRuler);
+                    ctx.fillRect(0, hRuler.height - border, hRuler.width, border);
+                    const maxDigits = ('' + this.props.cellProvider.getWidth()).length;
+                    const dist = Math.ceil((maxDigits * charWidth + 2 * padding) / cellSize);
+                    for (let i = 0; i < this.state.viewX; i++) {
+                        if (i % dist === 0) {
+                            if (i + dist - 1 < this.state.viewX) {
+                                ctx.fillText('' + (this.state.posX + i), cellSize * i + padding, fontSize);
+                            }
+                            ctx.fillRect(cellSize * i, hRuler.height - fullWidth, border, fullWidth);
+                        } else {
+                            ctx.fillRect(cellSize * i, hRuler.height - smallWidth, border, smallWidth);
+                        }
+                    }
+                }
+
+                if (this.vRulerRef.current) {
+                    const vRuler = this.vRulerRef.current;
+                    const ctx = getRulerContext(vRuler);
+                    ctx.fillRect(vRuler.width - border, 0, 1, vRuler.height);
+                    const dist = Math.ceil((fontSize + 2 * padding) / cellSize);
+                    for (let i = 0; i < this.state.viewY; i++) {
+                        if (i % dist === 0) {
+                            if (i + dist - 1 < this.state.viewY) {
+                                const text = '' + (this.state.posY + i);
+                                const width = ctx.measureText(text).width;
+                                ctx.fillText(
+                                    text,
+                                    vRuler.width - padding - width,
+                                    cellSize * i + fontSize + (padding >> 1)
+                                );
+                            }
+                            ctx.fillRect(vRuler.width - fullWidth,cellSize * i, fullWidth, border);
+                        } else {
+                            ctx.fillRect(vRuler.width - smallWidth, cellSize * i, smallWidth, border);
+                        }
+                    }
+                }
+            });
         }
     }
 
@@ -455,6 +577,13 @@ class FullRaster extends React.Component {
         this.setState(set);
     };
 
+    getRulerSpaceDims() {
+        return {
+            x: this.rulerFontSize + this.rulerPadding + this.rulerDist + this.context.defaultPadding,
+            y: this.rulerFontWidth * ('' + this.props.cellProvider.getHeight()).length + this.rulerPadding + this.rulerDist + this.context.defaultPadding
+        };
+    }
+
     getCanvasSizeForDim(width, height, updateViewDim = false) {
         const props = this.props;
         const padding = 20;
@@ -463,10 +592,10 @@ class FullRaster extends React.Component {
         let spaceY = height - (padding * 2) - this.state.border;
 
         if (this.state.rulers) {
-            spaceX -= this.rulerFontSize + this.rulerPadding + this.rulerDist + this.context.defaultPadding;
-            spaceY -= this.rulerFontWidth * ('' + this.props.cellProvider.getHeight()).length + this.rulerPadding + this.rulerDist + this.context.defaultPadding;
+            const rulerSpaceDim = this.getRulerSpaceDims();
+            spaceX -= rulerSpaceDim.x;
+            spaceY -= rulerSpaceDim.y;
         }
-
         const cellSize = this.state.zoom * props.cellProvider.getSize() + this.state.border;
         let viewX = props.full ? props.cellProvider.getWidth() : Math.floor(spaceX / cellSize);
         let viewY = props.full ? props.cellProvider.getHeight() : Math.floor(spaceY / cellSize);
@@ -507,11 +636,11 @@ class FullRaster extends React.Component {
         const set = {
             markerMode
         };
-        const resetMarker = () => {
+        const resetMarker = (data) => {
             set.markerWidth = 1;
             set.markerHeight = 1;
-            set.markerPosX = null;
-            set.markerPosY = null;
+            set.markerPosX = data && data.x !== undefined ? data.x : null;
+            set.markerPosY = data && data.y !== undefined ? data.y : null;
         };
 
         switch(markerMode) {
@@ -523,7 +652,7 @@ class FullRaster extends React.Component {
                     set.markerPosY = null;
                     set.selection = data.selection;
                 } else {
-                    resetMarker();
+                    resetMarker(data);
                 }
                 break;
 
@@ -551,6 +680,7 @@ class FullRaster extends React.Component {
                 console.error('Unknown marker mode given: ', markerMode);
                 return;
         }
+        this.windowEvents.clearListeners();
         this.setState(set);
     }
 
@@ -597,12 +727,14 @@ class FullRaster extends React.Component {
 
         let initResize = undefined;
         let initMove = undefined;
+        let dblClick = undefined;
+        let click = undefined;
 
         if (!this.lastRasterPos) {
             this.lastRasterPos = {x: null, y: null};
         }
 
-        const initPositionTracking = (clickHandler) => {
+        const initPositionTracking = (clickHandler, trackHandler) => {
             const trackX = (markerType === 'rect' || markerType.startsWith('column'));
             const trackY = (markerType === 'rect' || markerType.startsWith('row'));
             const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
@@ -624,6 +756,9 @@ class FullRaster extends React.Component {
                         markerPosX,
                         markerPosY
                     });
+                    if (trackHandler) {
+                        trackHandler(markerPosX, markerPosY);
+                    }
                 }
             };
 
@@ -658,6 +793,14 @@ class FullRaster extends React.Component {
             const trackX = trackAxis.indexOf('x') !== -1;
             const trackY = trackAxis.indexOf('y') !== -1;
             const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
+
+            dblClick = (e) => {
+                if (this.copyAction) {
+                    this.copyAction();
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            };
 
             initResize = isGap ? null : (e, axis, startX, startY) => {
                 const anchorPos = {
@@ -710,13 +853,13 @@ class FullRaster extends React.Component {
                     e.stopPropagation();
                     e.preventDefault();
                 };
-                window.addEventListener('mousemove', mouseMove, false);
+                this.windowEvents.addListener('mousemove', mouseMove, false);
 
-                window.addEventListener(
+                this.windowEvents.addListener(
                     'mouseup',
                     (e) => {
                         checkWithLastRasterPos(e);
-                        window.removeEventListener('mousemove', mouseMove, false);
+                        this.windowEvents.removeListener('mousemove', mouseMove, false);
                         e.stopPropagation();
                         e.preventDefault();
                     },
@@ -734,8 +877,8 @@ class FullRaster extends React.Component {
                 }
 
                 const offPos = {
-                    x: lastRasterPos.x - (this.state.markerPosX - this.state.posX),
-                    y: lastRasterPos.y - (this.state.markerPosY - this.state.posY)
+                    x: isGap ? 0 : lastRasterPos.x - (this.state.markerPosX - this.state.posX),
+                    y: isGap ? 0 : lastRasterPos.y - (this.state.markerPosY - this.state.posY)
                 };
                 const checkWithLastRasterPos = (e) => {
                     const newRasterPos = this.getRasterPosFromEvent(e, false, isGap);
@@ -748,16 +891,33 @@ class FullRaster extends React.Component {
                     const xStart = newRasterPos.x - offPos.x;
                     const yStart = newRasterPos.y - offPos.y;
 
-                    const markerPosX = this.state.posX + xStart;
-                    const markerPosY = this.state.posY + yStart;
-                    const hasChanged =
-                        (markerPosX >= 0 && markerPosX + this.state.markerWidth <= this.props.cellProvider.getWidth()
-                            && markerPosY >= 0 && markerPosY + this.state.markerHeight <= this.props.cellProvider.getHeight()) &&
-                        ((trackX && newRasterPos.x !== lastRasterPos.x) || (trackY && newRasterPos.y !== lastRasterPos.y));
+                    let markerPosX = this.state.posX + xStart;
+                    let markerPosY = this.state.posY + yStart;
 
-                    if (hasChanged) {
-                        lastRasterPos = newRasterPos;
-                        this.setState({markerPosX, markerPosY});
+                    const hasChangedX = trackX && newRasterPos.x !== lastRasterPos.x;
+                    const hasChangedY = trackY && newRasterPos.y !== lastRasterPos.y;
+
+                    if (hasChangedX || hasChangedY) {
+                        const set = {};
+                        if (hasChangedX) {
+                            if (markerPosX < 0) {
+                                markerPosX = 0;
+                            } else if (markerPosX + this.state.markerWidth > this.props.cellProvider.getWidth()) {
+                                markerPosX = this.props.cellProvider.getWidth() - this.state.markerWidth;
+                            }
+                            lastRasterPos.x = newRasterPos.x;
+                            set.markerPosX = markerPosX;
+                        }
+                        if (hasChangedY) {
+                            if (markerPosY < 0) {
+                                markerPosY = 0;
+                            } else if (markerPosY + this.state.markerHeight > this.props.cellProvider.getHeight()) {
+                                markerPosY = this.props.cellProvider.getHeight() - this.state.markerHeight;
+                            }
+                            lastRasterPos.y = newRasterPos.y;
+                            set.markerPosY = markerPosY;
+                        }
+                        this.setState(set);
                     }
                 };
 
@@ -766,24 +926,48 @@ class FullRaster extends React.Component {
                     e.stopPropagation();
                     e.preventDefault();
                 };
-                window.addEventListener('mousemove', mouseMove, false);
+                this.windowEvents.addListener('mousemove', mouseMove, false);
 
-                window.addEventListener(
+                this.windowEvents.addListener(
                     'mouseup',
                     (e) => {
                         checkWithLastRasterPos(e);
-                        window.removeEventListener('mousemove', mouseMove, false);
+                        this.windowEvents.removeListener('mousemove', mouseMove, false);
                         e.stopPropagation();
                         e.preventDefault();
                     },
                     {capture: false, once: true}
                 );
+
             };
 
             if (this.modeSwitchData !== undefined) {
                 initResize(this.modeSwitchData, trackAxis, false, false);
                 this.modeSwitchData = undefined;
             }
+        };
+
+        const writeSelection = (x, y, clear = false) => {
+            let type = markerType;
+            if (this.state.selection) {
+                type = this.state.selection.getType();
+            }
+            if (type === 'rows') {
+                x = 0;
+            } else if (type === 'columns') {
+                y = 0;
+            }
+
+            if (this.state.selection !== null) {
+                if (clear) {
+                    this.props.cellProvider.writeSelection(x, y, this.state.selection, this.props.cellProvider.getEmptyCell());
+                } else {
+                    this.props.cellProvider.writeSelection(x, y, this.state.selection);
+                }
+            } else {
+                this.props.cellProvider.fillRect(x, y, 1, 1, this.props.cellProvider.getEmptyCell());
+            }
+
         };
 
         switch (this.state.markerMode) {
@@ -796,28 +980,42 @@ class FullRaster extends React.Component {
                     markerType = this.state.selection.getType();
                 }
                 highlight = this.isDown;
-                const trackEventPosition = (e) => {
-                    const currRasterPos = this.getRasterPosFromEvent(e);
-                    const markerPosX = this.state.posX + currRasterPos.x;
-                    const markerPosY = this.state.posY + currRasterPos.y;
-                    if (this.state.selection !== null) {
-                        this.props.cellProvider.writeSelection(markerPosX, markerPosY, this.state.selection);
-                    } else {
-                        this.props.cellProvider.fillRect(markerPosX, markerPosY, 1, 1, this.props.cellProvider.getEmptyCell());
+
+                const trackEventPosition = (x, y) => {
+                    if (!this.isDown) {
+                        return;
                     }
+
+                    writeSelection(x, y, false);
+/*
+                    if (markerType === 'rows') {
+                        x = 0;
+                    } else if (markerType === 'columns') {
+                        y = 0;
+                    }
+
+                    if (this.state.selection !== null) {
+                        this.props.cellProvider.writeSelection(x, y, this.state.selection);
+                    } else {
+                        this.props.cellProvider.fillRect(x, y, 1, 1, this.props.cellProvider.getEmptyCell());
+                    }
+ */
                 };
 
                 initPositionTracking((e) => {
                     this.isDown = true;
-                    trackEventPosition(e);
+                    const currRasterPos = this.getRasterPosFromEvent(e);
+                    const markerPosX = this.state.posX + currRasterPos.x;
+                    const markerPosY = this.state.posY + currRasterPos.y;
+                    trackEventPosition(markerPosX, markerPosY);
                     this.setState({highlight: !this.state.highlight});
-                    window.addEventListener('mouseup', (e) => {
+                    this.windowEvents.addListener('mouseup', (e) => {
                         this.isDown = false;
                         this.setState({highlight: !this.state.highlight});
                         e.preventDefault();
                         e.stopPropagation();
                     }, {once: true, capture: false});
-                });
+                }, trackEventPosition);
                 break;
 
             case 'rows-select':
@@ -902,24 +1100,24 @@ class FullRaster extends React.Component {
 
             if (markerType === 'columns') {
                 offY = 0;
-                offHeight = viewEndY + 1;
+                offHeight = this.state.viewY;
                 hasTop = false;
                 hasBottom = false;
             } else if (markerType === 'rows') {
                 offX = 0;
-                offWidth = viewEndX + 1;
+                offWidth = this.state.viewX;
                 hasLeft = false;
                 hasRight = false;
             } else if (markerType === 'row-gap') {
                 offX = 0;
-                offWidth = viewEndX + 1;
+                offWidth = this.state.viewX;
                 hasTop = false;
                 hasBottom = false;
                 hasLeft = false;
                 hasRight = false;
             }  else if (markerType === 'column-gap') {
                 offY = 0;
-                offHeight = viewEndY + 1;
+                offHeight = this.state.viewY;
                 hasTop = false;
                 hasBottom = false;
                 hasLeft = false;
@@ -929,6 +1127,9 @@ class FullRaster extends React.Component {
             marker = <CellMarker
                 initMove={initMove}
                 initResize={initResize}
+                dblClick={dblClick}
+                click={click}
+                blink
                 size={this.props.cellProvider.getSize()}
                 border={this.state.border}
                 zoom={this.state.zoom}
@@ -953,9 +1154,20 @@ class FullRaster extends React.Component {
                     </div>
                 </Fragment>;
         }
+        const cancel = (e) => {
+            const pos = this.getRasterPosFromEvent(e);
+            if (this.state.markerMode !== 'write') {
+                this.switchToMode('write', pos);
+            } else {
+                writeSelection(pos.x, pos.y, true);
+            }
+            e.preventDefault();
+        };
+
         return (
             <Fragment>
-            <div className="leave"
+            <div
+                onContextMenu={cancel}
                 onMouseMove={mouseMoveCanvas}
                 onMouseLeave={mouseLeaveCanvas}
                 onMouseDown={mouseDownCanvas}
@@ -978,9 +1190,9 @@ class FullRaster extends React.Component {
             const height = cellSize * props.cellProvider.getHeight() + this.state.border;
             const style = {};
             if (this.state.rulers) {
-                // TODO calc these values
-                style.paddingLeft = 30;
-                style.paddingTop = 30;
+                const rulerSpaceDims = this.getRulerSpaceDims();
+                style.paddingLeft = rulerSpaceDims.x;
+                style.paddingTop = rulerSpaceDims.y;
             }
 
             canvas =
@@ -1059,7 +1271,7 @@ class FullRaster extends React.Component {
                     callback(1, start);
                 };
                 btnAddPageAttr.onClick = () => {
-                    callback(max - maxPos, start);
+                    callback(this.addPage, start);
                 };
                 if (max === 1) {
                     btnSub1Attr.disabled = 'disabled';
@@ -1069,7 +1281,7 @@ class FullRaster extends React.Component {
                         callback(-1, start);
                     };
                     btnSubPageAttr.onClick = () => {
-                        callback(-(max - maxPos), start);
+                        callback(-this.addPage, start);
                     }
                 }
             }
@@ -1112,12 +1324,6 @@ class FullRaster extends React.Component {
                 </button>
             );
         };
-
-        const sliderX = hiddenX ?
-            <div className="full-h"><input onChange={(e) => {setPosX(parseInt(e.target.value, 10))}} max={hiddenX} value={this.state.posX} type="range" className="full-h" /></div> : '';
-        const sliderY = hiddenY ?
-            <div className="full-v"><input onChange={(e) => {setPosY(parseInt(e.target.max, 10) - parseInt(e.target.value, 10))}} max={hiddenY} value={hiddenY - this.state.posY} type="range" orient="vertical" className="full-v" /></div> : '';
-
         const gridCls = ['full-v'];
         let topRow = '';
         let leftMidCell = '';
@@ -1161,6 +1367,24 @@ class FullRaster extends React.Component {
 
         let bottomTools = [];
         const bottomActions = [];
+        this.copyAction = undefined;
+        if (['rect', 'columns', 'rows', 'column-gap', 'row-gap'].indexOf(this.state.markerMode) !== -1) {
+            bottomActions.push(
+                <button key="goto" onClick={() => {
+                    let posX = this.state.markerPosX;
+                    if (this.state.markerMode === 'column-gap' && posX > 0) {
+                        posX--;
+                    }
+                    let posY = this.state.markerPosY;
+                    if (this.state.markerMode === 'row-gap' && posY > 0) {
+                        posY--;
+                    }
+                    this.updateDims({posX, posY})}}>
+                    Goto
+                </button>
+            );
+        }
+
         if (['rect', 'columns', 'rows'].indexOf(this.state.markerMode) !== -1) {
             bottomActions.push(
                 <button key="clear" onClick={() => {
@@ -1192,16 +1416,17 @@ class FullRaster extends React.Component {
                         this.switchToMode('write');
                     }}>Cut-Out</button>
                 );
+                this.copyAction = () => {
+                    const rect = props.cellProvider.getRect(
+                        this.state.markerPosX,
+                        this.state.markerPosY,
+                        this.state.markerWidth,
+                        this.state.markerHeight
+                    );
+                    this.switchToMode('write', {selection: new CellSelection('rect', rect)});
+                };
                 bottomActions.push(
-                    <button key="copy" onClick={() => {
-                        const rect = props.cellProvider.getRect(
-                            this.state.markerPosX,
-                            this.state.markerPosY,
-                            this.state.markerWidth,
-                            this.state.markerHeight
-                        );
-                        this.switchToMode('write', {selection: new CellSelection('rect', rect)});
-                    }}>Copy</button>
+                    <button key="copy" onClick={this.copyAction}>Copy</button>
                 );
             } else if (this.state.markerMode !== 'write') {
                 bottomTools.push(
@@ -1249,16 +1474,17 @@ class FullRaster extends React.Component {
                         this.switchToMode('write');
                     }}>Cut-Out</button>
                 );
+                this.copyAction = () => {
+                    const rect = props.cellProvider.getRect(
+                        this.state.markerPosX,
+                        this.state.markerPosY,
+                        this.state.markerMode === 'rows' ? this.props.cellProvider.getWidth() : this.state.markerWidth,
+                        this.state.markerMode === 'columns' ? this.props.cellProvider.getHeight() : this.state.markerHeight
+                    );
+                    this.switchToMode('write', {selection: new CellSelection(this.state.markerMode, rect)});
+                };
                 bottomActions.push(
-                    <button key="copy" onClick={() => {
-                        const rect = props.cellProvider.getRect(
-                            this.state.markerPosX,
-                            this.state.markerPosY,
-                            this.state.markerMode === 'rows' ? this.props.cellProvider.getWidth() : this.state.markerWidth,
-                            this.state.markerMode === 'columns' ? this.props.cellProvider.getHeight() : this.state.markerHeight
-                        );
-                        this.switchToMode('write', {selection: new CellSelection(this.state.markerMode, rect)});
-                    }}>Copy</button>
+                    <button key="copy" onClick={this.copyAction}>Copy</button>
                 );
             }
             bottomActions.push(
@@ -1282,13 +1508,22 @@ class FullRaster extends React.Component {
                 />
             );
             const insertGap = (no) => {
+                const set = {};
                 if (this.state.markerMode === 'row-gap') {
                     props.cellProvider.insertRowsAt(this.state.markerPosY, no);
+                    set.markerPosY = this.state.markerPosY + no;
                 } else {
                     props.cellProvider.insertColumnsAt(this.state.markerPosX, no);
+                    set.markerPosX = this.state.markerPosX + no;
                 }
+                this.setState(set);
                 this.updateDims({});
             };
+
+            this.copyAction = () => {
+                insertGap(1);
+            };
+
             bottomActions.push(
                 <button key="add1" onClick={() => {
                     insertGap(1);
@@ -1296,7 +1531,7 @@ class FullRaster extends React.Component {
             );
             bottomActions.push(
                 <button key="add10" onClick={() => {
-                    insertGap(10);
+                    insertGap(this.addPage);
                 }}>++</button>
             );
         }
@@ -1329,7 +1564,6 @@ class FullRaster extends React.Component {
                 {bottomTools}
                 {bottomActions}
             </Toolbar>;
-
 
         const canvasElem = this.getCanvas();
         const scrollSizeX = canvasElem ? canvasElem.width : 10;
@@ -1384,7 +1618,9 @@ class FullRaster extends React.Component {
     }
 
     componentDidMount() {
-        this.redrawCanvas();
+        this.props.cellProvider.load(() => {
+            this.updateDims({});
+        });
     }
 
     componentDidUpdate() {
@@ -1466,7 +1702,7 @@ function CellMarker(props) {
         return '';
     }
 
-    const hasResize = props.initResize !== undefined;
+    const hasResize = props.initResize !== undefined && !props.click;
     const hasMove = props.initMove !== undefined;
 
     const size = props.size * props.zoom;
@@ -1598,8 +1834,21 @@ function CellMarker(props) {
         }
     }
 
+    if (props.blink) {
+        cls.push('blink');
+    }
+    const divAttr = {
+        style: offset,
+        className: cls.join(' ')
+    };
+    if (props.dblClick) {
+        divAttr.onDoubleClick = props.dblClick;
+    } else if (props.click) {
+        divAttr.onClick = props.click;
+    }
+
     return (
-        <div style={offset} className={cls.join(' ')}>
+        <div {...divAttr}>
             <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>
             <div className={clsTop.join(' ')} onMouseDown={topClickHandler}></div>
             <div className={clsTopRight.join(' ')} onMouseDown={topRightClickHandler}></div>
@@ -1618,11 +1867,14 @@ function CellMarker(props) {
 function Scrollbar(props) {
 
     const divRef = useRef(null);
+    const windowEvents = getWindowEventManager();
 
     const pagePerc = Math.round(props.page / props.max * 100);
     if (props.auto && pagePerc === 100) {
         return '';
     }
+
+    const space = 15;
 
     const spacePerc = 100 - pagePerc;
     const maxSteps = props.max - props.page;
@@ -1637,11 +1889,11 @@ function Scrollbar(props) {
 
     const dimMin = {
         [axisKey]: minPerc + '%',
-        [oppAxisKey]: 20
+        [oppAxisKey]: space
     };
     const dimMax = {
         [axisKey]: maxPerc + '%',
-        [oppAxisKey]: 20
+        [oppAxisKey]: space
     };
 
     const mouseDown = (e) => {
@@ -1667,10 +1919,10 @@ function Scrollbar(props) {
             e.stopPropagation();
             e.preventDefault();
         };
-        window.addEventListener('mousemove', trackMouse, false);
+        windowEvents.addListener('mousemove', trackMouse, false);
 
-        window.addEventListener('mouseup', (e) => {
-            window.removeEventListener('mousemove', trackMouse, false);
+        windowEvents.addListener('mouseup', (e) => {
+            windowEvents.removeListener('mousemove', trackMouse, false);
             e.stopPropagation();
             e.preventDefault();
         }, {capture: false, once: true});
@@ -1689,7 +1941,7 @@ function Scrollbar(props) {
         e.stopPropagation();
     };
     const cls = ['scrollbar-div'];
-    const dim = {[oppAxisKey]: 20};
+    const dim = {[oppAxisKey]: space};
     if (props.size) {
         dim[axisKey] = props.size;
     } else {
@@ -2169,15 +2421,24 @@ class MyApp extends Component {
         </Modal>, document.getElementById('modals-container'));
     }
 
+    getNumFromPx(value) {
+        return parseInt(value, 10);
+    }
+
     render() {
         const style = getComputedStyle(document.body);
         const css = {
             contentTextColor: style.getPropertyValue('--content-text-color'),
-            defaultPadding: style.getPropertyValue('--default-padding')
+            defaultPadding: this.getNumFromPx(style.getPropertyValue('--default-padding'))
         };
 
-        const cellProvider = new CellProvider(16,
-        [
+        const cellProvider = new CellProvider(4,
+//            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAYCAYAAAAyC/XlAAAC/klEQVRoQ+1Z0U4DMQxj0v7/iyeBDtEpBDt2um4rMF6Yrm2aJo7j653evv4ul8v7+H0+n0/jd/w/5uTxuBbZQOPHvMrOGJtZG22z9WpO9E2d77DF4ncP/5VvMQfq/J+JPiblgDvJiQdHTiEguSBS/jjAdPxD/sRnajzvked313ftsXjmwmZFfXIcdI1VlcCS4R44M1IHIBVY1PmfMa7ArQCq1sfxZQDIVKPaBEugQjQDDAOIEwxF8RWNuwCZBfAq+2z/JQBQyc+bIwQjzeFoERUgxV7uegYk1WOVfQX4e6z/xgCImqMmUBXExE8V+OrQ3R6qArQaAPfwr7Kp9psB0A8AuL0b0YiqgGx72HCqOycv7q+UMGtBlTB17SvB6zBct0W6vuV5CiDwdQ/R8evZ34zAFQBMCDkUW4kk1EIiC3Tsu6+VSiUzWkVV5pytEpEz6xU7dOKn4nu9BziMzgRYaQRUN1WClMNMUA7/syZBGqUDEOXP6vGOPkL6LT9T/sG3AJVU5qTqN0iQqWSwQ1b6AFUIqxoVoGeMs2ajfFHxReM/AFBVEBKBCiwuA1Ti0KkKtM/BaEqkqqCuHq8YiQk9lDj3mWJEeQ+gAqAAoNZX/bM6JEN7TDr7PdNDGfgRg1UMxFqtiqND9yxeVYyhBlC03GkBLgBytapXrW4FoI9LGSAuhVbJyudlAKmuslfGF7XKGNuHvAVUCGQBi5XCaHw2gdWeuRU5uib7N/xC/q1uAZEZnBaShf7rHoAprn/yfIkGcGnPFZGVIPzNeXHY5NHnswEwKLmiMOcTLVo/aAxdgLAr40cH6tb9UJu41eaK9d8AcDip+haqzooBkGDKSnjsi5RuHFtx4Bkb2YcZn7YHAAoM++DifFCprjNZpaPAzgS7m+RKZEYVHcXdrXvswmzyoqSrMnN15/UMPCy4uwCAtakOELbWAKzH557Nejiibyf5ObConexQLbE9zvqzNQDYxQtyeuaiwmkxu4rAFRqgwxSPnLvVPcCuQmlVQnZkgA/VdyxzlcUF0AAAAABJRU5ErkJggg=="
+        "data:image/png;base64,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"
+            /*
+            ,
+
+            [
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -2191,6 +2452,8 @@ class MyApp extends Component {
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             ]
+
+             */
         );
 
         return (
