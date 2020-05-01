@@ -102,7 +102,6 @@ class Game {
         if (value < 1 || value > 4 || (!force && this.zoom === value)) {
             return;
         }
-        this.log('setZoom', value);
         this.zoom = value;
         const overlay = this.getDomElem('overlay');
         overlay.style.transform =  'scale(' + this.zoom +')';
@@ -203,53 +202,23 @@ class Game {
         }
         console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
 
-        function extractEditablesFromAreas(areas, editables) {
-            if (!Array.isArray(areas)) {
-                return;
-            }
-            for (let area of areas) {
-                if (area.panes !== undefined) {
-                    for (let pane of area.panes) {
+        this.setRunning(false);
+        this.getDomElem('game').style.display = 'none';
+        this.getDomElem('editor').style.display = 'block';
+        new gameEditor.GameEditor(this);
+    }
 
-                        if (pane instanceof BufferedTilesPane) {
-                            editables.push(pane);
-                        }
-                    }
-                }
-                if (Array.isArray(area)) {
-                    extractEditablesFromAreas(area, editables);
-                } else if (area.areas !== undefined) {
-                    extractEditablesFromAreas(area.areas, editables);
-                }
-            }
+    restart() {
+        if (this.running || gameEditor === null) {
+            return;
         }
-
-        const tilesPanes = [];
-        extractEditablesFromAreas(this.screens[this.currentScreen].areas, tilesPanes);
-
-        if (tilesPanes.length > 0) {
-            this.setRunning(false);
-            this.getDomElem('game').style.display = 'none';
-            const cssId = 'editorCss';
-            if (!document.getElementById(cssId)) {
-                const head  = document.getElementsByTagName('head')[0];
-                const link  = document.createElement('link');
-                link.id   = cssId;
-                link.rel  = 'stylesheet';
-                link.type = 'text/css';
-                link.href = 'css/editor.css';
-                link.media = 'all';
-                head.appendChild(link);
-            }
-
-            const editor = this.getDomElem('editor');
-            editor.style.display = 'block';
-            const mapEditor = new gameEditor.TilesMapEditor(this, editor, tilesPanes[0]);
-        }
+        this.getDomElem('editor').style.display = 'none';
+        this.getDomElem('game').style.display = 'flex';
+        this.setRunning(true);
+//        this.gotoScreen(this.currentScreen);
     }
 
     printDebugs() {
-
         if (this.debug) {
             const gameDuration = this.running ? this.addTimerDuration('game') : this.durations['game'];
             const frameTime = this.getRounded(this.durations['render'] / this.frames, 2);
@@ -415,9 +384,9 @@ class Game {
         this.running = value;
         if (value) {
             this.resetFps();
-            this.audio.continue();
+            this.audio.continueAll();
         } else {
-            this.audio.resetChannels();
+            this.audio.pauseAll();
             this.addTimerDuration('game');
         }
     }
@@ -1823,6 +1792,8 @@ class TilesPane {
 class BufferedTilesPane {
 
     constructor(tilesMap, config) {
+        // TODO solve instancof problem due to webpack build
+        this.isBufferedTilesPane = true;
         this.tilesMap = tilesMap;
         this.defaultTile = null;
         this.state = -1;
@@ -5306,6 +5277,7 @@ class AudioPlayer {
         this.audio = {};
         this.channels = {};
         this.masterVolume = 1;
+        this.paused = [];
     }
 
     addChannel(id) {
@@ -5321,6 +5293,7 @@ class AudioPlayer {
     }
 
     play(id, channel = null) {
+        this.paused = [];
         const audio = this.audio[id];
         if (channel !== null) {
             if (this.channels[channel] !== undefined) {
@@ -5360,6 +5333,23 @@ class AudioPlayer {
         // TODO we only want to restart what was paused
     }
 
+    pauseAll() {
+        this.paused = [];
+        for (let id in this.channels) {
+            if (this.channels[id].isPlaying()) {
+                this.pauseChannel(id);
+                this.paused.push(id);
+            }
+        }
+    }
+
+    continueAll() {
+        for (let id of this.paused) {
+            this.continueChannel(id);
+        }
+        this.paused = [];
+    }
+
     pauseChannel(id) {
         const channel = this.channels[id];
         if (channel !== null && channel.isPlaying()) {
@@ -5388,6 +5378,12 @@ class AudioPlayer {
     resetChannels() {
         for (let id in this.channels) {
             this.resetChannel(id);
+        }
+    }
+
+    pauseChannels() {
+        for (let id in this.channels) {
+            this.pauseChannel(id);
         }
     }
 }

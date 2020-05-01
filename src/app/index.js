@@ -34,12 +34,7 @@ import {
     COLLISION
 } from './engine';
 
-require('./editor.js');
-
-function XGame() {
-};
-
-new XGame(320, 224, {zoom: 2, debug: false}, function () {
+new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     /**
      * GLOBALS
@@ -5574,7 +5569,7 @@ new XGame(320, 224, {zoom: 2, debug: false}, function () {
             return true;
 
         } else if (this.keys['1']) {
-            this.gotoScreen('world', {lifes: 3, score: 0, coins: 0, world: '1-1', worldPos: null, marioLevel: 0});
+            this.gotoScreen('world', {lifes: 3, score: 0, coins: 0, world: '1-2', worldPos: null, marioLevel: 0});
             return true;
 
         }
