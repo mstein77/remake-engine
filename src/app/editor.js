@@ -34,7 +34,7 @@ class GameEditor {
             game.restart();
         };
 
-        ReactDOM.render(<EditorApp panes={panes} play={play} />, document.getElementById('editor'));
+        ReactDOM.render(<EditorApp game={game} play={play} />, document.getElementById('editor'));
     }
 }
 

@@ -208,6 +208,37 @@ class Game {
         new gameEditor.GameEditor(this);
     }
 
+    getEditableResources() {
+        const resources = [];
+
+        function extractEditablesFromAreas(areas) {
+            if (!Array.isArray(areas)) {
+                return;
+            }
+            for (let area of areas) {
+                if (area.panes !== undefined) {
+                    for (let pane of area.panes) {
+                        if (pane.tilesMap) {
+                            resources.push({type: 'tilesMap', data: pane.tilesMap});
+                        } else if (pane.font) {
+                            resources.push({type: 'fontMap', data: pane.font});
+                        } else if (pane.spriteSheet) {
+                            resources.push({type: 'spriteSheet', data: pane.spriteSheet});
+                        }
+                    }
+                }
+                if (Array.isArray(area)) {
+                    extractEditablesFromAreas(area);
+                } else if (area.areas !== undefined) {
+                    extractEditablesFromAreas(area.areas);
+                }
+            }
+        }
+        extractEditablesFromAreas(this.screens[this.currentScreen].areas);
+
+        return resources;
+    }
+
     restart() {
         if (this.running || gameEditor === null) {
             return;
