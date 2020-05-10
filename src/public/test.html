@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        /* STACK */
+
+        .stack-v {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stack-h {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .flex {
+            flex: 1
+        }
+
+        .bg {
+            background-color: #AAAAAA;
+        }
+
+        .cell {
+            background-color: #FFFFFF;
+            border: 1px solid red;
+            padding: 5px;
+        }
+
+        .no-overflow {
+            overflow: auto;
+        }
+
+        .inner-space-h > div:not(:first-child) {
+            margin-left: 10px;
+        }
+
+        .big {
+            border: 1px solid green;
+            width: 2000px;
+            position: absolute;
+        }
+
+        .over {
+            position: relative;
+            left: 0px;
+            top: 0px;
+        }
+
+        .padded {
+            padding: 5px;
+        }
+
+        .full-v {
+            height: 100%;
+        }
+
+        .padded.full-v {
+            padding: 0;
+        }
+
+        full-v > div.padded {
+            height: calc(100% - 2 * 5px) !important;
+        }
+
+        full-v.padded {
+            height: calc(100% - 2 * 5px) !important;
+            padding: 5px;
+        }
+
+        .checkdiv {
+            background-color: #AAAAAA;
+        }
+
+        .rootdiv {
+            height: 400px;
+            width: 800px;
+            border: 1px solid red;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="rootdiv full-v padded">
+        <div class="checkdiv padded full-v">
+            <div class="padded">Test</div>
+        </div>
+    </div>
+
+</body>
+</html>

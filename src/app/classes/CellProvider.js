@@ -31,6 +31,10 @@ class CellSelection {
         return result;
     }
 
+    getCells() {
+        return this.cells;
+    }
+
     getType() {
         return this.type;
     }
@@ -45,6 +49,19 @@ class CellSelection {
 
     isColumns() {
         return this.type === 'columns';
+    }
+
+    getMatchMatrix(value) {
+        const rows = [];
+        const xMax = this.cells[0].length;
+        for (let y = 0, yMax = this.cells.length; y < yMax; y++) {
+            const row = [];
+            for (let x = 0; x < xMax; x++) {
+                row.push(this.cells[y][x] === value);
+            }
+            rows.push(row);
+        }
+        return rows;
     }
 }
 
@@ -68,6 +85,10 @@ class CellProvider {
 
     getEmptyCell() {
         throw Error('Implement');
+    }
+
+    getEmptySelection() {
+        return new CellSelection('rect', [[this.getEmptyCell()]]);
     }
 
     overwriteCell(x, y, value) {
@@ -319,6 +340,8 @@ class TilesMapCellProvider extends CellProvider {
         this.cellsPerLine = null;
         this.cache = {};
         this.cacheZoom = 0;
+        this.cache2 = {};
+        this.cacheZoom2 = 0;
         this.tiles = tiles;
         this.animations = animations;
         this.map = map;
@@ -437,6 +460,55 @@ class TilesMapCellProvider extends CellProvider {
         const index = this.getIndexForValue(value);
         const pos = this.getPositionOfIndex(index);
         return this.imgContext.getImageData(pos.x, pos.y, this.size, this.size);
+    }
+
+    getBitmapForValue2(value, zoom, writeCache = true, bgColor = null) {
+        if (!this.imgContext) {
+            return null;
+        }
+
+        if (writeCache && zoom !== this.cacheZoom2) {
+            this.cacheZoom2 = zoom;
+            this.cache2 = {};
+        }
+
+        value = this.getTileForValue(value);
+        if (this.cache2[value] !== undefined) {
+            if (writeCache || this.cacheZoom2 === zoom) {
+                return this.cache2[value];
+            }
+        }
+
+        const index = this.getIndexForTile(value);
+        const start = this.getPositionOfIndex(index);
+        const img = this.imgContext.getImageData(start.x, start.y, this.size, this.size);
+        const target = this.imgContext.createImageData(img.width * zoom, img.height * zoom);
+        let targetPos = 0;
+        let sourceStart = 0;
+        for(let y = 0; y < img.height; y++) {
+
+            for (let w = 0; w < zoom; w++) {
+                let sourcePos = sourceStart;
+                let pos = targetPos;
+                for(let x = 0; x < img.width; x++) {
+                    for (let z = 0; z < zoom; z++) {
+                        target.data[pos] = img.data[sourcePos];
+                        target.data[pos + 1] = img.data[sourcePos + 1];
+                        target.data[pos + 2] = img.data[sourcePos + 2];
+                        target.data[pos + 3] = img.data[sourcePos + 3];
+                        pos += 4;
+                    }
+                    sourcePos += 4;
+                }
+                targetPos += target.width << 2;
+            }
+            sourceStart += img.width << 2;
+        }
+
+        if (writeCache) {
+            this.cache2[value] = target;
+        }
+        return target;
     }
 
     getBitmapForValue(value, zoom, writeCache = true, bgColor = null) {

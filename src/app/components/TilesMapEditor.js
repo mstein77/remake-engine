@@ -2,7 +2,7 @@ import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import ReactDOM from "react-dom";
 
 import {CssContext, Modal, Stack, SwitchButton, Checkbox, Section, Tabs, Tab, Int, closeModals} from './BaseComponents';
-import {Raster} from './Raster';
+import {Raster, EditorCtx, BasicRasterView} from './Raster';
 import {CellSelection, BitmapCellProvider, TilesCellProvider, TilesMapCellProvider} from '../classes/CellProvider.js';
 
 function TileTracker(props) {
@@ -353,6 +353,11 @@ function TilesMapEditor(props) {
 
             <Section name="Elements" collapse="v" raw>
                 <Tabs height={280} reverse>
+                    <Tab name="Test">
+                        <EditorCtx>
+                                <BasicRasterView auto cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={1} zoom={2} />
+                        </EditorCtx>
+                    </Tab>
                     <Tab name="Tiles">
                         <ActiveTileSelection ref={indexRef} raster={rasterRef} cellProvider={indexProvider} />
                     </Tab>

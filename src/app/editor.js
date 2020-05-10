@@ -5,7 +5,7 @@ import EditorApp from './components/EditorApp';
 
 class GameEditor {
 
-    constructor(game) {
+    constructor(game, active) {
         function extractEditablesFromAreas(areas, editables) {
             if (!Array.isArray(areas)) {
                 return;
@@ -34,7 +34,7 @@ class GameEditor {
             game.restart();
         };
 
-        ReactDOM.render(<EditorApp game={game} play={play} />, document.getElementById('editor'));
+        ReactDOM.render(<EditorApp game={game} play={play} active={active} />, document.getElementById('editor'));
     }
 }
 

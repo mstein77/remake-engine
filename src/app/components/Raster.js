@@ -1,4 +1,4 @@
-import React, {Fragment} from "react";
+import React, {Fragment, useState, useCallback, useRef, useEffect, useContext} from "react";
 import {
     Checkbox,
     Color,
@@ -9,7 +9,8 @@ import {
     Int, Scrollbar,
     Stack,
     SwitchButton,
-    Toolbar
+    Toolbar,
+    MouseOverlay
 } from "./BaseComponents";
 import {CellSelection} from "../classes/CellProvider";
 
@@ -2069,6 +2070,35 @@ function CellMarker(props) {
         divAttr.onClick = props.click;
     }
 
+    let matrix = '';
+    if (props.matrix) {
+        const style = {
+            display: 'grid',
+            gridColumnGap: props.border + 'px',
+            gridRowsGap: props.border + 'px'
+        };
+        const xMax = Math.min(props.matrix[0].length, props.width);
+        const yMax = Math.min(props.matrix.length, props.height);
+        const cells = [];
+        const xSizes = [];
+        const ySizes = [];
+        for (let y = 0; y < yMax; y++) {
+            ySizes.push(size + 'px');
+            for (let x = 0; x < xMax; x++) {
+                if (y === 0) {
+                    xSizes.push(size + 'px');
+                }
+                cells.push(<div key={y + ' ' + x} className={props.matrix[y][x] ? '' : 'marker-cell'}></div>);
+            }
+        }
+        style.gridTemplateColumns = xSizes.join(' ');
+        style.gridTemplateRows = ySizes.join(' ');
+        matrix =
+            <div style={style}>
+                {cells}
+            </div>;
+    }
+
     return (
         <div {...divAttr}>
             <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>
@@ -2076,7 +2106,7 @@ function CellMarker(props) {
             <div className={clsTopRight.join(' ')} onMouseDown={topRightClickHandler}></div>
 
             <div className={clsLeft.join(' ')} onMouseDown={leftClickHandler}></div>
-            <div className={clsCenter.join(' ')} onMouseDown={centerClickHandler} style={centerStyle}></div>
+            <div className={clsCenter.join(' ')} onMouseDown={centerClickHandler} style={centerStyle}>{matrix}</div>
             <div className={clsRight.join(' ')} onMouseDown={rightClickHandler}></div>
 
             <div className={clsBottomLeft.join(' ')} onMouseDown={bottomLeftClickHandler}></div>
@@ -2086,7 +2116,641 @@ function CellMarker(props) {
     )
 }
 
+function useMounted() {
+    const mounted = useRef(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        }
+    });
+    return mounted;
+}
+
+function useReadyCellProvider(cellProvider, mounted) {
+    const [ready, setReady] = useState(cellProvider.hasData());
+    if (!ready) {
+        cellProvider.load(() => {
+            if (mounted.current) {
+                setReady(true);
+            }
+        });
+    }
+    return ready;
+}
+
+function useRasterDim(props) {
+    const cellSize = (props.size ? props.size : props.cellProvider.getSize()) * props.zoom;
+    const cellPlusBorderSize = cellSize + props.border;
+    const rasterWidth = cellPlusBorderSize * props.width + props.border;
+    const rasterHeight = cellPlusBorderSize * props.height + props.border;
+
+    return [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight];
+}
+
+const EditorContext = React.createContext();
+
+const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
+
+    console.log('RENDER: RasterCanvas', props, canvasRef);
+    const context = useContext(CssContext);
+
+    useEffect(() => {
+        drawRaster();
+    });
+
+    const cellSize = props.size * props.zoom;
+    const cellPlusBorderSize = cellSize + props.border;
+    const canvasWidth = props.border + props.width * cellPlusBorderSize;
+    const canvasHeight = props.border + props.height * cellPlusBorderSize;
+
+    const drawRaster = () => {
+        console.log('drawRaster');
+        const canvas = canvasRef.current;
+        if (canvas === null) {
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        // TODO box-border-color?
+        ctx.fillStyle = context.contentTextColor;
+
+        let pos = 0;
+        if (props.border > 0) {
+            for (let x = 0; x <= props.width; x++) {
+                ctx.fillRect(pos, 0, props.border, canvasHeight);
+                pos += cellPlusBorderSize;
+            }
+            pos = 0;
+            for (let y = 0; y <= props.height; y++) {
+                ctx.fillRect(0, pos, canvasWidth, props.border);
+                pos += cellPlusBorderSize;
+            }
+        }
+        return ctx;
+    };
+
+    const bgColor = context.bgColor + (Math.min(context.bgOpacity * 10, 255)).toString(16).padStart(2, '0');
+    return (
+        <div style={{width: canvasWidth, height: canvasHeight}} className="checkbg"><div style={{backgroundColor: bgColor}}><canvas ref={canvasRef} width={canvasWidth} height={canvasHeight} /></div></div>
+    );
+}));
+
+function CellRaster(props) {
+    const canvasRef = useRef(null);
+    const height = props.cells.length;
+    const width = props.cells[0].length;
+    const {size, border, zoom} = props;
+    const rasterProps = {size, width, height, border, zoom, ref: canvasRef};
+    const cellPlusBorderSize = size * zoom + border;
+    let ctx = null;
+
+    const drawCells = (ctx) => {
+        console.log('drawCells');
+        let pos = border;
+        for (let row of props.cells) {
+            for (let x = 0; x < width; x++) {
+                props.render(ctx, border + x * cellPlusBorderSize, pos, row[x]);
+            }
+            pos += cellPlusBorderSize;
+        }
+    };
+
+    useEffect(() => {
+        ctx = canvasRef.current.getContext('2d');
+        drawCells(ctx);
+    });
+
+    return (
+        <RasterCanvas {...rasterProps} />
+    );
+}
+
+const CellProviderRaster = React.memo((props) => {
+    const eContext = useContext(EditorContext);
+    const [update, setUpdate] = useState(false);
+    const mounted = useMounted();
+    const ready = useReadyCellProvider(props.cellProvider, mounted);
+
+    useEffect(() => {
+        if (props.id) {
+            eContext.addRedraw(props.id, () => { setUpdate(!update); });
+        }
+    }, []);
+
+    if (!ready) {
+        return ''
+    }
+
+    const cells = props.cellProvider.getSelection(props.posX, props.posY, props.width, props.height).getCells();
+    const size = props.cellProvider.getSize();
+    let render = null;
+    switch (props.cellProvider.getCellType()) {
+        case 'bitmap':
+            render =
+                (ctx, x, y, value) => {
+                    const img = props.cellProvider.getBitmapForValue2(value, props.zoom);
+                    if (img) {
+                        ctx.putImageData(img, x, y);
+                    }
+                };
+            break;
+
+        case 'color':
+            const cellSize = size * props.zoom;
+            render =
+                (ctx, x, y, value) => {
+                    ctx.fillStyle = value;
+                    ctx.fillRect(x, y, cellSize, cellSize);
+                };
+            break;
+
+        default:
+            console.error('Unknown cell type', props.cellProvider.getCellType());
+            break;
+    }
+
+    return (
+        <CellRaster size={size} cells={cells} border={props.border} zoom={props.zoom} render={render} />
+    );
+});
+
+function FlexCellProviderRaster(props) {
+    const divRef = useRef(null);
+    const observerRef = useRef(null);
+
+    const rulerSpaceX = props.rulers ? 30 : 0;
+    const rulerSpaceY = props.rulers ? 20 : 0;
+
+    const size = props.cellProvider.getSize();
+    const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim({...props, size});
+
+    const checkSize = () => {
+        const rect = divRef.current.parentNode.getBoundingClientRect();
+        const spaceX = rect.width - (props.rulers ? rulerSpaceX : 0) - props.border;
+        const spaceY = rect.height - (props.rulers ? rulerSpaceY : 0) - props.border;
+        let newWidth = Math.min(Math.floor(spaceX / cellPlusBorderSize), props.cellProvider.getWidth());
+        let newHeight = Math.min(Math.floor(spaceY / cellPlusBorderSize), props.cellProvider.getHeight());
+
+        if (props.width !== newWidth) {
+            props.setWidth(newWidth);
+        }
+        if (props.height !== newHeight) {
+            props.setHeight(newHeight);
+        }
+    };
+
+    const maxColumns = props.cellProvider.getWidth();
+    const maxRows = props.cellProvider.getHeight();
+    if (props.setPosX && props.posX + props.width >= maxColumns) {
+        props.setPosX(maxColumns - props.width);
+    }
+    if (props.setPosY && props.posY + props.height >= maxRows) {
+        props.setPosY(maxRows - props.height);
+    }
+
+    useEffect(() => {
+        if (props.auto) {
+            const observer = new ResizeObserver(entries => {
+                checkSize();
+            });
+            observerRef.current = observer;
+            observer.observe(divRef.current);
+            return () => {
+                if (observerRef.current) {
+                    observerRef.current.disconnect();
+                }
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (props.auto) checkSize();
+    });
+
+    const style = {
+        width: rasterWidth,
+        height: rasterHeight
+    };
+
+    const rasterProps = {
+        cellProvider: props.cellProvider,
+        border: props.border,
+        zoom: props.zoom,
+        posX: props.posX,
+        posY: props.posY,
+        width: props.width,
+        height: props.height,
+        id: props.id
+    };
+
+    let topRuler = '';
+    let leftRuler = '';
+    if (props.rulers) {
+        topRuler = <HRuler digits={('' + props.cellProvider.getWidth()).length} width={rasterWidth} height={rulerSpaceY} max={props.width} start={props.posX} size={size} zoom={props.zoom} border={props.border} />;
+        leftRuler = <VRuler digits={('' + props.cellProvider.getHeight()).length} height={rasterHeight} width={rulerSpaceX} max={props.height} start={props.posY} size={size} zoom={props.zoom} border={props.border} />;
+        style.marginTop = -(rulerSpaceY >> 1);
+    }
+
+    return (
+        <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
+            <div className="stack-h centered items-centered">
+                <div className="rel-canvas marker-space" style={style}>
+                    <CellProviderRaster {...rasterProps} />
+                    {topRuler}
+                    {leftRuler}
+                    {props.children}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FlexCellProviderScrollRaster(props) {
+    const style = {
+        display: 'grid',
+        gridTemplateColumns: 'auto',
+        gridRowGap: 0,
+        gridColumGap: 0
+    };
+
+    const cellsWidth = props.cellProvider.getWidth();
+    const cellsHeight = props.cellProvider.getHeight();
+    const maxPosX = cellsWidth - props.width;
+    const maxPosY = cellsHeight - props.height;
+    const sensivity = 0.25;
+
+    const onWheel = (e) => {
+        let deltaX = Math.round(e.deltaX * sensivity);
+        let deltaY = Math.round(e.deltaY * sensivity);
+
+        const newPosX = Math.min(Math.max(props.posX + deltaX, 0), maxPosX);
+        const newPosY = Math.min(Math.max(props.posY + deltaY, 0), maxPosY);
+        if (newPosX !== props.posX) {
+            props.setPosX(newPosX);
+        }
+        if (newPosY !== props.posY) {
+            props.setPosY(newPosY);
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const hasScrollingX = props.width < cellsWidth;
+    const hasScrollingY = props.height < cellsHeight;
+
+    const firstCells = [<div key={1} onWheel={onWheel}><FlexCellProviderRaster {...props} /></div>];
+    if (hasScrollingY) {
+        firstCells.push(<div key={2}><Scrollbar auto vertical set={props.setPosY} pos={props.posY} page={props.height} max={props.cellProvider.getHeight()} /></div>);
+        style.gridTemplateColumns += ' 21px'
+    }
+    const secondCells = [];
+    if (hasScrollingX) {
+        secondCells.push(<div key={3}><Scrollbar auto set={props.setPosX} pos={props.posX} page={props.width} max={props.cellProvider.getWidth()} /></div>);
+        style.gridTemplateRows = 'auto';
+        if (hasScrollingY) {
+            secondCells.push(<div key={4}></div>);
+            style.gridTemplateRows += ' 21px';
+        }
+    }
+
+    return (
+        <div style={style} className="full-v">
+            {firstCells}
+            {secondCells}
+        </div>
+
+    );
+}
+
+function VRuler(props) {
+    const context = useContext(CssContext);
+    const rulerRef = useRef(null);
+    const rulerPadding = context.markerWidth;
+    const fontSize = 10;
+    const fontWidth = 10;
+    const width = props.width - rulerPadding;
+
+    const drawRuler = (ctx) => {
+        const fullWidth = 13;
+        const smallWidth = 3;
+        const border = 1;
+        const padding = 10;
+        const charWidth = fontWidth;
+        const cellSize = props.zoom * props.size + border;
+
+        ctx.clearRect(0, 0, props.width, props.height);
+        ctx.fillStyle = context.contentTextColor;
+        ctx.text = fontSize + 'px Monospace';
+
+        ctx.fillRect(width - border, 0, 1, props.height);
+        const dist = Math.ceil((fontSize + 2 * padding) / cellSize);
+        for (let i = 0; i < props.max; i++) {
+            if (i % dist === 0) {
+                if (i + dist - 1 < props.max) {
+                    const text = '' + (props.start + i);
+                    const txtWidth = ctx.measureText(text).width;
+                    ctx.fillText(
+                        text,
+                        width - padding - txtWidth,
+                        cellSize * i + fontSize + (padding >> 1)
+                    );
+                }
+                ctx.fillRect(width - fullWidth, cellSize * i, fullWidth, border);
+            } else {
+                ctx.fillRect(width - smallWidth, cellSize * i, smallWidth, border);
+            }
+        }
+    };
+
+    useEffect(() => {
+        drawRuler(rulerRef.current.getContext('2d'));
+    });
+
+    return (
+        <canvas
+            style={{position: 'absolute', left: (-props.width), top: 0}}
+            ref={rulerRef} width={width} height={props.height} />
+    );
+}
+
+function HRuler(props) {
+    const context = useContext(CssContext);
+    const rulerRef = useRef(null);
+    const rulerPadding = context.markerWidth;
+    const fontSize = 10;
+    const fontWidth = 10;
+    const height = props.height - rulerPadding;
+
+    const drawRuler = (ctx) => {
+        const fullWidth = 13;
+        const smallWidth = 3;
+        const border = 1;
+        const padding = 10;
+        const charWidth = fontWidth;
+        const cellSize = props.zoom * props.size + border;
+
+        ctx.clearRect(0, 0, props.width, height);
+        ctx.fillStyle = context.contentTextColor;
+        ctx.text = fontSize + 'px Monospace';
+
+        ctx.fillRect(0, height - border, props.width, border);
+        const dist = Math.ceil((props.digits * charWidth + 2 * padding) / cellSize);
+        for (let i = 0; i < props.max; i++) {
+            if (i % dist === 0) {
+                if (i + dist - 1 < props.max) {
+                    ctx.fillText('' + (props.start + i), cellSize * i + padding, fontSize);
+                }
+                ctx.fillRect(cellSize * i, height - fullWidth, border, fullWidth);
+            } else {
+                ctx.fillRect(cellSize * i, height - smallWidth, border, smallWidth);
+            }
+        }
+    };
+
+    useEffect(() => {
+        drawRuler(rulerRef.current.getContext('2d'));
+    });
+
+    return (
+        <canvas
+            style={{position: 'absolute', top: (-props.height), left: 0}}
+            ref={rulerRef} width={props.width} height={height} />
+    );
+}
+
+function CursorArea(props) {
+    const eContext = useContext(EditorContext);
+    const divRef = useRef(null);
+    const [offX, setOffX] = useState(null);
+    const [offY, setOffY] = useState(null);
+
+    const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim(props);
+    let marker;
+
+    if (eContext.selection === null) {
+        return '';
+    }
+    const selection = eContext.selection;
+    const cursorWidth = selection.getWidth();
+    const cursorHeight = selection.getHeight();
+    const markerType = selection.getType();
+
+    const isGap = markerType.endsWith('gap');
+
+    if (offX !== null) {
+
+        let hasTop = true;
+        let hasBottom = true;
+        let hasLeft = true;
+        let hasRight = true;
+
+        let markerWidth = markerType.startsWith('row') ? props.width : Math.min(cursorWidth, props.width - offX);
+        let markerHeight = markerType.startsWith('column') ? props.height : Math.min(cursorHeight, props.height - offY);
+
+        if (markerType === 'row-gap') {
+            markerHeight = 1;
+        } else if (markerType === 'column-gap') {
+            markerWidth = 1;
+        }
+
+        switch (markerType) {
+            case 'rect':
+                hasBottom = (offY + cursorHeight <= props.height);
+                hasRight = (offX + cursorWidth <= props.width);
+                break;
+
+            case 'columns':
+                hasTop = false;
+                hasBottom = false;
+                break;
+
+            case 'rows':
+                hasLeft = false;
+                hasRight = false;
+                break;
+
+            case 'row-gap':
+            case 'column-gap':
+                hasTop = false;
+                hasBottom = false;
+                hasLeft = false;
+                hasRight = false;
+                break;
+        }
+
+        const onClick = (e) => {
+            const offset = getOffsetPos(e);
+            props.click(props.posX + offset.x, props.posY + offset.y, 1, 1);
+            e.stopPropagation();
+            e.preventDefault();
+        };
+
+        marker = <CellMarker
+            blink
+            click={onClick}
+            size={props.size}
+            border={props.border}
+            zoom={props.zoom}
+            type={markerType}
+            highlight={false}
+            posX={offX}
+            posY={offY}
+            matrix={selection.getMatchMatrix(props.cellProvider.getEmptyCell())}
+            width={markerWidth}
+            height={markerHeight}
+            top={hasTop}
+            bottom={hasBottom}
+            left={hasLeft}
+            right={hasRight}
+        />;
+    }
+
+    const getOffsetPos = (e) => {
+        const rect = divRef.current.getBoundingClientRect();
+        let posX = Math.floor((e.clientX - rect.x)/cellPlusBorderSize);
+        let reset = (posX < 0 || posX >= props.width);
+        let posY = Math.floor((e.clientY - rect.y)/cellPlusBorderSize);
+        reset = reset || (posY < 0 || posY >= props.height);
+
+        if (reset) {
+            return false;
+        }
+        if (markerType.startsWith('column')) {
+            if (isGap && posX === 0 && props.posX === 0) {
+                posX = 1;
+            }
+            posY = 0;
+        } else if (markerType.startsWith('row')) {
+            if (isGap && posY === 0 && props.posY === 0) {
+                posY = 1;
+            }
+            posX = 0;
+        }
+        return {
+            x: posX,
+            y: posY
+        };
+    }
+
+    const onMouseMove = (e) => {
+        const offset = getOffsetPos(e);
+        if (offset === false) {
+            setOffX(null);
+            setOffY(null);
+        }  else if (offX !== offset.x || offY !== offset.y) {
+                setOffX(offset.x);
+                setOffY(offset.y);
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const onMouseLeave = (e) => {
+        setOffX(null);
+        setOffY(null);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    return (
+        <div
+            ref={divRef}
+            style={{width: rasterWidth, height: rasterHeight}}
+            onMouseMove={onMouseMove}
+            onMouseLeave={onMouseLeave}
+            className="marker-area">
+            {marker}
+        </div>
+    );
+}
+
+class EditorCtx extends React.Component {
+    render() {
+        const redraw = {};
+        const context = {
+            addRedraw: (id, cellRedraw) => {
+                redraw[id] = cellRedraw;
+            },
+            redraw: (id) => {
+                if (redraw[id]) {
+                    redraw[id]();
+                }
+            },
+            selection: null
+        };
+        return (
+            <EditorContext.Provider value={context}>
+                {this.props.children}
+            </EditorContext.Provider>
+        );
+    }
+}
+
+function BasicRasterView(props) {
+    const eContext = useContext(EditorContext);
+
+    useEffect(() => {
+        eContext.selection = props.cellProvider.getEmptySelection();
+    }, []);
+
+    const [border, setBorder] = useState(1);
+    const [zoom, setZoom] = useState(2);
+    const [posX, setPosX] = useState(0);
+    const [posY, setPosY] = useState(0);
+    const [test, setTest] = useState(0);
+    const [width, setWidth] = useState(10);
+    const [height, setHeight] = useState(5);
+    const [rulers, setRulers] = useState(true);
+
+    const size = props.cellProvider.getSize();
+
+    const cursorClick = (x, y, width, height) => {
+        eContext.selection = props.cellProvider.getSelection(x, y, 3, 2);
+    };
+
+    return (
+        <div className="padded full-v">
+            <Stack dir="x" full>
+                <div>
+                    PosX: <Int min={0} max={props.cellProvider.getWidth() - width} value={posX} set={setPosX} buttons />
+                    PosY: <Int min={0} max={props.cellProvider.getHeight() - height} value={posY} set={setPosY} buttons />
+                    Zoom: <Int min={1} max={5} value={zoom} set={setZoom} buttons />
+                    Border: <Int min={0} max={5} value={border} set={setBorder} buttons />
+                    <Checkbox name="rulers" value={rulers} set={setRulers} />
+                    <button onClick={() => {eContext.redraw('boom')}}>Redraw</button>
+                </div>
+
+                <div className="flex items-centered align-center">
+                    <FlexCellProviderScrollRaster
+                        auto
+                        setWidth={setWidth}
+                        setHeight={setHeight}
+                        setPosX={setPosX}
+                        setPosY={setPosY}
+                        width={width}
+                        height={height}
+                        posX={posX}
+                        posY={posY}
+                        id="boom"
+                        zoom={zoom}
+                        border={border}
+                        rulers={rulers}
+                        cellProvider={props.cellProvider}>
+                        <CursorArea cellProvider={props.cellProvider} click={cursorClick} width={width} height={height} zoom={zoom} border={border} size={size} posX={posX} posY={posY} />
+                    </FlexCellProviderScrollRaster>
+                </div>
+            </Stack>
+        </div>
+    );
+}
+
 export {
     Raster,
-    CellMarker
+    CellMarker,
+    RasterCanvas,
+    EditorContext,
+    EditorCtx,
+    BasicRasterView
 }

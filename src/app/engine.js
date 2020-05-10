@@ -205,7 +205,7 @@ class Game {
         this.setRunning(false);
         this.getDomElem('game').style.display = 'none';
         this.getDomElem('editor').style.display = 'block';
-        new gameEditor.GameEditor(this);
+        new gameEditor.GameEditor(this, this.activeResource);
     }
 
     getEditableResources() {

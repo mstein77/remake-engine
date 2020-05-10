@@ -119,7 +119,7 @@ class FitCanvas extends React.Component {
 }
 
 function Scrollbar(props) {
-
+    const [active, setActive] = useState(false);
     const divRef = useRef(null);
     const windowEvents = getWindowEventManager();
 
@@ -168,7 +168,7 @@ function Scrollbar(props) {
             const relPos = getOffset(e[client]);
             if (relPos !== lastPos) {
                 lastPos = relPos;
-                props.set(props.set(props.pos + relPos));
+                props.set(props.pos + relPos);
             }
             e.stopPropagation();
             e.preventDefault();
@@ -177,10 +177,12 @@ function Scrollbar(props) {
 
         windowEvents.addListener('mouseup', (e) => {
             windowEvents.removeListener('mousemove', trackMouse, false);
+            setActive(false);
             e.stopPropagation();
             e.preventDefault();
         }, {capture: false, once: true});
 
+        setActive(true);
         e.preventDefault();
         e.stopPropagation();
     };
@@ -190,6 +192,7 @@ function Scrollbar(props) {
         const pixelSteps = rect[axisKey] / props.max;
         const pageSize = Math.round(props.page * pixelSteps / 2);
         const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), props.max));
+
         props.set(offPos);
         e.preventDefault();
         e.stopPropagation();
@@ -215,6 +218,7 @@ function Scrollbar(props) {
                 <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
                 <div onMouseDown={setMouseDown} style={dimMax}></div>
             </div>
+            <MouseOverlay active={active} cursor={dirKey + 'resize'} />
         </div>
     );
 }
@@ -680,6 +684,16 @@ function Modal(props) {
     return modal;
 }
 
+function MouseOverlay(props) {
+    if (!props.active) {
+        return '';
+    }
+    const cls = ['cursor-' + props.cursor + ' fix-overlay'];
+    return (
+        <div className={cls.join(' ')}></div>
+    );
+}
+
 function Themed(props) {
 
     const [bgColor, setBgColor] = useState('#666677');
@@ -693,6 +707,7 @@ function Themed(props) {
     const css = {
         contentTextColor: style.getPropertyValue('--content-text-color'),
         defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
+        markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
         bgColor,
         setBgColor,
         bgOpacity,
@@ -725,5 +740,6 @@ export {
     SwitchButton,
     CssContext,
     getWindowEventManager,
+    MouseOverlay,
     Themed
 }

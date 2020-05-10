@@ -31,7 +31,7 @@ function Page(props) {
 
 function EditorApp(props) {
     const [resources, setResources]  =  useState(props.game.getEditableResources());
-    const [active, setActive] = useState(null);
+    const [active, setActive] = useState(props.active === undefined ? null : props.active);
 
     const actions = (
         <Fragment>
