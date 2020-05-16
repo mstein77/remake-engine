@@ -3,7 +3,51 @@ import ReactDOM from 'react-dom';
 
 const CssContext = React.createContext();
 
+function useWindowEventManager() {
+
+    const listenerRef = useRef([]);
+
+    const removeListener = (event, listener, options) => {
+        console.log('REMOVE LISTENER', event);
+        const remainingListeners = [];
+        for (let item of listenerRef.current) {
+            let match = false;
+            if (item.event === event) {
+                match = JSON.stringify(options) === JSON.stringify(item.options);
+            }
+            if (match) {
+                window.removeEventListener(event, listener, options);
+            } else {
+                remainingListeners.push(item);
+            }
+        }
+        listenerRef.current = remainingListeners;
+    };
+
+    const addListener = (event, listener, options) => {
+        console.log('ADD LISTENER', event);
+        removeListener(event, listener, options);
+        window.addEventListener(event, listener, options);
+        listenerRef.current.push({event, listener, options});
+    };
+
+    const clearListeners = () => {
+        console.log('CLEAR LISTENERS');
+        while(listenerRef.current.length > 0) {
+            const item = listenerRef.current.pop();
+            window.removeEventListener(item.event, item.listener, item.options);
+        }
+    };
+
+    return {
+        addListener,
+        removeListener,
+        clearListeners
+    };
+}
+
 function getWindowEventManager() {
+
     let windowListeners = [];
 
     const removeListener = (event, listener, options) => {
@@ -41,7 +85,6 @@ function getWindowEventManager() {
         clearListeners
     };
 }
-
 
 class FitCanvas extends React.Component {
 
@@ -721,6 +764,13 @@ function Themed(props) {
     );
 }
 
+function upperFirst(value) {
+    if (!value) {
+        return value;
+    }
+    return value[0].toUpperCase() + value.slice(1);
+}
+
 export {
     Modal,
     closeModals,
@@ -739,7 +789,9 @@ export {
     Color,
     SwitchButton,
     CssContext,
+    useWindowEventManager,
     getWindowEventManager,
     MouseOverlay,
-    Themed
+    Themed,
+    upperFirst
 }

@@ -5,11 +5,13 @@ import {
     CssContext,
     Dim,
     FitCanvas,
+    useWindowEventManager,
     getWindowEventManager,
     Int, Scrollbar,
     Stack,
     SwitchButton,
     Toolbar,
+    upperFirst,
     MouseOverlay
 } from "./BaseComponents";
 import {CellSelection} from "../classes/CellProvider";
@@ -2060,6 +2062,7 @@ function CellMarker(props) {
     if (props.blink) {
         cls.push('blink');
     }
+    cls.push('all-events');
     const divAttr = {
         style: offset,
         className: cls.join(' ')
@@ -2520,6 +2523,450 @@ function HRuler(props) {
     );
 }
 
+function MarkerArea(props) {
+    const eContext = useContext(EditorContext);
+    const divRef = useRef(null);
+    const autoScrollRef = useRef({id : null, x: null, y: null, marker: false});
+    const autoScroll = autoScrollRef.current;
+    autoScroll.props = props;
+
+    const [active, setActive] = useState(null);
+    const windowEvents = useWindowEventManager();
+
+    const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim(props);
+
+    if (props.markerX === null) {
+        return '';
+    }
+
+    const markerType = 'rect';
+    let offX = 0;
+    let offY = 0;
+    let markerWidth = 1;
+    let markerHeight = 1;
+
+    const checkX = !markerType.startsWith('row');
+    const checkY = !markerType.startsWith('column');
+
+    const maxMarkerX = props.markerX + props.markerWidth - 1;
+    const maxPosX = props.posX + props.width - 1;
+    const visibleX = !checkX || (props.posX <= maxMarkerX && maxPosX >= props.markerX);
+    const maxMarkerY = props.markerY + props.markerHeight - 1;
+    const maxPosY = props.posY + props.height - 1;
+    const visibleY = !checkY || (props.posY <= maxMarkerY && maxPosY >= props.markerY);
+
+    let hasTop = (checkY && props.posY <= props.markerY && maxPosY >= props.markerY);
+    let hasBottom = (checkY && props.posY <= maxMarkerY && maxPosY >= maxMarkerY);
+    let hasLeft = (checkX && props.posX <= props.markerX && maxPosX >= props.markerX);
+    let hasRight = (checkX && props.posX <= maxMarkerX && maxPosX >= maxMarkerX);
+
+    offX = checkX ? Math.max(props.markerX, props.posX) - props.posX : 0;
+    offY = checkY ? Math.max(props.markerY, props.posY) - props.posY : 0;
+
+    let maxOffX = Math.min(maxMarkerX, maxPosX) - props.posX;
+    let maxOffY = Math.min(maxMarkerY, maxPosY) - props.posY;
+    markerWidth = checkX ? maxOffX - offX + 1 : props.width;
+    // markerType.startsWith('row') ? props.width : Math.min(props.markerWidth, props.width - offX);
+    markerHeight = checkY ? maxOffY - offY + 1 : props.height; //markerType.startsWith('column') ? props.height : Math.min(props.markerHeight, props.height - offY);
+
+    const isGap = markerType.endsWith('gap');
+
+    const setState = (change, where = '?') => {
+        const props = autoScroll.props;
+        if (change.markerHeight !== undefined && change.markerHeight !== props.markerHeight) {
+            console.log(where, '-> markerHeight', change.markerHeight, props.markerHeight);
+            props.setMarkerHeight(change.markerHeight);
+        }
+        if (change.markerWidth !== undefined && change.markerWidth !== props.markerWidth) {
+            console.log(where, '-> markerWidth', change.markerWidth, props.markerWidth);
+            props.setMarkerWidth(change.markerWidth);
+        }
+        if (change.markerX !== undefined && change.markerX !== props.markerX) {
+            console.log(where, '-> markerX', change.markerX, props.markerX);
+            props.setMarkerX(change.markerX);
+        }
+        if (change.markerY !== undefined && change.markerY !== props.markerY) {
+            console.log(where, '-> markerY', change.markerY, props.markerY);
+            props.setMarkerY(change.markerY);
+        }
+        if (change.posX !== undefined && change.posX !== props.posX) {
+            console.log(where, '-> posX', change.posX, props.posX);
+            props.setPosX(change.posX);
+        }
+        if (change.posY !== undefined && change.posY !== props.posY) {
+            console.log(where, '-> posY', change.posY, props.posY);
+            props.setPosY(change.posY);
+        }
+    };
+
+    const getRasterPosFromEvent = (e, outside = false, isGap = false) => {
+        return getRasterPosFromClient({x: e.clientX, y: e.clientY}, outside, isGap);
+    };
+
+    const getRasterPosFromClient = (client, outside = false, gap = false) => {
+        if (!divRef.current) {
+            return null;
+        }
+        const rect = divRef.current.getBoundingClientRect();
+        if (!rect) {return null}
+
+        const rasterPos = {
+            x: Math.floor(Math.round(client.x - rect.left)/cellSize),
+            y: Math.floor(Math.round(client.y - rect.top)/cellSize),
+        };
+        const min = gap ? 1 : 0;
+        let maxX = props.width;
+        let maxY = props.height;
+
+        rasterPos.rawX = rasterPos.x;
+        rasterPos.rawY = rasterPos.y;
+        if (!outside) {
+            if (rasterPos.x < min) {
+                rasterPos.x = min;
+            } else if (rasterPos.x >= maxX) {
+                rasterPos.x = maxX - 1;
+            }
+            if (rasterPos.y < min) {
+                rasterPos.y = min;
+            } else if (rasterPos.y >= maxY) {
+                rasterPos.y = maxY - 1;
+            }
+        }
+        return rasterPos;
+    };
+
+    let initMove = null;
+    let initResize = null;
+
+    const initMoveResize = (trackAxis) => {
+        const trackX = trackAxis.indexOf('x') !== -1;
+        const trackY = trackAxis.indexOf('y') !== -1;
+        const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
+
+/*
+        dblClick = (e) => {
+            if (this.copyAction) {
+                this.copyAction();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+*/
+
+        const handleAutoScroll = () => {
+            const props = autoScroll.props;
+            if (!autoScroll.id || !(autoScroll.x || autoScroll.y)) {
+                autoScroll.id = undefined;
+                return;
+            }
+            const change = {};
+            if (autoScroll.x && !(autoScroll.marker && !autoScroll.marker.resizeX)) {
+                const maxPosX = props.cellProvider.getWidth() - props.width;
+                const posX =
+                    Math.min(Math.max(props.posX + autoScroll.x, 0), maxPosX);
+
+                if (autoScroll.marker && autoScroll.marker.resizeX) {
+                    const anchorX = autoScroll.marker.anchorPos.x;
+
+                    if (autoScroll.x < 0) {
+                        change.markerX = Math.min(posX, anchorX);
+                        change.markerWidth = Math.abs(posX - anchorX) + 1;
+                    } else {
+                        const posEndX = posX + props.width - 1;
+                        change.markerX = posEndX < anchorX ? posEndX - 1 : anchorX;
+                        change.markerWidth = Math.abs(posEndX - anchorX) + 1;
+                    }
+                } else {
+                    change.markerX =
+                        Math.min(Math.max(props.markerX + autoScroll.x, 0),
+                            props.cellProvider.getWidth() - props.markerWidth
+                        );
+                }
+                change.posX = posX;
+            }
+
+            if (autoScroll.y && !(autoScroll.marker && !autoScroll.marker.resizeY)) {
+                const maxPosY = props.cellProvider.getHeight() - props.height;
+                const posY =
+                    Math.min(Math.max(props.posY + autoScroll.y, 0), maxPosY);
+
+                if (autoScroll.marker && autoScroll.marker.resizeY) {
+                    const anchorY = autoScroll.marker.anchorPos.y;
+
+                    if (autoScroll.y < 0) {
+                        change.markerY = Math.min(posY, anchorY);
+                        change.markerHeight = Math.abs(posY - anchorY) + 1;
+                    } else {
+                        const posEndY = posY + props.height - 1;
+                        change.markerY = posEndY < anchorY ? posEndY - 1 : anchorY;
+                        change.markerHeight = Math.abs(posEndY - anchorY) + 1;
+                    }
+                } else {
+                    change.markerY =
+                        Math.min(Math.max(props.markerY + autoScroll.y, 0),
+                            props.cellProvider.getHeight() - props.markerHeight
+                        );
+                }
+                change.posY = posY;
+            }
+            setState(change, 'handleAutoScroll');
+            initAutoScroll();
+        };
+
+        const initAutoScroll = () => {
+            autoScroll.id = setTimeout(
+                handleAutoScroll, 100
+            );
+        };
+
+        const resetAutoScroll = () => {
+            if (autoScroll.id) {
+                clearTimeout(autoScroll.id);
+                autoScroll.id = undefined;
+            }
+            autoScroll.marker = false;
+            autoScroll.x = null;
+            autoScroll.y = null;
+        };
+
+        const updateAutoScroll = (newRasterPos, autoScrollMarker = null) => {
+
+            const scrollX = autoScrollMarker === null || autoScrollMarker.resizeX;
+            if (scrollX && newRasterPos.rawX < 0 || newRasterPos.rawX > props.width) {
+                autoScroll.x = newRasterPos.rawX < 0 ? newRasterPos.rawX : newRasterPos.rawX - props.width;
+            } else {
+                autoScroll.x = null;
+            }
+            const scrollY = autoScrollMarker === null || autoScrollMarker.resizeY;
+            if (scrollY && newRasterPos.rawY < 0 || newRasterPos.rawY > props.height) {
+                autoScroll.y = newRasterPos.rawY < 0 ? newRasterPos.rawY : newRasterPos.rawY - props.height;
+            } else {
+                autoScroll.y = null;
+            }
+            autoScroll.marker = autoScrollMarker;
+            if (autoScroll.x || autoScroll.y) {
+                if (!autoScroll.id) {
+                    initAutoScroll();
+                }
+            } else {
+                autoScroll.id = undefined;
+            }
+        };
+
+        initResize = isGap ? null : (e, axis, startX, startY) => {
+            const anchorPos = {
+                x: props.markerX + (!startX ? 0 : props.markerWidth - 1),
+                y: props.markerY + (!startY ? 0 : props.markerHeight - 1)
+            };
+            const resizeX = trackX && axis.indexOf('x') !== -1;
+            const resizeY = trackY && axis.indexOf('y') !== -1;
+
+            let lastRasterPos = getRasterPosFromEvent(e, true);
+
+            const checkWithLastRasterPos = (e) => {
+                const props = autoScroll.props;
+                const newRasterPos = getRasterPosFromEvent(e, true);
+                if (newRasterPos === null) {
+                    return;
+                }
+                updateAutoScroll(newRasterPos, {anchorPos, resizeX, resizeY});
+
+                // relative width/height from anchorPos
+                const absWidth = newRasterPos.x + props.posX - anchorPos.x;
+                const absHeight = newRasterPos.y + props.posY - anchorPos.y;
+
+                // width/height not 0 and within raster?
+                const validX = (resizeX && absWidth !== 0 && newRasterPos.x + 1 >= 0 && newRasterPos.x <= props.width);
+                const validY = (resizeY && absHeight !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= props.height);
+
+                // rasterPos has changed and has at least one valid raster position?
+                const hasChanged =
+                    (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
+                    (validX || validY);
+
+                if (hasChanged) {
+                    lastRasterPos = newRasterPos;
+                    const change = {};
+
+                    if (validX) {
+                        if (absWidth > 0) {
+                            // grow right => inc width
+                            change.markerWidth = absWidth;
+                        } else {
+                            // grow left => set new width and set position left of anchor
+                            change.markerWidth = -absWidth;
+                            change.markerX = anchorPos.x + absWidth + 1;
+                        }
+                    }
+                    if (validY) {
+                        if (absHeight > 0) {
+                            change.markerHeight = absHeight;
+                        } else {
+                            change.markerHeight = -absHeight;
+                            change.markerY = anchorPos.y + absHeight + 1;
+                        }
+                    }
+                    setState(change, 'checkWithLastRasterPos');
+                }
+            };
+
+            const mouseMove = (e) => {
+                checkWithLastRasterPos(e);
+                e.stopPropagation();
+                e.preventDefault();
+            };
+            windowEvents.addListener('mousemove', mouseMove, false);
+
+            windowEvents.addListener(
+                'mouseup',
+                (e) => {
+                    checkWithLastRasterPos(e);
+                    resetAutoScroll();
+                    windowEvents.removeListener('mousemove', mouseMove, false);
+                    setActive(null);
+                    e.stopPropagation();
+                    e.preventDefault();
+                },
+                {capture: false, once: true}
+            );
+
+            if (!active) {
+                let dir = '';
+                if (axis === 'x') {
+                    dir = 'h'
+                } else if (axis === 'y') {
+                    dir = 'v';
+                } else {
+                    dir = ((startX && startY) || (!startX && !startY)) ? 'nwse' : 'nesw';
+                }
+                setActive(dir + 'resize');
+            }
+        };
+
+        initMove = (e) => {
+            let lastRasterPos = getRasterPosFromEvent(e, false, isGap);
+            if (!trackX) {
+                lastRasterPos.x = 0;
+            }
+            if (!trackY) {
+                lastRasterPos.y = 0;
+            }
+
+            const offPos = {
+                x: isGap ? 0 : lastRasterPos.x - (props.markerX - props.posX),
+                y: isGap ? 0 : lastRasterPos.y - (props.markerY - props.posY)
+            };
+
+            const checkWithLastRasterPos = (e) => {
+                const props = autoScroll.props;
+                const newRasterPos = getRasterPosFromEvent(e, false, isGap);
+                if (newRasterPos === null) {
+                    return;
+                }
+                if (!trackX) {
+                    newRasterPos.x = 0;
+                }
+                if (!trackY) {
+                    newRasterPos.y = 0;
+                }
+                const xStart = newRasterPos.x - offPos.x;
+                const yStart = newRasterPos.y - offPos.y;
+
+                let markerPosX = props.posX + xStart;
+                let markerPosY = props.posY + yStart;
+
+                const hasChangedX = trackX && newRasterPos.x !== lastRasterPos.x;
+                const hasChangedY = trackY && newRasterPos.y !== lastRasterPos.y;
+
+                updateAutoScroll(newRasterPos);
+
+                if (hasChangedX || hasChangedY) {
+                    const change = {};
+                    if (hasChangedX) {
+                        if (markerPosX < 0) {
+                            markerPosX = 0;
+                        } else if (markerPosX + props.markerWidth > props.cellProvider.getWidth()) {
+                            markerPosX = props.cellProvider.getWidth() - props.markerWidth;
+                        }
+                        lastRasterPos.x = newRasterPos.x;
+                        change.markerX = markerPosX;
+                    }
+                    if (hasChangedY) {
+                        if (markerPosY < 0) {
+                            markerPosY = 0;
+                        } else if (markerPosY + props.markerHeight > props.cellProvider.getHeight()) {
+                            markerPosY = props.cellProvider.getHeight() - props.markerHeight;
+                        }
+                        lastRasterPos.y = newRasterPos.y;
+                        change.markerY = markerPosY;
+                    }
+                    setState(change, 'move');
+                }
+            };
+
+            const mouseMove = (e) => {
+                checkWithLastRasterPos(e);
+                e.stopPropagation();
+                e.preventDefault();
+            };
+            windowEvents.addListener('mousemove', mouseMove, false);
+
+            windowEvents.addListener(
+                'mouseup',
+                (e) => {
+                    checkWithLastRasterPos(e);
+                    resetAutoScroll();
+                    windowEvents.removeListener('mousemove', mouseMove, false);
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setActive(null);
+                },
+                {capture: false, once: true}
+            );
+
+            if (!active) {
+                setActive('move');
+            }
+        }
+    };
+
+    let marker = '';
+    if (visibleX && visibleY) {
+        initMoveResize('xy');
+
+        marker = <CellMarker
+            blink
+            initMove={initMove}
+            initResize={initResize}
+            size={props.size}
+            border={props.border}
+            zoom={props.zoom}
+            type={markerType}
+            highlight={true}
+            posX={offX}
+            posY={offY}
+            width={markerWidth}
+            height={markerHeight}
+            top={hasTop}
+            bottom={hasBottom}
+            left={hasLeft}
+            right={hasRight}
+        />;
+    }
+
+    return (
+        <Fragment>
+            <div
+                ref={divRef}
+                style={{width: rasterWidth, height: rasterHeight}}
+                className="marker-area no-events">
+                {marker}
+            </div>
+            <MouseOverlay active={active !== null} cursor={active} />
+        </Fragment>
+    );
+}
+
 function CursorArea(props) {
     const eContext = useContext(EditorContext);
     const divRef = useRef(null);
@@ -2632,7 +3079,7 @@ function CursorArea(props) {
             x: posX,
             y: posY
         };
-    }
+    };
 
     const onMouseMove = (e) => {
         const offset = getOffsetPos(e);
@@ -2699,15 +3146,25 @@ function BasicRasterView(props) {
     const [zoom, setZoom] = useState(2);
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
-    const [test, setTest] = useState(0);
     const [width, setWidth] = useState(10);
     const [height, setHeight] = useState(5);
     const [rulers, setRulers] = useState(true);
+    const [markerX, setMarkerX] = useState(null);
+    const [markerY, setMarkerY] = useState(null);
+    const [markerWidth, setMarkerWidth] = useState(3);
+    const [markerHeight, setMarkerHeight] = useState(4);
+    const [markerType, setMarkerType] = useState('');
+    const [markerSpaceX, setMarkerSpaceX] = useState(0);
+    const [markerSpaceY, setMarkerSpaceY] = useState(0);
 
     const size = props.cellProvider.getSize();
 
     const cursorClick = (x, y, width, height) => {
-        eContext.selection = props.cellProvider.getSelection(x, y, 3, 2);
+        eContext.selection = props.cellProvider.getSelection(x, y, 1, 1);
+        setMarkerX(x);
+        setMarkerY(y);
+        setMarkerHeight(1);
+        setMarkerWidth(1);
     };
 
     return (
@@ -2739,6 +3196,26 @@ function BasicRasterView(props) {
                         rulers={rulers}
                         cellProvider={props.cellProvider}>
                         <CursorArea cellProvider={props.cellProvider} click={cursorClick} width={width} height={height} zoom={zoom} border={border} size={size} posX={posX} posY={posY} />
+                        <MarkerArea
+                            setPosX={setPosX}
+                            setPosY={setPosY}
+                            setMarkerWidth={setMarkerWidth}
+                            setMarkerHeight={setMarkerHeight}
+                            setMarkerX={setMarkerX}
+                            setMarkerY={setMarkerY}
+                            cellProvider={props.cellProvider}
+                            width={width}
+                            height={height}
+                            zoom={zoom}
+                            border={border}
+                            size={size}
+                            posX={posX}
+                            posY={posY}
+                            markerX={markerX}
+                            markerY={markerY}
+                            markerWidth={markerWidth}
+                            markerHeight={markerHeight}
+                        />
                     </FlexCellProviderScrollRaster>
                 </div>
             </Stack>
