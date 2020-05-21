@@ -462,6 +462,10 @@ input[type=range][orient=vertical] {
     overflow: auto;
 }
 
+.cursor-pointer {
+    cursor: pointer;
+}
+
 .cursor-move {
     cursor: move;
 }

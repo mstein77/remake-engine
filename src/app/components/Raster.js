@@ -2071,6 +2071,8 @@ function CellMarker(props) {
         divAttr.onDoubleClick = props.dblClick;
     } else if (props.click) {
         divAttr.onClick = props.click;
+    } else if (props.mouseDown) {
+        divAttr.onMouseDown = props.mouseDown;
     }
 
     let matrix = '';
@@ -2154,8 +2156,6 @@ function useRasterDim(props) {
 const EditorContext = React.createContext();
 
 const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
-
-    console.log('RENDER: RasterCanvas', props, canvasRef);
     const context = useContext(CssContext);
 
     useEffect(() => {
@@ -2168,7 +2168,6 @@ const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
     const canvasHeight = props.border + props.height * cellPlusBorderSize;
 
     const drawRaster = () => {
-        console.log('drawRaster');
         const canvas = canvasRef.current;
         if (canvas === null) {
             return;
@@ -2235,10 +2234,14 @@ const CellProviderRaster = React.memo((props) => {
     const [update, setUpdate] = useState(false);
     const mounted = useMounted();
     const ready = useReadyCellProvider(props.cellProvider, mounted);
+    const updateRef = useRef(null);
+    updateRef.current = update;
 
     useEffect(() => {
         if (props.id) {
-            eContext.addRedraw(props.id, () => { setUpdate(!update); });
+            eContext.addRedraw(props.id, () => {
+                setUpdate(!updateRef.current);
+            });
         }
     }, []);
 
@@ -2535,15 +2538,24 @@ function MarkerArea(props) {
 
     const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim(props);
 
+    let initResize;
+
+    useEffect(() => {
+        if (props.resize) {
+            initResize(props.resize, 'xy', false, false);
+            props.setResize(null);
+        }
+    }, [props.resize]);
+
     if (props.markerX === null) {
         return '';
     }
 
-    const markerType = 'rect';
-    let offX = 0;
-    let offY = 0;
-    let markerWidth = 1;
-    let markerHeight = 1;
+    const markerType = props.markerType;
+    let offX;
+    let offY;
+    let markerWidth;
+    let markerHeight;
 
     const checkX = !markerType.startsWith('row');
     const checkY = !markerType.startsWith('column');
@@ -2554,11 +2566,12 @@ function MarkerArea(props) {
     const maxMarkerY = props.markerY + props.markerHeight - 1;
     const maxPosY = props.posY + props.height - 1;
     const visibleY = !checkY || (props.posY <= maxMarkerY && maxPosY >= props.markerY);
+    const isGap = markerType.endsWith('gap');
 
-    let hasTop = (checkY && props.posY <= props.markerY && maxPosY >= props.markerY);
-    let hasBottom = (checkY && props.posY <= maxMarkerY && maxPosY >= maxMarkerY);
-    let hasLeft = (checkX && props.posX <= props.markerX && maxPosX >= props.markerX);
-    let hasRight = (checkX && props.posX <= maxMarkerX && maxPosX >= maxMarkerX);
+    let hasTop = (checkY && props.posY <= props.markerY && maxPosY >= props.markerY && !isGap);
+    let hasBottom = (checkY && props.posY <= maxMarkerY && maxPosY >= maxMarkerY && !isGap);
+    let hasLeft = (checkX && props.posX <= props.markerX && maxPosX >= props.markerX && !isGap);
+    let hasRight = (checkX && props.posX <= maxMarkerX && maxPosX >= maxMarkerX && !isGap);
 
     offX = checkX ? Math.max(props.markerX, props.posX) - props.posX : 0;
     offY = checkY ? Math.max(props.markerY, props.posY) - props.posY : 0;
@@ -2566,10 +2579,7 @@ function MarkerArea(props) {
     let maxOffX = Math.min(maxMarkerX, maxPosX) - props.posX;
     let maxOffY = Math.min(maxMarkerY, maxPosY) - props.posY;
     markerWidth = checkX ? maxOffX - offX + 1 : props.width;
-    // markerType.startsWith('row') ? props.width : Math.min(props.markerWidth, props.width - offX);
-    markerHeight = checkY ? maxOffY - offY + 1 : props.height; //markerType.startsWith('column') ? props.height : Math.min(props.markerHeight, props.height - offY);
-
-    const isGap = markerType.endsWith('gap');
+    markerHeight = checkY ? maxOffY - offY + 1 : props.height;
 
     const setState = (change, where = '?') => {
         const props = autoScroll.props;
@@ -2581,11 +2591,11 @@ function MarkerArea(props) {
             console.log(where, '-> markerWidth', change.markerWidth, props.markerWidth);
             props.setMarkerWidth(change.markerWidth);
         }
-        if (change.markerX !== undefined && change.markerX !== props.markerX) {
+        if (checkX && change.markerX !== undefined && change.markerX !== props.markerX) {
             console.log(where, '-> markerX', change.markerX, props.markerX);
             props.setMarkerX(change.markerX);
         }
-        if (change.markerY !== undefined && change.markerY !== props.markerY) {
+        if (checkY && change.markerY !== undefined && change.markerY !== props.markerY) {
             console.log(where, '-> markerY', change.markerY, props.markerY);
             props.setMarkerY(change.markerY);
         }
@@ -2635,23 +2645,23 @@ function MarkerArea(props) {
         return rasterPos;
     };
 
-    let initMove = null;
-    let initResize = null;
+    let marker = '';
+    if (visibleX && visibleY) {
 
-    const initMoveResize = (trackAxis) => {
+        const trackAxis = 'xy';
         const trackX = trackAxis.indexOf('x') !== -1;
         const trackY = trackAxis.indexOf('y') !== -1;
         const isGap = (markerType === 'column-gap' || markerType === 'row-gap');
 
-/*
-        dblClick = (e) => {
-            if (this.copyAction) {
-                this.copyAction();
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        };
-*/
+        /*
+                dblClick = (e) => {
+                    if (this.copyAction) {
+                        this.copyAction();
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                };
+        */
 
         const handleAutoScroll = () => {
             const props = autoScroll.props;
@@ -2843,7 +2853,7 @@ function MarkerArea(props) {
             }
         };
 
-        initMove = (e) => {
+        const initMove = (e) => {
             let lastRasterPos = getRasterPosFromEvent(e, false, isGap);
             if (!trackX) {
                 lastRasterPos.x = 0;
@@ -2927,12 +2937,7 @@ function MarkerArea(props) {
             if (!active) {
                 setActive('move');
             }
-        }
-    };
-
-    let marker = '';
-    if (visibleX && visibleY) {
-        initMoveResize('xy');
+        };
 
         marker = <CellMarker
             blink
@@ -2979,10 +2984,9 @@ function CursorArea(props) {
     if (eContext.selection === null) {
         return '';
     }
-    const selection = eContext.selection;
-    const cursorWidth = selection.getWidth();
-    const cursorHeight = selection.getHeight();
-    const markerType = selection.getType();
+    const cursorWidth = props.cursorWidth;
+    const cursorHeight = props.cursorHeight;
+    const markerType = props.cursorType;
 
     const isGap = markerType.endsWith('gap');
 
@@ -3028,23 +3032,27 @@ function CursorArea(props) {
         }
 
         const onClick = (e) => {
+            if (!props.mouseDown) {
+                return;
+            }
             const offset = getOffsetPos(e);
-            props.click(props.posX + offset.x, props.posY + offset.y, 1, 1);
             e.stopPropagation();
             e.preventDefault();
+            return props.mouseDown(e, props.posX + offset.x, props.posY + offset.y, 1, 1);
         };
+
+        // matrix={selection.getMatchMatrix(props.cellProvider.getEmptyCell())}
 
         marker = <CellMarker
             blink
-            click={onClick}
+            mouseDown={onClick}
             size={props.size}
             border={props.border}
             zoom={props.zoom}
             type={markerType}
-            highlight={false}
+            highlight={props.highlight}
             posX={offX}
             posY={offY}
-            matrix={selection.getMatchMatrix(props.cellProvider.getEmptyCell())}
             width={markerWidth}
             height={markerHeight}
             top={hasTop}
@@ -3087,8 +3095,11 @@ function CursorArea(props) {
             setOffX(null);
             setOffY(null);
         }  else if (offX !== offset.x || offY !== offset.y) {
-                setOffX(offset.x);
-                setOffY(offset.y);
+            setOffX(offset.x);
+            setOffY(offset.y);
+            if (props.mouseTrack) {
+                props.mouseTrack(props.posX + offset.x, props.posY + offset.y);
+            }
         }
         e.stopPropagation();
         e.preventDefault();
@@ -3101,12 +3112,19 @@ function CursorArea(props) {
         e.preventDefault();
     };
 
+    const onDoubleClick = props.doubleClick ? (e) => {
+        props.doubleClick(e);
+        e.stopPropagation();
+        e.preventDefault();
+    } : null;
+
     return (
         <div
             ref={divRef}
             style={{width: rasterWidth, height: rasterHeight}}
             onMouseMove={onMouseMove}
             onMouseLeave={onMouseLeave}
+            onDoubleClick={onDoubleClick}
             className="marker-area">
             {marker}
         </div>
@@ -3114,21 +3132,91 @@ function CursorArea(props) {
 }
 
 class EditorCtx extends React.Component {
-    render() {
-        const redraw = {};
-        const context = {
+    constructor(props) {
+        super(props);
+
+        this.redraw = {};
+        this.frames = {};
+
+        this.setSelection = function (selection) {
+            this.setState({selection});
+        };
+        this.setSelection = this.setSelection.bind(this);
+
+        this.state = {
+            past: [],
+            future: [],
+            selection: null,
+            setSelection: this.setSelection,
+            hasPast: () => {
+                return this.state.past.length > 0;
+            },
+            hasFuture: () => {
+                return this.state.future.length > 0;
+            },
+            doAction: (doAction, undoAction) => {
+                const action = {doAction, undoAction};
+                const past = this.state.past.concat();
+                if (past.length > 10) {
+                    past.shift();
+                }
+                past.push(action);
+                this.setState({
+                    past,
+                    future: []
+                });
+                action.doAction();
+            },
+            undoAction: () => {
+                if (this.state.past.length === 0) {
+                    return;
+                }
+                const past = this.state.past.concat();
+                const future = this.state.future.concat();
+                const action = past.pop();
+                future.push(action);
+                this.setState({
+                    past,
+                    future
+                });
+                action.undoAction();
+            },
+            redoAction: () => {
+                if (this.state.future.length === 0) {
+                    return;
+                }
+                const past = this.state.past.concat();
+                const future = this.state.future.concat();
+                const action = future.pop();
+                past.push(action);
+                this.setState({
+                    past,
+                    future
+                });
+                action.doAction();
+            },
             addRedraw: (id, cellRedraw) => {
-                redraw[id] = cellRedraw;
+                this.redraw[id] = cellRedraw;
             },
             redraw: (id) => {
-                if (redraw[id]) {
-                    redraw[id]();
+                if (this.redraw[id]) {
+                    if (this.frames[id]) {
+                        cancelAnimationFrame(this.frames[id]);
+                    }
+                    this.frames[id] = requestAnimationFrame(
+                        () => {
+                            this.redraw[id]();
+                            this.frames[id] = undefined;
+                        }
+                    );
                 }
-            },
-            selection: null
+            }
         };
+    }
+
+    render() {
         return (
-            <EditorContext.Provider value={context}>
+            <EditorContext.Provider value={this.state}>
                 {this.props.children}
             </EditorContext.Provider>
         );
@@ -3138,8 +3226,11 @@ class EditorCtx extends React.Component {
 function BasicRasterView(props) {
     const eContext = useContext(EditorContext);
 
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
+
     useEffect(() => {
-        eContext.selection = props.cellProvider.getEmptySelection();
+        eContext.setSelection(props.cellProvider.getEmptySelection());
     }, []);
 
     const [border, setBorder] = useState(1);
@@ -3149,27 +3240,219 @@ function BasicRasterView(props) {
     const [width, setWidth] = useState(10);
     const [height, setHeight] = useState(5);
     const [rulers, setRulers] = useState(true);
+    const [cursorType, setCursorType] = useState('rect');
+    const [cursorWidth, setCursorWidth] = useState(1);
+    const [cursorHeight, setCursorHeight] = useState(1);
     const [markerX, setMarkerX] = useState(null);
     const [markerY, setMarkerY] = useState(null);
-    const [markerWidth, setMarkerWidth] = useState(3);
-    const [markerHeight, setMarkerHeight] = useState(4);
-    const [markerType, setMarkerType] = useState('');
+    const [markerWidth, setMarkerWidth] = useState(1);
+    const [markerHeight, setMarkerHeight] = useState(1);
+    const [markerType, setMarkerType] = useState('rect');
     const [markerSpaceX, setMarkerSpaceX] = useState(0);
     const [markerSpaceY, setMarkerSpaceY] = useState(0);
+    const [resize, setResize] = useState(null);
+    const [cursorMouseDown, setCursorMouseDown] = useState(null);
+    const [cursorMouseUp, setCursorMouseUp] = useState(null);
+    const [cursorDoubleClick, setCursorDoubleClick] = useState(null);
+    const [cursorHighlight, setCursorHighlight] = useState(false);
+    const [cursorMouseTrack, setCursorMouseTrack] = useState(null);
+    const [fixCursor, setFixCursor] = useState(null);
+    const windowEvent = useWindowEventManager();
 
+    const overlayRef = useRef({
+        modes: {},
+        modeId: null,
+        cleaned: true,
+        cleanUp: function () {
+            if (this.modeId !== null && !this.cleaned) {
+                this.modes[this.modeId].cleanUp();
+            }
+            this.cleaned = true;
+        },
+        addMode: function (id, init, cleanUp) {
+            this.modes[id] = {
+                init,
+                cleanUp
+            };
+        },
+        setMode: function (modeId, data = {}) {
+            if (!this.modes[modeId]) {
+                throw Error('Unknown mode id "' + modeId + '"');
+            }
+            this.cleanUp();
+            if (modeId !== null) {
+                this.modes[modeId].init(data);
+                this.modeId = modeId;
+                this.cleaned = false;
+            }
+        }
+    });
+    const overlay = overlayRef.current;
+
+    useEffect(() => {
+        overlay.addMode = overlay.addMode.bind(overlay);
+        overlay.setMode = overlay.setMode.bind(overlay);
+        overlay.cleanUp = overlay.cleanUp.bind(overlay);
+
+        const mouseUpPickAgain = (e) => {
+            overlay.setMode('pick');
+        };
+        overlay.addMode(
+            'pick',
+            (data) => {
+                setCursorType('rect');
+                setCursorWidth(1);
+                setCursorHeight(1);
+                setMarkerX(null);
+                setMarkerHeight(1);
+                setMarkerWidth(1);
+                setCursorHighlight(false);
+                setCursorMouseDown(() => (e, x, y) => {
+                    eCtxRef.current.setSelection(props.cellProvider.getSelection(x, y, 1, 1));
+                    setMarkerX(x);
+                    setMarkerY(y);
+                    windowEvent.addListener('mouseup', mouseUpPickAgain, {capture: false, once: true});
+                    setFixCursor('pointer');
+                });
+                setCursorDoubleClick(() => (e, x, y) => {
+                    overlay.setMode('startPath');
+                });
+            },
+            () => {
+                windowEvent.removeListener('mouseup', mouseUpPickAgain, {capture: false, once: true})
+                setMarkerX(null);
+                setMarkerY(null);
+                setCursorMouseDown(null);
+                setFixCursor(null);
+                setCursorDoubleClick(null);
+            }
+        );
+        overlay.addMode(
+            'select',
+            (data) => {
+                setCursorType(data.type ? data.type : 'rect');
+                setCursorWidth(data.width ? data.width : 1);
+                setCursorHeight(data.height ? data.height : 1);
+                // TODO fix, spacing
+                setCursorMouseDown(() => (e, x, y) => {
+                    setMarkerType(cursorType);
+                    setMarkerX(x);
+                    setMarkerY(y);
+                    setMarkerWidth(cursorWidth);
+                    setMarkerHeight(cursorHeight);
+                    setResize(cursorType.endsWith('gap') ? null : {clientX: e.clientX, clientY: e.clientY});
+                });
+            },
+            () => {
+                setCursorMouseDown(null);
+            }
+        );
+        overlay.addMode(
+            'startPath',
+            (data) => {
+                setCursorType(eCtxRef.current.selection.getType());
+                setCursorWidth(eCtxRef.current.selection.getWidth());
+                setCursorHeight(eCtxRef.current.selection.getHeight());
+
+                setCursorMouseDown(() => (e, x, y) => {
+                    overlayRef.current.setMode('writePath', {
+                        clear: (e.button === 2),
+                        start: {x, y}
+                    });
+                    e.stopPropagation();
+                    e.preventDefault();
+                });
+            },
+            () => {
+                setCursorMouseDown(null);
+            }
+        );
+
+        let mouseUpSavePath;
+        overlay.addMode(
+            'writePath',
+            (data) => {
+                const path = {
+                    new: {},
+                    old: {}
+                };
+                const track = (x, y) => {
+                    let segment;
+                    if (data.clear) {
+                        segment = props.cellProvider.writeSelection(x, y, eCtxRef.current.selection, props.cellProvider.getEmptyCell(), true);
+                    } else {
+                        segment = props.cellProvider.writeSelection(x, y, eCtxRef.current.selection, null, true);
+                    }
+                    Object.assign(path.new, segment.new);
+                    for(let key in segment.old) {
+                        if (path.old[key] === undefined) {
+                            path.old[key] = segment.old[key];
+                        }
+                    }
+                    eCtxRef.current.redraw('boom');
+                };
+
+                setCursorHighlight(true);
+                track(data.start.x, data.start.y);
+
+                mouseUpSavePath = (e, x, y) => {
+                    const doPath = path.new;
+                    const undoPath = path.old;
+                    const doAction = () => {
+                        props.cellProvider.writePath(doPath);
+                        eCtxRef.current.redraw('boom');
+                    };
+                    const undoAction = () => {
+                        props.cellProvider.writePath(undoPath);
+                        eCtxRef.current.redraw('boom');
+                    };
+                    eContext.doAction(doAction, undoAction);
+                    overlay.setMode('startPath');
+                };
+                //                setCursorTrack()
+                windowEvent.addListener('mouseup', mouseUpSavePath, {capture: false, once: true});
+                setCursorMouseTrack(() => (x, y) => {
+                    track(x, y);
+                });
+            },
+            () => {
+                windowEvent.removeListener('mouseup', mouseUpSavePath, {capture: false, once: true});
+                setCursorHighlight(false);
+                setCursorMouseTrack(null);
+            }
+        );
+
+        if (props.mode) {
+            overlay.setMode(props.mode);
+        }
+    }, []);
     const size = props.cellProvider.getSize();
 
-    const cursorClick = (x, y, width, height) => {
-        eContext.selection = props.cellProvider.getSelection(x, y, 1, 1);
-        setMarkerX(x);
-        setMarkerY(y);
-        setMarkerHeight(1);
-        setMarkerWidth(1);
+    const resetMarker = (type) => {
+        setMarkerX(null);
+        setMarkerY(null);
+        setCursorHeight(1);
+        setCursorWidth(1);
+        if (type) {
+            setCursorType(type);
+        }
     };
 
     return (
         <div className="padded full-v">
             <Stack dir="x" full>
+                <Stack dir="y">
+                    <div><button disabled={markerX === null} onClick={resetMarker}>Clear</button></div>
+                    <div><button onClick={() => {overlay.setMode('pick')}}>Pick</button></div>
+                    <div><button onClick={() => {overlay.setMode('select', {type: 'rect'})}}>Select Rect</button></div>
+                    <div><button onClick={() => {overlay.setMode('select', {type: 'rows'})}}>Select Rows</button></div>
+                    <div><button onClick={() => {overlay.setMode('select', {type: 'columns'})}}>Select Columns</button></div>
+                    <div><button onClick={() => {overlay.setMode('select', {type: 'column-gap'})}}>Select Column-Gap</button></div>
+                    <div><button onClick={() => {overlay.setMode('select', {type: 'row-gap'})}}>Select Row-Gap</button></div>
+                    <div><button onClick={() => {eContext.undoAction()}} disabled={!eContext.hasPast()}>Undo</button></div>
+                    <div><button onClick={() => {eContext.redoAction()}} disabled={!eContext.hasFuture()}>Redo</button></div>
+                </Stack>
+
                 <div>
                     PosX: <Int min={0} max={props.cellProvider.getWidth() - width} value={posX} set={setPosX} buttons />
                     PosY: <Int min={0} max={props.cellProvider.getHeight() - height} value={posY} set={setPosY} buttons />
@@ -3195,8 +3478,27 @@ function BasicRasterView(props) {
                         border={border}
                         rulers={rulers}
                         cellProvider={props.cellProvider}>
-                        <CursorArea cellProvider={props.cellProvider} click={cursorClick} width={width} height={height} zoom={zoom} border={border} size={size} posX={posX} posY={posY} />
+                        <CursorArea
+                            cellProvider={props.cellProvider}
+                            mouseDown={cursorMouseDown}
+                            mouseUp={cursorMouseUp}
+                            mouseTrack={cursorMouseTrack}
+                            highlight={cursorHighlight}
+                            cursorWidth={cursorWidth}
+                            cursorHeight={cursorHeight}
+                            cursorType={cursorType}
+                            doubleClick={cursorDoubleClick}
+                            width={width}
+                            height={height}
+                            zoom={zoom}
+                            border={border}
+                            size={size}
+                            posX={posX}
+                            posY={posY}
+                        />
                         <MarkerArea
+                            resize={resize}
+                            setResize={setResize}
                             setPosX={setPosX}
                             setPosY={setPosY}
                             setMarkerWidth={setMarkerWidth}
@@ -3213,9 +3515,11 @@ function BasicRasterView(props) {
                             posY={posY}
                             markerX={markerX}
                             markerY={markerY}
+                            markerType={markerType}
                             markerWidth={markerWidth}
                             markerHeight={markerHeight}
                         />
+                        <MouseOverlay active={fixCursor !== null} cursor={fixCursor} />
                     </FlexCellProviderScrollRaster>
                 </div>
             </Stack>

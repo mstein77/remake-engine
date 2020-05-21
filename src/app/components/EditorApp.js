@@ -33,6 +33,11 @@ function EditorApp(props) {
     const [resources, setResources]  =  useState(props.game.getEditableResources());
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
 
+    // TODO: move to game:init?
+    window.oncontextmenu = (e) => {
+        e.preventDefault();
+    };
+
     const actions = (
         <Fragment>
             <button>Save</button> <button onClick={() => {setActive(null)}}>Cancel</button> <button onClick={props.play}>Play</button>

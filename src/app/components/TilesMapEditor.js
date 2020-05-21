@@ -355,7 +355,7 @@ function TilesMapEditor(props) {
                 <Tabs height={280} reverse>
                     <Tab name="Test">
                         <EditorCtx>
-                                <BasicRasterView auto cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={1} zoom={2} />
+                                <BasicRasterView auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={1} zoom={2} />
                         </EditorCtx>
                     </Tab>
                     <Tab name="Tiles">
