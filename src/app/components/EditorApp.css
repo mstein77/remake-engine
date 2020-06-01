@@ -324,8 +324,8 @@ body {
 
 .grid-3x3 {
     display: grid;
-    grid-template-columns: 20px auto min-content;
-    grid-template-rows: 20px auto min-content;
+    grid-template-columns: min-content auto min-content;
+    grid-template-rows: min-content auto min-content;
 }
 
 .grid-2x2 {

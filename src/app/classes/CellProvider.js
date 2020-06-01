@@ -51,12 +51,16 @@ class CellSelection {
         return this.type === 'columns';
     }
 
-    getMatchMatrix(value) {
+    getMatchMatrix(value, offset = null, length = null) {
         const rows = [];
-        const xMax = this.cells[0].length;
-        for (let y = 0, yMax = this.cells.length; y < yMax; y++) {
+        const xMin = !this.isRows() || offset === null ? 0 : offset;
+        const xMax = this.isRows() && length !== null ? xMin + length : this.cells[0].length;
+        const yMin = !this.isColumns() || offset === null ? 0 : offset;
+        const yMax = this.isColumns() && length !== null ? yMin + length : this.cells.length;
+
+        for (let y = yMin; y < yMax; y++) {
             const row = [];
-            for (let x = 0; x < xMax; x++) {
+            for (let x = xMin; x < xMax; x++) {
                 row.push(this.cells[y][x] === value);
             }
             rows.push(row);

@@ -12,7 +12,8 @@ import {
     SwitchButton,
     Toolbar,
     upperFirst,
-    MouseOverlay
+    MouseOverlay,
+    d
 } from "./BaseComponents";
 import {CellSelection} from "../classes/CellProvider";
 
@@ -2153,283 +2154,6 @@ function useRasterDim(props) {
     return [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight];
 }
 
-const EditorContext = React.createContext();
-
-const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
-    const context = useContext(CssContext);
-
-    useEffect(() => {
-        drawRaster();
-    });
-
-    const cellSize = props.size * props.zoom;
-    const cellPlusBorderSize = cellSize + props.border;
-    const canvasWidth = props.border + props.width * cellPlusBorderSize;
-    const canvasHeight = props.border + props.height * cellPlusBorderSize;
-
-    const drawRaster = () => {
-        const canvas = canvasRef.current;
-        if (canvas === null) {
-            return;
-        }
-
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        // TODO box-border-color?
-        ctx.fillStyle = context.contentTextColor;
-
-        let pos = 0;
-        if (props.border > 0) {
-            for (let x = 0; x <= props.width; x++) {
-                ctx.fillRect(pos, 0, props.border, canvasHeight);
-                pos += cellPlusBorderSize;
-            }
-            pos = 0;
-            for (let y = 0; y <= props.height; y++) {
-                ctx.fillRect(0, pos, canvasWidth, props.border);
-                pos += cellPlusBorderSize;
-            }
-        }
-        return ctx;
-    };
-
-    const bgColor = context.bgColor + (Math.min(context.bgOpacity * 10, 255)).toString(16).padStart(2, '0');
-    return (
-        <div style={{width: canvasWidth, height: canvasHeight}} className="checkbg"><div style={{backgroundColor: bgColor}}><canvas ref={canvasRef} width={canvasWidth} height={canvasHeight} /></div></div>
-    );
-}));
-
-function CellRaster(props) {
-    const canvasRef = useRef(null);
-    const height = props.cells.length;
-    const width = props.cells[0].length;
-    const {size, border, zoom} = props;
-    const rasterProps = {size, width, height, border, zoom, ref: canvasRef};
-    const cellPlusBorderSize = size * zoom + border;
-    let ctx = null;
-
-    const drawCells = (ctx) => {
-        console.log('drawCells');
-        let pos = border;
-        for (let row of props.cells) {
-            for (let x = 0; x < width; x++) {
-                props.render(ctx, border + x * cellPlusBorderSize, pos, row[x]);
-            }
-            pos += cellPlusBorderSize;
-        }
-    };
-
-    useEffect(() => {
-        ctx = canvasRef.current.getContext('2d');
-        drawCells(ctx);
-    });
-
-    return (
-        <RasterCanvas {...rasterProps} />
-    );
-}
-
-const CellProviderRaster = React.memo((props) => {
-    const eContext = useContext(EditorContext);
-    const [update, setUpdate] = useState(false);
-    const mounted = useMounted();
-    const ready = useReadyCellProvider(props.cellProvider, mounted);
-    const updateRef = useRef(null);
-    updateRef.current = update;
-
-    useEffect(() => {
-        if (props.id) {
-            eContext.addRedraw(props.id, () => {
-                setUpdate(!updateRef.current);
-            });
-        }
-    }, []);
-
-    if (!ready) {
-        return ''
-    }
-
-    const cells = props.cellProvider.getSelection(props.posX, props.posY, props.width, props.height).getCells();
-    const size = props.cellProvider.getSize();
-    let render = null;
-    switch (props.cellProvider.getCellType()) {
-        case 'bitmap':
-            render =
-                (ctx, x, y, value) => {
-                    const img = props.cellProvider.getBitmapForValue2(value, props.zoom);
-                    if (img) {
-                        ctx.putImageData(img, x, y);
-                    }
-                };
-            break;
-
-        case 'color':
-            const cellSize = size * props.zoom;
-            render =
-                (ctx, x, y, value) => {
-                    ctx.fillStyle = value;
-                    ctx.fillRect(x, y, cellSize, cellSize);
-                };
-            break;
-
-        default:
-            console.error('Unknown cell type', props.cellProvider.getCellType());
-            break;
-    }
-
-    return (
-        <CellRaster size={size} cells={cells} border={props.border} zoom={props.zoom} render={render} />
-    );
-});
-
-function FlexCellProviderRaster(props) {
-    const divRef = useRef(null);
-    const observerRef = useRef(null);
-
-    const rulerSpaceX = props.rulers ? 30 : 0;
-    const rulerSpaceY = props.rulers ? 20 : 0;
-
-    const size = props.cellProvider.getSize();
-    const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim({...props, size});
-
-    const checkSize = () => {
-        const rect = divRef.current.parentNode.getBoundingClientRect();
-        const spaceX = rect.width - (props.rulers ? rulerSpaceX : 0) - props.border;
-        const spaceY = rect.height - (props.rulers ? rulerSpaceY : 0) - props.border;
-        let newWidth = Math.min(Math.floor(spaceX / cellPlusBorderSize), props.cellProvider.getWidth());
-        let newHeight = Math.min(Math.floor(spaceY / cellPlusBorderSize), props.cellProvider.getHeight());
-
-        if (props.width !== newWidth) {
-            props.setWidth(newWidth);
-        }
-        if (props.height !== newHeight) {
-            props.setHeight(newHeight);
-        }
-    };
-
-    const maxColumns = props.cellProvider.getWidth();
-    const maxRows = props.cellProvider.getHeight();
-    if (props.setPosX && props.posX + props.width >= maxColumns) {
-        props.setPosX(maxColumns - props.width);
-    }
-    if (props.setPosY && props.posY + props.height >= maxRows) {
-        props.setPosY(maxRows - props.height);
-    }
-
-    useEffect(() => {
-        if (props.auto) {
-            const observer = new ResizeObserver(entries => {
-                checkSize();
-            });
-            observerRef.current = observer;
-            observer.observe(divRef.current);
-            return () => {
-                if (observerRef.current) {
-                    observerRef.current.disconnect();
-                }
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        if (props.auto) checkSize();
-    });
-
-    const style = {
-        width: rasterWidth,
-        height: rasterHeight
-    };
-
-    const rasterProps = {
-        cellProvider: props.cellProvider,
-        border: props.border,
-        zoom: props.zoom,
-        posX: props.posX,
-        posY: props.posY,
-        width: props.width,
-        height: props.height,
-        id: props.id
-    };
-
-    let topRuler = '';
-    let leftRuler = '';
-    if (props.rulers) {
-        topRuler = <HRuler digits={('' + props.cellProvider.getWidth()).length} width={rasterWidth} height={rulerSpaceY} max={props.width} start={props.posX} size={size} zoom={props.zoom} border={props.border} />;
-        leftRuler = <VRuler digits={('' + props.cellProvider.getHeight()).length} height={rasterHeight} width={rulerSpaceX} max={props.height} start={props.posY} size={size} zoom={props.zoom} border={props.border} />;
-        style.marginTop = -(rulerSpaceY >> 1);
-    }
-
-    return (
-        <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
-            <div className="stack-h centered items-centered">
-                <div className="rel-canvas marker-space" style={style}>
-                    <CellProviderRaster {...rasterProps} />
-                    {topRuler}
-                    {leftRuler}
-                    {props.children}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function FlexCellProviderScrollRaster(props) {
-    const style = {
-        display: 'grid',
-        gridTemplateColumns: 'auto',
-        gridRowGap: 0,
-        gridColumGap: 0
-    };
-
-    const cellsWidth = props.cellProvider.getWidth();
-    const cellsHeight = props.cellProvider.getHeight();
-    const maxPosX = cellsWidth - props.width;
-    const maxPosY = cellsHeight - props.height;
-    const sensivity = 0.25;
-
-    const onWheel = (e) => {
-        let deltaX = Math.round(e.deltaX * sensivity);
-        let deltaY = Math.round(e.deltaY * sensivity);
-
-        const newPosX = Math.min(Math.max(props.posX + deltaX, 0), maxPosX);
-        const newPosY = Math.min(Math.max(props.posY + deltaY, 0), maxPosY);
-        if (newPosX !== props.posX) {
-            props.setPosX(newPosX);
-        }
-        if (newPosY !== props.posY) {
-            props.setPosY(newPosY);
-        }
-        e.stopPropagation();
-        e.preventDefault();
-    };
-
-    const hasScrollingX = props.width < cellsWidth;
-    const hasScrollingY = props.height < cellsHeight;
-
-    const firstCells = [<div key={1} onWheel={onWheel}><FlexCellProviderRaster {...props} /></div>];
-    if (hasScrollingY) {
-        firstCells.push(<div key={2}><Scrollbar auto vertical set={props.setPosY} pos={props.posY} page={props.height} max={props.cellProvider.getHeight()} /></div>);
-        style.gridTemplateColumns += ' 21px'
-    }
-    const secondCells = [];
-    if (hasScrollingX) {
-        secondCells.push(<div key={3}><Scrollbar auto set={props.setPosX} pos={props.posX} page={props.width} max={props.cellProvider.getWidth()} /></div>);
-        style.gridTemplateRows = 'auto';
-        if (hasScrollingY) {
-            secondCells.push(<div key={4}></div>);
-            style.gridTemplateRows += ' 21px';
-        }
-    }
-
-    return (
-        <div style={style} className="full-v">
-            {firstCells}
-            {secondCells}
-        </div>
-
-    );
-}
-
 function VRuler(props) {
     const context = useContext(CssContext);
     const rulerRef = useRef(null);
@@ -2444,14 +2168,14 @@ function VRuler(props) {
         const border = 1;
         const padding = 10;
         const charWidth = fontWidth;
-        const cellSize = props.zoom * props.size + border;
+        const cellPlusBorderSize = props.cellSize + props.border;
 
         ctx.clearRect(0, 0, props.width, props.height);
         ctx.fillStyle = context.contentTextColor;
         ctx.text = fontSize + 'px Monospace';
 
         ctx.fillRect(width - border, 0, 1, props.height);
-        const dist = Math.ceil((fontSize + 2 * padding) / cellSize);
+        const dist = Math.ceil((fontSize + 2 * padding) / cellPlusBorderSize);
         for (let i = 0; i < props.max; i++) {
             if (i % dist === 0) {
                 if (i + dist - 1 < props.max) {
@@ -2460,12 +2184,12 @@ function VRuler(props) {
                     ctx.fillText(
                         text,
                         width - padding - txtWidth,
-                        cellSize * i + fontSize + (padding >> 1)
+                        cellPlusBorderSize * i + fontSize + (padding >> 1)
                     );
                 }
-                ctx.fillRect(width - fullWidth, cellSize * i, fullWidth, border);
+                ctx.fillRect(width - fullWidth, cellPlusBorderSize * i, fullWidth, border);
             } else {
-                ctx.fillRect(width - smallWidth, cellSize * i, smallWidth, border);
+                ctx.fillRect(width - smallWidth, cellPlusBorderSize * i, smallWidth, border);
             }
         }
     };
@@ -2488,29 +2212,31 @@ function HRuler(props) {
     const fontSize = 10;
     const fontWidth = 10;
     const height = props.height - rulerPadding;
+    const fullWidth = 13;
+    const smallWidth = 3;
+    const border = 1;
+    const padding = 10;
 
     const drawRuler = (ctx) => {
-        const fullWidth = 13;
-        const smallWidth = 3;
-        const border = 1;
-        const padding = 10;
         const charWidth = fontWidth;
-        const cellSize = props.zoom * props.size + border;
+        const cellPlusBorderSize =  props.cellSize + props.border;
+
 
         ctx.clearRect(0, 0, props.width, height);
         ctx.fillStyle = context.contentTextColor;
         ctx.text = fontSize + 'px Monospace';
 
         ctx.fillRect(0, height - border, props.width, border);
-        const dist = Math.ceil((props.digits * charWidth + 2 * padding) / cellSize);
+        const dist = Math.ceil((props.digits * charWidth + 2 * padding) / cellPlusBorderSize);
+
         for (let i = 0; i < props.max; i++) {
             if (i % dist === 0) {
                 if (i + dist - 1 < props.max) {
-                    ctx.fillText('' + (props.start + i), cellSize * i + padding, fontSize);
+                    ctx.fillText('' + (props.start + i), cellPlusBorderSize * i + padding, fontSize);
                 }
-                ctx.fillRect(cellSize * i, height - fullWidth, border, fullWidth);
+                ctx.fillRect(cellPlusBorderSize * i, height - fullWidth, border, fullWidth);
             } else {
-                ctx.fillRect(cellSize * i, height - smallWidth, border, smallWidth);
+                ctx.fillRect(cellPlusBorderSize * i, height - smallWidth, border, smallWidth);
             }
         }
     };
@@ -2542,13 +2268,18 @@ function MarkerArea(props) {
     const checkX = !markerType.startsWith('row');
     const checkY = !markerType.startsWith('column');
 
-    const maxMarkerX = props.markerX + props.markerWidth - 1;
-    const maxPosX = props.posX + props.width - 1;
-    const visibleX = !checkX || (props.posX <= maxMarkerX && maxPosX >= props.markerX);
-    const maxMarkerY = props.markerY + props.markerHeight - 1;
-    const maxPosY = props.posY + props.height - 1;
-    const visibleY = !checkY || (props.posY <= maxMarkerY && maxPosY >= props.markerY);
     const isGap = markerType.endsWith('gap');
+
+    const maxMarkerX = props.markerX + props.markerWidth - 1;
+    const maxMarkerY = props.markerY + props.markerHeight - 1;
+    let maxPosX = props.posX + props.width;
+    let maxPosY = props.posY + props.height;
+    if (!isGap) {
+        maxPosX--;
+        maxPosY--;
+    }
+    const visibleX = !checkX || (props.posX <= maxMarkerX && maxPosX >= props.markerX);
+    const visibleY = !checkY || (props.posY <= maxMarkerY && maxPosY >= props.markerY);
 
     let hasTop = (checkY && props.posY <= props.markerY && maxPosY >= props.markerY && !isGap);
     let hasBottom = (checkY && props.posY <= maxMarkerY && maxPosY >= maxMarkerY && !isGap);
@@ -2584,7 +2315,6 @@ function MarkerArea(props) {
             right={hasRight}
         />;
     }
-
     return (
         <Fragment>
             <div
@@ -2597,7 +2327,6 @@ function MarkerArea(props) {
 }
 
 function CursorArea(props) {
-    const eContext = useContext(EditorContext);
     const divRef = useRef(null);
     const [offX, setOffX] = useState(null);
     const [offY, setOffY] = useState(null);
@@ -2668,11 +2397,10 @@ function CursorArea(props) {
             return props.mouseDown(e, props.posX + offset.x, props.posY + offset.y, 1, 1);
         };
 
-        // matrix={selection.getMatchMatrix(props.cellProvider.getEmptyCell())}
-
         marker = <CellMarker
             blink
             mouseDown={onClick}
+            matrix={props.matrix}
             size={props.size}
             border={props.border}
             zoom={props.zoom}
@@ -2689,25 +2417,28 @@ function CursorArea(props) {
         />;
     }
 
+    const adjustPosX = isGap ? cellSize >> 1 : 0;
+    let maxPosX = props.width;
+    const adjustPosY = isGap ? cellSize >> 1 : 0;
+    let maxPosY = props.height;
+    if (isGap) {
+        maxPosX++;
+        maxPosY++;
+    }
+
     const getOffsetPos = (e) => {
         const rect = divRef.current.getBoundingClientRect();
-        let posX = Math.floor((e.clientX - rect.x)/cellPlusBorderSize);
-        let reset = (posX < 0 || posX >= props.width);
-        let posY = Math.floor((e.clientY - rect.y)/cellPlusBorderSize);
-        reset = reset || (posY < 0 || posY >= props.height);
+        let posX = Math.floor((e.clientX - rect.x + adjustPosX)/cellPlusBorderSize);
+        let reset = (posX < 0 || posX >= maxPosX);
+        let posY = Math.floor((e.clientY - rect.y + adjustPosY)/cellPlusBorderSize);
+        reset = reset || (posY < 0 || posY >= maxPosY);
 
         if (reset) {
             return false;
         }
         if (markerType.startsWith('column')) {
-            if (isGap && posX === 0 && props.posX === 0) {
-                posX = 1;
-            }
             posY = 0;
         } else if (markerType.startsWith('row')) {
-            if (isGap && posY === 0 && props.posY === 0) {
-                posY = 1;
-            }
             posX = 0;
         }
         return {
@@ -2717,15 +2448,17 @@ function CursorArea(props) {
     };
 
     const onMouseMove = (e) => {
-        const offset = getOffsetPos(e);
-        if (offset === false) {
-            setOffX(null);
-            setOffY(null);
-        }  else if (offX !== offset.x || offY !== offset.y) {
-            setOffX(offset.x);
-            setOffY(offset.y);
-            if (props.mouseTrack) {
-                props.mouseTrack(props.posX + offset.x, props.posY + offset.y);
+        if (!props.fixed) {
+            const offset = getOffsetPos(e);
+            if (offset === false) {
+                setOffX(null);
+                setOffY(null);
+            } else if (offX !== offset.x || offY !== offset.y) {
+                setOffX(offset.x);
+                setOffY(offset.y);
+                if (props.mouseTrack) {
+                    props.mouseTrack(props.posX + offset.x, props.posY + offset.y);
+                }
             }
         }
         e.stopPropagation();
@@ -2850,18 +2583,425 @@ class EditorCtx extends React.Component {
     }
 }
 
-function BasicRasterView(props) {
-    const eContext = useContext(EditorContext);
+/**
+ *    R A S T E R - C o m p o n e n t s
+ */
 
-    const eCtxRef = useRef(null);
-    eCtxRef.current = eContext;
+const EditorContext = React.createContext();
 
-    const propsRef = useRef({});
+/**
+ * RasterCanvas
+ * ---------------------------------------------------------------
+ *   Creates a canvas and draws a raster matching the cell props
+ *   Returns the canvas as reference
+ *
+ * Props:
+ *   - cellSize
+ *   - border
+ *   - width
+ *   - height
+ *
+ * Context:
+ *   - bgColor
+ *   - bgOpacity
+ *   - contentTextColor
+ *
+ * Out:
+ *   - canvasRef
+ */
+const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
+    const context = useContext(CssContext);
+    const canvasElemRef = useRef(null);
+
+    const cellPlusBorderSize = props.cellSize + props.border;
+    const canvasWidth = props.border + props.width * cellPlusBorderSize;
+    const canvasHeight = props.border + props.height * cellPlusBorderSize;
 
     useEffect(() => {
-        eContext.setSelection(props.cellProvider.getEmptySelection());
+        if (canvasRef.current === null) {
+            canvasRef.current = {
+                elem: canvasElemRef.current,
+                ctx: canvasElemRef.current.getContext('2d')
+            };
+        }
+        const ctx = canvasRef.current.ctx;
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        // TODO box-border-color?
+        ctx.fillStyle = context.contentTextColor;
+
+        let pos = 0;
+        if (props.border > 0) {
+            for (let x = 0; x <= props.width; x++) {
+                ctx.fillRect(pos, 0, props.border, canvasHeight);
+                pos += cellPlusBorderSize;
+            }
+            pos = 0;
+            for (let y = 0; y <= props.height; y++) {
+                ctx.fillRect(0, pos, canvasWidth, props.border);
+                pos += cellPlusBorderSize;
+            }
+        }
+    });
+
+    const bgColor = context.bgColor + (Math.min(context.bgOpacity * 10, 255)).toString(16).padStart(2, '0');
+
+    return (
+        <div style={{width: canvasWidth, height: canvasHeight}} className="checkbg">
+            <div style={{backgroundColor: bgColor}}>
+                <canvas ref={canvasElemRef} width={canvasWidth} height={canvasHeight} />
+            </div>
+        </div>
+    );
+}));
+
+/**
+ * CellRaster
+ * ---------------------------------------------------------------
+ *   Creates a canvas with a raster for the given cells matrix and
+ *   uses the given cell render method for the matrix values
+ *
+ * Props:
+ *   - cells
+ *   - render
+ *   - cellSize
+ *   - border
+ *
+ */
+function CellRaster(props) {
+    const canvasRef = useRef(null);
+    const height = props.cells.length;
+    const width = (height === 0) ? 0 : props.cells[0].length;
+    const {cellSize, border} = props;
+    const rasterProps = {cellSize, width, height, border, ref: canvasRef};
+    const cellPlusBorderSize = cellSize + border;
+
+    useEffect(() => {
+        if (!canvasRef.current) {
+            return;
+        }
+        console.log('drawCells');
+        const ctx = canvasRef.current.ctx;
+        let pos = border;
+        for (let row of props.cells) {
+            for (let x = 0; x < width; x++) {
+                if (props.render)
+                props.render(ctx, border + x * cellPlusBorderSize, pos, row[x]);
+            }
+            pos += cellPlusBorderSize;
+        }
+    });
+
+    if (height === 0 || width === 0) {
+        return '';
+    }
+
+    return (
+        <RasterCanvas {...rasterProps} />
+    );
+}
+
+/**
+ * CellProviderRaster
+ * ----------------------------------------------------------
+ *   Creates a canvas with raster based on the specified rect
+ *   in the cellProvider and the zoom factor given in the props.
+ *   Registers an update trigger method in the editor context
+ *   when an editor id is given
+ *
+ * Props:
+ *   - cellProvider
+ *   - posX
+ *   - posY
+ *   - width
+ *   - height
+ *   - zoom
+ *   - editorId
+ *   - TODO: renderMode / renderCaching / renderBitmap
+ *
+ * Context:
+ *   - addRedraw
+ *
+ * Out:
+ *   - update() in editorContext
+ */
+const CellProviderRaster = React.memo((props) => {
+    const eContext = useContext(EditorContext);
+    const [update, setUpdate] = useState(false);
+    const mounted = useMounted();
+    const ready = useReadyCellProvider(props.cellProvider, mounted);
+    const renderRef = useRef(null);
+    const propsRef = useRef(null);
+    const size = props.cellProvider.getSize();
+    const cellSize = size * props.zoom;
+    propsRef.current = {
+        update: update,
+        zoom: props.zoom,
+        cellSize
+    };
+
+    if (!renderRef.current) {
+        const type = props.cellProvider.getCellType();
+        switch (type) {
+            case 'bitmap2':
+                renderRef.current =
+                    (ctx, x, y, value) => {
+                        const img = props.cellProvider.getBitmapForValue2(value, propsRef.current.zoom);
+                        if (img) {
+                        //    ctx.putImageData(img, x, y);
+                        }
+                    };
+                break;
+
+            case 'bitmap':
+                renderRef.current =
+                    (ctx, x, y, value) => {
+                        const img = props.cellProvider.getBitmapForValue(value, propsRef.current.zoom);
+                        if (img) {
+                            ctx.clearRect(x, y, propsRef.current.cellSize, propsRef.current.cellSize);
+                            ctx.drawImage(img, x, y);
+                        }
+                    };
+                break;
+
+
+            case 'color':
+                renderRef.current =
+                    (ctx, x, y, value) => {
+                        ctx.fillStyle = value;
+                        ctx.fillRect(x, y, propsRef.current.cellSize, propsRef.current.cellSize);
+                    };
+                break;
+
+            default:
+                console.error('Unknown cell type', type);
+                break;
+        }
+    }
+
+    useEffect(() => {
+        if (props.editorId) {
+            eContext.addRedraw(props.editorId, () => {
+                setUpdate(!propsRef.current.update);
+            });
+        }
     }, []);
 
+    if (!ready) {
+        return ''
+    }
+    const cells = props.cellProvider.getSelection(props.posX, props.posY, props.width, props.height).getCells();
+    return (
+        <CellRaster cellSize={propsRef.current.cellSize} cells={cells} border={props.border} render={renderRef.current} />
+    );
+});
+
+/**
+ * FlexCellProviderRaster
+ * ----------------------------------------------------------
+ *   Creates an absolute positioned canvas with a raster and cells
+ *   from the view of the given cellProvider which uses as much of
+ *   the available width and height as possible in the auto mode.
+ *   Registers a resize observer which will adjust the raster on size changes.
+ *   Can also display rulers on both axis with the current position
+ *   of the view
+ *
+ * Props:
+ *   - cellProvider
+ *   - posX
+ *   - posY
+ *   - width
+ *   - height
+ *   - zoom
+ *   - rulers
+ *   - editorId
+ *   - children
+ *   - TODO: renderMode / renderCaching?
+ *
+ * Context
+ */
+function FlexCellProviderRaster(props) {
+    const divRef = useRef(null);
+    const observerRef = useRef(null);
+    const propsRef = useRef(null);
+
+    const rulerSpaceX = props.rulers ? 30 : 0;
+    const rulerSpaceY = props.rulers ? 20 : 0;
+
+    const size = props.cellProvider.getSize();
+    const [cellSize, cellPlusBorderSize, rasterWidth, rasterHeight] = useRasterDim({...props, size});
+
+    propsRef.current = {...props, rulerSpaceX, rulerSpaceY, cellPlusBorderSize, rasterWidth, rasterHeight};
+
+    // prevent rect position outside with cells outside of cellProvider after zoom level change
+    const maxColumns = props.cellProvider.getWidth();
+    const maxRows = props.cellProvider.getHeight();
+    if (props.setPosX && props.posX + props.width >= maxColumns) {
+        props.setPosX(maxColumns - Math.min(props.width, maxColumns));
+    }
+    if (props.setPosY && props.posY + props.height >= maxRows) {
+        props.setPosY(maxRows - Math.min(props.height, maxRows));
+    }
+
+    const checkSize = () => {
+        const props = propsRef.current;
+        const rect = divRef.current.parentNode.getBoundingClientRect();
+        const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border;
+        const spaceY = rect.height - (props.rulers ? props.rulerSpaceY : 0) - props.border;
+
+        const maxWidth = props.cellProvider.hasAutoWidth() ? props.cellProvider.getMaxIndex() : props.cellProvider.getWidth();
+        const newWidth = Math.min(Math.floor(spaceX / props.cellPlusBorderSize), maxWidth);
+
+        const maxHeight = props.cellProvider.hasAutoWidth() ? props.cellProvider.getMaxIndex() : props.cellProvider.getHeight();
+        const newHeight = Math.min(Math.floor(spaceY / props.cellPlusBorderSize), maxHeight);
+
+        const changedWidth = props.width !== newWidth;
+        const changedHeight = props.height !== newHeight;
+
+        if (!changedWidth && !changedHeight) {
+            return;
+        }
+
+        if (changedWidth) {
+            if (props.cellProvider.hasAutoWidth()) {
+                props.cellProvider.setWidth(newWidth);
+            }
+            props.setWidth(newWidth);
+        }
+        if (changedHeight) {
+            props.setHeight(newHeight);
+        }
+    };
+
+    useEffect(() => {
+        if (props.auto) {
+            const observer = new ResizeObserver(entries => {
+                checkSize();
+            });
+            observerRef.current = observer;
+            observer.observe(divRef.current.parentNode);
+            return () => {
+                if (observerRef.current) {
+                    observerRef.current.disconnect();
+                }
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (props.auto) checkSize();
+    });
+
+    const style = {
+        width: rasterWidth,
+        height: rasterHeight
+    };
+
+    const rasterProps = {
+        cellProvider: props.cellProvider,
+        border: props.border,
+        zoom: props.zoom,
+        posX: props.posX,
+        posY: props.posY,
+        width: props.width,
+        height: props.height,
+        editorId: props.editorId
+    };
+
+    let topRuler = '';
+    let leftRuler = '';
+
+    if (props.rulers) {
+        const {width, posX, posY, zoom, border, height} = props;
+        const rulerProps = {width, posX, border, cellSize: size * zoom};
+        const hProps = {...rulerProps, width: rasterWidth, height: rulerSpaceY, max: width, start: posX};
+        topRuler =
+            <HRuler
+                digits={('' + props.cellProvider.getWidth()).length}
+                {...hProps}
+            />;
+        const vProps = {...rulerProps, width: rulerSpaceX, height: rasterHeight, max: height, start: posY};
+        leftRuler =
+            <VRuler
+                digits={('' + props.cellProvider.getHeight()).length}
+                {...vProps}
+            />;
+        style.marginTop = -(rulerSpaceY >> 1);
+    }
+
+    return (
+        <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
+            <div className="stack-h centered items-centered">
+                <div className="rel-canvas marker-space" style={style}>
+                    <CellProviderRaster {...rasterProps} />
+                    {topRuler}
+                    {leftRuler}
+                    {props.children}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ *
+ */
+function FlexCellProviderScrollRaster(props) {
+    const context = useContext(CssContext);
+    const style = {
+        display: 'grid',
+        gridTemplateColumns: 'auto',
+        gridRowGap: context.defaultPadding,
+        gridColumnGap: context.defaultPadding
+    };
+
+    const cellsWidth = props.cellProvider.getWidth();
+    const cellsHeight = props.cellProvider.getHeight();
+    const maxPosX = cellsWidth - props.width;
+    const maxPosY = cellsHeight - props.height;
+    const sensitivity = 0.25;
+
+    const onWheel = (e) => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        let deltaY = Math.round(e.deltaY * sensitivity);
+
+        const newPosX = Math.min(Math.max(props.posX + deltaX, 0), maxPosX);
+        const newPosY = Math.min(Math.max(props.posY + deltaY, 0), maxPosY);
+        if (newPosX !== props.posX) {
+            props.setPosX(newPosX);
+        }
+        if (newPosY !== props.posY) {
+            props.setPosY(newPosY);
+        }
+        e.stopPropagation();
+    };
+
+    const hasScrollingX = props.width < cellsWidth;
+    const hasScrollingY = props.height < cellsHeight;
+
+    const firstCells = [<div key={1} onWheel={onWheel}><FlexCellProviderRaster {...props} /></div>];
+    if (hasScrollingY) {
+        firstCells.push(<div key={2}><Scrollbar auto vertical set={props.setPosY} pos={props.posY} page={props.height} max={props.cellProvider.getHeight()} /></div>);
+        style.gridTemplateColumns += ' 21px'
+    }
+    const secondCells = [];
+    if (hasScrollingX) {
+        secondCells.push(<div style={{height: 21}} key={3}><Scrollbar auto set={props.setPosX} pos={props.posX} page={props.width} max={props.cellProvider.getWidth()} /></div>);
+        style.gridTemplateRows = 'auto 21px';
+        if (hasScrollingY) {
+            secondCells.push(<div key={4}></div>);
+        }
+    }
+
+    return (
+        <div style={style} className="full-v">
+            {firstCells}
+            {secondCells}
+        </div>
+
+    );
+}
+
+function BaseCellProviderIndexRaster(props) {
     const [border, setBorder] = useState(1);
     const [zoom, setZoom] = useState(2);
     const [posX, setPosX] = useState(0);
@@ -2869,55 +3009,140 @@ function BasicRasterView(props) {
     const [width, setWidth] = useState(10);
     const [height, setHeight] = useState(5);
     const [rulers, setRulers] = useState(true);
+    const [cursorHighlight, setCursorHighlight] = useState(false);
+    const [cursorFixed, setCursorFixed] = useState(false);
+    const boundingRectRef = useRef(null);
+    const [active, setActive] = useState(false);
+    const windowEvent = useWindowEventManager();
+
+    return (
+        <div className="full-v padded">
+            <FlexCellProviderScrollRaster
+                cellProvider={props.cellProvider}
+                auto={true}
+                posX={posX}
+                setPosX={setPosX}
+                posY={posY}
+                border={border}
+                setPosY={setPosY}
+                width={width}
+                setWidth={setWidth}
+                height={height}
+                setHeight={setHeight}
+                zoom={zoom}
+                rulers={rulers}
+                editorId={props.editorId}>
+                <CursorArea
+                    boundingRectRef={boundingRectRef}
+                    cellProvider={props.cellProvider}
+                    mouseDown={(e, x, y) => {
+                        setCursorHighlight(true);
+                        setCursorFixed(true);
+                        console.log('PICK', props.cellProvider.getRect(x, y, 1, 1)[0][0]);
+                        windowEvent.addListener(
+                            'mouseup',
+                            (e) => {
+                                setCursorFixed(false);
+                                setCursorHighlight(false);
+                            },
+                            {capture: false, once: true}
+                        );
+                    }}
+                    highlight={cursorHighlight}
+                    cursorWidth={1}
+                    cursorHeight={1}
+                    cursorType="rect"
+                    matrix={null}
+                    width={width}
+                    height={height}
+                    zoom={zoom}
+                    border={border}
+                    fixed={cursorFixed}
+                    size={props.cellProvider.getSize()}
+                    posX={posX}
+                    posY={posY}
+                />
+            </FlexCellProviderScrollRaster>
+            <MouseOverlay cursor="pointer" active={active} />
+        </div>
+    );
+}
+
+/**
+ *
+ */
+function RasterOverlays(props) {
+    const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
+
+    const propsRef = useRef(null);
+    propsRef.current = props;
+
     const [cursorType, setCursorType] = useState('rect');
     const [cursorWidth, setCursorWidth] = useState(1);
     const [cursorHeight, setCursorHeight] = useState(1);
-    const [markerX, setMarkerX] = useState(null);
-    const [markerY, setMarkerY] = useState(null);
-    const [markerWidth, setMarkerWidth] = useState(1);
-    const [markerHeight, setMarkerHeight] = useState(1);
-    const [markerType, setMarkerType] = useState('rect');
-    const [markerSpaceX, setMarkerSpaceX] = useState(0);
-    const [markerSpaceY, setMarkerSpaceY] = useState(0);
     const [cursorMouseDown, setCursorMouseDown] = useState(null);
     const [cursorMouseUp, setCursorMouseUp] = useState(null);
     const [cursorDoubleClick, setCursorDoubleClick] = useState(null);
     const [cursorHighlight, setCursorHighlight] = useState(false);
     const [cursorMouseTrack, setCursorMouseTrack] = useState(null);
+    const [cursorMatrix, setCursorMatrix] = useState(null);
     const [fixCursor, setFixCursor] = useState(null);
+
+    const cursorRef = useRef(null);
+    let trackX = true;
+    let trackY = true;
+    if (cursorType !== 'rect') {
+        if (cursorType.startsWith('column')) {
+            trackY = false;
+        } else if (cursorType.startsWith('row')) {
+            trackX = false;
+        }
+    }
+    cursorRef.current = {
+        cursorType, cursorWidth, cursorHeight, trackX, trackY,
+        axis: '' + (trackX ? 'x' : '') + (trackY ? 'y' : '')
+    };
+
     const windowEvent = useWindowEventManager();
     const boundingRectRef = useRef(null);
     const autoScrollRef = useRef({id : null, x: null, y: null, marker: false});
 
-    propsRef.current = {
-        width,
-        height,
-        posX,
-        posY,
-        markerX,
-        markerY,
-        markerWidth,
-        markerHeight,
-        setMarkerX,
-        setMarkerY,
-        setMarkerWidth,
-        setMarkerHeight,
-        setPosX,
-        setPosY,
-        cellProvider: props.cellProvider
-    };
+    useEffect(() => {
+        eContext.setSelection(props.cellProvider.getEmptySelection());
+    }, []);
 
     const overlayRef = useRef({
         modes: {},
         modeId: null,
         cleaned: true,
+        frameId: null,
         markerAction: null,
+        markerActions: {},
+        canDoActions: {},
+        addMarkerAction: function (id, action, canDo = () => {return true}) {
+            this.markerActions[id] = action;
+            this.canDoActions[id] = canDo;
+        },
+        doMarkerAction: function (id, data) {
+            if (this.markerActions[id] && this.canDoMarkerAction(id)) {
+                d('MarkerAction', id, data);
+                this.markerActions[id](propsRef.current, data);
+            }
+        },
+        canDoMarkerAction: function (id) {
+            if (this.canDoActions[id] === undefined) {
+                return false;
+            }
+            return this.canDoActions[id](propsRef.current);
+        },
         setMarkerAction: function (action) {
             this.markerAction = action;
         },
         triggerMarkerAction: function() {
             if (this.markerAction !== null) {
-                this.markerAction(propsRef.current, this);
+                return this.markerAction(propsRef.current, this);
             }
         },
         cleanUp: function () {
@@ -2933,19 +3158,25 @@ function BasicRasterView(props) {
             };
         },
         setMode: function (modeId, data = {}) {
-            console.log('setMode', modeId, data);
+            d('setMode', modeId, data);
             if (!this.modes[modeId]) {
                 throw Error('Unknown mode id "' + modeId + '"');
             }
-            this.cleanUp();
-            if (modeId !== null) {
+            if (this.frameId) {
+                cancelAnimationFrame(this.frameId);
+            }
+            this.frameId = requestAnimationFrame(() => {
+                this.cleanUp();
                 this.modes[modeId].init(data);
                 this.modeId = modeId;
                 this.cleaned = false;
-            }
+                this.frameId = null;
+                propsRef.current.setStateUpdate(!propsRef.current.stateUpdate);
+            });
         }
     });
     const overlay = overlayRef.current;
+    props.overlayRef.current = overlay;
 
     useEffect(() => {
         const autoScroll = autoScrollRef.current;
@@ -2954,6 +3185,9 @@ function BasicRasterView(props) {
         overlay.setMode = overlay.setMode.bind(overlay);
         overlay.cleanUp = overlay.cleanUp.bind(overlay);
         overlay.setMarkerAction = overlay.setMarkerAction.bind(overlay);
+        overlay.doMarkerAction = overlay.doMarkerAction.bind(overlay);
+        overlay.canDoMarkerAction = overlay.canDoMarkerAction.bind(overlay);
+        overlay.addMarkerAction = overlay.addMarkerAction.bind(overlay);
         overlay.triggerMarkerAction = overlay.triggerMarkerAction.bind(overlay);
 
         const mouseUpPickAgain = (e) => {
@@ -2965,14 +3199,15 @@ function BasicRasterView(props) {
                 setCursorType('rect');
                 setCursorWidth(1);
                 setCursorHeight(1);
-                setMarkerX(null);
-                setMarkerHeight(1);
-                setMarkerWidth(1);
+                propsRef.current.setMarkerX(null);
+                propsRef.current.setMarkerHeight(1);
+                propsRef.current.setMarkerWidth(1);
                 setCursorHighlight(false);
                 setCursorMouseDown(() => (e, x, y) => {
                     eCtxRef.current.setSelection(props.cellProvider.getSelection(x, y, 1, 1));
-                    setMarkerX(x);
-                    setMarkerY(y);
+                    propsRef.current.setMarkerX(x);
+                    propsRef.current.setMarkerY(y);
+                    propsRef.current.setMarkerType('rect');
                     windowEvent.addListener('mouseup', mouseUpPickAgain, {capture: false, once: true});
                     setFixCursor('pointer');
                 });
@@ -2982,53 +3217,88 @@ function BasicRasterView(props) {
             },
             () => {
                 windowEvent.removeListener('mouseup', mouseUpPickAgain, {capture: false, once: true})
-                setMarkerX(null);
-                setMarkerY(null);
+                propsRef.current.setMarkerX(null);
+                propsRef.current.setMarkerY(null);
                 setCursorMouseDown(null);
                 setFixCursor(null);
                 setCursorDoubleClick(null);
             }
         );
+        let matrix = null;
         overlay.addMode(
             'select',
             (data) => {
-                setCursorType(data.type ? data.type : 'rect');
-                setCursorWidth(data.width ? data.width : 1);
-                setCursorHeight(data.height ? data.height : 1);
+                const markerType = data.type ? data.type : 'rect';
+                setCursorType(markerType);
+                const markerWidth = data.width ? data.width : 1;
+                setCursorWidth(markerWidth);
+                const markerHeight = data.height ? data.height : 1;
+                setCursorHeight(markerHeight);
+                if (data.all) {
+                    setState({markerX: 0, markerY: 0, markerWidth: props.cellProvider.getWidth(), markerHeight: props.cellProvider.getHeight()});
+                } else if (markerType !== propsRef.current.markerType) {
+                    setState({markerX: null, markerY: null});
+                }
+
                 // TODO fix, spacing
-                setCursorMouseDown(() => (e, x, y) => {
-                    setMarkerType(cursorType);
-                    setMarkerX(x);
-                    setMarkerY(y);
-                    setMarkerWidth(cursorWidth);
-                    setMarkerHeight(cursorHeight);
-                    if (cursorType.endsWith('gap')) {
-                        overlay.setMode('select', {type: data.type});
+                setCursorMouseDown(() => (e, markerX, markerY) => {
+                    if (!cursorRef.current.trackX) {
+                        markerX = 0;
+                    }
+                    if (!cursorRef.current.trackY) {
+                        markerY = 0;
+                    }
+                    setState({
+                        markerType,
+                        markerX,
+                        markerY,
+                        markerWidth,
+                        markerHeight
+                    });
+                    const event = {clientX: e.clientX, clientY: e.clientY};
+                    if (markerType.endsWith('gap')) {
+                        overlay.setMode('markerMove', {type: markerType, event});
                     } else {
-                        requestAnimationFrame(() => {
-                            overlay.setMode('markerResize', {
-                                event: e,
-                                axis: 'xy',
-                                startX: false,
-                                startY: false
-                            });
+                        overlay.setMode('markerResize', {
+                            event,
+                            axis: cursorRef.current.axis,
+                            startX: false,
+                            startY: false
                         });
                     }
                 });
             },
             () => {
                 setCursorMouseDown(null);
+                setCursorMouseTrack(null);
             }
         );
         overlay.addMode(
             'startPath',
             (data) => {
-                setCursorType(eCtxRef.current.selection.getType());
-                setCursorWidth(eCtxRef.current.selection.getWidth());
-                setCursorHeight(eCtxRef.current.selection.getHeight());
-                setMarkerX(null);
-                setMarkerY(null);
+                const selection = eCtxRef.current.selection;
+                setCursorMatrix(matrix);
+                setCursorType(selection.getType());
+                setCursorWidth(selection.getWidth());
+                setCursorHeight(selection.getHeight());
+                const markerType = propsRef.current.markerType;
+                propsRef.current.setMarkerX(null);
+                propsRef.current.setMarkerY(null);
 
+                if (markerType === 'rows' || markerType === 'columns') {
+                    const isRows = markerType === 'rows';
+                    setCursorMouseTrack(() => (x, y) => {
+                        matrix = eCtxRef.current.selection.getMatchMatrix(
+                            props.cellProvider.getEmptyCell(),
+                            propsRef.current[isRows ? 'posX' : 'posY'],
+                            propsRef.current[isRows ? 'width' : 'height']
+                        );
+                        setCursorMatrix(matrix);
+                    });
+                } else if (markerType === 'rect') {
+                    matrix = selection.getMatchMatrix(props.cellProvider.getEmptyCell());
+                }
+                setCursorMatrix(matrix);
                 setCursorMouseDown(() => (e, x, y) => {
                     overlayRef.current.setMode('writePath', {
                         clear: (e.button === 2),
@@ -3040,6 +3310,8 @@ function BasicRasterView(props) {
             },
             () => {
                 setCursorMouseDown(null);
+                setCursorMatrix(null);
+                setCursorMouseTrack(null);
             }
         );
 
@@ -3047,16 +3319,23 @@ function BasicRasterView(props) {
         overlay.addMode(
             'writePath',
             (data) => {
+                setCursorMatrix(matrix);
                 const path = {
                     new: {},
                     old: {}
                 };
                 const track = (x, y) => {
                     let segment;
+                    const selection = eCtxRef.current.selection;
+                    if (selection.isRows()) {
+                        x = 0;
+                    } else if (selection.isColumns()) {
+                        y = 0;
+                    }
                     if (data.clear) {
-                        segment = props.cellProvider.writeSelection(x, y, eCtxRef.current.selection, props.cellProvider.getEmptyCell(), true);
+                        segment = props.cellProvider.writeSelection(x, y, selection, props.cellProvider.getEmptyCell(), true);
                     } else {
-                        segment = props.cellProvider.writeSelection(x, y, eCtxRef.current.selection, null, true);
+                        segment = props.cellProvider.writeSelection(x, y, selection, null,  propsRef.current.writeTransparent);
                     }
                     Object.assign(path.new, segment.new);
                     for(let key in segment.old) {
@@ -3064,9 +3343,8 @@ function BasicRasterView(props) {
                             path.old[key] = segment.old[key];
                         }
                     }
-                    eCtxRef.current.redraw('boom');
+                    eCtxRef.current.redraw(props.editorId);
                 };
-
                 setCursorHighlight(true);
                 track(data.start.x, data.start.y);
 
@@ -3075,11 +3353,11 @@ function BasicRasterView(props) {
                     const undoPath = path.old;
                     const doAction = () => {
                         props.cellProvider.writePath(doPath);
-                        eCtxRef.current.redraw('boom');
+                        eCtxRef.current.redraw(props.editorId);
                     };
                     const undoAction = () => {
                         props.cellProvider.writePath(undoPath);
-                        eCtxRef.current.redraw('boom');
+                        eCtxRef.current.redraw(props.editorId);
                     };
                     eContext.doAction(doAction, undoAction);
                     overlay.setMode('startPath');
@@ -3094,12 +3372,17 @@ function BasicRasterView(props) {
                 windowEvent.removeListener('mouseup', mouseUpSavePath, {capture: false, once: true});
                 setCursorHighlight(false);
                 setCursorMouseTrack(null);
+                setCursorMatrix(null);
             }
         );
 
         // # Marker Modes #
         const setState = (change, where = '?') => {
             const props = propsRef.current;
+            if (change.markerType !== undefined && change.markerType !== props.markerType) {
+                console.log(where, '-> markerType', change.markerType, props.markerType);
+                props.setMarkerType(change.markerType);
+            }
             if (change.markerHeight !== undefined && change.markerHeight !== props.markerHeight) {
                 console.log(where, '-> markerHeight', change.markerHeight, props.markerHeight);
                 props.setMarkerHeight(change.markerHeight);
@@ -3132,9 +3415,16 @@ function BasicRasterView(props) {
                 autoScroll.id = undefined;
                 return;
             }
+            const isGap = props.markerType.endsWith('gap');
+            let maxX = props.cellProvider.getWidth();
+            let maxY = props.cellProvider.getHeight();
+            if (isGap) {
+                maxX++;
+                maxY++;
+            }
             const change = {};
             if (autoScroll.x && !(autoScroll.marker && !autoScroll.marker.resizeX)) {
-                const maxPosX = props.cellProvider.getWidth() - props.width;
+                const maxPosX = maxX - props.width;
                 const posX =
                     Math.min(Math.max(props.posX + autoScroll.x, 0), maxPosX);
 
@@ -3152,14 +3442,14 @@ function BasicRasterView(props) {
                 } else {
                     change.markerX =
                         Math.min(Math.max(props.markerX + autoScroll.x, 0),
-                            props.cellProvider.getWidth() - props.markerWidth
+                            maxX - props.markerWidth
                         );
                 }
                 change.posX = posX;
             }
 
             if (autoScroll.y && !(autoScroll.marker && !autoScroll.marker.resizeY)) {
-                const maxPosY = props.cellProvider.getHeight() - props.height;
+                const maxPosY = maxY - props.height;
                 const posY =
                     Math.min(Math.max(props.posY + autoScroll.y, 0), maxPosY);
 
@@ -3177,7 +3467,7 @@ function BasicRasterView(props) {
                 } else {
                     change.markerY =
                         Math.min(Math.max(props.markerY + autoScroll.y, 0),
-                            props.cellProvider.getHeight() - props.markerHeight
+                            maxY - props.markerHeight
                         );
                 }
                 change.posY = posY;
@@ -3204,15 +3494,22 @@ function BasicRasterView(props) {
 
         const updateAutoScroll = (newRasterPos, autoScrollMarker = null) => {
             const props = propsRef.current;
+            const isGap = props.markerType.endsWith('gap');
+            let maxX = props.width;
+            let maxY = props.height;
+            if (isGap) {
+                maxX++;
+                maxY++;
+            }
             const scrollX = autoScrollMarker === null || autoScrollMarker.resizeX;
-            if (scrollX && newRasterPos.rawX < 0 || newRasterPos.rawX > props.width) {
-                autoScroll.x = newRasterPos.rawX < 0 ? newRasterPos.rawX : newRasterPos.rawX - props.width;
+            if (scrollX && newRasterPos.rawX < 0 || newRasterPos.rawX > maxX) {
+                autoScroll.x = newRasterPos.rawX < 0 ? newRasterPos.rawX : newRasterPos.rawX - maxX;
             } else {
                 autoScroll.x = null;
             }
             const scrollY = autoScrollMarker === null || autoScrollMarker.resizeY;
-            if (scrollY && newRasterPos.rawY < 0 || newRasterPos.rawY > props.height) {
-                autoScroll.y = newRasterPos.rawY < 0 ? newRasterPos.rawY : newRasterPos.rawY - props.height;
+            if (scrollY && newRasterPos.rawY < 0 || newRasterPos.rawY > maxY) {
+                autoScroll.y = newRasterPos.rawY < 0 ? newRasterPos.rawY : newRasterPos.rawY - maxY;
             } else {
                 autoScroll.y = null;
             }
@@ -3230,32 +3527,35 @@ function BasicRasterView(props) {
             return getRasterPosFromClient({x: e.clientX, y: e.clientY}, outside, isGap);
         };
 
-        const getRasterPosFromClient = (client, outside = false, gap = false) => {
+        const getRasterPosFromClient = (client, outside = false, isGap = false) => {
             if (!boundingRectRef.current) {
                 return null;
             }
             const rect = boundingRectRef.current;
 
+            const adjustPos = isGap ? rect.cellSize >> 1 : 0;
             const rasterPos = {
-                x: Math.floor(Math.round(client.x - rect.left)/rect.cellSize),
-                y: Math.floor(Math.round(client.y - rect.top)/rect.cellSize),
+                x: Math.floor(Math.round(client.x - rect.left + adjustPos)/rect.cellSize),
+                y: Math.floor(Math.round(client.y - rect.top + adjustPos)/rect.cellSize),
             };
-            const min = gap ? 1 : 0;
             let maxX = propsRef.current.width;
             let maxY = propsRef.current.height;
-
+            if (!isGap) {
+                maxX++;
+                maxY++;
+            }
             rasterPos.rawX = rasterPos.x;
             rasterPos.rawY = rasterPos.y;
             if (!outside) {
-                if (rasterPos.x < min) {
-                    rasterPos.x = min;
-                } else if (rasterPos.x >= maxX) {
-                    rasterPos.x = maxX - 1;
+                if (rasterPos.x < 0) {
+                    rasterPos.x = 0;
+                } else if (rasterPos.x > maxX) {
+                    rasterPos.x = maxX;
                 }
-                if (rasterPos.y < min) {
-                    rasterPos.y = min;
-                } else if (rasterPos.y >= maxY) {
-                    rasterPos.y = maxY - 1;
+                if (rasterPos.y < 0) {
+                    rasterPos.y = 0;
+                } else if (rasterPos.y > maxY) {
+                    rasterPos.y = maxY;
                 }
             }
             return rasterPos;
@@ -3268,40 +3568,31 @@ function BasicRasterView(props) {
         overlay.addMode(
             'markerMove',
             (data) => {
-                const clickTime = Date.now();
-                if (clickTime - lastMoveClick < 1500) {
-                    overlay.triggerMarkerAction();
-                    return;
-                }
-                lastMoveClick = clickTime;
                 const props = propsRef.current;
-                const isGap = false;
-                lastRasterPos = getRasterPosFromEvent(data.event, false, isGap);
-                const trackX = true;
-                const trackY = true;
+                const isGap = props.markerType.endsWith('gap');
 
-                if (!trackX) {
+                lastRasterPos = getRasterPosFromEvent(data.event, false, isGap);
+
+                if (!cursorRef.current.trackX) {
                     lastRasterPos.x = 0;
                 }
-                if (!trackY) {
+                if (!cursorRef.current.trackY) {
                     lastRasterPos.y = 0;
                 }
-
                 const offPos = {
                     x: isGap ? 0 : lastRasterPos.x - (props.markerX - props.posX),
                     y: isGap ? 0 : lastRasterPos.y - (props.markerY - props.posY)
                 };
-
                 const checkWithLastRasterPos = (e) => {
                     const props = propsRef.current;
                     const newRasterPos = getRasterPosFromEvent(e, false, isGap);
                     if (newRasterPos === null) {
                         return;
                     }
-                    if (!trackX) {
+                    if (!cursorRef.current.trackX) {
                         newRasterPos.x = 0;
                     }
-                    if (!trackY) {
+                    if (!cursorRef.current.trackY) {
                         newRasterPos.y = 0;
                     }
                     const xStart = newRasterPos.x - offPos.x;
@@ -3313,6 +3604,13 @@ function BasicRasterView(props) {
                     const hasChangedX = trackX && newRasterPos.x !== lastRasterPos.x;
                     const hasChangedY = trackY && newRasterPos.y !== lastRasterPos.y;
 
+                    let maxPosX = props.cellProvider.getWidth();
+                    let maxPosY = props.cellProvider.getHeight();
+                    if (isGap) {
+                        maxPosX++;
+                        maxPosY++;
+                    }
+
                     updateAutoScroll(newRasterPos);
 
                     if (hasChangedX || hasChangedY) {
@@ -3320,8 +3618,8 @@ function BasicRasterView(props) {
                         if (hasChangedX) {
                             if (markerPosX < 0) {
                                 markerPosX = 0;
-                            } else if (markerPosX + props.markerWidth > props.cellProvider.getWidth()) {
-                                markerPosX = props.cellProvider.getWidth() - props.markerWidth;
+                            } else if (markerPosX + props.markerWidth > maxPosX) {
+                                markerPosX = maxPosX - props.markerWidth;
                             }
                             lastRasterPos.x = newRasterPos.x;
                             change.markerX = markerPosX;
@@ -3329,8 +3627,8 @@ function BasicRasterView(props) {
                         if (hasChangedY) {
                             if (markerPosY < 0) {
                                 markerPosY = 0;
-                            } else if (markerPosY + props.markerHeight > props.cellProvider.getHeight()) {
-                                markerPosY = props.cellProvider.getHeight() - props.markerHeight;
+                            } else if (markerPosY + props.markerHeight > maxPosY) {
+                                markerPosY = maxPosY - props.markerHeight;
                             }
                             lastRasterPos.y = newRasterPos.y;
                             change.markerY = markerPosY;
@@ -3346,11 +3644,24 @@ function BasicRasterView(props) {
                 };
                 windowEvent.addListener('mousemove', mouseMove, false);
 
+                const clickStartTime = Date.now();
                 mouseUp = (e) => {
                     checkWithLastRasterPos(e);
                     e.stopPropagation();
                     e.preventDefault();
-                    overlay.setMode('select');
+                    const clickEndTime = Date.now();
+                    let doSelect = true;
+                    if (clickEndTime - clickStartTime < 250) {
+                        if (clickStartTime - lastMoveClick < 1000) {
+                            doSelect = overlay.triggerMarkerAction();
+                            lastMoveClick -= 1000;
+                        } else {
+                            lastMoveClick = clickStartTime;
+                        }
+                    }
+                    if (doSelect) {
+                        overlay.setMode('select', {type: propsRef.current.markerType});
+                    }
                 };
                 windowEvent.addListener(
                     'mouseup',
@@ -3371,27 +3682,20 @@ function BasicRasterView(props) {
         overlay.addMode(
             'markerResize',
             (data) => {
-                const clickTime = Date.now();
-                if (clickTime - lastResizeClick < 1500) {
-                    overlay.triggerMarkerAction();
-                    return;
-                }
-                lastResizeClick = clickTime;
                 const startX = data.startX;
                 const startY = data.startY;
+
                 const axis = data.axis;
-                const e = data.event;
                 const props = propsRef.current;
 
-                const trackX = true;
-                const trackY = true;
+                const e = data.event;
 
                 const anchorPos = {
                     x: props.markerX + (!startX ? 0 : props.markerWidth - 1),
                     y: props.markerY + (!startY ? 0 : props.markerHeight - 1)
                 };
-                const resizeX = trackX && axis.indexOf('x') !== -1;
-                const resizeY = trackY && axis.indexOf('y') !== -1;
+                const resizeX = cursorRef.current.trackX && axis.indexOf('x') !== -1;
+                const resizeY = cursorRef.current.trackY && axis.indexOf('y') !== -1;
 
                 lastRasterPos = getRasterPosFromEvent(e, true);
 
@@ -3449,9 +3753,22 @@ function BasicRasterView(props) {
                 };
                 windowEvent.addListener('mousemove', mouseMove, false);
 
+                const clickStartTime = Date.now();
                 mouseUp = (e) => {
                     checkWithLastRasterPos(e);
-                    overlay.setMode('select');
+                    const clickEndTime = Date.now();
+                    let doSelect = true;
+                    if (clickEndTime - clickStartTime < 250) {
+                        if (clickStartTime - lastResizeClick < 1000) {
+                            doSelect = overlay.triggerMarkerAction();
+                            lastResizeClick -= 1000;
+                        } else {
+                            lastResizeClick = clickStartTime;
+                        }
+                    }
+                    if (doSelect) {
+                        overlay.setMode('select', {type: propsRef.current.markerType});
+                    }
                     e.stopPropagation();
                     e.preventDefault();
                 };
@@ -3475,11 +3792,231 @@ function BasicRasterView(props) {
                 setFixCursor(null);
                 windowEvent.removeListener('mousemove', mouseMove, false);
                 windowEvent.removeListener(
-                'mouseup',
+                    'mouseup',
                     mouseUp,
-            {capture: false, once: true}
+                    {capture: false, once: true}
                 );
                 resetAutoScroll();
+            }
+        );
+
+        overlay.addMarkerAction(
+            'clear',
+            (props) => {
+                const markerX = props.markerX;
+                const markerY = props.markerY;
+                const markerType = props.markerType;
+                const width = markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth;
+                const height = markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight;
+                const undoSelection = props.cellProvider.getSelection(markerX, markerY, width, height);
+                const doAction = () => {
+                    props.cellProvider.fillRect(
+                        markerX,
+                        markerY,
+                        width,
+                        height,
+                        props.cellProvider.getEmptyCell()
+                    );
+                    eCtxRef.current.redraw(props.editorId);
+                };
+                const undoAction = () => {
+                    props.cellProvider.fillRectWithSelection(
+                        markerX,
+                        markerY,
+                        width,
+                        height,
+                        undoSelection
+                    );
+                    eCtxRef.current.redraw(props.editorId);
+                };
+                eCtxRef.current.doAction(doAction, undoAction);
+            },
+            (props) => {
+                return (props.markerX !== null && !props.markerType.endsWith('gap'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'delete',
+            (props) => {
+                const markerType = props.markerType;
+                const markerY = props.markerY;
+                const markerX = props.markerX;
+                const markerWidth = props.markerWidth;
+                const markerHeight = props.markerHeight;
+                const undoSelection = props.cellProvider.getRawSelection(0, 0, props.cellProvider.getWidth(), props.cellProvider.getHeight());
+                const doAction = () => {
+                    if (markerType === 'rows') {
+                        props.cellProvider.deleteRows(markerY, markerHeight);
+                    } else {
+                        props.cellProvider.deleteColumns(markerX, markerWidth);
+                    }
+                    props.setPosX(props.posX);
+                };
+                const undoAction = () => {
+                    props.cellProvider.importRawSelection(undoSelection);
+                    props.setPosX(props.posX);
+                };
+                eCtxRef.current.doAction(doAction, undoAction);
+            },
+            (props) => {
+                return (props.markerX !== null && (props.markerType === 'rows' || props.markerType === 'columns'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'copy',
+            (props) => {
+                const rect = props.cellProvider.getRect(
+                    props.markerX,
+                    props.markerY,
+                    props.markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth,
+                    props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight
+                );
+                eCtxRef.current.setSelection(new CellSelection(props.markerType, rect));
+                overlay.setMode('startPath');
+            },
+            (props) => {
+                return (props.markerX !== null && !props.markerType.endsWith('gap'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'fill',
+            (props) => {
+                const markerX = props.markerX;
+                const markerY = props.markerY;
+                const width = props.markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth;
+                const height = props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight;
+                const doSelection = new CellSelection(props.markerType, eCtxRef.current.selection.getCells());
+                const undoSelection = props.cellProvider.getSelection(
+                    markerX,
+                    markerY,
+                    width,
+                    height
+                );
+                const doAction = () => {
+                    props.cellProvider.fillRectWithSelection(
+                        markerX,
+                        markerY,
+                        width,
+                        height,
+                        doSelection
+                    );
+                    eCtxRef.current.redraw(props.editorId);
+                };
+                const undoAction = () => {
+                    props.cellProvider.fillRectWithSelection(
+                        markerX,
+                        markerY,
+                        width,
+                        height,
+                        undoSelection
+                    );
+                    eCtxRef.current.redraw(props.editorId);
+                };
+                eCtxRef.current.doAction(doAction, undoAction);
+            },
+            (props) => {
+                return (props.markerX !== null && !props.markerType.endsWith('gap'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'crop',
+            (props) => {
+                const markerX = props.markerX;
+                const markerY = props.markerY;
+                const markerType = props.markerType;
+                const oldWidth = props.cellProvider.getWidth();
+                const oldHeight = props.cellProvider.getHeight();
+                const markerWidth = markerType.startsWith('row') ? oldWidth : props.markerWidth;
+                const markerHeight = markerType.startsWith('column') ? oldHeight : props.markerHeight;
+                const undoSelection = props.cellProvider.getRawSelection(
+                    0, 0, oldWidth, oldHeight
+                );
+
+                const doAction = () => {
+                    props.cellProvider.reduceToRect(
+                        markerX,
+                        markerY,
+                        markerWidth,
+                        markerHeight
+                    );
+                    props.setPosX(0);
+                    props.setPosY(0);
+                };
+
+                const undoAction = () => {
+                    props.cellProvider.importRawSelection(undoSelection);
+                    props.setPosX(props.posX);
+                };
+                eCtxRef.current.doAction(doAction, undoAction);
+            },
+            (props) => {
+                return (props.markerX !== null && !props.markerType.endsWith('gap'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'insert',
+            (props, no) => {
+                if (!no) {
+                    no = 1;
+                };
+                const posY = props.posY;
+                if (props.markerType === 'row-gap') {
+                    const oldMarkerY = props.markerY;
+                    const doAction = () => {
+                        props.cellProvider.insertRowsAt(oldMarkerY, no);
+                        props.setPosY(posY + 1);
+                        props.setPosY(posY);
+                    };
+                    const undoAction = () => {
+                        props.cellProvider.deleteRows(oldMarkerY, no);
+                        eCtxRef.current.redraw(props.editorId);
+                        props.setPosY(posY + 1);
+                        props.setPosY(posY);
+                    };
+                    eCtxRef.current.doAction(doAction, undoAction);
+                } else {
+                    const oldMarkerX = props.markerX;
+                    const doAction = () => {
+                        props.cellProvider.insertColumnsAt(oldMarkerX, no);
+                        props.setPosY(posY + 1);
+                        props.setPosY(posY);
+                    };
+                    const undoAction = () => {
+                        props.cellProvider.deleteColumns(oldMarkerX, no);
+                        props.setPosY(posY + 1);
+                        props.setPosY(posY);
+                    };
+                    eCtxRef.current.doAction(doAction, undoAction);
+                }
+            },
+            (props) => {
+                return (props.markerX !== null && props.markerType.endsWith('gap'));
+            }
+        );
+
+        overlay.addMarkerAction(
+            'goto',
+            (props) => {
+                props.setPosX(props.markerX);
+                props.setPosY(props.markerY);
+            },
+            (props) => {
+                return (props.markerX !== null);
+            }
+        );
+
+        overlay.addMarkerAction(
+            'abort',
+            (props) => {
+                overlay.setMode('startPath');
+            },
+            (props) => {
+                return (props.markerX !== null && props.markerType !== null);
             }
         );
 
@@ -3488,52 +4025,380 @@ function BasicRasterView(props) {
         }
 
         overlay.setMarkerAction((props, overlay) => {
-            const selection = props.cellProvider.getSelection(props.markerX, props.markerY, props.markerWidth, props.markerHeight);
-            eCtxRef.current.setSelection(selection);
-            requestAnimationFrame(() => {
-                overlay.setMode('startPath');
-            });
+            if (props.markerX === null) {
+                return true;
+            }
+            switch(props.markerType) {
+                case 'column-gap':
+                case 'row-gap':
+                    overlay.doMarkerAction('insert');
+                    return true;
+
+                case 'rows':
+                case 'columns':
+                case 'rect':
+                    overlay.doMarkerAction('copy');
+                    return false;
+            }
+            return true;
         });
     }, []);
+
     const size = props.cellProvider.getSize();
 
-    const resetMarker = (type) => {
-        setMarkerX(null);
-        setMarkerY(null);
-        setCursorHeight(1);
-        setCursorWidth(1);
-        if (type) {
-            setCursorType(type);
+    return (
+        <Fragment>
+            <CursorArea
+                boundingRectRef={boundingRectRef}
+                cellProvider={props.cellProvider}
+                mouseDown={cursorMouseDown}
+                mouseUp={cursorMouseUp}
+                mouseTrack={cursorMouseTrack}
+                highlight={cursorHighlight}
+                cursorWidth={cursorWidth}
+                cursorHeight={cursorHeight}
+                cursorType={cursorType}
+                doubleClick={cursorDoubleClick}
+                matrix={props.writeTransparent ? null : cursorMatrix}
+                width={props.width}
+                height={props.height}
+                zoom={props.zoom}
+                border={props.border}
+                size={size}
+                posX={props.posX}
+                posY={props.posY}
+            />
+            <MarkerArea
+                setPosX={props.setPosX}
+                setPosY={props.setPosY}
+                setMarkerWidth={props.setMarkerWidth}
+                setMarkerHeight={props.setMarkerHeight}
+                setMarkerX={props.setMarkerX}
+                setMarkerY={props.setMarkerY}
+                cellProvider={props.cellProvider}
+                width={props.width}
+                height={props.height}
+                zoom={props.zoom}
+                border={props.border}
+                size={size}
+                posX={props.posX}
+                posY={props.posY}
+                markerX={props.markerX}
+                markerY={props.markerY}
+                markerType={props.markerType}
+                markerWidth={props.markerWidth}
+                markerHeight={props.markerHeight}
+                move={(event) => {
+                    overlay.setMode('markerMove', {event: {clientX: event.clientX, clientY: event.clientY}})
+                }}
+                resize={(event, axis, startX, startY) => {
+                    overlay.setMode('markerResize', {event: {clientX: event.clientX, clientY: event.clientY}, startX, startY, axis});
+                }}
+            />
+            <MouseOverlay active={fixCursor !== null} cursor={fixCursor} />
+        </Fragment>
+    );
+}
+
+/**
+ *
+ */
+function RasterViewGrid(props) {
+    const eContext = useContext(EditorContext);
+    const addPage = 10;
+    const {
+        auto, mode, writeTransparent,
+        setWidth, setHeight, setPosX, setPosY, width, height, posX, posY, zoom, border, rulers,
+        setMarkerX, setMarkerY, markerX, markerY, setMarkerType, markerType, overlayRef, markerWidth,
+        markerHeight, setMarkerWidth, setMarkerHeight, setStateUpdate, stateUpdate, editorId
+    } = props;
+
+    const updateDims = (newDims) => {
+        if (newDims.posX !== undefined && newDims.posX !== posX) {
+            setPosX(newDims.posX);
+        }
+        if (newDims.posY !== undefined && newDims.posY !== posY) {
+            setPosY(newDims.posY);
         }
     };
 
+    const addRows = (no, start) => {
+        let added = null;
+        let oldPosY = props.posY;
+        let undoSelection = null;
+        let min = Math.min(Math.abs(no), props.cellProvider.getHeight() - 1);
+
+        const doAction = () => {
+            if (no < 0) {
+                undoSelection = props.cellProvider.getRawSelection(
+                    0, start ? 0 : props.cellProvider.getHeight() - min,
+                    props.cellProvider.getWidth(), min
+                );
+            }
+            added = props.cellProvider.addRows(start, no);
+            if (no < 0) {
+                added *= -1;
+            }
+            const _posY = start ? 0 : Math.max(0, oldPosY + added);
+            updateDims({posY: _posY, endY: !start});
+        };
+
+        const undoAction = () => {
+            props.cellProvider.addRows(start, -added);
+            if (undoSelection) {
+                props.cellProvider.fillRectWithRawSelection(
+                    0, start ? 0 : props.cellProvider.getHeight() + added,
+                    props.cellProvider.getWidth(), -added,
+                    undoSelection
+                );
+            }
+            updateDims({posY: oldPosY, endY: !start});
+        };
+        eContext.doAction(doAction, undoAction);
+    };
+
+    const addColumns = (no, start) => {
+        let added = null;
+        let oldPosX = props.posX;
+        let undoSelection = null;
+        let min = Math.min(Math.abs(no), props.cellProvider.getWidth() - 1);
+
+        const doAction = () => {
+            if (no < 0) {
+                undoSelection = props.cellProvider.getRawSelection(
+                    start ? 0 : props.cellProvider.getWidth() - min, 0,
+                    min, props.cellProvider.getHeight()
+                );
+            }
+            added = props.cellProvider.addColumns(start, no);
+            if (no < 0) {
+                added *= -1;
+            }
+            const _posX = start ? 0 : Math.max(0, oldPosX + added);
+            updateDims({posX: _posX, endX: !start});
+        };
+
+        const undoAction = () => {
+            props.cellProvider.addColumns(start, -added);
+            if (undoSelection) {
+                props.cellProvider.fillRectWithRawSelection(
+                    start ? 0 : props.cellProvider.getWidth() + added, 0,
+                    -added, props.cellProvider.getHeight(),
+                    undoSelection
+                );
+            }
+            updateDims({posX: oldPosX, endX: !start});
+        };
+
+        eContext.doAction(doAction, undoAction);
+    };
+
+    const shiftRow = (start) => {
+        const width = props.cellProvider.getWidth();
+        const height = props.cellProvider.getHeight();
+        const undoSelection =
+            props.cellProvider.getRawSelection(
+                0, start ? 0 : height - 1, width, 1
+            );
+
+        const doAction = () => {
+            props.cellProvider.addRows(start, -1);
+            props.cellProvider.addRows(!start, 1);
+            updateDims({});
+        };
+        const undoAction = () => {
+            props.cellProvider.addRows(!start, -1);
+            props.cellProvider.addRows(start, 1);
+            props.cellProvider.writeSelection(
+                0, start ? 0 : height - 1,
+                undoSelection
+            );
+            updateDims({});
+        };
+        eContext.doAction(doAction, undoAction);
+    };
+
+    const shiftColumn = (start) => {
+        const width = props.cellProvider.getWidth();
+        const height = props.cellProvider.getHeight();
+        const undoSelection =
+            props.cellProvider.getRawSelection(
+                start ? 0 : width - 1, 0, 1, height
+            );
+        const doAction = () => {
+            props.cellProvider.addColumns(start, -1);
+            props.cellProvider.addColumns(!start, 1);
+            updateDims({});
+        };
+        const undoAction = () => {
+            props.cellProvider.addColumns(!start, -1);
+            props.cellProvider.addColumns(start, 1);
+            props.cellProvider.writeSelection(
+                start ? 0 : width - 1, 0,
+                undoSelection
+            );
+            updateDims({});
+        };
+        eContext.doAction(doAction, undoAction);
+    };
+
+    const getShiftButton = (start, vertical) => {
+        if (!props.shift) {
+            return '';
+        }
+        const shiftCallback = vertical ? shiftRow : shiftColumn;
+        const btnShiftAttr = {};
+        const shiftIconRotate = vertical ?
+            (start ? null : 180) :
+            (start ? 270 : 90);
+        const shiftStyle = {};
+        if (shiftIconRotate !== null) {
+            shiftStyle.transform = 'rotate(' + shiftIconRotate + 'deg)';
+        }
+        btnShiftAttr.onClick = () => {
+            shiftCallback(start);
+        };
+        return (
+            <button {...btnShiftAttr}>
+                <i className="material-icons md-18" style={shiftStyle}>present_to_all</i>
+            </button>
+        )
+    };
+
+    const getSizeButtons = (start, vertical) => {
+        const shiftBtn = getShiftButton(start, vertical);
+        const callback = vertical ? addRows : addColumns;
+        const pos = vertical ? props.posY : props.posX;
+        const height = props.cellProvider.getHeight();
+        const width = props.cellProvider.getWidth();
+        const maxPos = vertical ? height - props.height : width - props.width;
+        const max = vertical ? height : width;
+        const btnAdd1Attr = {};
+        const btnAddPageAttr = {};
+        const btnSub1Attr = {};
+        const btnSubPageAttr = {};
+        const btnJumpAttr = {};
+        const jumpChar = (start ? 'first' : 'last') + '_page';
+        const materialCls = ['material-icons md-18'];
+        const jumpStyle = {};
+        if (vertical) {
+            jumpStyle.transform = 'rotate(90deg)';
+        }
+        if (pos !== (start ? 0 : maxPos)) {
+            btnAdd1Attr.disabled = 'disabled';
+            btnSub1Attr.disabled = 'disabled';
+            btnAddPageAttr.disabled = 'disabled';
+            btnSubPageAttr.disabled = 'disabled';
+            btnJumpAttr.onClick = () => {
+                const target = {};
+                target[vertical ? 'posY' : 'posX'] = start ? 0 : maxPos;
+                updateDims(target);
+            };
+        } else {
+            btnJumpAttr.disabled = 'disabled';
+            btnAdd1Attr.onClick = () => {
+                callback(1, start);
+            };
+            btnAddPageAttr.onClick = () => {
+                callback(addPage, start);
+            };
+            if (max === 1) {
+                btnSub1Attr.disabled = 'disabled';
+                btnSubPageAttr.disabled = 'disabled';
+            } else {
+                btnSub1Attr.onClick = () => {
+                    callback(-1, start);
+                };
+                btnSubPageAttr.onClick = () => {
+                    callback(-addPage, start);
+                }
+            }
+        }
+        const jumpBtn =  props.full ? '' : <button {...btnJumpAttr}><i style={jumpStyle} className={materialCls.join(' ')}>{jumpChar}</i></button>;
+
+        const br = vertical ? '' : <br />;
+        const shiftBr = props.shift ? br : '';
+        return (<div>
+            <button {...btnSubPageAttr}>--</button>{br}
+            <button {...btnSub1Attr}>-</button>{br}
+            {shiftBtn}{shiftBr}
+            {jumpBtn}
+            <button {...btnAdd1Attr}>+</button>{br}
+            <button {...btnAddPageAttr}>++</button>
+        </div>)
+    };
+
+    const getNavButton = (axis, startX, startY, rotate) => {
+        const jumpChar = (startX ? 'first' : 'last') + '_page';
+        const materialCls = ['material-icons md-18'];
+        const endX = props.cellProvider.getWidth() - width;
+        const endY = props.cellProvider.getHeight() - height;
+        const hasX = axis.indexOf('x') !== -1;
+        const hasY = axis.indexOf('y') !== -1;
+        const btnAttr = {
+            onClick: () => {
+                if (hasX) {
+                    setPosX(startX ? 0 : endX);
+                }
+                if (hasY) {
+                    setPosY(startY ? 0 : endY);
+                }
+            }
+        };
+
+        let disabled = false;
+        if (axis === 'xy') {
+            disabled = (((startX && posX === 0) || (!startX && posX === endX)) && (
+                ((startY && posY === 0) || (!startY && posY === endY))
+            ));
+        } else {
+            if (axis === 'x') {
+                disabled = ((startX && posX === 0) || (!startX && posX === endX));
+            } else {
+                disabled = ((startY && posY === 0) || (!startY && posY === endY));
+            }
+        }
+        if (disabled) {
+            btnAttr.disabled = 'disabled';
+        }
+
+        return (
+            <button {...btnAttr}>
+                <i className={materialCls.join(' ')} style={{transform: 'rotate(' + rotate + 'deg)'}}>{jumpChar}</i>
+            </button>
+        );
+    };
+
+    const gridCls = ['grid-3x3 full-v'];
     return (
-        <div className="padded full-v">
-            <Stack dir="x" full>
-                <Stack dir="y">
-                    <div><button disabled={markerX === null} onClick={resetMarker}>Clear</button></div>
-                    <div><button onClick={() => {overlay.setMode('pick')}}>Pick</button></div>
-                    <div><button onClick={() => {overlay.setMode('select', {type: 'rect'})}}>Select Rect</button></div>
-                    <div><button onClick={() => {overlay.setMode('select', {type: 'rows'})}}>Select Rows</button></div>
-                    <div><button onClick={() => {overlay.setMode('select', {type: 'columns'})}}>Select Columns</button></div>
-                    <div><button onClick={() => {overlay.setMode('select', {type: 'column-gap'})}}>Select Column-Gap</button></div>
-                    <div><button onClick={() => {overlay.setMode('select', {type: 'row-gap'})}}>Select Row-Gap</button></div>
-                    <div><button onClick={() => {eContext.undoAction()}} disabled={!eContext.hasPast()}>Undo</button></div>
-                    <div><button onClick={() => {eContext.redoAction()}} disabled={!eContext.hasFuture()}>Redo</button></div>
+        <div className={gridCls.join(' ')}>
+            <div>{getNavButton('xy', true, true)}</div>
+            <div>{getSizeButtons(true, true)}</div>
+            <div>{getNavButton('xy',false, true)}</div>
+
+            <div>
+                <Stack dir="x" center full>
+                    {getSizeButtons(true, false)}
                 </Stack>
-
-                <div>
-                    PosX: <Int min={0} max={props.cellProvider.getWidth() - width} value={posX} set={setPosX} buttons />
-                    PosY: <Int min={0} max={props.cellProvider.getHeight() - height} value={posY} set={setPosY} buttons />
-                    Zoom: <Int min={1} max={5} value={zoom} set={setZoom} buttons />
-                    Border: <Int min={0} max={5} value={border} set={setBorder} buttons />
-                    <Checkbox name="rulers" value={rulers} set={setRulers} />
-                    <button onClick={() => {eContext.redraw('boom')}}>Redraw</button>
-                </div>
-
-                <div className="flex items-centered align-center">
-                    <FlexCellProviderScrollRaster
-                        auto
+            </div>
+            <div className="full-v padded">
+                <FlexCellProviderScrollRaster
+                    auto={auto}
+                    setWidth={setWidth}
+                    setHeight={setHeight}
+                    setPosX={setPosX}
+                    setPosY={setPosY}
+                    width={width}
+                    height={height}
+                    posX={posX}
+                    posY={posY}
+                    editorId={props.editorId}
+                    zoom={zoom}
+                    border={border}
+                    rulers={rulers}
+                    cellProvider={props.cellProvider}>
+                    <RasterOverlays
+                        overlayRef={overlayRef}
                         setWidth={setWidth}
                         setHeight={setHeight}
                         setPosX={setPosX}
@@ -3542,59 +4407,146 @@ function BasicRasterView(props) {
                         height={height}
                         posX={posX}
                         posY={posY}
-                        id="boom"
+                        editorId={props.editorId}
+                        writeTransparent={writeTransparent}
+                        stateUpdate={stateUpdate}
+                        setStateUpdate={setStateUpdate}
+                        mode={mode}
                         zoom={zoom}
                         border={border}
                         rulers={rulers}
-                        cellProvider={props.cellProvider}>
-                        <CursorArea
-                            boundingRectRef={boundingRectRef}
-                            cellProvider={props.cellProvider}
-                            mouseDown={cursorMouseDown}
-                            mouseUp={cursorMouseUp}
-                            mouseTrack={cursorMouseTrack}
-                            highlight={cursorHighlight}
-                            cursorWidth={cursorWidth}
-                            cursorHeight={cursorHeight}
-                            cursorType={cursorType}
-                            doubleClick={cursorDoubleClick}
-                            width={width}
-                            height={height}
-                            zoom={zoom}
-                            border={border}
-                            size={size}
-                            posX={posX}
-                            posY={posY}
-                        />
-                        <MarkerArea
-                            setPosX={setPosX}
-                            setPosY={setPosY}
-                            setMarkerWidth={setMarkerWidth}
-                            setMarkerHeight={setMarkerHeight}
-                            setMarkerX={setMarkerX}
-                            setMarkerY={setMarkerY}
-                            cellProvider={props.cellProvider}
-                            width={width}
-                            height={height}
-                            zoom={zoom}
-                            border={border}
-                            size={size}
-                            posX={posX}
-                            posY={posY}
-                            markerX={markerX}
-                            markerY={markerY}
-                            markerType={markerType}
-                            markerWidth={markerWidth}
-                            markerHeight={markerHeight}
-                            move={(e) => {
-                                overlay.setMode('markerMove', {event: e})
-                            }}
-                            resize={(event, axis, startX, startY) => {
-                                overlay.setMode('markerResize', {event, startX, startY, axis});
-                            }}
-                        />
-                        <MouseOverlay active={fixCursor !== null} cursor={fixCursor} />
-                    </FlexCellProviderScrollRaster>
+                        markerX={markerX}
+                        markerY={markerY}
+                        markerWidth={markerWidth}
+                        markerHeight={markerHeight}
+                        markerType={markerType}
+                        setMarkerX={setMarkerX}
+                        setMarkerY={setMarkerY}
+                        setMarkerWidth={setMarkerWidth}
+                        setMarkerHeight={setMarkerHeight}
+                        setMarkerType={setMarkerType}
+                        cellProvider={props.cellProvider}
+                    />
+                </FlexCellProviderScrollRaster>
+            </div>
+            <div>
+                <Stack dir="x" center full>
+                    {getSizeButtons(false, false)}
+                </Stack>
+            </div>
+
+            <div>{getNavButton('xy',true, false)}</div>
+            <div>{getSizeButtons(false, true)}</div>
+            <div>{getNavButton('xy',false, false)}</div>
+        </div>
+    );
+}
+
+/**
+ *
+ * @param props
+ * @returns {*}
+ * @constructor
+ */
+function BasicRasterView(props) {
+    const eContext = useContext(EditorContext);
+
+    const [border, setBorder] = useState(1);
+    const [zoom, setZoom] = useState(2);
+    const [posX, setPosX] = useState(0);
+    const [posY, setPosY] = useState(0);
+    const [width, setWidth] = useState(10);
+    const [height, setHeight] = useState(5);
+    const [rulers, setRulers] = useState(false);
+    const [markerX, setMarkerX] = useState(null);
+    const [markerY, setMarkerY] = useState(null);
+    const [markerWidth, setMarkerWidth] = useState(1);
+    const [markerHeight, setMarkerHeight] = useState(1);
+    const [markerType, setMarkerType] = useState('rect');
+    const [markerSpaceX, setMarkerSpaceX] = useState(0);
+    const [markerSpaceY, setMarkerSpaceY] = useState(0);
+    const [stateUpdate, setStateUpdate] = useState(false);
+    const [writeTransparent, setWriteTransparent] = useState(false);
+    const overlay = useRef(null);
+
+    let markerActions = '';
+    if (overlay.current) {
+        markerActions =
+            <Fragment>
+                <div><button onClick={() => {overlay.current.doMarkerAction('goto')}} disabled={!overlay.current.canDoMarkerAction('goto')}>Goto</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('clear')}} disabled={!overlay.current.canDoMarkerAction('clear')}>Clear</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('delete')}} disabled={!overlay.current.canDoMarkerAction('delete')}>Delete</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('copy')}} disabled={!overlay.current.canDoMarkerAction('copy')}>Copy</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('fill')}} disabled={!overlay.current.canDoMarkerAction('fill')}>Fill</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('crop')}} disabled={!overlay.current.canDoMarkerAction('crop')}>Crop</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('insert')}} disabled={!overlay.current.canDoMarkerAction('insert')}>Insert</button></div>
+                <div><button onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>Abort</button></div>
+                <div><button onClick={() => {overlay.current.setMode('select', {type: 'rect', all: true})}}>Select All</button></div>
+            </Fragment>
+
+    }
+
+    return (
+        <div className="padded full-v">
+            <Stack dir="x" full>
+                <Stack dir="y">
+                    <div><button onClick={() => {overlay.current.setMode('pick')}}>Pick</button></div>
+                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'rect'})}}>Select Rect</button></div>
+                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'rows'})}}>Select Rows</button></div>
+                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'columns'})}}>Select Columns</button></div>
+                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'column-gap'})}}>Select Column-Gap</button></div>
+                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'row-gap'})}}>Select Row-Gap</button></div>
+                    <div><button onClick={() => {eContext.undoAction()}} disabled={!eContext.hasPast()}>Undo</button></div>
+                    <div><button onClick={() => {eContext.redoAction()}} disabled={!eContext.hasFuture()}>Redo</button></div>
+                </Stack>
+
+                <Stack dir="y">
+                    {markerActions}
+                </Stack>
+
+                <div>
+                    PosX: <Int min={0} max={props.cellProvider.getWidth() - width} value={posX} set={setPosX} buttons />
+                    PosY: <Int min={0} max={props.cellProvider.getHeight() - height} value={posY} set={setPosY} buttons />
+                    Zoom: <Int min={1} max={5} value={zoom} set={setZoom} buttons />
+                    Border: <Int min={0} max={5} value={border} set={setBorder} buttons />
+                    <Checkbox name="rulers" value={rulers} set={setRulers} />
+                    <Checkbox name="Write Opaque" value={writeTransparent} set={setWriteTransparent} />
+                    <button onClick={() => {eContext.redraw(props.editorId)}}>Redraw</button>
+                </div>
+
+                <div className="flex items-centered align-center full-v">
+                    <RasterViewGrid
+                        auto
+                        shift
+                        setStateUpdate={setStateUpdate}
+                        stateUpdate={stateUpdate}
+                        setWidth={setWidth}
+                        setHeight={setHeight}
+                        setPosX={setPosX}
+                        setPosY={setPosY}
+                        width={width}
+                        height={height}
+                        posX={posX}
+                        posY={posY}
+                        editorId={props.editorId}
+                        zoom={zoom}
+                        border={border}
+                        rulers={rulers}
+                        cellProvider={props.cellProvider}
+                        overlayRef={overlay}
+                        writeTransparent={writeTransparent}
+                        mode="pick"
+                        markerX={markerX}
+                        markerY={markerY}
+                        markerWidth={markerWidth}
+                        markerHeight={markerHeight}
+                        markerType={markerType}
+                        setMarkerX={setMarkerX}
+                        setMarkerY={setMarkerY}
+                        setMarkerWidth={setMarkerWidth}
+                        setMarkerHeight={setMarkerHeight}
+                        setMarkerType={setMarkerType}
+                    />
                 </div>
             </Stack>
         </div>
@@ -3607,5 +4559,6 @@ export {
     RasterCanvas,
     EditorContext,
     EditorCtx,
-    BasicRasterView
+    BasicRasterView,
+    BaseCellProviderIndexRaster
 }

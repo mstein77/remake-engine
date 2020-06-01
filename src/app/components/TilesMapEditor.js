@@ -2,7 +2,7 @@ import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import ReactDOM from "react-dom";
 
 import {CssContext, Modal, Stack, SwitchButton, Checkbox, Section, Tabs, Tab, Int, closeModals} from './BaseComponents';
-import {Raster, EditorCtx, BasicRasterView} from './Raster';
+import {Raster, EditorCtx, BasicRasterView, BaseCellProviderIndexRaster} from './Raster';
 import {CellSelection, BitmapCellProvider, TilesCellProvider, TilesMapCellProvider} from '../classes/CellProvider.js';
 
 function TileTracker(props) {
@@ -213,6 +213,8 @@ class ActiveTileSelection extends React.Component {
             this.tilesRef.current.updateDims({});
         };
 
+        // <Raster ref={this.tilesRef} markerMode="pick" selector={selector} rulers={this.state.rulers} cellProvider={this.props.cellProvider} zoom={this.state.zoom} border={1} toolbars={false} />
+
         return (
             <Stack dir="x" full border>
                 <div className="padded">
@@ -223,7 +225,9 @@ class ActiveTileSelection extends React.Component {
                     <div><button>Export</button></div>
                 </div>
                 <div className="flex">
-                    <Raster ref={this.tilesRef} markerMode="pick" selector={selector} rulers={this.state.rulers} cellProvider={this.props.cellProvider} zoom={this.state.zoom} border={1} toolbars={false} />
+                    <BaseCellProviderIndexRaster
+                        auto width={10} height={5} cellProvider={this.props.cellProvider} editorId="test"
+                    />
                 </div>
                 <div className="padded">
                     <div className="padded">
@@ -351,12 +355,11 @@ function TilesMapEditor(props) {
                 </Section>
             </Stack>
 
+            <EditorCtx>
             <Section name="Elements" collapse="v" raw>
-                <Tabs height={280} reverse>
+                <Tabs height={280} reverse active={0}>
                     <Tab name="Test">
-                        <EditorCtx>
-                                <BasicRasterView auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={1} zoom={2} />
-                        </EditorCtx>
+                        <BasicRasterView editorId="bell" auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={0} zoom={1} />
                     </Tab>
                     <Tab name="Tiles">
                         <ActiveTileSelection ref={indexRef} raster={rasterRef} cellProvider={indexProvider} />
@@ -372,6 +375,7 @@ function TilesMapEditor(props) {
                     </Tab>
                 </Tabs>
             </Section>
+            </EditorCtx>
         </Stack>
     );
 }
