@@ -1,4 +1,4 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import ReactDOM from 'react-dom';
 
 const CssContext = React.createContext();
@@ -801,6 +801,17 @@ function upperFirst(value) {
     return value[0].toUpperCase() + value.slice(1);
 }
 
+function useMounted() {
+    const mounted = useRef(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        }
+    });
+    return mounted;
+}
+
 export {
     Modal,
     closeModals,
@@ -824,5 +835,6 @@ export {
     MouseOverlay,
     Themed,
     upperFirst,
+    useMounted,
     d
 }

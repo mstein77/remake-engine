@@ -1,4 +1,4 @@
-import React, {Fragment, useState, useCallback, useRef, useEffect, useContext} from "react";
+import React, {Fragment, useState, useCallback, useRef, useEffect, useContext, useMemo} from "react";
 import {
     Checkbox,
     Color,
@@ -13,9 +13,13 @@ import {
     Toolbar,
     upperFirst,
     MouseOverlay,
-    d
+    useMounted,
+    d,
+    Modal,
+    closeModals
 } from "./BaseComponents";
-import {CellSelection} from "../classes/CellProvider";
+import {BitmapCellProvider, CellSelection} from "../classes/CellProvider";
+import ReactDOM from "react-dom";
 
 class Raster extends React.Component {
 
@@ -2122,17 +2126,6 @@ function CellMarker(props) {
     )
 }
 
-function useMounted() {
-    const mounted = useRef(false);
-    useEffect(() => {
-        mounted.current = true;
-        return () => {
-            mounted.current = false;
-        }
-    });
-    return mounted;
-}
-
 function useReadyCellProvider(cellProvider, mounted) {
     const [ready, setReady] = useState(cellProvider.hasData());
     if (!ready) {
@@ -2453,6 +2446,9 @@ function CursorArea(props) {
             if (offset === false) {
                 setOffX(null);
                 setOffY(null);
+                if (props.mouseTrack) {
+                    props.mouseTrack(null, null);
+                }
             } else if (offX !== offset.x || offY !== offset.y) {
                 setOffX(offset.x);
                 setOffY(offset.y);
@@ -2473,7 +2469,8 @@ function CursorArea(props) {
     };
 
     const onDoubleClick = props.doubleClick ? (e) => {
-        props.doubleClick(e);
+        const offset = getOffsetPos(e);
+        props.doubleClick(e, offset.x, offset.y);
         e.stopPropagation();
         e.preventDefault();
     } : null;
@@ -2497,6 +2494,7 @@ class EditorCtx extends React.Component {
 
         this.redraw = {};
         this.frames = {};
+        this.raster = {};
 
         this.setSelection = function (selection) {
             this.setState({selection});
@@ -2558,18 +2556,45 @@ class EditorCtx extends React.Component {
             addRedraw: (id, cellRedraw) => {
                 this.redraw[id] = cellRedraw;
             },
-            redraw: (id) => {
-                if (this.redraw[id]) {
-                    if (this.frames[id]) {
-                        cancelAnimationFrame(this.frames[id]);
-                    }
-                    this.frames[id] = requestAnimationFrame(
-                        () => {
-                            this.redraw[id]();
-                            this.frames[id] = undefined;
+            redraw: (id = null) => {
+                const doRedraw = (id) => {
+                    if (this.redraw[id]) {
+                        if (this.frames[id]) {
+                            cancelAnimationFrame(this.frames[id]);
                         }
-                    );
+                        this.frames[id] = requestAnimationFrame(
+                            () => {
+                                this.redraw[id]();
+                                this.frames[id] = undefined;
+                            }
+                        );
+                    }
+                };
+
+                if (id === null) {
+                    for(let subId in this.redraw) {
+                        doRedraw(subId);
+                    }
+                } else {
+                    doRedraw(id);
                 }
+            },
+            addRaster: (id, overlay) => {
+                this.raster[id] = overlay;
+                d('ADD RASTER', id, overlay);
+            },
+            disableRaster: (id) => {
+                this.raster[id] = undefined;
+                d('DISABLE RASTER', id);
+            },
+            hasRaster: (id) => {
+                return this.raster[id];
+            },
+            setRasterMode: (id, mode) => {
+                if (!this.state.hasRaster(id)) {
+                    return;
+                }
+                this.raster[id].current.setMode(mode);
             }
         };
     }
@@ -2668,6 +2693,7 @@ const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
  *
  */
 function CellRaster(props) {
+    const context = useContext(CssContext);
     const canvasRef = useRef(null);
     const height = props.cells.length;
     const width = (height === 0) ? 0 : props.cells[0].length;
@@ -2781,6 +2807,9 @@ const CellProviderRaster = React.memo((props) => {
                 renderRef.current =
                     (ctx, x, y, value) => {
                         ctx.fillStyle = value;
+                        if (value.length === 9 && value.substr(-2).toLowerCase() != 'ff') {
+                            ctx.clearRect(x, y, propsRef.current.cellSize, propsRef.current.cellSize);
+                        }
                         ctx.fillRect(x, y, propsRef.current.cellSize, propsRef.current.cellSize);
                     };
                 break;
@@ -3023,12 +3052,61 @@ function BaseCellProviderIndexRaster(props) {
     const [width, setWidth] = useState(10);
     const [height, setHeight] = useState(5);
     const [rulers, setRulers] = useState(true);
+    const [markerX, setMarkerX] = useState(null);
+    const [markerY, setMarkerY] = useState(null);
+    const [markerWidth, setMarkerWidth] = useState(1);
+    const [markerHeight, setMarkerHeight] = useState(1);
+    const [markerType, setMarkerType] = useState('rect');
     const [renderOptions, setRenderOptions] = useState({events: false, caching: true});
     const [cursorHighlight, setCursorHighlight] = useState(false);
     const [cursorFixed, setCursorFixed] = useState(false);
     const boundingRectRef = useRef(null);
     const [active, setActive] = useState(false);
     const windowEvent = useWindowEventManager();
+    const [overlayRef, eContext] = useOverlay(props.editorId);
+
+    const propsRef = useRef(null);
+    propsRef.current = {
+        posY
+    };
+
+    useEffect(() => {
+        overlayRef.current.setMode('pick', {
+            doubleClick: (e, x, y) => {
+                const index = props.cellProvider.getCellValue(x, propsRef.current.posY + y);
+
+                const save = (provider) => {
+                    const doImage = provider.getImageData();
+                    const actionIndex = index;
+                    const undoImage = props.mapProvider.getImageDataForValue(actionIndex);
+                    eContext.doAction(() => {
+                        props.cellProvider.setBitmapForValue(actionIndex, doImage);
+                        props.mapProvider.setBitmapForValue(actionIndex, doImage);
+                        eContext.redraw();
+                    }, () => {
+                        props.cellProvider.setBitmapForValue(actionIndex, undoImage);
+                        props.mapProvider.setBitmapForValue(actionIndex, undoImage);
+                        eContext.redraw();
+                    });
+                    closeModals();
+                };
+                ReactDOM.render(
+                    <Modal name="Edit" closeable>
+                        <div style={{height: 600}}>
+                            <BitmapEditor
+                                resize={false}
+                                zoom="5"
+                                border="1"
+                                cancelHandler={() => {closeModals()}}
+                                saveHandler={save}
+                                bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
+                        </div>
+                    </Modal>,
+                    document.getElementById('modals-container')
+                );
+            }
+        });
+    }, []);
 
     return (
         <div className="full-v padded">
@@ -3048,34 +3126,32 @@ function BaseCellProviderIndexRaster(props) {
                 zoom={zoom}
                 rulers={rulers}
                 editorId={props.editorId}>
-                <CursorArea
-                    boundingRectRef={boundingRectRef}
-                    cellProvider={props.cellProvider}
-                    mouseDown={(e, x, y) => {
-                        setCursorHighlight(true);
-                        setCursorFixed(true);
-                        windowEvent.addListener(
-                            'mouseup',
-                            (e) => {
-                                setCursorFixed(false);
-                                setCursorHighlight(false);
-                            },
-                            {capture: false, once: true}
-                        );
-                    }}
-                    highlight={cursorHighlight}
-                    cursorWidth={1}
-                    cursorHeight={1}
-                    cursorType="rect"
-                    matrix={null}
+                <RasterOverlays
+                    overlayRef={overlayRef}
+                    setWidth={setWidth}
+                    setHeight={setHeight}
+                    setPosX={setPosX}
+                    setPosY={setPosY}
                     width={width}
                     height={height}
-                    zoom={zoom}
-                    border={border}
-                    fixed={cursorFixed}
-                    size={props.cellProvider.getSize()}
                     posX={posX}
                     posY={posY}
+                    editorId={props.editorId}
+                    mode="pick"
+                    zoom={zoom}
+                    border={border}
+                    rulers={rulers}
+                    markerX={markerX}
+                    markerY={markerY}
+                    markerWidth={markerWidth}
+                    markerHeight={markerHeight}
+                    markerType={markerType}
+                    setMarkerX={setMarkerX}
+                    setMarkerY={setMarkerY}
+                    setMarkerWidth={setMarkerWidth}
+                    setMarkerHeight={setMarkerHeight}
+                    setMarkerType={setMarkerType}
+                    cellProvider={props.cellProvider}
                 />
             </FlexCellProviderScrollRaster>
             <MouseOverlay cursor="pointer" active={active} />
@@ -3137,6 +3213,7 @@ function RasterOverlays(props) {
         markerAction: null,
         markerActions: {},
         canDoActions: {},
+        selectionType: 'rect',
         setState: function (change) {
             const props = propsRef.current;
             if (change.markerType !== undefined && change.markerType !== props.markerType) {
@@ -3186,7 +3263,6 @@ function RasterOverlays(props) {
                 return;
             }
 
-            d('SAVE MARKER', change.start, change.added, change.axis);
             const isGap = change.markerType.endsWith('gap');
             const checkX = change.axis === 'x' && !change.markerType.startsWith('row');
             const checkY = change.axis === 'y' && !change.markerType.startsWith('column');
@@ -3259,7 +3335,6 @@ function RasterOverlays(props) {
             }
 
             if (reset) {
-                d('Marker Reset');
                 props.setMarkerX(null);
                 props.setMarkerY(null);
             }
@@ -3336,9 +3411,7 @@ function RasterOverlays(props) {
         overlay.addMarkerAction = overlay.addMarkerAction.bind(overlay);
         overlay.triggerMarkerAction = overlay.triggerMarkerAction.bind(overlay);
 
-        const mouseUpPickAgain = (e) => {
-            overlay.setMode('pick');
-        };
+        let mouseUpPickAgain = null;
         overlay.addMode(
             'pick',
             (data) => {
@@ -3349,6 +3422,12 @@ function RasterOverlays(props) {
                 propsRef.current.setMarkerHeight(1);
                 propsRef.current.setMarkerWidth(1);
                 setCursorHighlight(false);
+                mouseUpPickAgain = (e) => {
+                    overlay.setMode('pick', data);
+                    if (props.editorId !== 'map') {
+                        eCtxRef.current.setRasterMode('map', 'startPath');
+                    }
+                };
                 setCursorMouseDown(() => (e, x, y) => {
                     eCtxRef.current.setSelection(props.cellProvider.getSelection(x, y, 1, 1));
                     propsRef.current.setMarkerX(x);
@@ -3357,14 +3436,22 @@ function RasterOverlays(props) {
                     windowEvent.addListener('mouseup', mouseUpPickAgain, {capture: false, once: true});
                     setFixCursor('pointer');
                 });
-                setCursorDoubleClick(() => (e, x, y) => {
+                if (props.tracker) {
+                    setCursorMouseTrack(() => props.tracker.current);
+                }
+                const doubleClick = data.doubleClick ? data.doubleClick : (e, x, y) => {
                     overlay.setMode('startPath');
-                });
+                };
+                setCursorDoubleClick(() => doubleClick);
             },
             () => {
                 windowEvent.removeListener('mouseup', mouseUpPickAgain, {capture: false, once: true})
                 propsRef.current.setMarkerX(null);
                 propsRef.current.setMarkerY(null);
+                if (props.tracker && props.tracker.current) {
+                    props.tracker.current(null, null);
+                }
+                setCursorMouseTrack(null);
                 setCursorMouseDown(null);
                 setFixCursor(null);
                 setCursorDoubleClick(null);
@@ -3376,12 +3463,13 @@ function RasterOverlays(props) {
             (data) => {
                 const markerType = data.type ? data.type : 'rect';
                 setCursorType(markerType);
+                overlay.selectionType = markerType;
                 const markerWidth = data.width ? data.width : 1;
                 setCursorWidth(markerWidth);
                 const markerHeight = data.height ? data.height : 1;
                 setCursorHeight(markerHeight);
                 if (data.all) {
-                    overlay.setState({markerX: 0, markerY: 0, markerWidth: props.cellProvider.getWidth(), markerHeight: props.cellProvider.getHeight()});
+                    overlay.setState({markerType, markerX: 0, markerY: 0, markerWidth: props.cellProvider.getWidth(), markerHeight: props.cellProvider.getHeight()});
                 } else if (markerType !== propsRef.current.markerType) {
                     overlay.setState({markerX: null, markerY: null});
                 }
@@ -3949,34 +4037,6 @@ function RasterOverlays(props) {
         );
 
         overlay.addMarkerAction(
-            'delete',
-            (props) => {
-                const markerType = props.markerType;
-                const markerY = props.markerY;
-                const markerX = props.markerX;
-                const markerWidth = props.markerWidth;
-                const markerHeight = props.markerHeight;
-                const undoSelection = props.cellProvider.getRawSelection(0, 0, props.cellProvider.getWidth(), props.cellProvider.getHeight());
-                const doAction = () => {
-                    if (markerType === 'rows') {
-                        props.cellProvider.deleteRows(markerY, markerHeight);
-                    } else {
-                        props.cellProvider.deleteColumns(markerX, markerWidth);
-                    }
-                    props.setPosX(props.posX);
-                };
-                const undoAction = () => {
-                    props.cellProvider.importRawSelection(undoSelection);
-                    props.setPosX(props.posX);
-                };
-                eCtxRef.current.doAction(doAction, undoAction);
-            },
-            (props) => {
-                return (props.markerX !== null && (props.markerType === 'rows' || props.markerType === 'columns'));
-            }
-        );
-
-        overlay.addMarkerAction(
             'copy',
             (props) => {
                 const rect = props.cellProvider.getRect(
@@ -4035,87 +4095,14 @@ function RasterOverlays(props) {
         );
 
         overlay.addMarkerAction(
-            'crop',
-            (props) => {
-                const markerX = props.markerX;
-                const markerY = props.markerY;
-                const markerType = props.markerType;
-                const oldWidth = props.cellProvider.getWidth();
-                const oldHeight = props.cellProvider.getHeight();
-                const markerWidth = markerType.startsWith('row') ? oldWidth : props.markerWidth;
-                const markerHeight = markerType.startsWith('column') ? oldHeight : props.markerHeight;
-                const undoSelection = props.cellProvider.getRawSelection(
-                    0, 0, oldWidth, oldHeight
-                );
-
-                const doAction = () => {
-                    props.cellProvider.reduceToRect(
-                        markerX,
-                        markerY,
-                        markerWidth,
-                        markerHeight
-                    );
-                    props.setPosX(0);
-                    props.setPosY(0);
-                };
-
-                const undoAction = () => {
-                    props.cellProvider.importRawSelection(undoSelection);
-                    props.setPosX(props.posX);
-                };
-                eCtxRef.current.doAction(doAction, undoAction);
-            },
-            (props) => {
-                return (props.markerX !== null && !props.markerType.endsWith('gap'));
-            }
-        );
-
-        overlay.addMarkerAction(
-            'insert',
-            (props, no) => {
-                if (!no) {
-                    no = 1;
-                };
-                const posY = props.posY;
-                if (props.markerType === 'row-gap') {
-                    const oldMarkerY = props.markerY;
-                    const doAction = () => {
-                        props.cellProvider.insertRowsAt(oldMarkerY, no);
-                        props.setPosY(posY + 1);
-                        props.setPosY(posY);
-                    };
-                    const undoAction = () => {
-                        props.cellProvider.deleteRows(oldMarkerY, no);
-                        eCtxRef.current.redraw(props.editorId);
-                        props.setPosY(posY + 1);
-                        props.setPosY(posY);
-                    };
-                    eCtxRef.current.doAction(doAction, undoAction);
-                } else {
-                    const oldMarkerX = props.markerX;
-                    const doAction = () => {
-                        props.cellProvider.insertColumnsAt(oldMarkerX, no);
-                        props.setPosY(posY + 1);
-                        props.setPosY(posY);
-                    };
-                    const undoAction = () => {
-                        props.cellProvider.deleteColumns(oldMarkerX, no);
-                        props.setPosY(posY + 1);
-                        props.setPosY(posY);
-                    };
-                    eCtxRef.current.doAction(doAction, undoAction);
-                }
-            },
-            (props) => {
-                return (props.markerX !== null && props.markerType.endsWith('gap'));
-            }
-        );
-
-        overlay.addMarkerAction(
             'goto',
             (props) => {
-                props.setPosX(props.markerX);
-                props.setPosY(props.markerY);
+                if (!props.markerType.startsWith('row')) {
+                    props.setPosX(props.markerX);
+                }
+                if (!props.markerType.startsWith('column')) {
+                    props.setPosY(props.markerY);
+                }
             },
             (props) => {
                 return (props.markerX !== null);
@@ -4217,6 +4204,9 @@ function RasterOverlays(props) {
  */
 function RasterViewGrid(props) {
     const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
+
     const addPage = 10;
     const {
         auto, mode, writeTransparent,
@@ -4225,76 +4215,197 @@ function RasterViewGrid(props) {
         markerHeight, setMarkerWidth, setMarkerHeight, renderOptions, editorId
     } = props;
 
-    const addRows = (no, start) => {
-        let added = null;
-        let oldPosY = props.posY;
-        let undoSelection = null;
-        let min = Math.min(Math.abs(no), props.cellProvider.getHeight() - 1);
+    const resizeable = props.cellProvider.isResizeable() && props.resizeable;
 
-        const doAction = () => {
-            if (no < 0) {
-                undoSelection = props.cellProvider.getRawSelection(
-                    0, start ? 0 : props.cellProvider.getHeight() - min,
-                    props.cellProvider.getWidth(), min
-                );
-            }
-            added = props.cellProvider.addRows(start, no);
-            if (no < 0) {
-                added *= -1;
-            }
-            const _posY = start ? 0 : Math.max(0, oldPosY + added);
-            overlayRef.current.setState({posY: _posY, start, added, axis: 'y'});
-        };
+    useEffect(() => {
+        const overlay = overlayRef.current;
+        if (resizeable) {
 
-        const undoAction = () => {
-            props.cellProvider.addRows(start, -added);
-            if (undoSelection) {
-                props.cellProvider.fillRectWithRawSelection(
-                    0, start ? 0 : props.cellProvider.getHeight() + added,
-                    props.cellProvider.getWidth(), -added,
-                    undoSelection
-                );
-            }
-            overlayRef.current.setState({posY: oldPosY, start, added: -added, axis: 'y'});
-        };
-        eContext.doAction(doAction, undoAction);
-    };
+            overlay.addMarkerAction(
+                'addRows',
+                (props, data) => {
+                    const no = data.no;
+                    const start = data.start;
+                    let added = null;
+                    let oldPosY = props.posY;
+                    let undoSelection = null;
+                    let min = Math.min(Math.abs(no), props.cellProvider.getHeight() - 1);
 
-    const addColumns = (no, start) => {
-        let added = null;
-        let oldPosX = props.posX;
-        let undoSelection = null;
-        let min = Math.min(Math.abs(no), props.cellProvider.getWidth() - 1);
+                    const doAction = () => {
+                        if (no < 0) {
+                            undoSelection = props.cellProvider.getRawSelection(
+                                0, start ? 0 : props.cellProvider.getHeight() - min,
+                                props.cellProvider.getWidth(), min
+                            );
+                        }
+                        added = props.cellProvider.addRows(start, no);
+                        if (no < 0) {
+                            added *= -1;
+                        }
+                        const _posY = start ? 0 : Math.max(0, oldPosY + added);
+                        overlayRef.current.setState({posY: _posY, start, added, axis: 'y'});
+                    };
 
-        const doAction = () => {
-            if (no < 0) {
-                undoSelection = props.cellProvider.getRawSelection(
-                    start ? 0 : props.cellProvider.getWidth() - min, 0,
-                    min, props.cellProvider.getHeight()
-                );
-            }
-            added = props.cellProvider.addColumns(start, no);
-            if (no < 0) {
-                added *= -1;
-            }
-            const _posX = start ? 0 : Math.max(0, oldPosX + added);
-            overlayRef.current.setState({posX: _posX, start, added, axis: 'x'});
-        };
+                    const undoAction = () => {
+                        props.cellProvider.addRows(start, -added);
+                        if (undoSelection) {
+                            props.cellProvider.fillRectWithRawSelection(
+                                0, start ? 0 : props.cellProvider.getHeight() + added,
+                                props.cellProvider.getWidth(), -added,
+                                undoSelection
+                            );
+                        }
+                        overlayRef.current.setState({posY: oldPosY, start, added: -added, axis: 'y'});
+                    };
+                    eContext.doAction(doAction, undoAction);
+                }
+            );
 
-        const undoAction = () => {
-            props.cellProvider.addColumns(start, -added);
-            if (undoSelection) {
-                props.cellProvider.fillRectWithRawSelection(
-                    start ? 0 : props.cellProvider.getWidth() + added, 0,
-                    -added, props.cellProvider.getHeight(),
-                    undoSelection
-                );
-            }
-            overlayRef.current.setState({posX: oldPosX, start, added: -added, axis: 'x'});
-        };
+            overlay.addMarkerAction(
+                'addColumns',
+                (props, data) => {
+                    const no = data.no;
+                    const start = data.start;
+                    let added = null;
+                    let oldPosX = props.posX;
+                    let undoSelection = null;
+                    let min = Math.min(Math.abs(no), props.cellProvider.getWidth() - 1);
 
-        eContext.doAction(doAction, undoAction);
-    };
+                    const doAction = () => {
+                        if (no < 0) {
+                            undoSelection = props.cellProvider.getRawSelection(
+                                start ? 0 : props.cellProvider.getWidth() - min, 0,
+                                min, props.cellProvider.getHeight()
+                            );
+                        }
+                        added = props.cellProvider.addColumns(start, no);
+                        if (no < 0) {
+                            added *= -1;
+                        }
+                        const _posX = start ? 0 : Math.max(0, oldPosX + added);
+                        overlayRef.current.setState({posX: _posX, start, added, axis: 'x'});
+                    };
+
+                    const undoAction = () => {
+                        props.cellProvider.addColumns(start, -added);
+                        if (undoSelection) {
+                            props.cellProvider.fillRectWithRawSelection(
+                                start ? 0 : props.cellProvider.getWidth() + added, 0,
+                                -added, props.cellProvider.getHeight(),
+                                undoSelection
+                            );
+                        }
+                        overlayRef.current.setState({posX: oldPosX, start, added: -added, axis: 'x'});
+                    };
+
+                    eContext.doAction(doAction, undoAction);
+                }
+            );
+
+            overlay.addMarkerAction(
+                'insert',
+                (props, no) => {
+                    if (!no) {
+                        no = 1;
+                    };
+                    const posY = props.posY;
+                    if (props.markerType === 'row-gap') {
+                        const oldMarkerY = props.markerY;
+                        const doAction = () => {
+                            props.cellProvider.insertRowsAt(oldMarkerY, no);
+                            props.setPosY(posY + 1);
+                            props.setPosY(posY);
+                        };
+                        const undoAction = () => {
+                            props.cellProvider.deleteRows(oldMarkerY, no);
+                            eCtxRef.current.redraw(props.editorId);
+                            props.setPosY(posY + 1);
+                            props.setPosY(posY);
+                        };
+                        eCtxRef.current.doAction(doAction, undoAction);
+                    } else {
+                        const oldMarkerX = props.markerX;
+                        const doAction = () => {
+                            props.cellProvider.insertColumnsAt(oldMarkerX, no);
+                            props.setPosY(posY + 1);
+                            props.setPosY(posY);
+                        };
+                        const undoAction = () => {
+                            props.cellProvider.deleteColumns(oldMarkerX, no);
+                            props.setPosY(posY + 1);
+                            props.setPosY(posY);
+                        };
+                        eCtxRef.current.doAction(doAction, undoAction);
+                    }
+                },
+                (props) => {
+                    return (props.markerX !== null && props.markerType.endsWith('gap'));
+                }
+            );
+
+            overlay.addMarkerAction(
+                'crop',
+                (props) => {
+                    const markerX = props.markerX;
+                    const markerY = props.markerY;
+                    const markerType = props.markerType;
+                    const oldWidth = props.cellProvider.getWidth();
+                    const oldHeight = props.cellProvider.getHeight();
+                    const markerWidth = markerType.startsWith('row') ? oldWidth : props.markerWidth;
+                    const markerHeight = markerType.startsWith('column') ? oldHeight : props.markerHeight;
+                    const undoSelection = props.cellProvider.getRawSelection(
+                        0, 0, oldWidth, oldHeight
+                    );
+                    const doAction = () => {
+                        props.cellProvider.reduceToRect(
+                            markerX,
+                            markerY,
+                            markerWidth,
+                            markerHeight
+                        );
+                        props.setPosX(0);
+                        props.setPosY(0);
+                    };
+                    const undoAction = () => {
+                        props.cellProvider.importRawSelection(undoSelection);
+                        props.setPosX(props.posX);
+                    };
+                    eCtxRef.current.doAction(doAction, undoAction);
+                },
+                (props) => {
+                    return (props.markerX !== null && !props.markerType.endsWith('gap'));
+                }
+            );
+
+            overlay.addMarkerAction(
+                'delete',
+                (props) => {
+                    const markerType = props.markerType;
+                    const markerY = props.markerY;
+                    const markerX = props.markerX;
+                    const markerWidth = props.markerWidth;
+                    const markerHeight = props.markerHeight;
+                    const undoSelection = props.cellProvider.getRawSelection(0, 0, props.cellProvider.getWidth(), props.cellProvider.getHeight());
+                    const doAction = () => {
+                        if (markerType === 'rows') {
+                            props.cellProvider.deleteRows(markerY, markerHeight);
+                        } else {
+                            props.cellProvider.deleteColumns(markerX, markerWidth);
+                        }
+                        props.setPosX(props.posX);
+                    };
+                    const undoAction = () => {
+                        props.cellProvider.importRawSelection(undoSelection);
+                        props.setPosX(props.posX);
+                    };
+                    eCtxRef.current.doAction(doAction, undoAction);
+                },
+                (props) => {
+                    return (props.markerX !== null && (props.markerType === 'rows' || props.markerType === 'columns'));
+                }
+            );
+        }
+    }, []);
 
     const shiftRow = (start) => {
         const width = props.cellProvider.getWidth();
@@ -4370,12 +4481,13 @@ function RasterViewGrid(props) {
 
     const getSizeButtons = (start, vertical) => {
         const shiftBtn = getShiftButton(start, vertical);
-        const callback = vertical ? addRows : addColumns;
+        const action = vertical ? 'addRows' : 'addColumns';
         const pos = vertical ? props.posY : props.posX;
         const height = props.cellProvider.getHeight();
         const width = props.cellProvider.getWidth();
         const maxPos = vertical ? height - props.height : width - props.width;
         const max = vertical ? height : width;
+
         const btnAdd1Attr = {};
         const btnAddPageAttr = {};
         const btnSub1Attr = {};
@@ -4400,34 +4512,44 @@ function RasterViewGrid(props) {
         } else {
             btnJumpAttr.disabled = 'disabled';
             btnAdd1Attr.onClick = () => {
-                callback(1, start);
+                overlayRef.current.doMarkerAction(action, {no: 1, start});
             };
             btnAddPageAttr.onClick = () => {
-                callback(addPage, start);
+                overlayRef.current.doMarkerAction(action, {no: addPage, start});
             };
             if (max === 1) {
                 btnSub1Attr.disabled = 'disabled';
                 btnSubPageAttr.disabled = 'disabled';
             } else {
                 btnSub1Attr.onClick = () => {
-                    callback(-1, start);
+                    overlayRef.current.doMarkerAction(action, {no: -1, start});
                 };
                 btnSubPageAttr.onClick = () => {
-                    callback(-addPage, start);
+                    overlayRef.current.doMarkerAction(action, {no: -addPage, start});
                 }
             }
         }
-        const jumpBtn =  props.full ? '' : <button {...btnJumpAttr}><i style={jumpStyle} className={materialCls.join(' ')}>{jumpChar}</i></button>;
-
+        const jumpBtn =  <button {...btnJumpAttr}><i style={jumpStyle} className={materialCls.join(' ')}>{jumpChar}</i></button>;
         const br = vertical ? '' : <br />;
         const shiftBr = props.shift ? br : '';
-        return (<div>
-            <button {...btnSubPageAttr}>--</button>{br}
-            <button {...btnSub1Attr}>-</button>{br}
+
+        return (
+            <div>{
+                resizeable &&
+                    <Fragment>
+                        <button {...btnSubPageAttr}>--</button>{br}
+                        <button {...btnSub1Attr}>-</button>{br}
+                    </Fragment>
+            }
             {shiftBtn}{shiftBr}
             {jumpBtn}
-            <button {...btnAdd1Attr}>+</button>{br}
-            <button {...btnAddPageAttr}>++</button>
+            {
+                resizeable &&
+                    <Fragment>
+                        <button {...btnAdd1Attr}>+</button>{br}
+                        <button {...btnAddPageAttr}>++</button>
+                    </Fragment>
+            }
         </div>)
     };
 
@@ -4511,6 +4633,7 @@ function RasterViewGrid(props) {
                         height={height}
                         posX={posX}
                         posY={posY}
+                        tracker={props.tracker}
                         editorId={props.editorId}
                         writeTransparent={writeTransparent}
                         mode={mode}
@@ -4545,7 +4668,8 @@ function RasterViewGrid(props) {
 }
 
 
-function useOverlay() {
+function useOverlay(id) {
+    const eContext = useContext(EditorContext);
     const overlay = useRef(null);
     const [updateState, setUpdateState] = useState(false);
     const updateRef = useRef(null);
@@ -4555,10 +4679,15 @@ function useOverlay() {
         overlay.current.updateState = () => {
             setUpdateState(!updateRef.current);
         };
+        eContext.addRaster(id, overlay);
+        return () => {
+            eContext.disableRaster(id);
+        }
     }, []);
 
-    return overlay;
+    return [overlay, eContext];
 }
+
 /**
  *
  * @param props
@@ -4566,15 +4695,17 @@ function useOverlay() {
  * @constructor
  */
 function BasicRasterView(props) {
-    const eContext = useContext(EditorContext);
+    const context = useContext(CssContext);
 
-    const [border, setBorder] = useState(1);
-    const [zoom, setZoom] = useState(2);
+    const defaults = props.defaults ? props.defaults : {};
+
+    const [border, setBorder] = useState(defaults.border !== undefined ? defaults.border : 0);
+    const [zoom, setZoom] = useState(defaults.zoom ? defaults.zoom : 1);
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
-    const [width, setWidth] = useState(10);
-    const [height, setHeight] = useState(5);
-    const [rulers, setRulers] = useState(false);
+    const [width, setWidth] = useState(defaults.width ? defaults.width : 1);
+    const [height, setHeight] = useState(defaults.height ? defaults.height : 1);
+    const [rulers, setRulers] = useState(defaults.rulers !== undefined ? defaults.rulers : false);
     const [markerX, setMarkerX] = useState(null);
     const [markerY, setMarkerY] = useState(null);
     const [markerWidth, setMarkerWidth] = useState(1);
@@ -4584,99 +4715,278 @@ function BasicRasterView(props) {
     const [markerSpaceY, setMarkerSpaceY] = useState(0);
     const [renderOptions, setRenderOptions] = useState({caching: true, events: true});
     const [writeTransparent, setWriteTransparent] = useState(false);
-    const overlay = useOverlay();
+    const resizeable = props.resizeable === true;
+    const [overlay, eContext] = useOverlay(props.editorId);
 
-    let markerActions = '';
-    if (overlay.current) {
-        markerActions =
-            <Fragment>
-                <div><button onClick={() => {overlay.current.doMarkerAction('goto')}} disabled={!overlay.current.canDoMarkerAction('goto')}>Goto</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('clear')}} disabled={!overlay.current.canDoMarkerAction('clear')}>Clear</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('delete')}} disabled={!overlay.current.canDoMarkerAction('delete')}>Delete</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('copy')}} disabled={!overlay.current.canDoMarkerAction('copy')}>Copy</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('fill')}} disabled={!overlay.current.canDoMarkerAction('fill')}>Fill</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('crop')}} disabled={!overlay.current.canDoMarkerAction('crop')}>Crop</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('insert')}} disabled={!overlay.current.canDoMarkerAction('insert')}>Insert</button></div>
-                <div><button onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>Abort</button></div>
-                <div><button onClick={() => {overlay.current.setMode('select', {type: 'rect', all: true})}}>Select All</button></div>
-            </Fragment>
+    const maxWidth = props.cellProvider.getWidth();
+    const maxHeight = props.cellProvider.getHeight();
+    const maxZoom = 5;
 
+    const mode = overlay.current && overlay.current.modeId !== null ? overlay.current.modeId : '?';
+    const isSelectionMode = ['select', 'markerMove', 'markerResize'].indexOf(mode) !== -1;
+    const isWriteMode = ['startPath', 'writePath'].indexOf(mode) !== -1;
+
+    const bottomActions = [];
+    const bottomTools = [];
+    if (overlay.current && isWriteMode) {
+        bottomActions.push(
+            <Checkbox key="trans" name="Write opaque" value={writeTransparent} set={setWriteTransparent} />
+        );
+    }
+    if (overlay.current && isSelectionMode && markerX !== null) {
+        const selectionType = overlay.current.selectionType;
+        const isGap = selectionType.endsWith('gap');
+
+        bottomActions.push(
+            <button key="goto" onClick={() => {overlay.current.doMarkerAction('goto')}} disabled={!overlay.current.canDoMarkerAction('goto')}>Goto</button>
+        );
+        if (!isGap) {
+            bottomActions.push(
+                <button key="clear" onClick={() => {overlay.current.doMarkerAction('clear')}} disabled={!overlay.current.canDoMarkerAction('clear')}>Clear</button>
+            );
+        }
+        if (resizeable && (selectionType === 'rows' || selectionType === 'columns')) {
+            bottomActions.push(
+                <button key="delete" onClick={() => {overlay.current.doMarkerAction('delete')}} disabled={!overlay.current.canDoMarkerAction('delete')}>Delete</button>
+            );
+        }
+        if (!isGap) {
+            bottomActions.push(
+                <button key="copy" onClick={() => {overlay.current.doMarkerAction('copy')}} disabled={!overlay.current.canDoMarkerAction('copy')}>Copy</button>
+            );
+            bottomActions.push(
+                <button key="fill" onClick={() => {overlay.current.doMarkerAction('fill')}} disabled={!overlay.current.canDoMarkerAction('fill')}>Fill</button>
+            );
+            if (resizeable) {
+                bottomActions.push(
+                    <button key="crop" onClick={() => {overlay.current.doMarkerAction('crop')}} disabled={!overlay.current.canDoMarkerAction('crop')}>Crop</button>
+                );
+            }
+        } else if (resizeable) {
+            bottomActions.push(
+                <button key="insert" onClick={() => {overlay.current.doMarkerAction('insert')}} disabled={!overlay.current.canDoMarkerAction('insert')}>+</button>
+            );
+            bottomActions.push(
+                <button key="insertPage" onClick={() => {overlay.current.doMarkerAction('insert', 10)}} disabled={!overlay.current.canDoMarkerAction('insert')}>++</button>
+            );
+        }
+        bottomActions.push(
+            <button key="abort" onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>X</button>
+        );
+
+        if (selectionType === 'rect') {
+            bottomTools.push(
+                <Dim key="pos" name="Position:" buttons x={markerX} setX={setMarkerX}
+                     y={markerY} setY={setMarkerY} maxX={maxWidth - markerWidth}
+                     maxY={maxHeight - markerHeight} min="0"
+                     readOnly
+                />
+            );
+            bottomTools.push(
+                <Dim key="size" name="Size:" buttons
+                     x={markerWidth} setX={setMarkerWidth}
+                     y={markerHeight} setY={setMarkerHeight}
+                     maxX={maxWidth - markerX} maxY={maxHeight - markerY} min="1"
+                     readOnly
+                />
+            );
+        }
+        if (['columns', 'rows'].indexOf(selectionType) !== -1) {
+            bottomTools.push(
+                <Int key="pos" name="Position:" buttons min="0"
+                     value={selectionType === 'rows' ? markerY : markerX}
+                     set={selectionType === 'rows' ? setMarkerY : setMarkerX}
+                     max={selectionType === 'rows' ? maxHeight - markerHeight : maxWidth - markerWidth}
+                />
+            );
+            bottomTools.push(
+                <Int key="size" name={selectionType === 'rows' ? 'Rows:' : 'Columns'} buttons min="1"
+                     value={selectionType === 'rows' ? markerHeight : markerWidth}
+                     set={selectionType === 'rows' ? setMarkerHeight : setMarkerWidth}
+                     max={selectionType === 'rows' ? maxHeight - markerY : maxWidth - markerX}
+                />
+            );
+        }
+        if (isGap) {
+            bottomTools.push(
+                <Int key="pos" name="Position:" buttons min="0"
+                     value={selectionType === 'row-gap' ? markerY : markerX}
+                     set={selectionType === 'row-gap' ? setMarkerY : setMarkerX}
+                     max={selectionType === 'row-gap' ? maxHeight - markerHeight : maxWidth - markerWidth}
+                />
+            );
+        }
+    }
+
+    let modeInfo = mode;
+    if (isSelectionMode) {
+        modeInfo = 'Select ' + overlay.current.selectionType;
+    } else if (isWriteMode) {
+        modeInfo = 'Write'
+    }
+    const bottomToolbar =
+        <Toolbar>
+            <div>Mode: {modeInfo}</div>
+            {bottomTools}
+            {bottomActions}
+        </Toolbar>;
+
+    const undoAttr = {
+        onClick: () => {
+            eContext.undoAction()
+        }
+    };
+    if (!eContext.hasPast()) {
+        undoAttr.disabled = 'disabled'
+    }
+    const redoAttr = {
+        onClick: () => {
+            eContext.redoAction();
+        }
+    };
+    if (!eContext.hasFuture()) {
+        redoAttr.disabled = 'disabled'
+    }
+    const gapButtons = resizeable ?
+        <Fragment>
+            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'row-gap'} switch={(enabled) => selectMode(enabled, 'row-gap')}>Row Gap</SwitchButton>
+            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'column-gap'} switch={(enabled) => selectMode(enabled, 'column-gap')}>Column Gap</SwitchButton>
+        </Fragment> : '';
+
+    const selectMode = (enabled, type) => {
+        overlay.current.setMode(
+            enabled ? 'select' : 'startPath',
+            enabled ? {type} : undefined
+        );
+    };
+    const posSize =
+        <Fragment>
+            <Dim name="Size:" x={maxWidth} y={maxHeight} readOnly/>
+            <Dim name="Position:" buttons x={posX} setX={setPosX} y={posY} setY={setPosY}
+                 maxX={maxWidth - width} maxY={maxHeight - height} min="0" readOnly/>
+        </Fragment>;
+    const zoomInput =
+        <Int name="Zoom:" readOnly min="1" max={maxZoom} set={setZoom} value={zoom} buttons/>;
+
+    const topToolbar = <Toolbar>
+        <div>
+            <button {...undoAttr}>Undo</button>
+            <button {...redoAttr}>Redo</button>
+        </div>
+        <Stack dir="x">
+            <SwitchButton enabled={mode === 'pick'} switch={(enabled) => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
+            <SwitchButton enabled={false} switch={() => overlay.current.setMode('select', {type: 'rect', all: true})}>All</SwitchButton>
+            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rect'} switch={(enabled) => {selectMode(enabled, 'rect')}}>Rect</SwitchButton>
+            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rows'} switch={(enabled) => {selectMode(enabled, 'rows')}}>Rows</SwitchButton>
+            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'columns'} switch={(enabled) => {selectMode(enabled, 'columns')}}>Columns</SwitchButton>
+            {gapButtons}
+        </Stack>
+        {posSize}
+        {zoomInput}
+        <Int name="Border:" readOnly min="0" max="5" set={setBorder} value={border} buttons />
+        <Checkbox name="Rulers" value={rulers} set={setRulers} />
+        <Stack dir="x">
+            <Int name="Background:" readOnly min="0" max="26" set={context.setBgOpacity} value={context.bgOpacity} buttons />
+            <Color value={context.bgColor} set={(value) => {context.setBgColor(value)}} />
+        </Stack>
+    </Toolbar>;
+
+    return (
+        <Stack dir="y" border full>
+            {topToolbar}
+            <div className="flex items-centered align-center full-v">
+                <RasterViewGrid
+                    auto
+                    shift
+                    resizeable={resizeable}
+                    renderOptions={renderOptions}
+                    setWidth={setWidth}
+                    setHeight={setHeight}
+                    setPosX={setPosX}
+                    setPosY={setPosY}
+                    width={width}
+                    height={height}
+                    posX={posX}
+                    posY={posY}
+                    editorId={props.editorId}
+                    zoom={zoom}
+                    border={border}
+                    rulers={rulers}
+                    cellProvider={props.cellProvider}
+                    overlayRef={overlay}
+                    writeTransparent={writeTransparent}
+                    tracker={props.tracker}
+                    mode="pick"
+                    markerX={markerX}
+                    markerY={markerY}
+                    markerWidth={markerWidth}
+                    markerHeight={markerHeight}
+                    markerType={markerType}
+                    setMarkerX={setMarkerX}
+                    setMarkerY={setMarkerY}
+                    setMarkerWidth={setMarkerWidth}
+                    setMarkerHeight={setMarkerHeight}
+                    setMarkerType={setMarkerType}
+                />
+            </div>
+            {bottomToolbar}
+        </Stack>
+    );
+}
+
+function BitmapEditor(props) {
+
+    const cellProvider = useMemo(() => {
+        return new BitmapCellProvider(4,
+            props.bitmap
+        );
+    }, []);
+
+    const mounted = useMounted();
+    const ready = useReadyCellProvider(cellProvider, mounted);
+
+    const buttons = [];
+    if (props.saveHandler) {
+        buttons.push(
+            <button key="save" onClick={() => {
+                props.saveHandler(cellProvider);
+            }}>Save</button>
+        );
+    }
+    if (props.cancelHandler) {
+        buttons.push(
+            <button key="cancel" onClick={() => {
+                props.cancelHandler();
+            }}>Cancel</button>
+        );
+    }
+    const buttonDiv = buttons.length === 0 ?
+        '' :
+        <div className="padded">
+            {buttons}
+        </div>;
+
+    if (!ready) {
+        return '';
     }
 
     return (
-        <div className="padded full-v">
-            <Stack dir="x" full>
-                <Stack dir="y">
-                    <div><button onClick={() => {overlay.current.setMode('pick')}}>Pick</button></div>
-                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'rect'})}}>Select Rect</button></div>
-                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'rows'})}}>Select Rows</button></div>
-                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'columns'})}}>Select Columns</button></div>
-                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'column-gap'})}}>Select Column-Gap</button></div>
-                    <div><button onClick={() => {overlay.current.setMode('select', {type: 'row-gap'})}}>Select Row-Gap</button></div>
-                    <div><button onClick={() => {eContext.undoAction()}} disabled={!eContext.hasPast()}>Undo</button></div>
-                    <div><button onClick={() => {eContext.redoAction()}} disabled={!eContext.hasFuture()}>Redo</button></div>
+        <EditorCtx>
+            <Stack dir="y" border full>
+                <Stack dir="x" border full>
+                    <div className="">Palette goes here</div>
+                    <div className="flex full-v">
+                        <BasicRasterView
+                            editorId="bitmap"
+                            cellProvider={cellProvider}
+                            defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
+                        />
+                    </div>
                 </Stack>
-
-                <Stack dir="y">
-                    {markerActions}
-                </Stack>
-
-                <div>
-                    PosX: <Int min={0} max={props.cellProvider.getWidth() - width} value={posX} set={setPosX} buttons />
-                    PosY: <Int min={0} max={props.cellProvider.getHeight() - height} value={posY} set={setPosY} buttons />
-                    Zoom: <Int min={1} max={5} value={zoom} set={setZoom} buttons />
-                    Border: <Int min={0} max={5} value={border} set={setBorder} buttons />
-                    <Checkbox
-                        name="Render Events"
-                        value={renderOptions.events}
-                        set={
-                            () => {
-                                const options = {...renderOptions};
-                                options.events = !options.events;
-                                setRenderOptions(options)
-                            }
-                        }
-                    />
-                    <Checkbox name="Rulers" value={rulers} set={setRulers} />
-                    <Checkbox name="Write Opaque" value={writeTransparent} set={setWriteTransparent} />
-                </div>
-
-                <div className="flex items-centered align-center full-v">
-                    <RasterViewGrid
-                        auto
-                        shift
-                        renderOptions={renderOptions}
-                        setWidth={setWidth}
-                        setHeight={setHeight}
-                        setPosX={setPosX}
-                        setPosY={setPosY}
-                        width={width}
-                        height={height}
-                        posX={posX}
-                        posY={posY}
-                        editorId={props.editorId}
-                        zoom={zoom}
-                        border={border}
-                        rulers={rulers}
-                        cellProvider={props.cellProvider}
-                        overlayRef={overlay}
-                        writeTransparent={writeTransparent}
-                        mode="pick"
-                        markerX={markerX}
-                        markerY={markerY}
-                        markerWidth={markerWidth}
-                        markerHeight={markerHeight}
-                        markerType={markerType}
-                        setMarkerX={setMarkerX}
-                        setMarkerY={setMarkerY}
-                        setMarkerWidth={setMarkerWidth}
-                        setMarkerHeight={setMarkerHeight}
-                        setMarkerType={setMarkerType}
-                    />
-                </div>
+                {buttonDiv}
             </Stack>
-        </div>
-    );
+        </EditorCtx>
+    )
 }
 
 export {
@@ -4686,5 +4996,6 @@ export {
     EditorContext,
     EditorCtx,
     BasicRasterView,
+    CellProviderRaster,
     BaseCellProviderIndexRaster
 }

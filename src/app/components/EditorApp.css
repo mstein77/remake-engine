@@ -517,3 +517,8 @@ input[type=range][orient=vertical] {
     background-color: transparent;
     z-index: 999999;
 }
+
+.min-content {
+    width: min-content;
+    height: min-content;
+}

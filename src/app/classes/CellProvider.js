@@ -312,6 +312,14 @@ class CellProvider {
         return rowSlices;
     }
 
+    getCellValue(posX, posY, raw = false) {
+        const rect = this.getRect(posX, posY, 1, 1, raw);
+        if (Array.isArray(rect) && rect.length > 0) {
+            return rect[0][0];
+        }
+        return null;
+    }
+
     importSelection(selection, raw = false) {
         this.map = [];
         const iMax = selection.getHeight();
@@ -344,8 +352,6 @@ class TilesMapCellProvider extends CellProvider {
         this.cellsPerLine = null;
         this.cache = {};
         this.cacheZoom = 0;
-        this.cache2 = {};
-        this.cacheZoom2 = 0;
         this.tiles = tiles;
         this.animations = animations;
         this.map = map;
@@ -366,6 +372,10 @@ class TilesMapCellProvider extends CellProvider {
                 callback();
             }
         );
+    }
+
+    getImageContext() {
+        return this.imgContext;
     }
 
     getCellType() {
@@ -456,67 +466,18 @@ class TilesMapCellProvider extends CellProvider {
     setBitmapForValue(value, imageData) {
         const index = this.getIndexForValue(value);
         const pos = this.getPositionOfIndex(index);
-        this.imgContext.putImageData(imageData, pos.x, pos.y);
+        this.getImageContext().putImageData(imageData, pos.x, pos.y);
         this.cache = {};
     }
 
     getImageDataForValue(value) {
         const index = this.getIndexForValue(value);
         const pos = this.getPositionOfIndex(index);
-        return this.imgContext.getImageData(pos.x, pos.y, this.size, this.size);
-    }
-
-    getBitmapForValue2(value, zoom, writeCache = true, bgColor = null) {
-        if (!this.imgContext) {
-            return null;
-        }
-
-        if (writeCache && zoom !== this.cacheZoom2) {
-            this.cacheZoom2 = zoom;
-            this.cache2 = {};
-        }
-
-        value = this.getTileForValue(value);
-        if (this.cache2[value] !== undefined) {
-            if (writeCache || this.cacheZoom2 === zoom) {
-                return this.cache2[value];
-            }
-        }
-
-        const index = this.getIndexForTile(value);
-        const start = this.getPositionOfIndex(index);
-        const img = this.imgContext.getImageData(start.x, start.y, this.size, this.size);
-        const target = this.imgContext.createImageData(img.width * zoom, img.height * zoom);
-        let targetPos = 0;
-        let sourceStart = 0;
-        for(let y = 0; y < img.height; y++) {
-
-            for (let w = 0; w < zoom; w++) {
-                let sourcePos = sourceStart;
-                let pos = targetPos;
-                for(let x = 0; x < img.width; x++) {
-                    for (let z = 0; z < zoom; z++) {
-                        target.data[pos] = img.data[sourcePos];
-                        target.data[pos + 1] = img.data[sourcePos + 1];
-                        target.data[pos + 2] = img.data[sourcePos + 2];
-                        target.data[pos + 3] = img.data[sourcePos + 3];
-                        pos += 4;
-                    }
-                    sourcePos += 4;
-                }
-                targetPos += target.width << 2;
-            }
-            sourceStart += img.width << 2;
-        }
-
-        if (writeCache) {
-            this.cache2[value] = target;
-        }
-        return target;
+        return this.getImageContext().getImageData(pos.x, pos.y, this.size, this.size);
     }
 
     getBitmapForValue(value, zoom, writeCache = true, bgColor = null) {
-        if (!this.imgContext) {
+        if (!this.getImageContext()) {
             return null;
         }
 
@@ -534,8 +495,8 @@ class TilesMapCellProvider extends CellProvider {
 
         const index = this.getIndexForTile(value);
         const start = this.getPositionOfIndex(index);
-        const img = this.imgContext.getImageData(start.x, start.y, this.size, this.size);
-        const target = this.imgContext.createImageData(img.width * zoom, img.height * zoom);
+        const img = this.getImageContext().getImageData(start.x, start.y, this.size, this.size);
+        const target = this.getImageContext().createImageData(img.width * zoom, img.height * zoom);
         let targetPos = 0;
         let sourceStart = 0;
         for(let y = 0; y < img.height; y++) {
@@ -577,6 +538,28 @@ class TilesMapCellProvider extends CellProvider {
             this.cache[value] = canvas;
         }
         return canvas;
+    }
+}
+
+class MapSelectionCellProvider extends TilesMapCellProvider {
+    constructor(provider, selection) {
+        // TODO improve handling
+        super(provider.size, 'foo', provider.tiles, provider.animations, selection.getCells());
+        this.provider = provider;
+        this.load(() => {});
+    }
+
+    getImageContext() {
+        return this.provider.getImageContext();
+    }
+
+    load(callback) {
+        this.provider.load(() => {
+            this.data = null;
+            this.cellsPerLine = this.provider.cellsPerLine;
+            this.maxIndex = this.provider.maxIndex;
+            callback();
+        });
     }
 }
 
@@ -822,5 +805,6 @@ export {
     CellSelection,
     TilesCellProvider,
     BitmapCellProvider,
-    TilesMapCellProvider
+    TilesMapCellProvider,
+    MapSelectionCellProvider
 };
