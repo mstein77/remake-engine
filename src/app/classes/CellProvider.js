@@ -35,6 +35,13 @@ class CellSelection {
         return this.cells;
     }
 
+    getCell(x = 0, y = 0) {
+        if (x < 0 || x >= this.getWidth() || y < 0 || y >= this.getHeight()) {
+            return null;
+        }
+        return this.cells[y][x];
+    }
+
     getType() {
         return this.type;
     }
@@ -563,6 +570,12 @@ class MapSelectionCellProvider extends TilesMapCellProvider {
     }
 }
 
+class MapValueCellProvider extends MapSelectionCellProvider {
+    constructor(provider, value) {
+        super(provider, new CellSelection('rect', [[value]]))
+    }
+}
+
 class BitmapCellProvider extends CellProvider {
 
     constructor(size, data) {
@@ -806,5 +819,6 @@ export {
     TilesCellProvider,
     BitmapCellProvider,
     TilesMapCellProvider,
-    MapSelectionCellProvider
+    MapSelectionCellProvider,
+    MapValueCellProvider
 };

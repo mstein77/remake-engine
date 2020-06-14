@@ -1,34 +1,22 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+
+import {d, Stack, SwitchButton, Checkbox, Section, Tabs, Tab, Int, Modal, closeModals} from './BaseComponents';
+import {EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster, useMountedReadyCellProvider, BitmapEditor, useEditorContextPart} from './Raster';
+import {CellSelection, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider, MapValueCellProvider} from '../classes/CellProvider.js';
 import ReactDOM from "react-dom";
 
-import {d, useMounted, CssContext, Modal, Stack, SwitchButton, Checkbox, Section, Tabs, Tab, Int, closeModals} from './BaseComponents';
-import {Raster, EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster} from './Raster';
-import {CellSelection, BitmapCellProvider, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider} from '../classes/CellProvider.js';
-
-
 function TileTracker(props) {
-    const context = useContext(CssContext);
-    const mounted = useMounted();
+    const eContext = useEditorContextPart(props.editorId);
     const [trackX, setTrackX] = useState(null);
     const [trackY, setTrackY] = useState(null);
 
     const style = {
         width: 180
     };
-    props.trackerRef.current = (x, y) => {
-        if (mounted.current) {
-            setTrackX(x);
-            setTrackY(y);
-        }
-    };
-/*
-    useEffect(() => {
-        return () => {
-            props.trackerRef.current = null;
-        }
+    eContext.setTracker(props.editorId, (x, y) => {
+        setTrackX(x);
+        setTrackY(y);
     });
-
- */
 
     if (trackX === null || !props.cellProvider.hasData()) {
         return <div style={style}></div>;
@@ -43,7 +31,7 @@ function TileTracker(props) {
                 <div className="boxed min-content">
                     <CellProviderRaster
                         cellProvider={selectionProvider}
-                        editorId="hover"
+                        editorId="hovered"
                         zoom={4}
                         posX={0}
                         posY={0}
@@ -61,10 +49,7 @@ function TileTracker(props) {
 }
 
 function ActiveTile(props) {
-
     const eContext = useContext(EditorContext);
-    const [refresh, setRefresh] = useState(0);
-
     const selection = eContext.selection;
     const style = {width: 180};
     const width = selection ? selection.getWidth() : 1;
@@ -80,23 +65,54 @@ function ActiveTile(props) {
     }
     const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
 
-    const editTile = () => {};
+    const editTile = () => {
+        const index = selection.getCell();
+        const save = (provider) => {
+            const doImage = provider.getImageData();
+            const actionIndex = props.cellProvider.getIndexForValue(index);
+            const undoImage = props.cellProvider.getImageDataForValue(actionIndex);
+            eContext.doAction(() => {
+                props.cellProvider.setBitmapForValue(actionIndex, doImage);
+                props.indexProvider.setBitmapForValue(actionIndex, doImage);
+                eContext.updateRaster();
+            }, () => {
+                props.cellProvider.setBitmapForValue(actionIndex, undoImage);
+                props.indexProvider.setBitmapForValue(actionIndex, undoImage);
+                eContext.updateRaster();
+            });
+            closeModals();
+        };
+        ReactDOM.render(
+            <Modal name="Edit" closeable>
+                <div style={{height: 600}}>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={() => {closeModals()}}
+                        saveHandler={save}
+                        bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
+                </div>
+            </Modal>,
+            document.getElementById('modals-container')
+        );
+    };
     return (
         <div style={style}>
             <div>Type: {type}</div>
             <div className="stack-h centered padded">
                 <div className="boxed min-content">
-                <CellProviderRaster
-                    cellProvider={selectionProvider}
-                    editorId="active"
-                    zoom={4}
-                    posX={0}
-                    posY={0}
-                    width={selection.getWidth()}
-                    height={selection.getHeight()}
-                    border={0}
-                    renderOptions={{events: false, caching: false}}
-                />
+                    <CellProviderRaster
+                        cellProvider={selectionProvider}
+                        editorId="active"
+                        zoom={4}
+                        posX={0}
+                        posY={0}
+                        width={selection.getWidth()}
+                        height={selection.getHeight()}
+                        border={0}
+                        renderOptions={{events: false, caching: false}}
+                    />
                 </div>
             </div>
             <button disabled={width !== 1 || height !== 1} onClick={editTile}>Edit</button>
@@ -108,36 +124,23 @@ function ActiveTile(props) {
 }
 
 function ActiveAliasSelection(props) {
-    const [isReady, setIsReady] = useState(false);
-    const context = useContext(CssContext);
-    const mounted = useRef(false);
+    const eContext = useContext(EditorContext);
+    const ready = useMountedReadyCellProvider(props.cellProvider);
     const aliases = props.cellProvider.getAliases();
     const selection = [];
-    useEffect(() => {
-        mounted.current = true;
-        return () => {
-            mounted.current = false
-        }
-    }, []);
 
-    if (!isReady) {
-        props.cellProvider.load(() => {
-            if (mounted.current) {
-                setIsReady(true);
-            }
-        });
+    if (!ready) {
         return '';
     }
 
-    const bgColor = context.bgColor + (Math.min(context.bgOpacity * 10, 255)).toString(16).padStart(2, '0');
-
     const setActive = (name) => {
-        props.raster.current.setSelection(new CellSelection('rect', [[name]]));
+        eContext.setSelection(new CellSelection('rect', [[name]]));
+        eContext.setRasterMode('map', 'startPath');
     };
 
     for (let alias of aliases) {
         const index = props.cellProvider.getIndexForTile(alias);
-        let imgData = props.cellProvider.getBitmapForValue(index, 2, false, bgColor).toDataURL('image/png');
+        const selectionProvider = new MapValueCellProvider(props.cellProvider, index);
         selection.push(
             <div key={alias} className="thin-boxed" onClick={(e) => {
                 setActive(alias);
@@ -145,8 +148,17 @@ function ActiveAliasSelection(props) {
                 e.stopPropagation();
             }}>
                 <Stack dir="x">
-                    <div className="padded checkboard-bg">
-                        <img className="thin-boxed" src={imgData} />
+                    <div className="padded">
+                        <CellProviderRaster
+                            cellProvider={selectionProvider}
+                            zoom={2}
+                            posX={0}
+                            posY={0}
+                            width={1}
+                            height={1}
+                            border={1}
+                            renderOptions={{events: false, caching: false}}
+                        />
                     </div>
                     <div className="padded"><kbd>{alias}</kbd><br />Index: <kbd>{index}</kbd></div>
                 </Stack>
@@ -160,6 +172,8 @@ function ActiveAliasSelection(props) {
     );
 }
 
+
+// TODO as Hook!
 class ActiveTileSelection extends React.Component {
 
     constructor(props) {
@@ -176,7 +190,6 @@ class ActiveTileSelection extends React.Component {
     setRulers(rulers) {
         this.setState({rulers});
         this.tilesRef.current.setState({rulers});
-        this.tilesRef.current.redrawCanvas();
     }
 
     componentDidMount() {
@@ -190,13 +203,6 @@ class ActiveTileSelection extends React.Component {
 
     componentWillUnmount() {
         this._isMounted = false;
-    }
-
-    setBitmapForTile(index, bitmap) {
-        if (this.tilesRef.current) {
-            this.props.cellProvider.setBitmapForValue(index, bitmap);
-            this.tilesRef.current.redrawCanvas();
-        }
     }
 
     render() {
@@ -239,58 +245,7 @@ class ActiveTileSelection extends React.Component {
 }
 ActiveTileSelection._isMounted = false;
 
-function BitmapEditor(props) {
-
-    const cellProvider = useMemo(() => {
-        return new BitmapCellProvider(4,
-            props.bitmap
-        );
-    }, []);
-
-    const buttons = [];
-    if (props.saveHandler) {
-        buttons.push(
-            <button key="save" onClick={() => {
-                props.saveHandler(cellProvider);
-            }}>Save</button>
-        );
-    }
-    if (props.cancelHandler) {
-        buttons.push(
-            <button key="cancel" onClick={() => {
-                props.cancelHandler();
-            }}>Cancel</button>
-        );
-    }
-    const buttonDiv = buttons.length === 0 ?
-        '' :
-        <div className="padded">
-            {buttons}
-        </div>;
-
-    const zoom = props.zoom ? parseInt(props.zoom, 10) : 1;
-    const border = props.border ? parseInt(props.border, 10) : 0;
-    const resize = props.resize !== undefined ? props.resize : true;
-
-    return (
-        <Stack dir="y" border full>
-            <Stack dir="x" border full>
-                <div className="">Palette goes here</div>
-                <div className="flex full-v">
-                    <Raster markerMode="pick" shift resize={resize} maxZoom={9} border={border} zoom={zoom} cellProvider={cellProvider} />
-                </div>
-            </Stack>
-            {buttonDiv}
-        </Stack>
-    )
-}
-
 function TilesMapEditor(props) {
-
-    const [selection, setSelection] = useState(null);
-    const [trackX, setTrackX] = useState(null);
-    const [trackY, setTrackY] = useState(null);
-    const rasterRef = useRef(null);
 
     const tilesImage = useMemo(() => {
         return props.tilesMap.tilesImg.elem.toDataURL('image/png');
@@ -318,15 +273,15 @@ function TilesMapEditor(props) {
     }, []);
 
     const trackerRef = useRef(null);
-//
-    // <Raster ref={rasterRef} shift markerMode="pick" selector={selector} tracker={tracker} maxZoom={9} border={0} zoom={1} cellProvider={cellProvider} />
     return (
         <Stack dir="y" full>
-            <EditorCtx>
+            <EditorCtx tracking={{
+                map: ['active', 'hover']
+            }}>
                 <Stack dir="x" full>
                     <Section name="Selected" collapse="h">
                         <div className="padded">
-                            <ActiveTile selection={selection} cellProvider={cellProvider} />
+                            <ActiveTile cellProvider={cellProvider} indexProvider={indexProvider} />
                         </div>
                     </Section>
 
@@ -336,7 +291,7 @@ function TilesMapEditor(props) {
 
                     <Section name="Cursor" collapse="h">
                         <div className="padded">
-                            <TileTracker trackerRef={trackerRef} x={trackX} y={trackY} cellProvider={cellProvider} />
+                            <TileTracker editorId="hover" cellProvider={cellProvider} />
                         </div>
                     </Section>
                 </Stack>
@@ -344,10 +299,10 @@ function TilesMapEditor(props) {
                 <Section name="Elements" collapse="v" raw>
                     <Tabs height={280} reverse active={0}>
                         <Tab name="Tiles">
-                            <ActiveTileSelection mapProvider={cellProvider} raster={rasterRef} cellProvider={indexProvider} />
+                            <ActiveTileSelection mapProvider={cellProvider} cellProvider={indexProvider} />
                         </Tab>
                         <Tab name="Aliases">
-                            <ActiveAliasSelection raster={rasterRef} indexProvider={indexProvider} cellProvider={cellProvider} />
+                            <ActiveAliasSelection indexProvider={indexProvider} cellProvider={cellProvider} />
                         </Tab>
                         <Tab name="Brushes">
                             Brush selection here...
