@@ -172,78 +172,41 @@ function ActiveAliasSelection(props) {
     );
 }
 
-
-// TODO as Hook!
-class ActiveTileSelection extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.state = {
-            ready: false,
-            rulers: true,
-            zoom: props.zoom || 2
-        };
-        this.tilesRef = React.createRef();
-        this.setRulers = this.setRulers.bind(this);
+function ActiveTileSelection(props) {
+    const [rulers, setRulers] = useState(true);
+    const [zoom, setZoom] = useState(props.zoom || 1);
+    const ready = useMountedReadyCellProvider(props.cellProvider);
+    if (!ready) {
+        return '';
     }
-
-    setRulers(rulers) {
-        this.setState({rulers});
-        this.tilesRef.current.setState({rulers});
-    }
-
-    componentDidMount() {
-        this._isMounted = true;
-        this.props.cellProvider.load(() => {
-            if (this._isMounted) {
-                this.setState({ready: true});
-            }
-        });
-    }
-
-    componentWillUnmount() {
-        this._isMounted = false;
-    }
-
-    render() {
-        if (!this.state.ready) return <div></div>;
-
-        const setZoom = (zoom) => {
-            this.setState({zoom});
-            this.tilesRef.current.setState({zoom});
-            this.tilesRef.current.updateDims({});
-        };
-
-        return (
-            <Stack dir="x" full border>
+    return (
+        <Stack dir="x" full border>
+            <div className="padded">
+                <div>Tiles: {props.cellProvider.getMaxIndex()}</div>
+                <div><Int min={1} max={4} value={zoom} set={setZoom} buttons /></div>
+                <div><Checkbox value={rulers} set={setRulers} name="Rulers" /></div>
+                <div><button>Import</button></div>
+                <div><button>Export</button></div>
+            </div>
+            <div className="flex">
+                <BaseCellProviderIndexRaster
+                    auto width={10} height={5} mapProvider={props.mapProvider} cellProvider={props.cellProvider} editorId="tiles"
+                />
+            </div>
+            <div className="padded">
                 <div className="padded">
-                    <div>Tiles: {this.props.cellProvider.getMaxIndex()}</div>
-                    <div><Int min={1} max={4} value={this.state.zoom} set={setZoom} buttons /></div>
-                    <div><Checkbox value={this.state.rulers} set={this.setRulers} name="Rulers" /></div>
-                    <div><button>Import</button></div>
-                    <div><button>Export</button></div>
-                </div>
-                <div className="flex">
-                    <BaseCellProviderIndexRaster
-                        auto width={10} height={5} mapProvider={this.props.mapProvider} cellProvider={this.props.cellProvider} editorId="tiles"
-                    />
+                    <SwitchButton enabled={true}>All</SwitchButton>
                 </div>
                 <div className="padded">
-                    <div className="padded">
-                        <SwitchButton enabled={true}>All</SwitchButton>
-                    </div>
-                    <div className="padded">
-                        <SwitchButton enabled={false}>Most used</SwitchButton>
-                    </div>
-                    <div className="padded">
-                        <SwitchButton enabled={false}>Last used</SwitchButton>
-                    </div>
+                    <SwitchButton enabled={false}>Most used</SwitchButton>
                 </div>
-            </Stack>
-        );
-    }
+                <div className="padded">
+                    <SwitchButton enabled={false}>Last used</SwitchButton>
+                </div>
+            </div>
+        </Stack>
+    );
 }
-ActiveTileSelection._isMounted = false;
 
 function TilesMapEditor(props) {
 
