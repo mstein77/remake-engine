@@ -1,9 +1,83 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import ReactDOM from 'react-dom';
 
 const CssContext = React.createContext();
 
+function d(main, ...params) {
+    let stack = null;
+    try {
+        throw new Error('myError');
+    }
+    catch(e) {
+        stack = e.stack.split('\n');
+    }
+    const func = [];
+    let no = 0;
+    for (let line of stack) {
+        const pos = no;
+        no++;
+        if (pos <= 1) {
+            continue;
+        } else if (pos === 2) {
+            func.push(line.trim());
+            continue;
+        } else if (pos > 6) {
+            break;
+        }
+        line = line.split('(');
+        func.push(line[0].substr(6).trim());
+    }
+    console.group('Debug ' + func.join(' <- '));
+    console.log(main, ...params);
+    console.groupEnd();
+    return main;
+}
+
+function useWindowEventManager() {
+
+    const listenerRef = useRef([]);
+
+    const removeListener = (event, listener, options) => {
+        console.log('REMOVE LISTENER', event);
+        const remainingListeners = [];
+        for (let item of listenerRef.current) {
+            let match = false;
+            if (item.event === event) {
+                match = JSON.stringify(options) === JSON.stringify(item.options);
+            }
+            if (match) {
+                window.removeEventListener(event, listener, options);
+            } else {
+                remainingListeners.push(item);
+            }
+        }
+        listenerRef.current = remainingListeners;
+    };
+
+    const addListener = (event, listener, options) => {
+        console.log('ADD LISTENER', event);
+        removeListener(event, listener, options);
+        window.addEventListener(event, listener, options);
+        listenerRef.current.push({event, listener, options});
+    };
+
+    const clearListeners = () => {
+        console.log('CLEAR LISTENERS');
+        while(listenerRef.current.length > 0) {
+            const item = listenerRef.current.pop();
+            window.removeEventListener(item.event, item.listener, item.options);
+        }
+    };
+
+    return {
+        addListener,
+        removeListener,
+        clearListeners
+    };
+}
+
 function getWindowEventManager() {
+
     let windowListeners = [];
 
     const removeListener = (event, listener, options) => {
@@ -41,7 +115,6 @@ function getWindowEventManager() {
         clearListeners
     };
 }
-
 
 class FitCanvas extends React.Component {
 
@@ -119,7 +192,7 @@ class FitCanvas extends React.Component {
 }
 
 function Scrollbar(props) {
-
+    const [active, setActive] = useState(false);
     const divRef = useRef(null);
     const windowEvents = getWindowEventManager();
 
@@ -168,7 +241,7 @@ function Scrollbar(props) {
             const relPos = getOffset(e[client]);
             if (relPos !== lastPos) {
                 lastPos = relPos;
-                props.set(props.set(props.pos + relPos));
+                props.set(props.pos + relPos);
             }
             e.stopPropagation();
             e.preventDefault();
@@ -177,10 +250,12 @@ function Scrollbar(props) {
 
         windowEvents.addListener('mouseup', (e) => {
             windowEvents.removeListener('mousemove', trackMouse, false);
+            setActive(false);
             e.stopPropagation();
             e.preventDefault();
         }, {capture: false, once: true});
 
+        setActive(true);
         e.preventDefault();
         e.stopPropagation();
     };
@@ -190,6 +265,7 @@ function Scrollbar(props) {
         const pixelSteps = rect[axisKey] / props.max;
         const pageSize = Math.round(props.page * pixelSteps / 2);
         const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), props.max));
+
         props.set(offPos);
         e.preventDefault();
         e.stopPropagation();
@@ -199,7 +275,7 @@ function Scrollbar(props) {
     if (props.size) {
         dim[axisKey] = props.size;
     } else {
-        cls.push('full-' + dirKey);
+        dim[axisKey] = 'calc(100% - 6px)';
     }
 
     const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
@@ -215,6 +291,7 @@ function Scrollbar(props) {
                 <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
                 <div onMouseDown={setMouseDown} style={dimMax}></div>
             </div>
+            <MouseOverlay active={active} cursor={dirKey + 'resize'} />
         </div>
     );
 }
@@ -680,6 +757,16 @@ function Modal(props) {
     return modal;
 }
 
+function MouseOverlay(props) {
+    if (!props.active) {
+        return '';
+    }
+    const cls = ['cursor-' + props.cursor + ' fix-overlay'];
+    return (
+        <div className={cls.join(' ')}></div>
+    );
+}
+
 function Themed(props) {
 
     const [bgColor, setBgColor] = useState('#666677');
@@ -693,6 +780,7 @@ function Themed(props) {
     const css = {
         contentTextColor: style.getPropertyValue('--content-text-color'),
         defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
+        markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
         bgColor,
         setBgColor,
         bgOpacity,
@@ -704,6 +792,24 @@ function Themed(props) {
             {props.children}
         </CssContext.Provider>
     );
+}
+
+function upperFirst(value) {
+    if (!value) {
+        return value;
+    }
+    return value[0].toUpperCase() + value.slice(1);
+}
+
+function useMounted() {
+    const mounted = useRef(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        }
+    });
+    return mounted;
 }
 
 export {
@@ -724,6 +830,11 @@ export {
     Color,
     SwitchButton,
     CssContext,
+    useWindowEventManager,
     getWindowEventManager,
-    Themed
+    MouseOverlay,
+    Themed,
+    upperFirst,
+    useMounted,
+    d
 }

@@ -31,6 +31,17 @@ class CellSelection {
         return result;
     }
 
+    getCells() {
+        return this.cells;
+    }
+
+    getCell(x = 0, y = 0) {
+        if (x < 0 || x >= this.getWidth() || y < 0 || y >= this.getHeight()) {
+            return null;
+        }
+        return this.cells[y][x];
+    }
+
     getType() {
         return this.type;
     }
@@ -45,6 +56,23 @@ class CellSelection {
 
     isColumns() {
         return this.type === 'columns';
+    }
+
+    getMatchMatrix(value, offset = null, length = null) {
+        const rows = [];
+        const xMin = !this.isRows() || offset === null ? 0 : offset;
+        const xMax = this.isRows() && length !== null ? xMin + length : this.cells[0].length;
+        const yMin = !this.isColumns() || offset === null ? 0 : offset;
+        const yMax = this.isColumns() && length !== null ? yMin + length : this.cells.length;
+
+        for (let y = yMin; y < yMax; y++) {
+            const row = [];
+            for (let x = xMin; x < xMax; x++) {
+                row.push(this.cells[y][x] === value);
+            }
+            rows.push(row);
+        }
+        return rows;
     }
 }
 
@@ -68,6 +96,10 @@ class CellProvider {
 
     getEmptyCell() {
         throw Error('Implement');
+    }
+
+    getEmptySelection() {
+        return new CellSelection('rect', [[this.getEmptyCell()]]);
     }
 
     overwriteCell(x, y, value) {
@@ -287,6 +319,14 @@ class CellProvider {
         return rowSlices;
     }
 
+    getCellValue(posX, posY, raw = false) {
+        const rect = this.getRect(posX, posY, 1, 1, raw);
+        if (Array.isArray(rect) && rect.length > 0) {
+            return rect[0][0];
+        }
+        return null;
+    }
+
     importSelection(selection, raw = false) {
         this.map = [];
         const iMax = selection.getHeight();
@@ -339,6 +379,10 @@ class TilesMapCellProvider extends CellProvider {
                 callback();
             }
         );
+    }
+
+    getImageContext() {
+        return this.imgContext;
     }
 
     getCellType() {
@@ -429,18 +473,18 @@ class TilesMapCellProvider extends CellProvider {
     setBitmapForValue(value, imageData) {
         const index = this.getIndexForValue(value);
         const pos = this.getPositionOfIndex(index);
-        this.imgContext.putImageData(imageData, pos.x, pos.y);
+        this.getImageContext().putImageData(imageData, pos.x, pos.y);
         this.cache = {};
     }
 
     getImageDataForValue(value) {
         const index = this.getIndexForValue(value);
         const pos = this.getPositionOfIndex(index);
-        return this.imgContext.getImageData(pos.x, pos.y, this.size, this.size);
+        return this.getImageContext().getImageData(pos.x, pos.y, this.size, this.size);
     }
 
     getBitmapForValue(value, zoom, writeCache = true, bgColor = null) {
-        if (!this.imgContext) {
+        if (!this.getImageContext()) {
             return null;
         }
 
@@ -458,8 +502,8 @@ class TilesMapCellProvider extends CellProvider {
 
         const index = this.getIndexForTile(value);
         const start = this.getPositionOfIndex(index);
-        const img = this.imgContext.getImageData(start.x, start.y, this.size, this.size);
-        const target = this.imgContext.createImageData(img.width * zoom, img.height * zoom);
+        const img = this.getImageContext().getImageData(start.x, start.y, this.size, this.size);
+        const target = this.getImageContext().createImageData(img.width * zoom, img.height * zoom);
         let targetPos = 0;
         let sourceStart = 0;
         for(let y = 0; y < img.height; y++) {
@@ -501,6 +545,34 @@ class TilesMapCellProvider extends CellProvider {
             this.cache[value] = canvas;
         }
         return canvas;
+    }
+}
+
+class MapSelectionCellProvider extends TilesMapCellProvider {
+    constructor(provider, selection) {
+        // TODO improve handling
+        super(provider.size, 'foo', provider.tiles, provider.animations, selection.getCells());
+        this.provider = provider;
+        this.load(() => {});
+    }
+
+    getImageContext() {
+        return this.provider.getImageContext();
+    }
+
+    load(callback) {
+        this.provider.load(() => {
+            this.data = null;
+            this.cellsPerLine = this.provider.cellsPerLine;
+            this.maxIndex = this.provider.maxIndex;
+            callback();
+        });
+    }
+}
+
+class MapValueCellProvider extends MapSelectionCellProvider {
+    constructor(provider, value) {
+        super(provider, new CellSelection('rect', [[value]]))
     }
 }
 
@@ -746,5 +818,7 @@ export {
     CellSelection,
     TilesCellProvider,
     BitmapCellProvider,
-    TilesMapCellProvider
+    TilesMapCellProvider,
+    MapSelectionCellProvider,
+    MapValueCellProvider
 };

@@ -106,7 +106,19 @@ body {
 }
 
 .padded {
-    padding: var(--default-padding);
+    padding-left: var(--default-padding);
+    padding-right: var(--default-padding);
+}
+
+.padded:not(.full-v) {
+    padding-top: var(--default-padding);
+    padding-bottom: var(--default-padding);
+}
+
+.padded.full-v {
+    height: calc(100% - 2 * var(--default-padding)) !important;
+    margin-top: var(--default-padding);
+    margin-bottom: var(--default-padding);
 }
 
 .inner-border-v > div:not(:first-child) {
@@ -298,6 +310,12 @@ body {
     padding: 0;
 }
 
+.rel-canvas div:first-child {
+    position: relative;
+    left: 0px;
+    right: 0px;
+}
+
 .rel-canvas canvas {
     position: relative;
     left: 0px;
@@ -306,8 +324,8 @@ body {
 
 .grid-3x3 {
     display: grid;
-    grid-template-columns: 20px auto min-content;
-    grid-template-rows: 20px auto min-content;
+    grid-template-columns: min-content auto min-content;
+    grid-template-rows: min-content auto min-content;
 }
 
 .grid-2x2 {
@@ -366,7 +384,14 @@ input[type=range][orient=vertical] {
     position: absolute;
     top: 0;
     left: 0;
-    overflow: hidden;
+}
+
+.no-events {
+    pointer-events: none;
+}
+
+.all-events {
+    pointer-events: all;
 }
 
 .cursor {
@@ -396,7 +421,11 @@ input[type=range][orient=vertical] {
 .checkboard-bg > img {
     background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3ggRDQENU0dyawAAACZJREFUGNNjPHXqDAMSMDY2ROYyMeAFNJVm/Pv3LzL/7Nnzg8VpAKebCGpIIxHBAAAAAElFTkSuQmCC');
     background-repeat: repeat;
+}
 
+.checkbg {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3ggRDQENU0dyawAAACZJREFUGNNjPHXqDAMSMDY2ROYyMeAFNJVm/Pv3LzL/7Nnzg8VpAKebCGpIIxHBAAAAAElFTkSuQmCC');
+    background-repeat: repeat;
 }
 
 @-webkit-keyframes blinker {
@@ -431,6 +460,10 @@ input[type=range][orient=vertical] {
     width: min-content;
     display: inline-block;
     overflow: auto;
+}
+
+.cursor-pointer {
+    cursor: pointer;
 }
 
 .cursor-move {
@@ -473,4 +506,19 @@ input[type=range][orient=vertical] {
 .head {
     border-top: 1px dashed #E0E0E0;
     color: #E0E0E0;
+}
+
+.fix-overlay {
+    top: 0;
+    left: 0;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    z-index: 999999;
+}
+
+.min-content {
+    width: min-content;
+    height: min-content;
 }

@@ -505,7 +505,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             };
 
             globals.statusPane = statusPane;
-            this.gotoScreen('demo');
+            this.gotoScreen(
+                //'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
+                'demo'
+            );
         }
     });
     this.addScreen(bootstrap);
@@ -4225,6 +4228,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 bgTilesMap.updateFrames();
                 // update animated tiles
                 tilesPane.updateAnimatedTiles();
+
+                // TODO: remove!
+//                this.activeResource = 1;
+//                this.openEditorMode();
 
                 if (inputController.hasInput('back')) {
                     this.gotoScreen('demo');

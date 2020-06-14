@@ -31,7 +31,12 @@ function Page(props) {
 
 function EditorApp(props) {
     const [resources, setResources]  =  useState(props.game.getEditableResources());
-    const [active, setActive] = useState(null);
+    const [active, setActive] = useState(props.active === undefined ? null : props.active);
+
+    // TODO: move to game:init?
+    window.oncontextmenu = (e) => {
+        e.preventDefault();
+    };
 
     const actions = (
         <Fragment>
