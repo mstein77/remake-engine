@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import ReactDOM from 'react-dom';
+import {BitmapSelector} from "./Raster";
 
 const CssContext = React.createContext();
 
@@ -339,9 +340,13 @@ function Stack(props) {
     if (props.wrap) {
         cls.push('wrap');
     }
+    const style = {};
+    if (props.height) {
+        style.height = props.height;
+    }
 
     return (
-        <div className={cls.join(' ')}>
+        <div className={cls.join(' ')} style={style}>
             {props.children}
         </div>
     );
@@ -812,6 +817,13 @@ function useMounted() {
     return mounted;
 }
 
+function openModal(modal) {
+    ReactDOM.render(
+        modal,
+        document.getElementById('modals-container')
+    );
+}
+
 export {
     Modal,
     closeModals,
@@ -836,5 +848,6 @@ export {
     Themed,
     upperFirst,
     useMounted,
+    openModal,
     d
 }

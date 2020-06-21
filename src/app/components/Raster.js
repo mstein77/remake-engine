@@ -12,10 +12,10 @@ import {
     useMounted,
     d,
     Modal,
+    openModal,
     closeModals
 } from "./BaseComponents";
-import {BitmapCellProvider, CellSelection} from "../classes/CellProvider";
-import ReactDOM from "react-dom";
+import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 
 function CellMarker(props) {
     if (props.posX === null || props.posY === null) {
@@ -218,13 +218,15 @@ function CellMarker(props) {
 
 function useReadyCellProvider(cellProvider, mounted) {
     const [ready, setReady] = useState(cellProvider.hasData());
-    if (!ready) {
-        cellProvider.load(() => {
-            if (mounted.current) {
-                setReady(true);
-            }
-        });
-    }
+    useEffect(() => {
+        if (!ready) {
+            cellProvider.load(() => {
+                if (mounted.current) {
+                    setReady(true);
+                }
+            });
+        }
+    }, [ready, mounted.current]);
     return ready;
 }
 
@@ -604,7 +606,7 @@ class EditorCtx extends React.Component {
         this.state = {
 
             // Selection
-            selection: null,
+            selection: new CellSelection(),
             setSelection: (selection) => {
                 this.setState({selection});
             },
@@ -1056,9 +1058,24 @@ const CellProviderRaster = React.memo((props) => {
         cellSize
     };
 
+
+
     if (!renderRef.current) {
         const type = props.cellProvider.getCellType();
         switch (type) {
+
+            case 'pure-bitmap':
+                renderRef.current =
+                    (ctx, x, y, value) => {
+                        const img = props.cellProvider.getBitmapForValue(value, propsRef.current.zoom, propsRef.current.renderOptions.caching);
+
+                        if (img) {
+                            const size = propsRef.current.cellSize;
+                            ctx.clearRect(x, y, size, size);
+                            ctx.drawImage(img, x, y);
+                        }
+                    };
+                break;
 
             case 'bitmap':
                 renderRef.current =
@@ -1372,7 +1389,7 @@ function BaseCellProviderIndexRaster(props) {
                     });
                     closeModals();
                 };
-                ReactDOM.render(
+                openModal(
                     <Modal name="Edit" closeable>
                         <div style={{height: 600}}>
                             <BitmapEditor
@@ -1383,8 +1400,7 @@ function BaseCellProviderIndexRaster(props) {
                                 saveHandler={save}
                                 bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
                         </div>
-                    </Modal>,
-                    document.getElementById('modals-container')
+                    </Modal>
                 );
             }
         });
@@ -1480,10 +1496,6 @@ function RasterOverlays(props) {
     const windowEvent = eContext.getWindowEvents(props.editorId);
     const boundingRectRef = useRef(null);
     const autoScrollRef = useRef({id : null, x: null, y: null, marker: false});
-
-    useEffect(() => {
-        eContext.setSelection(props.cellProvider.getEmptySelection());
-    }, []);
 
     const overlayRef = useRef({
         modes: {},
@@ -1679,6 +1691,13 @@ function RasterOverlays(props) {
     const overlay = overlayRef.current;
     props.overlayRef.current = overlay;
     eContext.setRasterOverlay(props.editorId, overlay);
+    const hasMode = (mode) => {
+        if (!props.modes) {
+            return true;
+        }
+        return props.modes.indexOf(mode) !== -1;
+    };
+
 
     useEffect(() => {
         const autoScroll = autoScrollRef.current;
@@ -1693,8 +1712,20 @@ function RasterOverlays(props) {
         overlay.addMarkerAction = overlay.addMarkerAction.bind(overlay);
         overlay.triggerMarkerAction = overlay.triggerMarkerAction.bind(overlay);
 
+        const selectionDoubleClick = props.modeParams && props.modeParams.doubleClick ? props.modeParams.doubleClick : null;
+
+        hasMode('display') && overlay.addMode(
+            'display',
+            (callback) => {
+                if (callback) {
+                    callback();
+                }
+            },
+            () => {}
+        );
+
         let mouseUpPickAgain = null;
-        overlay.addMode(
+        hasMode('pick') && overlay.addMode(
             'pick',
             (data) => {
                 setCursorType('rect');
@@ -1740,7 +1771,7 @@ function RasterOverlays(props) {
             }
         );
         let matrix = null;
-        overlay.addMode(
+        hasMode('select') && overlay.addMode(
             'select',
             (data) => {
                 const markerType = data.type ? data.type : 'rect';
@@ -1787,7 +1818,7 @@ function RasterOverlays(props) {
                 setCursorMouseTrack(null);
             }
         );
-        overlay.addMode(
+        hasMode('startPath') && overlay.addMode(
             'startPath',
             (data) => {
                 const selection = eCtxRef.current.selection;
@@ -1830,7 +1861,7 @@ function RasterOverlays(props) {
         );
 
         let mouseUpSavePath;
-        overlay.addMode(
+        hasMode('writePath') && overlay.addMode(
             'writePath',
             (data) => {
                 setCursorMatrix(matrix);
@@ -2050,7 +2081,7 @@ function RasterOverlays(props) {
         let mouseMove = null;
         let mouseUp = null;
         let lastMoveClick = Date.now();
-        overlay.addMode(
+        hasMode('markerMove') && overlay.addMode(
             'markerMove',
             (data) => {
                 const props = propsRef.current;
@@ -2160,11 +2191,15 @@ function RasterOverlays(props) {
                 windowEvent.removeListener('mousemove', mouseMove, false);
                 windowEvent.removeListener('mouseup', mouseUp, {capture: false, once: true});
                 eCtxRef.current.setFixCursor(null);
+                if (props.autoSelect) {
+                    d('AUTO SELECT....');
+                    overlay.doMarkerAction('copy', true);
+                }
             }
         );
 
         let lastResizeClick = Date.now();
-        overlay.addMode(
+        hasMode('markerResize') && overlay.addMode(
             'markerResize',
             (data) => {
                 const startX = data.startX;
@@ -2282,6 +2317,10 @@ function RasterOverlays(props) {
                     {capture: false, once: true}
                 );
                 resetAutoScroll();
+                if (props.autoSelect) {
+                    overlay.doMarkerAction('copy', true);
+                }
+
             }
         );
 
@@ -2323,7 +2362,8 @@ function RasterOverlays(props) {
 
         overlay.addMarkerAction(
             'copy',
-            (props) => {
+            (props, copyOnly = false) => {
+
                 const rect = props.cellProvider.getRect(
                     props.markerX,
                     props.markerY,
@@ -2331,7 +2371,9 @@ function RasterOverlays(props) {
                     props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight
                 );
                 eCtxRef.current.setSelection(new CellSelection(props.markerType, rect));
-                overlay.setMode('startPath');
+                if (!copyOnly) {
+                    overlay.setMode(hasMode('startPath') ? 'startPath' : 'display');
+                }
             },
             (props) => {
                 return (props.markerX !== null && !props.markerType.endsWith('gap'));
@@ -2405,7 +2447,7 @@ function RasterOverlays(props) {
         );
 
         if (props.mode) {
-            overlay.setMode(props.mode);
+            overlay.setMode(props.mode, props.modeParams);
         }
 
         overlay.setMarkerAction((props, overlay) => {
@@ -2421,7 +2463,14 @@ function RasterOverlays(props) {
                 case 'rows':
                 case 'columns':
                 case 'rect':
-                    overlay.doMarkerAction('copy');
+                    if (selectionDoubleClick) {
+                        overlay.doMarkerAction('copy', true);
+                        overlay.setMode('display', () => {
+                            selectionDoubleClick(eCtxRef.current.selection);
+                        });
+                    } else {
+                        overlay.doMarkerAction('copy');
+                    }
                     return false;
             }
             return true;
@@ -2493,7 +2542,7 @@ function RasterViewGrid(props) {
 
     const addPage = 10;
     const {
-        auto, mode, writeTransparent,
+        auto, mode, modes, modeParams, writeTransparent,
         setWidth, setHeight, setPosX, setPosY, width, height, posX, posY, zoom, border, rulers,
         setMarkerX, setMarkerY, markerX, markerY, setMarkerType, markerType, overlayRef, markerWidth,
         markerHeight, setMarkerWidth, setMarkerHeight, renderOptions, editorId
@@ -2741,7 +2790,7 @@ function RasterViewGrid(props) {
     };
 
     const getShiftButton = (start, vertical) => {
-        if (!props.shift) {
+        if (!props.shifteable) {
             return '';
         }
         const shiftCallback = vertical ? shiftRow : shiftColumn;
@@ -2815,7 +2864,7 @@ function RasterViewGrid(props) {
         }
         const jumpBtn =  <button {...btnJumpAttr}><i style={jumpStyle} className={materialCls.join(' ')}>{jumpChar}</i></button>;
         const br = vertical ? '' : <br />;
-        const shiftBr = props.shift ? br : '';
+        const shiftBr = props.shifteable ? br : '';
 
         return (
             <div>{
@@ -2917,10 +2966,13 @@ function RasterViewGrid(props) {
                         height={height}
                         posX={posX}
                         posY={posY}
+                        autoSelect={props.autoSelect}
                         tracker={props.tracker}
                         editorId={props.editorId}
                         writeTransparent={writeTransparent}
                         mode={mode}
+                        modes={modes}
+                        modeParams={modeParams}
                         zoom={zoom}
                         border={border}
                         rulers={rulers}
@@ -2994,8 +3046,15 @@ function BasicRasterView(props) {
     const [markerSpaceY, setMarkerSpaceY] = useState(0);
     const [renderOptions, setRenderOptions] = useState({caching: true, events: true});
     const [writeTransparent, setWriteTransparent] = useState(false);
-    const resizeable = props.resizeable === true;
+    const resizeable = props.resizeable === true && !props.selectOnly;
+    const shifteable = !props.selectOnly;
     const [overlay, eContext] = useOverlay(props.editorId);
+    let defaultMode = props.mode ? props.mode : 'pick';
+    let modeParams = undefined;
+    if (props.selectOnly) {
+        defaultMode = 'select';
+        modeParams = props.selectOnly;
+    };
 
     const maxWidth = props.cellProvider.getWidth();
     const maxHeight = props.cellProvider.getHeight();
@@ -3019,39 +3078,41 @@ function BasicRasterView(props) {
         bottomActions.push(
             <button key="goto" onClick={() => {overlay.current.doMarkerAction('goto')}} disabled={!overlay.current.canDoMarkerAction('goto')}>Goto</button>
         );
-        if (!isGap) {
-            bottomActions.push(
-                <button key="clear" onClick={() => {overlay.current.doMarkerAction('clear')}} disabled={!overlay.current.canDoMarkerAction('clear')}>Clear</button>
-            );
-        }
-        if (resizeable && (selectionType === 'rows' || selectionType === 'columns')) {
-            bottomActions.push(
-                <button key="delete" onClick={() => {overlay.current.doMarkerAction('delete')}} disabled={!overlay.current.canDoMarkerAction('delete')}>Delete</button>
-            );
-        }
-        if (!isGap) {
-            bottomActions.push(
-                <button key="copy" onClick={() => {overlay.current.doMarkerAction('copy')}} disabled={!overlay.current.canDoMarkerAction('copy')}>Copy</button>
-            );
-            bottomActions.push(
-                <button key="fill" onClick={() => {overlay.current.doMarkerAction('fill')}} disabled={!overlay.current.canDoMarkerAction('fill')}>Fill</button>
-            );
-            if (resizeable) {
+        if (!props.selectOnly) {
+            if (!isGap) {
                 bottomActions.push(
-                    <button key="crop" onClick={() => {overlay.current.doMarkerAction('crop')}} disabled={!overlay.current.canDoMarkerAction('crop')}>Crop</button>
+                    <button key="clear" onClick={() => {overlay.current.doMarkerAction('clear')}} disabled={!overlay.current.canDoMarkerAction('clear')}>Clear</button>
                 );
             }
-        } else if (resizeable) {
+            if (resizeable && (selectionType === 'rows' || selectionType === 'columns')) {
+                bottomActions.push(
+                    <button key="delete" onClick={() => {overlay.current.doMarkerAction('delete')}} disabled={!overlay.current.canDoMarkerAction('delete')}>Delete</button>
+                );
+            }
+            if (!isGap) {
+                bottomActions.push(
+                    <button key="copy" onClick={() => {overlay.current.doMarkerAction('copy')}} disabled={!overlay.current.canDoMarkerAction('copy')}>Copy</button>
+                );
+                bottomActions.push(
+                    <button key="fill" onClick={() => {overlay.current.doMarkerAction('fill')}} disabled={!overlay.current.canDoMarkerAction('fill')}>Fill</button>
+                );
+                if (resizeable) {
+                    bottomActions.push(
+                        <button key="crop" onClick={() => {overlay.current.doMarkerAction('crop')}} disabled={!overlay.current.canDoMarkerAction('crop')}>Crop</button>
+                    );
+                }
+            } else if (resizeable) {
+                bottomActions.push(
+                    <button key="insert" onClick={() => {overlay.current.doMarkerAction('insert')}} disabled={!overlay.current.canDoMarkerAction('insert')}>+</button>
+                );
+                bottomActions.push(
+                    <button key="insertPage" onClick={() => {overlay.current.doMarkerAction('insert', 10)}} disabled={!overlay.current.canDoMarkerAction('insert')}>++</button>
+                );
+            }
             bottomActions.push(
-                <button key="insert" onClick={() => {overlay.current.doMarkerAction('insert')}} disabled={!overlay.current.canDoMarkerAction('insert')}>+</button>
-            );
-            bottomActions.push(
-                <button key="insertPage" onClick={() => {overlay.current.doMarkerAction('insert', 10)}} disabled={!overlay.current.canDoMarkerAction('insert')}>++</button>
+                <button key="abort" onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>X</button>
             );
         }
-        bottomActions.push(
-            <button key="abort" onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>X</button>
-        );
 
         if (selectionType === 'rect') {
             bottomTools.push(
@@ -3110,34 +3171,57 @@ function BasicRasterView(props) {
             {bottomActions}
         </Toolbar>;
 
-    const undoAttr = {
-        onClick: () => {
-            eContext.undoAction()
+    let undoRedo = '';
+    if (!props.selectOnly) {
+        const undoAttr = {
+            onClick: () => {
+                eContext.undoAction()
+            }
+        };
+        if (!eContext.hasPast()) {
+            undoAttr.disabled = 'disabled'
         }
-    };
-    if (!eContext.hasPast()) {
-        undoAttr.disabled = 'disabled'
-    }
-    const redoAttr = {
-        onClick: () => {
-            eContext.redoAction();
+        const redoAttr = {
+            onClick: () => {
+                eContext.redoAction();
+            }
+        };
+        if (!eContext.hasFuture()) {
+            redoAttr.disabled = 'disabled'
         }
-    };
-    if (!eContext.hasFuture()) {
-        redoAttr.disabled = 'disabled'
+        undoRedo = <div>
+            <button {...undoAttr}>Undo</button>
+            <button {...redoAttr}>Redo</button>
+        </div>;
     }
-    const gapButtons = resizeable ?
-        <Fragment>
-            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'row-gap'} switch={(enabled) => selectMode(enabled, 'row-gap')}>Row Gap</SwitchButton>
-            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'column-gap'} switch={(enabled) => selectMode(enabled, 'column-gap')}>Column Gap</SwitchButton>
-        </Fragment> : '';
 
-    const selectMode = (enabled, type) => {
-        overlay.current.setMode(
-            enabled ? 'select' : 'startPath',
-            enabled ? {type} : undefined
+    let modeSelect = '';
+    if (!props.selectOnly) {
+        const gapButtons = !props.selectOnly && resizeable ?
+            <Fragment>
+                <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'row-gap'} switch={(enabled) => selectMode(enabled, 'row-gap')}>Row Gap</SwitchButton>
+                <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'column-gap'} switch={(enabled) => selectMode(enabled, 'column-gap')}>Column Gap</SwitchButton>
+            </Fragment> : '';
+
+        const selectMode = (enabled, type) => {
+            overlay.current.setMode(
+                enabled ? 'select' : 'startPath',
+                enabled ? {type} : undefined
+            );
+        };
+        modeSelect = (
+            <Stack dir="x">
+                <SwitchButton enabled={mode === 'pick'} switch={(enabled) => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
+                <SwitchButton enabled={false} switch={() => overlay.current.setMode('select', {type: 'rect', all: true})}>All</SwitchButton>
+                <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rect'} switch={(enabled) => {selectMode(enabled, 'rect')}}>Rect</SwitchButton>
+                <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rows'} switch={(enabled) => {selectMode(enabled, 'rows')}}>Rows</SwitchButton>
+                <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'columns'} switch={(enabled) => {selectMode(enabled, 'columns')}}>Columns</SwitchButton>
+                {gapButtons}
+            </Stack>
         );
-    };
+
+    }
+
     const posSize =
         <Fragment>
             <Dim name="Size:" x={maxWidth} y={maxHeight} readOnly/>
@@ -3148,18 +3232,8 @@ function BasicRasterView(props) {
         <Int name="Zoom:" readOnly min="1" max={maxZoom} set={setZoom} value={zoom} buttons/>;
 
     const topToolbar = <Toolbar>
-        <div>
-            <button {...undoAttr}>Undo</button>
-            <button {...redoAttr}>Redo</button>
-        </div>
-        <Stack dir="x">
-            <SwitchButton enabled={mode === 'pick'} switch={(enabled) => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
-            <SwitchButton enabled={false} switch={() => overlay.current.setMode('select', {type: 'rect', all: true})}>All</SwitchButton>
-            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rect'} switch={(enabled) => {selectMode(enabled, 'rect')}}>Rect</SwitchButton>
-            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rows'} switch={(enabled) => {selectMode(enabled, 'rows')}}>Rows</SwitchButton>
-            <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'columns'} switch={(enabled) => {selectMode(enabled, 'columns')}}>Columns</SwitchButton>
-            {gapButtons}
-        </Stack>
+        {undoRedo}
+        {modeSelect}
         {posSize}
         {zoomInput}
         <Int name="Border:" readOnly min="0" max="5" set={setBorder} value={border} buttons />
@@ -3176,8 +3250,8 @@ function BasicRasterView(props) {
             <div className="flex items-centered align-center full-v">
                 <RasterViewGrid
                     auto
-                    shift
                     resizeable={resizeable}
+                    shifteable={shifteable}
                     renderOptions={renderOptions}
                     setWidth={setWidth}
                     setHeight={setHeight}
@@ -3187,6 +3261,7 @@ function BasicRasterView(props) {
                     height={height}
                     posX={posX}
                     posY={posY}
+                    autoSelect={props.selectOnly !== undefined}
                     editorId={props.editorId}
                     zoom={zoom}
                     border={border}
@@ -3195,7 +3270,9 @@ function BasicRasterView(props) {
                     overlayRef={overlay}
                     writeTransparent={writeTransparent}
                     tracker={props.tracker}
-                    mode="pick"
+                    mode={defaultMode}
+                    modes={props.modes}
+                    modeParams={modeParams}
                     markerX={markerX}
                     markerY={markerY}
                     markerWidth={markerWidth}
@@ -3211,6 +3288,312 @@ function BasicRasterView(props) {
             {bottomToolbar}
         </Stack>
     );
+}
+
+function FlexRasterIndex(props) {
+    const context = useContext(CssContext);
+    const eContext = useContext(EditorContext);
+    const [zoom, setZoom] = useState(props.zoom || 10);
+    const [pos, setPos] = useState(0);
+    const [page, setPage] = useState(10);
+    const [marked, setMarked] = useState([]);
+    const divRef = useRef(null);
+    const ready = useMountedReadyCellProvider(props.cellProvider);
+    const observerRef = useRef(null);
+    const propsRef = useRef(null);
+    const {minWidth, cellProvider} = props;
+
+    propsRef.current = {
+        zoom,
+        page,
+        pos,
+        cellProvider,
+        minWidth,
+        setPos,
+        setMarked
+    };
+    if (props.incPosRef) {
+        props.incPosRef.current = propsRef.current;
+    }
+
+    const checkSize = (props) => {
+        const rect = divRef.current.getBoundingClientRect();
+        const padding = 5;
+
+        const boxSize = props.zoom * props.cellProvider.getSize() + 2;
+        const itemSize = Math.max(props.minWidth, boxSize) + 2 + 3 * padding;
+        const space = rect.width - 2 * padding;
+        const newPage = Math.min(Math.floor(space/itemSize), props.cellProvider.getWidth());
+
+        if (newPage !== props.page) {
+            setPage(newPage);
+        }
+    };
+
+    useEffect(() => {
+        if (ready) {
+            const observer = new ResizeObserver(entries => {
+                checkSize(propsRef.current);
+            });
+            observerRef.current = observer;
+            observer.observe(divRef.current);
+        }
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        }
+    }, [ready]);
+
+    useEffect(() => {
+        if (ready) {
+            checkSize(propsRef.current);
+        }
+    }, [zoom]);
+
+    if (!ready) {
+        return '';
+    }
+
+    const width = props.cellProvider.getWidth();
+    const max = Math.max(width - page, 0);
+
+
+    if (pos > max) {
+        setPos(max);
+    }
+
+    let scroller = '';
+    let height = 5 * 3 + (props.titleHeight + 2 + 10) + zoom * props.cellProvider.getSize();
+    if (page < width) {
+        height += 31;
+        scroller = <RasterScrollbar auto pos={pos} set={setPos} page={page} min={0} max={props.cellProvider.getWidth()} />
+    }
+
+    const items = [];
+    const style = {
+        minWidth
+    };
+    const getDoubleClickAction = (index) => {
+        if (!props.doubleClick) {
+            return null;
+        }
+        return () => {
+            props.doubleClick(index);
+        };
+    };
+
+    const getRightClickAction = (index) => {
+        if (!props.rightClick) {
+            return null;
+        }
+        return () => {
+            props.rightClick(index);
+        };
+    };
+
+    let undoRedo = '';
+    if (props.undoRedo) {
+        const undoAttr = {
+            onClick: () => {
+                eContext.undoAction()
+            }
+        };
+        if (!eContext.hasPast()) {
+            undoAttr.disabled = 'disabled'
+        }
+        const redoAttr = {
+            onClick: () => {
+                eContext.redoAction();
+            }
+        };
+        if (!eContext.hasFuture()) {
+            redoAttr.disabled = 'disabled'
+        }
+        undoRedo = <div>
+            <button {...undoAttr}>Undo</button>
+            <button {...redoAttr}>Redo</button>
+        </div>;
+    }
+
+    const toggleMarker = (index) => {
+        const newMarked = marked.concat();
+        const pos = marked.indexOf(index);
+        if (pos !== -1) {
+            newMarked.splice(pos, 1);
+        } else {
+            newMarked.push(index);
+        }
+        setMarked(newMarked);
+    };
+
+    const sensitivity = 0.25;
+    const onWheel = (e) => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        const newPos = Math.min(Math.max(propsRef.current.pos + deltaX, 0), max);
+        if (newPos !== propsRef.current.pos) {
+            setPos(newPos);
+        }
+        e.stopPropagation();
+    };
+
+    const iMax = Math.min(pos + page, width);
+    for (let i = pos; i < iMax; i++) {
+        const selectionProvider = new FontIndexCellProvider(props.cellProvider, i);
+        const cls = ['padded thin-boxed'];
+        if (marked.indexOf(i) !== -1) {
+            cls.push('marked-item');
+        } else {
+            cls.push('hover-item');
+        }
+        const click = props.actions ? () => {toggleMarker(i)} : null;
+        items.push(
+            <div key={i} className={cls.join(' ')}
+                 style={style}
+                 onDoubleClick={getDoubleClickAction(i)}
+                 onContextMenu={getRightClickAction(i)}
+                 onClick={click}
+            >
+                <Stack dir="y">
+                    <div style={{height: props.titleHeight}}>{props.renderTitle(i)}</div>
+                    <div className="center-h">
+                        <div className="thin-boxed min-content">
+                            <CellProviderRaster
+                                cellProvider={selectionProvider}
+                                zoom={zoom}
+                                posX={0}
+                                posY={0}
+                                width={1}
+                                height={1}
+                                border={0}
+                                renderOptions={{events: false, caching: false}}
+                            />
+                        </div>
+                    </div>
+                </Stack>
+            </div>
+        );
+    }
+
+    let bottomItems = [];
+    if (props.actions && marked.length > 0) {
+        bottomItems.push(<div key="info">Marked items: {marked.length}</div>);
+
+        const bottomActions = [];
+        bottomActions.push(<button key="all" onClick={() => {
+            const indices = [];
+            for (let i = 0; i < props.cellProvider.getWidth(); i++) {
+                indices.push(i);
+            }
+            setMarked(indices);
+        }}>All</button>);
+        bottomActions.push(<button key="reverse" onClick={() => {
+            const indices = [];
+            for (let i = 0; i < props.cellProvider.getWidth(); i++) {
+                if (marked.indexOf(i) === -1) {
+                    indices.push(i);
+                }
+            }
+            setMarked(indices);
+        }}>Reverse</button>);
+        for (let action of props.actions) {
+            if (action.isHidden !== undefined && action.isHidden({marked})) {
+                continue;
+            }
+            bottomActions.push(
+                <button key={action.name} onClick={(e) => {
+                    action.doAction(marked);
+                    setMarked([]);
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}>{action.name}</button>
+            );
+        }
+        bottomActions.push(<button key="cancel" onClick={() => {setMarked([])}}>X</button>);
+        bottomItems.push(
+            <div key="actions">
+                {bottomActions}
+            </div>
+        );
+    }
+    const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
+
+    return (
+        <Stack dir="y" full border>
+            <Toolbar>
+                {undoRedo}
+                <Int name="Position:" max={max} min={0} value={pos} set={setPos} buttons />
+                <Int name="Zoom:" max={10} min={1} value={zoom} set={setZoom} buttons />
+                <Stack dir="x">
+                    <Int name="Background:" readOnly min="0" max="26" set={context.setBgOpacity} value={context.bgOpacity} buttons />
+                    <Color value={context.bgColor} set={(value) => {context.setBgColor(value)}} />
+                </Stack>
+            </Toolbar>
+
+            <div className="padded" ref={divRef} style={{height}}>
+                <Stack center dir="y">
+                    <div className="rel-canvas" onWheel={onWheel}>
+                        <Stack dir="y">
+                            <Stack dir="x" padded>
+                                {items}
+                            </Stack>
+                            {scroller}
+                        </Stack>
+                    </div>
+                </Stack>
+            </div>
+
+            {bottomToolbar}
+        </Stack>
+    );
+}
+
+function BitmapSelector(props) {
+    const cellProvider = useMemo(() => {
+        return new BitmapCellProvider(4,
+            props.bitmap
+        );
+    }, []);
+
+    const eContext = useContext(EditorContext);
+    const resultRef = useRef(null);
+    resultRef.current = eContext.selection;
+
+    const ready = useMountedReadyCellProvider(cellProvider);
+    if (!ready) {
+        return '';
+    }
+
+    const selectionType = eContext.selection ? eContext.selection.getType() : 'none';
+
+    const select = () => {
+        props.okay(resultRef.current);
+    };
+
+    return (
+        <Stack dir="y" center full>
+            <div className="flex">
+                <Stack dir="x" border full>
+                    <div className="flex full-v">
+                        <BasicRasterView
+                            editorId="bitmap"
+                            selectOnly={props.selection}
+                            resizeable={false}
+                            mode="select"
+                            modes={['select', 'markerResize', 'markerMove', 'display']}
+                            cellProvider={cellProvider}
+                            defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
+                        />
+                    </div>
+                </Stack>
+            </div>
+
+            <div>
+                <button disabled={selectionType === 'none'} onClick={select}>OK</button>
+                <button onClick={() => {closeModals()}}>Cancel</button>
+            </div>
+        </Stack>
+    )
 }
 
 function BitmapEditor(props) {
@@ -3289,6 +3672,23 @@ function useEditorContextPart(id) {
     return eContext;
 }
 
+function BitmapSelectorModal(props, okay) {
+    openModal(
+        <EditorCtx>
+        <Modal name={props.name} closeable>
+            <div style={{height: 600}}>
+                <BitmapSelector
+                    zoom="5"
+                    border="1"
+                    selection={props.selection}
+                    okay={okay}
+                    bitmap={props.bitmap} />
+            </div>
+        </Modal>
+        </EditorCtx>
+    );
+}
+
 export {
     CellMarker,
     RasterCanvas,
@@ -3298,6 +3698,9 @@ export {
     CellProviderRaster,
     useEditorContextPart,
     BitmapEditor,
+    BitmapSelectorModal,
     BaseCellProviderIndexRaster,
-    useMountedReadyCellProvider
+    useMountedReadyCellProvider,
+    RasterScrollbar,
+    FlexRasterIndex
 }

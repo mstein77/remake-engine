@@ -4901,7 +4901,7 @@ class FontMap {
         this.image = imageRsrc.getCanvasElem();
         this.width = width;
         this.height = height;
-        this.map = [];
+        this.map = {};
     }
 
     addChar(posX, posY, char) {
@@ -5367,7 +5367,7 @@ class AudioPlayer {
     pauseAll() {
         this.paused = [];
         for (let id in this.channels) {
-            if (this.channels[id].isPlaying()) {
+            if (this.channels[id] && this.channels[id].isPlaying()) {
                 this.pauseChannel(id);
                 this.paused.push(id);
             }

@@ -1,7 +1,7 @@
 class CellSelection {
-    constructor(type, cells) {
+    constructor(type = 'none', cells = [[]]) {
         this.type = type;
-        this.cells = cells;
+        this.cells = type === 'none' ? [[]] : cells;
     }
 
     getWidth() {
@@ -56,6 +56,10 @@ class CellSelection {
 
     isColumns() {
         return this.type === 'columns';
+    }
+
+    isBitmap() {
+        return this.type === 'bitmap';
     }
 
     getMatchMatrix(value, offset = null, length = null) {
@@ -452,8 +456,6 @@ class TilesMapCellProvider extends CellProvider {
                 index = this.animations[tile.animation].getFrame().id;
             } else if (tile.index !== undefined) {
                 index = this.tiles[index].index;
-            } else {
-                console.log('WTF?', index, tile);
             }
         }
         return index;
@@ -578,10 +580,14 @@ class MapValueCellProvider extends MapSelectionCellProvider {
 
 class BitmapCellProvider extends CellProvider {
 
-    constructor(size, data) {
+    constructor(size, data = null) {
         super(size);
         this.data = data;
         this.map = [[this.getEmptyCell()]];
+    }
+
+    setMap(map) {
+        this.map = map;
     }
 
     load(callback) {
@@ -814,11 +820,250 @@ class TilesCellProvider extends CellProvider {
     }
 }
 
+class FontCharIndexProvider extends CellProvider {
+
+    constructor(fontMap) {
+        const size = Math.max(fontMap.width, fontMap.height);
+        super(size);
+        this.cache = {};
+        this.cacheZoom = 0;
+        this.dims = fontMap.map;
+        this.mapping = {};
+        this.codes = [];
+        this.width = null;
+        this.height = 1;
+        this.charSize = size;
+        this.data = fontMap.image ? fontMap.image.toDataURL('image/png') : null;
+    }
+
+    hasData() {
+        return this.data === null;
+    }
+
+    load(callback) {
+        if (this.hasData()) {
+            callback();
+            return;
+        }
+        this.convertURIToImageData(this.data).then(
+            (img) => {
+                this.data = null;
+                const newMap = {};
+                const codes = [];
+                this.map = [];
+                let index = 0;
+                let row = [];
+                for (let code in this.dims) {
+                    const dim = this.dims[code];
+                    const charCanvas = document.createElement('canvas');
+                    charCanvas.width = this.charSize;
+                    charCanvas.height = this.charSize;
+                    const ctx = charCanvas.getContext('2d');
+                    ctx.putImageData(img.context.getImageData(dim.x, dim.y, this.charSize, this.charSize), 0, 0);
+                    newMap[code] = charCanvas;
+                    codes.push(code);
+                    row.push(index);
+                    index++;
+                }
+                this.codes = codes;
+                this.codes.sort();
+                this.map.push(codes);
+                this.mapping = newMap;
+                this.width = codes.length;
+
+                callback(codes);
+            }
+        );
+    }
+
+    getWidth() {
+        return this.width;
+    }
+
+    getHeight() {
+        return this.height;
+    }
+
+    getMaxIndex() {
+        return this.codes.length;
+    }
+
+    getEventCount() {
+        return null;
+    }
+
+    getCellType() {
+        return 'pure-bitmap';
+    }
+
+    isResizeable() {
+        return false;
+    }
+
+    getEmptyCell() {
+        return ' ';
+    }
+
+    getCharAt(index) {
+        const value = this.codes[index];
+        return {
+            char: value,
+            code: value.charCodeAt(0)
+        };
+    }
+
+    getCharAtIndex(index) {
+        return this.getCharAt(index).char;
+    }
+
+    hasCode(code) {
+        return this.codes.indexOf(code) !== -1;
+    }
+
+    deleteIndex(index) {
+        this.deleteChar(this.codes[index]);
+    }
+
+    deleteChar(code) {
+        if (this.mapping[code] === undefined) {
+            return;
+        }
+        this.mapping[code] = undefined;
+        this.codes.splice(this.codes.indexOf(code), 1);
+        this.map = [this.codes];
+        this.width--;
+    }
+
+    addCharCode(code) {
+        if (this.codes.indexOf(code) !== -1) {
+            return;
+        }
+        this.codes.push(code);
+        this.codes.sort();
+
+        this.map = [this.codes];
+        this.width++;
+        const canvas = document.createElement('canvas');
+        canvas.width = this.charSize;
+        canvas.height = this.charSize;
+        this.mapping[code] = canvas;
+    }
+
+    getBitmapForIndex(index, zoom, writeCache = true) {
+        if (index > this.getMaxIndex()) {
+            return null;
+        }
+        const value = this.codes[index];
+        return this.getBitmapForValue(value, zoom, writeCache);
+    }
+
+    setBitmapForIndex(index, bitmap) {
+        const value = this.codes[index];
+        const ctx = this.mapping[value].getContext('2d');
+        ctx.putImageData(bitmap, 0, 0);
+    }
+
+    setBitmapForValue(value, bitmap) {
+        const index = this.codes.indexOf(value);
+        if (index !== -1) {
+            this.setBitmapForIndex(index, bitmap);
+        }
+    }
+
+    getBitmapForValue(value, zoom, writeCache = true) {
+        if (!this.hasData()) {
+            return null;
+        }
+        if (writeCache && zoom !== this.cacheZoom) {
+            this.cacheZoom = zoom;
+            this.cache = {};
+        }
+
+        if (this.cache[value] !== undefined) {
+            if (writeCache || this.cacheZoom === zoom) {
+                return this.cache[value];
+            }
+        }
+
+        const canvas = document.createElement('canvas');
+        const targetSize = this.charSize * zoom;
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const charImg = this.mapping[value];
+        if (!charImg) {
+            return canvas;
+        }
+
+        const charCtx = charImg.getContext('2d');
+        const img = charCtx.getImageData(0, 0, this.charSize, this.charSize);
+
+        const target = charCtx.createImageData(targetSize, targetSize);
+        let targetPos = 0;
+        let sourceStart = 0;
+        for(let y = 0; y < img.height; y++) {
+
+            for (let w = 0; w < zoom; w++) {
+                let sourcePos = sourceStart;
+                let pos = targetPos;
+                for(let x = 0; x < img.width; x++) {
+                    for (let z = 0; z < zoom; z++) {
+                        target.data[pos] = img.data[sourcePos];
+                        target.data[pos + 1] = img.data[sourcePos + 1];
+                        target.data[pos + 2] = img.data[sourcePos + 2];
+                        target.data[pos + 3] = img.data[sourcePos + 3];
+                        pos += 4;
+                    }
+                    sourcePos += 4;
+                }
+                targetPos += target.width << 2;
+            }
+            sourceStart += img.width << 2;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.putImageData(target, 0, 0);
+        if (writeCache) {
+            this.cache[value] = canvas;
+        }
+        return canvas;
+    }
+}
+
+class FontIndexCellProvider extends CellProvider {
+    constructor(provider, index) {
+        super(provider.size);
+        this.provider = provider;
+        this.index = index;
+        this.map = [[index]];
+    }
+
+    load(callback) {
+        return this.provider.load(callback);
+    }
+
+    hasData() {
+        return this.provider.hasData();
+    }
+
+    getCellType() {
+        return this.provider.getCellType();
+    }
+
+    getRect(posX, posY, width, height, raw = false) {
+        return this.map;
+    }
+
+    getBitmapForValue(value, zoom, writeCache) {
+        return this.provider.getBitmapForIndex(this.index, zoom, false);
+    }
+}
+
 export {
     CellSelection,
     TilesCellProvider,
     BitmapCellProvider,
     TilesMapCellProvider,
     MapSelectionCellProvider,
-    MapValueCellProvider
+    MapValueCellProvider,
+    FontCharIndexProvider,
+    FontIndexCellProvider
 };
