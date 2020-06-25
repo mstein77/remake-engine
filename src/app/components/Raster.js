@@ -22,7 +22,7 @@ function CellMarker(props) {
         return '';
     }
 
-    const hasResize = props.initResize !== undefined && !props.click;
+    const hasResize = props.initResize !== undefined && props.initResize !== null && !props.click;
     const hasMove = props.initMove !== undefined;
 
     const size = props.size * props.zoom;
@@ -393,7 +393,7 @@ function MarkerArea(props) {
         marker = <CellMarker
             blink
             initMove={props.move}
-            initResize={props.resize}
+            initResize={props.resizeable ? props.resize : null}
             size={props.size}
             border={props.border}
             zoom={props.zoom}
@@ -491,24 +491,30 @@ function CursorArea(props) {
             return props.mouseDown(e, props.posX + offset.x, props.posY + offset.y, 1, 1);
         };
 
-        marker = <CellMarker
-            blink
-            mouseDown={onClick}
-            matrix={props.matrix}
-            size={props.size}
-            border={props.border}
-            zoom={props.zoom}
-            type={markerType}
-            highlight={props.highlight}
-            posX={offX}
-            posY={offY}
-            width={markerWidth}
-            height={markerHeight}
-            top={hasTop}
-            bottom={hasBottom}
-            left={hasLeft}
-            right={hasRight}
-        />;
+        if (!(props.inclusion &&
+            (props.posY + offY > props.cellProvider.getHeight() - cursorHeight ||
+                props.posX + offX > props.cellProvider.getWidth() - cursorWidth
+            ))
+        )  {
+            marker = <CellMarker
+                blink
+                mouseDown={onClick}
+                matrix={props.matrix}
+                size={props.size}
+                border={props.border}
+                zoom={props.zoom}
+                type={markerType}
+                highlight={props.highlight}
+                posX={offX}
+                posY={offY}
+                width={markerWidth}
+                height={markerHeight}
+                top={hasTop}
+                bottom={hasBottom}
+                left={hasLeft}
+                right={hasRight}
+            />;
+        }
     }
 
     const adjustPosX = isGap ? cellSize >> 1 : 0;
@@ -1458,6 +1464,8 @@ function BaseCellProviderIndexRaster(props) {
 }
 
 /**
+ *  fixCursorWidth
+ *  fixCursorHeight
  *
  */
 function RasterOverlays(props) {
@@ -1496,6 +1504,8 @@ function RasterOverlays(props) {
     const windowEvent = eContext.getWindowEvents(props.editorId);
     const boundingRectRef = useRef(null);
     const autoScrollRef = useRef({id : null, x: null, y: null, marker: false});
+
+    const multiSelect = (props.mode && props.mode === 'select' && props.modeParams) ? props.modeParams.multi === true : false;
 
     const overlayRef = useRef({
         modes: {},
@@ -1801,7 +1811,7 @@ function RasterOverlays(props) {
                         markerHeight
                     });
                     const event = {clientX: e.clientX, clientY: e.clientY};
-                    if (markerType.endsWith('gap')) {
+                    if (markerType.endsWith('gap') || (props.autoSelect && !multiSelect)) {
                         overlay.setMode('markerMove', {type: markerType, event});
                     } else {
                         overlay.setMode('markerResize', {
@@ -1945,17 +1955,41 @@ function RasterOverlays(props) {
                     Math.min(Math.max(props.posX + autoScroll.x, 0), maxPosX);
 
                 if (autoScroll.marker && autoScroll.marker.resizeX) {
+                    // marker resize mode?
                     const anchorX = autoScroll.marker.anchorPos.x;
+                    const anchorDistX = posX - anchorX + (autoScroll.x > 0 ? props.width : 0);
+                    const markerGapX = 0;
+                    const baseWidth = 8;
+                    const baseAndGapWidth = markerGapX + baseWidth;
 
+                    if (-1 <= anchorDistX && anchorDistX <= baseWidth) {
+                        change.markerWidth = baseWidth;
+                        change.markerX = anchorX;
+                    } else if (anchorDistX > baseWidth) {
+                        change.markerWidth = markerGapX > 0 ?
+                            baseWidth + Math.ceil((anchorDistX - baseWidth) / baseAndGapWidth) * baseAndGapWidth :
+                            Math.ceil(anchorDistX / baseWidth) * baseWidth;
+                        change.markerX = anchorX;
+                    } else {
+                        change.markerWidth =
+                            baseWidth + Math.ceil(Math.abs(anchorDistX) / baseAndGapWidth) * baseAndGapWidth;
+                        change.markerX = anchorX - change.markerWidth + baseWidth;
+                    }
+/*
                     if (autoScroll.x < 0) {
-                        change.markerX = Math.min(posX, anchorX);
+                        // auto scroll on left side
                         change.markerWidth = Math.abs(posX - anchorX) + 1;
+                        //                               anchorDistX + 1
+                        change.markerX = Math.min(posX, anchorX);
                     } else {
                         const posEndX = posX + props.width - 1;
                         change.markerX = posEndX < anchorX ? posEndX - 1 : anchorX;
                         change.markerWidth = Math.abs(posEndX - anchorX) + 1;
                     }
+
+ */
                 } else {
+                    // marker move mode...
                     change.markerX =
                         Math.min(Math.max(props.markerX + autoScroll.x, 0),
                             maxX - props.markerWidth
@@ -1971,14 +2005,23 @@ function RasterOverlays(props) {
 
                 if (autoScroll.marker && autoScroll.marker.resizeY) {
                     const anchorY = autoScroll.marker.anchorPos.y;
+                    const anchorDistY = posY - anchorY + (autoScroll.y > 0 ? props.height : 0);
+                    const markerGapY = 0;
+                    const baseHeight = 8;
+                    const baseAndGapHeight = markerGapY + baseHeight;
 
-                    if (autoScroll.y < 0) {
-                        change.markerY = Math.min(posY, anchorY);
-                        change.markerHeight = Math.abs(posY - anchorY) + 1;
+                    if (-1 <= anchorDistY && anchorDistY <= baseHeight) {
+                        change.markerHeight = baseHeight;
+                        change.markerY = anchorY;
+                    } else if (anchorDistY > baseHeight) {
+                        change.markerHeight = markerGapY > 0 ?
+                            baseHeight + Math.ceil((anchorDistY - baseHeight) / baseAndGapHeight) * baseAndGapHeight :
+                            Math.ceil(anchorDistY / baseHeight) * baseHeight;
+                        change.markerY = anchorY;
                     } else {
-                        const posEndY = posY + props.height - 1;
-                        change.markerY = posEndY < anchorY ? posEndY - 1 : anchorY;
-                        change.markerHeight = Math.abs(posEndY - anchorY) + 1;
+                        change.markerHeight =
+                            baseHeight + Math.ceil(Math.abs(anchorDistY)/baseAndGapHeight) * baseAndGapHeight;
+                        change.markerY = anchorY - change.markerHeight + baseHeight;
                     }
                 } else {
                     change.markerY =
@@ -2176,7 +2219,11 @@ function RasterOverlays(props) {
                         }
                     }
                     if (doSelect) {
-                        overlay.setMode('select', {type: propsRef.current.markerType});
+                        overlay.setMode('select', {
+                            type: propsRef.current.markerType,
+                            width: cursorRef.current.cursorWidth,
+                            height: cursorRef.current.cursorHeight
+                        });
                     }
                 };
                 windowEvent.addListener(
@@ -2192,7 +2239,6 @@ function RasterOverlays(props) {
                 windowEvent.removeListener('mouseup', mouseUp, {capture: false, once: true});
                 eCtxRef.current.setFixCursor(null);
                 if (props.autoSelect) {
-                    d('AUTO SELECT....');
                     overlay.doMarkerAction('copy', true);
                 }
             }
@@ -2210,9 +2256,16 @@ function RasterOverlays(props) {
 
                 const e = data.event;
 
+                const baseWidth = cursorRef.current.cursorWidth;
+                const baseHeight = cursorRef.current.cursorHeight;
+                const markerGapX = 0;
+                const markerGapY = 0;
+                const baseAndGapWidth = baseWidth + markerGapX;
+                const baseAndGapHeight = baseHeight + markerGapY;
+
                 const anchorPos = {
-                    x: props.markerX + (!startX ? 0 : props.markerWidth - 1),
-                    y: props.markerY + (!startY ? 0 : props.markerHeight - 1)
+                    x: props.markerX + (!startX ? 0 : props.markerWidth - baseWidth),
+                    y: props.markerY + (!startY ? 0 : props.markerHeight - baseHeight)
                 };
                 const resizeX = cursorRef.current.trackX && axis.indexOf('x') !== -1;
                 const resizeY = cursorRef.current.trackY && axis.indexOf('y') !== -1;
@@ -2227,15 +2280,19 @@ function RasterOverlays(props) {
                     }
                     updateAutoScroll(newRasterPos, {anchorPos, resizeX, resizeY});
 
-                    // relative width/height from anchorPos
-                    const absWidth = newRasterPos.x + props.posX - anchorPos.x;
-                    const absHeight = newRasterPos.y + props.posY - anchorPos.y;
+                    // distFromAnchor (+ => right from anchor, - = left from anchor)
+                    const anchorDistX = newRasterPos.x + props.posX - anchorPos.x;
+                    const anchorDistY = newRasterPos.y + props.posY - anchorPos.y;
 
-                    // width/height not 0 and within raster?
-                    const validX = (resizeX && absWidth !== 0 && newRasterPos.x + 1 >= 0 && newRasterPos.x <= props.width);
-                    const validY = (resizeY && absHeight !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= props.height);
+                    const validX =
+                        (resizeX  // resizing in X dir allowed
+                            && newRasterPos.x + 1 >= 0 // new rasterPos in Range [-1, ..., width]
+                            && newRasterPos.x <= props.width
+                        );
 
-                    // rasterPos has changed and has at least one valid raster position?
+                    const validY = (resizeY && anchorDistY !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= props.height);
+
+                    // rasterPos valid and has changed since last check?
                     const hasChanged =
                         (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
                         (validX || validY);
@@ -2245,21 +2302,33 @@ function RasterOverlays(props) {
                         const change = {};
 
                         if (validX) {
-                            if (absWidth > 0) {
-                                // grow right => inc width
-                                change.markerWidth = absWidth;
+                            if (-1 <= anchorDistX && anchorDistX <= baseWidth) {
+                                change.markerWidth = baseWidth;
+                                change.markerX = anchorPos.x;
+                            } else if (anchorDistX > baseWidth) {
+                                change.markerWidth = markerGapX > 0 ?
+                                    baseWidth + Math.ceil((anchorDistX - baseWidth) / baseAndGapWidth) * baseAndGapWidth :
+                                    Math.ceil(anchorDistX / baseWidth) * baseWidth;
+                                change.markerX = anchorPos.x;
                             } else {
-                                // grow left => set new width and set position left of anchor
-                                change.markerWidth = -absWidth;
-                                change.markerX = anchorPos.x + absWidth + 1;
+                                change.markerWidth =
+                                    baseWidth + Math.ceil(Math.abs(anchorDistX) / baseAndGapWidth) * baseAndGapWidth;
+                                change.markerX = anchorPos.x - change.markerWidth + baseWidth;
                             }
                         }
                         if (validY) {
-                            if (absHeight > 0) {
-                                change.markerHeight = absHeight;
+                            if (-1 <= anchorDistY && anchorDistY <= baseHeight) {
+                                change.markerHeight = baseHeight;
+                                change.markerY = anchorPos.y;
+                            } else if (anchorDistY > baseHeight) {
+                                change.markerHeight = markerGapY > 0 ?
+                                    baseHeight + Math.ceil((anchorDistY - baseHeight) / baseAndGapHeight) * baseAndGapHeight :
+                                    Math.ceil(anchorDistY / baseHeight) * baseHeight;
+                                change.markerY = anchorPos.y;
                             } else {
-                                change.markerHeight = -absHeight;
-                                change.markerY = anchorPos.y + absHeight + 1;
+                                change.markerHeight =
+                                    baseHeight + Math.ceil(Math.abs(anchorDistY)/baseAndGapHeight) * baseAndGapHeight;
+                                change.markerY = anchorPos.y - change.markerHeight + baseHeight;
                             }
                         }
                         overlay.setState(change);
@@ -2287,7 +2356,11 @@ function RasterOverlays(props) {
                         }
                     }
                     if (doSelect) {
-                        overlay.setMode('select', {type: propsRef.current.markerType});
+                        overlay.setMode('select', {
+                            type: propsRef.current.markerType,
+                            width: cursorRef.current.cursorWidth,
+                            height: cursorRef.current.cursorHeight
+                        });
                     }
                     e.stopPropagation();
                     e.preventDefault();
@@ -2493,6 +2566,7 @@ function RasterOverlays(props) {
                 cursorType={cursorType}
                 doubleClick={cursorDoubleClick}
                 matrix={props.writeTransparent ? null : cursorMatrix}
+                inclusion={props.autoSelect === true}
                 width={props.width}
                 height={props.height}
                 zoom={props.zoom}
@@ -2514,6 +2588,7 @@ function RasterOverlays(props) {
                 zoom={props.zoom}
                 border={props.border}
                 size={size}
+                resizeable={!(props.autoSelect && !multiSelect)}
                 posX={props.posX}
                 posY={props.posY}
                 markerX={props.markerX}
@@ -3123,7 +3198,7 @@ function BasicRasterView(props) {
                 />
             );
             bottomTools.push(
-                <Dim key="size" name="Size:" buttons
+                <Dim key="size" name="Size:" buttons={!(modeParams && modeParams.multi === false)}
                      x={markerWidth} setX={setMarkerWidth}
                      y={markerHeight} setY={setMarkerHeight}
                      maxX={maxWidth - markerX} maxY={maxHeight - markerY} min="1"

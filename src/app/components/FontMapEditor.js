@@ -21,7 +21,6 @@ function CharInput(props) {
             inputRef.current.focus();
         }
     });
-
     return (
         <input
             ref={inputRef}
@@ -338,6 +337,9 @@ function CharIndex(props) {
                 name: 'Select Rect',
                 selection: {
                     type: 'rect',
+                    width: size,
+                    height: size,
+                    multi: true,
                     doubleClick: selected
                 },
                 bitmap: props.source
