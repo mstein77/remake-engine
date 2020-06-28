@@ -1,6 +1,6 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
-import {closeModals, d, Section, Modal, Stack, Dim, Toolbar, Int, Color, CssContext, openModal} from "./BaseComponents";
+import {closeModals, d, Section, Modal, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color, CssContext, openModal} from "./BaseComponents";
 import {
     EditorCtx,
     EditorContext,
@@ -8,10 +8,10 @@ import {
     useMountedReadyCellProvider,
     FlexRasterIndex,
     BitmapEditor,
-    useEditorContextPart
+    useEditorContextPart,
+    CellMarker
 } from "./Raster";
 import {BitmapCellProvider, FontCharIndexProvider} from "../classes/CellProvider";
-
 
 function CharInput(props) {
     const [value, setValue] = useState(props.values[props.index]);
@@ -274,12 +274,17 @@ function CharIndex(props) {
         }
      ];
 
-    const saveChars = (provider) => {
+    const saveChars = (providers) => {
+        if (!Array.isArray(providers)) {
+            providers = [providers];
+        }
         const size = props.cellProvider.getSize();
         const assignProvider = new FontCharIndexProvider({width: size, height: size, map: {}});
-        const i = 0;
-        assignProvider.addCharCode('' + i);
-        assignProvider.setBitmapForIndex('' + i, provider.getImageData());
+        for (let i = 0; i < providers.length; i++) {
+            const code = String.fromCharCode(32 + i);
+            assignProvider.addCharCode(code);
+            assignProvider.setBitmapForValue(code, providers[i].getImageData());
+        }
 
         const assign = (values) => {
             const undoChars = {};
@@ -289,9 +294,11 @@ function CharIndex(props) {
             }
             eContext.doAction(
                 () => {
+                    let i = 0;
                     for(let code of values) {
                         props.cellProvider.addCharCode(code);
-                        props.cellProvider.setBitmapForValue(code, provider.getImageData());
+                        props.cellProvider.setBitmapForValue(code, providers[i].getImageData());
+                        i++;
                     }
                     update();
                 },
@@ -321,16 +328,14 @@ function CharIndex(props) {
     const importChars = () => {
         const selected = (selection) => {
             const size = props.cellProvider.getSize();
-            const provider = new BitmapCellProvider(size);
-            provider.setMap(selection.getCells());
-            const bitmap = provider.getImageData();
-            if (bitmap.width !== size || bitmap.height !== size) {
-                requestAnimationFrame(() => {
-                    closeModals();
-                });
-                return;
+            const providers = [];
+            const baseCells = selection.getBaseCells();
+            for(let cells of baseCells) {
+                const provider = new BitmapCellProvider(size);
+                provider.setMap(cells);
+                providers.push(provider);
             }
-            saveChars(provider);
+            saveChars(providers);
         };
         BitmapSelectorModal(
             {
@@ -427,8 +432,10 @@ function CharIndex(props) {
         <div>
             <Stack dir="x" full border>
                 <div className="padded">
-                    <button onClick={newChar}>New</button>
-                    <button onClick={importChars}>Import</button>
+                    <Stack dir="y">
+                        <button onClick={newChar}>New</button>
+                        <button onClick={importChars}>Import</button>
+                    </Stack>
                 </div>
                 <div className="flex">
                     <FlexRasterIndex
@@ -466,53 +473,234 @@ function FontPreview(props) {
 
     const ready = useMountedReadyCellProvider(props.provider);
     const [demoText, setDemoText] = useState('');
-    const [zoom, setZoom] = useState(2);
+    const [zoom, setZoomRaw] = useState(2);
     const [bgColor, setBgColor] = useState('#000000');
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
-    const eContext = useEditorContextPart('preview');
+    const [screenX, setScreenX] = useState(320);
+    const [screenY, setScreenY] = useState(200);
+    const [showMarker, setShowMarker] = useState(false);
+    const [textAlign, setTextAlignRaw] = useState('left');
+    const [autoCenterX, setAutoCenterX] = useState(false);
+    const [autoCenterY, setAutoCenterY] = useState(false);
+    const [rasterize, setRasterize] = useState(false);
+    const propsRef = useRef(null);
+    const overlayRef = useRef(null);
+    const canvasRef = useRef(null);
+    const imgRef = useRef(null);
+    const eContext = useEditorContextPart('preview', () => {
+        imgRef.current = null;
+    });
+    const setTextAlign = (value) => {
+        setTextAlignRaw(value);
+        imgRef.current = null;
+    };
+    const setZoom = (value) => {
+        setZoomRaw(value);
+        imgRef.current = null;
+    };
+    propsRef.current = {
+        zoom,
+        posX,
+        posY,
+        screenX,
+        screenY
+    };
+
+    useEffect(() => {
+        if (!canvasRef.current || !imgRef.current) {
+            return;
+        }
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(imgRef.current.canvas, propsRef.current.posX * propsRef.current.zoom, propsRef.current.posY * propsRef.current.zoom);
+    }, [imgRef.current, ready, textAlign, demoText, zoom, bgColor, posX, posY, screenX, screenY]);
 
     if (!ready) {
         return '';
     }
 
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 320 * zoom;
-    canvas.height = 200 * zoom;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
     const lines = demoText.split('\n');
-    const size = props.provider.getSize() * zoom;
-    for (let y = 0; y < lines.length; y++) {
-        const line = lines[y];
-        for (let x = 0; x < line.length; x++) {
-            const img = props.provider.getBitmapForValue(line[x], zoom, false);
-            ctx.drawImage(img, posX * zoom + x * size, posY * zoom + y * size);
+    let maxWidth = 0;
+    for (let line of lines) {
+        maxWidth = Math.max(maxWidth, line.length);
+    }
+    const blockHeight = props.provider.getSize() * lines.length;
+    const blockWidth = props.provider.getSize() * maxWidth;
+
+    if (!imgRef.current) {
+        const canvas = document.createElement('canvas');
+        canvas.width = blockWidth * zoom || 1;
+        canvas.height = blockHeight * zoom || 1;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const lines = demoText.split('\n');
+        const size = props.provider.getSize() * zoom;
+        for (let y = 0; y < lines.length; y++) {
+            let line = lines[y];
+            if (textAlign !== 'left' && line.length < maxWidth) {
+                const pad = textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
+                line = line.padStart(pad, ' ');
+            }
+            for (let x = 0; x < line.length; x++) {
+                const img = props.provider.getBitmapForValue(line[x], zoom, false);
+                ctx.drawImage(img, x * size, y * size);
+            }
+        }
+        imgRef.current = {canvas};
+    }
+
+    const getRasterized = (value) => {
+        if (!rasterize) {
+            return value;
+        }
+        return Math.floor(value/props.provider.getSize()) * props.provider.getSize();
+    };
+
+    if (autoCenterX) {
+        let centeredX = getRasterized(Math.ceil(screenX/2) - Math.ceil(blockWidth/2));
+        if (posX !== centeredX) {
+            setPosX(centeredX);
+        }
+    } else if (rasterize) {
+        let rasterPos = getRasterized(posX);
+        if (rasterPos !== posX) {
+            setPosX(rasterPos);
         }
     }
-    const src = canvas.toDataURL('image/png');
+    if (autoCenterY) {
+        const centeredY = getRasterized(Math.ceil(screenY/2) - Math.ceil(blockHeight/2));
+        if (posY !== centeredY) {
+            setPosY(centeredY);
+        }
+    } else if (rasterize) {
+        let rasterPos = getRasterized(posY);
+        if (rasterPos !== posY) {
+            setPosY(rasterPos);
+        }
+    }
+    let marker = '';
+    if (blockWidth > 0 && blockHeight > 0) {
+        const initMove = (e) => {
+            const rect = overlayRef.current.getBoundingClientRect();
+            let lastX = Math.floor((e.clientX - rect.x)/zoom);
+            let lastY = Math.floor((e.clientY - rect.y)/zoom);
+
+            const moveListener = (e) => {
+                const currX = Math.floor((e.clientX - rect.x)/zoom);
+                const currY = Math.floor((e.clientY - rect.y)/zoom);
+
+                const deltaX = currX - lastX;
+                if (deltaX !== 0) {
+                    const newX = Math.max(0, Math.min(posX + deltaX, screenX - 1));
+                    if (newX !== posX) {
+                        setPosX(newX);
+                    }
+                }
+                const deltaY = currY - lastY;
+                if (deltaY !== 0) {
+                    const newY = Math.max(0, Math.min(posY + deltaY, screenY - 1));
+                    if (newY !== posY) {
+                        setPosY(newY);
+                    }
+                }
+                e.stopPropagation();
+                e.preventDefault();
+            };
+
+            eContext.setFixCursor('move');
+            eContext.addListener(
+                props.editorId,
+                'mousemove',
+                moveListener,
+                {capture: false}
+            );
+            eContext.addListener(
+                props.editorId,
+                'mouseup',
+                (e) => {
+                    eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
+                    eContext.setFixCursor(null);
+                    setShowMarker(false);
+                    e.preventDefault();
+                    e.stopPropagation();
+                },
+                {
+                    once: true,
+                    capture: false
+                }
+            );
+            setShowMarker(true);
+        };
+
+        marker = (<CellMarker
+            blink
+            initMove={initMove}
+            border={0}
+            posX={posX}
+            posY={posY}
+            zoom={zoom}
+            bottom={showMarker && (posY + blockHeight < screenY)}
+            top={showMarker}
+            left={showMarker}
+            right={showMarker && (posX + blockWidth < screenX)}
+            size={1}
+            width={Math.min(blockWidth, screenX - posX)}
+            height={Math.min(blockHeight, screenY - posY)}
+            highlight={true}
+        />);
+    }
+    const realWidth = screenX * zoom;
+    const realHeight = screenY * zoom;
 
     return (
         <Stack dir="x" full>
             <Section name="Screen">
                 <div className="padded">
-                    <Dim name="Position" setX={setPosX} setY={setPosY} minX={0} minY={0} maxX={canvas.width} maxY={canvas.height} x={posX} y={posY} buttons />
-                    <textarea rows={20} cols={40} value={demoText} onChange={(e) => {setDemoText(e.target.value)}}></textarea>
+                    <Dim name="Position"
+                         setX={setPosX} setY={setPosY} minX={0}
+                         readOnlyX={autoCenterX} readOnlyY={autoCenterY}
+                         minY={0} maxX={screenX} maxY={screenY} x={posX} y={posY} buttons />
+                    <Stack dir="x">
+                        <div>Auto-Center: </div>
+                        <Checkbox name="X" value={autoCenterX} set={setAutoCenterX} />
+                        <Checkbox name="Y" value={autoCenterY} set={setAutoCenterY} />
+                    </Stack>
+                    <Checkbox name="Rasterize" value={rasterize} set={setRasterize} />
+                    <Stack dir="x" padded>
+                        <div>Text align: </div>
+                        <div className="padded">
+                            <Stack dir="x">
+                                <SwitchButton enabled={textAlign === 'left'} switch={() => setTextAlign('left')}><i className="material-icons md-18">format_align_left</i></SwitchButton>
+                                <SwitchButton enabled={textAlign === 'center'} switch={() => setTextAlign('center')}><i className="material-icons md-18">format_align_center</i></SwitchButton>
+                                <SwitchButton enabled={textAlign === 'right'} switch={() => setTextAlign('right')}><i className="material-icons md-18">format_align_right</i></SwitchButton>
+                            </Stack>
+                        </div>
+                    </Stack>
+                    <textarea rows={20} cols={40} value={demoText} onChange={(e) => {setDemoText(e.target.value); imgRef.current = null}}></textarea>
                 </div>
             </Section>
 
             <Section name="Preview" flex>
+                <Stack dir="y" border>
                 <Toolbar>
+                    <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
                     <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
                     <Color value={bgColor} set={setBgColor} />
                 </Toolbar>
-                <div className="padded full-v">
+                <div className="padded flex">
                     <div className="thin-boxed min-content">
-                        <img src={src} />
+                        <canvas ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
+                    </div>
+                    <div className="rel-canvas" style={{height: 0}}>
+                        <div ref={overlayRef} className="" style={{position: 'relative', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: -(realHeight + 1), left: 1}}>
+                            {marker}
+                        </div>
                     </div>
                 </div>
+                </Stack>
             </Section>
         </Stack>
     );
@@ -533,7 +721,7 @@ function FontMapEditor(props) {
                     <CharIndex cellProvider={provider} source={bitmap} />
                 </Section>
                 <div className="flex">
-                    <FontPreview provider={provider} source={bitmap} />
+                    <FontPreview editorId="preview" provider={provider} source={bitmap} />
                 </div>
             </Stack>
         </EditorCtx>

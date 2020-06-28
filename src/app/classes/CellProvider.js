@@ -1,7 +1,15 @@
 class CellSelection {
     constructor(type = 'none', cells = [[]]) {
         this.type = type;
-        this.cells = type === 'none' ? [[]] : cells;
+        if (type === 'multi') {
+            this.cells = cells.rect;
+            this.gapX = cells.gapX;
+            this.gapY = cells.gapY;
+            this.baseX = cells.baseX;
+            this.baseY = cells.baseY;
+        } else {
+            this.cells = type === 'none' ? [[]] : cells;
+        }
     }
 
     getWidth() {
@@ -30,6 +38,34 @@ class CellSelection {
         }
         return result;
     }
+
+    getBaseRect(x, y) {
+        const cells = [];
+        const pos = y;
+        while(cells.length < this.baseY) {
+            cells.push(this.cells[y].slice(x, x + this.baseX));
+            y++;
+        }
+        return cells;
+    }
+
+    getBaseCells() {
+        const baseCells = [];
+        const xDist = this.baseX + this.gapX;
+        const yDist = this.baseY + this.gapY;
+        let y = 0;
+        const yMax = this.getHeight();
+        const xMax = this.getWidth();
+        while (y < yMax) {
+            let x = 0;
+            while (x < xMax) {
+                baseCells.push(this.getBaseRect(x, y));
+                x += xDist;
+            }
+            y += yDist;
+        }
+        return baseCells;
+    };
 
     getCells() {
         return this.cells;
