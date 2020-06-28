@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import ReactDOM from 'react-dom';
+import {BitmapSelector} from "./Raster";
 
 const CssContext = React.createContext();
 
@@ -339,9 +340,13 @@ function Stack(props) {
     if (props.wrap) {
         cls.push('wrap');
     }
+    const style = {};
+    if (props.height) {
+        style.height = props.height;
+    }
 
     return (
-        <div className={cls.join(' ')}>
+        <div className={cls.join(' ')} style={style}>
             {props.children}
         </div>
     );
@@ -395,6 +400,7 @@ function IntField(props) {
     } else {
         attr.size = 3;
     }
+    const step = props.step || 1;
 
     const value = props.value !== undefined ? props.value : 0;
     attr.value = value;
@@ -404,11 +410,11 @@ function IntField(props) {
     };
 
     const incValue = () => {
-        props.set(parseInt(value, 10) + 1);
+        props.set(parseInt(value, 10) + step);
     };
 
     const decValue = () => {
-        props.set(parseInt(value, 10) - 1);
+        props.set(parseInt(value, 10) - step);
     };
 
     let buttonPrev = '';
@@ -417,13 +423,13 @@ function IntField(props) {
         const nextAttr = {
             onClick: incValue
         };
-        if (props.max !== undefined && parseInt(value, 10) >= parseInt(props.max, 10)) {
+        if (props.readOnly || (props.max !== undefined && parseInt(value, 10) + step > parseInt(props.max, 10))) {
             nextAttr.disabled = 'disabled';
         }
         const prevAttr = {
             onClick: decValue
         };
-        if (props.min !== undefined && parseInt(value, 10) <= parseInt(props.min, 10)) {
+        if (props.readOnly || (props.min !== undefined && parseInt(value, 10) - step < parseInt(props.min, 10))) {
             prevAttr.disabled = 'disabled';
         }
         buttonPrev =
@@ -464,6 +470,10 @@ function Dim(props) {
     const minY = props.min !== undefined ? props.min : props.minY;
     const sizeX = props.size !== undefined ? props.size : props.sizeX;
     const sizeY = props.size !== undefined ? props.size : props.sizeY;
+    const stepX = props.step !== undefined ? props.step : props.stepX;
+    const stepY = props.step !== undefined ? props.step : props.stepY;
+    const readOnlyX = props.readOnly !== undefined ? props.readOnly : props.readOnlyX;
+    const readOnlyY = props.readOnly !== undefined ? props.readOnly : props.readOnlyY;
 
     const xAttr = {
         name: props.name,
@@ -472,7 +482,8 @@ function Dim(props) {
         max: maxX,
         size: sizeX,
         set: props.setX,
-        readOnly: props.readOnly,
+        step: stepX,
+        readOnly: readOnlyX,
         buttons: props.buttons
     };
     const yAttr = {
@@ -482,7 +493,8 @@ function Dim(props) {
         max: maxY,
         size: sizeY,
         set: props.setY,
-        readOnly: props.readOnly,
+        step: stepY,
+        readOnly: readOnlyY,
         buttons: props.buttons
     };
 
@@ -812,6 +824,13 @@ function useMounted() {
     return mounted;
 }
 
+function openModal(modal) {
+    ReactDOM.render(
+        modal,
+        document.getElementById('modals-container')
+    );
+}
+
 export {
     Modal,
     closeModals,
@@ -836,5 +855,6 @@ export {
     Themed,
     upperFirst,
     useMounted,
+    openModal,
     d
 }

@@ -1,9 +1,20 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 
-import {d, Stack, SwitchButton, Checkbox, Section, Tabs, Tab, Int, Modal, closeModals} from './BaseComponents';
+import {
+    d,
+    Stack,
+    SwitchButton,
+    Checkbox,
+    Section,
+    Tabs,
+    Tab,
+    Int,
+    Modal,
+    closeModals,
+    openModal
+} from './BaseComponents';
 import {EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster, useMountedReadyCellProvider, BitmapEditor, useEditorContextPart} from './Raster';
 import {CellSelection, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider, MapValueCellProvider} from '../classes/CellProvider.js';
-import ReactDOM from "react-dom";
 
 function TileTracker(props) {
     const eContext = useEditorContextPart(props.editorId);
@@ -82,7 +93,7 @@ function ActiveTile(props) {
             });
             closeModals();
         };
-        ReactDOM.render(
+        openModal(
             <Modal name="Edit" closeable>
                 <div style={{height: 600}}>
                     <BitmapEditor
@@ -93,8 +104,7 @@ function ActiveTile(props) {
                         saveHandler={save}
                         bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
                 </div>
-            </Modal>,
-            document.getElementById('modals-container')
+            </Modal>
         );
     };
     return (
