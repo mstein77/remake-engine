@@ -59,7 +59,7 @@ function CellMarker(props) {
     }
     let centerClickHandler = null;
     if (hasMove) {
-        clsCenter.push('cursor-move');
+        clsCenter.push(props.moveCursor === undefined ? 'cursor-move' : props.moveCursor);
         centerClickHandler = (e) => {
             props.initMove(e);
         };
@@ -510,9 +510,9 @@ function CursorArea(props) {
 
     useEffect(() => {
         const rect = divRef.current.getBoundingClientRect();
-        rect.cellSize = cellSize;
+        rect.cellSize = cellPlusBorderSize;
         props.boundingRectRef.current = rect;
-    }, [rasterWidth, rasterHeight, cellSize]);
+    }, [rasterWidth, rasterHeight, cellPlusBorderSize]);
 
     const cursorWidth = props.cursorWidth;
     const cursorHeight = props.cursorHeight;
@@ -2025,7 +2025,9 @@ function RasterOverlays(props) {
 
             const posKey = dim.markerPos;
             let reset = false;
-            if (-1 <= dist && dist <= baseSize) {
+            let lower = baseAndGapSize > 1 ? -1 : 0;
+
+            if (lower <= dist && dist <= baseSize) {
                 change[dim.markerSize] = baseSize;
                 change[posKey] = anchorPos;
             } else if (dist > baseSize) {
@@ -2039,8 +2041,13 @@ function RasterOverlays(props) {
                     baseSize + Math.ceil(Math.abs(dist) / baseAndGapSize) * baseAndGapSize;
                 change[posKey] = anchorPos - change[dim.markerSize] + baseSize;
             }
-            if ((change[posKey] < 0) || (change[posKey] >= dim.size)) {
-                reset = true;
+            if (change[posKey] < 0) {
+                change[dim.markerSize] = Math.floor(anchorPos/baseAndGapSize) * baseAndGapSize;
+                change[posKey] = anchorPos - change[dim.markerSize];
+                change[dim.markerSize] += baseSize;
+            } else if (reset || change[posKey] >= dim.size) {
+                change[dim.markerSize] = Math.floor(dim.size - (anchorPos + baseSize)/baseAndGapSize) * baseAndGapSize + baseSize;
+                change[posKey] = anchorPos;
             }
             if (reset) {
                 change[posKey] = undefined;

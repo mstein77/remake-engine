@@ -582,7 +582,13 @@ function FontPreview(props) {
         }
     }
     let marker = '';
-    if (blockWidth > 0 && blockHeight > 0) {
+    if (blockWidth > 0 && blockHeight > 0 && !(autoCenterX && autoCenterY)) {
+        let moveCursor = 'move';
+        if (autoCenterY) {
+            moveCursor = 'hresize';
+        } else if (autoCenterX) {
+            moveCursor = 'vresize';
+        }
         const initMove = (e) => {
             const rect = overlayRef.current.getBoundingClientRect();
             let lastX = Math.floor((e.clientX - rect.x)/zoom);
@@ -610,7 +616,7 @@ function FontPreview(props) {
                 e.preventDefault();
             };
 
-            eContext.setFixCursor('move');
+            eContext.setFixCursor(moveCursor);
             eContext.addListener(
                 props.editorId,
                 'mousemove',
@@ -642,6 +648,7 @@ function FontPreview(props) {
             posX={posX}
             posY={posY}
             zoom={zoom}
+            moveCursor={'cursor-' + moveCursor}
             bottom={showMarker && (posY + blockHeight < screenY)}
             top={showMarker}
             left={showMarker}
@@ -649,7 +656,7 @@ function FontPreview(props) {
             size={1}
             width={Math.min(blockWidth, screenX - posX)}
             height={Math.min(blockHeight, screenY - posY)}
-            highlight={true}
+            highlight
         />);
     }
     const realWidth = screenX * zoom;
