@@ -1,5 +1,5 @@
 import React, {Fragment, useState} from "react";
-import {Stack, Themed, Section} from "./BaseComponents";
+import {Stack, GlobalCtx, Section} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import FontMapEditor from "./FontMapEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
@@ -7,7 +7,7 @@ import './EditorApp.css';
 
 function Page(props) {
     return (
-        <Themed>
+        <GlobalCtx>
             <Stack dir="y" full>
                 <div className="head padded">
                     <Stack dir="x">
@@ -24,7 +24,7 @@ function Page(props) {
                 </div>
             </Stack>
             <div id="modals-container"></div>
-        </Themed>
+        </GlobalCtx>
     );
 }
 

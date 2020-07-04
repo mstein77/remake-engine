@@ -2,7 +2,7 @@ import React, {Fragment, useState, useRef, useEffect, useContext, useMemo} from 
 import {
     Checkbox,
     Color,
-    CssContext,
+    GlobalContext,
     Dim,
     Int,
     Stack,
@@ -11,9 +11,7 @@ import {
     MouseOverlay,
     useMounted,
     d,
-    Modal,
-    openModal,
-    closeModals
+    useModal
 } from "./BaseComponents";
 import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 
@@ -245,7 +243,7 @@ function useRasterDim(props) {
 }
 
 function VRuler(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const rulerRef = useRef(null);
     const rulerPadding = context.markerWidth;
     const fontSize = 10;
@@ -300,7 +298,7 @@ function VRuler(props) {
 }
 
 function HRuler(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const rulerRef = useRef(null);
     const rulerPadding = context.markerWidth;
     const fontSize = 10;
@@ -1016,7 +1014,7 @@ const EditorContext = React.createContext();
  *   - canvasRef
  */
 const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const canvasElemRef = useRef(null);
 
     const cellPlusBorderSize = props.cellSize + props.border;
@@ -1074,7 +1072,7 @@ const RasterCanvas = React.memo(React.forwardRef((props, canvasRef) => {
  *
  */
 function CellRaster(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const canvasRef = useRef(null);
     const height = props.cells.length;
     const width = (height === 0) ? 0 : props.cells[0].length;
@@ -1375,7 +1373,7 @@ function FlexCellProviderRaster(props) {
  *
  */
 function FlexCellProviderScrollRaster(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const style = {
         display: 'grid',
         gridTemplateColumns: 'auto',
@@ -1449,6 +1447,7 @@ function BaseCellProviderIndexRaster(props) {
     const boundingRectRef = useRef(null);
     const [active, setActive] = useState(false);
     const [overlayRef, eContext] = useOverlay(props.editorId);
+    const EditModal = useModal();
 
     const propsRef = useRef(null);
     propsRef.current = {
@@ -1473,21 +1472,10 @@ function BaseCellProviderIndexRaster(props) {
                         props.mapProvider.setBitmapForValue(actionIndex, undoImage);
                         eContext.updateRaster();
                     });
-                    closeModals();
+                    EditModal.hide();
                 };
-                openModal(
-                    <Modal name="Edit" closeable>
-                        <div style={{height: 600}}>
-                            <BitmapEditor
-                                resize={false}
-                                zoom="5"
-                                border="1"
-                                cancelHandler={() => {closeModals()}}
-                                saveHandler={save}
-                                bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
-                        </div>
-                    </Modal>
-                );
+                const bitmap = props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png');
+                EditModal.show({save, bitmap});
             }
         });
     }, []);
@@ -1541,6 +1529,17 @@ function BaseCellProviderIndexRaster(props) {
                 />
             </FlexCellProviderScrollRaster>
             <MouseOverlay cursor="pointer" active={active} />
+            <EditModal.render name="Edit" closeable>
+                <div style={{height: 600}}>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={EditModal.hide}
+                        saveHandler={EditModal.params.save}
+                        bitmap={EditModal.params.bitmap} />
+                </div>
+            </EditModal.render>
         </div>
     );
 }
@@ -3183,6 +3182,9 @@ function useOverlay(id) {
         overlay.current.updateState = () => {
             setUpdateState(!updateRef.current);
         };
+        return () => {
+            overlay.current.updateState = null;
+        };
     }, []);
 
     return [overlay, eContext];
@@ -3195,7 +3197,7 @@ function useOverlay(id) {
  * @constructor
  */
 function BasicRasterView(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
 
     const defaults = props.defaults ? props.defaults : {};
 
@@ -3511,7 +3513,7 @@ function BasicRasterView(props) {
 }
 
 function FlexRasterIndex(props) {
-    const context = useContext(CssContext);
+    const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
     const [zoom, setZoom] = useState(props.zoom || 10);
     const [pos, setPos] = useState(0);
@@ -3787,7 +3789,7 @@ function BitmapSelector(props) {
     const selectionType = eContext.selection ? eContext.selection.getType() : 'none';
 
     const select = () => {
-        props.okay(resultRef.current);
+        props.saveHandler(resultRef.current);
     };
 
     return (
@@ -3810,14 +3812,13 @@ function BitmapSelector(props) {
 
             <div>
                 <button disabled={selectionType === 'none'} onClick={select}>OK</button>
-                <button onClick={() => {closeModals()}}>Cancel</button>
+                <button onClick={props.cancelHandler}>Cancel</button>
             </div>
         </Stack>
     )
 }
 
 function BitmapEditor(props) {
-
     const cellProvider = useMemo(() => {
         return new BitmapCellProvider(4,
             props.bitmap
@@ -3895,23 +3896,6 @@ function useEditorContextPart(id, updateCallback = null) {
     return eContext;
 }
 
-function BitmapSelectorModal(props, okay) {
-    openModal(
-        <EditorCtx>
-        <Modal name={props.name} closeable>
-            <div style={{height: 600}}>
-                <BitmapSelector
-                    zoom="5"
-                    border="1"
-                    selection={props.selection}
-                    okay={okay}
-                    bitmap={props.bitmap} />
-            </div>
-        </Modal>
-        </EditorCtx>
-    );
-}
-
 export {
     CellMarker,
     RasterCanvas,
@@ -3921,7 +3905,7 @@ export {
     CellProviderRaster,
     useEditorContextPart,
     BitmapEditor,
-    BitmapSelectorModal,
+    BitmapSelector,
     BaseCellProviderIndexRaster,
     useMountedReadyCellProvider,
     RasterScrollbar,

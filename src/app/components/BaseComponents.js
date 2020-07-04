@@ -1,8 +1,8 @@
-import React, {useState, useRef, useEffect} from "react";
+import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
 import {BitmapSelector} from "./Raster";
 
-const CssContext = React.createContext();
+const GlobalContext = React.createContext();
 
 function d(main, ...params) {
     let stack = null;
@@ -732,42 +732,91 @@ class Section extends React.Component {
     }
 }
 
-function closeModals(e) {
-    ReactDOM.unmountComponentAtNode(document.getElementById('modals-container'));
+function useModal() {
+    const context = useContext(GlobalContext);
+    const [isActive, setIsActive] = useState(false);
+    const paramsRef = useRef(null);
+    const hide = () => {
+        paramsRef.current = null;
+        context.closeModal(isActive);
+        setIsActive(false);
+    };
+    const show = (modalParams) => {
+        paramsRef.current = modalParams;
+        setIsActive(context.openModal());
+    };
+    const render = (props) => {
+        const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
+        d('z-index', isActive);
+        return (
+            <Fragment>
+                {isActive && <Modal hide={hide} zIndex={isActive} name={title} closeable={props.closeable}>{props.children}</Modal>}
+            </Fragment>
+        );
+    };
+    return {
+        render,
+        show,
+        hide,
+        get params() {
+            return paramsRef.current === null ? {} : paramsRef.current;
+        }
+    };
 }
 
-function Modal(props) {
+const Modal = React.memo((props) => {
 
+    const domElem = document.getElementById('modals-container');
+    if (!domElem) {
+        return null;
+    }
     const cls = [
         'modal-centered stack-v boxed inner-border-v'
     ];
-
-    const modal = <Themed><div className={cls.join(' ')}>
-        <div className="title-area-active padded stack-h inner-space-h">
-            <div className="flex">{props.name}</div>
-            <div className="action-box" onClick={(e) => {
-                closeModals();
-                e.stopPropagation();
-            }}><i className="material-icons md-18">close</i></div>
+    let modal = (
+        <div className="modal-overlay" style={{zIndex: props.zIndex}}>
+            <div className={cls.join(' ')} style={{zIndex: props.zIndex + 4}}>
+                <div className="title-area-active padded stack-h inner-space-h">
+                    <div className="flex">{props.name}</div>
+                    <div className="action-box" onClick={(e) => {
+                        props.hide();
+                        e.stopPropagation();
+                    }}><i className="material-icons md-18">close</i></div>
+                </div>
+                <div className="content-area flex">{props.children}</div>
+            </div>
         </div>
-        <div className="content-area flex">{props.children}</div>
-    </div></Themed>;
+    );
 
     if (props.closeable) {
-        return (<div className="modal-click-area" onClick={(e) => {
-            let target = e.target;
-            while(target.classList !== undefined) {
-                if (target.classList.contains('modal-centered')) {
-                    return;
+        modal = (
+            <div
+                className="modal-click-area"
+                style={{zIndex: props.zIndex + 1}}
+                onClick={
+                    (e) => {
+                        let target = e.target;
+                        while(target.classList !== undefined) {
+                            if (target.classList.contains('modal-centered')) {
+                                return;
+                            }
+                            target = target.parentNode;
+                        }
+                        props.hide();
+                    }
                 }
-                target = target.parentNode;
-            }
-            closeModals();
-        }}>{modal}</div>);
+            >
+                {modal}
+            </div>
+        );
     }
-
-    return modal;
-}
+    return (
+        ReactDOM.createPortal(
+            modal,
+            domElem
+        )
+    );
+});
 
 function MouseOverlay(props) {
     if (!props.active) {
@@ -779,31 +828,54 @@ function MouseOverlay(props) {
     );
 }
 
-function Themed(props) {
+class GlobalCtx extends React.Component {
 
-    const [bgColor, setBgColor] = useState('#666677');
-    const [bgOpacity, setBgOpacity] = useState(10);
+    constructor(props) {
+        super(props);
+        const style = getComputedStyle(document.body);
+        const getNumFromPx = (value) => {
+            return parseInt(value, 10);
+        };
 
-    const getNumFromPx = (value) => {
-        return parseInt(value, 10);
-    };
+        this.modalStack = [];
 
-    const style = getComputedStyle(document.body);
-    const css = {
-        contentTextColor: style.getPropertyValue('--content-text-color'),
-        defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
-        markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
-        bgColor,
-        setBgColor,
-        bgOpacity,
-        setBgOpacity
-    };
+        this.state = {
+            contentTextColor: style.getPropertyValue('--content-text-color'),
+            defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
+            markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
+            bgColor: '#666677',
+            setBgColor: (bgColor) => {
+                this.setState({bgColor});
+            },
+            bgOpacity: 10,
+            setBgOpacity: (bgOpacity) => {
+                this.setState({bgOpacity});
+            },
+            openModal: () => {
+                let zIndex = 10000;
+                const len = this.modalStack.length;
+                if (len > 0) {
+                    zIndex = this.modalStack[len - 1] + 10;
+                }
+                this.modalStack.push(zIndex);
+            },
+            closeModal: (zIndex) => {
+                const index = this.modalStack.indexOf(zIndex);
+                if (index === -1) {
+                    return;
+                }
+                this.modalStack.splice(index, 1);
+            }
+        };
+    }
 
-    return (
-        <CssContext.Provider value={css}>
-            {props.children}
-        </CssContext.Provider>
-    );
+    render() {
+        return (
+            <GlobalContext.Provider value={this.state}>
+                {this.props.children}
+            </GlobalContext.Provider>
+        );
+    }
 }
 
 function upperFirst(value) {
@@ -824,16 +896,7 @@ function useMounted() {
     return mounted;
 }
 
-function openModal(modal) {
-    ReactDOM.render(
-        modal,
-        document.getElementById('modals-container')
-    );
-}
-
 export {
-    Modal,
-    closeModals,
     Section,
     Tab,
     Tabs,
@@ -848,13 +911,13 @@ export {
     Scrollbar,
     Color,
     SwitchButton,
-    CssContext,
+    GlobalContext,
     useWindowEventManager,
     getWindowEventManager,
     MouseOverlay,
-    Themed,
+    GlobalCtx,
     upperFirst,
     useMounted,
-    openModal,
+    useModal,
     d
 }

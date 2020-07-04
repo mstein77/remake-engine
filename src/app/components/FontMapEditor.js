@@ -1,13 +1,13 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
-import {closeModals, d, Section, Modal, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color, CssContext, openModal} from "./BaseComponents";
+import {useModal, d, Section, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color} from "./BaseComponents";
 import {
     EditorCtx,
     EditorContext,
-    BitmapSelectorModal,
     useMountedReadyCellProvider,
     FlexRasterIndex,
     BitmapEditor,
+    BitmapSelector,
     useEditorContextPart,
     CellMarker
 } from "./Raster";
@@ -49,7 +49,7 @@ function CharInput(props) {
     );
 }
 
-function CharAssignModal(props) {
+function CharAssign(props) {
     const defaultValues = [];
     while(defaultValues.length < props.provider.getWidth()) {
         defaultValues.push('');
@@ -83,33 +83,31 @@ function CharAssignModal(props) {
     };
     return (
         <EditorCtx>
-            <Modal name="Save as..." closeable>
-                <Stack dir="y">
-                    <div>
-                        <FlexRasterIndex
-                            cellProvider={props.provider}
-                            minWidth={50}
-                            titleHeight={22}
-                            incPosRef={incPosRef}
-                            renderTitle={
-                                (index) => {
-                                    return (
-                                        <Stack dir="x">
-                                            <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
-                                            <div>
-                                                <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
-                                            </div>
-                                        </Stack>
-                                    );
-                                }
-                            } />
-                    </div>
-                    <div>
-                        <button disabled={values.indexOf('') !== -1} onClick={() => props.assign(values)}>Save</button>
-                        <button onClick={closeModals}>Cancel</button>
-                    </div>
-                </Stack>
-            </Modal>
+            <Stack dir="y">
+                <div>
+                    <FlexRasterIndex
+                        cellProvider={props.provider}
+                        minWidth={50}
+                        titleHeight={22}
+                        incPosRef={incPosRef}
+                        renderTitle={
+                            (index) => {
+                                return (
+                                    <Stack dir="x">
+                                        <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
+                                        <div>
+                                            <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
+                                        </div>
+                                    </Stack>
+                                );
+                            }
+                        } />
+                </div>
+                <div>
+                    <button disabled={values.indexOf('') !== -1} onClick={() => props.assign(values)}>Save</button>
+                    <button onClick={props.cancelHandler}>Cancel</button>
+                </div>
+            </Stack>
         </EditorCtx>
     );
 }
@@ -119,6 +117,11 @@ function CharIndex(props) {
 
     const eContext = useContext(EditorContext);
     const incPosRef = useRef(null);
+
+    const NewCharModal = useModal();
+    const EditCharModal = useModal();
+    const AssignCharsModal = useModal();
+    const ImportCharsModal = useModal();
 
     const getCharsForIndices = (indices) => {
         const chars = [];
@@ -231,7 +234,6 @@ function CharIndex(props) {
             doAction: (indices) => {
                 const bitmap = props.cellProvider.getBitmapForIndex(indices[0], 1, false).getContext('2d').getImageData(0, 0, size, size);
                 const selection = new CellSelection('bitmap', [[bitmap]]);
-                d(selection);
                 eContext.setSelection(selection);
             },
             isHidden: (props) => {
@@ -315,14 +317,9 @@ function CharIndex(props) {
                 }
             );
             incPosRef.current.setMarked([]);
-            closeModals();
+            AssignCharsModal.hide();
         };
-        openModal(
-            <CharAssignModal
-                provider={assignProvider}
-                assign={assign}
-            />
-        );
+        AssignCharsModal.show({provider: assignProvider, assign});
     };
 
     const importChars = () => {
@@ -336,21 +333,19 @@ function CharIndex(props) {
                 providers.push(provider);
             }
             saveChars(providers);
+            ImportCharsModal.hide();
         };
-        BitmapSelectorModal(
-            {
-                name: 'Select Rect',
-                selection: {
-                    type: 'rect',
-                    width: size,
-                    height: size,
-                    multi: true,
-                    doubleClick: selected
-                },
-                bitmap: props.source
+        ImportCharsModal.show({
+            selection: {
+                type: 'rect',
+                width: size,
+                height: size,
+                multi: true,
+                doubleClick: selected
             },
-            selected
-        );
+            bitmap: props.source,
+            save: selected
+        });
     };
 
     const deleteCharAtIndex = (index) => {
@@ -378,20 +373,7 @@ function CharIndex(props) {
         ctx.fillStyle = '#ffffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         const bitmap = canvas.toDataURL('image/png');
-
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={saveChars}
-                        bitmap={bitmap} />
-                </div>
-            </Modal>
-        );
+        NewCharModal.show({bitmap});
     };
 
     const editChar = (index) => {
@@ -411,21 +393,9 @@ function CharIndex(props) {
                     update();
                 }
             );
-            closeModals();
+            EditCharModal.hide();
         };
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={save}
-                        bitmap={bitmap} />
-                </div>
-            </Modal>
-        );
+        EditCharModal.show({title: 'Edit char at index ' + index, save, bitmap});
     };
 
     return (
@@ -465,6 +435,52 @@ function CharIndex(props) {
                         } />
                 </div>
             </Stack>
+            <NewCharModal.render name="New Char" closeable>
+                <div style={{height: 600}}>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={NewCharModal.hide}
+                        saveHandler={(provider) => {
+                            NewCharModal.hide();
+                            saveChars(provider);
+                        }}
+                        bitmap={NewCharModal.params.bitmap} />
+                </div>
+            </NewCharModal.render>
+            <EditCharModal.render name="Edit Char" closeable>
+                <div style={{height: 600}}>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={EditCharModal.hide}
+                        saveHandler={EditCharModal.params.save}
+                        bitmap={EditCharModal.params.bitmap} />
+                </div>
+            </EditCharModal.render>
+            <ImportCharsModal.render name="Select" closeable>
+                <div style={{height: 600}}>
+                    <EditorCtx>
+                        <BitmapSelector
+                            zoom="5"
+                            border="1"
+                            selection={ImportCharsModal.params.selection}
+                            cancelHandler={ImportCharsModal.hide}
+                            saveHandler={ImportCharsModal.params.save}
+                            bitmap={ImportCharsModal.params.bitmap}
+                        />
+                        </EditorCtx>
+                </div>
+            </ImportCharsModal.render>
+            <AssignCharsModal.render name="Assign Chars" closeable>
+                <CharAssign
+                    provider={AssignCharsModal.params.provider}
+                    assign={AssignCharsModal.params.assign}
+                    cancelHandler={AssignCharsModal.hide}
+                />
+            </AssignCharsModal.render>
         </div>
     );
 }

@@ -9,9 +9,7 @@ import {
     Tabs,
     Tab,
     Int,
-    Modal,
-    closeModals,
-    openModal
+    useModal
 } from './BaseComponents';
 import {EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster, useMountedReadyCellProvider, BitmapEditor, useEditorContextPart} from './Raster';
 import {CellSelection, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider, MapValueCellProvider} from '../classes/CellProvider.js';
@@ -61,6 +59,7 @@ function TileTracker(props) {
 
 function ActiveTile(props) {
     const eContext = useContext(EditorContext);
+    const EditModal = useModal();
     const selection = eContext.selection;
     const style = {width: 180};
     const width = selection ? selection.getWidth() : 1;
@@ -91,21 +90,10 @@ function ActiveTile(props) {
                 props.indexProvider.setBitmapForValue(actionIndex, undoImage);
                 eContext.updateRaster();
             });
-            closeModals();
+            EditModal.hide();
         };
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={save}
-                        bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
-                </div>
-            </Modal>
-        );
+        const bitmap = props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png');
+        EditModal.show({save, bitmap});
     };
     return (
         <div style={style}>
@@ -129,6 +117,17 @@ function ActiveTile(props) {
             <div>Index: {index}</div>
             <div>Width: {width}</div>
             <div>Height: {height}</div>
+            <EditModal.render name="Edit" closeable>
+                <div style={{height: 600}}>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={EditModal.hide}
+                        saveHandler={EditModal.params.save}
+                        bitmap={EditModal.params.bitmap} />
+                </div>
+            </EditModal.render>
         </div>
     );
 }
