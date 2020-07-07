@@ -1,6 +1,8 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
-import {useModal, d, Section, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color} from "./BaseComponents";
+import {useModal, useKeyListener, Section, Content, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color} from "./BaseComponents";
+import {d} from '../helper/helper';
+
 import {
     EditorCtx,
     EditorContext,
@@ -39,6 +41,7 @@ function CharInput(props) {
                     setValue(newValue);
                     newValues[props.index] = newValue;
                     if (inputValue !== '') {
+                        inputRef.current.blur();
                         props.setFocusIndex(props.index + 1);
                     } else {
                         props.setFocusIndex(props.index);
@@ -56,7 +59,10 @@ function CharAssign(props) {
     }
     const [values, setValues] = useState(defaultValues);
     const [focusIndex, setFocusIndex] = useState(0);
+    const saveRef = useRef(null);
+    saveRef.current = values;
     const incPosRef = useRef(null);
+    useKeyListener(13, () => {if (saveRef.current.indexOf('') !== -1) return false; save(); return true});
 
     const updateFocusIndex = (newIndex) => {
         const endPos = incPosRef.current.pos + incPosRef.current.page;
@@ -81,10 +87,14 @@ function CharAssign(props) {
         }
         setValues(newValues);
     };
+    const save = () => {
+        props.assign(saveRef.current);
+    };
+
     return (
         <EditorCtx>
-            <Stack dir="y">
-                <div>
+            <Stack vertical fit>
+                <Content>
                     <FlexRasterIndex
                         cellProvider={props.provider}
                         minWidth={50}
@@ -93,7 +103,7 @@ function CharAssign(props) {
                         renderTitle={
                             (index) => {
                                 return (
-                                    <Stack dir="x">
+                                    <Stack>
                                         <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
                                         <div>
                                             <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
@@ -102,11 +112,13 @@ function CharAssign(props) {
                                 );
                             }
                         } />
-                </div>
-                <div>
-                    <button disabled={values.indexOf('') !== -1} onClick={() => props.assign(values)}>Save</button>
-                    <button onClick={props.cancelHandler}>Cancel</button>
-                </div>
+                </Content>
+                <Content padded>
+                    <Stack>
+                        <button disabled={values.indexOf('') !== -1} onClick={save}>Save</button>
+                        <button onClick={props.cancelHandler}>Cancel</button>
+                    </Stack>
+                </Content>
             </Stack>
         </EditorCtx>
     );
@@ -399,15 +411,16 @@ function CharIndex(props) {
     };
 
     return (
-        <div>
-            <Stack dir="x" full border>
-                <div className="padded">
-                    <Stack dir="y">
+        <Fragment>
+            <Stack fullHeight border>
+                <Content padded>
+                    <Stack vertical>
                         <button onClick={newChar}>New</button>
                         <button onClick={importChars}>Import</button>
                     </Stack>
-                </div>
-                <div className="flex">
+                </Content>
+
+                <Content flex>
                     <FlexRasterIndex
                         editorId="fontIndex"
                         cellProvider={props.cellProvider}
@@ -422,66 +435,65 @@ function CharIndex(props) {
                             (index) => {
                                 const char = props.cellProvider.getCharAt(index);
                                 return (
-                                    <Stack dir="x">
-                                        <div className="flex">
-                                            <kbd className="padded title-area-active">{char.char}</kbd>
-                                        </div>
-                                        <div>
+                                    <Stack>
+                                        <Content flex>
+                                            <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + char.code + ';'}}></kbd>
+                                        </Content>
+                                        <Content>
                                             <kbd>{char.code}</kbd>
-                                        </div>
+                                        </Content>
                                     </Stack>
                                 );
                             }
                         } />
-                </div>
+                </Content>
             </Stack>
-            <NewCharModal.render name="New Char" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={NewCharModal.hide}
-                        saveHandler={(provider) => {
-                            NewCharModal.hide();
-                            saveChars(provider);
-                        }}
-                        bitmap={NewCharModal.params.bitmap} />
-                </div>
+
+            <NewCharModal.render name="New Char" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={NewCharModal.hide}
+                    saveHandler={(provider) => {
+                        NewCharModal.hide();
+                        saveChars(provider);
+                    }}
+                    bitmap={NewCharModal.params.bitmap} />
             </NewCharModal.render>
-            <EditCharModal.render name="Edit Char" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
+
+            <EditCharModal.render name="Edit Char" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={EditCharModal.hide}
+                    saveHandler={EditCharModal.params.save}
+                    bitmap={EditCharModal.params.bitmap} />
+            </EditCharModal.render>
+
+            <ImportCharsModal.render name="Select" height={600} closeable>
+                <EditorCtx>
+                    <BitmapSelector
                         zoom="5"
                         border="1"
-                        cancelHandler={EditCharModal.hide}
-                        saveHandler={EditCharModal.params.save}
-                        bitmap={EditCharModal.params.bitmap} />
-                </div>
-            </EditCharModal.render>
-            <ImportCharsModal.render name="Select" closeable>
-                <div style={{height: 600}}>
-                    <EditorCtx>
-                        <BitmapSelector
-                            zoom="5"
-                            border="1"
-                            selection={ImportCharsModal.params.selection}
-                            cancelHandler={ImportCharsModal.hide}
-                            saveHandler={ImportCharsModal.params.save}
-                            bitmap={ImportCharsModal.params.bitmap}
-                        />
-                        </EditorCtx>
-                </div>
+                        selection={ImportCharsModal.params.selection}
+                        cancelHandler={ImportCharsModal.hide}
+                        saveHandler={ImportCharsModal.params.save}
+                        bitmap={ImportCharsModal.params.bitmap}
+                    />
+                </EditorCtx>
             </ImportCharsModal.render>
-            <AssignCharsModal.render name="Assign Chars" closeable>
+
+            <AssignCharsModal.render name="Assign Chars" fit closeable>
                 <CharAssign
                     provider={AssignCharsModal.params.provider}
                     assign={AssignCharsModal.params.assign}
                     cancelHandler={AssignCharsModal.hide}
                 />
             </AssignCharsModal.render>
-        </div>
+
+        </Fragment>
     );
 }
 
@@ -679,23 +691,23 @@ function FontPreview(props) {
     const realHeight = screenY * zoom;
 
     return (
-        <Stack dir="x" full>
+        <Stack fullHeight>
             <Section name="Screen">
-                <div className="padded">
+                <Content padded fullHeight scroll>
                     <Dim name="Position"
                          setX={setPosX} setY={setPosY} minX={0}
                          readOnlyX={autoCenterX} readOnlyY={autoCenterY}
                          minY={0} maxX={screenX} maxY={screenY} x={posX} y={posY} buttons />
-                    <Stack dir="x">
+                    <Stack fit>
                         <div>Auto-Center: </div>
                         <Checkbox name="X" value={autoCenterX} set={setAutoCenterX} />
                         <Checkbox name="Y" value={autoCenterY} set={setAutoCenterY} />
                     </Stack>
                     <Checkbox name="Rasterize" value={rasterize} set={setRasterize} />
-                    <Stack dir="x" padded>
+                    <Stack padded>
                         <div>Text align: </div>
                         <div className="padded">
-                            <Stack dir="x">
+                            <Stack>
                                 <SwitchButton enabled={textAlign === 'left'} switch={() => setTextAlign('left')}><i className="material-icons md-18">format_align_left</i></SwitchButton>
                                 <SwitchButton enabled={textAlign === 'center'} switch={() => setTextAlign('center')}><i className="material-icons md-18">format_align_center</i></SwitchButton>
                                 <SwitchButton enabled={textAlign === 'right'} switch={() => setTextAlign('right')}><i className="material-icons md-18">format_align_right</i></SwitchButton>
@@ -703,26 +715,26 @@ function FontPreview(props) {
                         </div>
                     </Stack>
                     <textarea rows={20} cols={40} value={demoText} onChange={(e) => {setDemoText(e.target.value); imgRef.current = null}}></textarea>
-                </div>
+                </Content>
             </Section>
 
             <Section name="Preview" flex>
-                <Stack dir="y" border>
-                <Toolbar>
-                    <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
-                    <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
-                    <Color value={bgColor} set={setBgColor} />
-                </Toolbar>
-                <div className="padded flex">
-                    <div className="thin-boxed min-content">
-                        <canvas ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
-                    </div>
-                    <div className="rel-canvas" style={{height: 0}}>
-                        <div ref={overlayRef} className="" style={{position: 'relative', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: -(realHeight + 1), left: 1}}>
-                            {marker}
+                <Stack vertical border>
+                    <Toolbar>
+                        <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
+                        <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
+                        <Color value={bgColor} set={setBgColor} />
+                    </Toolbar>
+                    <Content padded flex scroll>
+                        <div className="thin-boxed min-content">
+                            <canvas ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
                         </div>
-                    </div>
-                </div>
+                        <div className="rel-canvas" style={{height: 0}}>
+                            <div ref={overlayRef} className="" style={{position: 'relative', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: -(realHeight + 1), left: 1}}>
+                                {marker}
+                            </div>
+                        </div>
+                    </Content>
                 </Stack>
             </Section>
         </Stack>
@@ -739,13 +751,13 @@ function FontMapEditor(props) {
 
     return (
         <EditorCtx>
-            <Stack dir="y" full>
+            <Stack vertical fullHeight>
                 <Section name="Font">
                     <CharIndex cellProvider={provider} source={bitmap} />
                 </Section>
-                <div className="flex">
+                <Content flex>
                     <FontPreview editorId="preview" provider={provider} source={bitmap} />
-                </div>
+                </Content>
             </Stack>
         </EditorCtx>
     );

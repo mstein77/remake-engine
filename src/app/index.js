@@ -4231,7 +4231,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 // TODO: remove!
 
-                this.activeResource = 0;
+                this.activeResource = 1;
                 this.openEditorMode();
 
                 if (inputController.hasInput('back')) {

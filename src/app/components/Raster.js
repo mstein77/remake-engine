@@ -6,13 +6,15 @@ import {
     Dim,
     Int,
     Stack,
+    Content,
     SwitchButton,
     Toolbar,
     MouseOverlay,
     useMounted,
-    d,
     useModal
 } from "./BaseComponents";
+import {d} from '../helper/helper';
+
 import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 
 function CellMarker(props) {
@@ -1142,8 +1144,6 @@ const CellProviderRaster = React.memo((props) => {
         cellSize
     };
 
-
-
     if (!renderRef.current) {
         const type = props.cellProvider.getCellType();
         switch (type) {
@@ -1481,66 +1481,64 @@ function BaseCellProviderIndexRaster(props) {
     }, []);
 
     return (
-        <div className="full-v padded">
-            <FlexCellProviderScrollRaster
-                cellProvider={props.cellProvider}
-                auto={true}
-                posX={posX}
-                setPosX={setPosX}
-                posY={posY}
-                border={border}
-                renderOptions={renderOptions}
-                setPosY={setPosY}
-                width={width}
-                setWidth={setWidth}
-                height={height}
-                setHeight={setHeight}
-                zoom={zoom}
-                rulers={rulers}
-                editorId={props.editorId}>
-                <RasterOverlays
-                    overlayRef={overlayRef}
-                    setWidth={setWidth}
-                    setHeight={setHeight}
+        <Content padded fullHeight>
+                <FlexCellProviderScrollRaster
+                    cellProvider={props.cellProvider}
+                    auto={true}
+                    posX={posX}
                     setPosX={setPosX}
+                    posY={posY}
+                    border={border}
+                    renderOptions={renderOptions}
                     setPosY={setPosY}
                     width={width}
+                    setWidth={setWidth}
                     height={height}
-                    posX={posX}
-                    posY={posY}
-                    editorId={props.editorId}
-                    mode="pick"
+                    setHeight={setHeight}
                     zoom={zoom}
-                    border={border}
                     rulers={rulers}
-                    markerX={markerX}
-                    markerY={markerY}
-                    markerGapX={0}
-                    markerGapY={0}
-                    markerWidth={markerWidth}
-                    markerHeight={markerHeight}
-                    markerType={markerType}
-                    setMarkerX={setMarkerX}
-                    setMarkerY={setMarkerY}
-                    setMarkerWidth={setMarkerWidth}
-                    setMarkerHeight={setMarkerHeight}
-                    setMarkerType={setMarkerType}
-                    cellProvider={props.cellProvider}
-                />
-            </FlexCellProviderScrollRaster>
+                    editorId={props.editorId}>
+                    <RasterOverlays
+                        overlayRef={overlayRef}
+                        setWidth={setWidth}
+                        setHeight={setHeight}
+                        setPosX={setPosX}
+                        setPosY={setPosY}
+                        width={width}
+                        height={height}
+                        posX={posX}
+                        posY={posY}
+                        editorId={props.editorId}
+                        mode="pick"
+                        zoom={zoom}
+                        border={border}
+                        rulers={rulers}
+                        markerX={markerX}
+                        markerY={markerY}
+                        markerGapX={0}
+                        markerGapY={0}
+                        markerWidth={markerWidth}
+                        markerHeight={markerHeight}
+                        markerType={markerType}
+                        setMarkerX={setMarkerX}
+                        setMarkerY={setMarkerY}
+                        setMarkerWidth={setMarkerWidth}
+                        setMarkerHeight={setMarkerHeight}
+                        setMarkerType={setMarkerType}
+                        cellProvider={props.cellProvider}
+                    />
+                </FlexCellProviderScrollRaster>
             <MouseOverlay cursor="pointer" active={active} />
-            <EditModal.render name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={EditModal.hide}
-                        saveHandler={EditModal.params.save}
-                        bitmap={EditModal.params.bitmap} />
-                </div>
+            <EditModal.render name="Edit" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={EditModal.hide}
+                    saveHandler={EditModal.params.save}
+                    bitmap={EditModal.params.bitmap} />
             </EditModal.render>
-        </div>
+        </Content>
     );
 }
 
@@ -3097,11 +3095,11 @@ function RasterViewGrid(props) {
     return (
         <div className={gridCls.join(' ')}>
             <div>{getNavButton('xy', true, true)}</div>
-            <div>{getSizeButtons(true, true)}</div>
+            <Stack align="center">{getSizeButtons(true, true)}</Stack>
             <div>{getNavButton('xy',false, true)}</div>
 
             <div>
-                <Stack dir="x" center full>
+                <Stack vertical align="center" alignItems="center" fullHeight>
                     {getSizeButtons(true, false)}
                 </Stack>
             </div>
@@ -3159,13 +3157,13 @@ function RasterViewGrid(props) {
                 </FlexCellProviderScrollRaster>
             </div>
             <div>
-                <Stack dir="x" center full>
+                <Stack vertical align="center" alignItems="center" fullHeight>
                     {getSizeButtons(false, false)}
                 </Stack>
             </div>
 
             <div>{getNavButton('xy',true, false)}</div>
-            <div>{getSizeButtons(false, true)}</div>
+            <Stack align="center">{getSizeButtons(false, true)}</Stack>
             <div>{getNavButton('xy',false, false)}</div>
         </div>
     );
@@ -3386,7 +3384,7 @@ function BasicRasterView(props) {
     }
     const bottomToolbar =
         <Toolbar>
-            <div>Mode: {modeInfo}</div>
+            <Stack fullHeight align="center"><Content>Mode: {modeInfo}</Content></Stack>
             {bottomTools}
             {bottomActions}
         </Toolbar>;
@@ -3430,7 +3428,7 @@ function BasicRasterView(props) {
             );
         };
         modeSelect = (
-            <Stack dir="x">
+            <Stack>
                 <SwitchButton enabled={mode === 'pick'} switch={(enabled) => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
                 <SwitchButton enabled={false} switch={() => overlay.current.setMode('select', {type: 'rect', all: true})}>All</SwitchButton>
                 <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rect'} switch={(enabled) => {selectMode(enabled, 'rect')}}>Rect</SwitchButton>
@@ -3458,16 +3456,16 @@ function BasicRasterView(props) {
         {zoomInput}
         <Int name="Border:" min="0" max="5" set={setBorder} value={border} buttons />
         <Checkbox name="Rulers" value={rulers} set={setRulers} />
-        <Stack dir="x">
+        <Stack>
             <Int name="Background:" min="0" max="26" set={context.setBgOpacity} value={context.bgOpacity} buttons />
             <Color value={context.bgColor} set={(value) => {context.setBgColor(value)}} />
         </Stack>
     </Toolbar>;
 
     return (
-        <Stack dir="y" border full>
+        <Stack vertical border fullHeight>
             {topToolbar}
-            <div className="flex items-centered align-center full-v">
+            <Content flex fullHeight>
                 <RasterViewGrid
                     auto
                     resizeable={resizeable}
@@ -3506,7 +3504,7 @@ function BasicRasterView(props) {
                     setMarkerHeight={setMarkerHeight}
                     setMarkerType={setMarkerType}
                 />
-            </div>
+            </Content>
             {bottomToolbar}
         </Stack>
     );
@@ -3669,6 +3667,7 @@ function FlexRasterIndex(props) {
             cls.push('hover-item');
         }
         const click = props.actions ? () => {toggleMarker(i)} : null;
+        // TODO replace DIVs
         items.push(
             <div key={i} className={cls.join(' ')}
                  style={style}
@@ -3676,9 +3675,9 @@ function FlexRasterIndex(props) {
                  onContextMenu={getRightClickAction(i)}
                  onClick={click}
             >
-                <Stack dir="y">
-                    <div style={{height: props.titleHeight}}>{props.renderTitle(i)}</div>
-                    <div className="center-h">
+                <Stack vertical>
+                    <Content height={props.titleHeight}>{props.renderTitle(i)}</Content>
+                    <Stack alignItems="center" align="center">
                         <div className="thin-boxed min-content">
                             <CellProviderRaster
                                 cellProvider={selectionProvider}
@@ -3691,7 +3690,7 @@ function FlexRasterIndex(props) {
                                 renderOptions={{events: false, caching: false}}
                             />
                         </div>
-                    </div>
+                    </Stack>
                 </Stack>
             </div>
         );
@@ -3699,7 +3698,7 @@ function FlexRasterIndex(props) {
 
     let bottomItems = [];
     if (props.actions && marked.length > 0) {
-        bottomItems.push(<div key="info">Marked items: {marked.length}</div>);
+        bottomItems.push(<Content key="info">Marked items: {marked.length}</Content>);
 
         const bottomActions = [];
         bottomActions.push(<button key="all" onClick={() => {
@@ -3733,30 +3732,30 @@ function FlexRasterIndex(props) {
         }
         bottomActions.push(<button key="cancel" onClick={() => {setMarked([])}}>X</button>);
         bottomItems.push(
-            <div key="actions">
+            <Stack fit key="actions">
                 {bottomActions}
-            </div>
+            </Stack>
         );
     }
     const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
 
     return (
-        <Stack dir="y" full border>
+        <Stack vertical fullHeight border>
             <Toolbar>
                 {undoRedo}
                 <Int name="Position:" max={max} min={0} value={pos} set={setPos} buttons />
                 <Int name="Zoom:" max={10} min={1} value={zoom} set={setZoom} buttons />
-                <Stack dir="x">
+                <Stack>
                     <Int name="Background:" min="0" max="26" set={context.setBgOpacity} value={context.bgOpacity} buttons />
                     <Color value={context.bgColor} set={(value) => {context.setBgColor(value)}} />
                 </Stack>
             </Toolbar>
 
             <div className="padded" ref={divRef} style={{height}}>
-                <Stack center dir="y">
+                <Stack alignItems="center" vertical>
                     <div className="rel-canvas" onWheel={onWheel}>
-                        <Stack dir="y">
-                            <Stack dir="x" padded>
+                        <Stack vertical>
+                            <Stack padded>
                                 {items}
                             </Stack>
                             {scroller}
@@ -3793,27 +3792,25 @@ function BitmapSelector(props) {
     };
 
     return (
-        <Stack dir="y" center full>
-            <div className="flex">
-                <Stack dir="x" border full>
-                    <div className="flex full-v">
-                        <BasicRasterView
-                            editorId="bitmap"
-                            selectOnly={props.selection}
-                            resizeable={false}
-                            mode="select"
-                            modes={['select', 'markerResize', 'markerMove', 'display']}
-                            cellProvider={cellProvider}
-                            defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
-                        />
-                    </div>
-                </Stack>
-            </div>
+        <Stack vertical border>
+            <Content flex>
+                <BasicRasterView
+                    editorId="bitmap"
+                    selectOnly={props.selection}
+                    resizeable={false}
+                    mode="select"
+                    modes={['select', 'markerResize', 'markerMove', 'display']}
+                    cellProvider={cellProvider}
+                    defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
+                />
+            </Content>
 
-            <div>
-                <button disabled={selectionType === 'none'} onClick={select}>OK</button>
-                <button onClick={props.cancelHandler}>Cancel</button>
-            </div>
+            <Content padded>
+                <Stack align="start">
+                    <button disabled={selectionType === 'none'} onClick={select}>OK</button>
+                    <button onClick={props.cancelHandler}>Cancel</button>
+                </Stack>
+            </Content>
         </Stack>
     )
 }
@@ -3842,28 +3839,29 @@ function BitmapEditor(props) {
             }}>Cancel</button>
         );
     }
-    const buttonDiv = buttons.length === 0 ?
-        '' :
-        <div className="padded">
-            {buttons}
-        </div>;
 
     if (!ready) {
         return '';
     }
 
+    const buttonDiv = buttons.length === 0 ?
+        '' :
+        <Content padded>
+            <Stack fit>{buttons}</Stack>
+        </Content>;
+
     return (
         <EditorCtx>
-            <Stack dir="y" border full>
-                <Stack dir="x" border full>
-                    <div className="">Palette goes here</div>
-                    <div className="flex full-v">
+            <Stack vertical border fullHeight>
+                <Stack border fullHeight>
+                    <Content padded>Palette goes here</Content>
+                    <Content flex>
                         <BasicRasterView
                             editorId="bitmap"
                             cellProvider={cellProvider}
                             defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
                         />
-                    </div>
+                    </Content>
                 </Stack>
                 {buttonDiv}
             </Stack>

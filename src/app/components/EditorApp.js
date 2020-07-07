@@ -1,5 +1,5 @@
 import React, {Fragment, useState} from "react";
-import {Stack, GlobalCtx, Section} from "./BaseComponents";
+import {Stack, Content, GlobalCtx, Section} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import FontMapEditor from "./FontMapEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
@@ -8,21 +8,25 @@ import './EditorApp.css';
 function Page(props) {
     return (
         <GlobalCtx>
-            <Stack dir="y" full>
-                <div className="head padded">
-                    <Stack dir="x">
-                        <div className="flex">
+            <Content maxHeight="100vh">
+            <Stack vertical fullHeight>
+                <Content>
+                    <Stack className="head">
+                        <Content flex padded>
                             {props.title}
-                        </div>
-                        <div>
+                        </Content>
+                        <Content padded>
                             {props.actions}
-                        </div>
+                        </Content>
                     </Stack>
-                </div>
-                <div className="flex">
+                </Content>
+
+                <Content flex>
                     {props.children}
-                </div>
+                </Content>
             </Stack>
+            </Content>
+
             <div id="modals-container"></div>
         </GlobalCtx>
     );

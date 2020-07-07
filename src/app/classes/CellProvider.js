@@ -1,3 +1,5 @@
+import {d} from '../helper/helper';
+
 class CellSelection {
     constructor(type = 'none', cells = [[]]) {
         this.type = type;

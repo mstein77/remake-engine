@@ -1,306 +1,17 @@
 import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
-import {BitmapSelector} from "./Raster";
+import {d} from '../helper/helper';
 
 const GlobalContext = React.createContext();
-
-function d(main, ...params) {
-    let stack = null;
-    try {
-        throw new Error('myError');
-    }
-    catch(e) {
-        stack = e.stack.split('\n');
-    }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
-        }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
-    }
-    console.group('Debug ' + func.join(' <- '));
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
-}
-
-function useWindowEventManager() {
-
-    const listenerRef = useRef([]);
-
-    const removeListener = (event, listener, options) => {
-        console.log('REMOVE LISTENER', event);
-        const remainingListeners = [];
-        for (let item of listenerRef.current) {
-            let match = false;
-            if (item.event === event) {
-                match = JSON.stringify(options) === JSON.stringify(item.options);
-            }
-            if (match) {
-                window.removeEventListener(event, listener, options);
-            } else {
-                remainingListeners.push(item);
-            }
-        }
-        listenerRef.current = remainingListeners;
-    };
-
-    const addListener = (event, listener, options) => {
-        console.log('ADD LISTENER', event);
-        removeListener(event, listener, options);
-        window.addEventListener(event, listener, options);
-        listenerRef.current.push({event, listener, options});
-    };
-
-    const clearListeners = () => {
-        console.log('CLEAR LISTENERS');
-        while(listenerRef.current.length > 0) {
-            const item = listenerRef.current.pop();
-            window.removeEventListener(item.event, item.listener, item.options);
-        }
-    };
-
-    return {
-        addListener,
-        removeListener,
-        clearListeners
-    };
-}
-
-function getWindowEventManager() {
-
-    let windowListeners = [];
-
-    const removeListener = (event, listener, options) => {
-        const remainingListeners = [];
-        for (let item of windowListeners) {
-            let match = false;
-            if (item.event === event) {
-                match = JSON.stringify(options) === JSON.stringify(item.options);
-            }
-            if (match) {
-                window.removeEventListener(event, listener, options);
-            } else {
-                remainingListeners.push(item);
-            }
-        }
-        windowListeners = remainingListeners;
-    };
-
-    const addListener = (event, listener, options) => {
-        removeListener(event, listener, options);
-        window.addEventListener(event, listener, options);
-        windowListeners.push({event, listener, options});
-    };
-
-    const clearListeners = () => {
-        while(windowListeners.length > 0) {
-            const item = windowListeners.pop();
-            window.removeEventListener(item.event, item.listener, item.options);
-        }
-    };
-
-    return {
-        addListener,
-        removeListener,
-        clearListeners
-    };
-}
-
-class FitCanvas extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.divRef = React.createRef();
-        this.canvasRef = React.createRef();
-        this.state = {
-            width: null,
-            height: null
-        };
-    }
-
-    getCanvas() {
-        return this.canvasRef.current;
-    }
-
-    render() {
-        let overlays = this.props.renderOverlays !== undefined ?
-            this.props.renderOverlays(this.state.width, this.state.height) : null;
-
-        const cls = ['rel-canvas marker-space checkboard-bg'];
-        const canvas = (this.state.width && this.state.height) ?
-            <div className={cls.join(' ')}>
-                <canvas ref={this.canvasRef} width={this.state.width} height={this.state.height} />
-                {overlays}
-            </div> : '';
-
-        return(
-            <div ref={this.divRef} className="full-v stack-h centered items-centered">
-                {canvas}
-            </div>
-        )
-    }
-
-    trigger() {
-        if (this.divRef.current === null) {
-            return null;
-        }
-        this.updateSize();
-        this.props.redrawCanvas();
-    }
-
-    updateSize() {
-        if (this.divRef.current === null) {
-            return;
-        }
-        const sizes = this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight, true);
-        this.setState(
-            {width: sizes.width, height: sizes.height}
-        );
-    }
-
-    getSnapshotBeforeUpdate() {
-        return this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight, false);
-    }
-
-    componentDidUpdate(a, b, snapshot) {
-        if (snapshot !== null) {
-            if (snapshot.width !== this.state.width || snapshot.height !== this.state.height) {
-                this.updateSize();
-                return;
-            }
-        }
-        this.props.redrawCanvas();
-    }
-
-    componentDidMount() {
-        this.updateSize();
-        const resizeObserver = new ResizeObserver(entries => {
-            this.updateSize();
-        });
-        resizeObserver.observe(this.divRef.current);
-    }
-}
-
-function Scrollbar(props) {
-    const [active, setActive] = useState(false);
-    const divRef = useRef(null);
-    const windowEvents = getWindowEventManager();
-
-    const pagePerc = Math.round(props.page / props.max * 100);
-    if (props.auto && pagePerc === 100) {
-        return '';
-    }
-
-    const space = 15;
-
-    const spacePerc = 100 - pagePerc;
-    const maxSteps = props.max - props.page;
-    const minPerc = maxSteps === 0 ? 0 : props.pos * (spacePerc / maxSteps);
-    const maxPerc = 100 - (pagePerc + minPerc);
-
-    const axis = props.vertical ? 'y' : 'x';
-    const axisKey = props.vertical ? 'height' : 'width';
-    const oppAxisKey = props.vertical ? 'width' : 'height';
-    const client = 'client' + axis.toUpperCase();
-    const dirKey = (axis === 'x' ? 'h' : 'v');
-
-    const dimMin = {
-        [axisKey]: minPerc + '%',
-        [oppAxisKey]: space
-    };
-    const dimMax = {
-        [axisKey]: maxPerc + '%',
-        [oppAxisKey]: space
-    };
-
-    const mouseDown = (e) => {
-        const rect = divRef.current.getBoundingClientRect();
-        const anchorPos =  e[client];
-        const pixelSteps = rect[axisKey] / props.max;
-        const maxDistRight = (maxSteps - props.pos) * pixelSteps;
-        const minDistLeft = -props.pos * pixelSteps;
-
-        const getOffset = (value) => {
-            const dist = value - anchorPos;
-            const relPos = Math.max(Math.min(dist, maxDistRight), minDistLeft);
-            return Math.round(relPos / pixelSteps);
-        };
-        let lastPos = 0;
-
-        const trackMouse = (e) => {
-            const relPos = getOffset(e[client]);
-            if (relPos !== lastPos) {
-                lastPos = relPos;
-                props.set(props.pos + relPos);
-            }
-            e.stopPropagation();
-            e.preventDefault();
-        };
-        windowEvents.addListener('mousemove', trackMouse, false);
-
-        windowEvents.addListener('mouseup', (e) => {
-            windowEvents.removeListener('mousemove', trackMouse, false);
-            setActive(false);
-            e.stopPropagation();
-            e.preventDefault();
-        }, {capture: false, once: true});
-
-        setActive(true);
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const setMouseDown = (e) => {
-        const rect = divRef.current.getBoundingClientRect();
-        const pixelSteps = rect[axisKey] / props.max;
-        const pageSize = Math.round(props.page * pixelSteps / 2);
-        const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), props.max));
-
-        props.set(offPos);
-        e.preventDefault();
-        e.stopPropagation();
-    };
-    const cls = ['scrollbar-div'];
-    const dim = {[oppAxisKey]: space};
-    if (props.size) {
-        dim[axisKey] = props.size;
-    } else {
-        dim[axisKey] = 'calc(100% - 6px)';
-    }
-
-    const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
-    const stackCls = ['stack-' + dirKey];
-    if (props.vertical) {
-        stackCls.push('full-v');
-    }
-
-    return (
-        <div style={dim} ref={divRef} className={cls.join(' ')}>
-            <div className={stackCls.join(' ')}>
-                <div onMouseDown={setMouseDown} style={dimMin}></div>
-                <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
-                <div onMouseDown={setMouseDown} style={dimMax}></div>
-            </div>
-            <MouseOverlay active={active} cursor={dirKey + 'resize'} />
-        </div>
-    );
-}
 
 function Color(props) {
     return (
         <div>
-            <input type="color" value={props.value} onChange={(e) => { props.set(e.target.value); }} />
+            <input
+                type="color"
+                value={props.value}
+                onChange={(e) => { props.set(e.target.value); }}
+            />
         </div>
     );
 }
@@ -323,67 +34,6 @@ function Checkbox(props) {
             <div><input onChange={(e) => {
                 props.set(e.target.checked);
             }} type="checkbox" checked={!!props.value} /></div>
-        </div>
-    );
-}
-
-function Stack(props) {
-    const dir = (props.dir === 'x') ? 'h' : 'v';
-    const cls = ['stack-' + dir];
-    cls.push('inner-' + (props.border ? 'border' : 'space') + '-' + dir);
-    if (props.full) {
-        cls.push('full-v');
-    }
-    if (props.center) {
-        cls.push('items-centered');
-    }
-    if (props.wrap) {
-        cls.push('wrap');
-    }
-    const style = {};
-    if (props.height) {
-        style.height = props.height;
-    }
-
-    return (
-        <div className={cls.join(' ')} style={style}>
-            {props.children}
-        </div>
-    );
-}
-
-function TabAccordion(props) {
-    const [active, setActive] = useState(props.active !== undefined ? props.active : 0);
-    const items = [];
-    let current = 0;
-    for (let child of props.children) {
-        const isActive = (current === active);
-        const cls = ['padded'];
-        cls.push('title-area-' + (isActive ? 'active' : 'inactive'));
-        const itemNo = current;
-
-        items.push(
-            <div key={current} onClick={() => {setActive(itemNo)}} className={cls.join(' ')}>{child.props.name}</div>
-        );
-        if (isActive) {
-            items.push(<div key="-1" className="flex">{child}</div>);
-        }
-        current++;
-    }
-    const cls = [
-        'stack-v inner-border-v boxed full-v'
-    ];
-    return (
-        <div className={cls.join(' ')}>
-            {items}
-        </div>
-    );
-}
-
-function Toolbar(props) {
-    return (
-        <div className="toolbar-div">
-            {props.children}
         </div>
     );
 }
@@ -446,18 +96,18 @@ function IntField(props) {
     return (
         <React.Fragment>
             <div>{props.name}</div>
-            <div className="stack-h items-centered">
+            <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
                 {buttonNext}
-            </div>
+            </Stack>
         </React.Fragment>
     );
 }
 
 function Int(props) {
     return (
-        <Stack dir="x">
+        <Stack>
             <IntField {...props} />
         </Stack>
     );
@@ -499,21 +149,137 @@ function Dim(props) {
     };
 
     return (
-        <Stack dir="x" center>
+        <Stack fit>
             <IntField {...xAttr} />
             <IntField {...yAttr} />
         </Stack>
     );
 }
 
-function Tab(props) {
+function useStyleProps(props) {
+    const {width, minWidth, maxWidth, height, minHeight, maxHeight, zIndex} = props;
+    return {width, minWidth, maxWidth, height, minHeight, maxHeight, zIndex};
+}
+
+function useDimProps(props, style = {}) {
+    if (props.width) {
+        style.width = props.width;
+    }
+    if (props.minWidth) {
+        style.minWidth = props.minWidth;
+    }
+    if (props.maxWidth) {
+        style.maxWidth = props.maxWidth;
+    }
+    if (props.height) {
+        style.height = props.height;
+    }
+    if (props.minHeight) {
+        style.minHeight = props.minHeight;
+    }
+    if (props.maxHeight) {
+        style.maxHeight = props.maxHeight;
+    }
+    if (props.zIndex) {
+        style.zIndex = props.zIndex;
+    }
+    return style;
+}
+
+/**
+ *   -------------------------------------------
+ *     Layout Components
+ *   -------------------------------------------
+ */
+
+function Content(props) {
+    const cls = [];
+    const style = useDimProps(props);
+    if (props.flex) {
+        cls.push('flex');
+    }
+    if (props.padded) {
+        cls.push('padded');
+    }
+    if (props.scroll) {
+        cls.push('overflow-auto');
+    } else if (!props.raw) {
+        cls.push('overflow-hidden')
+    }
+    if (props.boxed) {
+        cls.push('boxed');
+    }
+    if (props.fullHeight) {
+        cls.push(props.boxed ? 'full-boxed-v' :  'full-v');
+    }
+    if (props.className) {
+        cls.push(props.className);
+    }
+
+    const attr = {};
+    if (cls.length) {
+        attr.className = cls.join(' ');
+    }
+    if (style) {
+        attr.style = style;
+    }
+    if (props.click) {
+        attr.onClick = props.click;
+    }
     return (
-        <React.Fragment>{props.children}</React.Fragment>
+        <div {...attr}>{props.children}</div>
+    );
+}
+
+function Stack(props) {
+    const dir = props.vertical ? 'v' : 'h';
+
+    const cls = ['stack-' + dir];
+    if (props.className) {
+        cls.push(props.className);
+    }
+    if (!props.noGap) {
+        cls.push('inner-' + (props.border ? 'border' : 'space') + '-' + dir);
+    }
+    if (props.fit) {
+        cls.push('fit-content-' + dir);
+    }
+    if ((props.fullHeight || (props.vertical && !props.fullHeight)) && !(props.vertical && props.fit)) {
+        cls.push('full-v');
+    }
+
+    const style = useDimProps(props);
+    if (props.align === 'center') {
+        style.justifyContent = 'center';
+    } else if (props.align === 'end') {
+        style.justifyContent = 'flex-end';
+    }
+
+    if (props.alignItems === 'center') {
+        style.alignItems = 'center';
+    } else if (props.alignItems === 'end') {
+        style.alignItems = 'flex-end';
+    }
+    if (props.wrap) {
+        cls.push('wrap');
+    }
+
+    return (
+        <div className={cls.join(' ')} style={style}>
+            {props.children}
+        </div>
+    );
+}
+
+function Toolbar(props) {
+    return (
+        <div className="toolbar-div">
+            {props.children}
+        </div>
     );
 }
 
 function Tabs(props) {
-
     const tabs = [];
     const contents = [];
     const [active, setActiveTab] = useState(props.active !== undefined ? props.active : 0);
@@ -636,6 +402,7 @@ function Tabs(props) {
     if (props.reverse) {
         cls.push('reverse-' + oppDir);
     }
+    cls.push('full-v');
 
     const style = {};
     if (props.height) {
@@ -657,164 +424,89 @@ function Tabs(props) {
     )
 }
 
-class Section extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.state = {
-            collapsed: false,
-            collapse: (props.collapse && ['h', 'v'].indexOf(props.collapse) !== -1 ? props.collapse : null)
-        };
-        this.toggleCollapse = this.toggleCollapse.bind(this);
-    }
-
-    toggleCollapse(e) {
-        this.setState({collapsed: !this.state.collapsed});
-    };
-
-    render() {
-        const props = this.props;
-        const cls = [
-            'section-div stack-v'
-        ];
-        if (!props.raw) {
-            cls.push('boxed  inner-border-v');
-        }
-        if (props.flex) {
-            cls.push('flex');
-        }
-        if (this.state.collapsed && props.collapse !== null) {
-            cls.push('collapsed-' + props.collapse);
-        }
-
-        const actions = [];
-        if (props.collapse) {
-            const icon = this.state.collapsed ? 'call_made' : 'call_received';
-            actions.push(<div key="collapse-h" className="action-box action-collapse-h" onClick={this.toggleCollapse}><i className="material-icons md-18">{icon}</i></div>);
-            if (!this.state.collapsed) {
-                // additional actions
-            }
-        }
-        const actionsDiv = actions.length > 0 ?
-            <div className="section-actions stack-h inner-space-h">{actions}</div> : '';
-
-        const contentCls = ['flex'];
-        if (!props.raw) {
-            contentCls.push('content-area');
-        }
-        const contentDiv = this.state.collapsed ?
-            '' :
-            <div className={contentCls.join(' ')}>
-                {props.children}
-            </div>;
-
-        const titleCls = [
-            'title-area-active stack-h inner-space-h items-centered'
-        ];
-        if (!(this.state.collapsed && props.collapse === 'h')) {
-            titleCls.push('padded');
-        }
-
-        const nameCls = ['flex'];
-        if (this.state.collapsed && props.collapse === 'h') {
-            nameCls.push('text-v');
-        }
-
-        return (
-            <div className={cls.join(' ')}>
-                <div className={titleCls.join(' ')}>
-                    <div className={nameCls.join(' ')}>{props.name}</div>
-                    {actionsDiv}
-                </div>
-                {contentDiv}
-            </div>
-        );
-    }
+function Tab(props) {
+    return (
+        <Fragment>{props.children}</Fragment>
+    );
 }
 
-function useModal() {
-    const context = useContext(GlobalContext);
-    const [isActive, setIsActive] = useState(false);
-    const paramsRef = useRef(null);
-    const hide = () => {
-        paramsRef.current = null;
-        context.closeModal(isActive);
-        setIsActive(false);
-    };
-    const show = (modalParams) => {
-        paramsRef.current = modalParams;
-        setIsActive(context.openModal());
-    };
-    const render = (props) => {
-        const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
-        d('z-index', isActive);
-        return (
-            <Fragment>
-                {isActive && <Modal hide={hide} zIndex={isActive} name={title} closeable={props.closeable}>{props.children}</Modal>}
-            </Fragment>
+function TabAccordion(props) {
+    const [active, setActive] = useState(props.active !== undefined ? props.active : 0);
+    const items = [];
+    let current = 0;
+    for (let child of props.children) {
+        const isActive = (current === active);
+        const cls = ['padded'];
+        cls.push('title-area-' + (isActive ? 'active' : 'inactive'));
+        const itemNo = current;
+
+        items.push(
+            <div key={current} onClick={() => {setActive(itemNo)}} className={cls.join(' ')}>{child.props.name}</div>
         );
-    };
-    return {
-        render,
-        show,
-        hide,
-        get params() {
-            return paramsRef.current === null ? {} : paramsRef.current;
+        if (isActive) {
+            items.push(<div key="-1" className="flex">{child}</div>);
         }
-    };
+        current++;
+    }
+    const cls = [
+        'stack-v inner-border-v boxed full-v'
+    ];
+    return (
+        <div className={cls.join(' ')}>
+            {items}
+        </div>
+    );
+}
+
+function Portal(props) {
+    const domElem = document.getElementById(props.id);
+
+    if (!domElem) {
+        return '';
+    }
+    return ReactDOM.createPortal(
+        props.children,
+        domElem
+    );
 }
 
 const Modal = React.memo((props) => {
+    useKeyListener(27, () => {props.hide(); return true}, () => props.closeable);
 
-    const domElem = document.getElementById('modals-container');
-    if (!domElem) {
-        return null;
-    }
-    const cls = [
-        'modal-centered stack-v boxed inner-border-v'
-    ];
-    let modal = (
-        <div className="modal-overlay" style={{zIndex: props.zIndex}}>
-            <div className={cls.join(' ')} style={{zIndex: props.zIndex + 4}}>
-                <div className="title-area-active padded stack-h inner-space-h">
-                    <div className="flex">{props.name}</div>
-                    <div className="action-box" onClick={(e) => {
-                        props.hide();
-                        e.stopPropagation();
-                    }}><i className="material-icons md-18">close</i></div>
-                </div>
-                <div className="content-area flex">{props.children}</div>
-            </div>
-        </div>
-    );
-
-    if (props.closeable) {
-        modal = (
-            <div
-                className="modal-click-area"
-                style={{zIndex: props.zIndex + 1}}
-                onClick={
-                    (e) => {
-                        let target = e.target;
-                        while(target.classList !== undefined) {
-                            if (target.classList.contains('modal-centered')) {
-                                return;
-                            }
-                            target = target.parentNode;
-                        }
-                        props.hide();
-                    }
+    const styleProps = useStyleProps(props);
+    const click = props.closeable ?
+        (e) => {
+            let target = e.target;
+            while(target.classList !== undefined) {
+                if (target.classList.contains('modal-centered')) {
+                    return;
                 }
-            >
-                {modal}
-            </div>
-        );
-    }
+                target = target.parentNode;
+            }
+            props.hide();
+        } : null;
+
     return (
-        ReactDOM.createPortal(
-            modal,
-            domElem
-        )
+        <Portal id="modals-container">
+            <Content className="modal-overlay" click={click} zIndex={styleProps.zIndex - 1}>
+                <Stack align="center" fit={props.fit} vertical border {...styleProps} className="modal-centered boxed">
+
+                    <Content padded className="title-area-active">
+                        <Stack alignItems="center">
+                            <Content flex>{props.name}</Content>
+                            <Stack fit><ActionBox material click={(e) => {
+                                props.hide();
+                                e.stopPropagation();
+                            }}>close</ActionBox></Stack>
+                        </Stack>
+                    </Content>
+
+                    <Content flex raw={props.fit} className="content-area">
+                        {props.children}
+                    </Content>
+                </Stack>
+            </Content>
+        </Portal>
     );
 });
 
@@ -825,6 +517,81 @@ function MouseOverlay(props) {
     const cls = ['cursor-' + props.cursor + ' fix-overlay'];
     return (
         <div className={cls.join(' ')}></div>
+    );
+}
+
+function ActionBox(props) {
+    const content = props.material ?
+        <i className="material-icons md-18">{props.children}</i> : props.children;
+    return (
+        <div
+            className="action-box"
+            onClick={props.click}>
+            {content}
+        </div>
+    );
+}
+
+function Section(props) {
+    const [collapsed, setCollapsed] = useState(false);
+
+    const {width, minWidth, maxWidth, height, minHeight, maxHeight} = props;
+
+    const dim = collapsed ? {} : {width, minWidth, maxWidth, height, minHeight, maxHeight};
+    const collapse = (props.collapse ? props.vertical ? 'h' : 'v' : null);
+
+    const toggleCollapse = (e) => {
+        setCollapsed(!collapsed);
+    };
+    const actions = [];
+    if (collapse) {
+        const icon = collapsed ? 'call_made' : 'call_received';
+        actions.push(
+            <ActionBox key="0" material click={toggleCollapse}>{icon}</ActionBox>
+        );
+        if (!collapsed) {
+            // additional actions
+        }
+    }
+    const actionsDiv = actions.length > 0 ?
+        <Stack key="actions" fit alignItems="centered">{actions}</Stack> : '';
+
+    const nameCls = [];
+    if (collapsed && collapse === 'h') {
+        nameCls.push('text-v');
+    }
+
+    const boxed = collapsed || !props.raw;
+    const contentCls = [];
+    if (!props.raw) {
+        contentCls.push('content-area');
+    }
+    const isVCollapse = collapsed && props.vertical;
+
+    const nameDiv = (
+        <Content key="name" flex className={nameCls.join(' ')}>
+            {props.name}
+        </Content>
+    );
+    let headItems = isVCollapse ? [actionsDiv, nameDiv] : [nameDiv, actionsDiv];
+
+    return (
+        <Content flex={props.flex} fullHeight={isVCollapse} boxed={boxed} {...dim}>
+            <Stack vertical={!isVCollapse} border noGap={props.raw} fit={collapsed} fullHeight={!collapsed || isVCollapse}>
+                <Content padded className="title-area-active">
+                    <Stack vertical={collapsed && props.vertical} alignItems="center">
+                        {headItems}
+                    </Stack>
+                </Content>
+                {
+                    !collapsed && (
+                        <Content flex scroll className={contentCls.join(' ')}>
+                            {props.children}
+                        </Content>
+                    )
+                }
+            </Stack>
+        </Content>
     );
 }
 
@@ -858,6 +625,7 @@ class GlobalCtx extends React.Component {
                     zIndex = this.modalStack[len - 1] + 10;
                 }
                 this.modalStack.push(zIndex);
+                return zIndex;
             },
             closeModal: (zIndex) => {
                 const index = this.modalStack.indexOf(zIndex);
@@ -878,13 +646,6 @@ class GlobalCtx extends React.Component {
     }
 }
 
-function upperFirst(value) {
-    if (!value) {
-        return value;
-    }
-    return value[0].toUpperCase() + value.slice(1);
-}
-
 function useMounted() {
     const mounted = useRef(false);
     useEffect(() => {
@@ -896,6 +657,71 @@ function useMounted() {
     return mounted;
 }
 
+function useModal() {
+    const context = useContext(GlobalContext);
+    const [isActive, setIsActive] = useState(false);
+    const paramsRef = useRef(null);
+    const hide = () => {
+        paramsRef.current = null;
+        context.closeModal(isActive);
+        setIsActive(false);
+    };
+    const show = (modalParams) => {
+        paramsRef.current = modalParams;
+        setIsActive(context.openModal());
+    };
+    const render = (props) => {
+        const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
+        const styleProps = useStyleProps(props);
+        styleProps.zIndex = isActive;
+        return (
+            <Fragment>
+                {isActive && <Modal hide={hide} name={title} fit={props.fit} closeable={props.closeable} {...styleProps}>{props.children}</Modal>}
+            </Fragment>
+        );
+    };
+    return {
+        render,
+        show,
+        hide,
+        get params() {
+            return paramsRef.current === null ? {} : paramsRef.current;
+        }
+    };
+}
+
+function useKeyListener(keyCode, action, doRegister = () => true) {
+    useEffect(
+        () => {
+            if (!doRegister()) {
+                return;
+            }
+            const keyHandler = (e) => {
+                if (e.keyCode === keyCode) {
+                    if (!action()) {
+                        return;
+                    }
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            };
+            window.addEventListener(
+                'keydown',
+                keyHandler,
+                {capture: false}
+            );
+            return () => {
+                window.removeEventListener(
+                    'keydown',
+                    keyHandler,
+                    {capture: false}
+                )
+            }
+        },
+        []
+    );
+}
+
 export {
     Section,
     Tab,
@@ -903,21 +729,17 @@ export {
     Dim,
     Int,
     IntField,
-    FitCanvas,
     Checkbox,
     Toolbar,
     TabAccordion,
     Stack,
-    Scrollbar,
+    Content,
     Color,
     SwitchButton,
     GlobalContext,
-    useWindowEventManager,
-    getWindowEventManager,
     MouseOverlay,
     GlobalCtx,
-    upperFirst,
     useMounted,
     useModal,
-    d
+    useKeyListener
 }

@@ -72,6 +72,7 @@ body {
     border: var(--box-border-width) var(--box-border-style) var(--box-border-color);
     margin: 0px;
     padding: 0px;
+    max-height: calc(100% - 2 * var(--box-border-width));
 }
 
 .thin-boxed {
@@ -115,8 +116,14 @@ body {
     padding-bottom: var(--default-padding);
 }
 
-.padded.full-v {
+.padded.full-v:not(.boxed) {
     height: calc(100% - 2 * var(--default-padding)) !important;
+    margin-top: var(--default-padding);
+    margin-bottom: var(--default-padding);
+}
+
+.padded.full-v.boxed {
+    height: calc(100% - 2 * var(--default-padding) - 2 * var(--box-border-width)) !important;
     margin-top: var(--default-padding);
     margin-bottom: var(--default-padding);
 }
@@ -139,6 +146,10 @@ body {
 
 .full-v {
     height: 100%;
+}
+
+.full-boxed-v {
+    height: calc(100% - 2 * var(--box-border-width));
 }
 
 .full-h {
@@ -464,6 +475,14 @@ input[type=range][orient=vertical] {
     overflow: auto;
 }
 
+.overflow-auto {
+    overflow: auto;
+}
+
+.overflow-hidden {
+    overflow: hidden;
+}
+
 .cursor-pointer {
     cursor: pointer;
 }
@@ -523,6 +542,18 @@ input[type=range][orient=vertical] {
 .min-content {
     width: min-content;
     height: min-content;
+}
+
+.fit-content-h {
+    width: fit-content;
+}
+
+.fit-content-v {
+    height: fit-content;
+}
+
+.test {
+    background-color: #A09080;
 }
 
 .hover-item {
