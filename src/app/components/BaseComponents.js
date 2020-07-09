@@ -226,6 +226,9 @@ function Content(props) {
     if (props.click) {
         attr.onClick = props.click;
     }
+    if (props.doubleClick) {
+        attr.onDoubleClick = props.doubleClick;
+    }
     return (
         <div {...attr}>{props.children}</div>
     );
@@ -458,6 +461,159 @@ function TabAccordion(props) {
     );
 }
 
+function Grid(props) {
+    const style = {
+        display: 'grid',
+        gridTemplateColumns: props.columns
+    };
+    if (props.gap) {
+        style.gridGap = props.gap;
+    }
+    return (
+        <div style={style}>
+            {props.children}
+        </div>
+    );
+}
+
+function ItemsStack(props) {
+    const [collapsed, setCollapsed] = useState(false);
+    const dimProps = useDimProps(props);
+    const toggleCollapse = () => {setCollapsed(!collapsed)};
+
+    const itemElems = [];
+    for(let i = 0; i < props.items.length; i++) {
+        const index = i;
+        const item = props.items[i];
+        itemElems.push(
+            <Fragment key={i}>
+                <Content padded><kbd>#{i+1}</kbd></Content>
+                <Content click={() => props.setActive(index)} doubleClick={toggleCollapse}>
+                    <Stack className={'title-area-' + (i === props.active ? 'active' : 'inactive')}>
+                        <Content flex padded>{props.getName(item)}</Content>
+                    </Stack>
+                </Content>
+            </Fragment>
+        );
+    }
+
+    let itemsContent = props.items.length === 0 ?
+        <Stack flex vertical fullHeight alignItems="center" align="center">
+            <Content>
+                {props.empty}
+            </Content>
+        </Stack>
+        : (
+            <Content flex scroll>
+                <Stack vertical fullHeight border>
+                    <Grid columns="min-content auto" gap={2}>
+                        {itemElems}
+                    </Grid>
+                    <Content flex></Content>
+                </Stack>
+            </Content>
+        );
+
+    return (
+        <Stack fullHeight border>
+            <Stack vertical border fullHeight {...dimProps}>
+                <Toolbar>
+                    <Stack>
+                        <ActionBox
+                            material
+                            disabled={props.max && props.items.length === props.max}
+                            click={() => {
+                                const newItems = props.items.concat();
+                                newItems.push(props.getNewItem());
+                                props.setItems(newItems);
+                                props.setActive(newItems.length - 1);
+                            }}>add</ActionBox>
+
+                        {props.getClone && <ActionBox
+                            material
+                            disabled={props.max && props.items.length === props.max}
+                            click={() => {
+                                if (props.items.length > 0) {
+                                    const newItems = props.items.concat();
+                                    newItems.splice(props.active + 1, 0, props.getClone(props.items[props.active]));
+                                    props.setItems(newItems);
+                                    props.setActive(props.active + 1);
+                                }
+                            }}>content_copy</ActionBox>}
+
+                        <ActionBox
+                            material
+                            disabled={props.items.length === 0 || props.min && props.items.length === props.min}
+                            click={() => {
+                                const newItems = props.items.concat();
+                                newItems.splice(props.active, 1);
+                                props.setItems(newItems);
+                                props.setActive(Math.min(props.active, newItems.length - 1));
+                            }}>delete</ActionBox>
+
+                        {props.ordered && <ActionBox
+                            material
+                            disabled={props.items.length <= 1}
+                            click={() => {
+                                if (props.active > 0) {
+                                    const newItems = [];
+                                    for (let i = 0; i < (props.active - 1); i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    newItems.push(props.items[props.active]);
+                                    newItems.push(props.items[props.active - 1]);
+                                    for (let i = props.active + 1; i < props.items.length; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    props.setItems(newItems);
+                                    props.setActive(props.active - 1);
+                                }
+                            }}>keyboard_arrow_up</ActionBox>}
+
+                        {props.ordered && <ActionBox
+                            material
+                            disabled={props.items.length <= 1}
+                            click={() => {
+                                if (props.active < props.items.length - 1) {
+                                    const newItems = [];
+                                    for (let i = 0; i < props.active; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    newItems.push(props.items[props.active + 1]);
+                                    newItems.push(props.items[props.active]);
+                                    for (let i = props.active + 2; i < props.items.length; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    props.setItems(newItems);
+                                    props.setActive(props.active + 1);
+                                }
+                            }}>keyboard_arrow_down</ActionBox>}
+
+                    </Stack>
+                    <Content flex></Content>
+                    <Stack align="end" alignItems="end">
+                        <ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>
+                    </Stack>
+                </Toolbar>
+
+                {itemsContent}
+            </Stack>
+
+            {!collapsed && props.items.length !== 0 && (
+                <Stack vertical border fullHeight>
+                    <Toolbar>
+                        <Content>Properties Item # {props.active + 1}</Content>
+                    </Toolbar>
+
+                    <Content padded flex scroll>
+                        {props.getProperties(props.active)}
+                    </Content>
+                </Stack>
+            )}
+        </Stack>
+    );
+}
+
 function Portal(props) {
     const domElem = document.getElementById(props.id);
 
@@ -526,7 +682,7 @@ function ActionBox(props) {
     return (
         <div
             className="action-box"
-            onClick={props.click}>
+            onClick={props.disabled ? null : props.click}>
             {content}
         </div>
     );
@@ -735,11 +891,15 @@ export {
     Stack,
     Content,
     Color,
+    ActionBox,
+    ItemsStack,
+    Grid,
     SwitchButton,
     GlobalContext,
     MouseOverlay,
     GlobalCtx,
     useMounted,
     useModal,
+    useDimProps,
     useKeyListener
 }
