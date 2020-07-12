@@ -4,10 +4,11 @@ import TilesMapEditor from "./TilesMapEditor";
 import FontMapEditor from "./FontMapEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import './EditorApp.css';
+import {d} from '../helper/helper';
 
 function Page(props) {
     return (
-        <GlobalCtx>
+        <GlobalCtx filters={props.filters}>
             <Content maxHeight="100vh">
             <Stack vertical fullHeight>
                 <Content>
@@ -36,6 +37,13 @@ function Page(props) {
 function EditorApp(props) {
     const [resources, setResources]  =  useState(props.game.getEditableResources());
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
+
+    let filters = null;
+    for (let resource of resources) {
+        if (resource.type === 'filters') {
+            filters = resource.data;
+        }
+    }
 
     // TODO: move to game:init?
     window.oncontextmenu = (e) => {
@@ -67,6 +75,7 @@ function EditorApp(props) {
     }
     const resource = resources[active];
     let editor = 'Unknown';
+
     switch(resource.type) {
         case 'tilesMap':
             editor = <TilesMapEditor tilesMap={resource.data} />;
@@ -79,6 +88,10 @@ function EditorApp(props) {
         case 'spriteSheet':
             editor = <SpriteSheetEditor spriteSheet={resource.data} />;
             break;
+
+        case 'filters':
+            filters = resource.data;
+            break;
     }
 
     const title = (
@@ -88,7 +101,7 @@ function EditorApp(props) {
     );
 
     return (
-        <Page title={title} actions={actions}>{editor}</Page>
+        <Page title={title} actions={actions} filters={filters}>{editor}</Page>
     )
 }
 

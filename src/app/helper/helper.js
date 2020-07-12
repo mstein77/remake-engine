@@ -28,6 +28,28 @@ function d(main, ...params) {
     return main;
 }
 
+function hex2rgb(hex) {
+    const color = {};
+    if (hex[0] === '#') {
+        if (hex.length === 7) {
+            color.r = parseInt(hex.substr(1, 2), 16);
+            color.g = parseInt(hex.substr(3, 2), 16);
+            color.b = parseInt(hex.substr(5, 2), 16);
+            return color;
+        }
+    }
+    return null;
+}
+
+function rgb2hex(rgb) {
+    if (typeof rgb === 'string') {
+        return rgb;
+    }
+    return '#' + (rgb.r).toString(16) + (rgb.g).toString(16) + (rgb.b).toString(16);
+}
+
 export {
-    d
+    d,
+    hex2rgb,
+    rgb2hex
 }

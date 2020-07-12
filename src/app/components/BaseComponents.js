@@ -486,7 +486,7 @@ function ItemsStack(props) {
         const index = i;
         const item = props.items[i];
         itemElems.push(
-            <Fragment key={i}>
+            <Fragment key={'i' + i}>
                 <Content padded><kbd>#{i+1}</kbd></Content>
                 <Content click={() => props.setActive(index)} doubleClick={toggleCollapse}>
                     <Stack className={'title-area-' + (i === props.active ? 'active' : 'inactive')}>
@@ -497,9 +497,36 @@ function ItemsStack(props) {
         );
     }
 
+    let assignContent = props.assignable ?
+        <Stack vertical fullHeight border>
+            <Toolbar>
+                <Content padded>Assigneable:</Content>
+            </Toolbar>
+            <Content scroll>
+                <Grid columns="auto min-content" gap={2}>
+                    {props.assignable.map(
+                        e =>
+                            <Fragment key={e.name}>
+                                <Content
+                                    key={e.name}
+                                    click={() => {
+                                        props.setItems([...props.items, e.item]);
+                                        props.setActive(props.items.length);
+                                    }}
+                                    padded
+                                >
+                                    {e.name}
+                                </Content>
+                                <Content padded><i className="material-icons md-18">keyboard_arrow_right</i></Content>
+                            </Fragment>
+                                )}
+                </Grid>
+            </Content>
+        </Stack> : '';
+
     let itemsContent = props.items.length === 0 ?
         <Stack flex vertical fullHeight alignItems="center" align="center">
-            <Content>
+            <Content padded>
                 {props.empty}
             </Content>
         </Stack>
@@ -516,10 +543,11 @@ function ItemsStack(props) {
 
     return (
         <Stack fullHeight border>
+            {assignContent}
             <Stack vertical border fullHeight {...dimProps}>
                 <Toolbar>
                     <Stack>
-                        <ActionBox
+                        {props.getNewItem && <ActionBox
                             material
                             disabled={props.max && props.items.length === props.max}
                             click={() => {
@@ -527,7 +555,7 @@ function ItemsStack(props) {
                                 newItems.push(props.getNewItem());
                                 props.setItems(newItems);
                                 props.setActive(newItems.length - 1);
-                            }}>add</ActionBox>
+                            }}>add</ActionBox>}
 
                         {props.getClone && <ActionBox
                             material
@@ -595,7 +623,6 @@ function ItemsStack(props) {
                         <ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>
                     </Stack>
                 </Toolbar>
-
                 {itemsContent}
             </Stack>
 
@@ -767,6 +794,7 @@ class GlobalCtx extends React.Component {
             defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
             markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
             bgColor: '#666677',
+            filters: props.filters,
             setBgColor: (bgColor) => {
                 this.setState({bgColor});
             },

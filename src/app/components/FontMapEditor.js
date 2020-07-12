@@ -1,7 +1,21 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
-import {useModal, useKeyListener, ItemsStack, Section, Content, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color} from "./BaseComponents";
-import {d} from '../helper/helper';
+import {
+    useModal,
+    useKeyListener,
+    ItemsStack,
+    Section,
+    Content,
+    Checkbox,
+    SwitchButton,
+    Stack,
+    Dim,
+    Toolbar,
+    Int,
+    Color,
+    GlobalContext
+} from "./BaseComponents";
+import {d, rgb2hex} from '../helper/helper';
 
 import {
     EditorCtx,
@@ -541,7 +555,239 @@ function CharIndex(props) {
     );
 }
 
+function FiltersSelector(props) {
+    const context = useContext(GlobalContext);
+    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
+    const filterDefinitions = context.filters.getFilters();
+    const allFilters = useMemo(() => {
+        const keys = Object.keys(filterDefinitions).sort();
+        const items = [];
+        for (let key of keys) {
+            const item = {
+                name: key
+            };
+            const filterDefinition = filterDefinitions[key];
+            for (let def of filterDefinition.paramDefs) {
+                item[def.key] = def.default;
+            }
+            items.push({name: key, item});
+        }
+        return items;
+    }, []);
+
+    const [active, setActive] = useState(0);
+    const assignedFilters = [];
+    const filterExpressions = props.filters.split('|');
+    for (let expr of filterExpressions) {
+        if (expr === '') {
+            continue;
+        }
+        let name = expr;
+        let item = {};
+        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
+            const parts = expr.split('(', 2);
+            name = parts[0];
+            const values = parts[1].substr(0, parts[1].length - 1).split(',');
+            const params = filterDefinitions[name].params;
+            for (let i = 0; i < params.length; i++) {
+                params[i](values[i], item);
+            }
+        }
+        assignedFilters.push({name, ...item});
+    }
+    const previewRef = useRef(null);
+    const [filters, setFilters] = useState(assignedFilters);
+
+    useEffect(() => {
+        if (!previewRef.current || !props.canvas) {
+            return;
+        }
+        const ctx = previewRef.current.getContext('2d');
+        const baseCanvas = props.canvas;
+        const width = baseCanvas.width;
+        const height = baseCanvas.height;
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+
+        const currFilters = getFilterString();
+
+        let filteredCanvas = baseCanvas;
+        if (currFilters) {
+            const transformed =
+                context.filters.getCanvasWithFiltersApplied(
+                    currFilters,
+                {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
+            filteredCanvas = transformed[0].elem;
+        }
+        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
+    });
+
+    let preview = null;
+    if (props.canvas) {
+        preview =
+            <Stack vertical border fullHeight>
+                <Toolbar>
+                    <Content padded>Preview:</Content>
+                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
+                </Toolbar>
+                <Content padded><canvas className="thin-boxed" ref={previewRef} width={props.canvas.width} height={props.canvas.height} /></Content>
+            </Stack>;
+    }
+
+    const getItemProperties = (index) => {
+        const item = filters[index];
+        const paramDefs = filterDefinitions[item.name].paramDefs;
+        const inputs = [];
+        for (let def of paramDefs) {
+            switch(def.type) {
+                case 2:
+                    const colorValue = rgb2hex(item[def.key]);
+                    inputs.push(
+                        <Content padded key={def.key}>
+                            <Stack alignItems="center">
+                                <Content>{def.key}:</Content>
+                                <Content>
+                                    <Color
+                                        value={colorValue}
+                                        set={(value) => {
+                                            const newFilters = [...filters];
+                                            newFilters[active][def.key] = value;
+                                            setFilters(newFilters);
+                                        }}
+                                    />
+                                </Content>
+                            </Stack>
+                        </Content>
+                    );
+                    break;
+
+                case 1:
+                    const controls =
+                        <Stack alignItems="center">
+                            <Content padded>
+                                <kbd>{def.min}</kbd>
+                            </Content>
+                            <input
+                                type="range"
+                                onChange={
+                                    (e) => {
+                                        const value = e.target.value;
+                                        const newFilters = [...filters];
+                                        newFilters[active][def.key] = value;
+                                        setFilters(newFilters);
+                                    }
+                                }
+                                min={def.min}
+                                max={def.max}
+                                step={0.01}
+                                value={item[def.key]}
+                            />
+                            <Content padded>
+                                <kbd>{def.max}</kbd>
+                            </Content>
+                            <Content>
+                                <input type="text" size={String(def.max).length + 3} readOnly value={item[def.key]} />
+                            </Content>
+                        </Stack>;
+
+                    inputs.push(
+                        <Content padded key={def.key}>
+                            <Stack>
+                                <Content>{def.key}:</Content>
+                                <Content>
+                                    {controls}
+                                </Content>
+                            </Stack>
+                        </Content>
+                    );
+                    break;
+
+                case 4:
+                    inputs.push(
+                        <Content padded key={def.key}>
+                            <Stack alignItems="center">
+                                <Content>{def.key}:</Content>
+                                <Content>
+                                    <Int
+                                        buttons
+                                        set={
+                                            (value) => {
+                                                const newFilters = [...filters];
+                                                newFilters[active][def.key] = value;
+                                                setFilters(newFilters);
+                                            }
+                                        }
+                                        value={item[def.key]}
+                                    />
+                                </Content>
+                            </Stack>
+                        </Content>
+
+                    );
+                    break;
+
+                default:
+                    d('???', def);
+                    break;
+            }
+        }
+        return (
+            <Fragment>
+                {inputs}
+            </Fragment>
+        );
+    };
+
+    const getFilterString = () => {
+        const values = [];
+        for (let filter of filters) {
+            let expr = filter.name;
+            const paramDefs = filterDefinitions[filter.name].paramDefs;
+            if (paramDefs.length > 0) {
+                expr += '(';
+                const params = [];
+                for (let def of paramDefs) {
+                    const rawValue = filter[def.key];
+                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
+                }
+                expr += params.join(',') + ')';
+            }
+            values.push(expr);
+        }
+        return values.join('|');
+    };
+
+    return (
+        <Stack vertical border>
+            <Stack fullHeight border>
+                <ItemsStack
+                    empty="Assign filters from the left side"
+                    assignable={allFilters}
+                    active={active}
+                    setActive={setActive}
+                    items={filters}
+                    setItems={setFilters}
+                    getProperties={getItemProperties}
+                    getName={(item) => item.name}
+                    ordered
+                />
+                {preview}
+            </Stack>
+            <Content padded>
+                <Stack>
+                    <button onClick={() => {
+                        props.save(getFilterString());
+                    }}>Save</button>
+                    <button onClick={props.cancel}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
 function BlockProperties(props) {
+    const FiltersModal = useModal();
     const {
         text, setText,
         posX, setPosX,
@@ -553,8 +799,21 @@ function BlockProperties(props) {
         screenX,
         screenY,
         fontSize,
-        filters, setFilters
+        filters, setFilters,
+        canvas,
+        bgColor
     } = props;
+
+    const changeFilters = () => {
+        FiltersModal.show({
+            title: 'Change assigned filters',
+            filters,
+            save: (newFilters) => {
+                setFilters(newFilters);
+                FiltersModal.hide();
+            }
+        });
+    };
 
     return (
         <Fragment>
@@ -592,17 +851,20 @@ function BlockProperties(props) {
                 <Content>Filters: </Content>
                 <Content flex>
                     <Stack noGap>
-                        <Content flex><input onClick={() => {d('change', filters)}} className="full-h" type="text" value={filters} readOnly /></Content>
+                        <Content flex><input onClick={changeFilters} className="full-h" type="text" value={filters} readOnly /></Content>
                         <Content><button onClick={() => {setFilters('')}}>X</button></Content>
                     </Stack>
                 </Content>
             </Stack>
+            <FiltersModal.render height={500} closeable>
+                <FiltersSelector bgColor={bgColor} canvas={canvas} cancel={FiltersModal.hide} save={FiltersModal.params.save} filters={FiltersModal.params.filters} />
+            </FiltersModal.render>
         </Fragment>
     );
 }
 
 function FontPreview(props) {
-
+    const context = useContext(GlobalContext);
     const ready = useMountedReadyCellProvider(props.provider);
     const [active, setActive] = useState(0);
     const [zoom, setZoomRaw] = useState(2);
@@ -615,7 +877,7 @@ function FontPreview(props) {
         posX: 0,
         posY: 0,
         text: '',
-        filters: 'monochrome',
+        filters: '',
         img: null,
         textAlign: 'left',
         autoCenterX: false,
@@ -634,13 +896,14 @@ function FontPreview(props) {
     currBlockRef.current = blocks.length === 0 ? null : blocks[active];
 
     const invalidateImages = () => {
-        for (let block of blocks) {
+        for (let block of propsRef.current.blocks) {
             block.img = null;
         }
     };
 
     const eContext = useEditorContextPart('preview', () => {
         invalidateImages();
+        setBlocks(propsRef.current.blocks);
     });
 
     const setZoom = (value) => {
@@ -655,6 +918,44 @@ function FontPreview(props) {
         screenY
     };
 
+    const getBlockImage = (block, raw = false) => {
+        if (block.img === null) {
+            const lines = block.text.split('\n');
+            let maxWidth = 0;
+            for (let line of lines) {
+                maxWidth = Math.max(maxWidth, line.length);
+            }
+            const blockHeight = fontSize * lines.length;
+            const blockWidth = fontSize * maxWidth;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = blockWidth * zoom || 1;
+            canvas.height = blockHeight * zoom || 1;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const size = fontSize * zoom;
+            for (let y = 0; y < lines.length; y++) {
+                let line = lines[y];
+                if (block.textAlign !== 'left' && line.length < maxWidth) {
+                    const pad = block.textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
+                    line = line.padStart(pad, ' ');
+                }
+                for (let x = 0; x < line.length; x++) {
+                    const img = props.provider.getBitmapForValue(line[x], zoom, false);
+                    ctx.drawImage(img, x * size, y * size);
+                }
+            }
+            let elem = canvas;
+            block.rawImg = canvas;
+            if (block.filters) {
+                const transformed = context.filters.getCanvasWithFiltersApplied(block.filters, {elem: canvas, ctx}, 0, 0, canvas.width, canvas.height);
+                elem = transformed[0].elem;
+            }
+            block.img = {canvas: elem};
+        }
+        return raw ? block.rawImg : block.img.canvas;
+    };
+
     useEffect(() => {
         if (!canvasRef.current) {
             return;
@@ -665,36 +966,7 @@ function FontPreview(props) {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         for (let block of propsRef.current.blocks) {
-            if (block.img === null) {
-                const lines = block.text.split('\n');
-                let maxWidth = 0;
-                for (let line of lines) {
-                    maxWidth = Math.max(maxWidth, line.length);
-                }
-                const blockHeight = fontSize * lines.length;
-                const blockWidth = fontSize * maxWidth;
-
-                const canvas = document.createElement('canvas');
-                canvas.width = blockWidth * zoom || 1;
-                canvas.height = blockHeight * zoom || 1;
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                const size = fontSize * zoom;
-                for (let y = 0; y < lines.length; y++) {
-                    let line = lines[y];
-                    if (block.textAlign !== 'left' && line.length < maxWidth) {
-                        const pad = block.textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
-                        line = line.padStart(pad, ' ');
-                    }
-                    for (let x = 0; x < line.length; x++) {
-                        const img = props.provider.getBitmapForValue(line[x], zoom, false);
-                        ctx.drawImage(img, x * size, y * size);
-                    }
-                }
-                block.img = {canvas};
-            }
-            const img = block.img;
-            ctx.drawImage(img.canvas, block.posX * propsRef.current.zoom, block.posY * propsRef.current.zoom);
+            ctx.drawImage(getBlockImage(block), block.posX * propsRef.current.zoom, block.posY * propsRef.current.zoom);
         }
     });
 
@@ -893,6 +1165,8 @@ function FontPreview(props) {
                 setFilters={getSetProp('filters')}
                 screenX={screenX}
                 screenY={screenY}
+                canvas={getBlockImage(item, true)}
+                bgColor={bgColor}
             />
         );
     };

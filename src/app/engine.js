@@ -236,6 +236,7 @@ class Game {
         }
         extractEditablesFromAreas(this.screens[this.currentScreen].areas);
 
+        resources.push({type: 'filters', data: filterer});
         return resources;
     }
 
@@ -3779,7 +3780,8 @@ const FILTER = {
        STRING: 0,
        FLOAT: 1,
        COLOR: 2,
-       MAPPING: 3
+       MAPPING: 3,
+        INT: 4
     }
 };
 
@@ -3787,6 +3789,10 @@ class BitmapFilterer {
 
     constructor() {
         this.filters = {};
+    }
+
+    getFilters() {
+        return this.filters;
     }
 
     addFilter(id, type, callback, params = []) {
@@ -3818,6 +3824,12 @@ class BitmapFilterer {
                             }
                         }
                         return null;
+                    };
+                    break;
+
+                case FILTER.PARAM.INT:
+                    parser = function(rawValue) {
+                        return parseInt(rawValue, 10);
                     };
                     break;
 
@@ -3858,6 +3870,7 @@ class BitmapFilterer {
             type,
             callback,
             minParams,
+            paramDefs: params,
             params: paramClosures
         }
     }
@@ -3956,7 +3969,7 @@ filterer.addFilter(
         return [newCanvas, 0, 0, data[3], data[4]];
     },
     [
-        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+        {type: FILTER.PARAM.INT, key: 'pixels', default: 0}
     ]
 );
 
@@ -4014,7 +4027,7 @@ filterer.addFilter(
         return [newCanvas, 0, 0, data[3], data[4]];
     },
     [
-        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+        {type: FILTER.PARAM.INT, key: 'pixels', default: 0}
     ]
 );
 
@@ -4034,7 +4047,7 @@ filterer.addFilter(
         return [newCanvas, 0, 0, data[3], data[4]];
     },
     [
-        {type: FILTER.PARAM.FLOAT, key: 'pixels'}
+        {type: FILTER.PARAM.INT, key: 'pixels', default: 0}
     ]
 );
 
@@ -4054,23 +4067,23 @@ filterer.addFilter(
         return imageData;
     },
     [
-        {type: FILTER.PARAM.COLOR, key: 'color'}
+        {type: FILTER.PARAM.COLOR, key: 'color', default: '#ffffff'}
     ]
 );
 
 filterer.addFilter(
-    'transparent',
+    'opacity',
     FILTER.TYPE.IMAGEDATA,
     function(imageData, params) {
         const rgba = imageData.data;
         for(let i = 0; i < imageData.width * imageData.height; i++) {
             const pos = (i << 2) + 3;
-            rgba[pos] = rgba[pos] * params.factor;
+            rgba[pos] = rgba[pos] * params.opacity;
         };
         return imageData;
     },
     [
-        {key: 'factor', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 0.5}
+        {key: 'opacity', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 1}
     ]
 );
 
