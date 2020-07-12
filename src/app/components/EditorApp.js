@@ -8,7 +8,7 @@ import {d} from '../helper/helper';
 
 function Page(props) {
     return (
-        <GlobalCtx filters={props.filters}>
+        <GlobalCtx filters={props.filters} imageResources={props.imageResources}>
             <Content maxHeight="100vh">
             <Stack vertical fullHeight>
                 <Content>
@@ -39,9 +39,33 @@ function EditorApp(props) {
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
 
     let filters = null;
+    let imageResources = [];
     for (let resource of resources) {
-        if (resource.type === 'filters') {
-            filters = resource.data;
+        switch(resource.type) {
+            case 'filters':
+                filters = resource.data;
+                break;
+
+            case 'tilesMap':
+                imageResources.push({
+                    name: 'Tiles Map image',
+                    bitmap: resource.data.tilesImg.elem.toDataURL('image/png')
+                });
+                break;
+
+            case 'fontMap':
+                imageResources.push({
+                    name: 'Font Map image',
+                    bitmap: resource.data.image.toDataURL('image/png')
+                });
+                break;
+
+            case 'spriteSheet':
+                imageResources.push({
+                    name: 'Sprite Sheet image',
+                    bitmap: resource.data.sheet.elem.toDataURL('image/png')
+                });
+                break;
         }
     }
 
@@ -101,7 +125,7 @@ function EditorApp(props) {
     );
 
     return (
-        <Page title={title} actions={actions} filters={filters}>{editor}</Page>
+        <Page title={title} actions={actions} imageResources={imageResources} filters={filters}>{editor}</Page>
     )
 }
 

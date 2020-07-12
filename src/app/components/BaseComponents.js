@@ -477,7 +477,7 @@ function Grid(props) {
 }
 
 function ItemsStack(props) {
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(props.collapsed === true);
     const dimProps = useDimProps(props);
     const toggleCollapse = () => {setCollapsed(!collapsed)};
 
@@ -641,6 +641,83 @@ function ItemsStack(props) {
     );
 }
 
+function FileDropZone(props) {
+    useEffect(() => {
+        const handlePaste = (event) => {
+            // use event.originalEvent.clipboard for newer chrome versions
+            let items = (event.clipboardData  || event.originalEvent.clipboardData).items;
+            // find pasted image among pasted items
+            let blob = null;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") === 0) {
+                    blob = items[i].getAsFile();
+                }
+            }
+            // load image if there is a pasted image
+            if (blob !== null) {
+                let reader = new FileReader();
+                reader.onload = function(event) {
+                    props.save(reader.result);
+                };
+                reader.readAsDataURL(blob);
+            }
+            event.stopPropagation();
+            event.preventDefault();
+        };
+        window.addEventListener('paste', handlePaste, {capture: false});
+        return () => {
+            window.removeEventListener('paste', handlePaste, {capture: false});
+        }
+    }, []);
+
+    const handleImages = (items) => {
+        if (items.length !== 1 || !items[0].type.startsWith('image/')) {
+            return;
+        }
+        const file = items[0];
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            props.save(reader.result, file.name);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleDrop = (e) => {
+        handleImages(e.dataTransfer.files);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragOver = (e) => {
+//        d('handleDragOver', e);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragEnter = (e) => {
+ //       d('handleDragEnter', e);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragLeave = (e) => {
+//        d('handleDragLeave', e);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    return (
+        <div onDrop={handleDrop}
+             onDragOver={handleDragOver}
+             onDragEnter={handleDragEnter}
+             onDragLeave={handleDragLeave}>
+            <Stack fullHeight vertical align="center" alignItems="center">
+                <Content padded>
+                    Drop Image here...
+                </Content>
+            </Stack>
+        </div>
+    );
+}
+
 function Portal(props) {
     const domElem = document.getElementById(props.id);
 
@@ -795,6 +872,7 @@ class GlobalCtx extends React.Component {
             markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
             bgColor: '#666677',
             filters: props.filters,
+            imageResources: {current: props.imageResources},
             setBgColor: (bgColor) => {
                 this.setState({bgColor});
             },
@@ -923,6 +1001,7 @@ export {
     ItemsStack,
     Grid,
     SwitchButton,
+    FileDropZone,
     GlobalContext,
     MouseOverlay,
     GlobalCtx,

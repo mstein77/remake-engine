@@ -6,7 +6,9 @@ import {
     Dim,
     Int,
     Stack,
+    FileDropZone,
     Content,
+    ItemsStack,
     SwitchButton,
     Toolbar,
     MouseOverlay,
@@ -217,16 +219,21 @@ function CellMarker(props) {
 }
 
 function useReadyCellProvider(cellProvider, mounted) {
-    const [ready, setReady] = useState(cellProvider.hasData());
+    const [ready, setReady] = useState(cellProvider === null || cellProvider.hasData());
     useEffect(() => {
+        if (cellProvider === null) {
+            return;
+        }
         if (!ready) {
             cellProvider.load(() => {
                 if (mounted.current) {
                     setReady(true);
                 }
             });
+        } else if (!cellProvider.hasData()) {
+            setReady(false);
         }
-    }, [ready, mounted.current]);
+    }, [cellProvider, ready, mounted.current]);
     return ready;
 }
 
@@ -3282,7 +3289,6 @@ function BasicRasterView(props) {
                 <button key="abort" onClick={() => {overlay.current.doMarkerAction('abort')}} disabled={!overlay.current.canDoMarkerAction('abort')}>X</button>
             );
         }
-
         if (selectionType === 'rect') {
             const isMulti = modeParams && modeParams.multi;
             bottomTools.push(
@@ -3302,7 +3308,7 @@ function BasicRasterView(props) {
                      minY={isMulti ? modeParams.height : 1}
                 />
             );
-            if (modeParams && modeParams.multi) {
+            if (isMulti) {
                 bottomTools.push(
                     <Dim key="gap" name="Gap:" buttons
                          x={markerGapX}
@@ -3344,7 +3350,7 @@ function BasicRasterView(props) {
                                  )
                              )
                          }
-                         min="0"
+                         min={0}
                     />
                 )
             }
@@ -3770,40 +3776,67 @@ function FlexRasterIndex(props) {
 }
 
 function BitmapSelector(props) {
+    const [items, setItemsRaw] = useState(props.bitmaps.current);
+    const setItems = (value) => {
+        props.bitmaps.current = value;
+        setItemsRaw(value);
+    };
+    const [active, setActive] = useState(0);
+    const currItem = items[active];
     const cellProvider = useMemo(() => {
+        const img = currItem.bitmap;
+        if (img === null) {
+            return null;
+        }
         return new BitmapCellProvider(4,
-            props.bitmap
+            img
         );
-    }, []);
+    }, [active, currItem.bitmap]);
 
     const eContext = useContext(EditorContext);
     const resultRef = useRef(null);
     resultRef.current = eContext.selection;
 
-    const ready = useMountedReadyCellProvider(cellProvider);
-    if (!ready) {
-        return '';
-    }
-
+    let ready = useMountedReadyCellProvider(cellProvider);
     const selectionType = eContext.selection ? eContext.selection.getType() : 'none';
 
     const select = () => {
         props.saveHandler(resultRef.current);
     };
 
+    let selector = '';
+    if (ready) {
+        selector = cellProvider !== null ?
+            <BasicRasterView
+                editorId="bitmap"
+                selectOnly={props.selection}
+                resizeable={false}
+                mode="select"
+                modes={['select', 'markerResize', 'markerMove', 'display']}
+                cellProvider={cellProvider}
+                defaults={{zoom: 1, border: 0, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
+            /> :
+            <FileDropZone save={
+                (bitmap, name = null) => {
+                    const newItems = [...items];
+                    if (name !== null) {
+                        newItems[active].name = name;
+                    }
+                    newItems[active].bitmap = bitmap;
+                    setItems(newItems);
+                }
+            } />;
+    }
+
     return (
         <Stack vertical border>
-            <Content flex>
-                <BasicRasterView
-                    editorId="bitmap"
-                    selectOnly={props.selection}
-                    resizeable={false}
-                    mode="select"
-                    modes={['select', 'markerResize', 'markerMove', 'display']}
-                    cellProvider={cellProvider}
-                    defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
-                />
-            </Content>
+            <Stack border fullHeight>
+                <ItemsStack collapsed getNewItem={() => {return {name: 'new', bitmap: null}}} active={active} setActive={setActive} items={items} setItems={setItems} getName={item => item.name} getProperties={() => ''} width={200} />
+
+                <Content flex>
+                    {selector}
+                </Content>
+            </Stack>
 
             <Content padded>
                 <Stack align="start">

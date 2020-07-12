@@ -142,6 +142,7 @@ function CharAssign(props) {
 function CharIndex(props) {
 
     const eContext = useContext(EditorContext);
+    const context = useContext(GlobalContext);
     const incPosRef = useRef(null);
 
     const NewCharModal = useModal();
@@ -529,15 +530,15 @@ function CharIndex(props) {
                     bitmap={EditCharModal.params.bitmap} />
             </EditCharModal.render>
 
-            <ImportCharsModal.render name="Select" height={600} closeable>
+            <ImportCharsModal.render name="Select" height={600} width="90%" closeable>
                 <EditorCtx>
                     <BitmapSelector
-                        zoom="5"
-                        border="1"
+                        zoom="1"
+                        border="0"
                         selection={ImportCharsModal.params.selection}
                         cancelHandler={ImportCharsModal.hide}
                         saveHandler={ImportCharsModal.params.save}
-                        bitmap={ImportCharsModal.params.bitmap}
+                        bitmaps={context.imageResources}
                     />
                 </EditorCtx>
             </ImportCharsModal.render>
