@@ -28,6 +28,12 @@ function d(main, ...params) {
     return main;
 }
 
+function getItemsCloneWithUpdatedItem(oldItems, index, props) {
+    const newItems = [...oldItems];
+    newItems[index] = Object.assign({}, oldItems[index], props);
+    return newItems;
+}
+
 function hex2rgb(hex) {
     const color = {};
     if (hex[0] === '#') {
@@ -51,5 +57,6 @@ function rgb2hex(rgb) {
 export {
     d,
     hex2rgb,
-    rgb2hex
+    rgb2hex,
+    getItemsCloneWithUpdatedItem
 }

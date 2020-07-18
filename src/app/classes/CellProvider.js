@@ -861,6 +861,7 @@ class TilesCellProvider extends CellProvider {
 class FontCharIndexProvider extends CellProvider {
 
     constructor(fontMap) {
+        d('CREATE', fontMap);
         const size = Math.max(fontMap.width, fontMap.height);
         super(size);
         this.cache = {};
@@ -885,6 +886,10 @@ class FontCharIndexProvider extends CellProvider {
         }
         this.convertURIToImageData(this.data).then(
             (img) => {
+                if (this.data === null) {
+                    callback(this.codes);
+                    return;
+                }
                 this.data = null;
                 const newMap = {};
                 const codes = [];
@@ -908,6 +913,7 @@ class FontCharIndexProvider extends CellProvider {
                 this.map.push(codes);
                 this.mapping = newMap;
                 this.width = codes.length;
+                this.dims = null;
 
                 callback(codes);
             }

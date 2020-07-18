@@ -8,6 +8,7 @@ import {
     Stack,
     FileDropZone,
     Content,
+    TextField,
     ItemsStack,
     SwitchButton,
     Toolbar,
@@ -15,7 +16,7 @@ import {
     useMounted,
     useModal
 } from "./BaseComponents";
-import {d} from '../helper/helper';
+import {d, getItemsCloneWithUpdatedItem} from '../helper/helper';
 
 import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 
@@ -1592,6 +1593,7 @@ function RasterOverlays(props) {
     const autoScrollRef = useRef({id : null, x: null, y: null, marker: false});
 
     const multiSelect = (props.mode && props.mode === 'select' && props.modeParams) ? props.modeParams.multi === true : false;
+    const fixedMarker = (!multiSelect && props.modeParams && props.modeParams.fixed);
 
     const overlayRef = useRef({
         modes: {},
@@ -1897,7 +1899,7 @@ function RasterOverlays(props) {
                         markerHeight
                     });
                     const event = {clientX: e.clientX, clientY: e.clientY};
-                    if (markerType.endsWith('gap') || (props.autoSelect && !multiSelect)) {
+                    if (markerType.endsWith('gap') || fixedMarker) {
                         overlay.setMode('markerMove', {type: markerType, event});
                     } else {
                         overlay.setMode('markerResize', {
@@ -2679,7 +2681,7 @@ function RasterOverlays(props) {
                 zoom={props.zoom}
                 border={props.border}
                 size={size}
-                resizeable={!(props.autoSelect && !multiSelect)}
+                resizeable={!fixedMarker}
                 posX={props.posX}
                 posY={props.posY}
                 markerX={props.markerX}
@@ -3569,7 +3571,7 @@ function FlexRasterIndex(props) {
                 observerRef.current.disconnect();
             }
         }
-    }, [ready]);
+    }, [ready, props.cellProvider]);
 
     useEffect(() => {
         if (ready) {
@@ -3816,7 +3818,9 @@ function BitmapSelector(props) {
                 cellProvider={cellProvider}
                 defaults={{zoom: 1, border: 0, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
             /> :
-            <FileDropZone save={
+            <FileDropZone
+                type="image"
+                save={
                 (bitmap, name = null) => {
                     const newItems = [...items];
                     if (name !== null) {
@@ -3828,10 +3832,34 @@ function BitmapSelector(props) {
             } />;
     }
 
+    const getImageProps = index => {
+        const imgItem = items[index];
+        return <Stack>
+            <Content>Name:</Content>
+            <Content>
+                <TextField value={imgItem.name} set={value => {
+                    setItems(getItemsCloneWithUpdatedItem(items, index, {name: value}));
+                }} />
+            </Content>
+        </Stack>
+    };
+
     return (
         <Stack vertical border>
             <Stack border fullHeight>
-                <ItemsStack collapsed getNewItem={() => {return {name: 'new', bitmap: null}}} active={active} setActive={setActive} items={items} setItems={setItems} getName={item => item.name} getProperties={() => ''} width={200} />
+                <ItemsStack
+                    collapsed
+                    getNewItem={() => {
+                        return {name: 'new', bitmap: null}
+                    }}
+                    active={active}
+                    setActive={setActive}
+                    items={items}
+                    setItems={setItems}
+                    getName={item => item.name}
+                    getProperties={getImageProps}
+                    width={200}
+                />
 
                 <Content flex>
                     {selector}

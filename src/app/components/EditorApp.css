@@ -569,6 +569,7 @@ input[type=range][orient=vertical] {
     background-color: var(--marker-color);
 }
 
+
 input:invalid {
     -webkit-animation-name: blinker;
     -webkit-animation-duration: 0.6s;

@@ -38,6 +38,31 @@ function Checkbox(props) {
     );
 }
 
+function TextField(props) {
+    const attr = {
+    };
+    if (!props.readOnly) {
+        attr.onChange = e => props.set(e.target.value);
+    } else {
+        attr.readOnly = true;
+    }
+    if (props.size) {
+        attr.size = props.size
+    }
+    if (props.className) {
+        attr.className = props.className;
+    }
+    if (props.onClick) {
+        attr.onClick = props.onClick;
+    }
+    return (
+        <input type="text"
+               value={props.value}
+               {...attr}
+        />
+    );
+}
+
 function IntField(props) {
     const attr = {};
     if (props.readOnly) {
@@ -217,9 +242,6 @@ function Content(props) {
     }
 
     const attr = {};
-    if (cls.length) {
-        attr.className = cls.join(' ');
-    }
     if (style) {
         attr.style = style;
     }
@@ -228,6 +250,23 @@ function Content(props) {
     }
     if (props.doubleClick) {
         attr.onDoubleClick = props.doubleClick;
+    }
+    if (props.onDragStart) {
+        attr.onDragStart = props.onDragStart;
+        attr.draggable = true;
+        cls.push('cursor-move');
+    }
+    if (props.onDrop) {
+        attr.onDrop = props.onDrop;
+        attr.onDragOver = (e) => {
+            e.preventDefault();
+        };
+        if (props.onDragEnd) {
+            attr.onDragEnd = props.onDragEnd;
+        }
+    }
+    if (cls.length) {
+        attr.className = cls.join(' ');
     }
     return (
         <div {...attr}>{props.children}</div>
@@ -461,6 +500,46 @@ function TabAccordion(props) {
     );
 }
 
+function Select(props) {
+    const options = [];
+    let active = null;
+    let index = 0;
+    for (let item of props.options) {
+        options.push(
+            <option key={item.id} value={item.id}>
+                {item.name}
+            </option>
+        );
+        if (item.id == props.value) {
+            active = index;
+        }
+        index++;
+    }
+    const prev = props.buttons ? <button disabled={options.length < 2} onClick={
+        () => {
+            props.set(options[active === 0 ? options.length - 1 : active - 1].key)
+        }
+    }>-</button> : '';
+    const next = props.buttons ? <button disabled={options.length < 2} onClick={
+        () => {
+            props.set(options[active === options.length - 1 ? 0 : active + 1].key)
+        }
+    }>+</button> : '';
+
+    return (
+        <Stack>
+            <Content>{props.name}:</Content>
+            <Stack>
+                {prev}
+                <select value={props.value} onChange={(e) => {props.set(e.target.value)}}>
+                    {options}
+                </select>
+                {next}
+            </Stack>
+        </Stack>
+    );
+}
+
 function Grid(props) {
     const style = {
         display: 'grid',
@@ -478,17 +557,33 @@ function Grid(props) {
 
 function ItemsStack(props) {
     const [collapsed, setCollapsed] = useState(props.collapsed === true);
+    const [dragIndex, setDragIndex] = useState(null);
     const dimProps = useDimProps(props);
+
     const toggleCollapse = () => {setCollapsed(!collapsed)};
 
     const itemElems = [];
     for(let i = 0; i < props.items.length; i++) {
         const index = i;
         const item = props.items[i];
+        const attr = {};
+        if (props.ordered) {
+            if (i === props.active) {
+                attr.onDragEnd = () => setDragIndex(null);
+                attr.onDragStart = () => setDragIndex(index);
+            }
+            attr.onDrop = () => {
+                if (dragIndex === index) return;
+                const swapped = [...props.items];
+                [swapped[index], swapped[dragIndex]] = [swapped[dragIndex], swapped[index]];
+                props.setItems(swapped);
+                props.setActive(index);
+            };
+        }
         itemElems.push(
             <Fragment key={'i' + i}>
                 <Content padded><kbd>#{i+1}</kbd></Content>
-                <Content click={() => props.setActive(index)} doubleClick={toggleCollapse}>
+                <Content {...attr} click={() => props.setActive(index)} doubleClick={toggleCollapse}>
                     <Stack className={'title-area-' + (i === props.active ? 'active' : 'inactive')}>
                         <Content flex padded>{props.getName(item)}</Content>
                     </Stack>
@@ -519,7 +614,7 @@ function ItemsStack(props) {
                                 </Content>
                                 <Content padded><i className="material-icons md-18">keyboard_arrow_right</i></Content>
                             </Fragment>
-                                )}
+                    )}
                 </Grid>
             </Content>
         </Stack> : '';
@@ -541,21 +636,23 @@ function ItemsStack(props) {
             </Content>
         );
 
+    const addItem = props.new ? props.new : () => {
+        const newItems = props.items.concat();
+        newItems.push(props.getNewItem());
+        props.setItems(newItems);
+        props.setActive(newItems.length - 1);
+    };
+
     return (
         <Stack fullHeight border>
             {assignContent}
             <Stack vertical border fullHeight {...dimProps}>
                 <Toolbar>
                     <Stack>
-                        {props.getNewItem && <ActionBox
+                        {(props.new || props.getNewItem) && <ActionBox
                             material
                             disabled={props.max && props.items.length === props.max}
-                            click={() => {
-                                const newItems = props.items.concat();
-                                newItems.push(props.getNewItem());
-                                props.setItems(newItems);
-                                props.setActive(newItems.length - 1);
-                            }}>add</ActionBox>}
+                            click={addItem}>add</ActionBox>}
 
                         {props.getClone && <ActionBox
                             material
@@ -642,25 +739,15 @@ function ItemsStack(props) {
 }
 
 function FileDropZone(props) {
+
+    const [error, setError] = useState('');
+    const dragEnterRef = useRef(null);
+    const dropzoneRef = useRef(null);
+
     useEffect(() => {
         const handlePaste = (event) => {
-            // use event.originalEvent.clipboard for newer chrome versions
             let items = (event.clipboardData  || event.originalEvent.clipboardData).items;
-            // find pasted image among pasted items
-            let blob = null;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") === 0) {
-                    blob = items[i].getAsFile();
-                }
-            }
-            // load image if there is a pasted image
-            if (blob !== null) {
-                let reader = new FileReader();
-                reader.onload = function(event) {
-                    props.save(reader.result);
-                };
-                reader.readAsDataURL(blob);
-            }
+            handleImages(items);
             event.stopPropagation();
             event.preventDefault();
         };
@@ -671,16 +758,34 @@ function FileDropZone(props) {
     }, []);
 
     const handleImages = (items) => {
-        if (items.length !== 1 || !items[0].type.startsWith('image/')) {
+        const matches = [];
+        const invTypes = new Map();
+        for(let item of items) {
+            if (props.type && item.type.startsWith(props.type + '/')) {
+                matches.push(item);
+            } else {
+                invTypes.set('"' + item.type + '"', null);
+            }
+        }
+        if (matches.length === 0) {
+            if (invTypes.size > 0) {
+                setError('The given types ' + [...invTypes.keys()].join(', ') + ' are not supported!');
+            } else {
+                setError('No content found!');
+            }
+            return;
+        } else if (matches.length > 1) {
+            setError('Multiple files not allowed!');
             return;
         }
-        const file = items[0];
+        const file = matches[0];
 
         const reader = new FileReader();
         reader.onloadend = () => {
             props.save(reader.result, file.name);
+            setError('');
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(file.getAsFile ? file.getAsFile() : file);
     };
 
     const handleDrop = (e) => {
@@ -689,29 +794,46 @@ function FileDropZone(props) {
         e.preventDefault();
     };
     const handleDragOver = (e) => {
-//        d('handleDragOver', e);
         e.stopPropagation();
         e.preventDefault();
     };
     const handleDragEnter = (e) => {
- //       d('handleDragEnter', e);
+        if (dropzoneRef.current) {
+            dropzoneRef.current.classList.toggle('blink', true);
+            dragEnterRef.current = e.target;
+        }
         e.stopPropagation();
         e.preventDefault();
     };
     const handleDragLeave = (e) => {
-//        d('handleDragLeave', e);
-        e.stopPropagation();
+        if (dropzoneRef.current && dragEnterRef.current === e.target) {
+            dropzoneRef.current.classList.toggle('blink', false);
+        }
         e.preventDefault();
     };
+    const handleFileSelection = (e) => {
+        e.preventDefault();
+        handleImages(e.target.files);
+    };
+
+    const accept = props.type ? props.type + '/*' : '*';
 
     return (
-        <div onDrop={handleDrop}
+        <div
+            ref={dropzoneRef}
+             onDrop={handleDrop}
              onDragOver={handleDragOver}
              onDragEnter={handleDragEnter}
              onDragLeave={handleDragLeave}>
             <Stack fullHeight vertical align="center" alignItems="center">
                 <Content padded>
-                    Drop Image here...
+                    No image given. Please insert image by one of the following options:
+                    <ul>
+                        <li>Drag'n Drop an image from your desktop here<br /><br /></li>
+                      <li>Copy image to clipboard and paste it here<br /><br /></li>
+                        <li><input onChange={handleFileSelection} type="file" accept={accept} /></li>
+                    </ul>
+                    {error && <Content boxed padded>Reading content failed: {error}</Content>}
                 </Content>
             </Stack>
         </div>
@@ -991,6 +1113,7 @@ export {
     Dim,
     Int,
     IntField,
+    TextField,
     Checkbox,
     Toolbar,
     TabAccordion,
@@ -999,6 +1122,7 @@ export {
     Color,
     ActionBox,
     ItemsStack,
+    Select,
     Grid,
     SwitchButton,
     FileDropZone,

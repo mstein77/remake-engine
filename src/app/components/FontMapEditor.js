@@ -8,14 +8,16 @@ import {
     Content,
     Checkbox,
     SwitchButton,
+    TextField,
     Stack,
     Dim,
     Toolbar,
     Int,
     Color,
+    Select,
     GlobalContext
 } from "./BaseComponents";
-import {d, rgb2hex} from '../helper/helper';
+import {d, getItemsCloneWithUpdatedItem, rgb2hex} from '../helper/helper';
 
 import {
     EditorCtx,
@@ -149,6 +151,7 @@ function CharIndex(props) {
     const EditCharModal = useModal();
     const AssignCharsModal = useModal();
     const ImportCharsModal = useModal();
+    const ApplyFilterModal = useModal();
 
     const getCharsForIndices = (indices) => {
         const chars = [];
@@ -268,6 +271,40 @@ function CharIndex(props) {
                     images.push(props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size, size));
                 }
                 assignImagesToChars(images, chars);
+            }
+        },
+        {
+            name: 'Apply...',
+            doAction: (indices) => {
+                ApplyFilterModal.show({
+                    canvas: props.cellProvider.getBitmapForIndex(indices[0], 5, false),
+                    save: (filter) => {
+                        const undoBitmaps = {};
+                        const doBitmaps = {};
+                        const size = props.cellProvider.getSize();
+                        for (let index of indices) {
+                            const char = props.cellProvider.getCharAtIndex(index);
+                            const bitmap = props.cellProvider.getBitmapForIndex(index, 1, false);
+                            undoBitmaps[char] = bitmap;
+                            doBitmaps[char] = context.filters.getCanvasWithFiltersApplied(filter, {elem: bitmap, ctx: bitmap.getContext('2d')}, 0, 0, size, size)[0].elem;
+                        }
+                        eContext.doAction(
+                            () => {
+                                for(let char in doBitmaps) {
+                                    props.cellProvider.setBitmapForValue(char, doBitmaps[char].getContext('2d').getImageData(0, 0, size, size));
+                                }
+                                update();
+                            },
+                            () => {
+                                for(let char in undoBitmaps) {
+                                    props.cellProvider.setBitmapForValue(char, undoBitmaps[char].getContext('2d').getImageData(0, 0, size, size));
+                                }
+                                update();
+                            }
+                        );
+                       ApplyFilterModal.hide()
+                    }
+                });
             }
         },
         {
@@ -410,6 +447,7 @@ function CharIndex(props) {
                 type: 'rect',
                 width: size,
                 height: size,
+                fixed: true,
                 multi: true,
                 doubleClick: selected
             },
@@ -552,6 +590,10 @@ function CharIndex(props) {
                 />
             </AssignCharsModal.render>
 
+            <ApplyFilterModal.render height={500} closeable>
+                <FiltersSelector bgColor="#000000" canvas={d(ApplyFilterModal.params.canvas)} cancel={ApplyFilterModal.hide} save={ApplyFilterModal.params.save} filters="" />
+            </ApplyFilterModal.render>
+
         </Fragment>
     );
 }
@@ -688,7 +730,7 @@ function FiltersSelector(props) {
                                 <kbd>{def.max}</kbd>
                             </Content>
                             <Content>
-                                <input type="text" size={String(def.max).length + 3} readOnly value={item[def.key]} />
+                                <TextField size={String(def.max).length + 3} readOnly value={item[def.key]} />
                             </Content>
                         </Stack>;
 
@@ -790,6 +832,7 @@ function FiltersSelector(props) {
 function BlockProperties(props) {
     const FiltersModal = useModal();
     const {
+        name, setName,
         text, setText,
         posX, setPosX,
         posY, setPosY,
@@ -799,11 +842,14 @@ function BlockProperties(props) {
         autoCenterY, setAutoCenterY,
         screenX,
         screenY,
-        fontSize,
+        fonts,
+        font, setFont,
         filters, setFilters,
         canvas,
         bgColor
     } = props;
+
+    const fontSize = fonts[font].provider.getSize();
 
     const changeFilters = () => {
         FiltersModal.show({
@@ -816,8 +862,20 @@ function BlockProperties(props) {
         });
     };
 
+    const fontOptions = [];
+    let id = 0;
+    for (let fontItem of fonts) {
+        fontOptions.push({id, name: fontItem.name});
+        id++;
+    }
+
     return (
         <Fragment>
+            <Stack>
+                <Content>Name:</Content>
+                <Content><TextField value={name} set={(value) => setName(value)} /></Content>
+            </Stack>
+            <Select name="Font" buttons value={font} set={setFont} options={fontOptions} />
             <Dim name="Position"
                  setX={setPosX}
                  setY={setPosY}
@@ -852,7 +910,8 @@ function BlockProperties(props) {
                 <Content>Filters: </Content>
                 <Content flex>
                     <Stack noGap>
-                        <Content flex><input onClick={changeFilters} className="full-h" type="text" value={filters} readOnly /></Content>
+                        <Content flex>
+                            <TextField onClick={changeFilters} className="full-h" value={filters} readOnly /></Content>
                         <Content><button onClick={() => {setFilters('')}}>X</button></Content>
                     </Stack>
                 </Content>
@@ -866,19 +925,18 @@ function BlockProperties(props) {
 
 function FontPreview(props) {
     const context = useContext(GlobalContext);
-    const ready = useMountedReadyCellProvider(props.provider);
     const [active, setActive] = useState(0);
     const [zoom, setZoomRaw] = useState(2);
     const [bgColor, setBgColor] = useState('#000000');
     const [screenX, setScreenX] = useState(320);
     const [screenY, setScreenY] = useState(200);
     const [showMarker, setShowMarker] = useState(false);
-    const fontSize = props.provider.getSize();
     const defaultBlock = {
         posX: 0,
         posY: 0,
         text: '',
         filters: '',
+        font: 0,
         img: null,
         textAlign: 'left',
         autoCenterX: false,
@@ -895,6 +953,9 @@ function FontPreview(props) {
     const currBlockRef = useRef(null);
 
     currBlockRef.current = blocks.length === 0 ? null : blocks[active];
+    const currFont = props.fonts[blocks[active].font];
+    const ready = useMountedReadyCellProvider(currFont.provider);
+    const fontSize = currFont.provider.getSize();
 
     const invalidateImages = () => {
         for (let block of propsRef.current.blocks) {
@@ -926,6 +987,7 @@ function FontPreview(props) {
             for (let line of lines) {
                 maxWidth = Math.max(maxWidth, line.length);
             }
+            const fontSize = props.fonts[block.font].provider.getSize();
             const blockHeight = fontSize * lines.length;
             const blockWidth = fontSize * maxWidth;
 
@@ -942,7 +1004,7 @@ function FontPreview(props) {
                     line = line.padStart(pad, ' ');
                 }
                 for (let x = 0; x < line.length; x++) {
-                    const img = props.provider.getBitmapForValue(line[x], zoom, false);
+                    const img = props.fonts[block.font].provider.getBitmapForValue(line[x], zoom, false);
                     ctx.drawImage(img, x * size, y * size);
                 }
             }
@@ -977,8 +1039,10 @@ function FontPreview(props) {
 
     const setState = (newProps) => {
         const curr = currBlockRef.current;
-        const {text, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY} = curr;
-        const change = Object.assign({text, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY}, newProps);
+        const {text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY} = curr;
+        const change = Object.assign({text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY}, newProps);
+
+        const fontSize = props.fonts[font].provider.getSize();
 
         const getRasterized = (value) => {
             if (!change.rasterize) {
@@ -1023,7 +1087,7 @@ function FontPreview(props) {
         for (let key in change) {
             if (change[key] !== curr[key]) {
                 hasChanged = true;
-                if (['text', 'textAlign', 'filters'].indexOf(key) !== -1) {
+                if (['font', 'text', 'textAlign', 'filters'].indexOf(key) !== -1) {
                     invalidateImage = true;
                 }
             }
@@ -1147,6 +1211,11 @@ function FontPreview(props) {
         const item = propsRef.current.blocks[index];
         return (
             <BlockProperties
+                name={item.name}
+                setName={getSetProp('name')}
+                fonts={props.fonts}
+                font={item.font}
+                setFont={getSetProp('font')}
                 fontSize={fontSize}
                 text={item.text}
                 setText={getSetProp('text')}
@@ -1237,22 +1306,135 @@ function FontPreview(props) {
     );
 }
 
+function NewFontForm(props) {
+    const context = useContext(GlobalContext);
+    const [size, setSize] = useState(8);
+    const [name, setName] = useState('Font');
+    const SelectDimModal = useModal();
+
+    const selectDim = () => {
+        const selected = (result) => {
+            setSize(result.getWidth());
+            SelectDimModal.hide();
+        };
+        SelectDimModal.show({
+            selection: {
+                type: 'rect',
+                multi: false,
+                fixed: false,
+                doubleClick: selected
+            },
+            bitmap: props.source,
+            save: selected
+        });
+    };
+
+    return (
+        <Stack vertical border>
+            <Content padded>
+                <Stack>
+                    <Content padded>Name:</Content>
+                    <TextField value={name} set={value => setName(value)} size={20} />
+                </Stack>
+                <Stack>
+                    <Content padded>Size:</Content>
+                    <Int buttons min={1} max={128} value={size} set={setSize}></Int>
+                    <button onClick={selectDim}>Select...</button>
+                </Stack>
+                <SelectDimModal.render closeable>
+                    <EditorCtx>
+                        <BitmapSelector
+                            zoom="1"
+                            border="0"
+                            selection={SelectDimModal.params.selection}
+                            cancelHandler={SelectDimModal.hide}
+                            saveHandler={SelectDimModal.params.save}
+                            bitmaps={context.imageResources}
+                        />
+                    </EditorCtx>
+                </SelectDimModal.render>
+            </Content>
+            <Content padded>
+                <Stack>
+                    <button onClick={() => {
+                        props.save({size, name});
+                    }}>Save</button>
+                    <button onClick={props.hide}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    );
+}
+
 function FontMapEditor(props) {
-    const bitmap = useMemo(() => {
-        return props.fontMap.image.toDataURL('image/png');
-    }, []);
-    const provider = new FontCharIndexProvider(props.fontMap);
+    const [active, setActive] = useState(0);
+    const [fonts, setFonts] = useState([{name: 'Font 8x8', fontMap: props.fontMap}]);
+    const currFont = fonts[active];
+
+    const NewFontModal = useModal();
+    for (let font of fonts) {
+        if (!font.provider) {
+            font.provider = new FontCharIndexProvider(font.fontMap);
+        }
+    }
+
+    const newFont = () => {
+        NewFontModal.show({
+            save: (item) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = item.size;
+                canvas.height = item.size;
+                const fontMap = {
+                    width: item.size,
+                    image: canvas,
+                    height: item.size,
+                    map: {}
+                };
+                setFonts([...fonts,  {
+                    name: item.name,
+                    fontMap
+                }]);
+                setActive(fonts.length);
+                NewFontModal.hide();
+            }
+        });
+    };
+
+    function getFontProps(index) {
+        const editFont = fonts[index];
+        return (
+            <Content>
+                <Stack>
+                    <Content>Name:</Content>
+                    <Content>
+                        <TextField
+                            value={editFont.name}
+                            set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {name: value}))}
+                        />
+                    </Content>
+                </Stack>
+            </Content>
+        )
+    }
 
     return (
         <EditorCtx>
             <Stack vertical fullHeight>
-                <Section name="Font">
-                    <CharIndex cellProvider={provider} source={bitmap} />
-                </Section>
+                <Stack>
+                    <Section name="Fonts">
+                        <ItemsStack new={newFont} width={200} min={1} collapsed active={active} setActive={setActive} setItems={setFonts} items={fonts} getProperties={getFontProps} getName={item => item.name} />
+                    </Section>
+                    <Section name="Characters" flex>
+                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.toDataURL('image/png')} />
+                    </Section>
+                </Stack>
                 <Content flex>
-                    <FontPreview editorId="preview" provider={provider} source={bitmap} />
+                    <FontPreview editorId="preview" fonts={fonts} />
                 </Content>
             </Stack>
+            <NewFontModal.render name="New Font" fit closeable>
+                <NewFontForm save={NewFontModal.params.save} hide={NewFontModal.hide} />
+            </NewFontModal.render>
         </EditorCtx>
     );
 }
