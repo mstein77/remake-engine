@@ -861,7 +861,6 @@ class TilesCellProvider extends CellProvider {
 class FontCharIndexProvider extends CellProvider {
 
     constructor(fontMap) {
-        d('CREATE', fontMap);
         const size = Math.max(fontMap.width, fontMap.height);
         super(size);
         this.cache = {};
@@ -871,7 +870,7 @@ class FontCharIndexProvider extends CellProvider {
         this.codes = [];
         this.width = null;
         this.height = 1;
-        this.charSize = size;
+        this.charSize = {x: fontMap.width, y: fontMap.height};
         this.data = fontMap.image ? fontMap.image.toDataURL('image/png') : null;
     }
 
@@ -899,10 +898,10 @@ class FontCharIndexProvider extends CellProvider {
                 for (let code in this.dims) {
                     const dim = this.dims[code];
                     const charCanvas = document.createElement('canvas');
-                    charCanvas.width = this.charSize;
-                    charCanvas.height = this.charSize;
+                    charCanvas.width = this.charSize.x;
+                    charCanvas.height = this.charSize.y;
                     const ctx = charCanvas.getContext('2d');
-                    ctx.putImageData(img.context.getImageData(dim.x, dim.y, this.charSize, this.charSize), 0, 0);
+                    ctx.putImageData(img.context.getImageData(dim.x, dim.y, this.charSize.x, this.charSize.y), 0, 0);
                     newMap[code] = charCanvas;
                     codes.push(code);
                     row.push(index);
@@ -918,6 +917,10 @@ class FontCharIndexProvider extends CellProvider {
                 callback(codes);
             }
         );
+    }
+
+    getCharSize() {
+        return this.charSize;
     }
 
     getWidth() {
@@ -988,8 +991,8 @@ class FontCharIndexProvider extends CellProvider {
         this.map = [this.codes];
         this.width++;
         const canvas = document.createElement('canvas');
-        canvas.width = this.charSize;
-        canvas.height = this.charSize;
+        canvas.width = this.charSize.x;
+        canvas.height = this.charSize.y;
         this.mapping[code] = canvas;
     }
 
@@ -1031,17 +1034,17 @@ class FontCharIndexProvider extends CellProvider {
 
         const canvas = document.createElement('canvas');
         const targetSize = this.charSize * zoom;
-        canvas.width = targetSize;
-        canvas.height = targetSize;
+        canvas.width = this.charSize.x * zoom;
+        canvas.height = this.charSize.y * zoom;
         const charImg = this.mapping[value];
         if (!charImg) {
             return canvas;
         }
 
         const charCtx = charImg.getContext('2d');
-        const img = charCtx.getImageData(0, 0, this.charSize, this.charSize);
+        const img = charCtx.getImageData(0, 0, this.charSize.x, this.charSize.y);
 
-        const target = charCtx.createImageData(targetSize, targetSize);
+        const target = charCtx.createImageData(canvas.width, canvas.height);
         let targetPos = 0;
         let sourceStart = 0;
         for(let y = 0; y < img.height; y++) {

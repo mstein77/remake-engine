@@ -16,26 +16,115 @@ function Color(props) {
     );
 }
 
+function ColorProp(props) {
+    const {name, ...colorProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Color {...colorProps} />
+        </PropLabel>
+    );
+}
+
+function Range(props) {
+    return (
+        <Stack alignItems="center">
+            <Content>
+                <kbd>{props.min}</kbd>
+            </Content>
+            <Content>
+                <input
+                    type="range"
+                    onChange={e => props.set(e.target.value)}
+                    min={props.min}
+                    max={props.max}
+                    step={props.step ? props.step : 0.01}
+                    value={props.value}
+                />
+            </Content>
+            <Content>
+                <kbd>{props.max}</kbd>
+            </Content>
+            <Content>
+                <TextField size={String(props.max).length + 3} readOnly value={props.value} />
+            </Content>
+        </Stack>
+    );
+}
+
+function RangeProp(props) {
+    const {name, ...rangeProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Range {...rangeProps} />
+        </PropLabel>
+    )
+}
+
 function SwitchButton(props) {
     const cls = ['switch-div switch-button' + (props.enabled ? '-enabled' : '')];
+    const style = useStyleProps(props);
+    let children = props.children;
+    if (props.material) {
+        children = <i className="material-icons md-18 center-h">{props.children}</i>;
+    }
     return (
-        <div>
-            <div onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
-                {props.children}
-            </div>
+        <div style={style} onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
+            {children}
         </div>
     );
 }
 
+function Radio(props) {
+    const buttons = [];
+    for (let key in props.options) {
+        const name = props.options[key];
+        buttons.push(
+            <SwitchButton
+                key={key}
+                enabled={props.value == key}
+                material={props.material}
+                switch={() => {props.set(key)}}
+            >
+                {name}
+            </SwitchButton>
+        );
+    }
+    return (
+        <Stack>
+            {buttons}
+        </Stack>
+    )
+}
+
+function RadioProp(props) {
+    const {name, ...radioProps} = props;
+
+    return (
+        <PropLabel name={name}>
+            <Radio {...radioProps} />
+        </PropLabel>
+    )
+}
+
 function Checkbox(props) {
+    const name = props.name ? <div>{props.name}</div> : '';
     return (
         <div className="stack-h">
-            <div>{props.name}</div>
+            {name}
             <div><input onChange={(e) => {
                 props.set(e.target.checked);
             }} type="checkbox" checked={!!props.value} /></div>
         </div>
     );
+}
+
+function CheckboxProp(props) {
+    const {name, ...checkboxProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Checkbox {...checkboxProps} />
+        </PropLabel>
+    )
 }
 
 function TextField(props) {
@@ -60,6 +149,41 @@ function TextField(props) {
                value={props.value}
                {...attr}
         />
+    );
+}
+
+function PropLabel(props) {
+    return (
+        <Fragment>
+            <Content>
+                {props.name}
+            </Content>
+            <Content>
+                {props.children}
+            </Content>
+        </Fragment>
+    )
+}
+
+function FullProp(props) {
+    const items = [];
+    if (props.name) {
+        items.push(<div key="0" style={{gridColumn: 'span 2'}}>{props.name}</div>);
+    }
+    items.push(<div key="1" style={{gridColumn: 'span 2'}}>{props.children}</div>);
+    return (
+        <Fragment>
+            {items}
+        </Fragment>
+    )
+}
+
+function TextFieldProp(props) {
+    const {name, ...fieldProps} = props;
+    return (
+        <PropLabel name={name}>
+            <TextField {...fieldProps} />
+        </PropLabel>
     );
 }
 
@@ -118,9 +242,11 @@ function IntField(props) {
             </React.Fragment>;
     }
 
+    const name = props.name ? <div>{props.name}</div> : '';
+
     return (
         <React.Fragment>
-            <div>{props.name}</div>
+            {name}
             <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
@@ -135,6 +261,15 @@ function Int(props) {
         <Stack>
             <IntField {...props} />
         </Stack>
+    );
+}
+
+function IntProp(props) {
+    const {name, ...intProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Int {...intProps} />
+        </PropLabel>
     );
 }
 
@@ -179,6 +314,15 @@ function Dim(props) {
             <IntField {...yAttr} />
         </Stack>
     );
+}
+
+function DimProp(props) {
+    const {name, ...dimProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Dim {...dimProps} />
+        </PropLabel>
+    )
 }
 
 function useStyleProps(props) {
@@ -313,12 +457,32 @@ function Stack(props) {
     );
 }
 
-function Toolbar(props) {
+function Centered(props) {
+    const {children, contentProps} = props;
     return (
+        <Stack vertical fullHeight alignItems="center" align="center">
+            <Content {...contentProps}>{children}</Content>
+        </Stack>
+    );
+}
+
+function Toolbar(props) {
+    const toolbar = (
         <div className="toolbar-div">
             {props.children}
         </div>
     );
+    if (props.end) {
+        return (
+            <Stack noGap>
+                {toolbar}
+                <div className="toolbar-div flex from-end">
+                    {props.end}
+                </div>
+            </Stack>
+        )
+    }
+    return toolbar;
 }
 
 function Tabs(props) {
@@ -528,15 +692,21 @@ function Select(props) {
 
     return (
         <Stack>
-            <Content>{props.name}:</Content>
-            <Stack>
-                {prev}
-                <select value={props.value} onChange={(e) => {props.set(e.target.value)}}>
-                    {options}
-                </select>
-                {next}
-            </Stack>
+            {prev}
+            <select value={props.value} onChange={(e) => {props.set(e.target.value)}}>
+                {options}
+            </select>
+            {next}
         </Stack>
+    );
+}
+
+function SelectProp(props) {
+    const {name, ...selectProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Select {...selectProps} />
+        </PropLabel>
     );
 }
 
@@ -555,11 +725,25 @@ function Grid(props) {
     );
 }
 
+function PropertyGrid(props) {
+    return (
+        <Grid gap={5} columns="min-content auto" {...props} />
+    );
+}
+
+function LabelAndSubInfo(props) {
+    return <Fragment>
+        <div>{props.name}</div>
+        <div className="sub-info">{props.children}</div>
+    </Fragment>
+}
+
 function ItemsStack(props) {
     const [collapsed, setCollapsed] = useState(props.collapsed === true);
     const [dragIndex, setDragIndex] = useState(null);
     const dimProps = useDimProps(props);
 
+    const active = (props.active === null || props.active >= props.items.length) ? null : props.active;
     const toggleCollapse = () => {setCollapsed(!collapsed)};
 
     const itemElems = [];
@@ -637,7 +821,7 @@ function ItemsStack(props) {
         );
 
     const addItem = props.new ? props.new : () => {
-        const newItems = props.items.concat();
+        const newItems = [...props.items];
         newItems.push(props.getNewItem());
         props.setItems(newItems);
         props.setActive(newItems.length - 1);
@@ -647,7 +831,7 @@ function ItemsStack(props) {
         <Stack fullHeight border>
             {assignContent}
             <Stack vertical border fullHeight {...dimProps}>
-                <Toolbar>
+                <Toolbar end={<ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>}>
                     <Stack>
                         {(props.new || props.getNewItem) && <ActionBox
                             material
@@ -656,7 +840,7 @@ function ItemsStack(props) {
 
                         {props.getClone && <ActionBox
                             material
-                            disabled={props.max && props.items.length === props.max}
+                            disabled={(props.max && props.items.length === props.max) || active === null}
                             click={() => {
                                 if (props.items.length > 0) {
                                     const newItems = props.items.concat();
@@ -668,17 +852,23 @@ function ItemsStack(props) {
 
                         <ActionBox
                             material
-                            disabled={props.items.length === 0 || props.min && props.items.length === props.min}
+                            disabled={props.items.length === 0 || active === null || props.min && props.items.length === props.min}
                             click={() => {
-                                const newItems = props.items.concat();
+                                const newItems = [...props.items];
                                 newItems.splice(props.active, 1);
+                                if (props.cleanUp) {
+                                    props.cleanUp(props.items[props.active], props.active);
+                                }
                                 props.setItems(newItems);
-                                props.setActive(Math.min(props.active, newItems.length - 1));
+                                props.setActive(
+                                    newItems.length === 0 ? null :
+                                    Math.min(props.active, newItems.length - 1)
+                                );
                             }}>delete</ActionBox>
 
                         {props.ordered && <ActionBox
                             material
-                            disabled={props.items.length <= 1}
+                            disabled={props.items.length <= 1 || active === null}
                             click={() => {
                                 if (props.active > 0) {
                                     const newItems = [];
@@ -697,7 +887,7 @@ function ItemsStack(props) {
 
                         {props.ordered && <ActionBox
                             material
-                            disabled={props.items.length <= 1}
+                            disabled={props.items.length <= 1 || active === null}
                             click={() => {
                                 if (props.active < props.items.length - 1) {
                                     const newItems = [];
@@ -715,15 +905,11 @@ function ItemsStack(props) {
                             }}>keyboard_arrow_down</ActionBox>}
 
                     </Stack>
-                    <Content flex></Content>
-                    <Stack align="end" alignItems="end">
-                        <ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>
-                    </Stack>
                 </Toolbar>
                 {itemsContent}
             </Stack>
 
-            {!collapsed && props.items.length !== 0 && (
+            {!collapsed && active !== null && props.items.length !== 0 && (
                 <Stack vertical border fullHeight>
                     <Toolbar>
                         <Content>Properties Item # {props.active + 1}</Content>
@@ -1106,24 +1292,87 @@ function useKeyListener(keyCode, action, doRegister = () => true) {
     );
 }
 
+function useUniqueIds(prefix = '') {
+    const uidRef = useRef(1);
+
+    return items => {
+        if (Array.isArray(items)) {
+            for (let item of items) {
+                if (!item.id) {
+                    item.id = prefix + uidRef.current;
+                    uidRef.current++;
+                }
+            }
+        } else if (!items.id) {
+            items.id = prefix + uidRef.current;
+            uidRef.current++;
+        }
+        return items;
+    }
+}
+
+function useEntity(prefix, defaults = {}) {
+    const entityRef = useRef(null);
+
+    if (entityRef.current === null) {
+        entityRef.current = {
+            defaults,
+            uid: 1,
+            setDefaults: function(props) {
+                this.defaults = {...this.defaults, ...props};
+            },
+            getNew: function(props = {}, overwrites = {}) {
+                const id = prefix + '_' + this.uid;
+                this.uid++;
+                return {...this.defaults, ...props, ...overwrites, id}
+            },
+            id2Items: function(items) {
+                const id2items = {};
+                for (let item of items) {
+                    id2items[item.id] = item;
+                }
+                return id2items;
+            }
+        };
+        entityRef.current.getNew = entityRef.current.getNew.bind(entityRef.current);
+        entityRef.current.setDefaults = entityRef.current.setDefaults.bind(entityRef.current);
+    }
+    return entityRef.current;
+}
+
 export {
     Section,
     Tab,
     Tabs,
     Dim,
+    DimProp,
     Int,
+    IntProp,
     IntField,
     TextField,
+    TextFieldProp,
     Checkbox,
+    CheckboxProp,
     Toolbar,
     TabAccordion,
     Stack,
     Content,
     Color,
+    ColorProp,
+    Radio,
+    RadioProp,
+    LabelAndSubInfo,
     ActionBox,
     ItemsStack,
     Select,
+    SelectProp,
+    Range,
+    RangeProp,
     Grid,
+    PropertyGrid,
+    PropLabel,
+    FullProp,
+    Centered,
     SwitchButton,
     FileDropZone,
     GlobalContext,
@@ -1132,5 +1381,7 @@ export {
     useMounted,
     useModal,
     useDimProps,
-    useKeyListener
+    useKeyListener,
+    useEntity,
+    useUniqueIds
 }

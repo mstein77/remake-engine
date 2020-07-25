@@ -185,10 +185,30 @@ body {
     margin-right: auto;
 }
 
+.selectable-box {
+    border: var(--marker-width) solid transparent;
+    height: min-content;
+    width: min-content;
+}
+
+.selectable-box:hover {
+    border: var(--marker-width) solid var(--marker-color);
+}
+
+.selectable-box img {
+    display: block;
+    margin: auto auto;
+}
+
 .title-area-active {
     background-color: var(--title-bg-color-active);
     color: var(--title-text-color-active);
     font-size: var(--title-text-size);
+}
+
+.sub-info {
+    opacity: 0.75;
+    font-size: 14px;
 }
 
 .title-area-inactive {
