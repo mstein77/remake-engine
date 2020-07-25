@@ -1,13 +1,46 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
-import {closeModals, d, Section, Modal, Checkbox, SwitchButton, Stack, Dim, Toolbar, Int, Color, CssContext, openModal} from "./BaseComponents";
+import {CellProviderRaster} from "./Raster";
+import {
+    useModal,
+    useKeyListener,
+    useEntity,
+    ItemsStack,
+    Section,
+    Content,
+    Centered,
+    ActionBox,
+    Checkbox,
+    CheckboxProp,
+    TextField,
+    TextFieldProp,
+    SelectProp,
+    LabelAndSubInfo,
+    PropertyGrid,
+    PropLabel,
+    RadioProp,
+    FullProp,
+    Select,
+    Stack,
+    Dim,
+    DimProp,
+    Toolbar,
+    Int,
+    IntProp,
+    Color,
+    ColorProp,
+    RangeProp,
+    GlobalContext
+} from "./BaseComponents";
+import {d, getItemsCloneWithUpdatedItem, rgb2hex} from '../helper/helper';
+
 import {
     EditorCtx,
     EditorContext,
-    BitmapSelectorModal,
     useMountedReadyCellProvider,
     FlexRasterIndex,
     BitmapEditor,
+    BitmapSelector,
     useEditorContextPart,
     CellMarker
 } from "./Raster";
@@ -39,6 +72,7 @@ function CharInput(props) {
                     setValue(newValue);
                     newValues[props.index] = newValue;
                     if (inputValue !== '') {
+                        inputRef.current.blur();
                         props.setFocusIndex(props.index + 1);
                     } else {
                         props.setFocusIndex(props.index);
@@ -49,14 +83,17 @@ function CharInput(props) {
     );
 }
 
-function CharAssignModal(props) {
+function CharAssign(props) {
     const defaultValues = [];
     while(defaultValues.length < props.provider.getWidth()) {
         defaultValues.push('');
     }
-    const [values, setValues] = useState(defaultValues);
+    const [values, setValues] = useState(props.codes ? props.codes : defaultValues);
     const [focusIndex, setFocusIndex] = useState(0);
+    const saveRef = useRef(null);
+    saveRef.current = values;
     const incPosRef = useRef(null);
+    useKeyListener(13, () => {if (saveRef.current.indexOf('') !== -1) return false; save(); return true});
 
     const updateFocusIndex = (newIndex) => {
         const endPos = incPosRef.current.pos + incPosRef.current.page;
@@ -81,35 +118,40 @@ function CharAssignModal(props) {
         }
         setValues(newValues);
     };
+    const save = () => {
+        props.assign(saveRef.current);
+    };
+
     return (
         <EditorCtx>
-            <Modal name="Save as..." closeable>
-                <Stack dir="y">
-                    <div>
-                        <FlexRasterIndex
-                            cellProvider={props.provider}
-                            minWidth={50}
-                            titleHeight={22}
-                            incPosRef={incPosRef}
-                            renderTitle={
-                                (index) => {
-                                    return (
-                                        <Stack dir="x">
-                                            <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
-                                            <div>
-                                                <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
-                                            </div>
-                                        </Stack>
-                                    );
-                                }
-                            } />
-                    </div>
-                    <div>
-                        <button disabled={values.indexOf('') !== -1} onClick={() => props.assign(values)}>Save</button>
-                        <button onClick={closeModals}>Cancel</button>
-                    </div>
-                </Stack>
-            </Modal>
+            <Stack vertical fit>
+                <Content>
+                    <FlexRasterIndex
+                        cellProvider={props.provider}
+                        dim={props.provider.getCharSize()}
+                        minWidth={50}
+                        titleHeight={22}
+                        incPosRef={incPosRef}
+                        renderTitle={
+                            (index) => {
+                                return (
+                                    <Stack>
+                                        <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
+                                        <div>
+                                            <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
+                                        </div>
+                                    </Stack>
+                                );
+                            }
+                        } />
+                </Content>
+                <Content padded>
+                    <Stack>
+                        <button disabled={values.indexOf('') !== -1} onClick={save}>Save</button>
+                        <button onClick={props.cancelHandler}>Cancel</button>
+                    </Stack>
+                </Content>
+            </Stack>
         </EditorCtx>
     );
 }
@@ -118,7 +160,14 @@ function CharAssignModal(props) {
 function CharIndex(props) {
 
     const eContext = useContext(EditorContext);
+    const context = useContext(GlobalContext);
     const incPosRef = useRef(null);
+
+    const NewCharModal = useModal();
+    const EditCharModal = useModal();
+    const AssignCharsModal = useModal();
+    const ImportCharsModal = useModal();
+    const ApplyFilterModal = useModal();
 
     const getCharsForIndices = (indices) => {
         const chars = [];
@@ -128,7 +177,7 @@ function CharIndex(props) {
         return chars;
     };
 
-    const size = props.cellProvider.getSize();
+    const size = props.cellProvider.getCharSize();
 
     const update = () => {
         incPosRef.current.setMarked([]);
@@ -150,8 +199,8 @@ function CharIndex(props) {
             doAction: (indices) => {
                 const first = indices[0];
                 const second = indices[1];
-                const firstBitmap = props.cellProvider.getBitmapForIndex(first, 1, false).getContext('2d').getImageData(0, 0, size, size);
-                const secondBitmap = props.cellProvider.getBitmapForIndex(second, 1, false).getContext('2d').getImageData(0, 0, size, size);
+                const firstBitmap = props.cellProvider.getBitmapForIndex(first, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
+                const secondBitmap = props.cellProvider.getBitmapForIndex(second, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
                 eContext.doAction(
                     () => {
                         props.cellProvider.setBitmapForIndex(first, secondBitmap);
@@ -187,7 +236,7 @@ function CharIndex(props) {
                     () => {
                         for (let code in undoChars) {
                             props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size, size);
+                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
                             props.cellProvider.setBitmapForValue(code, bitmap);
                         }
                         update();
@@ -201,24 +250,24 @@ function CharIndex(props) {
                 const chars = getCharsForIndices(indices);
                 const undoChars = {};
                 let clearCanvas = document.createElement('canvas');
-                clearCanvas.width = size;
-                clearCanvas.height = size;
+                clearCanvas.width = size.x;
+                clearCanvas.height = size.y;
                 clearCanvas = clearCanvas.getContext('2d');
-                clearCanvas.clearRect(0, 0, size, size);
+                clearCanvas.clearRect(0, 0, size.x, size.y);
                 for (let char of chars) {
                     undoChars[char] = props.cellProvider.getBitmapForValue(char, 1, false);
                 }
                 eContext.doAction(
                     () => {
                         for (let char of chars) {
-                            props.cellProvider.setBitmapForValue(char, clearCanvas.getImageData(0, 0, size, size));
+                            props.cellProvider.setBitmapForValue(char, clearCanvas.getImageData(0, 0, size.x, size.y));
                         }
                         update();
                     },
                     () => {
                         for (let code in undoChars) {
                             props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size, size);
+                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
                             props.cellProvider.setBitmapForValue(code, bitmap);
                         }
                         update();
@@ -227,11 +276,63 @@ function CharIndex(props) {
             },
         },
         {
+            name: 'Reassign',
+            doAction: (indices) => {
+                const chars = [];
+                const images = [];
+                indices.sort();
+                for (let index of indices) {
+                    chars.push(props.cellProvider.getCharAtIndex(index));
+                    images.push(props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y));
+                }
+                assignImagesToChars(images, chars);
+            }
+        },
+        {
+            name: 'Apply...',
+            doAction: (indices) => {
+                const previewCanvas = [];
+                for (let index of indices) {
+                    previewCanvas.push({
+                        name: props.cellProvider.getCharAtIndex(index),
+                        canvas: props.cellProvider.getBitmapForIndex(index, 5, false)
+                    });
+                }
+                ApplyFilterModal.show({
+                    canvas: previewCanvas,
+                    save: (filter) => {
+                        const undoBitmaps = {};
+                        const doBitmaps = {};
+                        for (let index of indices) {
+                            const char = props.cellProvider.getCharAtIndex(index);
+                            const bitmap = props.cellProvider.getBitmapForIndex(index, 1, false);
+                            undoBitmaps[char] = bitmap;
+                            doBitmaps[char] = context.filters.getCanvasWithFiltersApplied(filter, {elem: bitmap, ctx: bitmap.getContext('2d')}, 0, 0, size.x, size.y)[0].elem;
+                        }
+                        eContext.doAction(
+                            () => {
+                                for(let char in doBitmaps) {
+                                    props.cellProvider.setBitmapForValue(char, doBitmaps[char].getContext('2d').getImageData(0, 0, size.x, size.y));
+                                }
+                                update();
+                            },
+                            () => {
+                                for(let char in undoBitmaps) {
+                                    props.cellProvider.setBitmapForValue(char, undoBitmaps[char].getContext('2d').getImageData(0, 0, size.x, size.y));
+                                }
+                                update();
+                            }
+                        );
+                       ApplyFilterModal.hide()
+                    }
+                });
+            }
+        },
+        {
             name: 'Copy',
             doAction: (indices) => {
-                const bitmap = props.cellProvider.getBitmapForIndex(indices[0], 1, false).getContext('2d').getImageData(0, 0, size, size);
+                const bitmap = props.cellProvider.getBitmapForIndex(indices[0], 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
                 const selection = new CellSelection('bitmap', [[bitmap]]);
-                d(selection);
                 eContext.setSelection(selection);
             },
             isHidden: (props) => {
@@ -257,7 +358,7 @@ function CharIndex(props) {
                     () => {
                         for (let code in undoChars) {
                             props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size, size);
+                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
                             props.cellProvider.setBitmapForValue(code, bitmap);
                         }
                         update();
@@ -269,94 +370,113 @@ function CharIndex(props) {
                     return true;
                 }
                 const cell = eContext.selection.getCell();
-                return (cell.width !== size || cell.height !== size);
+                return (cell.width !== size.x || cell.height !== size.y);
             }
         }
      ];
 
-    const saveChars = (providers) => {
+    const assignChars = (providers) => {
         if (!Array.isArray(providers)) {
             providers = [providers];
         }
-        const size = props.cellProvider.getSize();
-        const assignProvider = new FontCharIndexProvider({width: size, height: size, map: {}});
-        for (let i = 0; i < providers.length; i++) {
+        const images = [];
+        for (let provider of providers) {
+            images.push(provider.getImageData());
+        }
+        assignImagesToChars(images, null);
+    };
+
+    const assignImagesToChars = (images, oldCodes) => {
+        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}});
+        for (let i = 0; i < images.length; i++) {
             const code = String.fromCharCode(32 + i);
             assignProvider.addCharCode(code);
-            assignProvider.setBitmapForValue(code, providers[i].getImageData());
+            assignProvider.setBitmapForValue(code, images[i]);
         }
 
-        const assign = (values) => {
-            const undoChars = {};
-            const size = props.cellProvider.getSize();
-            for (let value of values) {
-                undoChars[value] = props.cellProvider.hasCode(value) ? props.cellProvider.getBitmapForValue(value, 1, false) : null;
+        const assign = (newCodes) => {
+            const backups = {};
+            const deleted = [];
+            const skip = [];
+            if (oldCodes !== null) {
+                for (let char of oldCodes) {
+                    const newIndex = newCodes.indexOf(char);
+                    if (newIndex === -1) {
+                        backups[char] = props.cellProvider.getBitmapForValue(char, 1, false);
+                        deleted.push(char);
+                    } else if (newIndex === oldCodes.indexOf(char)) {
+                        skip.push(char);
+                    }
+                }
+            }
+            for (let char of newCodes) {
+                if (skip.indexOf(char) !== -1) continue;
+                backups[char] = props.cellProvider.hasCode(char) ? props.cellProvider.getBitmapForValue(char, 1, false) : null;
             }
             eContext.doAction(
                 () => {
-                    let i = 0;
-                    for(let code of values) {
-                        props.cellProvider.addCharCode(code);
-                        props.cellProvider.setBitmapForValue(code, providers[i].getImageData());
-                        i++;
+                    for(let char of deleted) {
+                        props.cellProvider.deleteChar(char);
+                    }
+                    for (let i = 0; i < newCodes.length; i++) {
+                        const char = newCodes[i];
+                        if (backups[char] === null) {
+                            props.cellProvider.addCharCode(char);
+                        }
+                        props.cellProvider.setBitmapForValue(char, images[i]);
                     }
                     update();
                 },
                 () => {
-                    for(let code in undoChars) {
-                        if (undoChars[code] === null) {
-                            props.cellProvider.deleteChar(code);
+                    for(let char of deleted) {
+                        props.cellProvider.addCharCode(char);
+                    }
+                    for(let char in backups) {
+                        if (backups[char] === null) {
+                            props.cellProvider.deleteChar(char);
                         } else {
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size, size);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
+                            const bitmap = backups[char].getContext('2d').getImageData(0, 0, size.x, size.y);
+                            props.cellProvider.setBitmapForValue(char, bitmap);
                         }
                     }
                     update();
                 }
             );
             incPosRef.current.setMarked([]);
-            closeModals();
+            AssignCharsModal.hide();
         };
-        openModal(
-            <CharAssignModal
-                provider={assignProvider}
-                assign={assign}
-            />
-        );
+        AssignCharsModal.show({provider: assignProvider, assign, oldCodes});
     };
 
     const importChars = () => {
         const selected = (selection) => {
-            const size = props.cellProvider.getSize();
             const providers = [];
             const baseCells = selection.getBaseCells();
             for(let cells of baseCells) {
-                const provider = new BitmapCellProvider(size);
+                const provider = new BitmapCellProvider(1); //size);
                 provider.setMap(cells);
                 providers.push(provider);
             }
-            saveChars(providers);
+            assignChars(providers);
+            ImportCharsModal.hide();
         };
-        BitmapSelectorModal(
-            {
-                name: 'Select Rect',
-                selection: {
-                    type: 'rect',
-                    width: size,
-                    height: size,
-                    multi: true,
-                    doubleClick: selected
-                },
-                bitmap: props.source
+        ImportCharsModal.show({
+            selection: {
+                type: 'rect',
+                width: size.x,
+                height: size.y,
+                fixed: true,
+                multi: true,
+                doubleClick: selected
             },
-            selected
-        );
+            bitmap: props.source,
+            save: selected
+        });
     };
 
     const deleteCharAtIndex = (index) => {
         const undoChar = props.cellProvider.getCharAt(index).char;
-        const size = props.cellProvider.getSize();
-        const undoBitmap = props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size, size);
+        const undoBitmap = props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
         eContext.doAction(
             () => {
                 props.cellProvider.deleteIndex(index);
@@ -372,26 +492,13 @@ function CharIndex(props) {
 
     const newChar = () => {
         const canvas = props.cellProvider.getBitmapForValue('');
-        canvas.width = 8;
-        canvas.height = 8;
+        canvas.width = size.x;
+        canvas.height = size.y;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         const bitmap = canvas.toDataURL('image/png');
-
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={saveChars}
-                        bitmap={bitmap} />
-                </div>
-            </Modal>
-        );
+        NewCharModal.show({bitmap});
     };
 
     const editChar = (index) => {
@@ -411,37 +518,28 @@ function CharIndex(props) {
                     update();
                 }
             );
-            closeModals();
+            EditCharModal.hide();
         };
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={save}
-                        bitmap={bitmap} />
-                </div>
-            </Modal>
-        );
+        EditCharModal.show({title: 'Edit char at index ' + index, save, bitmap});
     };
 
     return (
-        <div>
-            <Stack dir="x" full border>
-                <div className="padded">
-                    <Stack dir="y">
-                        <button onClick={newChar}>New</button>
-                        <button onClick={importChars}>Import</button>
+        <Fragment>
+            <Stack fullHeight border>
+                <Toolbar padded>
+                    <Stack vertical>
+                        <ActionBox material click={newChar}>add</ActionBox>
+                        <ActionBox material click={importChars}>playlist_add</ActionBox>
                     </Stack>
-                </div>
-                <div className="flex">
+                </Toolbar>
+
+                <Content flex>
                     <FlexRasterIndex
                         editorId="fontIndex"
                         cellProvider={props.cellProvider}
                         undoRedo
+                        empty="No characters yet, please import or create new ones"
+                        dim={props.cellProvider.getCharSize()}
                         incPosRef={incPosRef}
                         minWidth={50}
                         titleHeight={22}
@@ -452,285 +550,1198 @@ function CharIndex(props) {
                             (index) => {
                                 const char = props.cellProvider.getCharAt(index);
                                 return (
-                                    <Stack dir="x">
-                                        <div className="flex">
-                                            <kbd className="padded title-area-active">{char.char}</kbd>
-                                        </div>
-                                        <div>
+                                    <Stack>
+                                        <Content flex>
+                                            <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + char.code + ';'}}></kbd>
+                                        </Content>
+                                        <Content>
                                             <kbd>{char.code}</kbd>
-                                        </div>
+                                        </Content>
                                     </Stack>
                                 );
                             }
                         } />
-                </div>
+                </Content>
             </Stack>
-        </div>
+
+            <NewCharModal.render name="New Char" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={NewCharModal.hide}
+                    saveHandler={(provider) => {
+                        NewCharModal.hide();
+                        assignChars(provider);
+                    }}
+                    bitmap={NewCharModal.params.bitmap} />
+            </NewCharModal.render>
+
+            <EditCharModal.render name="Edit Char" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={EditCharModal.hide}
+                    saveHandler={EditCharModal.params.save}
+                    bitmap={EditCharModal.params.bitmap} />
+            </EditCharModal.render>
+
+            <ImportCharsModal.render name="Select" height={600} width="90%" closeable>
+                <EditorCtx>
+                    <BitmapSelector
+                        zoom="1"
+                        border="0"
+                        selection={ImportCharsModal.params.selection}
+                        cancelHandler={ImportCharsModal.hide}
+                        saveHandler={ImportCharsModal.params.save}
+                        bitmaps={context.imageResources}
+                    />
+                </EditorCtx>
+            </ImportCharsModal.render>
+
+            <AssignCharsModal.render name="Assign Chars" fit closeable>
+                <CharAssign
+                    provider={AssignCharsModal.params.provider}
+                    assign={AssignCharsModal.params.assign}
+                    codes={AssignCharsModal.params.codes}
+                    cancelHandler={AssignCharsModal.hide}
+                />
+            </AssignCharsModal.render>
+
+            <ApplyFilterModal.render height={500} closeable>
+                <FiltersSelector bgColor="#000000" canvas={ApplyFilterModal.params.canvas} cancel={ApplyFilterModal.hide} save={ApplyFilterModal.params.save} filters="" />
+            </ApplyFilterModal.render>
+
+        </Fragment>
+    );
+}
+
+function FiltersSelector(props) {
+    const context = useContext(GlobalContext);
+    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const filterDefinitions = context.filters.getFilters();
+    const allFilters = useMemo(() => {
+        const keys = Object.keys(filterDefinitions).sort();
+        const items = [];
+        for (let key of keys) {
+            const item = {
+                name: key
+            };
+            const filterDefinition = filterDefinitions[key];
+            for (let def of filterDefinition.paramDefs) {
+                item[def.key] = def.default;
+            }
+            items.push({name: key, item});
+        }
+        return items;
+    }, []);
+
+    const [active, setActive] = useState(0);
+    const assignedFilters = [];
+    const filterExpressions = props.filters.split('|');
+    for (let expr of filterExpressions) {
+        if (expr === '') {
+            continue;
+        }
+        let name = expr;
+        let item = {};
+        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
+            const parts = expr.split('(', 2);
+            name = parts[0];
+            const values = parts[1].substr(0, parts[1].length - 1).split(',');
+            const params = filterDefinitions[name].params;
+            for (let i = 0; i < params.length; i++) {
+                params[i](values[i], item);
+            }
+        }
+        assignedFilters.push({name, ...item});
+    }
+    const previewRef = useRef(null);
+    const [filters, setFilters] = useState(assignedFilters);
+
+    useEffect(() => {
+        if (!previewRef.current || !props.canvas) {
+            return;
+        }
+        const ctx = previewRef.current.getContext('2d');
+        const baseCanvas = Array.isArray(props.canvas) ? props.canvas[previewIndex].canvas : props.canvas;
+        const width = baseCanvas.width;
+        const height = baseCanvas.height;
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+
+        const currFilters = getFilterString();
+
+        let filteredCanvas = baseCanvas;
+        if (currFilters) {
+            const transformed =
+                context.filters.getCanvasWithFiltersApplied(
+                    currFilters,
+                {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
+            filteredCanvas = transformed[0].elem;
+        }
+        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
+    });
+
+    let preview = null;
+    if (props.canvas) {
+        let imageCtrl = '';
+        let previewCanvas = props.canvas;
+        if (Array.isArray(props.canvas)) {
+            const options = [];
+            for (let i = 0; i < props.canvas.length; i++) {
+                options.push({id: i, name: props.canvas[i].name});
+            }
+            if (options.length > 1) {
+                imageCtrl = <Select options={options} value={previewIndex} buttons set={setPreviewIndex} />;
+            }
+            previewCanvas = props.canvas[0].canvas;
+        }
+        preview =
+            <Stack vertical border fullHeight>
+                <Toolbar>
+                    <Content padded>Preview:</Content>
+                    {imageCtrl}
+                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
+                </Toolbar>
+                <Content scroll fullHeight><Centered><canvas className="thin-boxed" ref={previewRef} width={previewCanvas.width} height={previewCanvas.height} /></Centered></Content>
+            </Stack>;
+    }
+
+    const getItemProperties = (index) => {
+        const item = filters[index];
+        const paramDefs = filterDefinitions[item.name].paramDefs;
+        const inputs = [];
+        for (let def of paramDefs) {
+            switch(def.type) {
+                case 2:
+                    const colorValue = rgb2hex(item[def.key]);
+                    inputs.push(
+                        <ColorProp
+                            name={def.key + ':'}
+                            key={def.key}
+                            value={colorValue}
+                            set={(value) => {
+                               const newFilters = [...filters];
+                               newFilters[active][def.key] = value;
+                               setFilters(newFilters);
+                           }}
+                        />
+                    );
+                    break;
+
+                case 1:
+                    inputs.push(
+                        <RangeProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            min={def.min}
+                            max={def.max}
+                            step={def.step}
+                            value={item[def.key]}
+                            set={value => {
+                                const newFilters = [...filters];
+                                newFilters[active][def.key] = value;
+                                setFilters(newFilters);
+                            }}
+                        />
+                    );
+                    break;
+
+                case 4:
+                    inputs.push(
+                        <IntProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            buttons
+                            set={
+                                (value) => {
+                                    const newFilters = [...filters];
+                                    newFilters[active][def.key] = value;
+                                    setFilters(newFilters);
+                                }
+                            }
+                            value={item[def.key]}
+                        />
+                    );
+                    break;
+
+                default:
+                    d('???', def);
+                    break;
+            }
+        }
+        return (
+            <PropertyGrid>
+                {inputs}
+            </PropertyGrid>
+        );
+    };
+
+    const getFilterString = () => {
+        const values = [];
+        for (let filter of filters) {
+            let expr = filter.name;
+            const paramDefs = filterDefinitions[filter.name].paramDefs;
+            if (paramDefs.length > 0) {
+                expr += '(';
+                const params = [];
+                for (let def of paramDefs) {
+                    const rawValue = filter[def.key];
+                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
+                }
+                expr += params.join(',') + ')';
+            }
+            values.push(expr);
+        }
+        return values.join('|');
+    };
+
+    const currFilters = getFilterString();
+
+    return (
+        <Stack vertical border>
+            <Stack fullHeight border>
+                <ItemsStack
+                    empty="Assign filters from the left side"
+                    assignable={allFilters}
+                    active={active}
+                    setActive={setActive}
+                    items={filters}
+                    setItems={setFilters}
+                    getProperties={getItemProperties}
+                    getName={(item) => item.name}
+                    ordered
+                />
+                {preview}
+            </Stack>
+            <Content padded>
+                <Stack>
+                    <button disabled={currFilters === props.filters} onClick={() => {
+                        props.save(currFilters);
+                    }}>Save</button>
+                    <button onClick={props.cancel}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+function BlockProperties(props) {
+    const FiltersModal = useModal();
+    const {
+        name, setName,
+        text, setText,
+        posX, setPosX,
+        posY, setPosY,
+        rasterize, setRasterize,
+        textAlign, setTextAlign,
+        autoCenterX, setAutoCenterX,
+        autoCenterY, setAutoCenterY,
+        screenX,
+        screenY,
+        fonts,
+        font, setFont,
+        filters, setFilters,
+        canvas,
+        bgColor
+    } = props;
+
+    const fontSize = fonts[font].provider.getCharSize();
+
+    const changeFilters = () => {
+        FiltersModal.show({
+            title: 'Change assigned filters',
+            filters,
+            save: (newFilters) => {
+                setFilters(newFilters);
+                FiltersModal.hide();
+            }
+        });
+    };
+
+    const fontOptions = [];
+    for (let id in fonts) {
+        fontOptions.push({id, name: fonts[id].name});
+    }
+
+    return (
+        <Fragment>
+            <PropertyGrid>
+                <TextFieldProp name="Name:"  value={name} set={(value) => setName(value)} />
+                <SelectProp name="Font:" buttons value={font} set={setFont} options={fontOptions} />
+                <DimProp name="Position:"
+                         setX={setPosX}
+                         setY={setPosY}
+                         stepX={rasterize ? fontSize.x : 1}
+                         stepY={rasterize ? fontSize.y : 1}
+                         minX={0}
+                         readOnlyX={autoCenterX} readOnlyY={autoCenterY}
+                         minY={0} maxX={screenX} maxY={screenY} x={posX} y={posY} buttons
+                />
+                <PropLabel name="Auto-Center:">
+                    <Stack>
+                        <Checkbox name="X" value={autoCenterX} set={setAutoCenterX}/>
+                        <Checkbox name="Y" value={autoCenterY} set={setAutoCenterY}/>
+                    </Stack>
+                </PropLabel>
+                <CheckboxProp name="Grid-Positions:" value={rasterize} set={setRasterize} />
+                <RadioProp name="Text align:" material value={textAlign} set={setTextAlign} options={{left: 'format_align_left', center: 'format_align_center', right: 'format_align_right'}} />
+                <FullProp name="Text:">
+                    <textarea rows={10} cols={40} value={text} onChange={(e) => {
+                        setText(e.target.value);
+                    }}></textarea>
+                </FullProp>
+                <PropLabel name="Filters:">
+                    <Stack noGap>
+                        <Content flex>
+                            <TextField onClick={changeFilters} className="full-h" value={filters} readOnly /></Content>
+                        <Content><button onClick={() => {setFilters('')}}>X</button></Content>
+                    </Stack>
+                </PropLabel>
+            </PropertyGrid>
+
+            <FiltersModal.render height={500} closeable>
+                <FiltersSelector bgColor={bgColor} canvas={canvas} cancel={FiltersModal.hide} save={FiltersModal.params.save} filters={FiltersModal.params.filters} />
+            </FiltersModal.render>
+        </Fragment>
     );
 }
 
 function FontPreview(props) {
-
-    const ready = useMountedReadyCellProvider(props.provider);
-    const [demoText, setDemoText] = useState('');
+    const context = useContext(GlobalContext);
+    const [active, setActive] = useState(0);
     const [zoom, setZoomRaw] = useState(2);
     const [bgColor, setBgColor] = useState('#000000');
-    const [posX, setPosX] = useState(0);
-    const [posY, setPosY] = useState(0);
     const [screenX, setScreenX] = useState(320);
     const [screenY, setScreenY] = useState(200);
     const [showMarker, setShowMarker] = useState(false);
-    const [textAlign, setTextAlignRaw] = useState('left');
-    const [autoCenterX, setAutoCenterX] = useState(false);
-    const [autoCenterY, setAutoCenterY] = useState(false);
-    const [rasterize, setRasterize] = useState(false);
+    const {blocks, setBlocks, defaultBlock} = props;
+
     const propsRef = useRef(null);
     const overlayRef = useRef(null);
     const canvasRef = useRef(null);
-    const imgRef = useRef(null);
+    const currBlockRef = useRef(null);
+
+    currBlockRef.current = blocks.length === 0 || active === null || active >= blocks.length ? null : blocks[active];
+    const currFont = currBlockRef.current ? props.fonts[currBlockRef.current.font] : null;
+    const currProvider = currFont ? currFont.provider : null;
+    const ready = useMountedReadyCellProvider(currProvider);
+    const fontSize = currProvider ? currProvider.getCharSize() : null;
+
+    const invalidateImages = () => {
+        for (let block of propsRef.current.blocks) {
+            block.img = null;
+        }
+    };
+
     const eContext = useEditorContextPart('preview', () => {
-        imgRef.current = null;
+        invalidateImages();
+        setBlocks(propsRef.current.blocks);
     });
-    const setTextAlign = (value) => {
-        setTextAlignRaw(value);
-        imgRef.current = null;
-    };
+
     const setZoom = (value) => {
+        invalidateImages();
         setZoomRaw(value);
-        imgRef.current = null;
     };
+
     propsRef.current = {
         zoom,
-        posX,
-        posY,
+        blocks,
         screenX,
         screenY
     };
 
+    const getBlockImage = (block, raw = false) => {
+        if (block.img === null) {
+            const lines = block.text.split('\n');
+            let maxWidth = 0;
+            for (let line of lines) {
+                maxWidth = Math.max(maxWidth, line.length);
+            }
+            const fontSize = props.fonts[block.font].provider.getCharSize();
+            const blockHeight = fontSize.y * lines.length;
+            const blockWidth = fontSize.x * maxWidth;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = blockWidth * zoom || 1;
+            canvas.height = blockHeight * zoom || 1;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const sizeX = fontSize.x * zoom;
+            const sizeY = fontSize.y * zoom;
+            let trigger = false;
+            for (let y = 0; y < lines.length; y++) {
+                let line = lines[y];
+                if (block.textAlign !== 'left' && line.length < maxWidth) {
+                    const pad = block.textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
+                    line = line.padStart(pad, ' ');
+                }
+                for (let x = 0; x < line.length; x++) {
+                    const img = props.fonts[block.font].provider.getBitmapForValue(line[x], zoom, false);
+                    if (img) {
+                        ctx.drawImage(img, x * sizeX, y * sizeY);
+                    } else {
+                        trigger = true;
+                    }
+                }
+            }
+            let elem = canvas;
+            block.rawImg = canvas;
+            if (block.filters) {
+                const transformed = context.filters.getCanvasWithFiltersApplied(block.filters, {elem: canvas, ctx}, 0, 0, canvas.width, canvas.height);
+                elem = transformed[0].elem;
+            }
+            block.img = {canvas: elem};
+            if (trigger) {
+                requestAnimationFrame(() => {
+                    eContext.updateRaster('preview');
+                })
+            }
+        }
+        return raw ? block.rawImg : block.img.canvas;
+    };
+
     useEffect(() => {
-        if (!canvasRef.current || !imgRef.current) {
+        if (!canvasRef.current) {
             return;
         }
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(imgRef.current.canvas, propsRef.current.posX * propsRef.current.zoom, propsRef.current.posY * propsRef.current.zoom);
-    }, [imgRef.current, ready, textAlign, demoText, zoom, bgColor, posX, posY, screenX, screenY]);
+
+        for (let block of propsRef.current.blocks) {
+            ctx.drawImage(getBlockImage(block), block.posX * propsRef.current.zoom, block.posY * propsRef.current.zoom);
+        }
+    });
 
     if (!ready) {
         return '';
     }
 
-    const lines = demoText.split('\n');
-    let maxWidth = 0;
-    for (let line of lines) {
-        maxWidth = Math.max(maxWidth, line.length);
-    }
-    const blockHeight = props.provider.getSize() * lines.length;
-    const blockWidth = props.provider.getSize() * maxWidth;
+    const setState = (newProps) => {
+        const curr = currBlockRef.current;
+        const {text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY} = curr;
+        const change = Object.assign({text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY}, newProps);
 
-    if (!imgRef.current) {
-        const canvas = document.createElement('canvas');
-        canvas.width = blockWidth * zoom || 1;
-        canvas.height = blockHeight * zoom || 1;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const lines = demoText.split('\n');
-        const size = props.provider.getSize() * zoom;
-        for (let y = 0; y < lines.length; y++) {
-            let line = lines[y];
-            if (textAlign !== 'left' && line.length < maxWidth) {
-                const pad = textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
-                line = line.padStart(pad, ' ');
+        const fontSize = props.fonts[font].provider.getCharSize();
+
+        const getRasterized = (value, dim) => {
+            if (!change.rasterize) {
+                return value;
             }
-            for (let x = 0; x < line.length; x++) {
-                const img = props.provider.getBitmapForValue(line[x], zoom, false);
-                ctx.drawImage(img, x * size, y * size);
-            }
-        }
-        imgRef.current = {canvas};
-    }
-
-    const getRasterized = (value) => {
-        if (!rasterize) {
-            return value;
-        }
-        return Math.floor(value/props.provider.getSize()) * props.provider.getSize();
-    };
-
-    if (autoCenterX) {
-        let centeredX = getRasterized(Math.ceil(screenX/2) - Math.ceil(blockWidth/2));
-        if (posX !== centeredX) {
-            setPosX(centeredX);
-        }
-    } else if (rasterize) {
-        let rasterPos = getRasterized(posX);
-        if (rasterPos !== posX) {
-            setPosX(rasterPos);
-        }
-    }
-    if (autoCenterY) {
-        const centeredY = getRasterized(Math.ceil(screenY/2) - Math.ceil(blockHeight/2));
-        if (posY !== centeredY) {
-            setPosY(centeredY);
-        }
-    } else if (rasterize) {
-        let rasterPos = getRasterized(posY);
-        if (rasterPos !== posY) {
-            setPosY(rasterPos);
-        }
-    }
-    let marker = '';
-    if (blockWidth > 0 && blockHeight > 0 && !(autoCenterX && autoCenterY)) {
-        let moveCursor = 'move';
-        if (autoCenterY) {
-            moveCursor = 'hresize';
-        } else if (autoCenterX) {
-            moveCursor = 'vresize';
-        }
-        const initMove = (e) => {
-            const rect = overlayRef.current.getBoundingClientRect();
-            let lastX = Math.floor((e.clientX - rect.x)/zoom);
-            let lastY = Math.floor((e.clientY - rect.y)/zoom);
-
-            const moveListener = (e) => {
-                const currX = Math.floor((e.clientX - rect.x)/zoom);
-                const currY = Math.floor((e.clientY - rect.y)/zoom);
-
-                const deltaX = currX - lastX;
-                if (deltaX !== 0) {
-                    const newX = Math.max(0, Math.min(posX + deltaX, screenX - 1));
-                    if (newX !== posX) {
-                        setPosX(newX);
-                    }
-                }
-                const deltaY = currY - lastY;
-                if (deltaY !== 0) {
-                    const newY = Math.max(0, Math.min(posY + deltaY, screenY - 1));
-                    if (newY !== posY) {
-                        setPosY(newY);
-                    }
-                }
-                e.stopPropagation();
-                e.preventDefault();
-            };
-
-            eContext.setFixCursor(moveCursor);
-            eContext.addListener(
-                props.editorId,
-                'mousemove',
-                moveListener,
-                {capture: false}
-            );
-            eContext.addListener(
-                props.editorId,
-                'mouseup',
-                (e) => {
-                    eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
-                    eContext.setFixCursor(null);
-                    setShowMarker(false);
-                    e.preventDefault();
-                    e.stopPropagation();
-                },
-                {
-                    once: true,
-                    capture: false
-                }
-            );
-            setShowMarker(true);
+            return Math.floor(value/fontSize[dim]) * fontSize[dim];
         };
 
-        marker = (<CellMarker
-            blink
-            initMove={initMove}
-            border={0}
-            posX={posX}
-            posY={posY}
-            zoom={zoom}
-            moveCursor={'cursor-' + moveCursor}
-            bottom={showMarker && (posY + blockHeight < screenY)}
-            top={showMarker}
-            left={showMarker}
-            right={showMarker && (posX + blockWidth < screenX)}
-            size={1}
-            width={Math.min(blockWidth, screenX - posX)}
-            height={Math.min(blockHeight, screenY - posY)}
-            highlight
-        />);
+        const lines = currBlockRef.current.text.split('\n');
+        let maxWidth = 0;
+        for (let line of lines) {
+            maxWidth = Math.max(maxWidth, line.length);
+        }
+        const blockHeight = fontSize.y * lines.length;
+        const blockWidth = fontSize.x * maxWidth;
+
+        if (change.autoCenterX) {
+            let centeredX = getRasterized(Math.ceil(screenX/2) - Math.ceil(blockWidth/2), 'x');
+            if (change.posX !== centeredX) {
+                change.posX = centeredX;
+            }
+        } else if (change.rasterize) {
+            let rasterPos = getRasterized(change.posX, 'x');
+            if (rasterPos !== change.posX) {
+                change.posX = rasterPos;
+            }
+        }
+        if (change.autoCenterY) {
+            const centeredY = getRasterized(Math.ceil(screenY/2) - Math.ceil(blockHeight/2), 'y');
+            if (change.posY !== centeredY) {
+                change.posY = centeredY;
+            }
+        } else if (change.rasterize) {
+            let rasterPos = getRasterized(change.posY, 'y');
+            if (rasterPos !== change.posY) {
+                change.posY =rasterPos;
+            }
+        }
+
+        let hasChanged = false;
+        let invalidateImage = false;
+        for (let key in change) {
+            if (change[key] !== curr[key]) {
+                hasChanged = true;
+                if (['font', 'text', 'textAlign', 'filters'].indexOf(key) !== -1) {
+                    invalidateImage = true;
+                }
+            }
+        }
+
+        if (invalidateImage) {
+            change.img = null;
+        }
+        if (hasChanged) {
+            const newBlocks = [...blocks];
+            newBlocks[active] = {...curr, ...change};
+            setBlocks(newBlocks);
+        }
+    };
+
+    const getSetProp = (prop, invalidateImage = false) => {
+        return (value) => {
+            setState({[prop]: value});
+        }
+    };
+
+    let marker = '';
+    const currBlock = currBlockRef.current;
+    if (currBlock && blocks.length > 0) {
+        const currLines = currBlock.text.split('\n');
+        let currMaxWidth = 0;
+        for (let currLine of currLines) {
+            currMaxWidth = Math.max(currMaxWidth, currLine.length);
+        }
+        const currBlockHeight = fontSize.x * currLines.length;
+        const currBlockWidth = fontSize.y * currMaxWidth;
+
+        if (currBlockWidth > 0 && currBlockHeight > 0 && !(currBlock.autoCenterX && currBlock.autoCenterY)) {
+            const setCurrPosX = getSetProp('posX');
+            const setCurrPosY = getSetProp('posY');
+
+            let moveCursor = 'move';
+            if (currBlock.autoCenterY) {
+                moveCursor = 'hresize';
+            } else if (currBlock.autoCenterX) {
+                moveCursor = 'vresize';
+            }
+            const initMove = (e) => {
+                const rect = overlayRef.current.getBoundingClientRect();
+                let lastX = Math.floor((e.clientX - rect.x)/zoom);
+                let lastY = Math.floor((e.clientY - rect.y)/zoom);
+
+                const moveListener = (e) => {
+                    const currX = Math.floor((e.clientX - rect.x)/zoom);
+                    const currY = Math.floor((e.clientY - rect.y)/zoom);
+
+                    const cBlock = currBlockRef.current;
+                    const deltaX = currX - lastX;
+                    if (deltaX !== 0) {
+                        const newX = Math.max(0, Math.min(cBlock.posX + deltaX, screenX - 1));
+                        if (newX !== cBlock.posX) {
+                            setCurrPosX(newX);
+                            lastX = newX;
+                        }
+                    }
+                    const deltaY = currY - lastY;
+                    if (deltaY !== 0) {
+                        const newY = Math.max(0, Math.min(cBlock.posY + deltaY, screenY - 1));
+                        if (newY !== cBlock.posY) {
+                            setCurrPosY(newY);
+                            lastY = newY;
+                        }
+                    }
+                    e.stopPropagation();
+                    e.preventDefault();
+                };
+
+                eContext.setFixCursor(moveCursor);
+                eContext.addListener(
+                    props.editorId,
+                    'mousemove',
+                    moveListener,
+                    {capture: false}
+                );
+                eContext.addListener(
+                    props.editorId,
+                    'mouseup',
+                    (e) => {
+                        eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
+                        eContext.setFixCursor(null);
+                        setShowMarker(false);
+                        e.preventDefault();
+                        e.stopPropagation();
+                    },
+                    {
+                        once: true,
+                        capture: false
+                    }
+                );
+                setShowMarker(true);
+            };
+
+            marker = (<CellMarker
+                blink
+                initMove={initMove}
+                border={0}
+                posX={currBlockRef.current.posX}
+                posY={currBlockRef.current.posY}
+                zoom={zoom}
+                moveCursor={'cursor-' + moveCursor}
+                bottom={showMarker && (currBlockRef.current.posY + currBlockHeight < screenY)}
+                top={showMarker}
+                left={showMarker}
+                right={showMarker && (currBlockRef.current.posX + currBlockWidth < screenX)}
+                size={1}
+                width={Math.min(currBlockWidth, screenX - currBlockRef.current.posX)}
+                height={Math.min(currBlockHeight, screenY - currBlockRef.current.posY)}
+                highlight
+            />);
+        }
     }
     const realWidth = screenX * zoom;
     const realHeight = screenY * zoom;
 
+    const getTextBlockProperties = (index) => {
+        const item = propsRef.current.blocks[index];
+        return (
+            <BlockProperties
+                name={item.name}
+                setName={getSetProp('name')}
+                fonts={props.fonts}
+                font={item.font}
+                setFont={getSetProp('font')}
+                fontSize={fontSize}
+                text={item.text}
+                setText={getSetProp('text')}
+                posX={item.posX}
+                setPosX={getSetProp('posX')}
+                posY={item.posY}
+                setPosY={getSetProp('posY')}
+                textAlign={item.textAlign}
+                setTextAlign={getSetProp('textAlign')}
+                autoCenterX={item.autoCenterX}
+                setAutoCenterX={getSetProp('autoCenterX')}
+                autoCenterY={item.autoCenterY}
+                setAutoCenterY={getSetProp('autoCenterY')}
+                rasterize={item.rasterize}
+                setRasterize={getSetProp('rasterize')}
+                filters={item.filters}
+                setFilters={getSetProp('filters')}
+                screenX={screenX}
+                screenY={screenY}
+                canvas={getBlockImage(item, true)}
+                bgColor={bgColor}
+            />
+        );
+    };
+
     return (
-        <Stack dir="x" full>
-            <Section name="Screen">
-                <div className="padded">
-                    <Dim name="Position"
-                         setX={setPosX} setY={setPosY} minX={0}
-                         readOnlyX={autoCenterX} readOnlyY={autoCenterY}
-                         minY={0} maxX={screenX} maxY={screenY} x={posX} y={posY} buttons />
-                    <Stack dir="x">
-                        <div>Auto-Center: </div>
-                        <Checkbox name="X" value={autoCenterX} set={setAutoCenterX} />
-                        <Checkbox name="Y" value={autoCenterY} set={setAutoCenterY} />
-                    </Stack>
-                    <Checkbox name="Rasterize" value={rasterize} set={setRasterize} />
-                    <Stack dir="x" padded>
-                        <div>Text align: </div>
-                        <div className="padded">
-                            <Stack dir="x">
-                                <SwitchButton enabled={textAlign === 'left'} switch={() => setTextAlign('left')}><i className="material-icons md-18">format_align_left</i></SwitchButton>
-                                <SwitchButton enabled={textAlign === 'center'} switch={() => setTextAlign('center')}><i className="material-icons md-18">format_align_center</i></SwitchButton>
-                                <SwitchButton enabled={textAlign === 'right'} switch={() => setTextAlign('right')}><i className="material-icons md-18">format_align_right</i></SwitchButton>
-                            </Stack>
-                        </div>
-                    </Stack>
-                    <textarea rows={20} cols={40} value={demoText} onChange={(e) => {setDemoText(e.target.value); imgRef.current = null}}></textarea>
-                </div>
+        <Stack fullHeight>
+            <Section name="Text blocks">
+                <ItemsStack
+                    items={blocks}
+                    active={active}
+                    setActive={setActive}
+                    getName={(item) => item.name}
+                    setItems={(newBlocks) => {
+                        let changed = false;
+                        if (newBlocks.length !== blocks.length) {
+                            changed = true;
+                        } else {
+                            for (let i = 0; i < blocks.length; i++) {
+                                if (blocks[i].id !== newBlocks[i].id) {
+                                    changed = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (changed) {
+                            for (let block of newBlocks) {
+                                block.img = null;
+                            }
+                        }
+                        setBlocks(newBlocks);
+                    }}
+                    ordered
+                    getClone={item => {
+                        return props.entity.getNew(item, {name: item.name + ' Clone'})
+                    }}
+                    getNewItem={() => {
+                        return props.entity.getNew({name: 'New Item #' + (blocks.length + 1)})
+                    }}
+                    getProperties={getTextBlockProperties}
+                    empty="Add text block"
+                    width={200}
+                />
             </Section>
 
             <Section name="Preview" flex>
-                <Stack dir="y" border>
-                <Toolbar>
-                    <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
-                    <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
-                    <Color value={bgColor} set={setBgColor} />
-                </Toolbar>
-                <div className="padded flex">
-                    <div className="thin-boxed min-content">
-                        <canvas ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
-                    </div>
-                    <div className="rel-canvas" style={{height: 0}}>
-                        <div ref={overlayRef} className="" style={{position: 'relative', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: -(realHeight + 1), left: 1}}>
-                            {marker}
+                <Stack vertical border>
+                    <Toolbar>
+                        <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
+                        <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
+                        <Color value={bgColor} set={setBgColor} />
+                    </Toolbar>
+                    <Content flex>
+                        <div style={{position: 'relative', overflow: 'auto', height: '100%'}}>
+                            <div style={{position: 'absolute'}}>
+                                <Content padded>
+                                    <canvas className="thin-boxed" ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
+                                    <div ref={overlayRef} className="" style={{position: 'absolute', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: 6, left: 6}}>
+                                        {marker}
+                                    </div>
+                                </Content>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    </Content>
                 </Stack>
             </Section>
         </Stack>
     );
 }
 
+function ResizeFontForm(props) {
+    const eContext = useContext(EditorContext);
+    const context = useContext(GlobalContext);
+    const [width, setWidth] = useState(props.font.fontMap.width);
+    const [height, setHeight] = useState(props.font.fontMap.height);
+    const [offsetX, setOffsetX] = useState(0);
+    const [offsetY, setOffsetY] = useState(0);
+    const overlayRef = useRef(null);
+    const SelectDimModal = useModal();
+
+    const propsRef = useRef(null);
+
+    const selectDim = () => {
+        const selected = (result) => {
+            setState({width: result.getWidth(), height: result.getHeight()});
+            SelectDimModal.hide();
+        };
+        SelectDimModal.show({
+            selection: {
+                type: 'rect',
+                multi: false,
+                fixed: false,
+                doubleClick: selected
+            },
+            bitmap: props.source,
+            save: selected
+        });
+    };
+
+    const setState = (changes) => {
+        changes.width = changes.width ? changes.width : width;
+        changes.height = changes.height ? changes.height : height;
+        changes.offsetX = changes.offsetX !== undefined ? changes.offsetX : offsetX;
+        changes.offsetY = changes.offsetY !== undefined ? changes.offsetY : offsetY;
+
+        if (changes.width !== width) {
+            changes.offsetX = Math.min(changes.offsetX, Math.abs(changes.width - props.font.fontMap.width));
+            setWidth(changes.width);
+        }
+        if (changes.height !== height) {
+            changes.offsetY = Math.min(changes.offsetY, Math.abs(changes.height - props.font.fontMap.height));
+            setHeight(changes.height);
+        }
+        if (changes.offsetX !== offsetX) {
+            setOffsetX(changes.offsetX);
+        }
+        if (changes.offsetY !== offsetY) {
+            setOffsetY(changes.offsetY);
+        }
+    };
+
+    const maxOffsetX = Math.abs(width - props.font.fontMap.width);
+    const maxOffsetY = Math.abs(height - props.font.fontMap.height);
+
+    propsRef.current = {offsetX, offsetY, maxOffsetX, maxOffsetY, setState};
+
+    const previewWidth = Math.max(width, props.font.fontMap.width);
+    const previewHeight = Math.max(height, props.font.fontMap.height);
+
+    const provider = new BitmapCellProvider(4);
+    const map = [];
+    for (let j = 0; j < previewHeight; j++) {
+        const row = [];
+        for (let i = 0; i < previewWidth; i++) {
+            row.push('#000000');
+        }
+        map.push(row);
+    }
+    provider.setMap(map);
+    const zoom = 4;
+    const size = provider.getSize();
+    const border = 1;
+
+    let moveCursor = 'move';
+
+    const initMove = (e) => {
+        const rect = overlayRef.current.getBoundingClientRect();
+        const cellSize = (size * zoom + border);
+        let lastX = Math.floor((e.clientX - rect.x)/cellSize);
+        let lastY = Math.floor((e.clientY - rect.y)/cellSize);
+
+        const moveListener = (e) => {
+            const currX = Math.floor((e.clientX - rect.x)/cellSize);
+            const currY = Math.floor((e.clientY - rect.y)/cellSize);
+
+            const curr = propsRef.current;
+            const deltaX = currX - lastX;
+            if (deltaX !== 0) {
+                const newX = Math.max(0, Math.min(currX, curr.maxOffsetX));
+                if (newX !== curr.offsetX) {
+                    curr.setState({offsetX: newX});
+                    lastX = newX;
+                }
+            }
+            const deltaY = currY - lastY;
+            if (deltaY !== 0) {
+                const newY = Math.max(0, Math.min(currY, curr.maxOffsetY));
+                if (newY !== curr.offsetY) {
+                    curr.setState({offsetY: newY});
+                    lastY = newY;
+                }
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        };
+        eContext.setFixCursor(moveCursor);
+        eContext.addListener(
+            props.editorId,
+            'mousemove',
+            moveListener,
+            {capture: false}
+        );
+        eContext.addListener(
+            props.editorId,
+            'mouseup',
+            (e) => {
+                eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
+                eContext.setFixCursor(null);
+                e.preventDefault();
+                e.stopPropagation();
+            },
+            {
+                once: true,
+                capture: false
+            }
+        );
+    };
+
+    return (
+        <Stack vertical border>
+            <Content padded>
+                <SelectDimModal.render closeable>
+                    <EditorCtx>
+                        <BitmapSelector
+                            zoom="1"
+                            border="0"
+                            selection={SelectDimModal.params.selection}
+                            cancelHandler={SelectDimModal.hide}
+                            saveHandler={SelectDimModal.params.save}
+                            bitmaps={context.imageResources}
+                        />
+                    </EditorCtx>
+                </SelectDimModal.render>
+                <PropertyGrid>
+                    <DimProp name="Old Size:" buttons readOnly
+                             x={props.font.fontMap.width}
+                             y={props.font.fontMap.height} />
+                    <PropLabel name="New Size:">
+                        <Stack>
+                            <Dim buttons min={1} max={128}
+                                 x={width} setX={width => setState({width})}
+                                 y={height} setY={height => setState({height})}></Dim>
+
+                            <Content><button onClick={selectDim}>Select...</button></Content>
+                        </Stack>
+                    </PropLabel>
+                    <DimProp name="Offset" buttons min={0}
+                             maxX={maxOffsetX} maxY={maxOffsetY}
+                             x={offsetX} setX={offsetX => setState({offsetX})}
+                             y={offsetY} setY={offsetY => setState({offsetY})}></DimProp>
+                    <FullProp name="Position:">
+                        <div  style={{border: context.markerWidth + 'px solid transparent'}}>
+                            <Centered>
+                                <CellProviderRaster
+                                    cellProvider={provider}
+                                    width={previewWidth}
+                                    height={previewHeight}
+                                    posX={0}
+                                    posY={0}
+                                    border={border}
+                                    zoom={zoom}
+                                />
+                                <div className="rel-canvas" style={{height: 1}}>
+                                    <div ref={overlayRef} style={{top: -(previewHeight * zoom * size + (previewHeight * border))}}>
+                                        <CellMarker
+                                            blink
+                                            initMove={initMove}
+                                            initResize={null}
+                                            size={size}
+                                            border={border}
+                                            zoom={zoom}
+                                            type="rect"
+                                            highlight={true}
+                                            posX={offsetX}
+                                            posY={offsetY}
+                                            width={Math.min(width, props.font.fontMap.width)}
+                                            height={Math.min(height, props.font.fontMap.height)}
+                                            top={true}
+                                            bottom={true}
+                                            left={true}
+                                            right={true}
+                                        />
+
+                                    </div>
+                                </div>
+                            </Centered>
+                        </div>
+                    </FullProp>
+                </PropertyGrid>
+            </Content>
+
+            <Content padded>
+                <Stack>
+                    <button onClick={() => {
+                        d('SAVE...');
+                        props.save({width, height, offsetX, offsetY});
+                    }}>Save</button>
+                    <button onClick={props.hide}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+function NewFontForm(props) {
+    const context = useContext(GlobalContext);
+    const [width, setWidth] = useState(8);
+    const [height, setHeight] = useState(8);
+    const [name, setName] = useState('Font');
+    const SelectDimModal = useModal();
+
+    const selectDim = () => {
+        const selected = (result) => {
+            setWidth(result.getWidth());
+            setHeight(result.getHeight());
+            SelectDimModal.hide();
+        };
+        SelectDimModal.show({
+            selection: {
+                type: 'rect',
+                multi: false,
+                fixed: false,
+                doubleClick: selected
+            },
+            bitmap: props.source,
+            save: selected
+        });
+    };
+
+    return (
+        <Stack vertical border>
+            <Content padded>
+                <PropertyGrid>
+                    <TextFieldProp name="Name:" value={name} set={value => setName(value)} size={20} />
+                    <PropLabel name="Size:">
+                        <Stack>
+                            <Dim buttons min={1} max={128} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
+                            <Content><button onClick={selectDim}>Select...</button></Content>
+                        </Stack>
+                    </PropLabel>
+                </PropertyGrid>
+                <SelectDimModal.render closeable>
+                    <EditorCtx>
+                        <BitmapSelector
+                            zoom="1"
+                            border="0"
+                            selection={SelectDimModal.params.selection}
+                            cancelHandler={SelectDimModal.hide}
+                            saveHandler={SelectDimModal.params.save}
+                            bitmaps={context.imageResources}
+                        />
+                    </EditorCtx>
+                </SelectDimModal.render>
+            </Content>
+            <Content padded>
+                <Stack>
+                    <button onClick={() => {
+                        props.save({width, height, name});
+                    }}>Save</button>
+                    <button onClick={props.hide}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    );
+}
+
 function FontMapEditor(props) {
+    const [active, setActive] = useState(0);
+    const FontEntity = useEntity('font', {
+        name: 'New font', fontMap: null
+    });
+    const [fonts, setFonts] = useState(() => [
+        FontEntity.getNew({name: 'TextPane Font', fontMap: props.fontMap})
+    ]);
+    const TextBlockEntity = useEntity('block', {
+        name: 'New block',
+        posX: 0,
+        posY: 0,
+        text: '',
+        filters: '',
+        img: null,
+        textAlign: 'left',
+        autoCenterX: false,
+        autoCenterY: false,
+        rasterize: false
+    });
+    TextBlockEntity.setDefaults({font: fonts[0].id});
+    const [blocks, setBlocks] = useState(() => {
+        return [
+            TextBlockEntity.getNew({name: 'Demo text'})
+        ]
+    });
+    const id2Font = FontEntity.id2Items(fonts);
+    const currFont = fonts[active];
 
-    const bitmap = useMemo(() => {
-        return props.fontMap.image.toDataURL('image/png');
-    }, []);
+    const ResizeFontModal = useModal();
+    const NewFontModal = useModal();
+    for (let font of fonts) {
+        if (!font.provider) {
+            font.provider = new FontCharIndexProvider(font.fontMap);
+        }
+    }
 
-    const provider = new FontCharIndexProvider(props.fontMap);
+    const newFont = () => {
+        NewFontModal.show({
+            save: (item) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = item.width;
+                canvas.height = item.height;
+                const fontMap = {
+                    width: item.width,
+                    image: canvas,
+                    height: item.height,
+                    map: {}
+                };
+                setFonts([...fonts, FontEntity.getNew({name: item.name, fontMap})]);
+                setActive(fonts.length);
+                NewFontModal.hide();
+            }
+        });
+    };
+
+    function getFontProps(index) {
+        const editFont = fonts[index];
+
+        const resizeAction = () => {
+            ResizeFontModal.show({
+                font: editFont,
+                save: (resize) => {
+                    const canvas = document.createElement('canvas');
+                    const iMax = editFont.provider.getMaxIndex();
+                    canvas.width = resize.width * editFont.provider.getMaxIndex();
+                    canvas.height = resize.height;
+                    const targetWidth = Math.min(resize.width, editFont.fontMap.width);
+                    const targetHeight = Math.min(resize.height, editFont.fontMap.height);
+                    const sourceOffsetX = resize.width < editFont.fontMap.width ? resize.offsetX : 0;
+                    const sourceOffsetY = resize.height < editFont.fontMap.height ? resize.offsetY : 0;
+                    const targetOffsetX = resize.width > editFont.fontMap.width ? resize.offsetX : 0;
+                    const targetOffsetY = resize.height > editFont.fontMap.height ? resize.offsetY : 0;
+
+                    const ctx = canvas.getContext('2d');
+                    const map = {};
+                    for(let i = 0; i < iMax; i++) {
+                        ctx.drawImage(
+                            editFont.provider.getBitmapForIndex(i, 1, false),
+                            sourceOffsetX,
+                            sourceOffsetY,
+                            targetWidth,
+                            targetHeight,
+                            (i * resize.width) + targetOffsetX,
+                            targetOffsetY,
+                            targetWidth,
+                            targetHeight
+                        );
+                        map[editFont.provider.getCharAtIndex(i)] = {x: i*resize.width, y: 0};
+                    }
+                    const doFontMap = {
+                        height: resize.height,
+                        width: resize.width,
+                        map,
+                        image: canvas
+                    };
+                    const doFont = {
+                        id: editFont.id,
+                        name: editFont.name,
+                        fontMap: doFontMap,
+                        provider: null
+                    };
+                    const newFonts = [...fonts];
+                    newFonts[index] = doFont;
+                    for (let block of blocks) {
+                        block.img = null;
+                    }
+                    setFonts(newFonts);
+                    ResizeFontModal.hide();
+                }
+            })
+        };
+
+        return (
+            <PropertyGrid>
+                <TextFieldProp
+                    name="Name:"
+                    value={editFont.name}
+                    set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {name: value}))} />
+                <PropLabel name="Size:">
+                    <Stack>
+                        <Dim x={editFont.fontMap.width} y={editFont.fontMap.height} readOnly />
+                        <Content>
+                            <button onClick={resizeAction}>Resize</button>
+                        </Content>
+                    </Stack>
+                </PropLabel>
+            </PropertyGrid>
+        )
+    }
 
     return (
         <EditorCtx>
-            <Stack dir="y" full>
-                <Section name="Font">
-                    <CharIndex cellProvider={provider} source={bitmap} />
-                </Section>
-                <div className="flex">
-                    <FontPreview editorId="preview" provider={provider} source={bitmap} />
-                </div>
+            <Stack vertical fullHeight>
+                <Stack>
+                    <Section name="Fonts">
+                        <ItemsStack
+                            new={newFont}
+                            width={200}
+                            min={1}
+                            collapsed
+                            active={active}
+                            setActive={setActive}
+                            setItems={setFonts}
+                            items={fonts}
+                            cleanUp={(item) => {
+                                const newBlocks = [];
+                                for (let block of blocks) {
+                                    if (block.font != item.id) {
+                                        newBlocks.push(block);
+                                    }
+                                }
+                                setBlocks(newBlocks);
+                            }}
+                            getProperties={getFontProps}
+                            getName={item => <LabelAndSubInfo name={item.name}> - Size: {item.fontMap.width + 'x' + item.fontMap.height}</LabelAndSubInfo>}
+                        />
+                    </Section>
+                    <Section name="Characters" flex>
+                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.toDataURL('image/png')} />
+                    </Section>
+                </Stack>
+                <Content flex>
+                    <FontPreview entity={TextBlockEntity} blocks={blocks} setBlocks={setBlocks} editorId="preview" fonts={id2Font} />
+                </Content>
             </Stack>
+
+            <ResizeFontModal.render name="Resize Font" fit closeable>
+                <ResizeFontForm save={ResizeFontModal.params.save} hide={ResizeFontModal.hide} font={ResizeFontModal.params.font} />
+            </ResizeFontModal.render>
+
+            <NewFontModal.render name="New Font" fit closeable>
+                <NewFontForm save={NewFontModal.params.save} hide={NewFontModal.hide} />
+            </NewFontModal.render>
         </EditorCtx>
     );
 }

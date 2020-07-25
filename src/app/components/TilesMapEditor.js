@@ -1,7 +1,5 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
-
+import React, {useContext, useEffect, useMemo, useRef, useState, Fragment} from "react";
 import {
-    d,
     Stack,
     SwitchButton,
     Checkbox,
@@ -9,60 +7,59 @@ import {
     Tabs,
     Tab,
     Int,
-    Modal,
-    closeModals,
-    openModal
+    Content,
+    useModal
 } from './BaseComponents';
 import {EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster, useMountedReadyCellProvider, BitmapEditor, useEditorContextPart} from './Raster';
 import {CellSelection, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider, MapValueCellProvider} from '../classes/CellProvider.js';
+import {d} from '../helper/helper';
 
 function TileTracker(props) {
     const eContext = useEditorContextPart(props.editorId);
     const [trackX, setTrackX] = useState(null);
     const [trackY, setTrackY] = useState(null);
 
-    const style = {
-        width: 180
-    };
+    const width = 180;
     eContext.setTracker(props.editorId, (x, y) => {
         setTrackX(x);
         setTrackY(y);
     });
 
-    if (trackX === null || !props.cellProvider.hasData()) {
-        return <div style={style}></div>;
+    let content = '';
+    if (trackX !== null && props.cellProvider.hasData()) {
+        const selection = props.cellProvider.getRawSelection(trackX, trackY, 1, 1);
+        const tile = selection.getRow(0)[0];
+        const index = Array.isArray(tile) ? tile[0] : tile;
+        const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
+        content = (
+            <Fragment>
+                <Stack align="center" alignItems="center">
+                    <Content boxed className="min-content">
+                        <CellProviderRaster
+                            cellProvider={selectionProvider}
+                            editorId="hovered"
+                            zoom={4}
+                            posX={0}
+                            posY={0}
+                            width={selection.getWidth()}
+                            height={selection.getHeight()}
+                            border={0}
+                            renderOptions={{events: true, caching: false}}
+                        />
+                    </Content>
+                </Stack>
+                <Content>Position: <kbd>{trackX}x{trackY}</kbd></Content>
+                <Content>Tile: <kbd>{index}</kbd></Content>
+            </Fragment>
+        );
     }
-    const selection = props.cellProvider.getRawSelection(trackX, trackY, 1, 1);
-    const tile = selection.getRow(0)[0];
-    const index = Array.isArray(tile) ? tile[0] : tile;
-    const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
-    return (
-        <div style={style}>
-            <div className="stack-h centered padded">
-                <div className="boxed min-content">
-                    <CellProviderRaster
-                        cellProvider={selectionProvider}
-                        editorId="hovered"
-                        zoom={4}
-                        posX={0}
-                        posY={0}
-                        width={selection.getWidth()}
-                        height={selection.getHeight()}
-                        border={0}
-                        renderOptions={{events: true, caching: false}}
-                    />
-                </div>
-            </div>
-            <div>Position: <kbd>{trackX}x{trackY}</kbd></div>
-            <div>Tile: <kbd>{index}</kbd></div>
-        </div>
-    );
+    return <Content width={width}>{content}</Content>;
 }
 
 function ActiveTile(props) {
     const eContext = useContext(EditorContext);
+    const EditModal = useModal();
     const selection = eContext.selection;
-    const style = {width: 180};
     const width = selection ? selection.getWidth() : 1;
     const height = selection ? selection.getHeight() : 1;
     const type = (width !== 1 || height !== 1) ? selection.getType() : 'cell';
@@ -72,7 +69,7 @@ function ActiveTile(props) {
     }
 
     if (selection === null || !props.cellProvider.hasData()) {
-        return <div style={style}></div>;
+        return <Content width={180}></Content>;
     }
     const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
 
@@ -91,45 +88,45 @@ function ActiveTile(props) {
                 props.indexProvider.setBitmapForValue(actionIndex, undoImage);
                 eContext.updateRaster();
             });
-            closeModals();
+            EditModal.hide();
         };
-        openModal(
-            <Modal name="Edit" closeable>
-                <div style={{height: 600}}>
-                    <BitmapEditor
-                        resize={false}
-                        zoom="5"
-                        border="1"
-                        cancelHandler={() => {closeModals()}}
-                        saveHandler={save}
-                        bitmap={props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png')} />
-                </div>
-            </Modal>
-        );
+        const bitmap = props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png');
+        EditModal.show({save, bitmap});
     };
     return (
-        <div style={style}>
+        <Content width={180} padded>
             <div>Type: {type}</div>
-            <div className="stack-h centered padded">
-                <div className="boxed min-content">
-                    <CellProviderRaster
-                        cellProvider={selectionProvider}
-                        editorId="active"
-                        zoom={4}
-                        posX={0}
-                        posY={0}
-                        width={selection.getWidth()}
-                        height={selection.getHeight()}
-                        border={0}
-                        renderOptions={{events: false, caching: false}}
-                    />
-                </div>
-            </div>
+            <Content padded>
+                <Stack align="center" alignItems="center">
+                    <Content boxed>
+                        <CellProviderRaster
+                            cellProvider={selectionProvider}
+                            editorId="active"
+                            zoom={4}
+                            posX={0}
+                            posY={0}
+                            width={selection.getWidth()}
+                            height={selection.getHeight()}
+                            border={0}
+                            renderOptions={{events: false, caching: false}}
+                        />
+                    </Content>
+                </Stack>
+            </Content>
             <button disabled={width !== 1 || height !== 1} onClick={editTile}>Edit</button>
-            <div>Index: {index}</div>
-            <div>Width: {width}</div>
-            <div>Height: {height}</div>
-        </div>
+            <Content>Index: {index}</Content>
+            <Content>Width: {width}</Content>
+            <Content>Height: {height}</Content>
+            <EditModal.render name="Edit" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="5"
+                    border="1"
+                    cancelHandler={EditModal.hide}
+                    saveHandler={EditModal.params.save}
+                    bitmap={EditModal.params.bitmap} />
+            </EditModal.render>
+        </Content>
     );
 }
 
@@ -157,8 +154,8 @@ function ActiveAliasSelection(props) {
                 e.preventDefault();
                 e.stopPropagation();
             }}>
-                <Stack dir="x">
-                    <div className="padded">
+                <Stack>
+                    <Content padded>
                         <CellProviderRaster
                             cellProvider={selectionProvider}
                             zoom={2}
@@ -169,15 +166,17 @@ function ActiveAliasSelection(props) {
                             border={1}
                             renderOptions={{events: false, caching: false}}
                         />
-                    </div>
-                    <div className="padded"><kbd>{alias}</kbd><br />Index: <kbd>{index}</kbd></div>
+                    </Content>
+                    <Content padded>
+                        <kbd>{alias}</kbd><br />Index: <kbd>{index}</kbd>
+                    </Content>
                 </Stack>
             </div>
         );
     }
     return (
         <div className="padded">
-            <Stack dir="x" wrap>{selection}</Stack>
+            <Stack wrap>{selection}</Stack>
         </div>
     );
 }
@@ -190,30 +189,32 @@ function ActiveTileSelection(props) {
         return '';
     }
     return (
-        <Stack dir="x" full border>
-            <div className="padded">
-                <div>Tiles: {props.cellProvider.getMaxIndex()}</div>
-                <div><Int min={1} max={4} value={zoom} set={setZoom} buttons /></div>
-                <div><Checkbox value={rulers} set={setRulers} name="Rulers" /></div>
-                <div><button>Import</button></div>
-                <div><button>Export</button></div>
-            </div>
-            <div className="flex">
+        <Stack fullHeight scroll border>
+            <Content padded>
+                <Content>Tiles: {props.cellProvider.getMaxIndex()}</Content>
+                <Content><Int min={1} max={4} value={zoom} set={setZoom} buttons /></Content>
+                <Content><Checkbox value={rulers} set={setRulers} name="Rulers" /></Content>
+                <Content><button>Import</button></Content>
+                <Content><button>Export</button></Content>
+            </Content>
+
+            <Content flex scroll>
                 <BaseCellProviderIndexRaster
                     auto width={10} height={5} mapProvider={props.mapProvider} cellProvider={props.cellProvider} editorId="tiles"
                 />
-            </div>
-            <div className="padded">
-                <div className="padded">
+            </Content>
+
+            <Content padded>
+                <Content padded>
                     <SwitchButton enabled={true}>All</SwitchButton>
-                </div>
-                <div className="padded">
+                </Content>
+                <Content padded>
                     <SwitchButton enabled={false}>Most used</SwitchButton>
-                </div>
-                <div className="padded">
+                </Content>
+                <Content padded>
                     <SwitchButton enabled={false}>Last used</SwitchButton>
-                </div>
-            </div>
+                </Content>
+            </Content>
         </Stack>
     );
 }
@@ -247,30 +248,28 @@ function TilesMapEditor(props) {
 
     const trackerRef = useRef(null);
     return (
-        <Stack dir="y" full>
+        <Stack vertical>
             <EditorCtx tracking={{
                 map: ['active', 'hover']
             }}>
-                <Stack dir="x" full>
-                    <Section name="Selected" collapse="h">
-                        <div className="padded">
-                            <ActiveTile cellProvider={cellProvider} indexProvider={indexProvider} />
-                        </div>
+                <Stack flex fullHeight>
+                    <Section name="Selected" collapse vertical>
+                        <ActiveTile cellProvider={cellProvider} indexProvider={indexProvider} />
                     </Section>
 
                     <Section name="Map" flex>
                         <BasicRasterView tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={0} zoom={1} />
                     </Section>
 
-                    <Section name="Cursor" collapse="h">
-                        <div className="padded">
+                    <Section name="Cursor" collapse vertical>
+                        <Content padded>
                             <TileTracker editorId="hover" cellProvider={cellProvider} />
-                        </div>
+                        </Content>
                     </Section>
                 </Stack>
 
-                <Section name="Elements" collapse="v" raw>
-                    <Tabs height={280} reverse active={0}>
+                <Section name="Elements" height={350} collapse raw>
+                    <Tabs reverse active={0}>
                         <Tab name="Tiles">
                             <ActiveTileSelection mapProvider={cellProvider} cellProvider={indexProvider} />
                         </Tab>

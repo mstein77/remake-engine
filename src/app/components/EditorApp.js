@@ -1,42 +1,36 @@
 import React, {Fragment, useState} from "react";
-import {Stack, Themed, Section} from "./BaseComponents";
+import {Stack, Content, GlobalCtx, Section} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import FontMapEditor from "./FontMapEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import './EditorApp.css';
+import {d} from '../helper/helper';
 
 function Page(props) {
     return (
-        <Themed>
-            <Stack dir="y" full>
-                <div className="head padded">
-                    <Stack dir="x">
-                        <div className="flex">
+        <Content maxHeight="100vh">
+            <Stack vertical fullHeight>
+                <Content>
+                    <Stack className="head">
+                        <Content flex padded>
                             {props.title}
-                        </div>
-                        <div>
+                        </Content>
+                        <Content padded>
                             {props.actions}
-                        </div>
+                        </Content>
                     </Stack>
-                </div>
-                <div className="flex">
+                </Content>
+
+                <Content flex>
                     {props.children}
-                </div>
+                </Content>
             </Stack>
-            <div id="modals-container"></div>
-        </Themed>
+        </Content>
     );
 }
 
-
-function EditorApp(props) {
-    const [resources, setResources]  =  useState(props.game.getEditableResources());
+function PageSelector(props) {
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
-
-    // TODO: move to game:init?
-    window.oncontextmenu = (e) => {
-        e.preventDefault();
-    };
 
     const actions = (
         <Fragment>
@@ -46,7 +40,7 @@ function EditorApp(props) {
     if (active === null) {
         const items = [];
         let key = 0;
-        for (let resource of resources) {
+        for (let resource of props.resources) {
             const index = key;
             items.push(
                 <div className="padded" key={key}>
@@ -61,8 +55,9 @@ function EditorApp(props) {
             </Page>
         )
     }
-    const resource = resources[active];
+    const resource = props.resources[active];
     let editor = 'Unknown';
+
     switch(resource.type) {
         case 'tilesMap':
             editor = <TilesMapEditor tilesMap={resource.data} />;
@@ -86,6 +81,56 @@ function EditorApp(props) {
     return (
         <Page title={title} actions={actions}>{editor}</Page>
     )
+}
+
+function EditorApp(props) {
+    const resources = props.game.getEditableResources();
+    let filters = null;
+    let imageResources = [];
+    for (let resource of resources) {
+        switch(resource.type) {
+            case 'filters':
+                filters = resource.data;
+                break;
+
+            case 'tilesMap':
+                imageResources.push({
+                    name: 'Tiles Map image',
+                    bitmap: resource.data.tilesImg.elem.toDataURL('image/png')
+                });
+                break;
+
+            case 'fontMap':
+                imageResources.push({
+                    name: 'Font Map image',
+                    bitmap: resource.data.image.toDataURL('image/png')
+                });
+                break;
+
+            case 'spriteSheet':
+                imageResources.push({
+                    name: 'Sprite Sheet image',
+                    bitmap: resource.data.sheet.elem.toDataURL('image/png')
+                });
+                break;
+
+            default:
+                d('???', resource);
+                break;
+        }
+    }
+
+    // TODO: move to game:init?
+    window.oncontextmenu = (e) => {
+        e.preventDefault();
+    };
+
+    return (
+        <GlobalCtx filters={filters} imageResources={imageResources}>
+            <PageSelector {...props} resources={resources} />
+            <div id="modals-container"></div>
+        </GlobalCtx>
+    );
 }
 
 export default EditorApp;

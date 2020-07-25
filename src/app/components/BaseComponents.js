@@ -1,325 +1,116 @@
-import React, {useState, useRef, useEffect} from "react";
+import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
-import {BitmapSelector} from "./Raster";
+import {d} from '../helper/helper';
 
-const CssContext = React.createContext();
-
-function d(main, ...params) {
-    let stack = null;
-    try {
-        throw new Error('myError');
-    }
-    catch(e) {
-        stack = e.stack.split('\n');
-    }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
-        }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
-    }
-    console.group('Debug ' + func.join(' <- '));
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
-}
-
-function useWindowEventManager() {
-
-    const listenerRef = useRef([]);
-
-    const removeListener = (event, listener, options) => {
-        console.log('REMOVE LISTENER', event);
-        const remainingListeners = [];
-        for (let item of listenerRef.current) {
-            let match = false;
-            if (item.event === event) {
-                match = JSON.stringify(options) === JSON.stringify(item.options);
-            }
-            if (match) {
-                window.removeEventListener(event, listener, options);
-            } else {
-                remainingListeners.push(item);
-            }
-        }
-        listenerRef.current = remainingListeners;
-    };
-
-    const addListener = (event, listener, options) => {
-        console.log('ADD LISTENER', event);
-        removeListener(event, listener, options);
-        window.addEventListener(event, listener, options);
-        listenerRef.current.push({event, listener, options});
-    };
-
-    const clearListeners = () => {
-        console.log('CLEAR LISTENERS');
-        while(listenerRef.current.length > 0) {
-            const item = listenerRef.current.pop();
-            window.removeEventListener(item.event, item.listener, item.options);
-        }
-    };
-
-    return {
-        addListener,
-        removeListener,
-        clearListeners
-    };
-}
-
-function getWindowEventManager() {
-
-    let windowListeners = [];
-
-    const removeListener = (event, listener, options) => {
-        const remainingListeners = [];
-        for (let item of windowListeners) {
-            let match = false;
-            if (item.event === event) {
-                match = JSON.stringify(options) === JSON.stringify(item.options);
-            }
-            if (match) {
-                window.removeEventListener(event, listener, options);
-            } else {
-                remainingListeners.push(item);
-            }
-        }
-        windowListeners = remainingListeners;
-    };
-
-    const addListener = (event, listener, options) => {
-        removeListener(event, listener, options);
-        window.addEventListener(event, listener, options);
-        windowListeners.push({event, listener, options});
-    };
-
-    const clearListeners = () => {
-        while(windowListeners.length > 0) {
-            const item = windowListeners.pop();
-            window.removeEventListener(item.event, item.listener, item.options);
-        }
-    };
-
-    return {
-        addListener,
-        removeListener,
-        clearListeners
-    };
-}
-
-class FitCanvas extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.divRef = React.createRef();
-        this.canvasRef = React.createRef();
-        this.state = {
-            width: null,
-            height: null
-        };
-    }
-
-    getCanvas() {
-        return this.canvasRef.current;
-    }
-
-    render() {
-        let overlays = this.props.renderOverlays !== undefined ?
-            this.props.renderOverlays(this.state.width, this.state.height) : null;
-
-        const cls = ['rel-canvas marker-space checkboard-bg'];
-        const canvas = (this.state.width && this.state.height) ?
-            <div className={cls.join(' ')}>
-                <canvas ref={this.canvasRef} width={this.state.width} height={this.state.height} />
-                {overlays}
-            </div> : '';
-
-        return(
-            <div ref={this.divRef} className="full-v stack-h centered items-centered">
-                {canvas}
-            </div>
-        )
-    }
-
-    trigger() {
-        if (this.divRef.current === null) {
-            return null;
-        }
-        this.updateSize();
-        this.props.redrawCanvas();
-    }
-
-    updateSize() {
-        if (this.divRef.current === null) {
-            return;
-        }
-        const sizes = this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight, true);
-        this.setState(
-            {width: sizes.width, height: sizes.height}
-        );
-    }
-
-    getSnapshotBeforeUpdate() {
-        return this.props.getCanvasSizeForDim(this.divRef.current.offsetWidth, this.divRef.current.offsetHeight, false);
-    }
-
-    componentDidUpdate(a, b, snapshot) {
-        if (snapshot !== null) {
-            if (snapshot.width !== this.state.width || snapshot.height !== this.state.height) {
-                this.updateSize();
-                return;
-            }
-        }
-        this.props.redrawCanvas();
-    }
-
-    componentDidMount() {
-        this.updateSize();
-        const resizeObserver = new ResizeObserver(entries => {
-            this.updateSize();
-        });
-        resizeObserver.observe(this.divRef.current);
-    }
-}
-
-function Scrollbar(props) {
-    const [active, setActive] = useState(false);
-    const divRef = useRef(null);
-    const windowEvents = getWindowEventManager();
-
-    const pagePerc = Math.round(props.page / props.max * 100);
-    if (props.auto && pagePerc === 100) {
-        return '';
-    }
-
-    const space = 15;
-
-    const spacePerc = 100 - pagePerc;
-    const maxSteps = props.max - props.page;
-    const minPerc = maxSteps === 0 ? 0 : props.pos * (spacePerc / maxSteps);
-    const maxPerc = 100 - (pagePerc + minPerc);
-
-    const axis = props.vertical ? 'y' : 'x';
-    const axisKey = props.vertical ? 'height' : 'width';
-    const oppAxisKey = props.vertical ? 'width' : 'height';
-    const client = 'client' + axis.toUpperCase();
-    const dirKey = (axis === 'x' ? 'h' : 'v');
-
-    const dimMin = {
-        [axisKey]: minPerc + '%',
-        [oppAxisKey]: space
-    };
-    const dimMax = {
-        [axisKey]: maxPerc + '%',
-        [oppAxisKey]: space
-    };
-
-    const mouseDown = (e) => {
-        const rect = divRef.current.getBoundingClientRect();
-        const anchorPos =  e[client];
-        const pixelSteps = rect[axisKey] / props.max;
-        const maxDistRight = (maxSteps - props.pos) * pixelSteps;
-        const minDistLeft = -props.pos * pixelSteps;
-
-        const getOffset = (value) => {
-            const dist = value - anchorPos;
-            const relPos = Math.max(Math.min(dist, maxDistRight), minDistLeft);
-            return Math.round(relPos / pixelSteps);
-        };
-        let lastPos = 0;
-
-        const trackMouse = (e) => {
-            const relPos = getOffset(e[client]);
-            if (relPos !== lastPos) {
-                lastPos = relPos;
-                props.set(props.pos + relPos);
-            }
-            e.stopPropagation();
-            e.preventDefault();
-        };
-        windowEvents.addListener('mousemove', trackMouse, false);
-
-        windowEvents.addListener('mouseup', (e) => {
-            windowEvents.removeListener('mousemove', trackMouse, false);
-            setActive(false);
-            e.stopPropagation();
-            e.preventDefault();
-        }, {capture: false, once: true});
-
-        setActive(true);
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const setMouseDown = (e) => {
-        const rect = divRef.current.getBoundingClientRect();
-        const pixelSteps = rect[axisKey] / props.max;
-        const pageSize = Math.round(props.page * pixelSteps / 2);
-        const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), props.max));
-
-        props.set(offPos);
-        e.preventDefault();
-        e.stopPropagation();
-    };
-    const cls = ['scrollbar-div'];
-    const dim = {[oppAxisKey]: space};
-    if (props.size) {
-        dim[axisKey] = props.size;
-    } else {
-        dim[axisKey] = 'calc(100% - 6px)';
-    }
-
-    const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
-    const stackCls = ['stack-' + dirKey];
-    if (props.vertical) {
-        stackCls.push('full-v');
-    }
-
-    return (
-        <div style={dim} ref={divRef} className={cls.join(' ')}>
-            <div className={stackCls.join(' ')}>
-                <div onMouseDown={setMouseDown} style={dimMin}></div>
-                <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
-                <div onMouseDown={setMouseDown} style={dimMax}></div>
-            </div>
-            <MouseOverlay active={active} cursor={dirKey + 'resize'} />
-        </div>
-    );
-}
+const GlobalContext = React.createContext();
 
 function Color(props) {
     return (
         <div>
-            <input type="color" value={props.value} onChange={(e) => { props.set(e.target.value); }} />
+            <input
+                type="color"
+                value={props.value}
+                onChange={(e) => { props.set(e.target.value); }}
+            />
         </div>
     );
+}
+
+function ColorProp(props) {
+    const {name, ...colorProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Color {...colorProps} />
+        </PropLabel>
+    );
+}
+
+function Range(props) {
+    return (
+        <Stack alignItems="center">
+            <Content>
+                <kbd>{props.min}</kbd>
+            </Content>
+            <Content>
+                <input
+                    type="range"
+                    onChange={e => props.set(e.target.value)}
+                    min={props.min}
+                    max={props.max}
+                    step={props.step ? props.step : 0.01}
+                    value={props.value}
+                />
+            </Content>
+            <Content>
+                <kbd>{props.max}</kbd>
+            </Content>
+            <Content>
+                <TextField size={String(props.max).length + 3} readOnly value={props.value} />
+            </Content>
+        </Stack>
+    );
+}
+
+function RangeProp(props) {
+    const {name, ...rangeProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Range {...rangeProps} />
+        </PropLabel>
+    )
 }
 
 function SwitchButton(props) {
     const cls = ['switch-div switch-button' + (props.enabled ? '-enabled' : '')];
+    const style = useStyleProps(props);
+    let children = props.children;
+    if (props.material) {
+        children = <i className="material-icons md-18 center-h">{props.children}</i>;
+    }
     return (
-        <div>
-            <div onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
-                {props.children}
-            </div>
+        <div style={style} onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
+            {children}
         </div>
     );
 }
 
+function Radio(props) {
+    const buttons = [];
+    for (let key in props.options) {
+        const name = props.options[key];
+        buttons.push(
+            <SwitchButton
+                key={key}
+                enabled={props.value == key}
+                material={props.material}
+                switch={() => {props.set(key)}}
+            >
+                {name}
+            </SwitchButton>
+        );
+    }
+    return (
+        <Stack>
+            {buttons}
+        </Stack>
+    )
+}
+
+function RadioProp(props) {
+    const {name, ...radioProps} = props;
+
+    return (
+        <PropLabel name={name}>
+            <Radio {...radioProps} />
+        </PropLabel>
+    )
+}
+
 function Checkbox(props) {
+    const name = props.name ? <div>{props.name}</div> : '';
     return (
         <div className="stack-h">
-            <div>{props.name}</div>
+            {name}
             <div><input onChange={(e) => {
                 props.set(e.target.checked);
             }} type="checkbox" checked={!!props.value} /></div>
@@ -327,64 +118,72 @@ function Checkbox(props) {
     );
 }
 
-function Stack(props) {
-    const dir = (props.dir === 'x') ? 'h' : 'v';
-    const cls = ['stack-' + dir];
-    cls.push('inner-' + (props.border ? 'border' : 'space') + '-' + dir);
-    if (props.full) {
-        cls.push('full-v');
-    }
-    if (props.center) {
-        cls.push('items-centered');
-    }
-    if (props.wrap) {
-        cls.push('wrap');
-    }
-    const style = {};
-    if (props.height) {
-        style.height = props.height;
-    }
-
+function CheckboxProp(props) {
+    const {name, ...checkboxProps} = props;
     return (
-        <div className={cls.join(' ')} style={style}>
-            {props.children}
-        </div>
+        <PropLabel name={name}>
+            <Checkbox {...checkboxProps} />
+        </PropLabel>
+    )
+}
+
+function TextField(props) {
+    const attr = {
+    };
+    if (!props.readOnly) {
+        attr.onChange = e => props.set(e.target.value);
+    } else {
+        attr.readOnly = true;
+    }
+    if (props.size) {
+        attr.size = props.size
+    }
+    if (props.className) {
+        attr.className = props.className;
+    }
+    if (props.onClick) {
+        attr.onClick = props.onClick;
+    }
+    return (
+        <input type="text"
+               value={props.value}
+               {...attr}
+        />
     );
 }
 
-function TabAccordion(props) {
-    const [active, setActive] = useState(props.active !== undefined ? props.active : 0);
+function PropLabel(props) {
+    return (
+        <Fragment>
+            <Content>
+                {props.name}
+            </Content>
+            <Content>
+                {props.children}
+            </Content>
+        </Fragment>
+    )
+}
+
+function FullProp(props) {
     const items = [];
-    let current = 0;
-    for (let child of props.children) {
-        const isActive = (current === active);
-        const cls = ['padded'];
-        cls.push('title-area-' + (isActive ? 'active' : 'inactive'));
-        const itemNo = current;
-
-        items.push(
-            <div key={current} onClick={() => {setActive(itemNo)}} className={cls.join(' ')}>{child.props.name}</div>
-        );
-        if (isActive) {
-            items.push(<div key="-1" className="flex">{child}</div>);
-        }
-        current++;
+    if (props.name) {
+        items.push(<div key="0" style={{gridColumn: 'span 2'}}>{props.name}</div>);
     }
-    const cls = [
-        'stack-v inner-border-v boxed full-v'
-    ];
+    items.push(<div key="1" style={{gridColumn: 'span 2'}}>{props.children}</div>);
     return (
-        <div className={cls.join(' ')}>
+        <Fragment>
             {items}
-        </div>
-    );
+        </Fragment>
+    )
 }
 
-function Toolbar(props) {
+function TextFieldProp(props) {
+    const {name, ...fieldProps} = props;
     return (
-        <div className="toolbar-div">
-            {props.children}
-        </div>
+        <PropLabel name={name}>
+            <TextField {...fieldProps} />
+        </PropLabel>
     );
 }
 
@@ -443,23 +242,34 @@ function IntField(props) {
             </React.Fragment>;
     }
 
+    const name = props.name ? <div>{props.name}</div> : '';
+
     return (
         <React.Fragment>
-            <div>{props.name}</div>
-            <div className="stack-h items-centered">
+            {name}
+            <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
                 {buttonNext}
-            </div>
+            </Stack>
         </React.Fragment>
     );
 }
 
 function Int(props) {
     return (
-        <Stack dir="x">
+        <Stack>
             <IntField {...props} />
         </Stack>
+    );
+}
+
+function IntProp(props) {
+    const {name, ...intProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Int {...intProps} />
+        </PropLabel>
     );
 }
 
@@ -499,21 +309,183 @@ function Dim(props) {
     };
 
     return (
-        <Stack dir="x" center>
+        <Stack fit>
             <IntField {...xAttr} />
             <IntField {...yAttr} />
         </Stack>
     );
 }
 
-function Tab(props) {
+function DimProp(props) {
+    const {name, ...dimProps} = props;
     return (
-        <React.Fragment>{props.children}</React.Fragment>
+        <PropLabel name={name}>
+            <Dim {...dimProps} />
+        </PropLabel>
+    )
+}
+
+function useStyleProps(props) {
+    const {width, minWidth, maxWidth, height, minHeight, maxHeight, zIndex} = props;
+    return {width, minWidth, maxWidth, height, minHeight, maxHeight, zIndex};
+}
+
+function useDimProps(props, style = {}) {
+    if (props.width) {
+        style.width = props.width;
+    }
+    if (props.minWidth) {
+        style.minWidth = props.minWidth;
+    }
+    if (props.maxWidth) {
+        style.maxWidth = props.maxWidth;
+    }
+    if (props.height) {
+        style.height = props.height;
+    }
+    if (props.minHeight) {
+        style.minHeight = props.minHeight;
+    }
+    if (props.maxHeight) {
+        style.maxHeight = props.maxHeight;
+    }
+    if (props.zIndex) {
+        style.zIndex = props.zIndex;
+    }
+    return style;
+}
+
+/**
+ *   -------------------------------------------
+ *     Layout Components
+ *   -------------------------------------------
+ */
+
+function Content(props) {
+    const cls = [];
+    const style = useDimProps(props);
+    if (props.flex) {
+        cls.push('flex');
+    }
+    if (props.padded) {
+        cls.push('padded');
+    }
+    if (props.scroll) {
+        cls.push('overflow-auto');
+    } else if (!props.raw) {
+        cls.push('overflow-hidden')
+    }
+    if (props.boxed) {
+        cls.push('boxed');
+    }
+    if (props.fullHeight) {
+        cls.push(props.boxed ? 'full-boxed-v' :  'full-v');
+    }
+    if (props.className) {
+        cls.push(props.className);
+    }
+
+    const attr = {};
+    if (style) {
+        attr.style = style;
+    }
+    if (props.click) {
+        attr.onClick = props.click;
+    }
+    if (props.doubleClick) {
+        attr.onDoubleClick = props.doubleClick;
+    }
+    if (props.onDragStart) {
+        attr.onDragStart = props.onDragStart;
+        attr.draggable = true;
+        cls.push('cursor-move');
+    }
+    if (props.onDrop) {
+        attr.onDrop = props.onDrop;
+        attr.onDragOver = (e) => {
+            e.preventDefault();
+        };
+        if (props.onDragEnd) {
+            attr.onDragEnd = props.onDragEnd;
+        }
+    }
+    if (cls.length) {
+        attr.className = cls.join(' ');
+    }
+    return (
+        <div {...attr}>{props.children}</div>
     );
 }
 
-function Tabs(props) {
+function Stack(props) {
+    const dir = props.vertical ? 'v' : 'h';
 
+    const cls = ['stack-' + dir];
+    if (props.className) {
+        cls.push(props.className);
+    }
+    if (!props.noGap) {
+        cls.push('inner-' + (props.border ? 'border' : 'space') + '-' + dir);
+    }
+    if (props.fit) {
+        cls.push('fit-content-' + dir);
+    }
+    if ((props.fullHeight || (props.vertical && !props.fullHeight)) && !(props.vertical && props.fit)) {
+        cls.push('full-v');
+    }
+
+    const style = useDimProps(props);
+    if (props.align === 'center') {
+        style.justifyContent = 'center';
+    } else if (props.align === 'end') {
+        style.justifyContent = 'flex-end';
+    }
+
+    if (props.alignItems === 'center') {
+        style.alignItems = 'center';
+    } else if (props.alignItems === 'end') {
+        style.alignItems = 'flex-end';
+    }
+    if (props.wrap) {
+        cls.push('wrap');
+    }
+
+    return (
+        <div className={cls.join(' ')} style={style}>
+            {props.children}
+        </div>
+    );
+}
+
+function Centered(props) {
+    const {children, contentProps} = props;
+    return (
+        <Stack vertical fullHeight alignItems="center" align="center">
+            <Content {...contentProps}>{children}</Content>
+        </Stack>
+    );
+}
+
+function Toolbar(props) {
+    const toolbar = (
+        <div className="toolbar-div">
+            {props.children}
+        </div>
+    );
+    if (props.end) {
+        return (
+            <Stack noGap>
+                {toolbar}
+                <div className="toolbar-div flex from-end">
+                    {props.end}
+                </div>
+            </Stack>
+        )
+    }
+    return toolbar;
+}
+
+function Tabs(props) {
     const tabs = [];
     const contents = [];
     const [active, setActiveTab] = useState(props.active !== undefined ? props.active : 0);
@@ -636,6 +608,7 @@ function Tabs(props) {
     if (props.reverse) {
         cls.push('reverse-' + oppDir);
     }
+    cls.push('full-v');
 
     const style = {};
     if (props.height) {
@@ -657,104 +630,420 @@ function Tabs(props) {
     )
 }
 
-class Section extends React.Component {
+function Tab(props) {
+    return (
+        <Fragment>{props.children}</Fragment>
+    );
+}
 
-    constructor(props) {
-        super(props);
-        this.state = {
-            collapsed: false,
-            collapse: (props.collapse && ['h', 'v'].indexOf(props.collapse) !== -1 ? props.collapse : null)
-        };
-        this.toggleCollapse = this.toggleCollapse.bind(this);
+function TabAccordion(props) {
+    const [active, setActive] = useState(props.active !== undefined ? props.active : 0);
+    const items = [];
+    let current = 0;
+    for (let child of props.children) {
+        const isActive = (current === active);
+        const cls = ['padded'];
+        cls.push('title-area-' + (isActive ? 'active' : 'inactive'));
+        const itemNo = current;
+
+        items.push(
+            <div key={current} onClick={() => {setActive(itemNo)}} className={cls.join(' ')}>{child.props.name}</div>
+        );
+        if (isActive) {
+            items.push(<div key="-1" className="flex">{child}</div>);
+        }
+        current++;
     }
+    const cls = [
+        'stack-v inner-border-v boxed full-v'
+    ];
+    return (
+        <div className={cls.join(' ')}>
+            {items}
+        </div>
+    );
+}
 
-    toggleCollapse(e) {
-        this.setState({collapsed: !this.state.collapsed});
+function Select(props) {
+    const options = [];
+    let active = null;
+    let index = 0;
+    for (let item of props.options) {
+        options.push(
+            <option key={item.id} value={item.id}>
+                {item.name}
+            </option>
+        );
+        if (item.id == props.value) {
+            active = index;
+        }
+        index++;
+    }
+    const prev = props.buttons ? <button disabled={options.length < 2} onClick={
+        () => {
+            props.set(options[active === 0 ? options.length - 1 : active - 1].key)
+        }
+    }>-</button> : '';
+    const next = props.buttons ? <button disabled={options.length < 2} onClick={
+        () => {
+            props.set(options[active === options.length - 1 ? 0 : active + 1].key)
+        }
+    }>+</button> : '';
+
+    return (
+        <Stack>
+            {prev}
+            <select value={props.value} onChange={(e) => {props.set(e.target.value)}}>
+                {options}
+            </select>
+            {next}
+        </Stack>
+    );
+}
+
+function SelectProp(props) {
+    const {name, ...selectProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Select {...selectProps} />
+        </PropLabel>
+    );
+}
+
+function Grid(props) {
+    const style = {
+        display: 'grid',
+        gridTemplateColumns: props.columns
     };
+    if (props.gap) {
+        style.gridGap = props.gap;
+    }
+    return (
+        <div style={style}>
+            {props.children}
+        </div>
+    );
+}
 
-    render() {
-        const props = this.props;
-        const cls = [
-            'section-div stack-v'
-        ];
-        if (!props.raw) {
-            cls.push('boxed  inner-border-v');
-        }
-        if (props.flex) {
-            cls.push('flex');
-        }
-        if (this.state.collapsed && props.collapse !== null) {
-            cls.push('collapsed-' + props.collapse);
-        }
+function PropertyGrid(props) {
+    return (
+        <Grid gap={5} columns="min-content auto" {...props} />
+    );
+}
 
-        const actions = [];
-        if (props.collapse) {
-            const icon = this.state.collapsed ? 'call_made' : 'call_received';
-            actions.push(<div key="collapse-h" className="action-box action-collapse-h" onClick={this.toggleCollapse}><i className="material-icons md-18">{icon}</i></div>);
-            if (!this.state.collapsed) {
-                // additional actions
+function LabelAndSubInfo(props) {
+    return <Fragment>
+        <div>{props.name}</div>
+        <div className="sub-info">{props.children}</div>
+    </Fragment>
+}
+
+function ItemsStack(props) {
+    const [collapsed, setCollapsed] = useState(props.collapsed === true);
+    const [dragIndex, setDragIndex] = useState(null);
+    const dimProps = useDimProps(props);
+
+    const active = (props.active === null || props.active >= props.items.length) ? null : props.active;
+    const toggleCollapse = () => {setCollapsed(!collapsed)};
+
+    const itemElems = [];
+    for(let i = 0; i < props.items.length; i++) {
+        const index = i;
+        const item = props.items[i];
+        const attr = {};
+        if (props.ordered) {
+            if (i === props.active) {
+                attr.onDragEnd = () => setDragIndex(null);
+                attr.onDragStart = () => setDragIndex(index);
             }
+            attr.onDrop = () => {
+                if (dragIndex === index) return;
+                const swapped = [...props.items];
+                [swapped[index], swapped[dragIndex]] = [swapped[dragIndex], swapped[index]];
+                props.setItems(swapped);
+                props.setActive(index);
+            };
         }
-        const actionsDiv = actions.length > 0 ?
-            <div className="section-actions stack-h inner-space-h">{actions}</div> : '';
-
-        const contentCls = ['flex'];
-        if (!props.raw) {
-            contentCls.push('content-area');
-        }
-        const contentDiv = this.state.collapsed ?
-            '' :
-            <div className={contentCls.join(' ')}>
-                {props.children}
-            </div>;
-
-        const titleCls = [
-            'title-area-active stack-h inner-space-h items-centered'
-        ];
-        if (!(this.state.collapsed && props.collapse === 'h')) {
-            titleCls.push('padded');
-        }
-
-        const nameCls = ['flex'];
-        if (this.state.collapsed && props.collapse === 'h') {
-            nameCls.push('text-v');
-        }
-
-        return (
-            <div className={cls.join(' ')}>
-                <div className={titleCls.join(' ')}>
-                    <div className={nameCls.join(' ')}>{props.name}</div>
-                    {actionsDiv}
-                </div>
-                {contentDiv}
-            </div>
+        itemElems.push(
+            <Fragment key={'i' + i}>
+                <Content padded><kbd>#{i+1}</kbd></Content>
+                <Content {...attr} click={() => props.setActive(index)} doubleClick={toggleCollapse}>
+                    <Stack className={'title-area-' + (i === props.active ? 'active' : 'inactive')}>
+                        <Content flex padded>{props.getName(item)}</Content>
+                    </Stack>
+                </Content>
+            </Fragment>
         );
     }
+
+    let assignContent = props.assignable ?
+        <Stack vertical fullHeight border>
+            <Toolbar>
+                <Content padded>Assigneable:</Content>
+            </Toolbar>
+            <Content scroll>
+                <Grid columns="auto min-content" gap={2}>
+                    {props.assignable.map(
+                        e =>
+                            <Fragment key={e.name}>
+                                <Content
+                                    key={e.name}
+                                    click={() => {
+                                        props.setItems([...props.items, e.item]);
+                                        props.setActive(props.items.length);
+                                    }}
+                                    padded
+                                >
+                                    {e.name}
+                                </Content>
+                                <Content padded><i className="material-icons md-18">keyboard_arrow_right</i></Content>
+                            </Fragment>
+                    )}
+                </Grid>
+            </Content>
+        </Stack> : '';
+
+    let itemsContent = props.items.length === 0 ?
+        <Stack flex vertical fullHeight alignItems="center" align="center">
+            <Content padded>
+                {props.empty}
+            </Content>
+        </Stack>
+        : (
+            <Content flex scroll>
+                <Stack vertical fullHeight border>
+                    <Grid columns="min-content auto" gap={2}>
+                        {itemElems}
+                    </Grid>
+                    <Content flex></Content>
+                </Stack>
+            </Content>
+        );
+
+    const addItem = props.new ? props.new : () => {
+        const newItems = [...props.items];
+        newItems.push(props.getNewItem());
+        props.setItems(newItems);
+        props.setActive(newItems.length - 1);
+    };
+
+    return (
+        <Stack fullHeight border>
+            {assignContent}
+            <Stack vertical border fullHeight {...dimProps}>
+                <Toolbar end={<ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>}>
+                    <Stack>
+                        {(props.new || props.getNewItem) && <ActionBox
+                            material
+                            disabled={props.max && props.items.length === props.max}
+                            click={addItem}>add</ActionBox>}
+
+                        {props.getClone && <ActionBox
+                            material
+                            disabled={(props.max && props.items.length === props.max) || active === null}
+                            click={() => {
+                                if (props.items.length > 0) {
+                                    const newItems = props.items.concat();
+                                    newItems.splice(props.active + 1, 0, props.getClone(props.items[props.active]));
+                                    props.setItems(newItems);
+                                    props.setActive(props.active + 1);
+                                }
+                            }}>content_copy</ActionBox>}
+
+                        <ActionBox
+                            material
+                            disabled={props.items.length === 0 || active === null || props.min && props.items.length === props.min}
+                            click={() => {
+                                const newItems = [...props.items];
+                                newItems.splice(props.active, 1);
+                                if (props.cleanUp) {
+                                    props.cleanUp(props.items[props.active], props.active);
+                                }
+                                props.setItems(newItems);
+                                props.setActive(
+                                    newItems.length === 0 ? null :
+                                    Math.min(props.active, newItems.length - 1)
+                                );
+                            }}>delete</ActionBox>
+
+                        {props.ordered && <ActionBox
+                            material
+                            disabled={props.items.length <= 1 || active === null}
+                            click={() => {
+                                if (props.active > 0) {
+                                    const newItems = [];
+                                    for (let i = 0; i < (props.active - 1); i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    newItems.push(props.items[props.active]);
+                                    newItems.push(props.items[props.active - 1]);
+                                    for (let i = props.active + 1; i < props.items.length; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    props.setItems(newItems);
+                                    props.setActive(props.active - 1);
+                                }
+                            }}>keyboard_arrow_up</ActionBox>}
+
+                        {props.ordered && <ActionBox
+                            material
+                            disabled={props.items.length <= 1 || active === null}
+                            click={() => {
+                                if (props.active < props.items.length - 1) {
+                                    const newItems = [];
+                                    for (let i = 0; i < props.active; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    newItems.push(props.items[props.active + 1]);
+                                    newItems.push(props.items[props.active]);
+                                    for (let i = props.active + 2; i < props.items.length; i++) {
+                                        newItems.push(props.items[i]);
+                                    }
+                                    props.setItems(newItems);
+                                    props.setActive(props.active + 1);
+                                }
+                            }}>keyboard_arrow_down</ActionBox>}
+
+                    </Stack>
+                </Toolbar>
+                {itemsContent}
+            </Stack>
+
+            {!collapsed && active !== null && props.items.length !== 0 && (
+                <Stack vertical border fullHeight>
+                    <Toolbar>
+                        <Content>Properties Item # {props.active + 1}</Content>
+                    </Toolbar>
+
+                    <Content padded flex scroll>
+                        {props.getProperties(props.active)}
+                    </Content>
+                </Stack>
+            )}
+        </Stack>
+    );
 }
 
-function closeModals(e) {
-    ReactDOM.unmountComponentAtNode(document.getElementById('modals-container'));
-}
+function FileDropZone(props) {
 
-function Modal(props) {
+    const [error, setError] = useState('');
+    const dragEnterRef = useRef(null);
+    const dropzoneRef = useRef(null);
 
-    const cls = [
-        'modal-centered stack-v boxed inner-border-v'
-    ];
+    useEffect(() => {
+        const handlePaste = (event) => {
+            let items = (event.clipboardData  || event.originalEvent.clipboardData).items;
+            handleImages(items);
+            event.stopPropagation();
+            event.preventDefault();
+        };
+        window.addEventListener('paste', handlePaste, {capture: false});
+        return () => {
+            window.removeEventListener('paste', handlePaste, {capture: false});
+        }
+    }, []);
 
-    const modal = <Themed><div className={cls.join(' ')}>
-        <div className="title-area-active padded stack-h inner-space-h">
-            <div className="flex">{props.name}</div>
-            <div className="action-box" onClick={(e) => {
-                closeModals();
-                e.stopPropagation();
-            }}><i className="material-icons md-18">close</i></div>
+    const handleImages = (items) => {
+        const matches = [];
+        const invTypes = new Map();
+        for(let item of items) {
+            if (props.type && item.type.startsWith(props.type + '/')) {
+                matches.push(item);
+            } else {
+                invTypes.set('"' + item.type + '"', null);
+            }
+        }
+        if (matches.length === 0) {
+            if (invTypes.size > 0) {
+                setError('The given types ' + [...invTypes.keys()].join(', ') + ' are not supported!');
+            } else {
+                setError('No content found!');
+            }
+            return;
+        } else if (matches.length > 1) {
+            setError('Multiple files not allowed!');
+            return;
+        }
+        const file = matches[0];
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            props.save(reader.result, file.name);
+            setError('');
+        };
+        reader.readAsDataURL(file.getAsFile ? file.getAsFile() : file);
+    };
+
+    const handleDrop = (e) => {
+        handleImages(e.dataTransfer.files);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragOver = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragEnter = (e) => {
+        if (dropzoneRef.current) {
+            dropzoneRef.current.classList.toggle('blink', true);
+            dragEnterRef.current = e.target;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragLeave = (e) => {
+        if (dropzoneRef.current && dragEnterRef.current === e.target) {
+            dropzoneRef.current.classList.toggle('blink', false);
+        }
+        e.preventDefault();
+    };
+    const handleFileSelection = (e) => {
+        e.preventDefault();
+        handleImages(e.target.files);
+    };
+
+    const accept = props.type ? props.type + '/*' : '*';
+
+    return (
+        <div
+            ref={dropzoneRef}
+             onDrop={handleDrop}
+             onDragOver={handleDragOver}
+             onDragEnter={handleDragEnter}
+             onDragLeave={handleDragLeave}>
+            <Stack fullHeight vertical align="center" alignItems="center">
+                <Content padded>
+                    No image given. Please insert image by one of the following options:
+                    <ul>
+                        <li>Drag'n Drop an image from your desktop here<br /><br /></li>
+                      <li>Copy image to clipboard and paste it here<br /><br /></li>
+                        <li><input onChange={handleFileSelection} type="file" accept={accept} /></li>
+                    </ul>
+                    {error && <Content boxed padded>Reading content failed: {error}</Content>}
+                </Content>
+            </Stack>
         </div>
-        <div className="content-area flex">{props.children}</div>
-    </div></Themed>;
+    );
+}
 
-    if (props.closeable) {
-        return (<div className="modal-click-area" onClick={(e) => {
+function Portal(props) {
+    const domElem = document.getElementById(props.id);
+
+    if (!domElem) {
+        return '';
+    }
+    return ReactDOM.createPortal(
+        props.children,
+        domElem
+    );
+}
+
+const Modal = React.memo((props) => {
+    useKeyListener(27, () => {props.hide(); return true}, () => props.closeable);
+
+    const styleProps = useStyleProps(props);
+    const click = props.closeable ?
+        (e) => {
             let target = e.target;
             while(target.classList !== undefined) {
                 if (target.classList.contains('modal-centered')) {
@@ -762,12 +1051,32 @@ function Modal(props) {
                 }
                 target = target.parentNode;
             }
-            closeModals();
-        }}>{modal}</div>);
-    }
+            props.hide();
+        } : null;
 
-    return modal;
-}
+    return (
+        <Portal id="modals-container">
+            <Content className="modal-overlay" click={click} zIndex={styleProps.zIndex - 1}>
+                <Stack align="center" fit={props.fit} vertical border {...styleProps} className="modal-centered boxed">
+
+                    <Content padded className="title-area-active">
+                        <Stack alignItems="center">
+                            <Content flex>{props.name}</Content>
+                            <Stack fit><ActionBox material click={(e) => {
+                                props.hide();
+                                e.stopPropagation();
+                            }}>close</ActionBox></Stack>
+                        </Stack>
+                    </Content>
+
+                    <Content flex raw={props.fit} className="content-area">
+                        {props.children}
+                    </Content>
+                </Stack>
+            </Content>
+        </Portal>
+    );
+});
 
 function MouseOverlay(props) {
     if (!props.active) {
@@ -779,38 +1088,132 @@ function MouseOverlay(props) {
     );
 }
 
-function Themed(props) {
-
-    const [bgColor, setBgColor] = useState('#666677');
-    const [bgOpacity, setBgOpacity] = useState(10);
-
-    const getNumFromPx = (value) => {
-        return parseInt(value, 10);
-    };
-
-    const style = getComputedStyle(document.body);
-    const css = {
-        contentTextColor: style.getPropertyValue('--content-text-color'),
-        defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
-        markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
-        bgColor,
-        setBgColor,
-        bgOpacity,
-        setBgOpacity
-    };
-
+function ActionBox(props) {
+    const content = props.material ?
+        <i className="material-icons md-18">{props.children}</i> : props.children;
     return (
-        <CssContext.Provider value={css}>
-            {props.children}
-        </CssContext.Provider>
+        <div
+            className="action-box"
+            onClick={props.disabled ? null : props.click}>
+            {content}
+        </div>
     );
 }
 
-function upperFirst(value) {
-    if (!value) {
-        return value;
+function Section(props) {
+    const [collapsed, setCollapsed] = useState(false);
+
+    const {width, minWidth, maxWidth, height, minHeight, maxHeight} = props;
+
+    const dim = collapsed ? {} : {width, minWidth, maxWidth, height, minHeight, maxHeight};
+    const collapse = (props.collapse ? props.vertical ? 'h' : 'v' : null);
+
+    const toggleCollapse = (e) => {
+        setCollapsed(!collapsed);
+    };
+    const actions = [];
+    if (collapse) {
+        const icon = collapsed ? 'call_made' : 'call_received';
+        actions.push(
+            <ActionBox key="0" material click={toggleCollapse}>{icon}</ActionBox>
+        );
+        if (!collapsed) {
+            // additional actions
+        }
     }
-    return value[0].toUpperCase() + value.slice(1);
+    const actionsDiv = actions.length > 0 ?
+        <Stack key="actions" fit alignItems="centered">{actions}</Stack> : '';
+
+    const nameCls = [];
+    if (collapsed && collapse === 'h') {
+        nameCls.push('text-v');
+    }
+
+    const boxed = collapsed || !props.raw;
+    const contentCls = [];
+    if (!props.raw) {
+        contentCls.push('content-area');
+    }
+    const isVCollapse = collapsed && props.vertical;
+
+    const nameDiv = (
+        <Content key="name" flex className={nameCls.join(' ')}>
+            {props.name}
+        </Content>
+    );
+    let headItems = isVCollapse ? [actionsDiv, nameDiv] : [nameDiv, actionsDiv];
+
+    return (
+        <Content flex={props.flex} fullHeight={isVCollapse} boxed={boxed} {...dim}>
+            <Stack vertical={!isVCollapse} border noGap={props.raw} fit={collapsed} fullHeight={!collapsed || isVCollapse}>
+                <Content padded className="title-area-active">
+                    <Stack vertical={collapsed && props.vertical} alignItems="center">
+                        {headItems}
+                    </Stack>
+                </Content>
+                {
+                    !collapsed && (
+                        <Content flex scroll className={contentCls.join(' ')}>
+                            {props.children}
+                        </Content>
+                    )
+                }
+            </Stack>
+        </Content>
+    );
+}
+
+class GlobalCtx extends React.Component {
+
+    constructor(props) {
+        super(props);
+        const style = getComputedStyle(document.body);
+        const getNumFromPx = (value) => {
+            return parseInt(value, 10);
+        };
+
+        this.modalStack = [];
+
+        this.state = {
+            contentTextColor: style.getPropertyValue('--content-text-color'),
+            defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
+            markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
+            bgColor: '#666677',
+            filters: props.filters,
+            imageResources: {current: props.imageResources},
+            setBgColor: (bgColor) => {
+                this.setState({bgColor});
+            },
+            bgOpacity: 10,
+            setBgOpacity: (bgOpacity) => {
+                this.setState({bgOpacity});
+            },
+            openModal: () => {
+                let zIndex = 10000;
+                const len = this.modalStack.length;
+                if (len > 0) {
+                    zIndex = this.modalStack[len - 1] + 10;
+                }
+                this.modalStack.push(zIndex);
+                return zIndex;
+            },
+            closeModal: (zIndex) => {
+                const index = this.modalStack.indexOf(zIndex);
+                if (index === -1) {
+                    return;
+                }
+                this.modalStack.splice(index, 1);
+            }
+        };
+    }
+
+    render() {
+        return (
+            <GlobalContext.Provider value={this.state}>
+                {this.props.children}
+            </GlobalContext.Provider>
+        );
+    }
 }
 
 function useMounted() {
@@ -824,37 +1227,161 @@ function useMounted() {
     return mounted;
 }
 
-function openModal(modal) {
-    ReactDOM.render(
-        modal,
-        document.getElementById('modals-container')
+function useModal() {
+    const context = useContext(GlobalContext);
+    const [isActive, setIsActive] = useState(false);
+    const paramsRef = useRef(null);
+    const hide = () => {
+        paramsRef.current = null;
+        context.closeModal(isActive);
+        setIsActive(false);
+    };
+    const show = (modalParams) => {
+        paramsRef.current = modalParams;
+        setIsActive(context.openModal());
+    };
+    const render = (props) => {
+        const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
+        const styleProps = useStyleProps(props);
+        styleProps.zIndex = isActive;
+        return (
+            <Fragment>
+                {isActive && <Modal hide={hide} name={title} fit={props.fit} closeable={props.closeable} {...styleProps}>{props.children}</Modal>}
+            </Fragment>
+        );
+    };
+    return {
+        render,
+        show,
+        hide,
+        get params() {
+            return paramsRef.current === null ? {} : paramsRef.current;
+        }
+    };
+}
+
+function useKeyListener(keyCode, action, doRegister = () => true) {
+    useEffect(
+        () => {
+            if (!doRegister()) {
+                return;
+            }
+            const keyHandler = (e) => {
+                if (e.keyCode === keyCode) {
+                    if (!action()) {
+                        return;
+                    }
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            };
+            window.addEventListener(
+                'keydown',
+                keyHandler,
+                {capture: false}
+            );
+            return () => {
+                window.removeEventListener(
+                    'keydown',
+                    keyHandler,
+                    {capture: false}
+                )
+            }
+        },
+        []
     );
 }
 
+function useUniqueIds(prefix = '') {
+    const uidRef = useRef(1);
+
+    return items => {
+        if (Array.isArray(items)) {
+            for (let item of items) {
+                if (!item.id) {
+                    item.id = prefix + uidRef.current;
+                    uidRef.current++;
+                }
+            }
+        } else if (!items.id) {
+            items.id = prefix + uidRef.current;
+            uidRef.current++;
+        }
+        return items;
+    }
+}
+
+function useEntity(prefix, defaults = {}) {
+    const entityRef = useRef(null);
+
+    if (entityRef.current === null) {
+        entityRef.current = {
+            defaults,
+            uid: 1,
+            setDefaults: function(props) {
+                this.defaults = {...this.defaults, ...props};
+            },
+            getNew: function(props = {}, overwrites = {}) {
+                const id = prefix + '_' + this.uid;
+                this.uid++;
+                return {...this.defaults, ...props, ...overwrites, id}
+            },
+            id2Items: function(items) {
+                const id2items = {};
+                for (let item of items) {
+                    id2items[item.id] = item;
+                }
+                return id2items;
+            }
+        };
+        entityRef.current.getNew = entityRef.current.getNew.bind(entityRef.current);
+        entityRef.current.setDefaults = entityRef.current.setDefaults.bind(entityRef.current);
+    }
+    return entityRef.current;
+}
+
 export {
-    Modal,
-    closeModals,
     Section,
     Tab,
     Tabs,
     Dim,
+    DimProp,
     Int,
+    IntProp,
     IntField,
-    FitCanvas,
+    TextField,
+    TextFieldProp,
     Checkbox,
+    CheckboxProp,
     Toolbar,
     TabAccordion,
     Stack,
-    Scrollbar,
+    Content,
     Color,
+    ColorProp,
+    Radio,
+    RadioProp,
+    LabelAndSubInfo,
+    ActionBox,
+    ItemsStack,
+    Select,
+    SelectProp,
+    Range,
+    RangeProp,
+    Grid,
+    PropertyGrid,
+    PropLabel,
+    FullProp,
+    Centered,
     SwitchButton,
-    CssContext,
-    useWindowEventManager,
-    getWindowEventManager,
+    FileDropZone,
+    GlobalContext,
     MouseOverlay,
-    Themed,
-    upperFirst,
+    GlobalCtx,
     useMounted,
-    openModal,
-    d
+    useModal,
+    useDimProps,
+    useKeyListener,
+    useEntity,
+    useUniqueIds
 }
