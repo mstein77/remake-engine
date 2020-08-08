@@ -6,6 +6,7 @@ import {
     useKeyListener,
     useEntity,
     ItemsStack,
+    Page,
     Section,
     Content,
     Centered,
@@ -32,6 +33,7 @@ import {
     RangeProp,
     GlobalContext
 } from "./BaseComponents";
+
 import {d, getItemsCloneWithUpdatedItem, rgb2hex} from '../helper/helper';
 
 import {
@@ -1496,7 +1498,6 @@ function ResizeFontForm(props) {
             <Content padded>
                 <Stack>
                     <button onClick={() => {
-                        d('SAVE...');
                         props.save({width, height, offsetX, offsetY});
                     }}>Save</button>
                     <button onClick={props.hide}>Cancel</button>
@@ -1569,13 +1570,18 @@ function NewFontForm(props) {
 }
 
 function FontMapEditor(props) {
+    const context = useContext(GlobalContext);
+    const eContext = useContext(EditorContext);
     const [active, setActive] = useState(0);
     const FontEntity = useEntity('font', {
         name: 'New font', fontMap: null
     });
-    const [fonts, setFonts] = useState(() => [
-        FontEntity.getNew({name: 'TextPane Font', fontMap: props.fontMap})
-    ]);
+    const [fonts, setFonts] = useState(() => {
+        const fontMap =  props.fontMap.getJson();
+        return [
+            FontEntity.getNew({name: 'TextPane Font', fontMap})
+        ]
+    });
     const TextBlockEntity = useEntity('block', {
         name: 'New block',
         posX: 0,
@@ -1588,6 +1594,29 @@ function FontMapEditor(props) {
         autoCenterY: false,
         rasterize: false
     });
+
+    const saveFonts = () => {
+
+        for (let font of fonts) {
+            const resourceLoader = context.game.getResourceLoader();
+            const image = resourceLoader.makeImageResource(font.provider.getFontMapImage());
+            image.id = font.fontMap.image.id;
+            resourceLoader.updateImageResource('browser', image);
+            const json = font.provider.getFontMapJson(font.fontMap.id);
+            json.image = image.id;
+            resourceLoader.updateJsonResource('browser', json);
+        }
+        props.update();
+    };
+
+    const actions = (
+        <Fragment>
+            <button onClick={props.update}>Restore</button>
+            <button onClick={saveFonts} disabled={eContext.hasStorePos()}>Save</button>
+            <button onClick={props.cancel}>Cancel</button>
+            <button onClick={props.play}>Play</button>
+        </Fragment>
+    );
     TextBlockEntity.setDefaults({font: fonts[0].id});
     const [blocks, setBlocks] = useState(() => {
         return [
@@ -1611,6 +1640,7 @@ function FontMapEditor(props) {
                 const canvas = document.createElement('canvas');
                 canvas.width = item.width;
                 canvas.height = item.height;
+                // TODO
                 const fontMap = {
                     width: item.width,
                     image: canvas,
@@ -1699,9 +1729,14 @@ function FontMapEditor(props) {
         )
     }
 
+    const info = [];
+    for (let resource of props.info) {
+        info.push(`${resource.name}: "${resource.id}" [${resource.source}]`);
+    }
+
     return (
-        <EditorCtx>
-            <Stack vertical fullHeight>
+            <Page title={"Edit Resources > " + info.join(' + ')}  actions={actions}>
+                <Stack vertical fullHeight>
                 <Stack>
                     <Section name="Fonts">
                         <ItemsStack
@@ -1727,7 +1762,7 @@ function FontMapEditor(props) {
                         />
                     </Section>
                     <Section name="Characters" flex>
-                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.toDataURL('image/png')} />
+                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.getCanvasElem().toDataURL('image/png')} />
                     </Section>
                 </Stack>
                 <Content flex>
@@ -1742,7 +1777,7 @@ function FontMapEditor(props) {
             <NewFontModal.render name="New Font" fit closeable>
                 <NewFontForm save={NewFontModal.params.save} hide={NewFontModal.hide} />
             </NewFontModal.render>
-        </EditorCtx>
+            </Page>
     );
 }
 

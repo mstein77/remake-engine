@@ -709,6 +709,8 @@ class EditorCtx extends React.Component {
             },
 
             // Undo/Redo
+            storePos: 0,
+            historyPos: 0,
             past: [],
             future: [],
             hasPast: () => {
@@ -724,9 +726,11 @@ class EditorCtx extends React.Component {
                     past.shift();
                 }
                 past.push(action);
+                const historyPos = this.state.historyPos + 1;
                 this.setState({
                     past,
-                    future: []
+                    future: [],
+                    historyPos
                 });
                 action.doAction();
             },
@@ -737,10 +741,12 @@ class EditorCtx extends React.Component {
                 const past = this.state.past.concat();
                 const future = this.state.future.concat();
                 const action = past.pop();
+                const historyPos = this.state.historyPos - 1;
                 future.push(action);
                 this.setState({
                     past,
-                    future
+                    future,
+                    historyPos
                 });
                 action.undoAction();
             },
@@ -751,12 +757,22 @@ class EditorCtx extends React.Component {
                 const past = this.state.past.concat();
                 const future = this.state.future.concat();
                 const action = future.pop();
+                const historyPos = this.state.historyPos + 1;
                 past.push(action);
                 this.setState({
                     past,
-                    future
+                    future,
+                    historyPos
                 });
                 action.doAction();
+            },
+            hasStorePos: () => {
+                return this.state.historyPos === this.state.storePos
+            },
+            updateRestorePos: () => {
+                this.setState({
+                    storePos: this.state.historyPos
+                });
             },
 
             // raster management

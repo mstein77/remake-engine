@@ -1163,6 +1163,29 @@ function Section(props) {
     );
 }
 
+function Page(props) {
+    return (
+        <Content maxHeight="100vh">
+            <Stack vertical fullHeight>
+                <Content>
+                    <Stack className="head">
+                        <Content flex padded>
+                            {props.title}
+                        </Content>
+                        <Content padded>
+                            {props.actions}
+                        </Content>
+                    </Stack>
+                </Content>
+
+                <Content flex>
+                    {props.children}
+                </Content>
+            </Stack>
+        </Content>
+    );
+}
+
 class GlobalCtx extends React.Component {
 
     constructor(props) {
@@ -1175,6 +1198,13 @@ class GlobalCtx extends React.Component {
         this.modalStack = [];
 
         this.state = {
+            game: props.game,
+            dirty: false,
+            setDirty: () => {
+                if (this.state.dirty === false) {
+                    this.setState({dirty: true});
+                }
+            },
             contentTextColor: style.getPropertyValue('--content-text-color'),
             defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
             markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
@@ -1214,6 +1244,18 @@ class GlobalCtx extends React.Component {
             </GlobalContext.Provider>
         );
     }
+}
+
+function useUpdates() {
+    const [updates, setUpdates] = useState(0);
+    const updatesRef = useRef(null);
+    updatesRef.current = updates;
+    return {
+        count: updates,
+        update: () => {
+            setUpdates(updatesRef.current + 1);
+        }
+    };
 }
 
 function useMounted() {
@@ -1357,6 +1399,7 @@ export {
     TabAccordion,
     Stack,
     Content,
+    Page,
     Color,
     ColorProp,
     Radio,
@@ -1378,6 +1421,7 @@ export {
     GlobalContext,
     MouseOverlay,
     GlobalCtx,
+    useUpdates,
     useMounted,
     useModal,
     useDimProps,

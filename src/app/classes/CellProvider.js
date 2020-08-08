@@ -871,8 +871,37 @@ class FontCharIndexProvider extends CellProvider {
         this.width = null;
         this.height = 1;
         this.charSize = {x: fontMap.width, y: fontMap.height};
-        this.data = fontMap.image ? fontMap.image.toDataURL('image/png') : null;
+        this.data = fontMap.image ? fontMap.image.getCanvasElem().toDataURL('image/png') : null;
     }
+
+    getFontMapImage() {
+        let canvas = document.createElement('canvas');
+        canvas.width = this.codes.length * this.charSize.x;
+        canvas.height = this.charSize.y;
+        const ctx = canvas.getContext('2d');
+        let pos = 0;
+        for (let code of this.codes) {
+            ctx.drawImage(this.mapping[code], pos, 0);
+            pos += this.charSize.x;
+        }
+        return canvas;
+    }
+
+    getFontMapJson(id) {
+        const json = {
+            id,
+            width: this.charSize.x,
+            height: this.charSize.y,
+            map: {}
+        };
+        let pos = 0;
+        for (let code of this.codes) {
+            json.map[code] = {x: pos, y: 0};
+            pos += this.charSize.x;
+        }
+        return json;
+    };
+
 
     hasData() {
         return this.data === null;
@@ -975,7 +1004,7 @@ class FontCharIndexProvider extends CellProvider {
         if (this.mapping[code] === undefined) {
             return;
         }
-        this.mapping[code] = undefined;
+        delete this.mapping[code];
         this.codes.splice(this.codes.indexOf(code), 1);
         this.map = [this.codes];
         this.width--;
