@@ -1,13 +1,13 @@
-var path = require("path");
-var cors = require('cors')
-var express = require("express");
+const path = require("path");
+const cors = require('cors')
+const express = require("express");
 const fs = require('fs');
+const {isValidResourceId} = require('./src/app/helper/helper');
 
-var DIST_DIR = path.join(__dirname, "dist");
-var STATIC_DIR = path.join(__dirname, "src/public");
-console.log(DIST_DIR);
-var PORT = 8080;
-var app = express();
+const DIST_DIR = path.join(__dirname, "dist");
+const STATIC_DIR = path.join(__dirname, "src/public");
+const PORT = 8080;
+const app = express();
 
 app.use(cors());
 app.use('/', express.static(STATIC_DIR)); //DIST_DIR));
@@ -15,13 +15,103 @@ app.use(express.json());
 
 app.options('*', cors()); // include before other routes
 
-app.post('/store', (req, res) => {
+app.post('/has', (req, res) => {
     const resources = req.body.resources ? req.body.resources : [];
-
-    const stored = [];
-    const failed = [];
+    const found = [];
+    const notFound = [];
+    const invalid = [];
     for (let resource of resources) {
         const info = {id: resource.id, type: resource.type};
+        if (!isValidResourceId(info.type, info.id)) {
+            invalid.push(info);
+            continue;
+        }
+
+        let file;
+        switch(resource.type) {
+            case 'json':
+                file = `./resources/json/${resource.id}.json`;
+                break;
+
+            case 'image':
+                file = `./resources/image/${resource.id}`;
+                break;
+
+            case 'audio':
+                file = `./resources/audio/${resource.id}`;
+                break;
+        }
+        let success = false;
+        try {
+            success = fs.existsSync(file);
+        } catch(err) {
+            console.error(err)
+        }
+        if (success) {
+            found.push(info);
+        } else {
+            notFound.push(info);
+        }
+    }
+    res.json({found, notFound, invalid});
+});
+
+app.post('/delete', (req, res) => {
+    const resources = req.body.resources ? req.body.resources : [];
+    const deleted = [];
+    const notDeleted = [];
+    const invalid = [];
+    for (let resource of resources) {
+        const info = {id: resource.id, type: resource.type};
+        if (!isValidResourceId(info.type, info.id)) {
+            invalid.push(info);
+            continue;
+        }
+        let file;
+        switch(resource.type) {
+            case 'json':
+                file = `./resources/json/${resource.id}.json`;
+                break;
+
+            case 'image':
+                file = `./resources/image/${resource.id}`;
+                break;
+
+            case 'audio':
+                file = `./resources/audio/${resource.id}`;
+                break;
+        }
+        let success = false;
+        try {
+            if (fs.existsSync(file)) {
+                fs.unlinkSync(file);
+                success = !fs.existsSync(file);
+            } else {
+                success = true;
+            };
+        } catch(err) {
+            console.error(err)
+        }
+        if (success) {
+            deleted.push(info);
+        } else {
+            notDeleted.push(info);
+        }
+    }
+    res.json({deleted, notDeleted, invalid});
+});
+
+app.post('/store', (req, res) => {
+    const resources = req.body.resources ? req.body.resources : [];
+    const stored = [];
+    const failed = [];
+    const invalid = [];
+    for (let resource of resources) {
+        const info = {id: resource.id, type: resource.type};
+        if (!isValidResourceId(info.type, info.id)) {
+            invalid.push(info);
+            continue;
+        }
         let success = false;
         let file;
         try {
@@ -36,7 +126,7 @@ app.post('/store', (req, res) => {
                     break;
 
                 case 'image':
-                    file = `./resources/image/${resource.id}.png`;
+                    file = `./resources/image/${resource.id}`;
                     if (resource.data !== null) {
                         const parts = resource.data.split('base64,', 2);
                         if (parts.length === 2) {
@@ -47,7 +137,7 @@ app.post('/store', (req, res) => {
                     break;
 
                 case 'audio':
-                    file = `./resources/audio/${resource.id}.mp3`;
+                    file = `./resources/audio/${resource.id}`;
                     if (resource.data !== null) {
                         const parts = resource.data.split('base64,', 2);
                         if (parts.length === 2) {
@@ -66,7 +156,7 @@ app.post('/store', (req, res) => {
             failed.push(info);
         }
     }
-    res.json({stored, failed});
+    res.json({stored, failed, invalid});
 });
 
 app.post('/resources', (req, res) => {
@@ -84,12 +174,17 @@ app.post('/resources', (req, res) => {
 
     const found = [];
     const notFound = [];
+    const invalid = [];
     for (let resource of resources) {
+        if (!isValidResourceId(resource.type, resource.id)) {
+            invalid.push(resource);
+            continue;
+        }
         let data = null;
         switch (resource.type) {
             case 'image':
-                if (images.indexOf(resource.id + '.png') !== -1) {
-                    const filePath = `./resources/image/${resource.id}.png`;
+                if (images.indexOf(resource.id) !== -1) {
+                    const filePath = `./resources/image/${resource.id}`;
                     const content = fs.readFileSync(filePath);
                     const extensionName = path.extname(filePath);
                     const base64Image = new Buffer(content, 'binary').toString('base64');
@@ -98,8 +193,8 @@ app.post('/resources', (req, res) => {
                 break;
 
             case 'audio':
-                if (audios.indexOf(resource.id + '.wav') !== -1) {
-                    const filePath = `./resources/audio/${resource.id}.wav`;
+                if (audios.indexOf(resource.id) !== -1) {
+                    const filePath = `./resources/audio/${resource.id}`;
                     const content = fs.readFileSync(filePath);
                     const extensionName = path.extname(filePath);
                     const base64Audio = new Buffer(content, 'binary').toString('base64');
@@ -129,7 +224,7 @@ app.post('/resources', (req, res) => {
             notFound.push(resource);
         }
     }
-    res.json({found, notFound});
+    res.json({found, notFound, invalid});
 });
 /*
 app.get("*", function(req, res) {

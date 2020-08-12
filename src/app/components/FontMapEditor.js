@@ -1596,9 +1596,8 @@ function FontMapEditor(props) {
     });
 
     const saveFonts = () => {
-
+        const resourceLoader = context.game.getResourceLoader();
         for (let font of fonts) {
-            const resourceLoader = context.game.getResourceLoader();
             const image = resourceLoader.makeImageResource(font.provider.getFontMapImage());
             image.id = font.fontMap.image.id;
             resourceLoader.updateImageResource('browser', image);
@@ -1606,14 +1605,42 @@ function FontMapEditor(props) {
             json.image = image.id;
             resourceLoader.updateJsonResource('browser', json);
         }
+        eContext.updateRestorePos();
         props.update();
+    };
+
+    const getResourceDef = (type, id, value) => {
+        if (type === 'image') {
+            value = '"' + value + '"';
+        } else if (type === 'json') {
+            const lines = JSON.stringify(value, null, 4).split('\n');
+            value = lines.join('\n    ');
+        }
+        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
+    };
+
+    const exportFonts = () => {
+        const resourceLoader = context.game.getResourceLoader();
+        const exportLines = [];
+        for (let font of fonts) {
+            const image = resourceLoader.makeImageResource(font.provider.getFontMapImage());
+            exportLines.push(getResourceDef('image', font.fontMap.image.id, image.getDataUrl()));
+            exportLines.push(getResourceDef('json', font.fontMap.id, font.provider.getFontMapJson(font.fontMap.id)));
+        }
+        props.export(exportLines);
+    };
+
+    const deployFonts = () => {
+        props.deploy();
     };
 
     const actions = (
         <Fragment>
-            <button onClick={props.update}>Restore</button>
+            <button onClick={props.cancel}>Back</button>
+            <button onClick={props.revert}>Revert</button>
             <button onClick={saveFonts} disabled={eContext.hasStorePos()}>Save</button>
-            <button onClick={props.cancel}>Cancel</button>
+            <button onClick={deployFonts} disabled={!eContext.hasStorePos()}>Deploy</button>
+            <button onClick={exportFonts}>Export</button>
             <button onClick={props.play}>Play</button>
         </Fragment>
     );
@@ -1735,7 +1762,7 @@ function FontMapEditor(props) {
     }
 
     return (
-            <Page title={"Edit Resources > " + info.join(' + ')}  actions={actions}>
+            <Page title="Edit Resources" resources={props.info}  actions={actions}>
                 <Stack vertical fullHeight>
                 <Stack>
                     <Section name="Fonts">

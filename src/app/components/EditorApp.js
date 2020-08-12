@@ -1,5 +1,5 @@
 import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
-import {Page, Stack, Content, Section, useUpdates, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
+import {Page, Stack, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import FontMapEditor from "./FontMapEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
@@ -39,6 +39,7 @@ function RestorableContent(props) {
     }, []);
     return <Fragment>
         {props.children}
+
         <ConfirmModal.render name="Please confirm" fit closeable>
             <Stack vertical border>
                 <Content padded>
@@ -66,11 +67,136 @@ function Restorable(props) {
     )
 }
 
+function RevertSelector(props) {
+    const context = useContext(GlobalContext);
+    const resourceLoader = context.game.getResourceLoader();
+    const storageManager = context.game.getStorageManager();
+    const options = [];
+    const storedResources = [];
+
+    const availSources = [];
+    const defaultValues = [];
+    for (let info of props.resourcesInfo) {
+        const avail = {
+            code: resourceLoader.hasLocalResource(info.type, info.id),
+            external: resourceLoader.hasExternalResource(info.type, info.id),
+            server: props.serverResources.indexOf(info.type + ':' + info.id) !== -1,
+            browser: storageManager.hasResource(info.type, info.id)
+        };
+        availSources.push(avail);
+        let defaultValue = info.source;
+        switch(defaultValue) {
+            case 'browser':
+                if (avail.server) {
+                    defaultValue = 'server';
+                } else if (avail.external) {
+                    defaultValue = 'external';
+                } else if (avail.code) {
+                    defaultValue = 'code';
+                }
+                break;
+            case 'server':
+                if (avail.external) {
+                    defaultValue = 'external';
+                } else if (avail.code) {
+                    defaultValue = 'code';
+                }
+                break;
+        }
+        defaultValues.push(defaultValue);
+    }
+    const [selectedValue, setSelectedValue] = useState(defaultValues);
+    let i = 0;
+    for (let info of props.resourcesInfo) {
+        const disabled = [];
+        const index = i;
+        const sources = availSources[i];
+        const stored = [];
+        if (!sources.browser) {
+            disabled.push('browser');
+        } else {
+            stored.unshift('browser');
+        }
+        if (!sources.server) {
+            disabled.push('server');
+        } else {
+            stored.unshift('server');
+        }
+        if (!sources.external) {
+            disabled.push('external');
+        } else {
+            stored.unshift('external');
+        }
+        if (!sources.code) {
+            disabled.push('code');
+        } else {
+            stored.unshift('code');
+        }
+        storedResources.push(stored);
+        const setValue = (value) => {
+            const newValue = [...selectedValue];
+            newValue[index] = value;
+            setSelectedValue(newValue);
+        };
+        options.push(
+            <RadioProp
+                key={info.type + ':' + info.id}
+                set={setValue}
+                name={info.id}
+                disabled={disabled}
+                options={{code: 'Code', external: 'External', server: 'Server', browser: 'Browser'}}
+                value={selectedValue[index]}
+            />
+        );
+        i++;
+    }
+
+    const doRevert = () => {
+        const result = [];
+        for (let i = 0; i < props.resourcesInfo.length; i++) {
+            const lastSource = props.resourcesInfo[i].source;
+            if (lastSource !== selectedValue[i]) {
+                const deleteSources = [];
+                const currStored = storedResources[i];
+                let found = false;
+                for (let j = 0; j < currStored.length; j++) {
+                    if (!found) {
+                        found = (currStored[j] === selectedValue[i]);
+                    } else {
+                        deleteSources.push(currStored[j]);
+                        if (lastSource === currStored[j]) {
+                            break;
+                        }
+                    }
+                }
+                result.push([props.resourcesInfo[i], deleteSources]);
+            }
+        }
+        props.revert(result);
+    };
+
+    return (
+        <Stack vertical>
+            <Content padded>
+                <PropertyGrid>
+                    {options}
+                </PropertyGrid>
+            </Content>
+            <Content padded>
+                <button onClick={doRevert}>Revert</button>
+                <button onClick={props.cancel}>Cancel</button>
+            </Content>
+        </Stack>
+    );
+}
+
 function PageSelector(props) {
     const context = useContext(GlobalContext);
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
     const confirmRef = useRef(null);
     const updates = useUpdates();
+    const ExportModal = useModal();
+    const RevertModal = useModal();
 
     const cancel = () => {
         setActive(null);
@@ -118,17 +244,66 @@ function PageSelector(props) {
     };
 
     const resourceLoader = props.game.getResourceLoader();
-    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), update: () => {
+    const storageManager = props.game.getStorageManager();
+    const resourcesInfo = [];
+
+    const revert = () => {
+        resourceLoader.checkServerResources(resourcesInfo).then(
+            (serverResources) => {
+                RevertModal.show({
+                    resourcesInfo,
+                    serverResources,
+                    revert: (result) => {
+                        const resources = [];
+                        for (let item of result) {
+                            const [resource, stores] = item;
+                            if (stores.indexOf('browser') !== -1) {
+                                storageManager.deleteResource(resource.type, resource.id);
+                            }
+                            if (stores.indexOf('server') !== -1) {
+                                resources.push(resource);
+                            }
+                        }
+                        resourceLoader.deleteServerResources(resources).then(() => {
+                            RevertModal.hide();
+                            const game = props.game;
+                            ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                            game.reloadScreen(active);
+                        });
+                    }
+                });
+            }
+        );
+    };
+
+    const deploy = () => {
+        resourceLoader.deployResources(resourcesInfo).then(
+            () => {
+                const game = props.game;
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                game.reloadScreen(active);
+            }
+        );
+    };
+
+    const exportAsCode = (lines) => {
+        ExportModal.show({
+            code: lines.join('\n')
+        });
+    };
+
+    const update = () => {
         context.setDirty();
         updates.update();
-    }};
-    switch(resource.type) {
+    };
+
+    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), update, revert, deploy, export: exportAsCode};
+    switch (resource.type) {
         case 'tilesMap':
             editor = <TilesMapEditor tilesMap={resource.data} {...editorProps} />;
             break;
 
         case 'fontMap':
-            const resourcesInfo = [];
             resourcesInfo.push({
                 id: resource.data.id,
                 name: 'FontMap Config',
@@ -157,7 +332,26 @@ function PageSelector(props) {
             break;
     }
 
-    return editor;
+    return (
+        <Fragment>
+            {editor}
+            <ExportModal.render name="Export resources" width="80%" height="50%" closeable>
+                <Content padded>
+                    Use this in your code:
+                    <TextArea wrap="off" width="100%" height="80%" value={ExportModal.params.code} readOnly />
+                </Content>
+            </ExportModal.render>
+
+            <RevertModal.render name="Revert resources" fit closeable>
+                <RevertSelector
+                    serverResources={RevertModal.params.serverResources}
+                    resourcesInfo={RevertModal.params.resourcesInfo}
+                    revert={RevertModal.params.revert}
+                    cancel={RevertModal.hide}
+                />
+            </RevertModal.render>
+        </Fragment>
+    );
 }
 
 function EditorApp(props) {

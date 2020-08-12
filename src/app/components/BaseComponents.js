@@ -63,6 +63,9 @@ function RangeProp(props) {
 function SwitchButton(props) {
     const cls = ['switch-div switch-button' + (props.enabled ? '-enabled' : '')];
     const style = useStyleProps(props);
+    if (props.disabled) {
+        style.opacity = '0.5';
+    }
     let children = props.children;
     if (props.material) {
         children = <i className="material-icons md-18 center-h">{props.children}</i>;
@@ -76,14 +79,16 @@ function SwitchButton(props) {
 
 function Radio(props) {
     const buttons = [];
+    const disabled = props.disabled ? props.disabled : [];
     for (let key in props.options) {
         const name = props.options[key];
         buttons.push(
             <SwitchButton
                 key={key}
                 enabled={props.value == key}
+                disabled={disabled.indexOf(key) !== -1}
                 material={props.material}
-                switch={() => {props.set(key)}}
+                switch={() => {disabled.indexOf(key) === -1 && props.set(key)}}
             >
                 {name}
             </SwitchButton>
@@ -185,6 +190,13 @@ function TextFieldProp(props) {
             <TextField {...fieldProps} />
         </PropLabel>
     );
+}
+
+function TextArea(props) {
+    const style = useStyleProps(props);
+    return (
+        <textarea style={style} wrap={props.wrap} rows={props.rows} cols={props.cols} readOnly={props.readOnly} value={props.value} onChange={e => props.set(e.target.value)}></textarea>
+    )
 }
 
 function IntField(props) {
@@ -1164,14 +1176,50 @@ function Section(props) {
 }
 
 function Page(props) {
+
+    const resources = [];
+    const typeToIcon = {
+        image: 'image',
+        audio: 'audiotrack',
+        json: 'code'
+    };
+    if (props.resources) {
+        for (let resource of props.resources) {
+            resources.push(
+                <Content className="thin-boxed"
+                    key={resource.type + ':' + resource.id}>
+                    <Stack border>
+                        <Content padded>
+                            <Stack>
+                                <Content><i className="material-icons md-18">{typeToIcon[resource.type]}</i></Content>
+                                <Content>{resource.name}:</Content>
+                            </Stack>
+                        </Content>
+                        <Content padded>
+                            <kbd style={{fontWeight: 'bold'}}>{resource.id}</kbd>
+                        </Content>
+                    </Stack>
+                </Content>
+            );
+        }
+    }
+
     return (
         <Content maxHeight="100vh">
             <Stack vertical fullHeight>
                 <Content>
                     <Stack className="head">
                         <Content flex padded>
-                            {props.title}
+                            <Stack flex>
+                                <Content>
+                                    {props.title} &gt;
+                                </Content>
+                                <Stack flex wrap>
+                                    {resources}
+                                </Stack>
+                            </Stack>
                         </Content>
+
                         <Content padded>
                             {props.actions}
                         </Content>
@@ -1393,6 +1441,7 @@ export {
     IntField,
     TextField,
     TextFieldProp,
+    TextArea,
     Checkbox,
     CheckboxProp,
     Toolbar,

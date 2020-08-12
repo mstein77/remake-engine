@@ -1,3 +1,4 @@
+const {isValidResourceId, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -334,6 +335,8 @@ class ResourceLoader {
         this.permAudio = {};
         this.hasPermLoaded = false;
         this.source = new Map();
+        this.hasLocal = new Set();
+        this.hasExternal = new Set();
     }
 
     invalidatePermanentResources() {
@@ -357,7 +360,33 @@ class ResourceLoader {
  */
     }
 
+    hasLocalResource(type, id) {
+        return this.hasLocal.has(type + ':' + id);
+    }
+
+    hasExternalResource(type, id) {
+        return this.hasExternal.has(type + ':' + id);
+    }
+
+    isExternalValue(value) {
+        return typeof value === 'string' && /^http(s)?:\/\//.test(value);
+    }
+
+    registerLocal(id, value) {
+        if (this.isExternalValue(value)) {
+            this.hasExternal.add(id);
+        } else {
+            this.hasLocal.add(id);
+        }
+    }
+
     addJson(perm, id, local = null) {
+        if (!isValidResourceId('json', id)) {
+            throw Error(`Invalid id "${id}" given for JSON resource...TODO`);
+        }
+        if (local !== null) {
+            this.hasLocal.add('json:' + id);
+        }
         if (perm) {
             this.permJson[id] = local;
         } else {
@@ -366,6 +395,12 @@ class ResourceLoader {
     }
 
     addImage(perm, id, localValue = null) {
+        if (!isValidResourceId('image', id)) {
+            throw Error(`Invalid id "${id}" given for image resource...TODO`);
+        }
+        if (localValue !== null) {
+            this.registerLocal('image:' + id, localValue);
+        }
         if (perm) {
             this.permImage[id] = localValue;
         } else {
@@ -374,6 +409,12 @@ class ResourceLoader {
     }
 
     addAudio(perm, id, localValue = null) {
+        if (!isValidResourceId('audio', id)) {
+            throw Error(`Invalid id "${id}" given for audio resource...TODO`);
+        }
+        if (localValue !== null) {
+            this.registerLocal('audio:' + id, localValue);
+        }
         if (perm) {
             this.permAudio[id] = localValue;
         } else {
@@ -447,7 +488,6 @@ class ResourceLoader {
         if (this.resources[type] && this.resources[type][id] !== undefined) {
             return this.resources[type][id];
         }
-        console.log(this.resources);
         throw Error(`Resource "${id}" of type ${type} does not exists!`);
     }
 
@@ -464,6 +504,100 @@ class ResourceLoader {
 
     makeImageResource(data) {
         return new ImageResource(data);
+    }
+
+    deleteServerResources(resources) {
+        if (resources.length === 0) {
+            return Promise.resolve();
+        }
+        return (
+            fetch('http://localhost:8080/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resources
+                })
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('failed...');
+                    throw Error('BOOM!');
+                }
+                return response.json();
+            }).then(body => {
+                for (let resource of body.deleted) {
+                }
+                return body.deleted;
+            })
+        )
+    }
+
+    checkServerResources(resources) {
+        return (
+            fetch('http://localhost:8080/has', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resources
+                })
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('failed...');
+                    throw Error('BOOM!');
+                }
+                return response.json();
+            }).then(body => {
+                const found = [];
+                for (let item of body.found) {
+                    found.push(item.type + ':' + item.id);
+                }
+                return found;
+            })
+        )
+    }
+
+    deployResources(resources) {
+        const overwrites = [];
+        for(let resource of resources) {
+            let data = null;
+            if (this.resources[resource.type]) {
+                data = this.resources[resource.type][resource.id];
+                if (data) {
+                   if (data instanceof ImageResource) {
+                       data = data.getDataUrl();
+                   }
+                }
+            }
+            overwrites.push({data, type: resource.type, id: resource.id});
+        }
+        if (overwrites.length === 0) {
+            return Promise.resolve();
+        }
+        return (
+            fetch('http://localhost:8080/store', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    resources: overwrites
+                })
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('failed...');
+                    throw Error('BOOM!');
+                }
+                return response.json();
+            }).then(body => {
+                for (let resource of body.stored) {
+                    SM.deleteResource(resource.type, resource.id);
+                }
+                return body;
+            })
+        );
     }
 
     loadResources(images, jsons, audios) {
@@ -492,7 +626,7 @@ class ResourceLoader {
                                     response.blob().then(blob => {
                                         const resource = new ImageResource(URL.createObjectURL(blob));
                                         return resource.getNewDecodePromise().then(() => {
-                                            this.setResource('image', id, resource, 'server-url');
+                                            this.setResource('image', id, resource, 'external');
                                         });
                                     })
                                 )
@@ -527,7 +661,7 @@ class ResourceLoader {
                                     response.blob().then(blob => {
                                         const resource = new AudioResource(URL.createObjectURL(blob));
                                         return resource.getNewLoadingPromise().then(() => {
-                                            this.setResource('audio', id, resource, 'server-url');
+                                            this.setResource('audio', id, resource, 'external');
                                         });
                                     })
                                 )
@@ -582,7 +716,7 @@ class ResourceLoader {
                                 const image = new ImageResource(resource.data);
                                 subPromises.push(
                                     image.getNewDecodePromise().then(() => {
-                                        this.setResource(resource.type, resource.id, image, 'server-resource');
+                                        this.setResource(resource.type, resource.id, image, 'server');
                                     })
                                 );
                                 break;
@@ -591,13 +725,13 @@ class ResourceLoader {
                                 const audio = new AudioResource(resource.data);
                                 subPromises.push(
                                     audio.getNewLoadingPromise().then(() =>{
-                                        this.setResource(resource.type, resource.id, audio, 'server-resource');
+                                        this.setResource(resource.type, resource.id, audio, 'server');
                                     })
                                 );
                                 break;
 
                             case 'json':
-                                this.setResource('json', resource.id, resource.data, 'server-resource');
+                                this.setResource('json', resource.id, resource.data, 'server');
                                 break;
                         }
                     }
@@ -624,14 +758,14 @@ class ResourceLoader {
                             const image = new ImageResource(value);
                             subPromises.push(
                                 image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'server-resource');
+                                    this.setResource(resource.type, resource.id, image, 'code');
                                 })
                             );
                         } else if (resource.type === 'audio') {
                             const audio = new AudioResource(value);
                             subPromises.push(
                                 audio.getNewLoadingPromise().then(() => {
-                                    this.setResource(resource.type, resource.id, audio, 'server-resource');
+                                    this.setResource(resource.type, resource.id, audio, 'code');
                                 })
                             );
                         }
@@ -970,8 +1104,12 @@ class ResourceRequest {
 
     addImageResource(id, data) {
         if (Array.isArray(data)) {
+            if (!isValidResourceId('image', id)) {
+                throw Error('TODO');
+            }
             for (let index = 0; index < data.length; index++) {
-                RL.addImage(this.permament,id + '_' + index, data[index]);
+                const parts = id.split('.');
+                RL.addImage(this.permament,parts[0] + '_' + index + '.' + parts[1], data[index]);
             }
         } else {
             RL.addImage(this.permament, id, data);
@@ -1044,6 +1182,8 @@ class Game {
         this.hasTouch = false;
         this.buildState = null;
         this.hasBuildState = true;
+        this.editorRun = 0;
+        this.restartEditorWithId = null;
         this.lastState = null;
 
         document.addEventListener('DOMContentLoaded', function(event) {
@@ -1162,7 +1302,8 @@ class Game {
         this.screens[screen.id] = screen;
     }
 
-    reloadScreen() {
+    reloadScreen(restartEditorWithId = null) {
+        this.restartEditorWithId = restartEditorWithId;
         this.hasBuildState = false;
         RL.invalidatePermanentResources();
         this.globals = this.lastState;
@@ -1227,6 +1368,7 @@ class Game {
             return;
         }
         console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
+        this.editorRun++;
 
         this.setRunning(false);
         RL.loadPermanentResources().then(() => {
@@ -1407,6 +1549,11 @@ class Game {
                 }
             }
             this.updateGamepads();
+            if (this.restartEditorWithId !== null) {
+                this.activeResource = this.restartEditorWithId;
+                this.restartEditorWithId = null;
+                this.openEditorMode();
+            }
         }
         this.waitForNextFrame();
     }
@@ -7458,18 +7605,6 @@ class Position {
     getRounded() {
         return {x: Math.round(this.x), y: Math.round(this.y)}
     }
-}
-
-function d() {
-    if (arguments.length === 0) {
-        return;
-    }
-    const key = arguments[0];
-    const values = [];
-    for (let i = 1; i < arguments.length; i++) {
-        values.push('' + arguments[i]);
-    }
-    debugs[key] = values.join(' ');
 }
 
 const OCM = new CanvasManager();

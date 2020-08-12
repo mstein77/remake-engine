@@ -54,9 +54,31 @@ function rgb2hex(rgb) {
     return '#' + (rgb.r).toString(16) + (rgb.g).toString(16) + (rgb.b).toString(16);
 }
 
-export {
+const isValidResourceId = (type, id) => {
+    let regexp = null;
+    switch(type) {
+        case 'image':
+            regexp = /^[0-9a-zA-Z_\-]+(\/[0-9a-zA-Z_\-]+)*.(png|jpg|jpeg)$/;
+            break;
+
+        case 'audio':
+            regexp = /^[0-9a-zA-Z_\-]+(\/[0-9a-zA-Z_\-]+)*.(wav|mp3|ogg)$/;
+            break;
+
+        case 'json':
+            regexp = /^[0-9a-zA-Z_\-]+(\/[0-9a-zA-Z_\-]+)*$/;
+            break;
+
+        default:
+            return false;
+    }
+    return regexp.test(id);
+};
+
+module.exports = {
     d,
     hex2rgb,
     rgb2hex,
+    isValidResourceId,
     getItemsCloneWithUpdatedItem
 }
