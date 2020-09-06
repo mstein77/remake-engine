@@ -2,12 +2,115 @@ const path = require("path");
 const cors = require('cors')
 const express = require("express");
 const fs = require('fs');
-const {isValidResourceId} = require('./src/app/helper/helper');
+const {isValidResourceId, getRelevantResources, ResourceDependencies} = require('./src/app/helper/helper');
 
 const DIST_DIR = path.join(__dirname, "dist");
 const STATIC_DIR = path.join(__dirname, "src/public");
 const PORT = 8080;
 const app = express();
+
+const getFilesFromDir = (dir) => fs.readdirSync(dir, {withFileTypes: true})
+    .filter(item => !item.isDirectory())
+    .map(item => item.name);
+
+
+const removeEmptyResourceDirs = (type, id) => {
+    if (id.indexOf('/') === -1) {
+        return true;
+    }
+    const parts = id.split('/');
+    parts.pop();
+    const basePath = './resources/' + type + '/';
+    try {
+        while(parts.length > 0) {
+            const path = basePath + parts.join('/');
+            const files = getFilesFromDir(path);
+            if (files.length !== 0) {
+                break;
+            }
+            fs.rmdirSync(path);
+            parts.pop();
+        }
+    } catch (e) {
+        console.error(e);
+        return false;
+    }
+    return true;
+};
+
+const getResourceFilePath = (type, id) => {
+    let file;
+    switch(type) {
+        case 'json':
+            file = `./resources/json/${id}.json`;
+            break;
+
+        case 'image':
+            file = `./resources/image/${id}`;
+            break;
+
+        case 'audio':
+            file = `./resources/audio/${id}`;
+            break;
+    }
+    return file;
+}
+
+const deleteResource = (type, id) => {
+    const file = getResourceFilePath(type, id);
+    let success = false;
+    try {
+        if (fs.existsSync(file)) {
+            fs.unlinkSync(file);
+            success = !fs.existsSync(file);
+            if (success) {
+                removeEmptyResourceDirs(type, id);
+            }
+        } else {
+            success = true;
+        }
+    } catch(err) {
+        console.error(err)
+    }
+    return success;
+};
+
+const directFilePath = './resources/direct.json';
+const indirectFilePath = './resources/indirect.json';
+
+const dependencies = new ResourceDependencies(
+    () => {
+        if (!fs.existsSync(directFilePath)) {
+            return {}
+        }
+        const direct = JSON.parse(
+            fs.readFileSync(
+                directFilePath,
+                'utf8'
+            )
+        );
+        return direct;
+    },
+    content => {
+        fs.writeFileSync(directFilePath, JSON.stringify(content), 'utf8');
+    },
+    () => {
+        if (!fs.existsSync(indirectFilePath)) {
+            return {};
+        }
+        const indirect = JSON.parse(
+            fs.readFileSync(
+                indirectFilePath,
+                'utf8'
+            )
+        );
+        return indirect
+    },
+    content => {
+        fs.writeFileSync(indirectFilePath, JSON.stringify(content), 'utf8');
+    },
+    deleteResource
+);
 
 app.use(cors());
 app.use('/', express.static(STATIC_DIR)); //DIST_DIR));
@@ -27,20 +130,7 @@ app.post('/has', (req, res) => {
             continue;
         }
 
-        let file;
-        switch(resource.type) {
-            case 'json':
-                file = `./resources/json/${resource.id}.json`;
-                break;
-
-            case 'image':
-                file = `./resources/image/${resource.id}`;
-                break;
-
-            case 'audio':
-                file = `./resources/audio/${resource.id}`;
-                break;
-        }
+        const file = getResourceFilePath(resource.type, resource.id);
         let success = false;
         try {
             success = fs.existsSync(file);
@@ -58,40 +148,18 @@ app.post('/has', (req, res) => {
 
 app.post('/delete', (req, res) => {
     const resources = req.body.resources ? req.body.resources : [];
+
     const deleted = [];
     const notDeleted = [];
     const invalid = [];
+
     for (let resource of resources) {
         const info = {id: resource.id, type: resource.type};
         if (!isValidResourceId(info.type, info.id)) {
             invalid.push(info);
             continue;
         }
-        let file;
-        switch(resource.type) {
-            case 'json':
-                file = `./resources/json/${resource.id}.json`;
-                break;
-
-            case 'image':
-                file = `./resources/image/${resource.id}`;
-                break;
-
-            case 'audio':
-                file = `./resources/audio/${resource.id}`;
-                break;
-        }
-        let success = false;
-        try {
-            if (fs.existsSync(file)) {
-                fs.unlinkSync(file);
-                success = !fs.existsSync(file);
-            } else {
-                success = true;
-            };
-        } catch(err) {
-            console.error(err)
-        }
+        const success = deleteResource(resource.type, resource.id);
         if (success) {
             deleted.push(info);
         } else {
@@ -106,6 +174,25 @@ app.post('/store', (req, res) => {
     const stored = [];
     const failed = [];
     const invalid = [];
+
+    const createMissingDirsInResourceId = (type, id) => {
+        const parts = id.split('/');
+        if (parts <= 1) {
+            return true;
+        }
+        parts.pop();
+
+        const path = `./resources/${type}/` + parts.join('/');
+        try {
+            if (!fs.existsSync(path)) {
+                fs.mkdirSync(path, {recursive: true});
+            }
+        } catch (e) {
+            return false;
+        }
+        return true;
+    };
+
     for (let resource of resources) {
         const info = {id: resource.id, type: resource.type};
         if (!isValidResourceId(info.type, info.id)) {
@@ -114,108 +201,115 @@ app.post('/store', (req, res) => {
         }
         let success = false;
         let file;
-        try {
-            switch(resource.type) {
-                case 'json':
-                    file = `./resources/json/${resource.id}.json`;
-                    if (resource.data !== null) {
-                        const content = JSON.stringify(resource.data);
-                        fs.writeFileSync(file, content);
-                        success = true;
-                    }
-                    break;
-
-                case 'image':
-                    file = `./resources/image/${resource.id}`;
-                    if (resource.data !== null) {
-                        const parts = resource.data.split('base64,', 2);
-                        if (parts.length === 2) {
-                            fs.writeFileSync(file, parts[1], 'base64');
+        if (createMissingDirsInResourceId(resource.type, resource.id)) {
+            try {
+                switch(resource.type) {
+                    case 'json':
+                        file = `./resources/json/${resource.id}.json`;
+                        if (resource.data !== null) {
+                            const content = JSON.stringify(resource.data);
+                            fs.writeFileSync(file, content);
                             success = true;
                         }
-                    }
-                    break;
+                        break;
 
-                case 'audio':
-                    file = `./resources/audio/${resource.id}`;
-                    if (resource.data !== null) {
-                        const parts = resource.data.split('base64,', 2);
-                        if (parts.length === 2) {
-                            fs.writeFileSync(file, parts[1], 'base64');
-                            success = true;
+                    case 'image':
+                        file = `./resources/image/${resource.id}`;
+                        if (resource.data !== null) {
+                            const parts = resource.data.split('base64,', 2);
+                            if (parts.length === 2) {
+                                fs.writeFileSync(file, parts[1], 'base64');
+                                success = true;
+                            }
                         }
-                    }
-                    break;
+                        break;
+
+                    case 'audio':
+                        file = `./resources/audio/${resource.id}`;
+                        if (resource.data !== null) {
+                            const parts = resource.data.split('base64,', 2);
+                            if (parts.length === 2) {
+                                fs.writeFileSync(file, parts[1], 'base64');
+                                success = true;
+                            }
+                        }
+                        break;
+                }
+            } catch (e) {
+                console.error(`Failed to store ${resource.type} with id "${resource.id}"`);
             }
-        } catch (e) {
-            console.error(`Failed to store ${resource.type} with id "${resource.id}"`);
         }
+
         if (success) {
             stored.push(info);
         } else {
             failed.push(info);
         }
     }
+
+    // store new direct and indirect entries
+    if (req.body.direct && req.body.screen !== undefined) {
+        dependencies.storeScreenResources(req.body.screen, req.body.direct);
+    }
+    if (req.body.indirect) {
+        dependencies.storeResourceDependencies(req.body.indirect);
+    }
+
     res.json({stored, failed, invalid});
 });
 
 app.post('/resources', (req, res) => {
-    const resources = req.body.resources ? req.body.resources : [];
-
-    const images = fs.readdirSync('./resources/image', {withFileTypes: true})
-        .filter(item => !item.isDirectory())
-        .map(item => item.name);
-    const jsons = fs.readdirSync('./resources/json', {withFileTypes: true})
-        .filter(item => !item.isDirectory())
-        .map(item => item.name);
-    const audios = fs.readdirSync('./resources/audio', {withFileTypes: true})
-        .filter(item => !item.isDirectory())
-        .map(item => item.name);
-
     const found = [];
     const notFound = [];
     const invalid = [];
+
+    const resources = req.body.resources ? req.body.resources : [];
+    const relevant = dependencies.getRelevantScreenResources(req.body.screen, req.body.resolved, req.body.overwrites, req.body.remotes);
+    for (let resId of relevant.found) {
+        const [type, id] = resId.split(':');
+        resources.push({id, type});
+    }
+    for (let resId of relevant.notFound) {
+        const [type, id] = resId.split(':');
+        notFound.push({id, type});
+    }
+
     for (let resource of resources) {
         if (!isValidResourceId(resource.type, resource.id)) {
             invalid.push(resource);
             continue;
         }
         let data = null;
-        switch (resource.type) {
-            case 'image':
-                if (images.indexOf(resource.id) !== -1) {
-                    const filePath = `./resources/image/${resource.id}`;
-                    const content = fs.readFileSync(filePath);
-                    const extensionName = path.extname(filePath);
-                    const base64Image = new Buffer(content, 'binary').toString('base64');
-                    data = `data:image/${extensionName.split('.').pop()};base64,${base64Image}`;
-                }
-                break;
+        const filePath = getResourceFilePath(resource.type, resource.id);
+        if (fs.existsSync(filePath)) {
+            switch (resource.type) {
+                case 'image':
+                    const imgContent = fs.readFileSync(filePath);
+                    const imgType = path.extname(filePath);
+                    const base64Image = Buffer.from(imgContent, 'binary').toString('base64');
+                    data = `data:image/${imgType.split('.').pop()};base64,${base64Image}`;
+                    break;
 
-            case 'audio':
-                if (audios.indexOf(resource.id) !== -1) {
-                    const filePath = `./resources/audio/${resource.id}`;
+                case 'audio':
                     const content = fs.readFileSync(filePath);
                     const extensionName = path.extname(filePath);
-                    const base64Audio = new Buffer(content, 'binary').toString('base64');
+                    const base64Audio = Buffer.from(content, 'binary').toString('base64');
                     data = `data:audio/${extensionName.split('.').pop()};base64,${base64Audio}`;
-                }
-                break;
+                    break;
 
-            case 'json':
-                if (jsons.indexOf(resource.id + '.json') !== -1) {
+                case 'json':
                     try {
                         data = JSON.parse(
                             fs.readFileSync(
-                                './resources/json/' + resource.id + '.json',
+                                filePath,
                                 'utf8'
                             )
                         );
                     } catch (e) {
                         console.error(`Could not parse json resource "${resource.id}"`);
                     }
-                }
-                break;
+                    break;
+            }
         }
         if (data !== null) {
             resource.data = data;

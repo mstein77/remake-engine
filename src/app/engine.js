@@ -1,4 +1,4 @@
-const {isValidResourceId, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, flattenResources, getDeflatedResources, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -18,16 +18,153 @@ function has(arr, key) {
         arr.length > 0;
 }
 
+class DependencyManager {
+
+    constructor(direct = {}, indirect = {}) {
+        this.direct = {};
+        this.indirect = {};
+    }
+
+    addResourceToScreen(type, id, screen) {
+        if (this.direct[screen] === undefined) {
+            this.direct[screen] = [];
+        }
+        const resId = type + ':' + id;
+        if (!this.direct[screen].includes(resId)) {
+            this.direct[screen].push(resId);
+        }
+    }
+
+    addResourcesToScreen(json, image, audio, screen) {
+    }
+
+    setResourceDependencies(type, id, deps) {
+        // overwrite indirect dependencies
+        if (!Array.isArray(deps)) {
+            throw Error(`Dependencies for ${type} resource "${id}" must be an array but got ${typeof deps}`);
+        }
+        if (!deps.length) {
+            return;
+        }
+        for (let depId of deps) {
+            if (depId.split(':').length !== 2) {
+                throw Error(`Invalid dependency id "${depId}" without type-prefix given for ${type} resource "${id}"`);
+            }
+        }
+        this.indirect[type + ':' + id] = deps;
+    }
+
+    deleteResource(resType, resId) {
+        const id = resType + ':' + resId;
+        const newDirect = {};
+        for(let screen in this.direct) {
+            const ids = this.direct[screen].filter(curr => curr !== id);
+            if (ids.length > 0) {
+                newDirect[screen] = ids;
+            }
+        }
+        const newIndirect = {};
+        for(let [sourceId, deps] of Object.entries(this.indirect)) {
+            if (sourceId === id) continue;
+
+            const ids = deps.filter(curr => curr !== id);
+            if (ids.length > 0) {
+                newIndirect[sourceId] = ids;
+            }
+        }
+        this.direct = newDirect;
+        this.indirect = newIndirect;
+    }
+
+    getIdDeps(deps, id) {
+        if (this.indirect[id] === undefined) {
+            return deps;
+        }
+        for(let depId of this.indirect[id]) {
+            if (!deps.includes(depId)) {
+                deps.push(depId);
+            }
+            this.getIdDeps(deps, depId);
+        }
+        return deps;
+    }
+
+    /**
+     *
+     * @param screen
+     * @returns {[]}
+     */
+    getScreenDependencies(screen) {
+        const deps = {json: [], image: [], audio: []};
+        if (this.direct[screen] === undefined) {
+            return deps;
+        }
+        for (let typeId of this.direct[screen]) {
+            const [type, id] = typeId.split(':');
+            deps[type].push(id);
+            const idDeps = this.getIdDeps([], typeId);
+            for (let idTypeDep of idDeps) {
+                const [depType, depId] = idTypeDep.split(':');
+                if (!deps[depType].includes(depId)) {
+                    deps[depType].push(depId);
+                }
+            }
+        }
+        return deps;
+    }
+
+    syncDependencies(screens) {
+        const all = {json: [], image: [], audio: []};
+        for (let screen of screens) {
+            const typeDeps = this.getScreenDependencies(screen);
+            for (let [type, deps] of Object.entries(typeDeps)) {
+                for (let dep of deps) {
+                    if (!all[type].includes(dep)) {
+                        all[type].push(dep);
+                    }
+                }
+            }
+        }
+        const deadIds = {json: [], image: [], audio: []};
+        for (let resId in this.indirect) {
+            const [type, id] = resId.split(':');
+            if (!all[type].includes(id) && !deadIds[type].includes(id)) {
+                deadIds[type].push(id);
+            }
+        }
+        for (let [type, ids] of Object.entries(deadIds)) {
+            for (let id of ids) {
+                this.deleteResource(type, id);
+            }
+        }
+        const newDirect = {};
+        for (let screen of screens) {
+            newDirect[screen] = this.direct[screen];
+        }
+        this.direct = newDirect;
+    }
+}
+
 class ImageResource {
 
     constructor(data) {
-        this.image = new Image();
+        this.id = null;
+        this.image = typeof Image != 'undefined' ? new Image() : {width: 100, height: 100, decode: () => Promise.resolve()};
         this.canvas = null;
-        if (data instanceof HTMLCanvasElement) {
+        if (typeof HTMLCanvasElement != 'undefined' && (data instanceof HTMLCanvasElement)) {
             this.canvas = {elem: data, ctx: data.getContext('2d')};
             data = this.getDataUrl();
         }
         this.image.src = data;
+        this.resolved = false;
+    }
+
+    setId(id) {
+        this.id = id;
+    }
+
+    getId() {
+        return this.id;
     }
 
     getCanvas() {
@@ -43,7 +180,7 @@ class ImageResource {
     }
 
     getNewDecodePromise() {
-        return this.image.decode();
+        return this.image.decode().then(result => {this.resolved = true; return result});
     }
 
     getDataUrl(format = 'png') {
@@ -53,22 +190,40 @@ class ImageResource {
     getImage() {
         return this.image;
     }
+
+    isResolved() {
+        return this.resolved;
+    }
 }
 
 class AudioResource {
 
     constructor(url, readyCallback = null) {
         this.audio = null;
+        this.id = null;
         this.promise = new Promise((resolve) => {
-            this.audio = new Audio(url);
-            this.audio.oncanplaythrough = () => {
+            if (typeof Audio == 'undefined') {
+                this.audio = {};
                 resolve();
-                if (readyCallback) {
-                    readyCallback();
+            } else {
+                this.audio = new Audio(url);
+                this.audio.oncanplaythrough = () => {
+                    resolve();
+                    if (readyCallback) {
+                        readyCallback();
+                    }
                 }
             }
         });
         this.lastAction = null;
+    }
+
+    setId(id) {
+        this.id = id;
+    }
+
+    getId() {
+        return this.id;
     }
 
     play(volume = 1, restart = true) {
@@ -127,9 +282,60 @@ class AudioResource {
 
 class StorageManager {
 
-    constructor(gameId = 'demo') {
+    constructor(storage, gameId = 'demo') {
+        this.storage = storage;
         this.prefix = gameId;
         this.active = this.isAvailable();
+        this.remotes = null;
+
+        this.dependencies = new ResourceDependencies(
+    () => (!this.getKeys().includes('direct')) ?
+                {} : JSON.parse(this.storage.getItem(this.prefix + ':direct')),
+  direct => {
+                this.storage.setItem(this.prefix + ':direct', JSON.stringify(direct));
+            },
+        () => (!this.getKeys().includes('indirect')) ?
+            {} : this.indirect = JSON.parse(this.storage.getItem(this.prefix + ':indirect')),
+            indirect => {
+                this.storage.setItem(this.prefix + ':indirect', JSON.stringify(indirect));
+            },
+            (type, id) => this.deleteResourceItem(type, id)
+        )
+    }
+
+    getRemotes() {
+        if (this.remotes === null) {
+            if (!this.getKeys().includes('remotes')) {
+                this.remotes = {};
+            } else {
+                this.remotes = JSON.parse(this.storage.getItem(this.prefix + ':remotes'));
+            }
+        }
+        return this.remotes;
+    }
+
+    setRemotes(remotes) {
+        this.remotes = remotes;
+    }
+
+    getScreenRemotes(screen) {
+        const remotes = this.getRemotes();
+        const resources = this.dependencies.getRelevantScreenResources(screen).found;
+        const result = [];
+        for (let resource of resources) {
+            if (remotes[resource]) {
+                for (let remote of remotes[resource]) {
+                    if (!result.includes(remote)) {
+                        result.push(remote);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    storeRemotes() {
+        this.storage.setItem(this.prefix + ':remotes', JSON.stringify(this.getRemotes()));
     }
 
     isQuotaExceededException(e) {
@@ -140,13 +346,13 @@ class StorageManager {
     }
 
     isAvailable() {
-        if (!localStorage) {
+        if (!this.storage) {
             return false;
         }
         try {
             const x = '__storage_test__';
-            localStorage.setItem(x, '1');
-            localStorage.removeItem(x);
+            this.storage.setItem(x, '1');
+            this.storage.removeItem(x);
             return true;
         } catch(e) {
             return e instanceof DOMException && !this.isQuotaExceededException(e) && (
@@ -162,8 +368,8 @@ class StorageManager {
         }
         const prefix = this.prefix + (type !== null ? ':' + type : '') + ':';
         const keys = [];
-        for(let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
+        for(let i = 0; i < this.storage.length; i++) {
+            const key = this.storage.key(i);
             if (key.startsWith(prefix)) {
                 keys.push(key.substring(prefix.length));
             }
@@ -188,7 +394,7 @@ class StorageManager {
             return false;
         }
         try {
-            localStorage.setItem(this.prefix + ':' + type + ':' + id, data);
+            this.storage.setItem(this.prefix + ':' + type + ':' + id, data);
             return true;
         } catch (e) {
             return false;
@@ -218,7 +424,15 @@ class StorageManager {
             return null;
         }
         try {
-            return localStorage.getItem(this.prefix + ':' + type + ':' + id);
+            const item = this.storage.getItem(this.prefix + ':' + type + ':' + id);
+            if (type === 'json') {
+                try {
+                    return JSON.parse(item);
+                } catch (e) {
+                    return null;
+                }
+            }
+            return item;
         } catch (e) {
             console.error(e);
             return null;
@@ -230,19 +444,21 @@ class StorageManager {
     }
 
     getJson(id) {
-        const json = this.getResource('json', id);
-        if (json === null) {
-            return null;
-        }
-        try {
-            return JSON.parse(json);
-        } catch (e) {
-            return null;
-        }
+        return this.getResource('json', id);
     }
 
     getAudio(id) {
         return this.getResource('audio', id)
+    }
+
+    truncate() {
+        const keys = this.getKeys();
+        for (let key of keys) {
+            this.storage.removeItem(this.prefix + ':' + key);
+        }
+        this.dependencies.truncate();
+        this.remotes = {};
+        return true;
     }
 
     deleteResources(type = null) {
@@ -258,11 +474,21 @@ class StorageManager {
         }
     }
 
+    deleteResourceItem(type, id) {
+        const resId = type + ':' + id;
+        this.storage.removeItem(this.prefix + ':' + resId);
+    }
+
     deleteResource(type, id) {
         if (!this.isAvailable()) {
             return false;
         }
-        localStorage.removeItem(this.prefix + ':' + type + ':' + id);
+        this.dependencies.deleteResource(type, id);
+        return true;
+    }
+
+    deleteScreenResource(screen, type, id) {
+        this.dependencies.deleteScreenResource(screen, type, id);
         return true;
     }
 
@@ -294,38 +520,54 @@ class StorageManager {
         return this.hasResource('audio', id)
     }
 
-    clearResources(types = null) {
-        if (!this.isAvailable()) {
-            return false;
-        }
-        types =
-            types === null ? ['image', 'json', 'audio'] :
-                (Array.isArray(types) ? types : [types]);
-        for (let type of types) {
-            const keys = this.getKeys(type);
-            for (let key of keys) {
-                this.deleteResource(type, key);
+    getAllScreenResources(screen) {
+        return getDeflatedResources(this.dependencies.getRelevantScreenResources(screen).found)
+    }
+
+    getDirectScreenResources(screen) {
+        return this.dependencies.getDirectScreenResources(screen);
+    }
+
+    storeScreenResource(screen, type, resource) {
+        this.dependencies.storeScreenResource(screen, type, resource)
+    }
+
+    storeResourceDependencies(indirect) {
+        this.dependencies.storeResourceDependencies(indirect);
+    }
+
+    getResourcesWithChildren() {
+        return Object.keys(this.dependencies.getIndirect());
+    }
+}
+
+class BackEndFetcher {
+    constructor(baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
+    fetch(name, json) {
+        return fetch(this.baseUrl + name, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(json)
+        }).then(response => {
+            if (!response.ok) {
+                console.error('failed...');
+                throw Error('BOOM!');
             }
-        }
-        return true;
-    }
-
-    clearImages() {
-        return this.clearResources('image');
-    }
-
-    clearJsons() {
-        return this.clearResources('json');
-    }
-
-    clearAudios() {
-        return this.clearResources('audio');
+            return response.json();
+        })
     }
 }
 
 class ResourceLoader {
 
-    constructor() {
+    constructor(fetcher, storage) {
+        this.fetcher = fetcher;
+        this.storage = storage;
         this.resources = {};
         this.image = {};
         this.json = {};
@@ -335,6 +577,7 @@ class ResourceLoader {
         this.permAudio = {};
         this.hasPermLoaded = false;
         this.source = new Map();
+        this.screen = new Map();
         this.hasLocal = new Set();
         this.hasExternal = new Set();
     }
@@ -348,16 +591,7 @@ class ResourceLoader {
     }
 
     clearBrowserResources() {
-        SM.deleteResources();
-/*
-        for(let [id, source] of this.source.entries()) {
-            if (source === 'browser') {
-                const [type, resourceId] = id.split(':');
-                SM.deleteResource(type, resourceId);
-            }
-        }
-
- */
+        this.storage.truncate();
     }
 
     hasLocalResource(type, id) {
@@ -422,17 +656,21 @@ class ResourceLoader {
         }
     }
 
-    setResource(type, id, value, source) {
+    setResource(type, id, value, source, screen = null) {
         if (!has(this.resources, type)) {
             this.resources[type] = {};
         }
         if (type === 'json' && typeof value === 'object') {
             value.id = id;
-        } else if (type === 'image') {
-            value.id = id;
+            value.__resolved = true;
+        } else {
+            value.setId(id);
         }
         this.resources[type][id] = value;
         this.source.set(type + ':' + id, source);
+        if (screen !== null) {
+            this.screen.set(type + ':' + id, screen);
+        }
         if (source === 'browser') {
             this.hasBrowserResource = true;
         }
@@ -443,16 +681,20 @@ class ResourceLoader {
         return this.source.get(id);
     }
 
+    getResourceScreen(id) {
+        return this.screen.get(id);
+    }
+
     updateImageResource(storage, img) {
         if (!(img instanceof ImageResource)) {
-            throw Error('XX');
+            throw Error(`Expected ImageResource object but got ${typeof img}!`);
         }
         if (!img.id) {
-            throw Error('Bowoew');
+            throw Error('No id given in ImageResource');
         }
         switch (storage) {
             case 'browser':
-                SM.storeImage(img.id, img.getDataUrl());
+                this.storage.storeImage(img.id, img.getDataUrl());
                 this.setResource('image', img.id, img, 'browser');
                 break;
         }
@@ -460,14 +702,18 @@ class ResourceLoader {
 
     updateJsonResource(storage, json) {
         if (!json.id) {
-            throw Error('##we');
+            throw Error('Missing id property in JSON resource!');
         }
         switch (storage) {
             case 'browser':
-                SM.storeJson(json.id, json);
+                this.storage.storeJson(json.id, json);
                 this.setResource('json', json.id, json, 'browser');
                 break;
         }
+    }
+
+    hasResource(type, id) {
+        return this.resources[type] !== undefined && this.resources[type][id] !== undefined
     }
 
     getResources(type = null) {
@@ -498,65 +744,89 @@ class ResourceLoader {
         throw Error(`Image resource "${id}" does not exists!`);
     }
 
-    hasBrowserResources() {
-        return SM.getKeys().length > 0;
+    getAudioResource(id) {
+        if (this.resources.audio[id] !== undefined) {
+            return this.resources.audio[id];
+        }
+        throw Error(`Audio resource "${id}" does not exists!`);
     }
 
-    makeImageResource(data) {
-        return new ImageResource(data);
+    hasBrowserResources() {
+        for (let key of this.storage.getKeys()) {
+            if (key.indexOf(':') !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    makeImageResource(data, id = null) {
+        const img = new ImageResource(data);
+        img.resolved = true;
+        img.id = id;
+        return img;
+    }
+
+    storeScreenResource(screen, config) {
+        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + config.id);
+        // TODO bad
+        config.getJson();
+        const resources = config.getResources();
+        for (let resource of resources.resources) {
+            switch(resource.type) {
+                case 'json':
+                    this.updateJsonResource('browser', resource.data);
+                    break;
+
+                case 'image':
+                    this.updateImageResource('browser', resource.data);
+                    break;
+
+                default:
+                    throw Error('TODO');
+            }
+        }
+        this.storage.storeScreenResource(screen, 'json', config.id);
+        this.storage.storeResourceDependencies(resources.dependencies);
+
+        const newResources = [];
+        for (let node of Object.keys(resources.dependencies)) {
+            newResources.push(node);
+            for (let target of resources.dependencies[node]) {
+                if (!newResources.includes(target)) {
+                    newResources.push(target);
+                }
+            }
+        }
+        for (let resource of oldResources) {
+            if (!newResources.includes(resource)) {
+                d('TODO: SAFE DELETE', resource);
+            }
+        }
     }
 
     deleteServerResources(resources) {
         if (resources.length === 0) {
             return Promise.resolve();
         }
-        return (
-            fetch('http://localhost:8080/delete', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    resources
-                })
-            }).then(response => {
-                if (!response.ok) {
-                    console.error('failed...');
-                    throw Error('BOOM!');
-                }
-                return response.json();
-            }).then(body => {
-                for (let resource of body.deleted) {
-                }
-                return body.deleted;
-            })
-        )
+        return this.fetcher.fetch(
+            'delete', {resources}
+        ).then(body => {
+            for (let resource of body.deleted) {}
+            return body.deleted;
+        });
     }
 
     checkServerResources(resources) {
-        return (
-            fetch('http://localhost:8080/has', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    resources
-                })
-            }).then(response => {
-                if (!response.ok) {
-                    console.error('failed...');
-                    throw Error('BOOM!');
-                }
-                return response.json();
-            }).then(body => {
+        return this.fetcher.fetch(
+            'has', {resources}
+        ).then(body => {
                 const found = [];
                 for (let item of body.found) {
                     found.push(item.type + ':' + item.id);
                 }
                 return found;
-            })
-        )
+        })
     }
 
     deployResources(resources) {
@@ -577,40 +847,58 @@ class ResourceLoader {
             return Promise.resolve();
         }
         return (
-            fetch('http://localhost:8080/store', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            this.fetcher.fetch('store', {
                     resources: overwrites
-                })
-            }).then(response => {
-                if (!response.ok) {
-                    console.error('failed...');
-                    throw Error('BOOM!');
-                }
-                return response.json();
             }).then(body => {
                 for (let resource of body.stored) {
-                    SM.deleteResource(resource.type, resource.id);
+                    const screen = this.getResourceScreen(resource.type + ':' + resource.id);
+                    this.storage.deleteScreenResource(screen, resource.type, resource.id);
                 }
                 return body;
             })
         );
     }
 
-    loadResources(images, jsons, audios) {
+    loadResources(images, jsons, audios, screen = '') {
+        const direct = this.storage.getAllScreenResources(screen);
+
+        for (let id of direct.json) {
+            if (jsons[id] === undefined) {
+                jsons[id] = null;
+            }
+        }
+        for (let id of direct.image) {
+            if (images[id] === undefined) {
+                images[id] = null;
+            }
+        }
+        for (let id of direct.audio) {
+            if (audios[id] === undefined) {
+                audios[id] = null;
+            }
+        }
+
+        const resolved = flattenResources(direct);
+/*
+WHY ????
+        const resourcesWithChildren = this.storage.getResourcesWithChildren();
+
+        for(let resource of resourcesWithChildren) {
+            if (!resolved.includes(resource)) {
+                resolved.push(resource);
+            }
+        }
+*/
         const promises = [];
         const fetchResources = [];
-        const storedImageIds = SM.getImageIds();
+        const storedImageIds = this.storage.getImageIds();
         each(images,(value, id) => {
             if (has(storedImageIds, id)) {
-                const value = SM.getImage(id);
+                const value = this.storage.getImage(id);
                 const image = new ImageResource(value);
                 promises.push(
                     image.getNewDecodePromise().then(() => {
-                        this.setResource('image', id, image, 'browser');
+                        this.setResource('image', id, image, 'browser', screen);
                     })
                 );
             } else {
@@ -626,7 +914,7 @@ class ResourceLoader {
                                     response.blob().then(blob => {
                                         const resource = new ImageResource(URL.createObjectURL(blob));
                                         return resource.getNewDecodePromise().then(() => {
-                                            this.setResource('image', id, resource, 'external');
+                                            this.setResource('image', id, resource, 'external', screen);
                                         });
                                     })
                                 )
@@ -639,13 +927,13 @@ class ResourceLoader {
             }
         });
 
-        const storedAudioIds = SM.getAudioIds();
+        const storedAudioIds = this.storage.getAudioIds();
         each(audios, (value, id) => {
             if (has(storedAudioIds, id)) {
-                const audio = new AudioResource(SM.getAudio(id));
+                const audio = new AudioResource(this.storage.getAudio(id));
                 promises.push(
                     audio.getNewLoadingPromise().then(() => {
-                        this.setResource('audio', id, audio, 'browser');
+                        this.setResource('audio', id, audio, 'browser', screen);
                     })
                 );
             } else {
@@ -661,7 +949,7 @@ class ResourceLoader {
                                     response.blob().then(blob => {
                                         const resource = new AudioResource(URL.createObjectURL(blob));
                                         return resource.getNewLoadingPromise().then(() => {
-                                            this.setResource('audio', id, resource, 'external');
+                                            this.setResource('audio', id, resource, 'external', screen);
                                         });
                                     })
                                 )
@@ -675,10 +963,10 @@ class ResourceLoader {
         });
 
         // do the same for jsons
-        const storedJsonIds = SM.getJsonIds();
+        const storedJsonIds = this.storage.getJsonIds();
         each(jsons,(value, id) => {
             if (has(storedJsonIds, id)) {
-                this.setResource('json', id, SM.getJson(id), 'browser');
+                this.setResource('json', id, this.storage.getJson(id), 'browser', screen);
                 promises.push(
                     Promise.resolve()
                 );
@@ -689,22 +977,21 @@ class ResourceLoader {
         });
 
         // load ids from server
-        if (has(fetchResources)) {
+//        if (has(fetchResources)) {
+/*
+            const remotes = this.storage.getScreenRemotes(screen);
+            for(let remote of remotes) {
+                const [type, id] = remote.split(':');
+                fetchResources.push({type, id});
+            }
+*/
             promises.push(
-                fetch('http://localhost:8080/resources', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        resources: fetchResources
-                    })
-                }).then(response => {
-                    if (!response.ok) {
-                        console.error('failed...');
-                        throw Error('BOOM!');
-                    }
-                    return response.json();
+                this.fetcher.fetch('resources', {
+                    resources: fetchResources,
+                    screen,
+                    resolved,
+                    overwrites: this.storage.dependencies.getIndirect(),
+                    remotes: this.storage.getScreenRemotes(screen)
                 }).then(body => {
                     const subPromises = [];
                     for (let resource of body.found) {
@@ -716,7 +1003,7 @@ class ResourceLoader {
                                 const image = new ImageResource(resource.data);
                                 subPromises.push(
                                     image.getNewDecodePromise().then(() => {
-                                        this.setResource(resource.type, resource.id, image, 'server');
+                                        this.setResource(resource.type, resource.id, image, 'server', screen);
                                     })
                                 );
                                 break;
@@ -725,56 +1012,68 @@ class ResourceLoader {
                                 const audio = new AudioResource(resource.data);
                                 subPromises.push(
                                     audio.getNewLoadingPromise().then(() =>{
-                                        this.setResource(resource.type, resource.id, audio, 'server');
+                                        this.setResource(resource.type, resource.id, audio, 'server', screen);
                                     })
                                 );
                                 break;
 
                             case 'json':
-                                this.setResource('json', resource.id, resource.data, 'server');
+                                this.setResource('json', resource.id, resource.data, 'server', screen);
                                 break;
                         }
                     }
 
                     for (let resource of body.notFound) {
-                        let value = null;
-                        switch(resource.type) {
-                            case 'json':
-                                value = jsons[resource.id];
-                                break;
-
-                            case 'image':
-                                value = images[resource.id];
-                                break;
-
-                            case 'audio':
-                                value = audios[resource.id];
-                                break;
-                        }
-                        if (value === null) {
-                            throw Error(`Missing remote ${resource.type} resource ${resource.id}`);
-                        }
-                        if (resource.type === 'image') {
-                            const image = new ImageResource(value);
-                            subPromises.push(
-                                image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'code');
-                                })
+                        if (this.storage.hasResource(resource.type, resource.id)) {
+                            this.setResource(
+                                resource.type,
+                                resource.id,
+                                this.storage.getResource(resource.type, resource.id),
+                                'browser',
+                                screen
                             );
-                        } else if (resource.type === 'audio') {
-                            const audio = new AudioResource(value);
-                            subPromises.push(
-                                audio.getNewLoadingPromise().then(() => {
-                                    this.setResource(resource.type, resource.id, audio, 'code');
-                                })
-                            );
+                        } else {
+                            let value = null;
+                            switch(resource.type) {
+                                case 'json':
+                                    value = jsons[resource.id];
+                                    break;
+
+                                case 'image':
+                                    value = images[resource.id];
+                                    break;
+
+                                case 'audio':
+                                    value = audios[resource.id];
+                                    break;
+                            }
+                            if (value === null) {
+                                throw Error(`Missing remote ${resource.type} resource ${resource.id}`);
+                            }
+                            if (resource.type === 'image') {
+                                const image = new ImageResource(value);
+                                subPromises.push(
+                                    image.getNewDecodePromise().then(() => {
+                                        this.setResource(resource.type, resource.id, image, 'code', screen);
+                                    })
+                                );
+                                continue;
+                            } else if (resource.type === 'audio') {
+                                const audio = new AudioResource(value);
+                                subPromises.push(
+                                    audio.getNewLoadingPromise().then(() => {
+                                        this.setResource(resource.type, resource.id, audio, 'code', screen);
+                                    })
+                                );
+                                continue;
+                            }
+                            this.setResource(resource.type, resource.id, value, 'code', screen);
                         }
-                        this.setResource(resource.type, resource.id, value, 'code');
                     }
                     return Promise.all(subPromises);
                 })
             )
-        }
+ //       }
 
         return Promise.all(promises).then(() => {
             return this.resources;
@@ -789,28 +1088,80 @@ class ResourceLoader {
         });
     }
 
-    load() {
+    load(screen) {
         const promise = this.hasPermLoaded ? Promise.resolve() : this.loadPermanentResources(this.permImage, this.permJson, this.permAudio);
         return promise.then(() => this.loadResources(
-            this.image, this.json, this.audio
+            this.image, this.json, this.audio, screen
         ));
     }
 }
 
-const SM = new StorageManager();
-const RL = new ResourceLoader();
+let SM = null;
+let RL = null;
 
 class Config {
+
     constructor(json) {
-        if (typeof json === 'string') {
-           json = RL.getJsonResource(json);
-           this.parse(json);
-        } else if (json !== undefined) {
-            if (typeof json !== 'object') {
-                throw 'Config must be instantiated with a JSON or an JSON resource id!';
-            }
-            this.parse(json);
+        if (typeof json !== 'object') {
+            throw Error('Config must be instantiated with a JSON!');
         }
+        this.resolved = false;
+        this.parse({...this.getDefaults(), ...json});
+    }
+
+    getRebuildJson(deep = true) {
+        if (!this.isResolved()) {
+            throw Error('Config was not yet build!');
+        }
+        return this.addRebuildProps({id: this.id}, deep);
+    }
+
+    addRebuildProps(obj, deep) {
+        return obj;
+    }
+
+    getResources() {
+        const result = {
+            resources: [],
+            dependencies: {}
+        };
+        this.addResources(result, this.id);
+        return result;
+    }
+
+    addResources(result) {
+        result.resources.push({
+            id: this.id,
+            type: 'json',
+            data: this.getRebuildJson(false)
+        });
+        result.dependencies['json:' + this.id] = [];
+        this.addSubResources(result);
+    };
+
+    addSubResources(result) {
+        const deps = this.getSubResources();
+        for (let dep of deps) {
+            const sourceId = 'json:' + this.id;
+            const targetId = dep.type + ':' + dep.id;
+            if (!result.dependencies[sourceId].includes(targetId)) {
+                result.dependencies[sourceId].push(targetId);
+            }
+            if (dep.type === 'json') {
+                dep.data.config.addResources(result);
+            } else {
+                result.resources.push(dep);
+            }
+        }
+        return result
+    }
+
+    getSubResources() {
+        return [];
+    }
+
+    getDefaults() {
+        return {};
     }
 
     validateInt(value, props = {}) {
@@ -867,6 +1218,42 @@ class Config {
         return value;
     }
 
+    validateJsonResource(value, props = {}) {
+        if (value === undefined) {
+            throw Error('Undefined value');
+        }
+        let id = null;
+        if (typeof value === 'string') {
+            id = value;
+        } else if (typeof value === 'object') {
+            id = value.id;
+        }
+        if (id && RL.hasResource('json', id)) {
+            value = RL.getJsonResource(value);
+        }
+        if (!(typeof value !== 'object')) {
+            throw Error('value is no JSON object!');
+        }
+        if (!value.__resolved) {
+            throw Error(`JSON resource "${value.id}" not yet resolved, must be registered first!`);
+        }
+        return value;
+    }
+
+    validateJsonResources(values, props = {}) {
+        if (values === undefined) {
+            throw Error('Undefined value');
+        }
+        if (!Array.isArray(values)) {
+            throw Error(`Expected array of json resources but got ${typeof values}`);
+        }
+        const result = [];
+        for (let value of values) {
+            result.push(this.validateJsonResource(value));
+        }
+        return result;
+    }
+
     validateImageResource(value, props = {}) {
         if (value === undefined) {
             throw Error('Undefined value');
@@ -877,7 +1264,24 @@ class Config {
         if (!(value instanceof ImageResource)) {
             throw Error('value is no image resource!');
         }
+        if (!value.isResolved()) {
+            throw Error(`ImageResource "${value.id}" not yet resolved, must be registered first!`);
+        }
         return value;
+    }
+
+    validateImageResources(values, props = {}) {
+        if (values === undefined) {
+            throw Error('Undefined value');
+        }
+        if (!Array.isArray(values)) {
+            throw Error(`Expected array of image resources but got ${typeof values}`);
+        }
+        const result = [];
+        for (let value of values) {
+            result.push(this.validateImageResource(value));
+        }
+        return result;
     }
 
     validateObject(value, props = {}) {
@@ -900,6 +1304,40 @@ class Config {
         return value;
     }
 
+    validateConfigs(config, values) {
+        if (values === undefined) {
+            throw Error('Undefined value');
+        }
+        if (!Array.isArray(values)) {
+            throw Error('value must be an array of ');
+        }
+        const result = [];
+        for (let value of values) {
+            result.push(this.validateConfig(config, value));
+        }
+        return result;
+    }
+
+    validateConfig(config, value) {
+        if (typeof value === 'string') {
+            value = RL.getJsonResource(value);
+        }
+        if (!(value instanceof config)) {
+            if (typeof value === 'object') {
+                if (!(value instanceof config.Config)) {
+                    value = new config.Config(value);
+                }
+            }
+            if (value instanceof config.Config) {
+                value = new config(value);
+            }
+            if (!(value instanceof config)) {
+                throw Error('YYY');
+            }
+        }
+        return value;
+    }
+
     validateId(value) {
         if (value == undefined) {
             throw Error('config requires an id property');
@@ -908,8 +1346,8 @@ class Config {
             throw Error('id must be a string');
         }
 
-        if (!(/^[0-9_a-z]+$/i).test(value)) {
-            throw Error('unallowed characters in id');
+        if (!isValidResourceId('json', value)) {
+            throw Error('Invalid id for json resource');
         }
         return value;
     }
@@ -937,28 +1375,51 @@ class Config {
         return Object.freeze(obj);
     }
 
-    exists(keys = []) {
+    resolve() {
+        if (this['id'] === undefined) {
+            throw Error(`Missing key "id" in config`);
+        }
+        this.resolved = true;
         if (!Object.isFrozen(this)) {
             this.freezeDeep(this);
         }
-        keys.push('id');
-        for(let key of keys) {
-            if (this[key] === undefined) {
-                throw Error(`Missing key "${key}" in config`);
-            }
-        }
+    }
+
+    getType() {
+        return 'Conf';
     }
 
     applyTo(obj) {
+        this.resolve();
+        obj.id = this.id;
         return obj;
     }
 
     getJson() {
-        return this.applyTo({});
+        const obj = this.applyTo({});
+        obj.__type = Object.getPrototypeOf(this);
+        return obj;
+    }
+
+    isResolved() {
+        return this.resolved;
     }
 }
 
 class FontMapConfig extends Config {
+
+    getDefaults() {
+        return {
+            width: 8,
+            height: 8,
+            map: {}
+        }
+    }
+
+    getType() {
+        return FontMapConfig.__type;
+    }
+
     setWidth(width) {
         this.width = this.validateInt(width, {min: 1, max: 256});
     }
@@ -1014,16 +1475,118 @@ class FontMapConfig extends Config {
         }
     }
 
-    applyTo(obj) {
-        super.exists(['width', 'height', 'image']);
-        obj.id = this.id;
+    getSubResources() {
+        return [{id: this.image.id, type: 'image', data: this.image}];
+    }
+
+    addRebuildProps(obj, deep) {
         obj.width = this.width;
         obj.height = this.height;
-        obj.image = this.image;
-        obj.map = this.map ? {...this.map} : {};
+        obj.image = deep ? this.image : this.image.id;
+        obj.map = {...this.map};
 
         return obj;
     }
+
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.width = this.width;
+        obj.height = this.height;
+        obj.image = this.image;
+        obj.map = {...this.map};
+
+        return obj;
+    }
+}
+FontMapConfig.__type = 'FontMap';
+
+class TextPaneConfig extends Config {
+    getType() {
+        return TextPaneConfig.__type;
+    }
+
+    getSubResources() {
+        const result = [];
+        for (let item of this.fonts) {
+            result.push({
+                id: item.id,
+                type: 'json',
+                data: item
+            });
+        }
+        return result;
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.fonts = [];
+        if (this.fonts) {
+            for(let font of this.fonts) {
+                obj.fonts.push(deep ? font.config.getRebuildJson(true) : font.config.id);
+            }
+        }
+        return obj;
+    }
+
+    setFonts(fonts) {
+        this.fonts = this.validateConfigs(FontMap, fonts);
+    }
+
+    addFont(font) {
+        if (!this.fonts) {
+            this.fonts = [];
+        }
+        this.fonts.push(this.validateConfig(FontMap, font));
+    }
+
+    getDefaults() {
+        return {
+            fonts: []
+        };
+    }
+
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.fonts = this.fonts;
+        return obj;
+    }
+}
+TextPaneConfig.__type = 'TextPane';
+TextPaneConfig.deps = {
+    font: FontMapConfig
+};
+
+function getConfigFromInput(configCls, input) {
+    let id = null;
+    let confJson = null;
+    let conf = input;
+
+    if (typeof input === 'string') {
+        id = input;
+    } else if (input instanceof configCls) {
+/*
+        TODO check if we need this
+
+        if (!input.isResolved()) {
+            d('NOT RESOLVED', input.id, input);
+            id = input.id;
+        }
+ */
+    } else {
+        confJson = input;
+        if (!input.__resolved) {
+            id = input.id;
+        }
+    }
+    if (id && RL.hasResource('json', id)) {
+        confJson = RL.getJsonResource(id);
+    }
+    if (confJson !== null) {
+        conf = new configCls(confJson);
+    }
+    if (!(conf instanceof configCls)) {
+        throw Error('Invalid');
+    }
+    return conf;
 }
 
 class stateProxyHandler {
@@ -1098,6 +1661,7 @@ function getNewStateObj() {
 }
 
 class ResourceRequest {
+
     constructor(permanent = false) {
         this.permament = permanent;
     }
@@ -1157,6 +1721,9 @@ class Game {
             throw new Error('There is already a running game instance!');
         }
         Game.instance = this;
+        SM = new StorageManager(localStorage);
+        RL = new ResourceLoader(new BackEndFetcher('http://localhost:8080/'), SM);
+
         this.width = width;
         this.height = height;
         this.init = init.bind(this);
@@ -1390,8 +1957,20 @@ class Game {
                     for (let pane of area.panes) {
                         if (pane.tilesMap) {
                             resources.push({type: 'tilesMap', data: pane.tilesMap});
-                        } else if (pane.font) {
-                            resources.push({type: 'fontMap', config: FontMapConfig, data: pane.font.config});
+                        } else if (pane instanceof TextPane) {
+                            const blocks = [];
+                            for (let id in pane.blocks) {
+                                blocks.push({...pane.blocks[id], id});
+                            }
+                            resources.push(
+                                {
+                                    type: 'TextPane',
+                                    id: pane.id,
+                                    config: TextPaneConfig,
+                                    data: pane,
+                                    dim: pane.viewPortDim,
+                                    blocks
+                                });
                         } else if (pane.spriteSheet) {
                             resources.push({type: 'spriteSheet', data: pane.spriteSheet});
                         }
@@ -2126,7 +2705,7 @@ class Screen {
         if (this.initHandler !== null) {
             this.state = 'INIT';
             const build = this.initHandler(params);
-            RL.load().then((res) => {
+            RL.load(this.id).then((res) => {
                 this.hasDependencies = true;
             });
             return build;
@@ -2533,11 +3112,21 @@ class ColorPane {
  */
 class TextPane {
 
+    constructor(input) {
+        const config = getConfigFromInput(TextPane.Config, input);
+        config.applyTo(this);
+        this.config = config;
+        this.blocks = {};
+        this.lineSpacing = 0;
+    }
+
+    /*
     constructor(font) {
         this.font = font;
         this.blocks = {};
         this.lineSpacing = 0;
     }
+     */
 
     init(viewPortDimX, viewPortDimY) {
         this.viewPortDim = {
@@ -2565,8 +3154,8 @@ class TextPane {
         let parts = block.text.split("\n");
         let y = 0;
         for (let part of parts) {
-            this.font.drawTextLine(ctx, part, 0, y);
-            y += this.font.height + block.lineSpacing;
+            this.fonts[0].drawTextLine(ctx, part, 0, y);
+            y += this.fonts[0].height + block.lineSpacing;
         }
     }
 
@@ -2576,9 +3165,9 @@ class TextPane {
         const lines = text.split('\n');
         for (let line of lines) {
             width = Math.max(width, line.length);
-            height += this.font.height;
+            height += this.fonts[0].height;
         }
-        width *= this.font.width;
+        width *= this.fonts[0].width;
         height += lineSpacing * lines.length;
 
         const canvas = OCM.getNewOffscreenCanvas(width, height);
@@ -2628,6 +3217,7 @@ class TextPane {
         return value;
     }
 }
+TextPane.Config = TextPaneConfig;
 
 /**
  * TODO:
@@ -6112,13 +6702,10 @@ class TilesMap {
 }
 
 class FontMap {
-    constructor(configOrJson) {
-
-        if (!(configOrJson instanceof FontMap.Config)) {
-            configOrJson = new FontMap.Config(configOrJson);
-        }
-        configOrJson.applyTo(this);
-        this.config = configOrJson;
+    constructor(input) {
+        const config = getConfigFromInput(FontMap.Config, input);
+        config.applyTo(this);
+        this.config = config;
         this.image = this.image.getCanvasElem();
     }
 
@@ -7636,6 +8223,9 @@ module.exports = {
     SpriteAndTilesCollider,
     ObjectController,
     InputController,
+    ResourceLoader,
+    DependencyManager,
+    StorageManager,
     Position,
     Animation: BitmapPlayer,
     d,

@@ -887,6 +887,10 @@ class FontCharIndexProvider extends CellProvider {
         return canvas;
     }
 
+    getFontMapConfig(id) {
+
+    }
+
     getFontMapJson(id) {
         const json = {
             id,

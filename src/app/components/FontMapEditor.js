@@ -5,6 +5,7 @@ import {
     useModal,
     useKeyListener,
     useEntity,
+    useUniqueResourceId,
     ItemsStack,
     Page,
     Section,
@@ -34,7 +35,7 @@ import {
     GlobalContext
 } from "./BaseComponents";
 
-import {d, getItemsCloneWithUpdatedItem, rgb2hex} from '../helper/helper';
+import {d, getItemsCloneWithUpdatedItem, getCanvasForDim, rgb2hex, getIdToItems} from '../helper/helper';
 
 import {
     EditorCtx,
@@ -867,7 +868,7 @@ function BlockProperties(props) {
 
     const fontOptions = [];
     for (let id in fonts) {
-        fontOptions.push({id, name: fonts[id].name});
+        fontOptions.push({id, name: fonts[id].id});
     }
 
     return (
@@ -918,8 +919,8 @@ function FontPreview(props) {
     const [active, setActive] = useState(0);
     const [zoom, setZoomRaw] = useState(2);
     const [bgColor, setBgColor] = useState('#000000');
-    const [screenX, setScreenX] = useState(320);
-    const [screenY, setScreenY] = useState(200);
+    const [screenX, setScreenX] = useState(props.dim.x);
+    const [screenY, setScreenY] = useState(props.dim.y);
     const [showMarker, setShowMarker] = useState(false);
     const {blocks, setBlocks, defaultBlock} = props;
 
@@ -1297,8 +1298,8 @@ function FontPreview(props) {
 function ResizeFontForm(props) {
     const eContext = useContext(EditorContext);
     const context = useContext(GlobalContext);
-    const [width, setWidth] = useState(props.font.fontMap.width);
-    const [height, setHeight] = useState(props.font.fontMap.height);
+    const [width, setWidth] = useState(props.font.width);
+    const [height, setHeight] = useState(props.font.height);
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
     const overlayRef = useRef(null);
@@ -1330,11 +1331,11 @@ function ResizeFontForm(props) {
         changes.offsetY = changes.offsetY !== undefined ? changes.offsetY : offsetY;
 
         if (changes.width !== width) {
-            changes.offsetX = Math.min(changes.offsetX, Math.abs(changes.width - props.font.fontMap.width));
+            changes.offsetX = Math.min(changes.offsetX, Math.abs(changes.width - props.font.width));
             setWidth(changes.width);
         }
         if (changes.height !== height) {
-            changes.offsetY = Math.min(changes.offsetY, Math.abs(changes.height - props.font.fontMap.height));
+            changes.offsetY = Math.min(changes.offsetY, Math.abs(changes.height - props.font.height));
             setHeight(changes.height);
         }
         if (changes.offsetX !== offsetX) {
@@ -1345,13 +1346,13 @@ function ResizeFontForm(props) {
         }
     };
 
-    const maxOffsetX = Math.abs(width - props.font.fontMap.width);
-    const maxOffsetY = Math.abs(height - props.font.fontMap.height);
+    const maxOffsetX = Math.abs(width - props.font.width);
+    const maxOffsetY = Math.abs(height - props.font.height);
 
     propsRef.current = {offsetX, offsetY, maxOffsetX, maxOffsetY, setState};
 
-    const previewWidth = Math.max(width, props.font.fontMap.width);
-    const previewHeight = Math.max(height, props.font.fontMap.height);
+    const previewWidth = Math.max(width, props.font.width);
+    const previewHeight = Math.max(height, props.font.height);
 
     const provider = new BitmapCellProvider(4);
     const map = [];
@@ -1439,8 +1440,8 @@ function ResizeFontForm(props) {
                 </SelectDimModal.render>
                 <PropertyGrid>
                     <DimProp name="Old Size:" buttons readOnly
-                             x={props.font.fontMap.width}
-                             y={props.font.fontMap.height} />
+                             x={props.font.width}
+                             y={props.font.height} />
                     <PropLabel name="New Size:">
                         <Stack>
                             <Dim buttons min={1} max={128}
@@ -1479,8 +1480,8 @@ function ResizeFontForm(props) {
                                             highlight={true}
                                             posX={offsetX}
                                             posY={offsetY}
-                                            width={Math.min(width, props.font.fontMap.width)}
-                                            height={Math.min(height, props.font.fontMap.height)}
+                                            width={Math.min(width, props.font.width)}
+                                            height={Math.min(height, props.font.height)}
                                             top={true}
                                             bottom={true}
                                             left={true}
@@ -1509,9 +1510,9 @@ function ResizeFontForm(props) {
 
 function NewFontForm(props) {
     const context = useContext(GlobalContext);
-    const [width, setWidth] = useState(8);
-    const [height, setHeight] = useState(8);
-    const [name, setName] = useState('Font');
+    const [width, setWidth] = useState(props.defaults.width);
+    const [height, setHeight] = useState(props.defaults.height);
+    const [id, setId] = useState(props.defaults.id);
     const SelectDimModal = useModal();
 
     const selectDim = () => {
@@ -1536,7 +1537,7 @@ function NewFontForm(props) {
         <Stack vertical border>
             <Content padded>
                 <PropertyGrid>
-                    <TextFieldProp name="Name:" value={name} set={value => setName(value)} size={20} />
+                    <TextFieldProp name="Id:" value={id} set={value => setId(value)} size={20} />
                     <PropLabel name="Size:">
                         <Stack>
                             <Dim buttons min={1} max={128} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
@@ -1560,7 +1561,7 @@ function NewFontForm(props) {
             <Content padded>
                 <Stack>
                     <button onClick={() => {
-                        props.save({width, height, name});
+                        props.save({width, height, id});
                     }}>Save</button>
                     <button onClick={props.hide}>Cancel</button>
                 </Stack>
@@ -1572,16 +1573,23 @@ function NewFontForm(props) {
 function FontMapEditor(props) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
-    const [active, setActive] = useState(0);
-    const FontEntity = useEntity('font', {
-        name: 'New font', fontMap: null
-    });
+
+    const ResizeFontModal = useModal();
+    const NewFontModal = useModal();
+
     const [fonts, setFonts] = useState(() => {
-        const fontMap =  props.fontMap.getJson();
-        return [
-            FontEntity.getNew({name: 'TextPane Font', fontMap})
-        ]
+        const fonts = [];
+        for (let font of props.resource.data.fonts) {
+            // TODO: hier das ist eine Schwachstelle, eigentlich würden
+            // wir hier eher die font.config.config brauchen
+            fonts.push(font.config.getJson());
+        }
+        return fonts;
     });
+    const [active, setActive] = useState(fonts.length > 0 ? 0 : null);
+    const getNewFontUid = useUniqueResourceId(props.resource.id + '_font', fonts);
+
+    // TODO initialisiere mit Textblöcken, die beim Aufruf des Editors aktiv waren
     const TextBlockEntity = useEntity('block', {
         name: 'New block',
         posX: 0,
@@ -1594,21 +1602,74 @@ function FontMapEditor(props) {
         autoCenterY: false,
         rasterize: false
     });
+    TextBlockEntity.setDefaults({font: fonts[0].id});
+    const [blocks, setBlocks] = useState(() => {
+        const items = [];
+        for(let item of props.resource.blocks) {
+            const obj = {
+                name: item.id,
+                text: item.text,
+                posX: item.x,
+                posY: item.y,
+                filters: item.filter
+            };
+            items.push(TextBlockEntity.getNew(obj));
+        }
+        return items;
+    });
+    const id2Font = getIdToItems(fonts);
+    const currFont = fonts[active];
+
+    for (let font of fonts) {
+        if (!font.provider) {
+            font.provider = new FontCharIndexProvider(font);
+        }
+    }
+
+    // TODO: should be a state variable because the resources are dynamic
+    const info = [];
+    for (let resource of props.info) {
+        info.push(`${resource.name}: "${resource.id}" [${resource.source}]`);
+    }
+
+    const newFont = () => {
+        const defaultConfig = new props.resource.config.deps.font({});
+        const defaults = {...defaultConfig.getDefaults(), id: getNewFontUid()};
+        NewFontModal.show({
+            defaults,
+            save: item => {
+                const fontConfig = new props.resource.config.deps.font(item);
+                const img =
+                    context.resourceLoader.makeImageResource(
+                        getCanvasForDim(item.width, item.height),
+                        item.id + '_image'
+                    );
+                fontConfig.setImage(img);
+                setFonts([...fonts, fontConfig.getJson()]);
+                setActive(fonts.length);
+                NewFontModal.hide();
+            }
+        });
+    };
 
     const saveFonts = () => {
-        const resourceLoader = context.game.getResourceLoader();
+        const config = new props.resource.config({id: props.resource.data.id});
         for (let font of fonts) {
-            const image = resourceLoader.makeImageResource(font.provider.getFontMapImage());
-            image.id = font.fontMap.image.id;
-            resourceLoader.updateImageResource('browser', image);
-            const json = font.provider.getFontMapJson(font.fontMap.id);
-            json.image = image.id;
-            resourceLoader.updateJsonResource('browser', json);
+            const image = context.resourceLoader.makeImageResource(font.provider.getFontMapImage());
+            image.id = font.image.id;
+            const json = font.provider.getFontMapJson(font.id);
+            json.image = image;
+            config.addFont(json);
         }
+        context.resourceLoader.storeScreenResource(context.game.currentScreen, config);
+
         eContext.updateRestorePos();
+        props.resource.data = null;
         props.update();
     };
 
+    // TODO das hier können allgemeiner Abhandeln, da resource.conf.getResources()
+    // eigentlich schon alle infos für den Code-Export liefert
     const getResourceDef = (type, id, value) => {
         if (type === 'image') {
             value = '"' + value + '"';
@@ -1620,65 +1681,32 @@ function FontMapEditor(props) {
     };
 
     const exportFonts = () => {
-        const resourceLoader = context.game.getResourceLoader();
-        const exportLines = [];
+
+        const paneConf = new props.resource.config({id: props.resource.id});
         for (let font of fonts) {
-            const image = resourceLoader.makeImageResource(font.provider.getFontMapImage());
-            exportLines.push(getResourceDef('image', font.fontMap.image.id, image.getDataUrl()));
-            exportLines.push(getResourceDef('json', font.fontMap.id, font.provider.getFontMapJson(font.fontMap.id)));
+            const image = context.resourceLoader.makeImageResource(font.provider.getFontMapImage(), font.image.id);
+            const fontMap =
+                new props.resource.config.deps.font({
+                    id: font.id,
+                    width: font.width,
+                    height: font.height,
+                    map: font.provider.getFontMapJson(font.id).map,
+                    image
+                });
+            paneConf.addFont(fontMap);
+        }
+        paneConf.resolve();
+        const resources = paneConf.getResources();
+        const exportLines = [];
+        for (let resource of resources.resources.reverse()) {
+            const data = resource.type === 'image' ? resource.data.getDataUrl() : resource.data;
+            exportLines.push(getResourceDef(resource.type, resource.id, data));
         }
         props.export(exportLines);
     };
 
     const deployFonts = () => {
         props.deploy();
-    };
-
-    const actions = (
-        <Fragment>
-            <button onClick={props.cancel}>Back</button>
-            <button onClick={props.revert}>Revert</button>
-            <button onClick={saveFonts} disabled={eContext.hasStorePos()}>Save</button>
-            <button onClick={deployFonts} disabled={!eContext.hasStorePos()}>Deploy</button>
-            <button onClick={exportFonts}>Export</button>
-            <button onClick={props.play}>Play</button>
-        </Fragment>
-    );
-    TextBlockEntity.setDefaults({font: fonts[0].id});
-    const [blocks, setBlocks] = useState(() => {
-        return [
-            TextBlockEntity.getNew({name: 'Demo text'})
-        ]
-    });
-    const id2Font = FontEntity.id2Items(fonts);
-    const currFont = fonts[active];
-
-    const ResizeFontModal = useModal();
-    const NewFontModal = useModal();
-    for (let font of fonts) {
-        if (!font.provider) {
-            font.provider = new FontCharIndexProvider(font.fontMap);
-        }
-    }
-
-    const newFont = () => {
-        NewFontModal.show({
-            save: (item) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = item.width;
-                canvas.height = item.height;
-                // TODO
-                const fontMap = {
-                    width: item.width,
-                    image: canvas,
-                    height: item.height,
-                    map: {}
-                };
-                setFonts([...fonts, FontEntity.getNew({name: item.name, fontMap})]);
-                setActive(fonts.length);
-                NewFontModal.hide();
-            }
-        });
     };
 
     function getFontProps(index) {
@@ -1688,16 +1716,17 @@ function FontMapEditor(props) {
             ResizeFontModal.show({
                 font: editFont,
                 save: (resize) => {
-                    const canvas = document.createElement('canvas');
                     const iMax = editFont.provider.getMaxIndex();
-                    canvas.width = resize.width * editFont.provider.getMaxIndex();
-                    canvas.height = resize.height;
-                    const targetWidth = Math.min(resize.width, editFont.fontMap.width);
-                    const targetHeight = Math.min(resize.height, editFont.fontMap.height);
-                    const sourceOffsetX = resize.width < editFont.fontMap.width ? resize.offsetX : 0;
-                    const sourceOffsetY = resize.height < editFont.fontMap.height ? resize.offsetY : 0;
-                    const targetOffsetX = resize.width > editFont.fontMap.width ? resize.offsetX : 0;
-                    const targetOffsetY = resize.height > editFont.fontMap.height ? resize.offsetY : 0;
+                    const canvas = getCanvasForDim(
+                    resize.width * editFont.provider.getMaxIndex(),
+                        resize.height
+                    );
+                    const targetWidth = Math.min(resize.width, editFont.width);
+                    const targetHeight = Math.min(resize.height, editFont.height);
+                    const sourceOffsetX = resize.width < editFont.width ? resize.offsetX : 0;
+                    const sourceOffsetY = resize.height < editFont.height ? resize.offsetY : 0;
+                    const targetOffsetX = resize.width > editFont.width ? resize.offsetX : 0;
+                    const targetOffsetY = resize.height > editFont.height ? resize.offsetY : 0;
 
                     const ctx = canvas.getContext('2d');
                     const map = {};
@@ -1715,16 +1744,12 @@ function FontMapEditor(props) {
                         );
                         map[editFont.provider.getCharAtIndex(i)] = {x: i*resize.width, y: 0};
                     }
-                    const doFontMap = {
+                    const doFont = {
+                        id: editFont.id,
                         height: resize.height,
                         width: resize.width,
                         map,
-                        image: canvas
-                    };
-                    const doFont = {
-                        id: editFont.id,
-                        name: editFont.name,
-                        fontMap: doFontMap,
+                        image: context.resourceLoader.makeImageResource(canvas, editFont.image.id),
                         provider: null
                     };
                     const newFonts = [...fonts];
@@ -1741,12 +1766,13 @@ function FontMapEditor(props) {
         return (
             <PropertyGrid>
                 <TextFieldProp
-                    name="Name:"
-                    value={editFont.name}
-                    set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {name: value}))} />
+                    name="ID:"
+                    value={editFont.id}
+                    readOnly
+                    set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {id: value}))} />
                 <PropLabel name="Size:">
                     <Stack>
-                        <Dim x={editFont.fontMap.width} y={editFont.fontMap.height} readOnly />
+                        <Dim x={editFont.width} y={editFont.height} readOnly />
                         <Content>
                             <button onClick={resizeAction}>Resize</button>
                         </Content>
@@ -1756,14 +1782,20 @@ function FontMapEditor(props) {
         )
     }
 
-    const info = [];
-    for (let resource of props.info) {
-        info.push(`${resource.name}: "${resource.id}" [${resource.source}]`);
-    }
+    const actions = (
+        <Fragment>
+            <button onClick={props.cancel}>Back</button>
+            <button onClick={props.revert}>Revert</button>
+            <button onClick={saveFonts} disabled={eContext.hasStorePos()}>Save</button>
+            <button onClick={deployFonts} disabled={!eContext.hasStorePos()}>Deploy</button>
+            <button onClick={exportFonts}>Export</button>
+            <button onClick={props.play}>Play</button>
+        </Fragment>
+    );
 
     return (
-            <Page title="Edit Resources" resources={props.info}  actions={actions}>
-                <Stack vertical fullHeight>
+        <Page title="Edit TexPane" resources={props.info}  actions={actions}>
+            <Stack vertical fullHeight>
                 <Stack>
                     <Section name="Fonts">
                         <ItemsStack
@@ -1775,7 +1807,9 @@ function FontMapEditor(props) {
                             setActive={setActive}
                             setItems={setFonts}
                             items={fonts}
-                            cleanUp={(item) => {
+                            cleanUp={item => {
+                                // scheint beim Löschen eines Fonts auch die TextBlöcke
+                                // die auf diesen verlinkt haben, zu löschen
                                 const newBlocks = [];
                                 for (let block of blocks) {
                                     if (block.font != item.id) {
@@ -1785,15 +1819,15 @@ function FontMapEditor(props) {
                                 setBlocks(newBlocks);
                             }}
                             getProperties={getFontProps}
-                            getName={item => <LabelAndSubInfo name={item.name}> - Size: {item.fontMap.width + 'x' + item.fontMap.height}</LabelAndSubInfo>}
+                            getName={item => <LabelAndSubInfo name={item.id}> - Size: {item.width + 'x' + item.height}</LabelAndSubInfo>}
                         />
                     </Section>
                     <Section name="Characters" flex>
-                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.getCanvasElem().toDataURL('image/png')} />
+                        <CharIndex cellProvider={currFont.provider} source={currFont.image.getCanvasElem().toDataURL('image/png')} />
                     </Section>
                 </Stack>
                 <Content flex>
-                    <FontPreview entity={TextBlockEntity} blocks={blocks} setBlocks={setBlocks} editorId="preview" fonts={id2Font} />
+                    <FontPreview entity={TextBlockEntity} dim={props.resource.dim} blocks={blocks} setBlocks={setBlocks} editorId="preview" fonts={id2Font} />
                 </Content>
             </Stack>
 
@@ -1802,9 +1836,9 @@ function FontMapEditor(props) {
             </ResizeFontModal.render>
 
             <NewFontModal.render name="New Font" fit closeable>
-                <NewFontForm save={NewFontModal.params.save} hide={NewFontModal.hide} />
+                <NewFontForm save={NewFontModal.params.save} defaults={NewFontModal.params.defaults} hide={NewFontModal.hide} />
             </NewFontModal.render>
-            </Page>
+        </Page>
     );
 }
 

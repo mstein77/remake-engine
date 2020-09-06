@@ -1192,7 +1192,7 @@ function Page(props) {
                         <Content padded>
                             <Stack>
                                 <Content><i className="material-icons md-18">{typeToIcon[resource.type]}</i></Content>
-                                <Content>{resource.name}:</Content>
+                                <Content><kbd>{resource.source.toUpperCase()}</kbd></Content>
                             </Stack>
                         </Content>
                         <Content padded>
@@ -1247,6 +1247,7 @@ class GlobalCtx extends React.Component {
 
         this.state = {
             game: props.game,
+            resourceLoader: props.game.getResourceLoader(),
             dirty: false,
             setDirty: () => {
                 if (this.state.dirty === false) {
@@ -1401,6 +1402,25 @@ function useUniqueIds(prefix = '') {
     }
 }
 
+function useUniqueResourceId(baseId, resources) {
+    const ids = [];
+    for (let resource of resources) {
+        ids.push(resource.id);
+    }
+    // TODO wir sollten hier jetzt auch alle bekannten JSON ids
+    // aus dem RL hinzufügen
+    return () => {
+        if (ids.indexOf(baseId) === -1) {
+            return baseId;
+        }
+        let no = 2;
+        while(ids.indexOf(baseId + no) !== -1) {
+            no++;
+        }
+        return baseId + no;
+    }
+}
+
 function useEntity(prefix, defaults = {}) {
     const entityRef = useRef(null);
 
@@ -1476,5 +1496,6 @@ export {
     useDimProps,
     useKeyListener,
     useEntity,
-    useUniqueIds
+    useUniqueIds,
+    useUniqueResourceId
 }

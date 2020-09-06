@@ -212,7 +212,7 @@ function PageSelector(props) {
     };
     const actions = (
         <Fragment>
-            <button>Save</button> <button onClick={() => {setActive(null)}}>Cancel</button> <button onClick={props.play}>Play</button>
+            <button onClick={props.play}>Play</button>
         </Fragment>
     );
 
@@ -303,7 +303,12 @@ function PageSelector(props) {
             editor = <TilesMapEditor tilesMap={resource.data} {...editorProps} />;
             break;
 
-        case 'fontMap':
+        case 'TextPane':
+            // d('check', resource);
+            if (resource.data === null) {
+                resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+            }
+/*
             resourcesInfo.push({
                 id: resource.data.id,
                 name: 'FontMap Config',
@@ -316,13 +321,15 @@ function PageSelector(props) {
             });
             const components = {};
             for (let info of resourcesInfo) {
-                info.source = resourceLoader.getResourceSource(info.type + ':' + info.id)
+                info.source = resourceLoader.getResourceSource(info.type + ':' + info.id);
+                info.screen = resourceLoader.getResourceScreen(info.type + ':' + info.id);
                 components[info.type] = resourceLoader.getResource(info.type, info.id);
             }
-            const config = new resource.config(components.json);
+            // const config = new resource.config(components.json);
+*/
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <FontMapEditor key={'fontmap_' + updates.count} fontMap={config} info={resourcesInfo} {...editorProps} />
+                    <FontMapEditor key={'fontmap_' + updates.count} resource={resource} info={resourcesInfo} {...editorProps} />
                 </Restorable>
             );
             break;
@@ -371,12 +378,16 @@ function EditorApp(props) {
                 });
                 break;
 
-            case 'fontMap':
+            case 'TextPane':
+                // TODO: extract all images from the fonts
+/*
                 imageResources.push({
                     id: resource.data.image.id,
                     name: 'Font Map image ' + resource.data.image.id,
                     bitmap: resource.data.image.getCanvasElem().toDataURL('image/png')
                 });
+
+ */
                 break;
 
             case 'spriteSheet':
