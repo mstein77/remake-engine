@@ -1,7 +1,7 @@
 import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
 import {Page, Stack, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
-import FontMapEditor from "./FontMapEditor";
+import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
@@ -304,7 +304,6 @@ function PageSelector(props) {
             break;
 
         case 'TextPane':
-            // d('check', resource);
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
@@ -329,7 +328,7 @@ function PageSelector(props) {
 */
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <FontMapEditor key={'fontmap_' + updates.count} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TextPaneEditor key={'textPane_' + updates.count} resource={resource} info={resourcesInfo} {...editorProps} />
                 </Restorable>
             );
             break;
@@ -379,15 +378,15 @@ function EditorApp(props) {
                 break;
 
             case 'TextPane':
-                // TODO: extract all images from the fonts
-/*
-                imageResources.push({
-                    id: resource.data.image.id,
-                    name: 'Font Map image ' + resource.data.image.id,
-                    bitmap: resource.data.image.getCanvasElem().toDataURL('image/png')
-                });
-
- */
+                // TODO: use this for all resource-types and prevent double ids
+                const resources = resource.data.config.getResources('image').resources;
+                for (let resource of resources) {
+                    imageResources.push({
+                        id: resource.id,
+                        name: resource.id,
+                        bitmap: resource.data.getDataUrl()
+                    });
+                }
                 break;
 
             case 'spriteSheet':

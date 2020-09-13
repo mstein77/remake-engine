@@ -113,7 +113,7 @@ const flattenResources = resources => {
         }
     }
     return result;
-}
+};
 
 class ResourceDependencies {
 
@@ -159,8 +159,7 @@ class ResourceDependencies {
 
     getDirectScreenResources(screen) {
         const direct = this.getDirect();
-        // TODO undefined check kann raus
-        if (!direct[screen] || direct[screen].json === undefined) {
+        if (!direct[screen]) {
             return {json: [], image: [], audio: []};
         }
         return direct[screen];
@@ -250,6 +249,44 @@ class ResourceDependencies {
         return true;
     }
 
+    safeDeleteScreenResource(type, id, screen = null) {
+        const resId = type + ':' + id;
+
+        if (screen !== null) {
+            // TODO der part hier ist noch ungetestet
+            const direct = this.getDirect();
+            if (direct[screen]) {
+                const resources = flattenResources(direct[screen]);
+                if (resources.includes(resId)) {
+                    if (resources.length === 1) {
+                        delete direct[screen]
+                    } else {
+                        direct[screen][type].splice(direct[screen].indexOf(id), 1)
+                    }
+                    this.storeDirectContent(direct);
+                    this.direct = null;
+                }
+            }
+        }
+        if (this.isDirectTarget(type, id) || this.isIndirectTarget(type, id)) {
+            return;
+        }
+        this.deleteResourceContent(type, id);
+
+        // TODO: lösche remote kanten von resId
+        const indirect = this.getIndirect();
+        if (!indirect[resId]) {
+            return;
+        }
+        const targets = indirect[resId];
+        delete indirect[resId];
+        this.storeIndirectContent(indirect);
+        for (let target of targets) {
+            const [type, id] = target.split(':');
+            this.safeDeleteScreenResource(type, id)
+        }
+    }
+
     deleteScreenResource(screen, type, id) {
         const direct = this.getDirect();
         const index = direct[screen][type].indexOf(id);
@@ -323,9 +360,6 @@ class ResourceDependencies {
         }
         return {found, notFound};
     }
-
-
-
 }
 
 const getRD = (...args) => {

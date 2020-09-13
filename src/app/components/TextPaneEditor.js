@@ -1570,18 +1570,56 @@ function NewFontForm(props) {
     );
 }
 
-function FontMapEditor(props) {
+function TextPaneEditor(props) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
 
     const ResizeFontModal = useModal();
     const NewFontModal = useModal();
 
+    /*
+        Nehmen wir an, wir machen das, dann müssten wir einen globalen
+        ModelSetter haben:
+
+        const [model, setModel] = useState(props.model)
+
+        Damit React auf dem model arbeiten kann, müssten wir die Model-Ref
+        bei jeder Änderung durch ein neues (komplett-)Modell ersetzen. Beim
+        speichern würde das Modell über den RL gespeichert und dann wieder
+        von dort geladen.
+
+        Haben wir ein EditProp x, dann würden wir das folgendermaßen machen:
+
+          <Int name="x" value="model.x" set="value => setModel({...model, x: value})" />
+
+        Problem daran: wir generieren, alle Subkomponenten neu, es sei denn wir
+
+        <CharacterEditor font=model.fonts[activeFont] />
+
+        Jede Änderung innerhalb des CharacterEditors müsste über setModel
+        laufen und da das Font-Model nur über die props reinging, müsste der
+        Editor jedes mal über einen key neu generiert werden, was alle
+        Editorsettings zurücksetzen würde.
+
+        Alternativ bekommt der Editor über props eine Referenz auf das Font-
+        Submodel
+
+        modelRef = useRef(props.font);
+
+        Beispiel: Chars löschen
+
+        Der CharEditor initialisiert sich ein IndexProvider mit props.font
+        Dieser wiederum speichert sich eine Referenz this.modelRef = font
+        und arbeitet anschliessend auf dieser. Bei Änderungen muss aber auf
+        dem CharEditor ein Update getriggert werden, damit sich die Änderungen
+        auch in der Darstellung widerspiegeln.
+
+
+
+     */
     const [fonts, setFonts] = useState(() => {
         const fonts = [];
         for (let font of props.resource.data.fonts) {
-            // TODO: hier das ist eine Schwachstelle, eigentlich würden
-            // wir hier eher die font.config.config brauchen
             fonts.push(font.config.getJson());
         }
         return fonts;
@@ -1589,7 +1627,6 @@ function FontMapEditor(props) {
     const [active, setActive] = useState(fonts.length > 0 ? 0 : null);
     const getNewFontUid = useUniqueResourceId(props.resource.id + '_font', fonts);
 
-    // TODO initialisiere mit Textblöcken, die beim Aufruf des Editors aktiv waren
     const TextBlockEntity = useEntity('block', {
         name: 'New block',
         posX: 0,
@@ -1655,10 +1692,9 @@ function FontMapEditor(props) {
     const saveFonts = () => {
         const config = new props.resource.config({id: props.resource.data.id});
         for (let font of fonts) {
-            const image = context.resourceLoader.makeImageResource(font.provider.getFontMapImage());
-            image.id = font.image.id;
-            const json = font.provider.getFontMapJson(font.id);
-            json.image = image;
+            // TODO das geht noch besser
+            const rebuilder = new props.resource.config.deps.font({});
+            const json = rebuilder.getRebuildJson(true, font.provider.getJson());
             config.addFont(json);
         }
         context.resourceLoader.storeScreenResource(context.game.currentScreen, config);
@@ -1823,7 +1859,7 @@ function FontMapEditor(props) {
                         />
                     </Section>
                     <Section name="Characters" flex>
-                        <CharIndex cellProvider={currFont.provider} source={currFont.image.getCanvasElem().toDataURL('image/png')} />
+                        <CharIndex cellProvider={currFont.provider} source={currFont.image.toDataURL('image/png')} />
                     </Section>
                 </Stack>
                 <Content flex>
@@ -1842,4 +1878,4 @@ function FontMapEditor(props) {
     );
 }
 
-export default FontMapEditor;
+export default TextPaneEditor;

@@ -520,6 +520,13 @@ class StorageManager {
         return this.hasResource('audio', id)
     }
 
+    safeDeleteResources(resources) {
+        for(let resource of resources) {
+            const [type, id] = resource.split(':');
+            this.dependencies.safeDeleteScreenResource(type, id);
+        }
+    }
+
     getAllScreenResources(screen) {
         return getDeflatedResources(this.dependencies.getRelevantScreenResources(screen).found)
     }
@@ -769,8 +776,6 @@ class ResourceLoader {
 
     storeScreenResource(screen, config) {
         const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + config.id);
-        // TODO bad
-        config.getJson();
         const resources = config.getResources();
         for (let resource of resources.resources) {
             switch(resource.type) {
@@ -791,7 +796,9 @@ class ResourceLoader {
 
         const newResources = [];
         for (let node of Object.keys(resources.dependencies)) {
-            newResources.push(node);
+            if (!newResources.includes(node)) {
+                newResources.push(node);
+            }
             for (let target of resources.dependencies[node]) {
                 if (!newResources.includes(target)) {
                     newResources.push(target);
@@ -799,8 +806,12 @@ class ResourceLoader {
             }
         }
         for (let resource of oldResources) {
+            const deleteResources = [];
             if (!newResources.includes(resource)) {
-                d('TODO: SAFE DELETE', resource);
+                deleteResources.push(resource);
+            }
+            if (deleteResources.length) {
+                this.storage.safeDeleteResources(deleteResources);
             }
         }
     }
@@ -1109,37 +1120,44 @@ class Config {
         this.parse({...this.getDefaults(), ...json});
     }
 
-    getRebuildJson(deep = true) {
-        if (!this.isResolved()) {
+    getRebuildJson(deep = true, base = null) {
+        if (base === null) {
+            base = this.getJson();
+        }
+/*
+        if (base === this && !this.isResolved()) {
             throw Error('Config was not yet build!');
         }
-        return this.addRebuildProps({id: this.id}, deep);
+ */
+        return this.addRebuildProps({id: base.id}, deep, base);
     }
 
-    addRebuildProps(obj, deep) {
+    addRebuildProps(obj, deep, base) {
         return obj;
     }
 
-    getResources() {
+    getResources(type = null) {
         const result = {
             resources: [],
             dependencies: {}
         };
-        this.addResources(result, this.id);
+        this.addResources(result, type);
         return result;
     }
 
-    addResources(result) {
-        result.resources.push({
-            id: this.id,
-            type: 'json',
-            data: this.getRebuildJson(false)
-        });
+    addResources(result, type = null) {
+        if (type === null || type === 'json') {
+            result.resources.push({
+                id: this.id,
+                type: 'json',
+                data: this.getRebuildJson(false)
+            });
+        }
         result.dependencies['json:' + this.id] = [];
-        this.addSubResources(result);
+        this.addSubResources(result, type);
     };
 
-    addSubResources(result) {
+    addSubResources(result, type) {
         const deps = this.getSubResources();
         for (let dep of deps) {
             const sourceId = 'json:' + this.id;
@@ -1148,8 +1166,8 @@ class Config {
                 result.dependencies[sourceId].push(targetId);
             }
             if (dep.type === 'json') {
-                dep.data.config.addResources(result);
-            } else {
+                dep.data.config.addResources(result, type);
+            } else if (type === null || dep.type === type) {
                 result.resources.push(dep);
             }
         }
@@ -1479,11 +1497,11 @@ class FontMapConfig extends Config {
         return [{id: this.image.id, type: 'image', data: this.image}];
     }
 
-    addRebuildProps(obj, deep) {
-        obj.width = this.width;
-        obj.height = this.height;
-        obj.image = deep ? this.image : this.image.id;
-        obj.map = {...this.map};
+    addRebuildProps(obj, deep, base) {
+        obj.width = base.width;
+        obj.height = base.height;
+        obj.image = deep ? RL.makeImageResource(base.image, base.imageId) : base.imageId;
+        obj.map = {...base.map};
 
         return obj;
     }
@@ -1492,7 +1510,8 @@ class FontMapConfig extends Config {
         super.applyTo(obj);
         obj.width = this.width;
         obj.height = this.height;
-        obj.image = this.image;
+        obj.imageId = this.image.id;
+        obj.image = this.image.getCanvasElem();
         obj.map = {...this.map};
 
         return obj;
@@ -1517,11 +1536,15 @@ class TextPaneConfig extends Config {
         return result;
     }
 
-    addRebuildProps(obj, deep) {
+    addRebuildProps(obj, deep, base) {
         obj.fonts = [];
-        if (this.fonts) {
-            for(let font of this.fonts) {
-                obj.fonts.push(deep ? font.config.getRebuildJson(true) : font.config.id);
+        if (base.fonts) {
+            for(let font of base.fonts) {
+                obj.fonts.push(
+                    deep ?
+                    font.config.getRebuildJson(true) :
+                    font.config.id
+                );
             }
         }
         return obj;
@@ -6702,11 +6725,10 @@ class TilesMap {
 }
 
 class FontMap {
+
     constructor(input) {
-        const config = getConfigFromInput(FontMap.Config, input);
-        config.applyTo(this);
-        this.config = config;
-        this.image = this.image.getCanvasElem();
+        this.config = getConfigFromInput(FontMap.Config, input);
+        this.config.applyTo(this);
     }
 
     drawTextLine(ctx, text, posX, posY) {

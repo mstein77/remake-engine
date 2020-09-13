@@ -863,6 +863,7 @@ class FontCharIndexProvider extends CellProvider {
     constructor(fontMap) {
         const size = Math.max(fontMap.width, fontMap.height);
         super(size);
+        this.ref = fontMap;
         this.cache = {};
         this.cacheZoom = 0;
         this.dims = fontMap.map;
@@ -870,8 +871,10 @@ class FontCharIndexProvider extends CellProvider {
         this.codes = [];
         this.width = null;
         this.height = 1;
+        this.fontId = fontMap.id;
         this.charSize = {x: fontMap.width, y: fontMap.height};
-        this.data = fontMap.image ? fontMap.image.getCanvasElem().toDataURL('image/png') : null;
+        this.imageId = fontMap.imageId;
+        this.data = fontMap.image ? fontMap.image.toDataURL('image/png') : null;
     }
 
     getFontMapImage() {
@@ -887,13 +890,9 @@ class FontCharIndexProvider extends CellProvider {
         return canvas;
     }
 
-    getFontMapConfig(id) {
-
-    }
-
-    getFontMapJson(id) {
+    getJson() {
         const json = {
-            id,
+            id: this.fontId,
             width: this.charSize.x,
             height: this.charSize.y,
             map: {}
@@ -903,6 +902,8 @@ class FontCharIndexProvider extends CellProvider {
             json.map[code] = {x: pos, y: 0};
             pos += this.charSize.x;
         }
+        json.image = this.getFontMapImage();
+        json.imageId = this.imageId;
         return json;
     };
 
