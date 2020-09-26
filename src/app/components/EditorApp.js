@@ -5,7 +5,7 @@ import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
-import {d} from '../helper/helper';
+import {d, getJsonModelOfInstance, getRebuildJsonForModel, getResourceTreeForJsonModel} from '../helper/helper';
 import ReactDOM from "react-dom";
 
 
@@ -199,6 +199,7 @@ function PageSelector(props) {
     const RevertModal = useModal();
 
     const cancel = () => {
+        update();
         setActive(null);
     };
     const play = () => {
@@ -249,7 +250,7 @@ function PageSelector(props) {
 
     const revert = () => {
         resourceLoader.checkServerResources(resourcesInfo).then(
-            (serverResources) => {
+            serverResources => {
                 RevertModal.show({
                     resourcesInfo,
                     serverResources,
@@ -276,8 +277,19 @@ function PageSelector(props) {
         );
     };
 
-    const deploy = () => {
-        resourceLoader.deployResources(resourcesInfo).then(
+    const getModelConfig = model => {
+        const rebuildJson = getRebuildJsonForModel(resource.cls, model,true);
+        return new resource.config(rebuildJson);
+    };
+
+    const deploy = model => {
+        const resourcesInfo = getModelConfig(model).getResources();
+        resourceLoader.deployResources(
+            props.game.currentScreen,
+            resourcesInfo.resources,
+            {'json': [resource.id]},
+            resourcesInfo.dependencies
+        ).then(
             () => {
                 const game = props.game;
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
@@ -286,7 +298,23 @@ function PageSelector(props) {
         );
     };
 
-    const exportAsCode = (lines) => {
+    const getResourceDef = (type, id, value) => {
+        if (type === 'image') {
+            value = '"' + value + '"';
+        } else if (type === 'json') {
+            const lines = JSON.stringify(value, null, 4).split('\n');
+            value = lines.join('\n    ');
+        }
+        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
+    };
+
+    const exportModel = model => {
+        const resources = getModelConfig(model).getResources();
+        const lines = [];
+        for (let res of resources.resources.reverse()) {
+            const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
+            lines.push(getResourceDef(res.type, res.id, data));
+        }
         ExportModal.show({
             code: lines.join('\n')
         });
@@ -297,7 +325,14 @@ function PageSelector(props) {
         updates.update();
     };
 
-    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), update, revert, deploy, export: exportAsCode};
+    const save = model => {
+        context.resourceLoader.storeScreenResource(context.game.currentScreen, getModelConfig(model));
+        resource.data = null;
+        update();
+    };
+
+    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), save, revert, deploy, export: exportModel};
+
     switch (resource.type) {
         case 'tilesMap':
             editor = <TilesMapEditor tilesMap={resource.data} {...editorProps} />;
@@ -307,28 +342,12 @@ function PageSelector(props) {
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
-/*
-            resourcesInfo.push({
-                id: resource.data.id,
-                name: 'FontMap Config',
-                type: 'json'
-            });
-            resourcesInfo.push({
-                id: resource.data.image.id,
-                type: 'image',
-                name: 'FontMap Image'
-            });
-            const components = {};
-            for (let info of resourcesInfo) {
-                info.source = resourceLoader.getResourceSource(info.type + ':' + info.id);
-                info.screen = resourceLoader.getResourceScreen(info.type + ':' + info.id);
-                components[info.type] = resourceLoader.getResource(info.type, info.id);
-            }
-            // const config = new resource.config(components.json);
-*/
+            const model = getJsonModelOfInstance(resource.data);
+
+            const tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <TextPaneEditor key={'textPane_' + updates.count} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
                 </Restorable>
             );
             break;
@@ -341,6 +360,7 @@ function PageSelector(props) {
     return (
         <Fragment>
             {editor}
+
             <ExportModal.render name="Export resources" width="80%" height="50%" closeable>
                 <Content padded>
                     Use this in your code:
@@ -379,7 +399,7 @@ function EditorApp(props) {
 
             case 'TextPane':
                 // TODO: use this for all resource-types and prevent double ids
-                const resources = resource.data.config.getResources('image').resources;
+                const resources = resource.data.getResources('image').resources;
                 for (let resource of resources) {
                     imageResources.push({
                         id: resource.id,

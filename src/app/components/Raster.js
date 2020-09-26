@@ -698,14 +698,32 @@ class EditorCtx extends React.Component {
         this.raster = {};
         this.tracking = props.tracking ? props.tracking : {};
         this.tracker = {};
+        this.settings = {};
         this.listeners = [];
 
         this.state = {
 
             // Selection
             selection: new CellSelection(),
-            setSelection: (selection) => {
+            setSelection: selection => {
                 this.setState({selection});
+            },
+
+            // Settings
+            hasSetting: key => {
+                return this.settings[key] !== undefined
+            },
+            setSetting: (key, value) => {
+                this.settings[key] = value;
+            },
+            getSetting: (key, def) => {
+                if (this.settings[key] === undefined) {
+                    if (def === undefined) {
+                        throw Error(`Required setting ${key} not found!`);
+                    }
+                    return def;
+                }
+                return this.settings[key];
             },
 
             // Undo/Redo
@@ -1179,15 +1197,13 @@ const CellProviderRaster = React.memo((props) => {
             case 'pure-bitmap':
                 renderRef.current =
                     (ctx, x, y, value) => {
-                        const img = propsRef.current.cellProvider.getBitmapForValue(value, propsRef.current.zoom, propsRef.current.renderOptions.caching);
-
-                        if (img) {
-                            const size = propsRef.current.cellSize;
-                            ctx.clearRect(x, y, size.x, size.y);
-                            ctx.drawImage(img, x, y);
-                        }
+                        propsRef.current.cellProvider.drawBitmapForValue(
+                            ctx,
+                            value, x, y, propsRef.current.zoom
+                        );
                     };
                 break;
+
 
             case 'bitmap':
                 renderRef.current =

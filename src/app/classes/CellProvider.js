@@ -1,4 +1,4 @@
-import {d} from '../helper/helper';
+const {d, getCanvasForDim} = require('../helper/helper');
 
 class CellSelection {
     constructor(type = 'none', cells = [[]]) {
@@ -860,101 +860,62 @@ class TilesCellProvider extends CellProvider {
 
 class FontCharIndexProvider extends CellProvider {
 
-    constructor(fontMap) {
-        const size = Math.max(fontMap.width, fontMap.height);
+    constructor(model) {
+        // TODO das macht echt keinen Sinn hier
+        const size = Math.max(model.width, model.height);
         super(size);
-        this.ref = fontMap;
-        this.cache = {};
-        this.cacheZoom = 0;
-        this.dims = fontMap.map;
-        this.mapping = {};
-        this.codes = [];
-        this.width = null;
+        this.data = true;
+        this.model = model;
+        const codes = Object.keys(this.model.map);
+        this.codes = codes;
+        this.codes.sort();
+        this.map = [];
+        this.map.push(codes);
+        this.width = codes.length;
         this.height = 1;
-        this.fontId = fontMap.id;
-        this.charSize = {x: fontMap.width, y: fontMap.height};
-        this.imageId = fontMap.imageId;
-        this.data = fontMap.image ? fontMap.image.toDataURL('image/png') : null;
     }
-
-    getFontMapImage() {
-        let canvas = document.createElement('canvas');
-        canvas.width = this.codes.length * this.charSize.x;
-        canvas.height = this.charSize.y;
-        const ctx = canvas.getContext('2d');
-        let pos = 0;
-        for (let code of this.codes) {
-            ctx.drawImage(this.mapping[code], pos, 0);
-            pos += this.charSize.x;
-        }
-        return canvas;
-    }
-
-    getJson() {
-        const json = {
-            id: this.fontId,
-            width: this.charSize.x,
-            height: this.charSize.y,
-            map: {}
-        };
-        let pos = 0;
-        for (let code of this.codes) {
-            json.map[code] = {x: pos, y: 0};
-            pos += this.charSize.x;
-        }
-        json.image = this.getFontMapImage();
-        json.imageId = this.imageId;
-        return json;
-    };
-
 
     hasData() {
-        return this.data === null;
+        return this.data;
     }
 
     load(callback) {
         if (this.hasData()) {
-            callback();
+            callback(this.codes);
             return;
         }
-        this.convertURIToImageData(this.data).then(
-            (img) => {
-                if (this.data === null) {
-                    callback(this.codes);
-                    return;
-                }
-                this.data = null;
-                const newMap = {};
-                const codes = [];
-                this.map = [];
-                let index = 0;
-                let row = [];
-                for (let code in this.dims) {
-                    const dim = this.dims[code];
-                    const charCanvas = document.createElement('canvas');
-                    charCanvas.width = this.charSize.x;
-                    charCanvas.height = this.charSize.y;
-                    const ctx = charCanvas.getContext('2d');
-                    ctx.putImageData(img.context.getImageData(dim.x, dim.y, this.charSize.x, this.charSize.y), 0, 0);
-                    newMap[code] = charCanvas;
-                    codes.push(code);
-                    row.push(index);
-                    index++;
-                }
-                this.codes = codes;
-                this.codes.sort();
-                this.map.push(codes);
-                this.mapping = newMap;
-                this.width = codes.length;
-                this.dims = null;
+        this.generateFlatImage();
+        this.data = false;
+    }
 
-                callback(codes);
-            }
-        );
+    generateFlatImage() {
+        let pos = 0;
+        const canvas = getCanvasForDim(this.codes.length * this.model.width, this.model.height);
+        const ctx = canvas.getContext('2d');
+        for(let code of this.codes) {
+            this.drawBitmapForValue(ctx, code, pos);
+            this.model.map[code] = {
+                x: pos,
+                y: 0
+            };
+            pos += this.model.width;
+        }
+        this.model.image = canvas;
+    }
+
+    addSpaceForChars(number) {
+        if (number <= 0) {
+            return;
+        }
+        d('#', number, this.model);
+        const canvas = getCanvasForDim(this.model.image.width + number * this.model.width, this.model.image.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(this.model.image, 0, 0);
+        this.model.image = canvas;
     }
 
     getCharSize() {
-        return this.charSize;
+        return {x: this.model.width, y: this.model.height};
     }
 
     getWidth() {
@@ -1001,110 +962,89 @@ class FontCharIndexProvider extends CellProvider {
         return this.codes.indexOf(code) !== -1;
     }
 
-    deleteIndex(index) {
-        this.deleteChar(this.codes[index]);
+    deleteIndex(index, regenerate = true) {
+        this.deleteChar(this.codes[index], regenerate);
     }
 
-    deleteChar(code) {
-        if (this.mapping[code] === undefined) {
+    deleteChar(code, regenerate = true) {
+        if (this.model.map[code] === undefined) {
             return;
         }
-        delete this.mapping[code];
+        delete this.model.map[code];
         this.codes.splice(this.codes.indexOf(code), 1);
         this.map = [this.codes];
         this.width--;
+        if (regenerate) {
+            this.generateFlatImage();
+        }
     }
 
-    addCharCode(code) {
+    addCharCode(code, regenerate = true) {
         if (this.codes.indexOf(code) !== -1) {
             return;
         }
+        const x = this.codes.length * this.model.width;
         this.codes.push(code);
         this.codes.sort();
 
         this.map = [this.codes];
         this.width++;
-        const canvas = document.createElement('canvas');
-        canvas.width = this.charSize.x;
-        canvas.height = this.charSize.y;
-        this.mapping[code] = canvas;
+
+        this.model.map[code] = {x, y: 0};
+        if (regenerate) {
+            this.generateFlatImage();
+        }
     }
 
-    getBitmapForIndex(index, zoom, writeCache = true) {
+    drawBitmapForIndex(target, index, x, y, zoom = 1) {
         if (index > this.getMaxIndex()) {
             return null;
         }
         const value = this.codes[index];
-        return this.getBitmapForValue(value, zoom, writeCache);
+        this.drawBitmapForValue(target, value, x, y, zoom)
+    }
+
+    drawBitmapForValue(target, value, x = 0, y = 0, zoom = 1) {
+        const width = this.model.width * zoom;
+        const height = this.model.height * zoom;
+        target.clearRect(x, y, width, height);
+        const pos = this.model.map[value];
+        if (!pos || pos.x === null || !this.model.image.width) {
+            return;
+        }
+        const smoothing = target.imageSmoothingEnabled;
+        if (smoothing) {
+            target.imageSmoothingEnabled = false;
+        }
+        target.drawImage(
+            this.model.image,
+            pos.x, pos.y, this.model.width, this.model.height,
+            x, y, width, height
+        );
+        if (smoothing) {
+            target.imageSmoothingEnabled = true;
+        }
     }
 
     setBitmapForIndex(index, bitmap) {
         const value = this.codes[index];
-        const ctx = this.mapping[value].getContext('2d');
-        ctx.putImageData(bitmap, 0, 0);
+        this.setBitmapForValue(value, bitmap);
     }
 
     setBitmapForValue(value, bitmap) {
-        const index = this.codes.indexOf(value);
-        if (index !== -1) {
-            this.setBitmapForIndex(index, bitmap);
-        }
+        const pos = this.model.map[value];
+        const ctx = this.model.image.getContext('2d');
+        ctx.putImageData(bitmap, pos.x, pos.y);
     }
 
-    getBitmapForValue(value, zoom, writeCache = true) {
-        if (!this.hasData()) {
-            return null;
-        }
-        if (writeCache && zoom !== this.cacheZoom) {
-            this.cacheZoom = zoom;
-            this.cache = {};
-        }
+    getBitmapForIndex(index, zoom = 1) {
+        const value = this.codes[index];
+        return this.getBitmapForValue(value, zoom);
+    }
 
-        if (this.cache[value] !== undefined) {
-            if (writeCache || this.cacheZoom === zoom) {
-                return this.cache[value];
-            }
-        }
-
-        const canvas = document.createElement('canvas');
-        const targetSize = this.charSize * zoom;
-        canvas.width = this.charSize.x * zoom;
-        canvas.height = this.charSize.y * zoom;
-        const charImg = this.mapping[value];
-        if (!charImg) {
-            return canvas;
-        }
-
-        const charCtx = charImg.getContext('2d');
-        const img = charCtx.getImageData(0, 0, this.charSize.x, this.charSize.y);
-
-        const target = charCtx.createImageData(canvas.width, canvas.height);
-        let targetPos = 0;
-        let sourceStart = 0;
-        for(let y = 0; y < img.height; y++) {
-
-            for (let w = 0; w < zoom; w++) {
-                let sourcePos = sourceStart;
-                let pos = targetPos;
-                for(let x = 0; x < img.width; x++) {
-                    for (let z = 0; z < zoom; z++) {
-                        target.data[pos] = img.data[sourcePos];
-                        target.data[pos + 1] = img.data[sourcePos + 1];
-                        target.data[pos + 2] = img.data[sourcePos + 2];
-                        target.data[pos + 3] = img.data[sourcePos + 3];
-                        pos += 4;
-                    }
-                    sourcePos += 4;
-                }
-                targetPos += target.width << 2;
-            }
-            sourceStart += img.width << 2;
-        }
-        const ctx = canvas.getContext('2d');
-        ctx.putImageData(target, 0, 0);
-        if (writeCache) {
-            this.cache[value] = canvas;
-        }
+    getBitmapForValue(value, zoom = 1) {
+        const canvas = getCanvasForDim(this.model.width * zoom, this.model.height * zoom);
+        this.drawBitmapForValue(canvas.getContext('2d'), value, 0, 0, zoom);
         return canvas;
     }
 }
@@ -1131,6 +1071,10 @@ class FontIndexCellProvider extends CellProvider {
 
     getRect(posX, posY, width, height, raw = false) {
         return this.map;
+    }
+
+    drawBitmapForValue(target, value, x, y, zoom) {
+        this.provider.drawBitmapForIndex(target, this.index, x, y, zoom);
     }
 
     getBitmapForValue(value, zoom, writeCache) {

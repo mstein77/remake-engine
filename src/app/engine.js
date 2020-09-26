@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -685,7 +685,8 @@ class ResourceLoader {
     }
 
     getResourceSource(id) {
-        return this.source.get(id);
+        const source = this.source.get(id);
+        return source ? source : 'new';
     }
 
     getResourceScreen(id) {
@@ -840,17 +841,27 @@ class ResourceLoader {
         })
     }
 
-    deployResources(resources) {
+    getAllResourceIds(type) {
+        // TODO: we might also fetch the server ids here
+        let ids = [];
+        switch(type) {
+            case 'json':
+                ids = this.storage.getJsonIds();
+                break;
+
+            case 'image':
+                ids = this.storage.getImageIds();
+                break;
+        }
+        return ids;
+    }
+
+    deployResources(screen, resources, direct, indirect) {
         const overwrites = [];
         for(let resource of resources) {
-            let data = null;
-            if (this.resources[resource.type]) {
-                data = this.resources[resource.type][resource.id];
-                if (data) {
-                   if (data instanceof ImageResource) {
-                       data = data.getDataUrl();
-                   }
-                }
+            let data = resource.data;
+            if (data instanceof ImageResource) {
+                data = data.getDataUrl();
             }
             overwrites.push({data, type: resource.type, id: resource.id});
         }
@@ -859,7 +870,10 @@ class ResourceLoader {
         }
         return (
             this.fetcher.fetch('store', {
-                    resources: overwrites
+                    screen,
+                    resources: overwrites,
+                    direct,
+                    indirect
             }).then(body => {
                 for (let resource of body.stored) {
                     const screen = this.getResourceScreen(resource.type + ':' + resource.id);
@@ -867,7 +881,7 @@ class ResourceLoader {
                 }
                 return body;
             })
-        );
+        )
     }
 
     loadResources(images, jsons, audios, screen = '') {
@@ -1116,19 +1130,24 @@ class Config {
         if (typeof json !== 'object') {
             throw Error('Config must be instantiated with a JSON!');
         }
+        this.fieldProps = this.getFieldProps();
         this.resolved = false;
         this.parse({...this.getDefaults(), ...json});
+    }
+
+    getFieldProps() {
+        return {};
+    }
+
+    getFieldProp(field, add = {}) {
+        const props = this.fieldProps[field] ? this.fieldProps[field] : {};
+        return {...props, ...add};
     }
 
     getRebuildJson(deep = true, base = null) {
         if (base === null) {
             base = this.getJson();
         }
-/*
-        if (base === this && !this.isResolved()) {
-            throw Error('Config was not yet build!');
-        }
- */
         return this.addRebuildProps({id: base.id}, deep, base);
     }
 
@@ -1403,10 +1422,6 @@ class Config {
         }
     }
 
-    getType() {
-        return 'Conf';
-    }
-
     applyTo(obj) {
         this.resolve();
         obj.id = this.id;
@@ -1415,8 +1430,12 @@ class Config {
 
     getJson() {
         const obj = this.applyTo({});
-        obj.__type = Object.getPrototypeOf(this);
+        obj.__type = this.getType();
         return obj;
+    }
+
+    getType() {
+        return Object.getPrototypeOf(this).constructor.name;
     }
 
     isResolved() {
@@ -1434,16 +1453,19 @@ class FontMapConfig extends Config {
         }
     }
 
-    getType() {
-        return FontMapConfig.__type;
+    getFieldProps() {
+        return {
+            width: {min: 1, max: 256},
+            height: {min: 1, max: 256}
+        };
     }
 
     setWidth(width) {
-        this.width = this.validateInt(width, {min: 1, max: 256});
+        this.width = this.validateInt(width, this.getFieldProps('width'));
     }
 
     setHeight(height) {
-        this.height = this.validateInt(height, {min: 1, max: 256});
+        this.height = this.validateInt(height, this.getFieldProps('height'));
     }
 
     setImage(image) {
@@ -1520,9 +1542,6 @@ class FontMapConfig extends Config {
 FontMapConfig.__type = 'FontMap';
 
 class TextPaneConfig extends Config {
-    getType() {
-        return TextPaneConfig.__type;
-    }
 
     getSubResources() {
         const result = [];
@@ -1541,9 +1560,7 @@ class TextPaneConfig extends Config {
         if (base.fonts) {
             for(let font of base.fonts) {
                 obj.fonts.push(
-                    deep ?
-                    font.config.getRebuildJson(true) :
-                    font.config.id
+                    getRebuildJsonForModel(FontMap, font, deep)
                 );
             }
         }
@@ -1990,7 +2007,8 @@ class Game {
                                     type: 'TextPane',
                                     id: pane.id,
                                     config: TextPaneConfig,
-                                    data: pane,
+                                    cls: TextPane,
+                                    data: pane.config,
                                     dim: pane.viewPortDim,
                                     blocks
                                 });
@@ -6423,6 +6441,65 @@ class SpriteAndTilesCollider {
             result[collideId] = obj;
         }
         return result;
+    }
+}
+
+class TilesMapConfig extends Config {
+
+    setTileBits(value) {
+        this.tileBits = this.validateInt(value, {min: 1, max: 16})
+    }
+
+    setImage(value) {
+        this.image = this.validateImage(value)
+    }
+
+    setDefaultTile(value) {
+        // TODO
+    }
+
+    setTiles(value) {
+
+    }
+
+    addTile(value) {
+
+    }
+
+    addTiles(values) {
+
+    }
+
+    setAnimations(value) {
+
+    }
+
+    addAnimation(value) {
+
+    }
+
+    addAnimations(values) {
+
+    }
+
+    setMap(value) {
+        // TODO
+    }
+
+    setBrushes(value) {
+        // TODO
+    }
+
+    applyTo(json) {
+        super.applyTo(json);
+        json.tileBits = this.tileBits;
+        json.tileSize = 1 << this.tileBits;
+        json.tilesImgId = this.image.id;
+        json.tilesImg = this.image.getCanvas();
+        json.map = this.map; // TODO clone deep
+        json.defaultTile = this.defaultTile;
+        json.tiles  = this.tiles;
+        json.brushes = this.brushes; // TODO only in editor mode
     }
 }
 

@@ -362,10 +362,6 @@ class ResourceDependencies {
     }
 }
 
-const getRD = (...args) => {
-    return new ResourceDependencies(...args)
-};
-
 const getIdToItems = items => {
     const id2items = {};
     for (let item of items) {
@@ -381,6 +377,86 @@ const getCanvasForDim = (width, height) => {
     return canvas;
 };
 
+const rebuilders = [];
+const rebuildObj = [];
+
+const addTreeResource = (tree, resId, resourceInfo, level = 0) => {
+    const [type, id] = resId.split(':');
+    for (let resource of resourceInfo.resources) {
+        if (resource.id === id) {
+            tree.push({level, id, type, source: 'browser'});
+            break;
+        }
+    }
+    if (!resourceInfo.dependencies[resId]) {
+        return;
+    }
+    const deps = resourceInfo.dependencies[resId];
+    for (let dep of deps) {
+        addTreeResource(tree, dep, resourceInfo, level + 1);
+    }
+};
+
+const getResourceTreeForJsonModel = (cls, model) => {
+    const rebuildJson = getRebuildJsonForModel(cls, model, true);
+    const config = new cls.Config(rebuildJson);
+    const resourceInfo = config.getResources();
+    const tree = [];
+    addTreeResource(tree, 'json:' + model.id, resourceInfo);
+    return tree;
+};
+
+const getRebuildJsonForModel = (cls, model, deep) => {
+    if (model instanceof cls) {
+        return deep ? model.config.getRebuildJson(true) : model.config.id;
+    }
+    const conf = cls.Config;
+    if (model instanceof conf) {
+        return deep ? conf.getRebuildJson(true) : conf.id;
+    }
+    if (!deep) {
+        return model.id;
+    }
+    const index = rebuilders.indexOf(conf);
+    let obj;
+    if (index !== -1) {
+        obj = rebuildObj[index]
+    } else {
+        obj = new conf({});
+        rebuilders.push(conf);
+        rebuildObj.push(obj)
+    }
+    return obj.getRebuildJson(true, model)
+};
+
+const getJsonModelOfInstance = instance => {
+    if (Array.isArray(instance)) {
+        const json = [];
+        for (let item of instance) {
+            json.push(getJsonModelOfInstance(item));
+        }
+        return json;
+    }
+    if (typeof instance !== 'object') {
+        return instance;
+    }
+    if (instance.config === undefined && instance.getJson === undefined) {
+        if (instance instanceof HTMLCanvasElement) {
+            const canvas = getCanvasForDim(instance.width, instance.height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(instance, 0, 0);
+            return canvas;
+        }
+        return instance;
+    }
+    const config = instance.config ? instance.config : instance;
+    const json = config.getJson();
+    for (let key in json) {
+        json[key] = getJsonModelOfInstance(json[key]);
+    }
+    return json;
+};
+
 module.exports = {
     d,
     hex2rgb,
@@ -391,7 +467,9 @@ module.exports = {
     flattenResources,
     getFlatObjectResources,
     getDeflatedResources,
-    getRD,
     getIdToItems,
-    getCanvasForDim
+    getCanvasForDim,
+    getRebuildJsonForModel,
+    getJsonModelOfInstance,
+    getResourceTreeForJsonModel
 };

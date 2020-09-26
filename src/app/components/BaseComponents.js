@@ -149,10 +149,16 @@ function TextField(props) {
     if (props.onClick) {
         attr.onClick = props.onClick;
     }
+    const cls = [];
+    if (props.invalid) {
+        cls.push('invalid');
+    }
     return (
-        <input type="text"
-               value={props.value}
-               {...attr}
+        <input
+            type="text"
+            value={props.value}
+            {...attr}
+            className={cls.join(' ')}
         />
     );
 }
@@ -866,16 +872,22 @@ function ItemsStack(props) {
                             material
                             disabled={props.items.length === 0 || active === null || props.min && props.items.length === props.min}
                             click={() => {
-                                const newItems = [...props.items];
-                                newItems.splice(props.active, 1);
-                                if (props.cleanUp) {
-                                    props.cleanUp(props.items[props.active], props.active);
+                                if (props.deleteActiveItem) {
+                                    d('DEL OK');
+                                    props.deleteActiveItem();
+                                } else {
+                                    d('DEL WRONG');
+                                    const newItems = [...props.items];
+                                    newItems.splice(props.active, 1);
+                                    if (props.cleanUp) {
+                                        props.cleanUp(props.items[props.active], props.active);
+                                    }
+                                    props.setItems(newItems);
+                                    props.setActive(
+                                        newItems.length === 0 ? null :
+                                            Math.min(props.active, newItems.length - 1)
+                                    );
                                 }
-                                props.setItems(newItems);
-                                props.setActive(
-                                    newItems.length === 0 ? null :
-                                    Math.min(props.active, newItems.length - 1)
-                                );
                             }}>delete</ActionBox>
 
                         {props.ordered && <ActionBox
@@ -1176,15 +1188,20 @@ function Section(props) {
 }
 
 function Page(props) {
+    const context = useContext(GlobalContext);
 
+    const [open, setOpen] = useState(false);
     const resources = [];
+
     const typeToIcon = {
         image: 'image',
         audio: 'audiotrack',
         json: 'code'
     };
+
     if (props.resources) {
         for (let resource of props.resources) {
+            const source = context.resourceLoader.getResourceSource(resource.type + ':' + resource.id);
             resources.push(
                 <Content className="thin-boxed"
                     key={resource.type + ':' + resource.id}>
@@ -1192,7 +1209,7 @@ function Page(props) {
                         <Content padded>
                             <Stack>
                                 <Content><i className="material-icons md-18">{typeToIcon[resource.type]}</i></Content>
-                                <Content><kbd>{resource.source.toUpperCase()}</kbd></Content>
+                                <Content><kbd>{source.toUpperCase()}</kbd></Content>
                             </Stack>
                         </Content>
                         <Content padded>
@@ -1201,6 +1218,9 @@ function Page(props) {
                     </Stack>
                 </Content>
             );
+            if (!open) {
+                break;
+            }
         }
     }
 
@@ -1215,7 +1235,7 @@ function Page(props) {
                                     {props.title} &gt;
                                 </Content>
                                 <Stack flex wrap>
-                                    {resources}
+                                    <ActionBox click={() => setOpen(!open)}><i className="material-icons md-18">{'keyboard_arrow_' + (open ? 'down' : 'right')}</i></ActionBox> {resources}
                                 </Stack>
                             </Stack>
                         </Content>
@@ -1301,7 +1321,7 @@ function useUpdates() {
     updatesRef.current = updates;
     return {
         count: updates,
-        update: () => {
+        update: (state = {}) => {
             setUpdates(updatesRef.current + 1);
         }
     };
@@ -1402,22 +1422,22 @@ function useUniqueIds(prefix = '') {
     }
 }
 
-function useUniqueResourceId(baseId, resources) {
-    const ids = [];
-    for (let resource of resources) {
-        ids.push(resource.id);
-    }
-    // TODO wir sollten hier jetzt auch alle bekannten JSON ids
-    // aus dem RL hinzufügen
-    return () => {
-        if (ids.indexOf(baseId) === -1) {
-            return baseId;
+function useUniqueResourceId(resourceLoader, type) {
+    const ids = resourceLoader.getAllResourceIds(type);
+    const suffix = type === 'image' ? '.png' : '';
+    return (baseId, modelIds) => {
+        const hasId = id => {
+            return (modelIds.indexOf(id) !== -1 || ids.indexOf(id) !== -1)
+        };
+
+        if (!hasId(baseId + suffix)) {
+            return baseId + suffix;
         }
         let no = 2;
-        while(ids.indexOf(baseId + no) !== -1) {
+        while(hasId(baseId + no + suffix)) {
             no++;
         }
-        return baseId + no;
+        return baseId + no + suffix;
     }
 }
 

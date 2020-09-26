@@ -35,7 +35,16 @@ import {
     GlobalContext
 } from "./BaseComponents";
 
-import {d, getItemsCloneWithUpdatedItem, getCanvasForDim, rgb2hex, getIdToItems} from '../helper/helper';
+import {
+    d,
+    isValidResourceId,
+    getItemsCloneWithUpdatedItem,
+    getRebuildJsonForModel,
+    getCanvasForDim,
+    rgb2hex,
+    getIdToItems,
+    getResourceTreeForJsonModel
+} from '../helper/helper';
 
 import {
     EditorCtx,
@@ -187,6 +196,18 @@ function CharIndex(props) {
         eContext.updateRaster();
     };
 
+    const addCharsWithBitmap = chars => {
+        props.cellProvider.addSpaceForChars(Object.keys(chars).length);
+        const size = props.cellProvider.getCharSize();
+        for (let code in chars) {
+            props.cellProvider.addCharCode(code, false);
+            const bitmap = chars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
+            props.cellProvider.setBitmapForValue(code, bitmap);
+        }
+        props.cellProvider.generateFlatImage();
+        update();
+    };
+
     const actions = [
         {
             name: 'Edit',
@@ -227,22 +248,18 @@ function CharIndex(props) {
                 const chars = getCharsForIndices(indices);
                 const undoChars = {};
                 for (let char of chars) {
-                    undoChars[char] = props.cellProvider.getBitmapForValue(char, 1, false);
+                    undoChars[char] = props.cellProvider.getBitmapForValue(char);
                 }
                 eContext.doAction(
                     () => {
                         for (let char of chars) {
-                            props.cellProvider.deleteChar(char);
+                            props.cellProvider.deleteChar(char, false);
                         }
+                        props.cellProvider.generateFlatImage();
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             }
@@ -268,12 +285,7 @@ function CharIndex(props) {
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             },
@@ -359,12 +371,7 @@ function CharIndex(props) {
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             },
@@ -390,12 +397,14 @@ function CharIndex(props) {
     };
 
     const assignImagesToChars = (images, oldCodes) => {
-        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}});
+        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}, image: getCanvasForDim(size.x, size.y)});
+        assignProvider.addSpaceForChars(images.length);
         for (let i = 0; i < images.length; i++) {
             const code = String.fromCharCode(32 + i);
-            assignProvider.addCharCode(code);
+            assignProvider.addCharCode(code, false);
             assignProvider.setBitmapForValue(code, images[i]);
         }
+        assignProvider.generateFlatImage();
 
         const assign = (newCodes) => {
             const backups = {};
@@ -472,7 +481,6 @@ function CharIndex(props) {
                 multi: true,
                 doubleClick: selected
             },
-            bitmap: props.source,
             save: selected
         });
     };
@@ -540,7 +548,7 @@ function CharIndex(props) {
                     <FlexRasterIndex
                         editorId="fontIndex"
                         cellProvider={props.cellProvider}
-                        undoRedo
+                        undoRedo={props.undoRedo}
                         empty="No characters yet, please import or create new ones"
                         dim={props.cellProvider.getCharSize()}
                         incPosRef={incPosRef}
@@ -1324,7 +1332,7 @@ function ResizeFontForm(props) {
         });
     };
 
-    const setState = (changes) => {
+    const setState = changes => {
         changes.width = changes.width ? changes.width : width;
         changes.height = changes.height ? changes.height : height;
         changes.offsetX = changes.offsetX !== undefined ? changes.offsetX : offsetX;
@@ -1370,7 +1378,7 @@ function ResizeFontForm(props) {
 
     let moveCursor = 'move';
 
-    const initMove = (e) => {
+    const initMove = e => {
         const rect = overlayRef.current.getBoundingClientRect();
         const cellSize = (size * zoom + border);
         let lastX = Math.floor((e.clientX - rect.x)/cellSize);
@@ -1516,7 +1524,7 @@ function NewFontForm(props) {
     const SelectDimModal = useModal();
 
     const selectDim = () => {
-        const selected = (result) => {
+        const selected = result => {
             setWidth(result.getWidth());
             setHeight(result.getHeight());
             SelectDimModal.hide();
@@ -1540,7 +1548,7 @@ function NewFontForm(props) {
                     <TextFieldProp name="Id:" value={id} set={value => setId(value)} size={20} />
                     <PropLabel name="Size:">
                         <Stack>
-                            <Dim buttons min={1} max={128} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
+                            <Dim buttons {...props.fieldProps} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
                             <Content><button onClick={selectDim}>Select...</button></Content>
                         </Stack>
                     </PropLabel>
@@ -1570,63 +1578,49 @@ function NewFontForm(props) {
     );
 }
 
+function NewIdForm(props) {
+    const [id, setId] = useState(props.id);
+    const disabled = id === '' || !props.validator(id);
+
+    return (
+        <Stack vertical>
+            <Content padded>
+                <PropertyGrid>
+                    <TextFieldProp invalid={disabled} name="Id:" value={id} set={setId} size={20} />
+                </PropertyGrid>
+            </Content>
+            <Content padded>
+                <Stack>
+                    <button disabled={disabled} onClick={() => {
+                        props.save(id);
+                    }}>Save</button>
+                    <button onClick={props.hide}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
 function TextPaneEditor(props) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
 
     const ResizeFontModal = useModal();
     const NewFontModal = useModal();
+    const NewFontIdModal = useModal();
 
-    /*
-        Nehmen wir an, wir machen das, dann müssten wir einen globalen
-        ModelSetter haben:
-
-        const [model, setModel] = useState(props.model)
-
-        Damit React auf dem model arbeiten kann, müssten wir die Model-Ref
-        bei jeder Änderung durch ein neues (komplett-)Modell ersetzen. Beim
-        speichern würde das Modell über den RL gespeichert und dann wieder
-        von dort geladen.
-
-        Haben wir ein EditProp x, dann würden wir das folgendermaßen machen:
-
-          <Int name="x" value="model.x" set="value => setModel({...model, x: value})" />
-
-        Problem daran: wir generieren, alle Subkomponenten neu, es sei denn wir
-
-        <CharacterEditor font=model.fonts[activeFont] />
-
-        Jede Änderung innerhalb des CharacterEditors müsste über setModel
-        laufen und da das Font-Model nur über die props reinging, müsste der
-        Editor jedes mal über einen key neu generiert werden, was alle
-        Editorsettings zurücksetzen würde.
-
-        Alternativ bekommt der Editor über props eine Referenz auf das Font-
-        Submodel
-
-        modelRef = useRef(props.font);
-
-        Beispiel: Chars löschen
-
-        Der CharEditor initialisiert sich ein IndexProvider mit props.font
-        Dieser wiederum speichert sich eine Referenz this.modelRef = font
-        und arbeitet anschliessend auf dieser. Bei Änderungen muss aber auf
-        dem CharEditor ein Update getriggert werden, damit sich die Änderungen
-        auch in der Darstellung widerspiegeln.
-
-
-
-     */
-    const [fonts, setFonts] = useState(() => {
-        const fonts = [];
-        for (let font of props.resource.data.fonts) {
-            fonts.push(font.config.getJson());
-        }
-        return fonts;
-    });
-    const [active, setActive] = useState(fonts.length > 0 ? 0 : null);
-    const getNewFontUid = useUniqueResourceId(props.resource.id + '_font', fonts);
-
+    const [model, setModel] = useState(props.model);
+    const [active, setActiveRaw] = useState(eContext.getSetting('lastActiveFont', model.fonts.length > 0 ? 0 : null));
+    const setActive = value => {
+        eContext.setSetting('lastActiveFont', value);
+        setActiveRaw(value);
+        updateTree();
+    };
+    const [tree, setTree] = useState(props.tree);
+    const updateTree = () => {
+        setTree(getResourceTreeForJsonModel(props.resource.cls, model));
+    };
+    const getNewFontUid = useUniqueResourceId(context.resourceLoader, 'json');
     const TextBlockEntity = useEntity('block', {
         name: 'New block',
         posX: 0,
@@ -1639,7 +1633,7 @@ function TextPaneEditor(props) {
         autoCenterY: false,
         rasterize: false
     });
-    TextBlockEntity.setDefaults({font: fonts[0].id});
+    TextBlockEntity.setDefaults({font: model.fonts[0].id});
     const [blocks, setBlocks] = useState(() => {
         const items = [];
         for(let item of props.resource.blocks) {
@@ -1654,104 +1648,123 @@ function TextPaneEditor(props) {
         }
         return items;
     });
-    const id2Font = getIdToItems(fonts);
-    const currFont = fonts[active];
+    const id2Font = getIdToItems(model.fonts);
+    const currFont = model.fonts[active];
+    const getNewFontImageUid = useUniqueResourceId(context.resourceLoader, 'image');
 
-    for (let font of fonts) {
+    for (let font of model.fonts) {
         if (!font.provider) {
             font.provider = new FontCharIndexProvider(font);
         }
     }
 
-    // TODO: should be a state variable because the resources are dynamic
     const info = [];
-    for (let resource of props.info) {
-        info.push(`${resource.name}: "${resource.id}" [${resource.source}]`);
+    for (let resource of props.tree) {
+        info.push(`${resource.type}: "${resource.id}" [${resource.source}]`);
     }
 
+    const deleteFont = () => {
+        const undoFont = model.fonts[active];
+        const undoIndex = active;
+        const doAction = () => {
+            model.fonts.splice(active, 1);
+            const newBlocks = [];
+            for (let block of blocks) {
+                if (block.font != undoFont.id) {
+                    newBlocks.push(block);
+                }
+            }
+            let newActive = Math.min(model.fonts.length - 1, active);
+            setBlocks(newBlocks);
+            setActive(newActive < 0 ? null : newActive);
+        };
+        const undoAction = () => {
+            model.fonts.splice(undoIndex, 0, undoFont);
+            setActive(undoIndex);
+        };
+        eContext.doAction(doAction, undoAction);
+    };
+
     const newFont = () => {
+
         const defaultConfig = new props.resource.config.deps.font({});
-        const defaults = {...defaultConfig.getDefaults(), id: getNewFontUid()};
-        NewFontModal.show({
-            defaults,
-            save: item => {
-                const fontConfig = new props.resource.config.deps.font(item);
-                const img =
-                    context.resourceLoader.makeImageResource(
-                        getCanvasForDim(item.width, item.height),
-                        item.id + '_image'
-                    );
-                fontConfig.setImage(img);
-                setFonts([...fonts, fontConfig.getJson()]);
-                setActive(fonts.length);
-                NewFontModal.hide();
+        const fontIds = [];
+        for (let font of model.fonts) {
+            fontIds.push(font.id);
+        }
+        const id = getNewFontUid(props.resource.id + '_font', fontIds);
+        const jsonIds = context.resourceLoader.getAllResourceIds('json');
+
+        NewFontIdModal.show({
+            id,
+            validator: id => (isValidResourceId('json', id) && !(fontIds.includes(id) || jsonIds.includes(id))),
+            save: fontId => {
+                NewFontIdModal.hide();
+
+                const defaults = {...defaultConfig.getDefaults(), id: fontId};
+                let fieldProps = defaultConfig.getFieldProps();
+                fieldProps = {
+                    minX: fieldProps.width.min,
+                    minY: fieldProps.height.min,
+                    maxX: fieldProps.width.max,
+                    maxY: fieldProps.height.max
+                };
+                NewFontModal.show({
+                    defaults,
+                    fieldProps,
+                    save: item => {
+                        const undoIndex = active;
+                        const fontConfig = new props.resource.config.deps.font(item);
+                        const imgIds = [];
+                        for (let font of model.fonts) {
+                            if (!imgIds.includes(font.imageId)) {
+                                imgIds.push(font.imageId);
+                            }
+                        }
+                        const img =
+                            context.resourceLoader.makeImageResource(
+                                getCanvasForDim(item.width, item.height),
+                                getNewFontImageUid(fontId + '_image', imgIds)
+                            );
+                        fontConfig.setImage(img);
+                        const undoFont = fontConfig.getJson();
+
+                        const doAction = () => {
+                            model.fonts.push(undoFont);
+                            setActive(model.fonts.length - 1);
+                        };
+                        const undoAction = () => {
+                            model.fonts.pop();
+                            setActive(undoIndex);
+                        };
+                        eContext.doAction(doAction, undoAction);
+                        NewFontModal.hide();
+                    }
+                });
             }
         });
     };
 
-    const saveFonts = () => {
-        const config = new props.resource.config({id: props.resource.data.id});
-        for (let font of fonts) {
-            // TODO das geht noch besser
-            const rebuilder = new props.resource.config.deps.font({});
-            const json = rebuilder.getRebuildJson(true, font.provider.getJson());
-            config.addFont(json);
-        }
-        context.resourceLoader.storeScreenResource(context.game.currentScreen, config);
-
+    const saveTextPane = () => {
+        props.save(model);
         eContext.updateRestorePos();
-        props.resource.data = null;
-        props.update();
     };
 
-    // TODO das hier können allgemeiner Abhandeln, da resource.conf.getResources()
-    // eigentlich schon alle infos für den Code-Export liefert
-    const getResourceDef = (type, id, value) => {
-        if (type === 'image') {
-            value = '"' + value + '"';
-        } else if (type === 'json') {
-            const lines = JSON.stringify(value, null, 4).split('\n');
-            value = lines.join('\n    ');
-        }
-        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
+    const exportTextPane = () => {
+        props.export(model);
     };
 
-    const exportFonts = () => {
-
-        const paneConf = new props.resource.config({id: props.resource.id});
-        for (let font of fonts) {
-            const image = context.resourceLoader.makeImageResource(font.provider.getFontMapImage(), font.image.id);
-            const fontMap =
-                new props.resource.config.deps.font({
-                    id: font.id,
-                    width: font.width,
-                    height: font.height,
-                    map: font.provider.getFontMapJson(font.id).map,
-                    image
-                });
-            paneConf.addFont(fontMap);
-        }
-        paneConf.resolve();
-        const resources = paneConf.getResources();
-        const exportLines = [];
-        for (let resource of resources.resources.reverse()) {
-            const data = resource.type === 'image' ? resource.data.getDataUrl() : resource.data;
-            exportLines.push(getResourceDef(resource.type, resource.id, data));
-        }
-        props.export(exportLines);
-    };
-
-    const deployFonts = () => {
-        props.deploy();
+    const deployTextPane = () => {
+        props.deploy(model);
     };
 
     function getFontProps(index) {
-        const editFont = fonts[index];
+        const editFont = model.fonts[index];
 
         const resizeAction = () => {
             ResizeFontModal.show({
                 font: editFont,
-                save: (resize) => {
+                save: resize => {
                     const iMax = editFont.provider.getMaxIndex();
                     const canvas = getCanvasForDim(
                     resize.width * editFont.provider.getMaxIndex(),
@@ -1768,7 +1781,7 @@ function TextPaneEditor(props) {
                     const map = {};
                     for(let i = 0; i < iMax; i++) {
                         ctx.drawImage(
-                            editFont.provider.getBitmapForIndex(i, 1, false),
+                            editFont.provider.getBitmapForIndex(i),
                             sourceOffsetX,
                             sourceOffsetY,
                             targetWidth,
@@ -1778,22 +1791,34 @@ function TextPaneEditor(props) {
                             targetWidth,
                             targetHeight
                         );
-                        map[editFont.provider.getCharAtIndex(i)] = {x: i*resize.width, y: 0};
+                        map[editFont.provider.getCharAtIndex(i)] = {x: i * resize.width, y: 0};
                     }
                     const doFont = {
                         id: editFont.id,
                         height: resize.height,
                         width: resize.width,
                         map,
-                        image: context.resourceLoader.makeImageResource(canvas, editFont.image.id),
+                        imageId: editFont.imageId,
+                        image: canvas,
                         provider: null
                     };
-                    const newFonts = [...fonts];
-                    newFonts[index] = doFont;
+                    const undoFont = model.fonts[index];
+                    model.fonts[index] = doFont;
                     for (let block of blocks) {
                         block.img = null;
                     }
-                    setFonts(newFonts);
+
+                    const doAction = () => {
+                        model.fonts[index] = doFont;
+                        setActive(index);
+                        eContext.updateRaster();
+                    };
+                    const undoAction = () => {
+                        model.fonts[index] = undoFont;
+                        setActive(index);
+                        eContext.updateRaster();
+                    };
+                    eContext.doAction(doAction, undoAction);
                     ResizeFontModal.hide();
                 }
             })
@@ -1805,7 +1830,7 @@ function TextPaneEditor(props) {
                     name="ID:"
                     value={editFont.id}
                     readOnly
-                    set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {id: value}))} />
+                />
                 <PropLabel name="Size:">
                     <Stack>
                         <Dim x={editFont.width} y={editFont.height} readOnly />
@@ -1822,27 +1847,34 @@ function TextPaneEditor(props) {
         <Fragment>
             <button onClick={props.cancel}>Back</button>
             <button onClick={props.revert}>Revert</button>
-            <button onClick={saveFonts} disabled={eContext.hasStorePos()}>Save</button>
-            <button onClick={deployFonts} disabled={!eContext.hasStorePos()}>Deploy</button>
-            <button onClick={exportFonts}>Export</button>
+            <button onClick={saveTextPane}>Save</button>
+            <button onClick={deployTextPane} disabled={!eContext.hasStorePos()}>Deploy</button>
+            <button onClick={exportTextPane}>Export</button>
             <button onClick={props.play}>Play</button>
         </Fragment>
     );
 
     return (
-        <Page title="Edit TexPane" resources={props.info}  actions={actions}>
+        <Page title="Edit TexPane" resources={tree}  actions={actions}>
             <Stack vertical fullHeight>
+                <Section name="TextPane">
+                    <Toolbar>
+                        <button disabled={!eContext.hasPast()} onClick={() => eContext.undoAction()}>Undo</button>
+                        <button disabled={!eContext.hasFuture()} onClick={() => eContext.redoAction()}>Redo</button>
+                    </Toolbar>
+                </Section>
                 <Stack>
                     <Section name="Fonts">
                         <ItemsStack
                             new={newFont}
+                            deleteActiveItem={deleteFont}
                             width={200}
                             min={1}
                             collapsed
                             active={active}
                             setActive={setActive}
-                            setItems={setFonts}
-                            items={fonts}
+                            setItems={value => {model.fonts = value; setModel(model)}}
+                            items={model.fonts}
                             cleanUp={item => {
                                 // scheint beim Löschen eines Fonts auch die TextBlöcke
                                 // die auf diesen verlinkt haben, zu löschen
@@ -1859,7 +1891,7 @@ function TextPaneEditor(props) {
                         />
                     </Section>
                     <Section name="Characters" flex>
-                        <CharIndex cellProvider={currFont.provider} source={currFont.image.toDataURL('image/png')} />
+                        <CharIndex undoRedo={false} cellProvider={currFont.provider} />
                     </Section>
                 </Stack>
                 <Content flex>
@@ -1872,8 +1904,12 @@ function TextPaneEditor(props) {
             </ResizeFontModal.render>
 
             <NewFontModal.render name="New Font" fit closeable>
-                <NewFontForm save={NewFontModal.params.save} defaults={NewFontModal.params.defaults} hide={NewFontModal.hide} />
+                <NewFontForm save={NewFontModal.params.save} defaults={NewFontModal.params.defaults} fieldProps={NewFontModal.params.fieldProps} hide={NewFontModal.hide} />
             </NewFontModal.render>
+
+            <NewFontIdModal.render name="New Font Id" fit closeable>
+                <NewIdForm save={NewFontIdModal.params.save} validator={NewFontIdModal.params.validator} id={NewFontIdModal.params.id} hide={NewFontIdModal.hide} />
+            </NewFontIdModal.render>
         </Page>
     );
 }
