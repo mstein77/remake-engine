@@ -9,6 +9,7 @@ import {
     SpritePane,
     ColorPane,
     TextPane,
+    TextBlock,
     PatternPane,
     TilesPane,
     ObjectController,
@@ -66,16 +67,33 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const statusPaneConf = new TextPane.Config({id: 'statusPane'});
             statusPaneConf.addFont(globals.fontMap);
             const statusPane = new TextPane(statusPaneConf);
+            statusPane.addTextBlocks([{
+                id: 'status',
+                x: 24,
+                y: 8,
+                text: "MARIO         WORLD  TIME"
+            }, {
+                id: 'score',
+                x: 3 * 8,
+                y: 16,
+                text: '      '
 
-            statusPane.addTextBlock('status', 24, 8,
-                "MARIO         WORLD  TIME"
-            );
-
-            statusPane.addTextBlock('score', 3 * 8, 16, '      ');
-            statusPane.addTextBlock('coins', 12 * 8, 16, '   ');
-            statusPane.addTextBlock('world', 18 * 8, 16, '' + globals.world);
-            statusPane.addTextBlock('time', 25 * 8, 16, '   ');
-
+            }, {
+                id: 'coins',
+                x: 12 * 8,
+                y: 16,
+                text: '   '
+            }, {
+                id: 'world',
+                x: 18 * 8,
+                y: 16,
+                text: '' + globals.world
+            }, {
+                id: 'time',
+                x: 25 * 8,
+                y: 16,
+                text: '   '
+            }]);
             globals.updateCoins = function() {
                 statusPane.updateTextBlock('coins', '*' + TextPane.padStart(globals.coins, '0', 2));
             };
@@ -557,26 +575,37 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const canvasPane = new CanvasPane();
 
             const demoTextPane = new TextPane({id: 'demoTextPane', fonts: [turricanFont]});
-            demoTextPane.addTextBlock('screentext', 70, 25,
-                '     REMAKE ENGINE\n' +
-                '       SHOWCASES', 4);
+            demoTextPane.addTextBlocks([{
+                id: 'screentext',
+                autoCenteringX: true,
+                y: 25,
+                textAlign: 'center',
+                text:
+                    'REMAKE ENGINE\n' +
+                    'SHOWCASES',
+                lineSpacing: 4
+            }, {
+                id: 'games',
+                x: 30,
+                y: 66,
+                text: '  GAME 1     GAME 2    GAME 3',
+                lineSpacing: 4
+            }, {
+                id: 'start',
+                x: 83,
+                y: 192,
+                text: 'ESC=BACK RETURN=START'
+            }, {
+                id: 'controls',
+                x: 100,
+                y: 138,
+                text:
+                    '  W\n' +
+                    'A   D      J   K\n' +
+                    '  S',
+                lineSpacing: 10
+            }]);
 
-            demoTextPane.addTextBlock(
-                'games', 30, 66,
-                '  GAME 1     GAME 2    GAME 3',4
-            );
-
-            demoTextPane.addTextBlock(
-                'start', 83, 192,
-                'ESC=BACK RETURN=START'
-            );
-
-            demoTextPane.addTextBlock(
-                'controls', 100, 138,
-                '  W\n' +
-                'A   D      J   K\n' +
-                '  S', 10
-            );
             demoScreen.addPane(canvasPane);
             demoScreen.addPane(demoTextPane);
 
@@ -643,15 +672,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             const setDemo = function() {
                 demoTextPane.removeTextBlock('selected');
                 demoTextPane.removeTextBlock('system');
-                demoTextPane.addTextBlock(
-                    'selected', 30, 94,
-                    demos[activeDemo].name, 4
-                );
-                demoTextPane.setTextBlockFilter('selected', 'monochrome(#FFFFFF)')
-                demoTextPane.addTextBlock(
-                    'system', 30, 106,
-                    demos[activeDemo].system, 4
-                );
+                demoTextPane.addTextBlock({
+                    id: 'selected',
+                    x: 30,
+                    y: 94,
+                    text: demos[activeDemo].name,
+                    lineSpacing: 4
+                });
+                demoTextPane.setTextBlockFilters('selected', 'monochrome(#FFFFFF)')
+                demoTextPane.addTextBlock({
+                    id: 'system',
+                    x: 30,
+                    y: 106,
+                    text: demos[activeDemo].system,
+                    lineSpacing: 4
+                });
             };
 
             const minCol = 60;
@@ -3005,9 +3040,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         for (let plant of plants) {
                             plant.state = 'die';
                         }
-                        globals.statusPane.addTextBlock('warp-msg', 36, 88,
-                            "WELCOME YOU CHEATER!\n\n\n\n\n" +
-                            ' 1       1       1');
+                        globals.statusPane.addTextBlock({
+                            id: 'warp-msg',
+                            x: 36,
+                            y: 88,
+                            text:
+                                "WELCOME YOU CHEATER!\n\n\n\n\n" +
+                                ' 1       1       1'
+                        });
                         return false;
                     }
                 }
@@ -4467,9 +4507,21 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                         case 'thank-you':
                             if (cutsceneFrame === 0) {
-                                globals.statusPane.addTextBlock('thx', 40, 80, 'GO FUCK YOURSELF MARIO!', 10);
+                                globals.statusPane.addTextBlock({
+                                    id: 'thx',
+                                    x: 40,
+                                    y: 80,
+                                    text: 'GO FUCK YOURSELF MARIO!',
+                                    lineSpacing: 10
+                                });
                             } else if (cutsceneFrame === 200) {
-                                globals.statusPane.addTextBlock('thx2', 32, 100, 'YOU JUST KILLED MY LOVER!', 10);
+                                globals.statusPane.addTextBlock({
+                                    id: 'thx2',
+                                    x: 32,
+                                    y: 100,
+                                    text: 'YOU JUST KILLED MY LOVER!',
+                                    lineSpacing: 10
+                                });
                             } else if (cutsceneFrame === 500) {
                                 this.gotoScreen('game-over', {msgParams: {
                                         msg: 'GAME OVER',
@@ -5066,9 +5118,13 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             vSplitArea.addPane(globals.statusPane, 1);
 
             const msg = globals.msgParams.msg;
-            globals.statusPane.addTextBlock('screentext', 128 - (msg.length * 8 >> 1),110,
-                msg,4
-            );
+            globals.statusPane.addTextBlock({
+                id: 'screentext',
+                x: 128 - (msg.length * 8 >> 1),
+                y: 110,
+                text: msg,
+                lineSpacing: 4
+            });
 
             const spritePane = new SpritePane(globals.spriteSheet);
             spritePane.addSprite('minicoin', 'minicoin', 87, 16, -1);
@@ -5108,9 +5164,14 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             if (lifes.length === 1) {
                 lifes = ' ' + lifes;
             }
-            globals.statusPane.addTextBlock('screentext', 88, 64,
-                'WORLD ' + globals.world + "\n\n\n    * " + lifes,4
-            );
+            globals.statusPane.addTextBlock({
+                id: 'screentext',
+                x: 88,
+                y: 64,
+                text:
+                    'WORLD ' + globals.world + "\n\n\n    * " + lifes,
+                lineSpacing: 4
+            });
             vSplitArea.addPane(globals.statusPane, 1);
 
             const spritePane = new SpritePane(globals.spriteSheet);

@@ -370,6 +370,34 @@ const getIdToItems = items => {
     return id2items;
 };
 
+const getIdsFromObjects = (items, idProp = 'id') => {
+    const ids = [];
+    for (let item of items) {
+        ids.push(item[idProp]);
+    }
+    return ids;
+};
+
+const getObjectWithId = (items, id) => {
+    for (let item of items) {
+        if (item.id === id) {
+            return item;
+        }
+    }
+    return null;
+};
+
+const getNextUid = (ids, baseId) => {
+    if (!ids.includes(baseId)) {
+        return baseId;
+    }
+    let no = 2;
+    while (ids.includes(baseId + no)) {
+        no++;
+    }
+    return baseId + no;
+};
+
 const getCanvasForDim = (width, height) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -457,6 +485,139 @@ const getJsonModelOfInstance = instance => {
     return json;
 };
 
+const getInstanceFromInput = (cls, input) => {
+    if (input instanceof cls) {
+        return input;
+    }
+    if (!(input instanceof cls.Config)) {
+        input = new cls.Config(input);
+    }
+    return new cls(input);
+};
+
+const getBlockPos = (block, fonts, dim) => {
+    let blockDim = {};
+    let font = null;
+    if (block.canvas) {
+        blockDim.width = block.canvas.elem.width;
+        blockDim.height = block.canvas.elem.height;
+    } else {
+        font = getObjectWithId(fonts, block.font);
+        blockDim = getBlockDim(block, font);
+    }
+
+    let x = block.autoCenteringX ?
+        Math.ceil(dim.x/2) - Math.ceil(blockDim.width/2) : block.x;
+
+    let y = block.autoCenteringY ?
+        Math.ceil(dim.y/2) - Math.ceil(blockDim.height/2) : block.y;
+
+    if (block.alignToGrid) {
+        if (font === null) {
+            font = getObjectWithId(fonts, block.font);
+        }
+        x = Math.floor(x/font.width) * font.width;
+        y = Math.floor(y/font.height) * font.height;
+    }
+
+    return {x, y, width: blockDim.width, height: blockDim.height}
+};
+
+const drawTextBlocks = (ctx, dim, blocks, fonts, zoom = 1) => {
+    for (let block of blocks) {
+        const pos = getBlockPos(block, fonts, dim);
+
+        ctx.drawImage(
+            block.canvas.elem,
+            0,
+            0,
+            pos.width,
+            pos.height,
+            pos.x * zoom,
+            pos.y * zoom,
+            pos.width * zoom,
+            pos.height * zoom
+        );
+    }
+};
+
+const getBlockDim = (block, font) => {
+    const lines = block.text.split('\n');
+    block.height = lines.length;
+    let max = 0;
+    for (let line of lines) {
+        max = Math.max(line.length, max);
+    }
+    block.width = max;
+
+    // calc block dim
+    return {
+        width: font.width * block.width,
+        height: (font.height * block.height) + (block.lineSpacing * (block.height - 1))
+    }
+};
+
+const getTextBlockImage = (block, font, filterer = null) => {
+
+    if (block.font !== font.id) {
+        return null;
+    }
+
+    const blockDim = getBlockDim(block, font);
+
+    // get new canvas for block
+    let canvas = getCanvasForDim(
+    blockDim.width || 1,
+    blockDim.height || 1
+    );
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const lines = block.text.split('\n');
+    // process lines
+    let posY = 0;
+    for (let y = 0; y < block.height; y++) {
+        let line = lines[y];
+        // do text align on current line
+        if (block.textAlign !== 'left' && line.length < block.width) {
+            const pad = block.textAlign === 'right' ? block.width : (line.length + ((block.width - line.length) >> 1));
+            line = line.padStart(pad, ' ');
+        }
+        // draw each char in current line
+        for (let x = 0; x < line.length; x++) {
+            const char = font.map[line[x]];
+            if (char) {
+                ctx.drawImage(
+                    font.image,
+                    char.x,
+                    char.y,
+                    font.width,
+                    font.height,
+                    x * font.width,
+                    posY,
+                    font.width,
+                    font.height
+                );
+            } else {
+                trigger = true;
+            }
+        }
+        posY += block.lineSpacing + font.height;
+    }
+
+    if (filterer && block.filters) {
+        canvas = filterer.getCanvasWithFiltersApplied(
+            block.filters,
+        {elem: canvas, ctx},
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        )[0].elem;
+    }
+    return canvas;
+};
+
 module.exports = {
     d,
     hex2rgb,
@@ -465,11 +626,19 @@ module.exports = {
     getItemsCloneWithUpdatedItem,
     ResourceDependencies,
     flattenResources,
+    drawTextBlocks,
     getFlatObjectResources,
     getDeflatedResources,
     getIdToItems,
+    getIdsFromObjects,
+    getObjectWithId,
+    getNextUid,
     getCanvasForDim,
     getRebuildJsonForModel,
     getJsonModelOfInstance,
-    getResourceTreeForJsonModel
+    getResourceTreeForJsonModel,
+    getInstanceFromInput,
+    getTextBlockImage,
+    getBlockDim,
+    getBlockPos
 };

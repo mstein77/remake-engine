@@ -143,15 +143,15 @@ function TextField(props) {
     if (props.size) {
         attr.size = props.size
     }
-    if (props.className) {
-        attr.className = props.className;
-    }
     if (props.onClick) {
         attr.onClick = props.onClick;
     }
     const cls = [];
     if (props.invalid) {
         cls.push('invalid');
+    }
+    if (props.className) {
+        cls.push(props.className);
     }
     return (
         <input
@@ -1421,6 +1421,8 @@ function useUniqueIds(prefix = '') {
         return items;
     }
 }
+
+
 
 function useUniqueResourceId(resourceLoader, type) {
     const ids = resourceLoader.getAllResourceIds(type);

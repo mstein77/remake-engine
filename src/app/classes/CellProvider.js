@@ -907,7 +907,6 @@ class FontCharIndexProvider extends CellProvider {
         if (number <= 0) {
             return;
         }
-        d('#', number, this.model);
         const canvas = getCanvasForDim(this.model.image.width + number * this.model.width, this.model.image.height);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(this.model.image, 0, 0);

@@ -193,6 +193,20 @@ app.post('/store', (req, res) => {
         return true;
     };
 
+    const isScreenResource = (req.body.direct && req.body.screen !== undefined);
+    const oldResources = [];
+    if (isScreenResource && req.body.direct.json) {
+        for (let id of req.body.direct.json) {
+            const deps = dependencies.getResourceWithDependencies('json:' + id);
+            for (let id of deps) {
+                if (!oldResources.includes(id)) {
+                    oldResources.push(id);
+                }
+            }
+        }
+    }
+    const newResources = [];
+
     for (let resource of resources) {
         const info = {id: resource.id, type: resource.type};
         if (!isValidResourceId(info.type, info.id)) {
@@ -242,17 +256,32 @@ app.post('/store', (req, res) => {
 
         if (success) {
             stored.push(info);
+            newResources.push(info.type + ':' + info.id);
         } else {
             failed.push(info);
         }
     }
 
     // store new direct and indirect entries
-    if (req.body.direct && req.body.screen !== undefined) {
+    if (isScreenResource) {
         dependencies.storeScreenResources(req.body.screen, req.body.direct);
     }
     if (req.body.indirect) {
         dependencies.storeResourceDependencies(req.body.indirect);
+    }
+
+    // delete obsolete resources
+    for (let resource of oldResources) {
+        const deleteResources = [];
+        if (!newResources.includes(resource)) {
+            deleteResources.push(resource);
+        }
+        if (deleteResources.length) {
+            for(let resource of deleteResources) {
+                const [type, id] = resource.split(':');
+                dependencies.safeDeleteScreenResource(type, id);
+            }
+        }
     }
 
     res.json({stored, failed, invalid});

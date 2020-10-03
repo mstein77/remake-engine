@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -1201,6 +1201,13 @@ class Config {
         return {};
     }
 
+    validateBool(value) {
+        if (typeof value !== 'boolean') {
+            throw Error('value must be a boolean');
+        }
+        return value;
+    }
+
     validateInt(value, props = {}) {
         if (value === undefined) {
             throw Error('Undefined value');
@@ -1232,6 +1239,9 @@ class Config {
         }
         if (props.size && value.length !== props.size) {
             throw Error('value must have a length of ' + props.size);
+        }
+        if (props.values && !props.values.includes(value)) {
+            throw Error('value not allowed');
         }
         return value;
     }
@@ -1375,9 +1385,15 @@ class Config {
         return value;
     }
 
-    validateId(value) {
+    validateId(value, options = {}) {
         if (value == undefined) {
+            if (options.null) {
+                return null;
+            }
             throw Error('config requires an id property');
+        }
+        if (options.null && value === null) {
+            return null;
         }
         if (typeof value !== 'string') {
             throw Error('id must be a string');
@@ -1422,8 +1438,14 @@ class Config {
         }
     }
 
+    isEditable() {
+        return false;
+    }
+
     applyTo(obj) {
-        this.resolve();
+        if (!this.isEditable) {
+            this.resolve();
+        }
         obj.id = this.id;
         return obj;
     }
@@ -1541,6 +1563,99 @@ class FontMapConfig extends Config {
 }
 FontMapConfig.__type = 'FontMap';
 
+class TextBlockConfig extends Config {
+
+    isEditable() {
+        return true;
+    }
+
+    getDefaults() {
+        return {
+            x: 0,
+            y: 0,
+            font: null,
+            lineSpacing: 0,
+            alignToGrid: false,
+            autoCenteringX: false,
+            autoCenteringY: false,
+            textAlign: 'left',
+            text: '',
+            filters: ''
+        }
+    }
+
+    getFieldProps() {
+        return {
+            x: {min: -9999, max: 9999},
+            y: {min: -9999, max: 9999},
+            lineSpacing: {min: 0, max: 9999},
+            textAlign: {values: ['left', 'right', 'center']}
+        };
+    }
+
+    setFont(value) {
+        this.font = this.validateId(value, {null: true});
+    }
+
+    setText(value) {
+        this.text = this.validateString(value);
+    }
+
+    setTextAlign(value) {
+        this.textAlign = this.validateString(value);
+    }
+
+    setX(value) {
+        this.x = this.validateInt(value);
+    }
+
+    setY(value) {
+        this.y = this.validateInt(value);
+    }
+
+    setLineSpacing(value) {
+        this.lineSpacing = this.validateInt(value);
+    }
+
+    setAlignToGrid(value) {
+        this.alignToGrid = this.validateBool(value)
+    }
+
+    setAutoCenteringX(value) {
+        this.autoCenteringX = this.validateBool(value);
+    }
+
+    setAutoCenteringY(value) {
+        this.autoCenteringY = this.validateBool(value);
+    }
+
+    setFilters(value) {
+        this.filters = this.validateString(value);
+    }
+
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.x = this.x;
+        obj.y = this.y;
+        obj.alignToGrid = this.alignToGrid;
+        obj.autoCenteringX = this.autoCenteringX;
+        obj.autoCenteringY = this.autoCenteringY;
+        obj.text = this.text;
+        obj.font = this.font;
+        obj.textAlign = this.textAlign;
+        obj.lineSpacing = this.lineSpacing;
+        obj.filters = this.filters;
+        const lines = this.text.split('\n');
+        let maxWidth = 0;
+        for (let line of lines) {
+            maxWidth = Math.max(maxWidth, line.length);
+        }
+        obj.width = maxWidth;
+        obj.height = lines.length;
+        return obj;
+    }
+}
+
 class TextPaneConfig extends Config {
 
     getSubResources() {
@@ -1592,7 +1707,8 @@ class TextPaneConfig extends Config {
 }
 TextPaneConfig.__type = 'TextPane';
 TextPaneConfig.deps = {
-    font: FontMapConfig
+    font: FontMapConfig,
+    block: TextBlockConfig
 };
 
 function getConfigFromInput(configCls, input) {
@@ -2000,7 +2116,9 @@ class Game {
                         } else if (pane instanceof TextPane) {
                             const blocks = [];
                             for (let id in pane.blocks) {
-                                blocks.push({...pane.blocks[id], id});
+                                blocks.push(
+                                    {...pane.blocks[id].config.getJson()}
+                                );
                             }
                             resources.push(
                                 {
@@ -3143,10 +3261,23 @@ class ColorPane {
     }
 }
 
+
+class TextBlock {
+    constructor(input) {
+        this.config = getConfigFromInput(TextBlock.Config, input);
+        this.config.applyTo(this);
+    }
+
+    update(values) {
+        this.config.parse(values);
+        this.config.applyTo(this);
+    }
+}
+TextBlock.Config = TextBlockConfig;
+
+
 /**
  * TODO:
- *   - Multi-Font
- *   - Monochrome + Color
  *   - CaseInsensitive
  *   - Scrolling (Buffering?)
  *   - Proper Dirty-Handling (update)
@@ -3158,16 +3289,7 @@ class TextPane {
         config.applyTo(this);
         this.config = config;
         this.blocks = {};
-        this.lineSpacing = 0;
     }
-
-    /*
-    constructor(font) {
-        this.font = font;
-        this.blocks = {};
-        this.lineSpacing = 0;
-    }
-     */
 
     init(viewPortDimX, viewPortDimY) {
         this.viewPortDim = {
@@ -3191,62 +3313,72 @@ class TextPane {
         this.dirty = true;
     }
 
-    drawTextBlockToCtx(ctx, block) {
-        let parts = block.text.split("\n");
-        let y = 0;
-        for (let part of parts) {
-            this.fonts[0].drawTextLine(ctx, part, 0, y);
-            y += this.fonts[0].height + block.lineSpacing;
+    getBlockFont(block) {
+        if (!block.font) {
+            return null;
         }
+        for (let font of this.fonts) {
+            if (font.id === block.font) {
+                return font;
+            }
+        }
+        return null;
     }
 
-    addTextBlock(id, posX, posY, text, lineSpacing = 0) {
-        let width = 0;
-        let height = 0;
-        const lines = text.split('\n');
-        for (let line of lines) {
-            width = Math.max(width, line.length);
-            height += this.fonts[0].height;
+    addTextBlock(block) {
+        if (!this.fonts.length === 0) {
+            throw Error('Text block requires a font!');
         }
-        width *= this.fonts[0].width;
-        height += lineSpacing * lines.length;
-
-        const canvas = OCM.getNewOffscreenCanvas(width, height);
-        const block = {x: posX, y: posY, filter: '', height, width, text, lineSpacing, canvas};
-        this.drawTextBlockToCtx(canvas.ctx, block);
-        this.blocks[id] = block;
+        const instance = getInstanceFromInput(TextBlock, block);
+        if (instance.font === null) {
+            instance.update({font: this.fonts[0].id});
+        }
+        const font = this.getBlockFont(instance);
+        const canvas = getTextBlockImage(instance, font, filterer);
+        instance.canvas = {
+            elem: canvas,
+            ctx: canvas.getContext('2d')
+        };
+        instance.width = font.width * instance.width;
+        instance.height = font.height * instance.height;
+        this.blocks[instance.id] = instance;
         this.dirty = true;
     }
 
-    setTextBlockFilter(id, filter) {
-        this.blocks[id].filter = filter;
+    addTextBlocks(blocks) {
+        for (let block of blocks) {
+            this.addTextBlock(block);
+        }
+    }
+
+    setTextBlockFilters(id, filters) {
+        this.updateBlock(id, {filters});
+    }
+
+    updateBlock(id, updates) {
+        const block = this.blocks[id];
+        block.update(updates);
+        const canvas = getTextBlockImage(
+            block,
+            this.getBlockFont(block),
+            filterer
+        );
+        block.canvas = {
+            elem: canvas,
+            ctx: canvas.getContext('2d')
+        };
         this.dirty = true;
     }
 
     updateTextBlock(id, text) {
-        const block = this.blocks[id];
-        block.text = text;
-        if (block.canvas === undefined) {
-            block.canvas = OCM.getNewOffscreenCanvas(block.width, block.height);
-        } else {
-            block.canvas.ctx.clearRect(0, 0, block.width, block.height);
-        }
-        this.drawTextBlockToCtx(block.canvas.ctx, block);
-        this.dirty = true;
+        this.updateBlock(id, {text});
     }
 
     render() {
         const ctx = this.container.getCanvasCtx();
+
         ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
-        for (let id in this.blocks) {
-            const block = this.blocks[id];
-            if (block.filter === '') {
-                ctx.drawImage(block.canvas.elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
-            } else {
-                const result = filterer.getCanvasWithFiltersApplied(block.filter, block.canvas, 0, 0, block.width, block.height);
-                ctx.drawImage(result[0].elem, 0, 0, block.width, block.height, block.x, block.y, block.width, block.height);
-            }
-        }
+        drawTextBlocks(ctx, this.paneDim, Object.values(this.blocks), this.fonts);
         this.dirty = false;
     }
 
@@ -8311,6 +8443,7 @@ module.exports = {
     SpritePane,
     ColorPane,
     TextPane,
+    TextBlock,
     PatternPane,
     PatternPane2,
     TilesPane,
