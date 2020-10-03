@@ -5,7 +5,9 @@ import {
     useModal,
     useKeyListener,
     useEntity,
+    useUniqueResourceId,
     ItemsStack,
+    Page,
     Section,
     Content,
     Centered,
@@ -32,7 +34,22 @@ import {
     RangeProp,
     GlobalContext
 } from "./BaseComponents";
-import {d, getItemsCloneWithUpdatedItem, rgb2hex} from '../helper/helper';
+
+import {
+    d,
+    isValidResourceId,
+    getItemsCloneWithUpdatedItem,
+    getRebuildJsonForModel,
+    drawTextBlocks,
+    getCanvasForDim,
+    rgb2hex,
+    getIdToItems,
+    getIdsFromObjects,
+    getNextUid,
+    getTextBlockImage,
+    getBlockPos,
+    getResourceTreeForJsonModel
+} from '../helper/helper';
 
 import {
     EditorCtx,
@@ -184,6 +201,18 @@ function CharIndex(props) {
         eContext.updateRaster();
     };
 
+    const addCharsWithBitmap = chars => {
+        props.cellProvider.addSpaceForChars(Object.keys(chars).length);
+        const size = props.cellProvider.getCharSize();
+        for (let code in chars) {
+            props.cellProvider.addCharCode(code, false);
+            const bitmap = chars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
+            props.cellProvider.setBitmapForValue(code, bitmap);
+        }
+        props.cellProvider.generateFlatImage();
+        update();
+    };
+
     const actions = [
         {
             name: 'Edit',
@@ -224,22 +253,18 @@ function CharIndex(props) {
                 const chars = getCharsForIndices(indices);
                 const undoChars = {};
                 for (let char of chars) {
-                    undoChars[char] = props.cellProvider.getBitmapForValue(char, 1, false);
+                    undoChars[char] = props.cellProvider.getBitmapForValue(char);
                 }
                 eContext.doAction(
                     () => {
                         for (let char of chars) {
-                            props.cellProvider.deleteChar(char);
+                            props.cellProvider.deleteChar(char, false);
                         }
+                        props.cellProvider.generateFlatImage();
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             }
@@ -265,12 +290,7 @@ function CharIndex(props) {
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             },
@@ -356,12 +376,7 @@ function CharIndex(props) {
                         update();
                     },
                     () => {
-                        for (let code in undoChars) {
-                            props.cellProvider.addCharCode(code);
-                            const bitmap = undoChars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(code, bitmap);
-                        }
-                        update();
+                        addCharsWithBitmap(undoChars);
                     }
                 );
             },
@@ -387,12 +402,14 @@ function CharIndex(props) {
     };
 
     const assignImagesToChars = (images, oldCodes) => {
-        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}});
+        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}, image: getCanvasForDim(size.x, size.y)});
+        assignProvider.addSpaceForChars(images.length);
         for (let i = 0; i < images.length; i++) {
             const code = String.fromCharCode(32 + i);
-            assignProvider.addCharCode(code);
+            assignProvider.addCharCode(code, false);
             assignProvider.setBitmapForValue(code, images[i]);
         }
+        assignProvider.generateFlatImage();
 
         const assign = (newCodes) => {
             const backups = {};
@@ -469,7 +486,6 @@ function CharIndex(props) {
                 multi: true,
                 doubleClick: selected
             },
-            bitmap: props.source,
             save: selected
         });
     };
@@ -537,7 +553,7 @@ function CharIndex(props) {
                     <FlexRasterIndex
                         editorId="fontIndex"
                         cellProvider={props.cellProvider}
-                        undoRedo
+                        undoRedo={props.undoRedo}
                         empty="No characters yet, please import or create new ones"
                         dim={props.cellProvider.getCharSize()}
                         incPosRef={incPosRef}
@@ -833,14 +849,15 @@ function FiltersSelector(props) {
 function BlockProperties(props) {
     const FiltersModal = useModal();
     const {
-        name, setName,
+        id, setId,
         text, setText,
-        posX, setPosX,
-        posY, setPosY,
-        rasterize, setRasterize,
+        x, setX,
+        y, setY,
+        lineSpacing, setLineSpacing,
+        alignToGrid, setAlignToGrid,
         textAlign, setTextAlign,
-        autoCenterX, setAutoCenterX,
-        autoCenterY, setAutoCenterY,
+        autoCenteringX, setAutoCenteringX,
+        autoCenteringY, setAutoCenteringY,
         screenX,
         screenY,
         fonts,
@@ -856,7 +873,7 @@ function BlockProperties(props) {
         FiltersModal.show({
             title: 'Change assigned filters',
             filters,
-            save: (newFilters) => {
+            save: newFilters => {
                 setFilters(newFilters);
                 FiltersModal.hide();
             }
@@ -865,30 +882,53 @@ function BlockProperties(props) {
 
     const fontOptions = [];
     for (let id in fonts) {
-        fontOptions.push({id, name: fonts[id].name});
+        fontOptions.push({id, name: fonts[id].id});
     }
+    let fieldProps = props.defaultConfig.getFieldProps();
+    fieldProps = {
+        minX: fieldProps.x.min,
+        minY: fieldProps.y.min,
+        maxX: Math.min(fieldProps.x.max, screenX),
+        maxY: Math.min(fieldProps.y.max, screenY)
+    };
 
+    const actualPos = getBlockPos(
+        {font, text, x, y, lineSpacing, autoCenteringX, autoCenteringY, alignToGrid}, props.model.fonts, {x: props.screenX, y: props.screenY});
     return (
         <Fragment>
             <PropertyGrid>
-                <TextFieldProp name="Name:"  value={name} set={(value) => setName(value)} />
                 <SelectProp name="Font:" buttons value={font} set={setFont} options={fontOptions} />
                 <DimProp name="Position:"
-                         setX={setPosX}
-                         setY={setPosY}
-                         stepX={rasterize ? fontSize.x : 1}
-                         stepY={rasterize ? fontSize.y : 1}
-                         minX={0}
-                         readOnlyX={autoCenterX} readOnlyY={autoCenterY}
-                         minY={0} maxX={screenX} maxY={screenY} x={posX} y={posY} buttons
+                         setX={setX}
+                         setY={setY}
+                         stepX={alignToGrid ? fontSize.x : 1}
+                         stepY={alignToGrid ? fontSize.y : 1}
+                         {...fieldProps}
+                         readOnlyX={autoCenteringX} readOnlyY={autoCenteringY}
+                         x={x} y={y} buttons
                 />
-                <PropLabel name="Auto-Center:">
+                <PropLabel name=" - actual:">
                     <Stack>
-                        <Checkbox name="X" value={autoCenterX} set={setAutoCenterX}/>
-                        <Checkbox name="Y" value={autoCenterY} set={setAutoCenterY}/>
+                        <Dim x={actualPos.x} y={actualPos.y} readOnly />
+                        <Content>
+                            <button onClick={() => {
+                                setAutoCenteringX(false);
+                                setAutoCenteringY(false);
+                                setAlignToGrid(false);
+                                setX(actualPos.x);
+                                setY(actualPos.y);
+                            }}>Apply</button>
+                        </Content>
                     </Stack>
                 </PropLabel>
-                <CheckboxProp name="Grid-Positions:" value={rasterize} set={setRasterize} />
+                <IntProp name="Line Spacing:" buttons value={lineSpacing} set={setLineSpacing} {...props.defaultConfig.getFieldProp('lineSpacing')} />
+                <PropLabel name="Auto-Centering:">
+                    <Stack>
+                        <Checkbox name="X" value={autoCenteringX} set={setAutoCenteringX}/>
+                        <Checkbox name="Y" value={autoCenteringY} set={setAutoCenteringY}/>
+                    </Stack>
+                </PropLabel>
+                <CheckboxProp name="Align to Grid:" value={alignToGrid} set={setAlignToGrid} />
                 <RadioProp name="Text align:" material value={textAlign} set={setTextAlign} options={{left: 'format_align_left', center: 'format_align_center', right: 'format_align_right'}} />
                 <FullProp name="Text:">
                     <textarea rows={10} cols={40} value={text} onChange={(e) => {
@@ -913,13 +953,25 @@ function BlockProperties(props) {
 
 function FontPreview(props) {
     const context = useContext(GlobalContext);
+
+    const NewBlockIdModal = useModal();
+
     const [active, setActive] = useState(0);
+
     const [zoom, setZoomRaw] = useState(2);
     const [bgColor, setBgColor] = useState('#000000');
-    const [screenX, setScreenX] = useState(320);
-    const [screenY, setScreenY] = useState(200);
-    const [showMarker, setShowMarker] = useState(false);
-    const {blocks, setBlocks, defaultBlock} = props;
+    const [screenX, setScreenX] = useState(props.resource.dim.x);
+    const [screenY, setScreenY] = useState(props.resource.dim.y);
+    const [highlight, setHighlight] = useState(false);
+    const [showMarker, setShowMarker] = useState(true);
+    const fonts = getIdToItems(props.model.fonts)
+
+    // TODO: try to use real state here? or just use props.blocks
+    const {blocks, setBlocks} = props;
+
+    const [defaultConfig] = useState(() => {
+        return new props.resource.config.deps.block({});
+    });
 
     const propsRef = useRef(null);
     const overlayRef = useRef(null);
@@ -927,14 +979,17 @@ function FontPreview(props) {
     const currBlockRef = useRef(null);
 
     currBlockRef.current = blocks.length === 0 || active === null || active >= blocks.length ? null : blocks[active];
-    const currFont = currBlockRef.current ? props.fonts[currBlockRef.current.font] : null;
+    const currFont = currBlockRef.current ? fonts[currBlockRef.current.font] : null;
+
+    // TODO provider und auch load sollte überflüssig sein, weil kein dataUrl=>Image=>onLoad()
     const currProvider = currFont ? currFont.provider : null;
     const ready = useMountedReadyCellProvider(currProvider);
+
     const fontSize = currProvider ? currProvider.getCharSize() : null;
 
     const invalidateImages = () => {
         for (let block of propsRef.current.blocks) {
-            block.img = null;
+            block.canvas = null;
         }
     };
 
@@ -952,57 +1007,26 @@ function FontPreview(props) {
         zoom,
         blocks,
         screenX,
-        screenY
+        screenY,
+        model: props.model
     };
 
     const getBlockImage = (block, raw = false) => {
-        if (block.img === null) {
-            const lines = block.text.split('\n');
-            let maxWidth = 0;
-            for (let line of lines) {
-                maxWidth = Math.max(maxWidth, line.length);
-            }
-            const fontSize = props.fonts[block.font].provider.getCharSize();
-            const blockHeight = fontSize.y * lines.length;
-            const blockWidth = fontSize.x * maxWidth;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = blockWidth * zoom || 1;
-            canvas.height = blockHeight * zoom || 1;
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const sizeX = fontSize.x * zoom;
-            const sizeY = fontSize.y * zoom;
-            let trigger = false;
-            for (let y = 0; y < lines.length; y++) {
-                let line = lines[y];
-                if (block.textAlign !== 'left' && line.length < maxWidth) {
-                    const pad = block.textAlign === 'right' ? maxWidth : (line.length + ((maxWidth - line.length) >> 1));
-                    line = line.padStart(pad, ' ');
-                }
-                for (let x = 0; x < line.length; x++) {
-                    const img = props.fonts[block.font].provider.getBitmapForValue(line[x], zoom, false);
-                    if (img) {
-                        ctx.drawImage(img, x * sizeX, y * sizeY);
-                    } else {
-                        trigger = true;
-                    }
+        if (!block.canvas) {
+            let font = null;
+            for (let item of props.model.fonts) {
+                if (item.id === block.font) {
+                    font = item;
                 }
             }
-            let elem = canvas;
-            block.rawImg = canvas;
-            if (block.filters) {
-                const transformed = context.filters.getCanvasWithFiltersApplied(block.filters, {elem: canvas, ctx}, 0, 0, canvas.width, canvas.height);
-                elem = transformed[0].elem;
-            }
-            block.img = {canvas: elem};
-            if (trigger) {
-                requestAnimationFrame(() => {
-                    eContext.updateRaster('preview');
-                })
-            }
+            block.canvas = {elem: getTextBlockImage(
+                block,
+                font,
+                context.filters
+            )};
+            block.rawImg = block.filters === '' ? block.canvas.elem : getTextBlockImage(block, font);
         }
-        return raw ? block.rawImg : block.img.canvas;
+        return raw ? block.rawImg : block.canvas.elem;
     };
 
     useEffect(() => {
@@ -1011,93 +1035,68 @@ function FontPreview(props) {
         }
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        for (let block of propsRef.current.blocks) {
-            ctx.drawImage(getBlockImage(block), block.posX * propsRef.current.zoom, block.posY * propsRef.current.zoom);
-        }
+        drawTextBlocks(
+            ctx,
+            {x: propsRef.current.screenX, y: propsRef.current.screenY},
+            propsRef.current.blocks,
+            propsRef.current.model.fonts,
+            propsRef.current.zoom
+        );
     });
 
     if (!ready) {
         return '';
     }
 
+    for (let block of blocks) {
+        getBlockImage(block);
+    }
+
     const setState = (newProps) => {
         const curr = currBlockRef.current;
-        const {text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY} = curr;
-        const change = Object.assign({text, font, textAlign, filters, rasterize, posX, posY, autoCenterX, autoCenterY}, newProps);
-
-        const fontSize = props.fonts[font].provider.getCharSize();
-
-        const getRasterized = (value, dim) => {
-            if (!change.rasterize) {
-                return value;
-            }
-            return Math.floor(value/fontSize[dim]) * fontSize[dim];
-        };
-
-        const lines = currBlockRef.current.text.split('\n');
-        let maxWidth = 0;
-        for (let line of lines) {
-            maxWidth = Math.max(maxWidth, line.length);
-        }
-        const blockHeight = fontSize.y * lines.length;
-        const blockWidth = fontSize.x * maxWidth;
-
-        if (change.autoCenterX) {
-            let centeredX = getRasterized(Math.ceil(screenX/2) - Math.ceil(blockWidth/2), 'x');
-            if (change.posX !== centeredX) {
-                change.posX = centeredX;
-            }
-        } else if (change.rasterize) {
-            let rasterPos = getRasterized(change.posX, 'x');
-            if (rasterPos !== change.posX) {
-                change.posX = rasterPos;
-            }
-        }
-        if (change.autoCenterY) {
-            const centeredY = getRasterized(Math.ceil(screenY/2) - Math.ceil(blockHeight/2), 'y');
-            if (change.posY !== centeredY) {
-                change.posY = centeredY;
-            }
-        } else if (change.rasterize) {
-            let rasterPos = getRasterized(change.posY, 'y');
-            if (rasterPos !== change.posY) {
-                change.posY =rasterPos;
-            }
-        }
+        const {text, font, textAlign, filters, alignToGrid, x, y, autoCenteringX, autoCenteringY, lineSpacing} = curr;
+        const change = Object.assign({text, font, textAlign, filters, lineSpacing, alignToGrid, x, y, autoCenteringX, autoCenteringY}, newProps);
 
         let hasChanged = false;
         let invalidateImage = false;
         for (let key in change) {
             if (change[key] !== curr[key]) {
                 hasChanged = true;
-                if (['font', 'text', 'textAlign', 'filters'].indexOf(key) !== -1) {
+                if (['font', 'lineSpacing', 'text', 'textAlign', 'filters'].includes(key)) {
                     invalidateImage = true;
                 }
             }
         }
 
+        if (!hasChanged) {
+            return;
+        }
+
+        const newBlocks = [...blocks];
+        const changeBlock = newBlocks[active];
+        Object.assign(changeBlock, change);
         if (invalidateImage) {
-            change.img = null;
+            changeBlock.canvas = null;
         }
-        if (hasChanged) {
-            const newBlocks = [...blocks];
-            newBlocks[active] = {...curr, ...change};
-            setBlocks(newBlocks);
-        }
+        setBlocks(newBlocks);
     };
 
-    const getSetProp = (prop, invalidateImage = false) => {
-        return (value) => {
+    const getSetProp = prop => {
+        return value => {
             setState({[prop]: value});
         }
     };
 
     let marker = '';
     const currBlock = currBlockRef.current;
+    const fieldProps = defaultConfig.getFieldProps();
+
     if (currBlock && blocks.length > 0) {
+
         const currLines = currBlock.text.split('\n');
         let currMaxWidth = 0;
         for (let currLine of currLines) {
@@ -1106,20 +1105,24 @@ function FontPreview(props) {
         const currBlockHeight = fontSize.x * currLines.length;
         const currBlockWidth = fontSize.y * currMaxWidth;
 
-        if (currBlockWidth > 0 && currBlockHeight > 0 && !(currBlock.autoCenterX && currBlock.autoCenterY)) {
-            const setCurrPosX = getSetProp('posX');
-            const setCurrPosY = getSetProp('posY');
+        if (currBlockWidth > 0 && currBlockHeight > 0 && !(currBlock.autoCenteringX && currBlock.autoCenteringY)) {
+            const setCurrPosX = getSetProp('x');
+            const setCurrPosY = getSetProp('y');
 
             let moveCursor = 'move';
-            if (currBlock.autoCenterY) {
+            if (currBlock.autoCenteringY) {
                 moveCursor = 'hresize';
-            } else if (currBlock.autoCenterX) {
+            } else if (currBlock.autoCenteringX) {
                 moveCursor = 'vresize';
             }
-            const initMove = (e) => {
+            const initMove = e => {
                 const rect = overlayRef.current.getBoundingClientRect();
                 let lastX = Math.floor((e.clientX - rect.x)/zoom);
                 let lastY = Math.floor((e.clientY - rect.y)/zoom);
+                const offsetX = currBlockRef.current.x - lastX;
+                const offsetY = currBlockRef.current.y - lastY;
+                lastX += offsetX;
+                lastY += offsetY;
 
                 const moveListener = (e) => {
                     const currX = Math.floor((e.clientX - rect.x)/zoom);
@@ -1128,16 +1131,16 @@ function FontPreview(props) {
                     const cBlock = currBlockRef.current;
                     const deltaX = currX - lastX;
                     if (deltaX !== 0) {
-                        const newX = Math.max(0, Math.min(cBlock.posX + deltaX, screenX - 1));
-                        if (newX !== cBlock.posX) {
+                        const newX = Math.max(fieldProps.x.min, Math.min(cBlock.x + deltaX, fieldProps.x.max)) + offsetX;
+                        if (newX !== cBlock.x) {
                             setCurrPosX(newX);
                             lastX = newX;
                         }
                     }
                     const deltaY = currY - lastY;
                     if (deltaY !== 0) {
-                        const newY = Math.max(0, Math.min(cBlock.posY + deltaY, screenY - 1));
-                        if (newY !== cBlock.posY) {
+                        const newY = Math.max(fieldProps.y.min, Math.min(cBlock.y + deltaY, fieldProps.y.max)) + offsetY;
+                        if (newY !== cBlock.y) {
                             setCurrPosY(newY);
                             lastY = newY;
                         }
@@ -1159,7 +1162,7 @@ function FontPreview(props) {
                     (e) => {
                         eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
                         eContext.setFixCursor(null);
-                        setShowMarker(false);
+                        setHighlight(false);
                         e.preventDefault();
                         e.stopPropagation();
                     },
@@ -1168,25 +1171,27 @@ function FontPreview(props) {
                         capture: false
                     }
                 );
-                setShowMarker(true);
+                setHighlight(true);
             };
+
+            const pos = getBlockPos(currBlock, props.model.fonts, {x: screenX, y: screenY});
 
             marker = (<CellMarker
                 blink
                 initMove={initMove}
                 border={0}
-                posX={currBlockRef.current.posX}
-                posY={currBlockRef.current.posY}
+                posX={pos.x}
+                posY={pos.y}
                 zoom={zoom}
                 moveCursor={'cursor-' + moveCursor}
-                bottom={showMarker && (currBlockRef.current.posY + currBlockHeight < screenY)}
+                bottom={showMarker && (pos.y + pos.height < screenY)}
                 top={showMarker}
                 left={showMarker}
-                right={showMarker && (currBlockRef.current.posX + currBlockWidth < screenX)}
+                right={showMarker && (pos.x + pos.width < screenX)}
                 size={1}
-                width={Math.min(currBlockWidth, screenX - currBlockRef.current.posX)}
-                height={Math.min(currBlockHeight, screenY - currBlockRef.current.posY)}
-                highlight
+                width={Math.min(pos.width, screenX - pos.x)}
+                height={Math.min(pos.height, screenY - pos.y)}
+                highlight={highlight}
             />);
         }
     }
@@ -1197,34 +1202,54 @@ function FontPreview(props) {
         const item = propsRef.current.blocks[index];
         return (
             <BlockProperties
-                name={item.name}
-                setName={getSetProp('name')}
-                fonts={props.fonts}
+                id={item.id}
+                fonts={fonts}
                 font={item.font}
                 setFont={getSetProp('font')}
                 fontSize={fontSize}
                 text={item.text}
                 setText={getSetProp('text')}
-                posX={item.posX}
-                setPosX={getSetProp('posX')}
-                posY={item.posY}
-                setPosY={getSetProp('posY')}
+                x={item.x}
+                setX={getSetProp('x')}
+                y={item.y}
+                setY={getSetProp('y')}
                 textAlign={item.textAlign}
                 setTextAlign={getSetProp('textAlign')}
-                autoCenterX={item.autoCenterX}
-                setAutoCenterX={getSetProp('autoCenterX')}
-                autoCenterY={item.autoCenterY}
-                setAutoCenterY={getSetProp('autoCenterY')}
-                rasterize={item.rasterize}
-                setRasterize={getSetProp('rasterize')}
+                autoCenteringX={item.autoCenteringX}
+                setAutoCenteringX={getSetProp('autoCenteringX')}
+                autoCenteringY={item.autoCenteringY}
+                setAutoCenteringY={getSetProp('autoCenteringY')}
+                alignToGrid={item.alignToGrid}
+                setAlignToGrid={getSetProp('alignToGrid')}
                 filters={item.filters}
                 setFilters={getSetProp('filters')}
+                lineSpacing={item.lineSpacing}
+                setLineSpacing={getSetProp('lineSpacing')}
+                model={props.model}
                 screenX={screenX}
                 screenY={screenY}
                 canvas={getBlockImage(item, true)}
                 bgColor={bgColor}
+                defaultConfig={defaultConfig}
             />
         );
+    };
+
+    const blockIds = getIdsFromObjects(blocks);
+
+    const getNewTextBlock = () => {
+        NewBlockIdModal.show({
+            id: 'New block #' + (blockIds.length + 1),
+            validator: id => !blockIds.includes(id),
+            save: blockId => {
+                NewBlockIdModal.hide();
+                const newBlock = defaultConfig.getDefaults();
+                newBlock.id = blockId;
+                newBlock.font = props.activeFont === null ? null : props.model.fonts[props.activeFont].id;
+                newBlock.canvas = null;
+                setBlocks([...blocks, newBlock]);
+            }
+        })
     };
 
     return (
@@ -1234,8 +1259,8 @@ function FontPreview(props) {
                     items={blocks}
                     active={active}
                     setActive={setActive}
-                    getName={(item) => item.name}
-                    setItems={(newBlocks) => {
+                    getName={item => item.id}
+                    setItems={newBlocks => {
                         let changed = false;
                         if (newBlocks.length !== blocks.length) {
                             changed = true;
@@ -1255,12 +1280,8 @@ function FontPreview(props) {
                         setBlocks(newBlocks);
                     }}
                     ordered
-                    getClone={item => {
-                        return props.entity.getNew(item, {name: item.name + ' Clone'})
-                    }}
-                    getNewItem={() => {
-                        return props.entity.getNew({name: 'New Item #' + (blocks.length + 1)})
-                    }}
+                    getClone={item => {return {...item, id: getNextUid(blockIds, item.id + ' Clone'), canvas: null}}}
+                    new={props.model.fonts.length > 0 ? getNewTextBlock : null}
                     getProperties={getTextBlockProperties}
                     empty="Add text block"
                     width={200}
@@ -1273,6 +1294,7 @@ function FontPreview(props) {
                         <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
                         <Int buttons name="Zoom:" value={zoom} set={setZoom} min={1} max={5} />
                         <Color value={bgColor} set={setBgColor} />
+                        <Checkbox name="Show marker" set={setShowMarker} value={showMarker} />
                     </Toolbar>
                     <Content flex>
                         <div style={{position: 'relative', overflow: 'auto', height: '100%'}}>
@@ -1288,6 +1310,10 @@ function FontPreview(props) {
                     </Content>
                 </Stack>
             </Section>
+
+            <NewBlockIdModal.render name="New Block Id" fit closeable>
+                <NewIdForm save={NewBlockIdModal.params.save} validator={NewBlockIdModal.params.validator} id={NewBlockIdModal.params.id} hide={NewBlockIdModal.hide} />
+            </NewBlockIdModal.render>
         </Stack>
     );
 }
@@ -1295,8 +1321,8 @@ function FontPreview(props) {
 function ResizeFontForm(props) {
     const eContext = useContext(EditorContext);
     const context = useContext(GlobalContext);
-    const [width, setWidth] = useState(props.font.fontMap.width);
-    const [height, setHeight] = useState(props.font.fontMap.height);
+    const [width, setWidth] = useState(props.font.width);
+    const [height, setHeight] = useState(props.font.height);
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
     const overlayRef = useRef(null);
@@ -1321,18 +1347,18 @@ function ResizeFontForm(props) {
         });
     };
 
-    const setState = (changes) => {
+    const setState = changes => {
         changes.width = changes.width ? changes.width : width;
         changes.height = changes.height ? changes.height : height;
         changes.offsetX = changes.offsetX !== undefined ? changes.offsetX : offsetX;
         changes.offsetY = changes.offsetY !== undefined ? changes.offsetY : offsetY;
 
         if (changes.width !== width) {
-            changes.offsetX = Math.min(changes.offsetX, Math.abs(changes.width - props.font.fontMap.width));
+            changes.offsetX = Math.min(changes.offsetX, Math.abs(changes.width - props.font.width));
             setWidth(changes.width);
         }
         if (changes.height !== height) {
-            changes.offsetY = Math.min(changes.offsetY, Math.abs(changes.height - props.font.fontMap.height));
+            changes.offsetY = Math.min(changes.offsetY, Math.abs(changes.height - props.font.height));
             setHeight(changes.height);
         }
         if (changes.offsetX !== offsetX) {
@@ -1343,13 +1369,13 @@ function ResizeFontForm(props) {
         }
     };
 
-    const maxOffsetX = Math.abs(width - props.font.fontMap.width);
-    const maxOffsetY = Math.abs(height - props.font.fontMap.height);
+    const maxOffsetX = Math.abs(width - props.font.width);
+    const maxOffsetY = Math.abs(height - props.font.height);
 
     propsRef.current = {offsetX, offsetY, maxOffsetX, maxOffsetY, setState};
 
-    const previewWidth = Math.max(width, props.font.fontMap.width);
-    const previewHeight = Math.max(height, props.font.fontMap.height);
+    const previewWidth = Math.max(width, props.font.width);
+    const previewHeight = Math.max(height, props.font.height);
 
     const provider = new BitmapCellProvider(4);
     const map = [];
@@ -1367,7 +1393,7 @@ function ResizeFontForm(props) {
 
     let moveCursor = 'move';
 
-    const initMove = (e) => {
+    const initMove = e => {
         const rect = overlayRef.current.getBoundingClientRect();
         const cellSize = (size * zoom + border);
         let lastX = Math.floor((e.clientX - rect.x)/cellSize);
@@ -1437,8 +1463,8 @@ function ResizeFontForm(props) {
                 </SelectDimModal.render>
                 <PropertyGrid>
                     <DimProp name="Old Size:" buttons readOnly
-                             x={props.font.fontMap.width}
-                             y={props.font.fontMap.height} />
+                             x={props.font.width}
+                             y={props.font.height} />
                     <PropLabel name="New Size:">
                         <Stack>
                             <Dim buttons min={1} max={128}
@@ -1477,8 +1503,8 @@ function ResizeFontForm(props) {
                                             highlight={true}
                                             posX={offsetX}
                                             posY={offsetY}
-                                            width={Math.min(width, props.font.fontMap.width)}
-                                            height={Math.min(height, props.font.fontMap.height)}
+                                            width={Math.min(width, props.font.width)}
+                                            height={Math.min(height, props.font.height)}
                                             top={true}
                                             bottom={true}
                                             left={true}
@@ -1496,7 +1522,6 @@ function ResizeFontForm(props) {
             <Content padded>
                 <Stack>
                     <button onClick={() => {
-                        d('SAVE...');
                         props.save({width, height, offsetX, offsetY});
                     }}>Save</button>
                     <button onClick={props.hide}>Cancel</button>
@@ -1508,13 +1533,13 @@ function ResizeFontForm(props) {
 
 function NewFontForm(props) {
     const context = useContext(GlobalContext);
-    const [width, setWidth] = useState(8);
-    const [height, setHeight] = useState(8);
-    const [name, setName] = useState('Font');
+    const [width, setWidth] = useState(props.defaults.width);
+    const [height, setHeight] = useState(props.defaults.height);
+    const [id, setId] = useState(props.defaults.id);
     const SelectDimModal = useModal();
 
     const selectDim = () => {
-        const selected = (result) => {
+        const selected = result => {
             setWidth(result.getWidth());
             setHeight(result.getHeight());
             SelectDimModal.hide();
@@ -1535,10 +1560,10 @@ function NewFontForm(props) {
         <Stack vertical border>
             <Content padded>
                 <PropertyGrid>
-                    <TextFieldProp name="Name:" value={name} set={value => setName(value)} size={20} />
+                    <TextFieldProp name="Id:" value={id} set={value => setId(value)} size={20} />
                     <PropLabel name="Size:">
                         <Stack>
-                            <Dim buttons min={1} max={128} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
+                            <Dim buttons {...props.fieldProps} x={width} setX={setWidth} y={height} setY={setHeight}></Dim>
                             <Content><button onClick={selectDim}>Select...</button></Content>
                         </Stack>
                     </PropLabel>
@@ -1559,7 +1584,7 @@ function NewFontForm(props) {
             <Content padded>
                 <Stack>
                     <button onClick={() => {
-                        props.save({width, height, name});
+                        props.save({width, height, id});
                     }}>Save</button>
                     <button onClick={props.hide}>Cancel</button>
                 </Stack>
@@ -1568,85 +1593,189 @@ function NewFontForm(props) {
     );
 }
 
-function FontMapEditor(props) {
-    const [active, setActive] = useState(0);
-    const FontEntity = useEntity('font', {
-        name: 'New font', fontMap: null
+function NewIdForm(props) {
+    const [id, setId] = useState(props.id);
+    const disabled = id === '' || !props.validator(id);
+    const idRef = useRef(null);
+    idRef.current = {disabled, id};
+    useKeyListener(13,
+        () => {
+            if (idRef.current.disabled) return false;
+            props.save(idRef.current.id);
+            return true
     });
-    const [fonts, setFonts] = useState(() => [
-        FontEntity.getNew({name: 'TextPane Font', fontMap: props.fontMap})
-    ]);
-    const TextBlockEntity = useEntity('block', {
-        name: 'New block',
-        posX: 0,
-        posY: 0,
-        text: '',
-        filters: '',
-        img: null,
-        textAlign: 'left',
-        autoCenterX: false,
-        autoCenterY: false,
-        rasterize: false
-    });
-    TextBlockEntity.setDefaults({font: fonts[0].id});
-    const [blocks, setBlocks] = useState(() => {
-        return [
-            TextBlockEntity.getNew({name: 'Demo text'})
-        ]
-    });
-    const id2Font = FontEntity.id2Items(fonts);
-    const currFont = fonts[active];
+
+    return (
+        <Stack vertical>
+            <Content padded>
+                <PropertyGrid>
+                    <TextFieldProp invalid={disabled} name="Id:" value={id} set={setId} size={20} />
+                </PropertyGrid>
+            </Content>
+            <Content padded>
+                <Stack>
+                    <button disabled={disabled} onClick={() => {
+                        props.save(id);
+                    }}>Save</button>
+                    <button onClick={props.hide}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+function TextPaneEditor(props) {
+    const context = useContext(GlobalContext);
+    const eContext = useContext(EditorContext);
 
     const ResizeFontModal = useModal();
     const NewFontModal = useModal();
-    for (let font of fonts) {
+    const NewFontIdModal = useModal();
+
+    const [model, setModel] = useState(props.model);
+    const [blocks, setBlocks] = useState(props.resource.blocks);
+    const [active, setActiveRaw] = useState(eContext.getSetting('lastActiveFont', model.fonts.length > 0 ? 0 : null));
+    const setActive = value => {
+        eContext.setSetting('lastActiveFont', value);
+        setActiveRaw(value);
+        updateTree();
+    };
+    const [tree, setTree] = useState(props.tree);
+    const updateTree = () => {
+        setTree(getResourceTreeForJsonModel(props.resource.cls, model));
+    };
+    const getNewFontUid = useUniqueResourceId(context.resourceLoader, 'json');
+    const currFont = model.fonts[active];
+    const getNewFontImageUid = useUniqueResourceId(context.resourceLoader, 'image');
+
+    for (let font of model.fonts) {
         if (!font.provider) {
-            font.provider = new FontCharIndexProvider(font.fontMap);
+            font.provider = new FontCharIndexProvider(font);
         }
     }
 
+    const info = [];
+    for (let resource of props.tree) {
+        info.push(`${resource.type}: "${resource.id}" [${resource.source}]`);
+    }
+
     const newFont = () => {
-        NewFontModal.show({
-            save: (item) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = item.width;
-                canvas.height = item.height;
-                const fontMap = {
-                    width: item.width,
-                    image: canvas,
-                    height: item.height,
-                    map: {}
+
+        const defaultConfig = new props.resource.config.deps.font({});
+        const fontIds = getIdsFromObjects(model.fonts);
+        const id = getNewFontUid(props.resource.id + '_font', fontIds);
+        const jsonIds = context.resourceLoader.getAllResourceIds('json');
+
+        NewFontIdModal.show({
+            id,
+            validator: id => (isValidResourceId('json', id) && !(fontIds.includes(id) || jsonIds.includes(id))),
+            save: fontId => {
+                NewFontIdModal.hide();
+
+                const defaults = {...defaultConfig.getDefaults(), id: fontId};
+                let fieldProps = defaultConfig.getFieldProps();
+                fieldProps = {
+                    minX: fieldProps.width.min,
+                    minY: fieldProps.height.min,
+                    maxX: fieldProps.width.max,
+                    maxY: fieldProps.height.max
                 };
-                setFonts([...fonts, FontEntity.getNew({name: item.name, fontMap})]);
-                setActive(fonts.length);
-                NewFontModal.hide();
+                NewFontModal.show({
+                    defaults,
+                    fieldProps,
+                    save: item => {
+                        const undoIndex = active;
+                        const fontConfig = new props.resource.config.deps.font(item);
+                        const imgIds = [];
+                        for (let font of model.fonts) {
+                            if (!imgIds.includes(font.imageId)) {
+                                imgIds.push(font.imageId);
+                            }
+                        }
+                        const img =
+                            context.resourceLoader.makeImageResource(
+                                getCanvasForDim(item.width, item.height),
+                                getNewFontImageUid(fontId + '_image', imgIds)
+                            );
+                        fontConfig.setImage(img);
+                        const undoFont = fontConfig.getJson();
+
+                        const doAction = () => {
+                            model.fonts.push(undoFont);
+                            setActive(model.fonts.length - 1);
+                        };
+                        const undoAction = () => {
+                            model.fonts.pop();
+                            setActive(undoIndex);
+                        };
+                        eContext.doAction(doAction, undoAction);
+                        NewFontModal.hide();
+                    }
+                });
             }
         });
     };
 
+    const deleteFont = () => {
+        const undoFont = model.fonts[active];
+        const undoIndex = active;
+        const doAction = () => {
+            model.fonts.splice(active, 1);
+            const newBlocks = [];
+            for (let block of blocks) {
+                if (block.font != undoFont.id) {
+                    newBlocks.push(block);
+                }
+            }
+            let newActive = Math.min(model.fonts.length - 1, active);
+            setBlocks(newBlocks);
+            setActive(newActive < 0 ? null : newActive);
+        };
+        const undoAction = () => {
+            model.fonts.splice(undoIndex, 0, undoFont);
+            setActive(undoIndex);
+        };
+        eContext.doAction(doAction, undoAction);
+    };
+
+
+    const saveTextPane = () => {
+        props.save(model);
+        eContext.updateRestorePos();
+    };
+
+    const exportTextPane = () => {
+        props.export(model);
+    };
+
+    const deployTextPane = () => {
+        props.deploy(model);
+    };
+
     function getFontProps(index) {
-        const editFont = fonts[index];
+        const editFont = model.fonts[index];
 
         const resizeAction = () => {
             ResizeFontModal.show({
                 font: editFont,
-                save: (resize) => {
-                    const canvas = document.createElement('canvas');
+                save: resize => {
                     const iMax = editFont.provider.getMaxIndex();
-                    canvas.width = resize.width * editFont.provider.getMaxIndex();
-                    canvas.height = resize.height;
-                    const targetWidth = Math.min(resize.width, editFont.fontMap.width);
-                    const targetHeight = Math.min(resize.height, editFont.fontMap.height);
-                    const sourceOffsetX = resize.width < editFont.fontMap.width ? resize.offsetX : 0;
-                    const sourceOffsetY = resize.height < editFont.fontMap.height ? resize.offsetY : 0;
-                    const targetOffsetX = resize.width > editFont.fontMap.width ? resize.offsetX : 0;
-                    const targetOffsetY = resize.height > editFont.fontMap.height ? resize.offsetY : 0;
+                    const canvas = getCanvasForDim(
+                    resize.width * editFont.provider.getMaxIndex(),
+                        resize.height
+                    );
+                    const targetWidth = Math.min(resize.width, editFont.width);
+                    const targetHeight = Math.min(resize.height, editFont.height);
+                    const sourceOffsetX = resize.width < editFont.width ? resize.offsetX : 0;
+                    const sourceOffsetY = resize.height < editFont.height ? resize.offsetY : 0;
+                    const targetOffsetX = resize.width > editFont.width ? resize.offsetX : 0;
+                    const targetOffsetY = resize.height > editFont.height ? resize.offsetY : 0;
 
                     const ctx = canvas.getContext('2d');
                     const map = {};
                     for(let i = 0; i < iMax; i++) {
                         ctx.drawImage(
-                            editFont.provider.getBitmapForIndex(i, 1, false),
+                            editFont.provider.getBitmapForIndex(i),
                             sourceOffsetX,
                             sourceOffsetY,
                             targetWidth,
@@ -1656,26 +1785,34 @@ function FontMapEditor(props) {
                             targetWidth,
                             targetHeight
                         );
-                        map[editFont.provider.getCharAtIndex(i)] = {x: i*resize.width, y: 0};
+                        map[editFont.provider.getCharAtIndex(i)] = {x: i * resize.width, y: 0};
                     }
-                    const doFontMap = {
+                    const doFont = {
+                        id: editFont.id,
                         height: resize.height,
                         width: resize.width,
                         map,
-                        image: canvas
-                    };
-                    const doFont = {
-                        id: editFont.id,
-                        name: editFont.name,
-                        fontMap: doFontMap,
+                        imageId: editFont.imageId,
+                        image: canvas,
                         provider: null
                     };
-                    const newFonts = [...fonts];
-                    newFonts[index] = doFont;
+                    const undoFont = model.fonts[index];
+                    model.fonts[index] = doFont;
                     for (let block of blocks) {
                         block.img = null;
                     }
-                    setFonts(newFonts);
+
+                    const doAction = () => {
+                        model.fonts[index] = doFont;
+                        setActive(index);
+                        eContext.updateRaster();
+                    };
+                    const undoAction = () => {
+                        model.fonts[index] = undoFont;
+                        setActive(index);
+                        eContext.updateRaster();
+                    };
+                    eContext.doAction(doAction, undoAction);
                     ResizeFontModal.hide();
                 }
             })
@@ -1684,12 +1821,13 @@ function FontMapEditor(props) {
         return (
             <PropertyGrid>
                 <TextFieldProp
-                    name="Name:"
-                    value={editFont.name}
-                    set={value => setFonts(getItemsCloneWithUpdatedItem(fonts, index, {name: value}))} />
+                    name="ID:"
+                    value={editFont.id}
+                    readOnly
+                />
                 <PropLabel name="Size:">
                     <Stack>
-                        <Dim x={editFont.fontMap.width} y={editFont.fontMap.height} readOnly />
+                        <Dim x={editFont.width} y={editFont.height} readOnly />
                         <Content>
                             <button onClick={resizeAction}>Resize</button>
                         </Content>
@@ -1699,21 +1837,41 @@ function FontMapEditor(props) {
         )
     }
 
+    const actions = (
+        <Fragment>
+            <button onClick={props.cancel}>Back</button>
+            <button onClick={props.revert}>Revert</button>
+            <button onClick={saveTextPane}>Save</button>
+            <button onClick={deployTextPane} disabled={!eContext.hasStorePos()}>Deploy</button>
+            <button onClick={exportTextPane}>Export</button>
+            <button onClick={props.play}>Play</button>
+        </Fragment>
+    );
+
     return (
-        <EditorCtx>
+        <Page title="Edit TexPane" resources={tree}  actions={actions}>
             <Stack vertical fullHeight>
+                <Section name="TextPane">
+                    <Toolbar>
+                        <button disabled={!eContext.hasPast()} onClick={() => eContext.undoAction()}>Undo</button>
+                        <button disabled={!eContext.hasFuture()} onClick={() => eContext.redoAction()}>Redo</button>
+                    </Toolbar>
+                </Section>
                 <Stack>
                     <Section name="Fonts">
                         <ItemsStack
                             new={newFont}
+                            deleteActiveItem={deleteFont}
                             width={200}
                             min={1}
                             collapsed
                             active={active}
                             setActive={setActive}
-                            setItems={setFonts}
-                            items={fonts}
-                            cleanUp={(item) => {
+                            setItems={value => {model.fonts = value; setModel(model)}}
+                            items={model.fonts}
+                            cleanUp={item => {
+                                // scheint beim Löschen eines Fonts auch die TextBlöcke
+                                // die auf diesen verlinkt haben, zu löschen
                                 const newBlocks = [];
                                 for (let block of blocks) {
                                     if (block.font != item.id) {
@@ -1723,15 +1881,17 @@ function FontMapEditor(props) {
                                 setBlocks(newBlocks);
                             }}
                             getProperties={getFontProps}
-                            getName={item => <LabelAndSubInfo name={item.name}> - Size: {item.fontMap.width + 'x' + item.fontMap.height}</LabelAndSubInfo>}
+                            getName={item => <LabelAndSubInfo name={item.id}> - Size: {item.width + 'x' + item.height}</LabelAndSubInfo>}
                         />
                     </Section>
                     <Section name="Characters" flex>
-                        <CharIndex cellProvider={currFont.provider} source={currFont.fontMap.image.toDataURL('image/png')} />
+                        <CharIndex undoRedo={false} cellProvider={currFont.provider} />
                     </Section>
                 </Stack>
                 <Content flex>
-                    <FontPreview entity={TextBlockEntity} blocks={blocks} setBlocks={setBlocks} editorId="preview" fonts={id2Font} />
+                    <FontPreview model={model} activeFont={active} resource={props.resource}
+                                 blocks={blocks} setBlocks={setBlocks}
+                                 editorId="preview" />
                 </Content>
             </Stack>
 
@@ -1740,10 +1900,14 @@ function FontMapEditor(props) {
             </ResizeFontModal.render>
 
             <NewFontModal.render name="New Font" fit closeable>
-                <NewFontForm save={NewFontModal.params.save} hide={NewFontModal.hide} />
+                <NewFontForm save={NewFontModal.params.save} defaults={NewFontModal.params.defaults} fieldProps={NewFontModal.params.fieldProps} hide={NewFontModal.hide} />
             </NewFontModal.render>
-        </EditorCtx>
+
+            <NewFontIdModal.render name="New Font Id" fit closeable>
+                <NewIdForm save={NewFontIdModal.params.save} validator={NewFontIdModal.params.validator} id={NewFontIdModal.params.id} hide={NewFontIdModal.hide} />
+            </NewFontIdModal.render>
+        </Page>
     );
 }
 
-export default FontMapEditor;
+export default TextPaneEditor;
