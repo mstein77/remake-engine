@@ -88,6 +88,18 @@ body {
     max-height: calc(100% - 2 * var(--box-border-width));
 }
 
+.boxed-bg {
+    background-color: var(--box-border-color);
+}
+
+.less {
+    opacity: 0.55;
+}
+
+.bottom-dashed {
+    border-bottom: 1px dashed var(--box-border-color);
+}
+
 .thin-boxed {
     border: 1px solid var(--box-border-color);
 }
@@ -237,6 +249,10 @@ body {
 
 .nowrap {
     white-space: nowrap;
+}
+
+.ellipsis {
+    text-overflow: ellipsis;
 }
 
 /* ACTION */
@@ -501,6 +517,17 @@ input[type=range][orient=vertical] {
 
 .marker-cell-highlight {
     background-color: var(--marker-color-highlight);
+}
+
+.tooltip {
+    /* TODO: use constants */
+
+    position: fixed;
+    z-index: 10000;
+    background-color: #b3bbb1;
+    color: #000000;
+    font-size: 12px;
+    border: 1px solid black;
 }
 
 .auto-scroll {

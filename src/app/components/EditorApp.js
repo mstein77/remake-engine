@@ -1,5 +1,5 @@
 import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
-import {Page, Stack, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
+import {Page, Stack, Scene3d, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
@@ -220,7 +220,13 @@ function PageSelector(props) {
     if (active === null) {
         const items = [];
         let key = 0;
+        let preview = null;
+        let paneDim = null;
         for (let resource of props.resources) {
+            if (resource.preview) {
+                preview = resource.preview;
+                paneDim = resource.dim;
+            }
             const index = key;
             items.push(
                 <div className="padded" key={key}>
@@ -231,7 +237,16 @@ function PageSelector(props) {
         }
         return (
             <Page title="Game" actions={actions}>
-                <Section name="Resources">{items}</Section>
+                <Section name="Resources">
+                    <Stack>
+                        <Content padded>
+                            <Scene3d width={600} height={400} paneDim={paneDim} preview={preview} />
+                        </Content>
+                        <Content flex padded>
+                            {items}
+                        </Content>
+                    </Stack>
+                </Section>
             </Page>
         )
     }

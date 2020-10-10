@@ -1,6 +1,8 @@
 import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
+import {mat4} from 'gl-matrix';
 import {d} from '../helper/helper';
+
 
 const GlobalContext = React.createContext();
 
@@ -394,7 +396,7 @@ function Content(props) {
         cls.push('overflow-hidden')
     }
     if (props.boxed) {
-        cls.push('boxed');
+        cls.push((props.thin ? 'thin-' : '') + 'boxed');
     }
     if (props.fullHeight) {
         cls.push(props.boxed ? 'full-boxed-v' :  'full-v');
@@ -751,7 +753,7 @@ function PropertyGrid(props) {
 
 function LabelAndSubInfo(props) {
     return <Fragment>
-        <div>{props.name}</div>
+        <Title>{props.name}</Title>
         <div className="sub-info">{props.children}</div>
     </Fragment>
 }
@@ -1124,6 +1126,521 @@ function ActionBox(props) {
     );
 }
 
+function ActionFrame(props) {
+    return (
+        <Content boxed thin flex={props.flex}>
+            <Stack vertical noGap>
+                <Content className="bottom-dashed">
+                    <Stack className="full-v">
+                        <Content fullHeight className="boxed-bg"><Content padded><kbd>{props.type}</kbd></Content></Content>
+                        <Content padded className="head">{props.name}</Content>
+                        {props.sub ?
+                            <Fragment>
+                                {Object.entries(props.sub).map(item => (
+                                    <Fragment key={item[0]}>
+                                        <Content fullHeight className="boxed-bg less"><Content padded>{item[0]}</Content></Content>
+                                        <Content padded className="head less"><kbd>{item[1]}</kbd></Content>
+                                    </Fragment>))
+                                }
+                                <Content fullHeight className="boxed-lg less"></Content>
+                            </Fragment>
+                            : ''
+                        }
+                        <Content flex></Content>
+                        <Content padded>{props.actions}</Content>
+                    </Stack>
+                </Content>
+                <Content flex padded>{props.children}</Content>
+            </Stack>
+        </Content>
+    )
+}
+
+function Scene3d(props) {
+
+    /*
+      TODO:
+       * second plane + texture
+       - animation
+       - border
+     */
+
+    const canvasRef = useRef(null);
+    const [xRotation, setXRotation] = useState(0.0);
+    const [yRotation, setYRotation] = useState(0.5);
+    const [zRotation, setZRotation] = useState(0.0);
+    const [xDist, setXDist] = useState(-2.0);
+    const [yDist, setYDist] = useState(-0.0);
+    const [zDist, setZDist] = useState(-3.0);
+    const [info, setInfo] = useState(null);
+    const paneAspectRatio = props.paneDim.x / props.paneDim.y;
+
+    const loadShader = (gl, type, source) => {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('An error occured compiling the shaders: ' + gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    };
+
+
+
+    const initShaderProgram = gl => {
+        // Der Vertex-Shader bekommt 2 parameter aus Buffern:
+
+        //   - vertexPosition :vec4 = [float, float, float, float]
+        //     Der Buffer der an dieses Attribut gebunden wird, hat allerdings nur 3 Komponenten
+        //       => d.h. wohl dass die letzte Komponente 0 ist?
+        /*
+                    const numComponents = 3;
+                    const type = gl.FLOAT;
+                    const normalize = false;
+                    const stride = 0;
+                    const offset = 0;
+                    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+                    gl.vertexAttribPointer(
+                        programInfo.attribLocations.vertexPosition,
+                        numComponents = 3
+                        type = gl.FLOAT
+                        normalize = false
+                        stride = 0
+                        offset = 0
+                    );
+        */
+
+        //   - textureCoord :vec2 = [float, float]
+        //
+        /*
+                    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+                    gl.vertexAttribPointer(
+                        programInfo.attribLocations.textureCoord,
+                        numComponents = 2
+                        type = gl.FLOAT
+                        normalize = false
+                        stride = 0
+                        offset = 0
+                    );
+                    gl.enableVertexAttribArray(
+                        programInfo.attribLocations.textureCoord
+                    );
+
+            Ablauf:
+
+            1. Ausgangspunkt ist ein Vector3 auf Achsen von -1...1
+            2. Dieser Vector wird über die ModelViewMatrix
+                 a) skaliert
+                 b) rotiert
+                 c) translated
+            3. Über die Projection-Matrix perspektivisch verzerrt (Kamera)
+
+            Die TextureCoord die reinkommt wird nur an den Shader durchgereicht
+
+         */
+
+        const vsSource = `
+            attribute vec4 aVertexPosition;
+            attribute vec2 aTextureCoord;
+        
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+        
+            varying highp vec2 vTextureCoord;
+        
+            void main(void) {
+              gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+              vTextureCoord = aTextureCoord;
+            }        
+          `;
+
+
+        const fsSource = `
+            precision mediump float;
+            varying highp vec2 vTextureCoord;
+        
+            uniform sampler2D uSampler;
+        
+            void main(void) {
+              vec4 texColor = texture2D(uSampler, vTextureCoord);
+              if (texColor.a < 0.1)
+                 discard;
+              gl_FragColor = texColor;
+            }
+          `;
+        const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+        const shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            console.error('UNABLE TO INITIALIZE THE SHADER PROGRAM: ' + gl.getProgramInfoLog(shaderProgram));
+            return null;
+        }
+        return shaderProgram
+    };
+
+    const getPlainTexture = (gl) => {
+        const colorTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+        const pixel = new Uint8Array([0, 0, 0, 255]);
+        gl.texImage2D(
+            gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0,
+            gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        return colorTexture;
+    };
+
+    const loadTexture = (gl, url) => {
+        const textures = [
+            getPlainTexture(gl),
+            getPlainTexture(gl)
+        ];
+/*
+            gl.createTexture();
+
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+*/
+        const level = 0;
+        const internalFormat = gl.RGBA;
+        const width = 1;
+        const height = 1;
+        const border = 0;
+        const srcFormat = gl.RGBA;
+        const srcType = gl.UNSIGNED_BYTE;
+
+ /*
+        const pixel = new Uint8ClampedArray([0, 0, 255, 255]);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+   */
+        const image = new Image();
+        image.onload = function () {
+            gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+            gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        };
+        image.src = url;
+
+        return textures;
+    };
+
+    const initBuffer = gl => {
+        // Create a buffer for the cube's vertex positions.
+
+        const positionBuffer = gl.createBuffer();
+
+        // Select the positionBuffer as the one to apply buffer
+        // operations to from here out.
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+        // Now create an array of positions for the cube.
+
+        //
+
+        const positions = [
+            // first face
+            paneAspectRatio,  1.0,  0.0,
+            -paneAspectRatio,  1.0,  0.0,
+            -paneAspectRatio, -1.0,  0.0,
+            paneAspectRatio, -1.0,  0.0,
+
+            // second face
+            paneAspectRatio,  1.0,  -1.5,
+            -paneAspectRatio,  1.0,  -1.5,
+            -paneAspectRatio, -1.0,  -1.5,
+            paneAspectRatio, -1.0,  -1.5,
+
+        ];
+
+        // Now pass the list of positions into WebGL to build the
+        // shape. We do this by creating a Float32Array from the
+        // JavaScript array, then use it to fill the current buffer.
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+        // Now set up the texture coordinates for the faces.
+
+        const textureCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
+
+        const textureCoordinates = [
+            // first
+            1.0,  0.0,
+            0.0,  0.0,
+            0.0,  1.0,
+            1.0,  1.0,
+
+            // second
+            1.0,  0.0,
+            0.0,  0.0,
+            0.0,  1.0,
+            1.0,  1.0,
+        ];
+
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
+            gl.STATIC_DRAW);
+
+        // Build the element array buffer; this specifies the indices
+        // into the vertex arrays for each face's vertices.
+
+        const indexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+        // This array defines each face as two triangles, using the
+        // indices into the vertex array to specify each triangle's
+        // position.
+
+        const indices = [
+            0,  2,  3,      0,  1,  2,    // front
+
+            4,  6,  7,      4,  5,  6
+        ];
+
+        // Now send the element array to GL
+
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+            new Uint16Array(indices), gl.STATIC_DRAW);
+
+        return {
+            position: positionBuffer,
+            textureCoord: textureCoordBuffer,
+            indices: indexBuffer,
+        };
+    };
+
+    const drawScene = (gl, programInfo) => {
+        const buffers = programInfo.buffers;
+        const textures = programInfo.textures;
+        // draw scene
+        gl.clearColor(0.0, 0.0, 0.0, 0.0);
+        // wie darf man die Tiefe hier interpretieren?
+        gl.clearDepth(1.0);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const fieldOfView = 45 * Math.PI / 180;
+        const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+        const zNear = 0.1;
+        const zFar = 100.0;
+        const projectionMatrix = mat4.create();
+
+        mat4.perspective(
+            projectionMatrix,
+            fieldOfView,
+            aspect,
+            zNear,
+            zFar
+        );
+
+        const modelViewMatrix = mat4.create();
+
+        mat4.rotate(modelViewMatrix,  // destination matrix
+            modelViewMatrix,  // matrix to rotate
+            xRotation,     // amount to rotate in radians
+            [-1, 0, 0]);       // axis to rotate around (Z)
+
+        mat4.rotate(modelViewMatrix,  // destination matrix
+            modelViewMatrix,  // matrix to rotate
+            yRotation,// amount to rotate in radians
+            [0, -1, 0]);       // axis to rotate around (X)
+
+        mat4.rotate(modelViewMatrix,  // destination matrix
+            modelViewMatrix,  // matrix to rotate
+            zRotation,     // amount to rotate in radians
+            [0, 0, -1]);       // axis to rotate around (Z)
+
+        mat4.translate(modelViewMatrix,     // destination matrix
+            modelViewMatrix,     // matrix to translate
+            [xDist, yDist, zDist]);  // amount to translate
+
+
+
+        {
+            const numComponents = 3;
+            const type = gl.FLOAT;
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.vertexAttribPointer(
+                programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset
+            );
+            gl.enableVertexAttribArray(
+                programInfo.attribLocations.vertexPosition
+            );
+        }
+
+        {
+            const numComponents = 2;
+            const type = gl.FLOAT;
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
+            gl.vertexAttribPointer(
+                programInfo.attribLocations.textureCoord,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset
+            );
+            gl.enableVertexAttribArray(
+                programInfo.attribLocations.textureCoord
+            );
+        }
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
+
+        gl.useProgram(programInfo.program);
+
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix
+        );
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocations.modelViewMatrix,
+            false,
+            modelViewMatrix
+        );
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+
+        gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
+        {
+            const vertexCount = 6;
+            const type = gl.UNSIGNED_SHORT;
+            const offset = 0;
+            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+        }
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+
+        gl.uniform1i(programInfo.uniformLocations.uSampler, 1);
+
+        {
+            const vertexCount = 6;
+            const type = gl.UNSIGNED_SHORT;
+            const offset = 12;
+            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+        }
+
+    };
+
+
+    useEffect(() => {
+        if (!canvasRef.current) {
+            return;
+        }
+        const gl = canvasRef.current.getContext('webgl');
+
+        if (!gl) {
+            d('COULD NOT GET GL CONTEXT!');
+            return;
+        }
+
+        if (info === null) {
+            const shaderProgram = initShaderProgram(gl);
+            const programInfo = {
+                program: shaderProgram,
+                attribLocations: {
+                    vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+                    textureCoord: gl.getAttribLocation(shaderProgram, 'aTextureCoord')
+                },
+                uniformLocations: {
+                    projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                    modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+                    uSampler: gl.getUniformLocation(shaderProgram, 'uSampler')
+                },
+                buffers: initBuffer(gl),
+                textures: loadTexture(gl, props.preview)
+            };
+            setInfo(programInfo);
+            return;
+        }
+
+        drawScene(gl, info);
+    });
+
+    return (
+        <Stack vertical>
+            <canvas ref={canvasRef} width={props.width} height={props.height} />
+            <Content>
+                <PropertyGrid>
+                    <RangeProp min={-1.0} max={1.0} step={0.01} name="xRotation" value={xRotation} set={setXRotation} />
+                    <RangeProp min={-1.0} max={1.0} step={0.01} name="yRotation" value={yRotation} set={setYRotation} />
+                    <RangeProp min={-1.0} max={1.0} step={0.01} name="zRotation" value={zRotation} set={setZRotation} />
+                    <RangeProp min={-30.0} max={10.0} step={0.1} name="xDist" value={xDist} set={setXDist} />
+                    <RangeProp min={-30.0} max={10.0} step={0.1} name="yDist" value={yDist} set={setYDist} />
+                    <RangeProp min={-30.0} max={10.0} step={0.1} name="zDist" value={zDist} set={setZDist} />
+                </PropertyGrid>
+            </Content>
+        </Stack>
+    )
+};
+
+function Tooltip(props) {
+    if (!props.active) {
+        return '';
+    }
+    return (
+        <div className="tooltip padded">{props.children}</div>
+    );
+}
+
+function Title(props) {
+    const divRef = useRef(null);
+    const [start, setStart] = useState(null);
+    const [showTooltip, setShowTooltip] = useState(false);
+    const timeRef = useRef(null);
+    timeRef.current = start;
+
+    const checkEnter = e => {
+        const elem = divRef.current;
+        if (elem.offsetWidth >= elem.scrollWidth) {
+            return;
+        }
+        const time = Date.now();
+        setStart(time);
+        setTimeout(() => {
+            if (time === timeRef.current) {
+                setShowTooltip(true);
+            }
+        }, 1000);
+    };
+
+    const checkLeave = e => {
+        setShowTooltip(false);
+        setStart(null);
+    };
+    return (
+        <div style={{flex: 1, minWidth: 0, position: 'relative'}}>
+            <div ref={divRef} onMouseOver={checkEnter} onMouseLeave={checkLeave} className="nowrap ellipsis overflow-hidden">{props.children}</div>
+            <Tooltip active={showTooltip}>{props.children}</Tooltip>
+        </div>
+    );
+}
+
 function Section(props) {
     const [collapsed, setCollapsed] = useState(false);
 
@@ -1162,7 +1679,7 @@ function Section(props) {
 
     const nameDiv = (
         <Content key="name" flex className={nameCls.join(' ')}>
-            {props.name}
+            <Title>{props.name}</Title>
         </Content>
     );
     let headItems = isVCollapse ? [actionsDiv, nameDiv] : [nameDiv, actionsDiv];
@@ -1185,6 +1702,10 @@ function Section(props) {
             </Stack>
         </Content>
     );
+}
+
+function Spacer(props) {
+    return <div style={{height: 5}}></div>
 }
 
 function Page(props) {
@@ -1228,21 +1749,9 @@ function Page(props) {
         <Content maxHeight="100vh">
             <Stack vertical fullHeight>
                 <Content>
-                    <Stack className="head">
-                        <Content flex padded>
-                            <Stack flex>
-                                <Content>
-                                    {props.title} &gt;
-                                </Content>
-                                <Stack flex wrap>
-                                    <ActionBox click={() => setOpen(!open)}><i className="material-icons md-18">{'keyboard_arrow_' + (open ? 'down' : 'right')}</i></ActionBox> {resources}
-                                </Stack>
-                            </Stack>
-                        </Content>
-
-                        <Content padded>
-                            {props.actions}
-                        </Content>
+                    <Stack>
+                        <Content flex>{props.cancel ? (<button onClick={props.cancel}> &lt; Back</button>) : ''}</Content>
+                        <Content><button onClick={props.play}>Play</button></Content>
                     </Stack>
                 </Content>
 
@@ -1503,10 +2012,14 @@ export {
     Range,
     RangeProp,
     Grid,
+    Title,
+    Scene3d,
     PropertyGrid,
     PropLabel,
     FullProp,
     Centered,
+    Spacer,
+    ActionFrame,
     SwitchButton,
     FileDropZone,
     GlobalContext,

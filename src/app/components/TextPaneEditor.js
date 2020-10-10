@@ -11,6 +11,7 @@ import {
     Section,
     Content,
     Centered,
+    ActionFrame,
     ActionBox,
     Checkbox,
     CheckboxProp,
@@ -22,8 +23,10 @@ import {
     PropLabel,
     RadioProp,
     FullProp,
+    Title,
     Select,
     Stack,
+    Spacer,
     Dim,
     DimProp,
     Toolbar,
@@ -964,6 +967,7 @@ function FontPreview(props) {
     const [screenY, setScreenY] = useState(props.resource.dim.y);
     const [highlight, setHighlight] = useState(false);
     const [showMarker, setShowMarker] = useState(true);
+    const [moving, setMoving] = useState(null);
     const fonts = getIdToItems(props.model.fonts)
 
     // TODO: try to use real state here? or just use props.blocks
@@ -1008,6 +1012,7 @@ function FontPreview(props) {
         blocks,
         screenX,
         screenY,
+        moving,
         model: props.model
     };
 
@@ -1039,6 +1044,9 @@ function FontPreview(props) {
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        for (let block of blocks) {
+            getBlockImage(block);
+        }
         drawTextBlocks(
             ctx,
             {x: propsRef.current.screenX, y: propsRef.current.screenY},
@@ -1092,6 +1100,7 @@ function FontPreview(props) {
     };
 
     let marker = '';
+    let activateByClick = null;
     const currBlock = currBlockRef.current;
     const fieldProps = defaultConfig.getFieldProps();
 
@@ -1105,7 +1114,7 @@ function FontPreview(props) {
         const currBlockHeight = fontSize.x * currLines.length;
         const currBlockWidth = fontSize.y * currMaxWidth;
 
-        if (currBlockWidth > 0 && currBlockHeight > 0 && !(currBlock.autoCenteringX && currBlock.autoCenteringY)) {
+        if (currBlockWidth > 0 && currBlockHeight > 0) {
             const setCurrPosX = getSetProp('x');
             const setCurrPosY = getSetProp('y');
 
@@ -1117,16 +1126,16 @@ function FontPreview(props) {
             }
             const initMove = e => {
                 const rect = overlayRef.current.getBoundingClientRect();
-                let lastX = Math.floor((e.clientX - rect.x)/zoom);
-                let lastY = Math.floor((e.clientY - rect.y)/zoom);
+                let lastX = Math.floor((e.clientX - rect.x) / zoom);
+                let lastY = Math.floor((e.clientY - rect.y) / zoom);
                 const offsetX = currBlockRef.current.x - lastX;
                 const offsetY = currBlockRef.current.y - lastY;
                 lastX += offsetX;
                 lastY += offsetY;
 
                 const moveListener = (e) => {
-                    const currX = Math.floor((e.clientX - rect.x)/zoom);
-                    const currY = Math.floor((e.clientY - rect.y)/zoom);
+                    const currX = Math.floor((e.clientX - rect.x) / zoom);
+                    const currY = Math.floor((e.clientY - rect.y) / zoom);
 
                     const cBlock = currBlockRef.current;
                     const deltaX = currX - lastX;
@@ -1171,6 +1180,7 @@ function FontPreview(props) {
                         capture: false
                     }
                 );
+
                 setHighlight(true);
             };
 
@@ -1193,7 +1203,42 @@ function FontPreview(props) {
                 height={Math.min(pos.height, screenY - pos.y)}
                 highlight={highlight}
             />);
+/*
+            if (propsRef.current.moving !== null) {
+                d('INIT!...', propsRef.current);
+                initMove(propsRef.current.moving);
+                setMoving(null);
+            }
+*/
+            activateByClick = e => {
+                d('ACTIVATE');
+                const rect = overlayRef.current.getBoundingClientRect();
+                const clickX = Math.floor((e.clientX - rect.x)/zoom);
+                const clickY = Math.floor((e.clientY - rect.y)/zoom);
+
+                let i = blocks.length - 1;
+                let found = false;
+                while(!found && i >= 0) {
+                    const block = blocks[i];
+                    const pos = getBlockPos(block, props.model.fonts, {x: screenX, y: screenY});
+                    if (pos.x <= clickX && clickX <= (pos.x + pos.width - 1) &&
+                        pos.y <= clickY && clickY <= (pos.y + pos.height - 1)) {
+                        found = true;
+                    } else {
+                        i--;
+                    }
+                }
+                if (found) {
+                    setActive(i);
+                    setMoving({clientX: e.clientX, clientY: e.clientY});
+                } else {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                }
+            };
         }
+
     }
     const realWidth = screenX * zoom;
     const realHeight = screenY * zoom;
@@ -1259,7 +1304,7 @@ function FontPreview(props) {
                     items={blocks}
                     active={active}
                     setActive={setActive}
-                    getName={item => item.id}
+                    getName={item => <Title>{item.id}</Title>}
                     setItems={newBlocks => {
                         let changed = false;
                         if (newBlocks.length !== blocks.length) {
@@ -1288,7 +1333,7 @@ function FontPreview(props) {
                 />
             </Section>
 
-            <Section name="Preview" flex>
+            <Section name="Screen" flex>
                 <Stack vertical border>
                     <Toolbar>
                         <Dim name="Size" x={screenX} setX={setScreenX} y={screenY} setY={setScreenY} min={1} max={1024} buttons />
@@ -1301,7 +1346,7 @@ function FontPreview(props) {
                             <div style={{position: 'absolute'}}>
                                 <Content padded>
                                     <canvas className="thin-boxed" ref={canvasRef} width={screenX * zoom} height={screenY * zoom} />
-                                    <div ref={overlayRef} className="" style={{position: 'absolute', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: 6, left: 6}}>
+                                    <div ref={overlayRef} onMouseDown={activateByClick} className="" style={{position: 'absolute', backgroundColor: 'transparent', width: realWidth, height: realHeight, top: 6, left: 6}}>
                                         {marker}
                                     </div>
                                 </Content>
@@ -1837,63 +1882,67 @@ function TextPaneEditor(props) {
         )
     }
 
-    const actions = (
-        <Fragment>
-            <button onClick={props.cancel}>Back</button>
-            <button onClick={props.revert}>Revert</button>
-            <button onClick={saveTextPane}>Save</button>
-            <button onClick={deployTextPane} disabled={!eContext.hasStorePos()}>Deploy</button>
-            <button onClick={exportTextPane}>Export</button>
-            <button onClick={props.play}>Play</button>
-        </Fragment>
+    const frameActions = (
+        <Stack>
+            <Content>
+                <button disabled={!eContext.hasPast()} onClick={() => eContext.undoAction()}>Undo</button>
+                <button disabled={!eContext.hasFuture()} onClick={() => eContext.redoAction()}>Redo</button>
+            </Content>
+            <Content>
+                <button onClick={props.revert}>Revert</button>
+                <button onClick={saveTextPane}>Save</button>
+                <button onClick={deployTextPane} disabled={!eContext.hasStorePos()}>Deploy</button>
+                <button onClick={exportTextPane}>Export</button>
+            </Content>
+        </Stack>
     );
-
     return (
-        <Page title="Edit TexPane" resources={tree}  actions={actions}>
+        <Page title="Edit TexPane" resources={tree} cancel={props.cancel} play={props.play}>
             <Stack vertical fullHeight>
-                <Section name="TextPane">
-                    <Toolbar>
-                        <button disabled={!eContext.hasPast()} onClick={() => eContext.undoAction()}>Undo</button>
-                        <button disabled={!eContext.hasFuture()} onClick={() => eContext.redoAction()}>Redo</button>
-                    </Toolbar>
-                </Section>
-                <Stack>
-                    <Section name="Fonts">
-                        <ItemsStack
-                            new={newFont}
-                            deleteActiveItem={deleteFont}
-                            width={200}
-                            min={1}
-                            collapsed
-                            active={active}
-                            setActive={setActive}
-                            setItems={value => {model.fonts = value; setModel(model)}}
-                            items={model.fonts}
-                            cleanUp={item => {
-                                // scheint beim Löschen eines Fonts auch die TextBlöcke
-                                // die auf diesen verlinkt haben, zu löschen
-                                const newBlocks = [];
-                                for (let block of blocks) {
-                                    if (block.font != item.id) {
-                                        newBlocks.push(block);
+                <ActionFrame type="TextPane: " name={props.resource.id + (eContext.hasStorePos() ? ' ' : '*')} sub={{'from': tree[0].source, 'Resources': tree.length}} actions={frameActions}>
+                    <Stack fullHeight>
+                        <Section name="Fonts">
+                            <ItemsStack
+                                new={newFont}
+                                deleteActiveItem={deleteFont}
+                                width={200}
+                                min={1}
+                                collapsed
+                                active={active}
+                                setActive={setActive}
+                                setItems={value => {model.fonts = value; setModel(model)}}
+                                items={model.fonts}
+                                cleanUp={item => {
+                                    // scheint beim Löschen eines Fonts auch die TextBlöcke
+                                    // die auf diesen verlinkt haben, zu löschen
+                                    const newBlocks = [];
+                                    for (let block of blocks) {
+                                        if (block.font != item.id) {
+                                            newBlocks.push(block);
+                                        }
                                     }
-                                }
-                                setBlocks(newBlocks);
-                            }}
-                            getProperties={getFontProps}
-                            getName={item => <LabelAndSubInfo name={item.id}> - Size: {item.width + 'x' + item.height}</LabelAndSubInfo>}
-                        />
-                    </Section>
-                    <Section name="Characters" flex>
-                        <CharIndex undoRedo={false} cellProvider={currFont.provider} />
-                    </Section>
+                                    setBlocks(newBlocks);
+                                }}
+                                getProperties={getFontProps}
+                                getName={item => <LabelAndSubInfo name={item.id}> - Size: {item.width + 'x' + item.height}</LabelAndSubInfo>}
+                            />
+                        </Section>
+                        <Section name="Characters" flex>
+                            <CharIndex undoRedo={false} cellProvider={currFont.provider} />
+                        </Section>
+                    </Stack>
+                </ActionFrame>
+
+                <Spacer />
+
+                <ActionFrame type="Preview" flex actions={<button>Export</button>}>
+                    <Content flex>
+                        <FontPreview model={model} activeFont={active} resource={props.resource}
+                                     blocks={blocks} setBlocks={setBlocks}
+                                     editorId="preview" />
+                    </Content>
+                </ActionFrame>
                 </Stack>
-                <Content flex>
-                    <FontPreview model={model} activeFont={active} resource={props.resource}
-                                 blocks={blocks} setBlocks={setBlocks}
-                                 editorId="preview" />
-                </Content>
-            </Stack>
 
             <ResizeFontModal.render name="Resize Font" fit closeable>
                 <ResizeFontForm save={ResizeFontModal.params.save} hide={ResizeFontModal.hide} font={ResizeFontModal.params.font} />

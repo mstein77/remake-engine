@@ -2124,6 +2124,7 @@ class Game {
                                 {
                                     type: 'TextPane',
                                     id: pane.id,
+                                    preview: pane.container.canvas.elem.toDataURL('image/png'),
                                     config: TextPaneConfig,
                                     cls: TextPane,
                                     data: pane.config,
