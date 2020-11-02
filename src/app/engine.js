@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -1561,7 +1561,7 @@ class FontMapConfig extends Config {
         return obj;
     }
 }
-FontMapConfig.__type = 'FontMap';
+// FontMapConfig.__type = 'FontMap';
 
 class TextBlockConfig extends Config {
 
@@ -1705,7 +1705,7 @@ class TextPaneConfig extends Config {
         return obj;
     }
 }
-TextPaneConfig.__type = 'TextPane';
+// TextPaneConfig.__type = 'TextPane';
 TextPaneConfig.deps = {
     font: FontMapConfig,
     block: TextBlockConfig
@@ -2112,7 +2112,17 @@ class Game {
                 if (area.panes !== undefined) {
                     for (let pane of area.panes) {
                         if (pane.tilesMap) {
-                            resources.push({type: 'tilesMap', data: pane.tilesMap});
+                            resources.push(
+                                {
+                                    type: 'TilesMap',
+                                    id: pane.tilesMap.id,
+                                    config: TilesMapConfig,
+                                    cls: TilesMap,
+                                    data: pane.tilesMap.config,
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim
+                                }
+                            );
                         } else if (pane instanceof TextPane) {
                             const blocks = [];
                             for (let id in pane.blocks) {
@@ -2124,15 +2134,33 @@ class Game {
                                 {
                                     type: 'TextPane',
                                     id: pane.id,
-                                    preview: pane.container.canvas.elem.toDataURL('image/png'),
                                     config: TextPaneConfig,
                                     cls: TextPane,
+                                    elem: pane.getPreview(),
                                     data: pane.config,
                                     dim: pane.viewPortDim,
                                     blocks
                                 });
+                        } else if (pane instanceof ColorPane) {
+                            resources.push({
+                                type: 'ColorPane',
+                                id: pane.id,
+                                config: ColorPaneConfig,
+                                cls: ColorPane,
+                                elem: pane.getPreview(),
+                                data: pane.config,
+                                dim: pane.viewPortDim,
+
+                            });
                         } else if (pane.spriteSheet) {
-                            resources.push({type: 'spriteSheet', data: pane.spriteSheet});
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    type: 'spriteSheet',
+                                    data: pane.spriteSheet
+                                }
+                            );
                         }
                     }
                 }
@@ -3216,6 +3244,8 @@ class CanvasPane {
     }
 }
 
+class ColorPaneConfig extends Config {
+}
 class ColorPane {
     constructor(color) {
         this.color = color;
@@ -3260,8 +3290,18 @@ class ColorPane {
         }
         this.dirty = false;
     }
-}
 
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: null,
+            color: this.color,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
+}
+ColorPane.Config = ColorPaneConfig;
 
 class TextBlock {
     constructor(input) {
@@ -3381,6 +3421,16 @@ class TextPane {
         ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y);
         drawTextBlocks(ctx, this.paneDim, Object.values(this.blocks), this.fonts);
         this.dirty = false;
+    }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.container.canvas.elem.toDataURL('image/png'),
+            color: null,
+            width: this.paneDim.x,
+            height: this.paneDim.y
+        }
     }
 
     static padStart(value, char, len) {
@@ -4523,6 +4573,16 @@ class BufferedTilesPane {
             Game.instance.addDomOp(elemStyle, 'top', posTop);
         }
     }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.buffers.buffers[this.buffers.active].elem.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
 }
 
 const COLLISION = {
@@ -5102,6 +5162,16 @@ class SpritePane {
         this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : [];
         this.container.switchBuffer();
         this.dirty = false;
+    }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.container.buffers[this.container.active].elem.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
     }
 }
 
@@ -6579,48 +6649,86 @@ class SpriteAndTilesCollider {
 
 class TilesMapConfig extends Config {
 
+    getDefaults() {
+        return {
+            tileBits: 5,
+            defaultTile: {},
+            tiles: {},
+            animations: {},
+            brushes: {},
+            map: [[]]
+        }
+    }
+
+    getFieldProps() {
+        return {
+            tileBits: {min: 3, max: 16}
+        }
+    }
+
     setTileBits(value) {
-        this.tileBits = this.validateInt(value, {min: 1, max: 16})
+        this.tileBits = this.validateInt(value, this.getFieldProp('tileBits'))
     }
 
     setImage(value) {
-        this.image = this.validateImage(value)
+        this.image = this.validateImageResource(value)
     }
 
     setDefaultTile(value) {
-        // TODO
+        this.defaultTile = this.validateObject(value);
     }
 
     setTiles(value) {
-
+        this.tiles = this.validateObject(value);
     }
 
-    addTile(value) {
-
+    addTile(id, value) {
+        this.tiles[this.validateString(id)] = this.validateObject(value);
     }
 
     addTiles(values) {
+        for (let id in this.validateObject(values)) {
+            this.addTile(id, values[id]);
+        }
+    }
 
+    addTiles(values) {
+        for (let tile of values) {
+            this.addTile(tile);
+        }
     }
 
     setAnimations(value) {
-
+        this.animations = this.validateObject(value);
     }
 
-    addAnimation(value) {
-
+    addAnimation(id, value) {
+        this.animations[this.validateString(id)] = this.validateObject(value);
     }
 
     addAnimations(values) {
-
+        for (let id in this.validateObject(values)) {
+            this.addAnimation(id, values[id]);
+        }
     }
 
     setMap(value) {
-        // TODO
+        this.map = this.validateArray(value);
     }
 
     setBrushes(value) {
-        // TODO
+        this.brushes = this.validateObject(value);
+    }
+
+    addRebuildProps(obj, deep, base) {
+        obj.tileBits = base.tileBits;
+        obj.image = deep ? RL.makeImageResource(base.tilesImg.elem, base.tilesImgId) : base.tilesImgId;
+        obj.map = [...base.map];
+        obj.defaultTile = base.defaultTile;
+        obj.tiles = base.tiles;
+        obj.animations = base.animations;
+        obj.brushes = base.brushes;
+        return obj;
     }
 
     applyTo(json) {
@@ -6628,62 +6736,48 @@ class TilesMapConfig extends Config {
         json.tileBits = this.tileBits;
         json.tileSize = 1 << this.tileBits;
         json.tilesImgId = this.image.id;
-        json.tilesImg = this.image.getCanvas();
-        json.map = this.map; // TODO clone deep
+        let canvas = this.image.getCanvas();
+        if (canvas.height !== json.tileSize) {
+            const tilesPerLine = Math.floor(canvas.width / json.tileSize);
+            const lines = Math.floor(canvas.height / json.tileSize);
+            const flatCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * json.tileSize, json.tileSize);
+            for (let i = 0; i < lines; i++) {
+                const width = tilesPerLine * json.tileSize;
+                flatCanvas.ctx.drawImage(canvas.elem, 0, i * json.tileSize, width, json.tileSize, i * width, 0, width, json.tileSize);
+            }
+            canvas = flatCanvas;
+        }
+        json.tilesImg = canvas;
+        json.map = cloneDeep(this.map);
         json.defaultTile = this.defaultTile;
         json.tiles  = this.tiles;
+        json.animations = this.animations;
         json.brushes = this.brushes; // TODO only in editor mode
+        json.mapTiles = {
+            x: this.map[0].length,
+            y: this.map.length
+        };
+        return json;
     }
 }
 
 class TilesMap {
 
-    constructor(tileBits, imageResource, tiles, defaultTile = null) {
-        this.tileBits = tileBits;
-        this.tileSize = 1 << tileBits;
-
-        const srcCanvas = imageResource.getCanvas();
-        const tilesPerLine = Math.floor(srcCanvas.elem.width / this.tileSize);
-        const lines = Math.floor(srcCanvas.elem.height / this.tileSize);
-        const tgtCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * this.tileSize, this.tileSize);
-        for (let i = 0; i < lines; i++) {
-            const width = tilesPerLine * this.tileSize;
-            tgtCanvas.ctx.drawImage(srcCanvas.elem, 0, i*this.tileSize, width, this.tileSize, i*width, 0, width, this.tileSize);
+    constructor(input) {
+        this.config = getConfigFromInput(TilesMap.Config, input);
+        this.config.applyTo(this);
+        this.player = {};
+        for (let id in this.animations) {
+            const player = new BitmapPlayer();
+            const animation = this.animations[id];
+            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            this.player[id] = player;
         }
-        this.tilesImg = tgtCanvas;
-
-        this.map = [];
-        this.mapTiles = {
-            x: 0,
-            y: 0
-        };
-        this.tiles = tiles;
-        this.animations = {};
         this.animatedIndices = [];
-        this.defaultTile = defaultTile;
     }
-
-    addAnimation(id, animation) {
-        const player = new BitmapPlayer();
-        player.loadAnimation(animation.frames, animation.end, animation.dir);
-        this.animations[id] = player;
-    };
 
     getAnimations() {
-        return this.animations;
-    }
-
-    setMap(map) {
-        if (!Array.isArray(map)) {
-            throw Error('Map must be an array of arrays!');
-        }
-        if (map.length === 0 || map[0].length === 0) {
-            throw Error('Map cannot be empty!');
-        }
-
-        this.map = this.getMapClone(map);
-        this.mapTiles.x = this.map[0].length;
-        this.mapTiles.y = this.map.length;
+        return this.player;
     }
 
     getMap() {
@@ -6801,7 +6895,7 @@ class TilesMap {
         if (tile.animation === undefined) {
             return tile.index;
         }
-        const frame = this.animations[tile.animation].getFrame();
+        const frame = this.player[tile.animation].getFrame();
         if (tile.isRegistered !== true) {
             this.animatedIndices.push(tile.index);
             tile.isRegistered = true;
@@ -6810,8 +6904,8 @@ class TilesMap {
     }
 
     updateFrames() {
-        for (let index in this.animations) {
-            this.animations[index].nextStep();
+        for (let index in this.player) {
+            this.player[index].nextStep();
         }
     }
 
@@ -6933,22 +7027,13 @@ class TilesMap {
         }
     }
 }
+TilesMap.Config = TilesMapConfig;
 
 class FontMap {
 
     constructor(input) {
         this.config = getConfigFromInput(FontMap.Config, input);
         this.config.applyTo(this);
-    }
-
-    drawTextLine(ctx, text, posX, posY) {
-        for (let i = 0; i <= text.length; i++) {
-            const char = this.map[text[i]];
-            if (char !== undefined) {
-                ctx.drawImage(this.image, char.x, char.y, this.width, this.height, posX, posY, this.width, this.height);
-            }
-            posX += this.width;
-        }
     }
 }
 FontMap.Config = FontMapConfig;

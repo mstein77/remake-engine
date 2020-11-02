@@ -1,6 +1,8 @@
 import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from "react";
 import {CellSelection} from "../classes/CellProvider";
 import {CellProviderRaster} from "./Raster";
+import {EmptyGrid} from "../classes/Grid";
+import {AssignIndex, CharIndex, ColorIndex} from "../classes/IndexProvider";
 import {
     useModal,
     useKeyListener,
@@ -12,6 +14,7 @@ import {
     Content,
     Centered,
     ActionFrame,
+    CursorContext,
     ActionBox,
     Checkbox,
     CheckboxProp,
@@ -27,6 +30,7 @@ import {
     Select,
     Stack,
     Spacer,
+    Canvas,
     Dim,
     DimProp,
     Toolbar,
@@ -35,7 +39,7 @@ import {
     Color,
     ColorProp,
     RangeProp,
-    GlobalContext
+    GlobalContext, useComponentUpdate, IndexController, IndexPicker
 } from "./BaseComponents";
 
 import {
@@ -51,7 +55,7 @@ import {
     getNextUid,
     getTextBlockImage,
     getBlockPos,
-    getResourceTreeForJsonModel
+    getResourceTreeForJsonModel, getEmptyImageData, getColorsFromCanvas, getCanvasForBitmap
 } from '../helper/helper';
 
 import {
@@ -66,11 +70,11 @@ import {
 } from "./Raster";
 import {BitmapCellProvider, FontCharIndexProvider} from "../classes/CellProvider";
 
-function CharInput(props) {
-    const [value, setValue] = useState(props.values[props.index]);
+
+function CharInput({value, setValue, index, focusIndex}) {
     const inputRef = useRef(null);
     useEffect(() => {
-        if (props.index === props.focusIndex) {
+        if (index === focusIndex) {
             inputRef.current.focus();
         }
     });
@@ -78,52 +82,61 @@ function CharInput(props) {
         <input
             ref={inputRef}
             type="text"
-            value={props.values[props.index]}
+            value={value}
             required
+            onKeyPress={
+                e => {
+                    if (e.charCode >= 32) {
+                        setValue(e.key);
+                    }
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            }
             onChange={
                 (e) => {
-                    const newValues = props.values.concat();
-                    const inputValue = e.target.value;
-                    const isConflict = inputValue !== '' && newValues.indexOf(inputValue) !== -1;
-                    if (isConflict) {
-                        return;
-                    }
-                    const newValue = e.target.value;
-                    setValue(newValue);
-                    newValues[props.index] = newValue;
-                    if (inputValue !== '') {
-                        inputRef.current.blur();
-                        props.setFocusIndex(props.index + 1);
-                    } else {
-                        props.setFocusIndex(props.index);
-                    }
-                    props.setValues(newValues);
+                    setValue(e.target.value);
                 }
             } size={1} maxLength={1} />
     );
 }
 
-function CharAssign(props) {
-    const defaultValues = [];
-    while(defaultValues.length < props.provider.getWidth()) {
-        defaultValues.push('');
-    }
-    const [values, setValues] = useState(props.codes ? props.codes : defaultValues);
+function CharAssign({assignIndex, cancel, save}) {
     const [focusIndex, setFocusIndex] = useState(0);
+    const update = useComponentUpdate();
     const saveRef = useRef(null);
+    const values = assignIndex.getPropValues('newChar');
+
     saveRef.current = values;
     const incPosRef = useRef(null);
-    useKeyListener(13, () => {if (saveRef.current.indexOf('') !== -1) return false; save(); return true});
+    useKeyListener(13, () => {if (!canSave()) return false; doSave(); return true});
 
-    const updateFocusIndex = (newIndex) => {
-        const endPos = incPosRef.current.pos + incPosRef.current.page;
-        if (endPos < newIndex && endPos < defaultValues.length - 1) {
-            incPosRef.current.setPos(incPosRef.current.pos + 1);
+    const setValueAtIndex = (index, value) => {
+        if (value !== '') {
+            const oldIndex = assignIndex.getIndexByPropValue('newChar', value);
+            if (oldIndex !== null) {
+                assignIndex.setIndexProp(oldIndex, 'newChar', '');
+            }
         }
-        setFocusIndex(newIndex);
+        assignIndex.setIndexProp(index, 'newChar', value);
+        values[index] = value;
+        return value;
     };
-    const autoFill = (index) => {
-        const newValues = values.concat();
+
+    const focusNextFrom = from => {
+        if (values[from] === '') {
+            setFocusIndex(from);
+        } else {
+            let next = from + 1;
+            if (values.length === next) {
+                next = values.indexOf('');
+            }
+            setFocusIndex(next);
+        }
+        update();
+    };
+
+    const autoFill = index => {
         const leftValues = index === 0 ? [] : values.slice(0, index);
         for(let i = 0; i < leftValues.length; i++) {
             leftValues[i] = leftValues[i].charCodeAt(0);
@@ -131,34 +144,46 @@ function CharAssign(props) {
         let currCode = values[index].charCodeAt(0);
         for (let i = index + 1; i < values.length; i++) {
             currCode++;
-            while(leftValues.indexOf(currCode) !== -1) {
-                currCode++;
-            }
-            newValues[i] = String.fromCharCode(currCode);
+            setValueAtIndex(i, String.fromCharCode(currCode));
         }
-        setValues(newValues);
+        focusNextFrom(values.length - 1);
     };
-    const save = () => {
-        props.assign(saveRef.current);
+
+    const canSave = () => saveRef.current.indexOf('') === -1;
+
+    const doSave = () => {
+        save(assignIndex.getObjectsForIndices());
     };
 
     return (
         <EditorCtx>
             <Stack vertical fit>
                 <Content>
-                    <FlexRasterIndex
-                        cellProvider={props.provider}
-                        dim={props.provider.getCharSize()}
+                    <IndexController
+                        key={focusIndex}
+                        indexProvider={assignIndex}
+                        startPos={Math.max(focusIndex - 1, 0)}
                         minWidth={50}
                         titleHeight={22}
                         incPosRef={incPosRef}
                         renderTitle={
-                            (index) => {
+                            index => {
+                                const char = assignIndex.getIndexProps(index).newChar;
                                 return (
                                     <Stack>
-                                        <CharInput setFocusIndex={updateFocusIndex} focusIndex={focusIndex} setValues={setValues} values={values} index={index} />
+                                        <CharInput
+                                            key={index + '_' + char}
+                                            value={char}
+                                            setValue={
+                                                value => {
+                                                    setValueAtIndex(index, value);
+                                                    focusNextFrom(index);
+                                                }}
+                                            focusIndex={focusIndex}
+                                            index={index}
+                                        />
                                         <div>
-                                            <button disabled={values[index] === ''} onClick={() => autoFill(index)}>...</button>
+                                            <button disabled={char === ''} onClick={() => autoFill(index)}>...</button>
                                         </div>
                                     </Stack>
                                 );
@@ -167,8 +192,8 @@ function CharAssign(props) {
                 </Content>
                 <Content padded>
                     <Stack>
-                        <button disabled={values.indexOf('') !== -1} onClick={save}>Save</button>
-                        <button onClick={props.cancelHandler}>Cancel</button>
+                        <button disabled={!canSave()} onClick={doSave}>Save</button>
+                        <button onClick={cancel}>Cancel</button>
                     </Stack>
                 </Content>
             </Stack>
@@ -176,315 +201,52 @@ function CharAssign(props) {
     );
 }
 
-
-function CharIndex(props) {
-
-    const eContext = useContext(EditorContext);
+function CharIndexController({fontIndex}) {
     const context = useContext(GlobalContext);
-    const incPosRef = useRef(null);
+    const eContext = useContext(EditorContext);
 
     const NewCharModal = useModal();
     const EditCharModal = useModal();
+    const ApplyFilterModal = useModal();
     const AssignCharsModal = useModal();
     const ImportCharsModal = useModal();
-    const ApplyFilterModal = useModal();
 
-    const getCharsForIndices = (indices) => {
-        const chars = [];
-        for (let index of indices) {
-            chars.push(props.cellProvider.getCharAtIndex(index));
-        }
-        return chars;
-    };
-
-    const size = props.cellProvider.getCharSize();
-
-    const update = () => {
-        incPosRef.current.setMarked([]);
-        eContext.updateRaster();
-    };
-
-    const addCharsWithBitmap = chars => {
-        props.cellProvider.addSpaceForChars(Object.keys(chars).length);
-        const size = props.cellProvider.getCharSize();
-        for (let code in chars) {
-            props.cellProvider.addCharCode(code, false);
-            const bitmap = chars[code].getContext('2d').getImageData(0, 0, size.x, size.y);
-            props.cellProvider.setBitmapForValue(code, bitmap);
-        }
-        props.cellProvider.generateFlatImage();
-        update();
-    };
-
-    const actions = [
-        {
-            name: 'Edit',
-            doAction: (indices) => {
-                editChar(indices[0]);
-            },
-            isHidden: (props) => {
-                return (props.marked.length !== 1);
+    const newChar = () => {
+        NewCharModal.show({
+            image: getEmptyImageData(
+                fontIndex.getSizeX(),
+                fontIndex.getSizeY()
+            ),
+            colors: new ColorIndex({colors: getColorsFromCanvas(fontIndex.img)}),
+            save: provider => {
+                assignImagesToChars([{index: 0, value: provider.getImageData()}]);
+                NewCharModal.hide()
             }
-        },
-        {
-            name: 'Swap',
-            doAction: (indices) => {
-                const first = indices[0];
-                const second = indices[1];
-                const firstBitmap = props.cellProvider.getBitmapForIndex(first, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
-                const secondBitmap = props.cellProvider.getBitmapForIndex(second, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
-                eContext.doAction(
-                    () => {
-                        props.cellProvider.setBitmapForIndex(first, secondBitmap);
-                        props.cellProvider.setBitmapForIndex(second, firstBitmap);
-                        update();
-                    },
-                    () => {
-                        props.cellProvider.setBitmapForIndex(first, firstBitmap);
-                        props.cellProvider.setBitmapForIndex(second, secondBitmap);
-                        update();
-                    }
-                );
-            },
-            isHidden: (props) => {
-                return (props.marked.length !== 2);
-            }
-        },
-        {
-            name: 'Delete',
-            doAction: (indices) => {
-                const chars = getCharsForIndices(indices);
-                const undoChars = {};
-                for (let char of chars) {
-                    undoChars[char] = props.cellProvider.getBitmapForValue(char);
-                }
-                eContext.doAction(
-                    () => {
-                        for (let char of chars) {
-                            props.cellProvider.deleteChar(char, false);
-                        }
-                        props.cellProvider.generateFlatImage();
-                        update();
-                    },
-                    () => {
-                        addCharsWithBitmap(undoChars);
-                    }
-                );
-            }
-        },
-        {
-            name: 'Clear',
-            doAction: (indices) => {
-                const chars = getCharsForIndices(indices);
-                const undoChars = {};
-                let clearCanvas = document.createElement('canvas');
-                clearCanvas.width = size.x;
-                clearCanvas.height = size.y;
-                clearCanvas = clearCanvas.getContext('2d');
-                clearCanvas.clearRect(0, 0, size.x, size.y);
-                for (let char of chars) {
-                    undoChars[char] = props.cellProvider.getBitmapForValue(char, 1, false);
-                }
-                eContext.doAction(
-                    () => {
-                        for (let char of chars) {
-                            props.cellProvider.setBitmapForValue(char, clearCanvas.getImageData(0, 0, size.x, size.y));
-                        }
-                        update();
-                    },
-                    () => {
-                        addCharsWithBitmap(undoChars);
-                    }
-                );
-            },
-        },
-        {
-            name: 'Reassign',
-            doAction: (indices) => {
-                const chars = [];
-                const images = [];
-                indices.sort();
-                for (let index of indices) {
-                    chars.push(props.cellProvider.getCharAtIndex(index));
-                    images.push(props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y));
-                }
-                assignImagesToChars(images, chars);
-            }
-        },
-        {
-            name: 'Apply...',
-            doAction: (indices) => {
-                const previewCanvas = [];
-                for (let index of indices) {
-                    previewCanvas.push({
-                        name: props.cellProvider.getCharAtIndex(index),
-                        canvas: props.cellProvider.getBitmapForIndex(index, 5, false)
-                    });
-                }
-                ApplyFilterModal.show({
-                    canvas: previewCanvas,
-                    save: (filter) => {
-                        const undoBitmaps = {};
-                        const doBitmaps = {};
-                        for (let index of indices) {
-                            const char = props.cellProvider.getCharAtIndex(index);
-                            const bitmap = props.cellProvider.getBitmapForIndex(index, 1, false);
-                            undoBitmaps[char] = bitmap;
-                            doBitmaps[char] = context.filters.getCanvasWithFiltersApplied(filter, {elem: bitmap, ctx: bitmap.getContext('2d')}, 0, 0, size.x, size.y)[0].elem;
-                        }
-                        eContext.doAction(
-                            () => {
-                                for(let char in doBitmaps) {
-                                    props.cellProvider.setBitmapForValue(char, doBitmaps[char].getContext('2d').getImageData(0, 0, size.x, size.y));
-                                }
-                                update();
-                            },
-                            () => {
-                                for(let char in undoBitmaps) {
-                                    props.cellProvider.setBitmapForValue(char, undoBitmaps[char].getContext('2d').getImageData(0, 0, size.x, size.y));
-                                }
-                                update();
-                            }
-                        );
-                       ApplyFilterModal.hide()
-                    }
-                });
-            }
-        },
-        {
-            name: 'Copy',
-            doAction: (indices) => {
-                const bitmap = props.cellProvider.getBitmapForIndex(indices[0], 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
-                const selection = new CellSelection('bitmap', [[bitmap]]);
-                eContext.setSelection(selection);
-            },
-            isHidden: (props) => {
-                return props.marked.length !== 1;
-            }
-        },
-        {
-            name: 'Paste',
-            doAction: (indices) => {
-                const chars = getCharsForIndices(indices);
-                const undoChars = {};
-                const pasteBitmap = eContext.selection.getCell();
-                for (let char of chars) {
-                    undoChars[char] = props.cellProvider.getBitmapForValue(char, 1, false);
-                }
-                eContext.doAction(
-                    () => {
-                        for (let char of chars) {
-                            props.cellProvider.setBitmapForValue(char, pasteBitmap);
-                        }
-                        update();
-                    },
-                    () => {
-                        addCharsWithBitmap(undoChars);
-                    }
-                );
-            },
-            isHidden: () => {
-                if (!eContext.selection || !eContext.selection.isBitmap()) {
-                    return true;
-                }
-                const cell = eContext.selection.getCell();
-                return (cell.width !== size.x || cell.height !== size.y);
-            }
-        }
-     ];
-
-    const assignChars = (providers) => {
-        if (!Array.isArray(providers)) {
-            providers = [providers];
-        }
-        const images = [];
-        for (let provider of providers) {
-            images.push(provider.getImageData());
-        }
-        assignImagesToChars(images, null);
-    };
-
-    const assignImagesToChars = (images, oldCodes) => {
-        const assignProvider = new FontCharIndexProvider({width: size.x, height: size.y, map: {}, image: getCanvasForDim(size.x, size.y)});
-        assignProvider.addSpaceForChars(images.length);
-        for (let i = 0; i < images.length; i++) {
-            const code = String.fromCharCode(32 + i);
-            assignProvider.addCharCode(code, false);
-            assignProvider.setBitmapForValue(code, images[i]);
-        }
-        assignProvider.generateFlatImage();
-
-        const assign = (newCodes) => {
-            const backups = {};
-            const deleted = [];
-            const skip = [];
-            if (oldCodes !== null) {
-                for (let char of oldCodes) {
-                    const newIndex = newCodes.indexOf(char);
-                    if (newIndex === -1) {
-                        backups[char] = props.cellProvider.getBitmapForValue(char, 1, false);
-                        deleted.push(char);
-                    } else if (newIndex === oldCodes.indexOf(char)) {
-                        skip.push(char);
-                    }
-                }
-            }
-            for (let char of newCodes) {
-                if (skip.indexOf(char) !== -1) continue;
-                backups[char] = props.cellProvider.hasCode(char) ? props.cellProvider.getBitmapForValue(char, 1, false) : null;
-            }
-            eContext.doAction(
-                () => {
-                    for(let char of deleted) {
-                        props.cellProvider.deleteChar(char);
-                    }
-                    for (let i = 0; i < newCodes.length; i++) {
-                        const char = newCodes[i];
-                        if (backups[char] === null) {
-                            props.cellProvider.addCharCode(char);
-                        }
-                        props.cellProvider.setBitmapForValue(char, images[i]);
-                    }
-                    update();
-                },
-                () => {
-                    for(let char of deleted) {
-                        props.cellProvider.addCharCode(char);
-                    }
-                    for(let char in backups) {
-                        if (backups[char] === null) {
-                            props.cellProvider.deleteChar(char);
-                        } else {
-                            const bitmap = backups[char].getContext('2d').getImageData(0, 0, size.x, size.y);
-                            props.cellProvider.setBitmapForValue(char, bitmap);
-                        }
-                    }
-                    update();
-                }
-            );
-            incPosRef.current.setMarked([]);
-            AssignCharsModal.hide();
-        };
-        AssignCharsModal.show({provider: assignProvider, assign, oldCodes});
+        });
     };
 
     const importChars = () => {
-        const selected = (selection) => {
-            const providers = [];
+        const selected = selection => {
             const baseCells = selection.getBaseCells();
+            const chars = [];
+            let index = 0;
             for(let cells of baseCells) {
                 const provider = new BitmapCellProvider(1); //size);
                 provider.setMap(cells);
-                providers.push(provider);
+                chars.push({
+                    index,
+                    value: provider.getImageData()
+                });
+                index++;
             }
-            assignChars(providers);
+            assignImagesToChars(chars);
             ImportCharsModal.hide();
         };
         ImportCharsModal.show({
             selection: {
                 type: 'rect',
-                width: size.x,
-                height: size.y,
+                width: fontIndex.getSizeX(),
+                height: fontIndex.getSizeY(),
                 fixed: true,
                 multi: true,
                 doubleClick: selected
@@ -493,147 +255,335 @@ function CharIndex(props) {
         });
     };
 
-    const deleteCharAtIndex = (index) => {
-        const undoChar = props.cellProvider.getCharAt(index).char;
-        const undoBitmap = props.cellProvider.getBitmapForIndex(index, 1, false).getContext('2d').getImageData(0, 0, size.x, size.y);
-        eContext.doAction(
-            () => {
-                props.cellProvider.deleteIndex(index);
-                update();
-            },
-            () => {
-                props.cellProvider.addCharCode(undoChar);
-                props.cellProvider.setBitmapForValue(undoChar, undoBitmap);
-                update();
+    const editChar = index => {
+        EditCharModal.show({
+            image: fontIndex.getIndex(index),
+            colors: new ColorIndex({colors: getColorsFromCanvas(fontIndex.img)}),
+            save: provider => {
+                const doImage = provider.getImageData();
+                const undoImage = fontIndex.getIndex(index);
+                eContext.doAction(
+                    () => {
+                        fontIndex.setIndex(index, doImage);
+                    },
+                    () => {
+                        fontIndex.setIndex(index, undoImage);
+                    },
+                );
+                EditCharModal.hide();
             }
-        );
+        });
     };
 
-    const newChar = () => {
-        const canvas = props.cellProvider.getBitmapForValue('');
-        canvas.width = size.x;
-        canvas.height = size.y;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const bitmap = canvas.toDataURL('image/png');
-        NewCharModal.show({bitmap});
-    };
-
-    const editChar = (index) => {
-        const bitmap = props.cellProvider.getBitmapForIndex(index, 1, false).toDataURL('image/png')
-        const save = (provider) => {
-            const doImage = provider.getImageData();
-            const actionIndex = index;
-            const oldCanvas = props.cellProvider.getBitmapForIndex(actionIndex, 1, false);
-            const undoImage = oldCanvas.getContext('2d').getImageData(0, 0, oldCanvas.width, oldCanvas.height);
-            eContext.doAction(
-                () => {
-                    props.cellProvider.setBitmapForIndex(actionIndex, doImage);
-                    update();
-                },
-                () => {
-                    props.cellProvider.setBitmapForIndex(actionIndex, undoImage);
-                    update();
+    const assignImagesToChars = chars => {
+        const assignIndex = new AssignIndex(chars.length, fontIndex.getSizeX(), fontIndex.getSizeY(), {oldChar: '', newChar: ''});
+        assignIndex.setIndicesFromObjects(chars);
+        AssignCharsModal.show({
+            assignIndex,
+            save: items => {
+                const newItems = [];
+                const changeItems = [];
+                const deleteIndices = [];
+                const deleteChars = [];
+                const backup = {};
+                const newChars = [];
+                for (let item of items) {
+                    newChars.push(item.newChar);
                 }
-            );
-            EditCharModal.hide();
-        };
-        EditCharModal.show({title: 'Edit char at index ' + index, save, bitmap});
+
+                for (let item of items) {
+                    if (item.oldChar === item.newChar) continue;
+
+                    const newIndex = fontIndex.getIndexByPropValue('code', item.newChar);
+                    if (newIndex !== null) {
+                        backup[item.newChar] = fontIndex.getIndex(newIndex);
+                        changeItems.push(
+                            {index: newIndex, code: item.newChar, value: item.value}
+                        );
+                    } else {
+                        newItems.push(
+                            {code: item.newChar, value: item.value}
+                        );
+                    }
+
+                    if (item.oldChar !== '' && !newChars.includes(item.oldChar)) {
+                        const oldIndex = fontIndex.getIndexByPropValue('code', item.oldChar);
+                        backup[item.oldChar] = fontIndex.getIndex(oldIndex);
+                        deleteIndices.push(oldIndex);
+                        deleteChars.push(item.oldChar);
+                    }
+                }
+
+                eContext.doAction(
+                    () => {
+                        fontIndex.setIndicesFromObjects(changeItems);
+                        if (deleteIndices) {
+                            fontIndex.deleteIndices(deleteIndices);
+                        }
+                        fontIndex.setIndicesFromObjects(newItems);
+                    },
+                    () => {
+                        const undoIndices = [];
+                        for (let item of newItems) {
+                            undoIndices.push(fontIndex.getIndexByPropValue('code', item.code));
+                        }
+                        fontIndex.deleteIndices(undoIndices);
+                        const items = [];
+                        for (let char of deleteChars) {
+                            items.push({value: backup[char], code: char});
+                        }
+                        fontIndex.setIndicesFromObjects(items);
+                        const undoItems = [];
+                        for (let item of changeItems) {
+                            undoItems.push({...item, value: backup[item.code]});
+                        }
+                        fontIndex.setIndicesFromObjects(undoItems);
+                    }
+                );
+                AssignCharsModal.hide();
+            }
+        });
     };
+
+    const actions = [
+        {
+            name: 'Edit',
+            doAction: indices => {
+                editChar(indices[0]);
+            },
+            isHidden: props => props.marked.length !== 1
+        },
+        {
+            name: 'Delete',
+            doAction: indices => {
+                const undoChars = fontIndex.getObjectsForIndices(indices);
+                eContext.doAction(
+                    () => fontIndex.deleteIndices(indices),
+                    () => fontIndex.setIndicesFromObjects(undoChars)
+                );
+            }
+        },
+        {
+            name: 'Swap',
+            doAction: indices => {
+                const first = indices[0];
+                const second = indices[1];
+                const firstBitmap = fontIndex.getIndex(first);
+                const secondBitmap = fontIndex.getIndex(second);
+                eContext.doAction(
+                    () => {
+                        fontIndex.setIndex(first, secondBitmap);
+                        fontIndex.setIndex(second, firstBitmap);
+                    },
+                    () => {
+                        fontIndex.setIndex(first, firstBitmap);
+                        fontIndex.setIndex(second, secondBitmap);
+                    }
+                );
+            },
+            isHidden: props => props.marked.length !== 2
+        },
+        {
+            name: 'Clear',
+            doAction: indices => {
+                const emptyBitmap = getEmptyImageData(fontIndex.getSizeX(), fontIndex.getSizeY());
+                const undoChars = {};
+                for (let index of indices) {
+                    undoChars[index] = fontIndex.getIndex(index);
+                }
+                eContext.doAction(
+                    () => {
+                        for (let index of indices) {
+                            fontIndex.setIndex(index, emptyBitmap);
+                        }
+                    },
+                    () => {
+                        for (let [index, bitmap] of Object.entries(undoChars)) {
+                            fontIndex.setIndex(index, bitmap);
+                        }
+                    }
+                );
+            },
+        },
+        {
+            name: 'Reassign',
+            doAction: indices => {
+                indices.sort();
+                const items = [];
+                for (let index of indices) {
+                    const char = fontIndex.getIndexProps(index).code;
+                    items.push({
+                        value: fontIndex.getIndex(index),
+                        oldChar: char,
+                        newChar: char
+                    });
+                }
+                assignImagesToChars(items);
+            }
+        },
+        {
+            name: 'Apply...',
+            doAction: indices => {
+                const previewCanvas = [];
+                for (let index of indices) {
+                    previewCanvas.push({
+                        name: fontIndex.getIndexProps(index).code,
+                        canvas: getCanvasForBitmap(fontIndex.getIndex(index))
+                    });
+                }
+                ApplyFilterModal.show({
+                    canvas: previewCanvas,
+                    save: filter => {
+                        const undoChars = fontIndex.getObjectsForIndices(indices);
+                        const doBitmaps = {};
+                        const sizeX = fontIndex.getSizeX();
+                        const sizeY = fontIndex.getSizeY();
+                        for (let index of indices) {
+                            const canvas = getCanvasForBitmap(fontIndex.getIndex(index));
+                            const newBitmap =
+                                context.filters.getCanvasWithFiltersApplied(
+                                    filter,
+                                    {elem: canvas, ctx: canvas.getContext('2d')},
+                                    0,
+                                    0,
+                                    sizeX,
+                                    sizeY
+                                )[0].ctx.getImageData(0, 0, sizeX, sizeY);
+                            doBitmaps[index] = newBitmap;
+                        }
+                        eContext.doAction(
+                            () => {
+                                for(let [index, bitmap] of Object.entries(doBitmaps)) {
+                                    fontIndex.setIndex(index, bitmap);
+                                }
+                            },
+                            () => {
+                                for(let obj of undoChars) {
+                                    fontIndex.setIndex(obj.index, obj.value);
+                                }
+                            }
+                        );
+                        ApplyFilterModal.hide()
+                    }
+                });
+            }
+        },
+        {
+            name: 'Copy',
+            doAction: indices => {
+                const bitmap = fontIndex.getIndex(indices[0]);
+                const selection = new CellSelection('bitmap', [[bitmap]]);
+                eContext.setSelection(selection);
+            },
+            isHidden: props => props.marked.length !== 1
+        },
+        {
+            name: 'Paste',
+            doAction: indices => {
+                const undoChars = fontIndex.getObjectsForIndices(indices);
+                const pasteBitmap = eContext.selection.getCell();
+                eContext.doAction(
+                    () => {
+                        for (let index of indices) {
+                            fontIndex.setIndex(index, pasteBitmap);
+                        }
+                    },
+                    () => {
+                        fontIndex.setIndicesFromObjects(undoChars);
+                    }
+                );
+            },
+            isHidden: () => {
+                if (!eContext.selection || !eContext.selection.isBitmap()) {
+                    return true;
+                }
+                const cell = eContext.selection.getCell();
+                return (cell.width !== fontIndex.getSizeX() || cell.height !== fontIndex.getSizeY());
+            }
+        }
+    ];
+
+    const deleteCharAtIndex = () => {};
+    const incPosRef = {current: null};
+    const charMatcher = {type: 'prefix', field: 'code'};
 
     return (
-        <Fragment>
-            <Stack fullHeight border>
-                <Toolbar padded>
-                    <Stack vertical>
-                        <ActionBox material click={newChar}>add</ActionBox>
-                        <ActionBox material click={importChars}>playlist_add</ActionBox>
-                    </Stack>
-                </Toolbar>
-
-                <Content flex>
-                    <FlexRasterIndex
-                        editorId="fontIndex"
-                        cellProvider={props.cellProvider}
-                        undoRedo={props.undoRedo}
-                        empty="No characters yet, please import or create new ones"
-                        dim={props.cellProvider.getCharSize()}
-                        incPosRef={incPosRef}
-                        minWidth={50}
-                        titleHeight={22}
-                        rightClick={deleteCharAtIndex}
-                        doubleClick={editChar}
-                        actions={actions}
-                        renderTitle={
-                            (index) => {
-                                const char = props.cellProvider.getCharAt(index);
-                                return (
-                                    <Stack>
-                                        <Content flex>
-                                            <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + char.code + ';'}}></kbd>
-                                        </Content>
-                                        <Content>
-                                            <kbd>{char.code}</kbd>
-                                        </Content>
-                                    </Stack>
-                                );
-                            }
-                        } />
-                </Content>
-            </Stack>
-
-            <NewCharModal.render name="New Char" height={600} closeable>
-                <BitmapEditor
-                    resize={false}
-                    zoom="5"
-                    border="1"
-                    cancelHandler={NewCharModal.hide}
-                    saveHandler={(provider) => {
-                        NewCharModal.hide();
-                        assignChars(provider);
-                    }}
-                    bitmap={NewCharModal.params.bitmap} />
-            </NewCharModal.render>
+        <>
+            <IndexController
+                indexProvider={fontIndex}
+                empty="No characters yet, please import or create new ones"
+                incPosRef={incPosRef}
+                minWidth={50}
+                titleHeight={22}
+                newItem={newChar}
+                importItems={importChars}
+                rightClick={deleteCharAtIndex}
+                doubleClick={editChar}
+                actions={actions}
+                matcher={charMatcher}
+                renderTitle={
+                    index => {
+                        const char = {
+                            code: fontIndex.getIndexProps(index).code.charCodeAt(0)
+                        };
+                        return (
+                            <Stack>
+                                <Content flex>
+                                    <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + char.code + ';'}}></kbd>
+                                </Content>
+                                <Content>
+                                    <kbd>{char.code}</kbd>
+                                </Content>
+                            </Stack>
+                        );
+                    }
+                }
+            />
 
             <EditCharModal.render name="Edit Char" height={600} closeable>
                 <BitmapEditor
                     resize={false}
-                    zoom="5"
+                    zoom="2"
                     border="1"
-                    cancelHandler={EditCharModal.hide}
-                    saveHandler={EditCharModal.params.save}
-                    bitmap={EditCharModal.params.bitmap} />
+                    cancel={EditCharModal.hide}
+                    {...EditCharModal.params}
+                />
             </EditCharModal.render>
+
+            <NewCharModal.render name="Edit Char" height={600} closeable>
+                <BitmapEditor
+                    resize={false}
+                    zoom="2"
+                    border="1"
+                    cancel={EditCharModal.hide}
+                    {...NewCharModal.params} />
+            </NewCharModal.render>
+
+            <AssignCharsModal.render fit closeable>
+                <CharAssign
+                    {...AssignCharsModal.params}
+                    cancel={AssignCharsModal.hide}
+                />
+            </AssignCharsModal.render>
+
+            <ApplyFilterModal.render height={500} closeable>
+                <FiltersSelector bgColor="#000000" {...ApplyFilterModal.params} cancel={ApplyFilterModal.hide} filters="" />
+            </ApplyFilterModal.render>
 
             <ImportCharsModal.render name="Select" height={600} width="90%" closeable>
                 <EditorCtx>
                     <BitmapSelector
                         zoom="1"
                         border="0"
-                        selection={ImportCharsModal.params.selection}
                         cancelHandler={ImportCharsModal.hide}
                         saveHandler={ImportCharsModal.params.save}
+                        selection={ImportCharsModal.params.selection}
                         bitmaps={context.imageResources}
                     />
                 </EditorCtx>
             </ImportCharsModal.render>
-
-            <AssignCharsModal.render name="Assign Chars" fit closeable>
-                <CharAssign
-                    provider={AssignCharsModal.params.provider}
-                    assign={AssignCharsModal.params.assign}
-                    codes={AssignCharsModal.params.codes}
-                    cancelHandler={AssignCharsModal.hide}
-                />
-            </AssignCharsModal.render>
-
-            <ApplyFilterModal.render height={500} closeable>
-                <FiltersSelector bgColor="#000000" canvas={ApplyFilterModal.params.canvas} cancel={ApplyFilterModal.hide} save={ApplyFilterModal.params.save} filters="" />
-            </ApplyFilterModal.render>
-
-        </Fragment>
-    );
+        </>
+    )
 }
 
 function FiltersSelector(props) {
@@ -870,7 +820,8 @@ function BlockProperties(props) {
         bgColor
     } = props;
 
-    const fontSize = fonts[font].provider.getCharSize();
+
+    const fontSize = fonts[font].provider.getIndexDim();
 
     const changeFilters = () => {
         FiltersModal.show({
@@ -956,6 +907,7 @@ function BlockProperties(props) {
 
 function FontPreview(props) {
     const context = useContext(GlobalContext);
+    const cContext = useContext(CursorContext);
 
     const NewBlockIdModal = useModal();
 
@@ -987,9 +939,26 @@ function FontPreview(props) {
 
     // TODO provider und auch load sollte überflüssig sein, weil kein dataUrl=>Image=>onLoad()
     const currProvider = currFont ? currFont.provider : null;
-    const ready = useMountedReadyCellProvider(currProvider);
 
-    const fontSize = currProvider ? currProvider.getCharSize() : null;
+    const update = useComponentUpdate();
+    useEffect(() => {
+        if (!currProvider) {
+            return;
+        }
+        const updater = () => {
+            invalidateImages();
+            update();
+        };
+        currProvider.addListener(
+            updater
+        );
+        return () => {
+            currProvider.removeListener(updater);
+        }
+    }, []);
+
+
+    const fontSize = currProvider ? currProvider.getIndexDim() : null;
 
     const invalidateImages = () => {
         for (let block of propsRef.current.blocks) {
@@ -1055,11 +1024,6 @@ function FontPreview(props) {
             propsRef.current.zoom
         );
     });
-
-    if (!ready) {
-        return '';
-    }
-
     for (let block of blocks) {
         getBlockImage(block);
     }
@@ -1158,7 +1122,7 @@ function FontPreview(props) {
                     e.preventDefault();
                 };
 
-                eContext.setFixCursor(moveCursor);
+                cContext.setFixCursor(moveCursor);
                 eContext.addListener(
                     props.editorId,
                     'mousemove',
@@ -1170,7 +1134,7 @@ function FontPreview(props) {
                     'mouseup',
                     (e) => {
                         eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
-                        eContext.setFixCursor(null);
+                        cContext.setFixCursor(null);
                         setHighlight(false);
                         e.preventDefault();
                         e.stopPropagation();
@@ -1203,15 +1167,8 @@ function FontPreview(props) {
                 height={Math.min(pos.height, screenY - pos.y)}
                 highlight={highlight}
             />);
-/*
-            if (propsRef.current.moving !== null) {
-                d('INIT!...', propsRef.current);
-                initMove(propsRef.current.moving);
-                setMoving(null);
-            }
-*/
+
             activateByClick = e => {
-                d('ACTIVATE');
                 const rect = overlayRef.current.getBoundingClientRect();
                 const clickX = Math.floor((e.clientX - rect.x)/zoom);
                 const clickY = Math.floor((e.clientY - rect.y)/zoom);
@@ -1365,6 +1322,7 @@ function FontPreview(props) {
 
 function ResizeFontForm(props) {
     const eContext = useContext(EditorContext);
+    const cContext = useContext(CursorContext);
     const context = useContext(GlobalContext);
     const [width, setWidth] = useState(props.font.width);
     const [height, setHeight] = useState(props.font.height);
@@ -1422,19 +1380,13 @@ function ResizeFontForm(props) {
     const previewWidth = Math.max(width, props.font.width);
     const previewHeight = Math.max(height, props.font.height);
 
-    const provider = new BitmapCellProvider(4);
-    const map = [];
-    for (let j = 0; j < previewHeight; j++) {
-        const row = [];
-        for (let i = 0; i < previewWidth; i++) {
-            row.push('#000000');
-        }
-        map.push(row);
-    }
-    provider.setMap(map);
+
+
+    const size = 4;
     const zoom = 4;
-    const size = provider.getSize();
     const border = 1;
+    const provider = new EmptyGrid(previewWidth, previewHeight, size, '#000000');
+    const dim = provider.getGridDim(previewWidth, previewHeight, border, zoom);
 
     let moveCursor = 'move';
 
@@ -1468,7 +1420,7 @@ function ResizeFontForm(props) {
             e.stopPropagation();
             e.preventDefault();
         };
-        eContext.setFixCursor(moveCursor);
+        cContext.setFixCursor(moveCursor);
         eContext.addListener(
             props.editorId,
             'mousemove',
@@ -1480,7 +1432,7 @@ function ResizeFontForm(props) {
             'mouseup',
             (e) => {
                 eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
-                eContext.setFixCursor(null);
+                cContext.setFixCursor(null);
                 e.preventDefault();
                 e.stopPropagation();
             },
@@ -1490,6 +1442,7 @@ function ResizeFontForm(props) {
             }
         );
     };
+
 
     return (
         <Stack vertical border>
@@ -1526,15 +1479,9 @@ function ResizeFontForm(props) {
                     <FullProp name="Position:">
                         <div  style={{border: context.markerWidth + 'px solid transparent'}}>
                             <Centered>
-                                <CellProviderRaster
-                                    cellProvider={provider}
-                                    width={previewWidth}
-                                    height={previewHeight}
-                                    posX={0}
-                                    posY={0}
-                                    border={border}
-                                    zoom={zoom}
-                                />
+                                <Canvas width={dim.width} height={dim.height} render={
+                                    ctx => provider.drawGrid(ctx, 0, 0, previewWidth, previewHeight, border, zoom)
+                                } />
                                 <div className="rel-canvas" style={{height: 1}}>
                                     <div ref={overlayRef} style={{top: -(previewHeight * zoom * size + (previewHeight * border))}}>
                                         <CellMarker
@@ -1695,7 +1642,7 @@ function TextPaneEditor(props) {
 
     for (let font of model.fonts) {
         if (!font.provider) {
-            font.provider = new FontCharIndexProvider(font);
+            font.provider = new CharIndex(font);
         }
     }
 
@@ -1804,60 +1751,18 @@ function TextPaneEditor(props) {
             ResizeFontModal.show({
                 font: editFont,
                 save: resize => {
-                    const iMax = editFont.provider.getMaxIndex();
-                    const canvas = getCanvasForDim(
-                    resize.width * editFont.provider.getMaxIndex(),
-                        resize.height
+                    const undoObjects = editFont.provider.getObjectsForIndices();
+                    const undoSizeX = editFont.provider.getSizeX();
+                    const undoSizeY = editFont.provider.getSizeY();
+                    eContext.doAction(
+                        () => {
+                            editFont.provider.resize(resize.width, resize.height, resize.offsetX, resize.offsetY);
+                        },
+                        () => {
+                            editFont.provider.resize(undoSizeX, undoSizeY);
+                            editFont.provider.setIndicesFromObjects(undoObjects);
+                        }
                     );
-                    const targetWidth = Math.min(resize.width, editFont.width);
-                    const targetHeight = Math.min(resize.height, editFont.height);
-                    const sourceOffsetX = resize.width < editFont.width ? resize.offsetX : 0;
-                    const sourceOffsetY = resize.height < editFont.height ? resize.offsetY : 0;
-                    const targetOffsetX = resize.width > editFont.width ? resize.offsetX : 0;
-                    const targetOffsetY = resize.height > editFont.height ? resize.offsetY : 0;
-
-                    const ctx = canvas.getContext('2d');
-                    const map = {};
-                    for(let i = 0; i < iMax; i++) {
-                        ctx.drawImage(
-                            editFont.provider.getBitmapForIndex(i),
-                            sourceOffsetX,
-                            sourceOffsetY,
-                            targetWidth,
-                            targetHeight,
-                            (i * resize.width) + targetOffsetX,
-                            targetOffsetY,
-                            targetWidth,
-                            targetHeight
-                        );
-                        map[editFont.provider.getCharAtIndex(i)] = {x: i * resize.width, y: 0};
-                    }
-                    const doFont = {
-                        id: editFont.id,
-                        height: resize.height,
-                        width: resize.width,
-                        map,
-                        imageId: editFont.imageId,
-                        image: canvas,
-                        provider: null
-                    };
-                    const undoFont = model.fonts[index];
-                    model.fonts[index] = doFont;
-                    for (let block of blocks) {
-                        block.img = null;
-                    }
-
-                    const doAction = () => {
-                        model.fonts[index] = doFont;
-                        setActive(index);
-                        eContext.updateRaster();
-                    };
-                    const undoAction = () => {
-                        model.fonts[index] = undoFont;
-                        setActive(index);
-                        eContext.updateRaster();
-                    };
-                    eContext.doAction(doAction, undoAction);
                     ResizeFontModal.hide();
                 }
             })
@@ -1928,7 +1833,7 @@ function TextPaneEditor(props) {
                             />
                         </Section>
                         <Section name="Characters" flex>
-                            <CharIndex undoRedo={false} cellProvider={currFont.provider} />
+                            <CharIndexController fontIndex={currFont.provider} />
                         </Section>
                     </Stack>
                 </ActionFrame>
@@ -1936,16 +1841,18 @@ function TextPaneEditor(props) {
                 <Spacer />
 
                 <ActionFrame type="Preview" flex actions={<button>Export</button>}>
-                    <Content flex>
+                    <Content flex>{
                         <FontPreview model={model} activeFont={active} resource={props.resource}
                                      blocks={blocks} setBlocks={setBlocks}
                                      editorId="preview" />
+
+                    }
                     </Content>
                 </ActionFrame>
                 </Stack>
 
             <ResizeFontModal.render name="Resize Font" fit closeable>
-                <ResizeFontForm save={ResizeFontModal.params.save} hide={ResizeFontModal.hide} font={ResizeFontModal.params.font} />
+                <ResizeFontForm hide={ResizeFontModal.hide} {...ResizeFontModal.params} />
             </ResizeFontModal.render>
 
             <NewFontModal.render name="New Font" fit closeable>

@@ -3,6 +3,8 @@ import {
     Checkbox,
     Color,
     GlobalContext,
+    CellGrid,
+    IndexPicker,
     Dim,
     Int,
     Centered,
@@ -15,13 +17,16 @@ import {
     SwitchButton,
     LabelAndSubInfo,
     Toolbar,
+    BackgroundControl,
     MouseOverlay,
     useMounted,
     useModal
 } from "./BaseComponents";
-import {d, getItemsCloneWithUpdatedItem} from '../helper/helper';
+import {d, getItemsCloneWithUpdatedItem, getColorsFromImageData} from '../helper/helper';
 
 import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
+import {BitmapGrid} from "../classes/Grid";
+import {ColorIndex} from "../classes/IndexProvider";
 
 function CellMarker(props) {
     if (props.posX === null || props.posY === null) {
@@ -641,7 +646,7 @@ function CursorArea(props) {
     const onMouseMove = (e) => {
         if (!props.fixed) {
             const offset = getOffsetPos(e);
-            if (offset === false) {
+            if (offset === false || props.valid && !props.valid(props.posX + offset.x, props.posY + offset.y)) {
                 if (props.mouseTrack) {
                     props.mouseTrack(null, null);
                 }
@@ -906,6 +911,9 @@ class EditorCtx extends React.Component {
             setTracker: (id, tracker) => {
                 this.tracker[id] = tracker;
             },
+            setTracking: value => {
+                this.tracking = value;
+            },
             updateTracking: (id, x, y) => {
                 const rasterIds = this.tracking[id];
                 if (!rasterIds) {
@@ -1131,7 +1139,6 @@ function CellRaster(props) {
         if (!canvasRef.current) {
             return;
         }
-        console.log('drawCells');
         const ctx = canvasRef.current.ctx;
         let pos = border;
         for (let row of props.cells) {
@@ -1209,7 +1216,6 @@ const CellProviderRaster = React.memo((props) => {
                 renderRef.current =
                     (ctx, x, y, value) => {
                         const img = propsRef.current.cellProvider.getBitmapForValue(value, propsRef.current.zoom, propsRef.current.renderOptions.caching);
-
                         if (img) {
                             const size = propsRef.current.cellSize;
                             ctx.clearRect(x, y, size.x, size.y);
@@ -1526,8 +1532,8 @@ function BaseCellProviderIndexRaster(props) {
 
     return (
         <Content padded fullHeight>
-                <FlexCellProviderScrollRaster
-                    cellProvider={props.cellProvider}
+                <CellGrid
+                    gridProvider={props.cellProvider}
                     auto={true}
                     posX={posX}
                     setPosX={setPosX}
@@ -1571,7 +1577,7 @@ function BaseCellProviderIndexRaster(props) {
                         setMarkerType={setMarkerType}
                         cellProvider={props.cellProvider}
                     />
-                </FlexCellProviderScrollRaster>
+                </CellGrid>
             <MouseOverlay cursor="pointer" active={active} />
             <EditModal.render name="Edit" height={600} closeable>
                 <BitmapEditor
@@ -2761,7 +2767,7 @@ function RasterViewGrid(props) {
         markerHeight, setMarkerWidth, setMarkerHeight, renderOptions, markerGapX, markerGapY, editorId
     } = props;
 
-    const resizeable = props.cellProvider.isResizeable() && props.resizeable;
+    const resizeable = props.resizeable;
 
     useEffect(() => {
         const overlay = overlayRef.current;
@@ -3153,7 +3159,7 @@ function RasterViewGrid(props) {
                 </Stack>
             </div>
             <div className="full-v padded">
-                <FlexCellProviderScrollRaster
+                <CellGrid
                     auto={auto}
                     setWidth={setWidth}
                     setHeight={setHeight}
@@ -3168,7 +3174,7 @@ function RasterViewGrid(props) {
                     border={border}
                     rulers={rulers}
                     renderOptions={renderOptions}
-                    cellProvider={props.cellProvider}>
+                    gridProvider={props.cellProvider}>
                     <RasterOverlays
                         overlayRef={overlayRef}
                         setWidth={setWidth}
@@ -3203,7 +3209,7 @@ function RasterViewGrid(props) {
                         setMarkerType={setMarkerType}
                         cellProvider={props.cellProvider}
                     />
-                </FlexCellProviderScrollRaster>
+                </CellGrid>
             </div>
             <div>
                 <Stack vertical align="center" alignItems="center" fullHeight>
@@ -3244,8 +3250,6 @@ function useOverlay(id) {
  * @constructor
  */
 function BasicRasterView(props) {
-    const context = useContext(GlobalContext);
-
     const defaults = props.defaults ? props.defaults : {};
 
     const [border, setBorder] = useState(defaults.border !== undefined ? defaults.border : 0);
@@ -3438,7 +3442,7 @@ function BasicRasterView(props) {
         </Toolbar>;
 
     let undoRedo = '';
-    if (!props.selectOnly) {
+    if (!props.selectOnly && props.undoRedo) {
         const undoAttr = {
             onClick: () => {
                 eContext.undoAction()
@@ -3485,7 +3489,6 @@ function BasicRasterView(props) {
                 {gapButtons}
             </Stack>
         );
-
     }
 
     const posSize =
@@ -3502,12 +3505,9 @@ function BasicRasterView(props) {
         {modeSelect}
         {posSize}
         {zoomInput}
-        <Int name="Border:" min="0" max="5" set={setBorder} value={border} buttons />
         <Checkbox name="Rulers" value={rulers} set={setRulers} />
-        <Stack>
-            <Int name="Background:" min="0" max="26" set={context.setBgOpacity} value={context.bgOpacity} buttons />
-            <Color value={context.bgColor} set={(value) => {context.setBgColor(value)}} />
-        </Stack>
+        <Int name="Border:" min="0" max="5" set={setBorder} value={border} buttons />
+        <BackgroundControl />
     </Toolbar>;
 
     return (
@@ -3823,12 +3823,13 @@ function FlexRasterIndex(props) {
 }
 
 function BitmapSelector(props) {
+    const eContext = useContext(EditorContext);
     const [items, setItemsRaw] = useState(props.bitmaps.current);
     const [update, setUpdate] = useState(false);
     const updateRef = useRef(null);
     updateRef.current = update;
 
-    const setItems = (value) => {
+    const setItems = value => {
         props.bitmaps.current = value;
         setItemsRaw(value);
     };
@@ -3839,16 +3840,18 @@ function BitmapSelector(props) {
         if (currItemBitmap === null) {
             return null;
         }
-        return new BitmapCellProvider(4,
-            currItemBitmap
-        );
+        let image = currItem.bitmap;
+        if (image instanceof HTMLCanvasElement) {
+            image = image.getContext('2d').getImageData(0, 0, image.width, image.height);
+        }
+        d(currItem, image);
+        return new BitmapGrid({image});
     }, [active, currItemBitmap]);
 
-    const eContext = useContext(EditorContext);
     const resultRef = useRef(null);
     resultRef.current = eContext.selection;
 
-    let ready = useMountedReadyCellProvider(cellProvider);
+//    let ready = useMountedReadyCellProvider(cellProvider);
     const selectionType = eContext.selection ? eContext.selection.getType() : 'none';
 
     const select = () => {
@@ -3856,68 +3859,69 @@ function BitmapSelector(props) {
     };
 
     let selector = '';
-    if (ready) {
-        if (active === null) {
-            const images = [];
-            let i = 0;
-            for (let item of items) {
-                const index = i;
-                images.push(
-                    <div className="selectable-box" key={i}>
-                    <Content click={() => setActive(index)} className="thin-boxed" width={250} height={250}>
-                        <Stack fullHeight alignItems="center">
-                            <img onLoad={(e) => {
-                                const elem = e.target;
-                                if (!elem.width) {
-                                    return;
-                                }
-                                const update = !item.width || item.width !== elem.width;
-                                if (update) {
-                                    item.width = elem.width;
-                                    item.height = elem.height;
-                                    setItems(items);
-                                    setUpdate(!updateRef.current);
-                                }
+//    if (ready) {
+    if (active === null) {
+        const images = [];
+        let i = 0;
+        for (let item of items) {
+            const index = i;
+            images.push(
+                <div className="selectable-box" key={i}>
+                <Content click={() => setActive(index)} className="thin-boxed" width={250} height={250}>
+                    <Stack fullHeight alignItems="center">
+                        <img onLoad={(e) => {
+                            const elem = e.target;
+                            if (!elem.width) {
+                                return;
                             }
-                            } src={item.bitmap} />
-                        </Stack>
-                    </Content>
-                    </div>
-                );
-                i++;
-            }
-            selector = <Content padded><Stack wrap>{images}</Stack></Content>;
-        } else {
-            selector = cellProvider !== null ?
-                <BasicRasterView
-                    editorId="bitmap"
-                    selectOnly={props.selection}
-                    resizeable={false}
-                    mode="select"
-                    modes={['select', 'markerResize', 'markerMove', 'display']}
-                    cellProvider={cellProvider}
-                    defaults={{
-                        zoom: 1,
-                        border: 0,
-                        resizeable: false,
-                        width: cellProvider.getWidth(),
-                        height: cellProvider.getHeight()
-                    }}
-                /> :
-                <FileDropZone
-                    type="image"
-                    save={
-                        (bitmap, name = null) => {
-                            const newItems = [...items];
-                            if (name !== null) {
-                                newItems[active].name = name;
+                            const update = !item.width || item.width !== elem.width;
+                            if (update) {
+                                item.width = elem.width;
+                                item.height = elem.height;
+                                setItems(items);
+                                setUpdate(!updateRef.current);
                             }
-                            newItems[active].bitmap = bitmap;
-                            setItems(newItems);
-                        }}
-                />;
+                        }
+                        } src={item.bitmap} />
+                    </Stack>
+                </Content>
+                </div>
+            );
+            i++;
         }
+        selector = <Content padded><Stack wrap>{images}</Stack></Content>;
+    } else {
+        selector = cellProvider !== null ?
+            <BasicRasterView
+                key={active}
+                editorId="bitmap"
+                selectOnly={props.selection}
+                resizeable={false}
+                mode="select"
+                modes={['select', 'markerResize', 'markerMove', 'display']}
+                cellProvider={cellProvider}
+                defaults={{
+                    zoom: 1,
+                    border: 0,
+                    resizeable: false,
+                    width: cellProvider.getWidth(),
+                    height: cellProvider.getHeight()
+                }}
+            /> :
+            <FileDropZone
+                type="image"
+                save={
+                    (bitmap, name = null) => {
+                        const newItems = [...items];
+                        if (name !== null) {
+                            newItems[active].name = name;
+                        }
+                        newItems[active].bitmap = bitmap;
+                        setItems(newItems);
+                    }}
+            />;
     }
+//    }
 
     const getImageProps = index => {
         const imgItem = items[index];
@@ -3962,33 +3966,28 @@ function BitmapSelector(props) {
     )
 }
 
-function BitmapEditor(props) {
-    const cellProvider = useMemo(() => {
-        return new BitmapCellProvider(4,
-            props.bitmap
-        );
+function BitmapEditor({image, save, cancel, colors}) {
+    const eContext = useContext(EditorContext);
+    const gridProvider = useMemo(() => {
+        return new BitmapGrid({image})
     }, []);
-
-    const ready = useMountedReadyCellProvider(cellProvider);
-
+    const colorIndex = useMemo(() => {
+        return colors ? colors : new ColorIndex({colors: getColorsFromImageData(image)});
+    });
     const buttons = [];
-    if (props.saveHandler) {
+    if (save) {
         buttons.push(
             <button key="save" onClick={() => {
-                props.saveHandler(cellProvider);
+                save(gridProvider);
             }}>Save</button>
         );
     }
-    if (props.cancelHandler) {
+    if (cancel) {
         buttons.push(
             <button key="cancel" onClick={() => {
-                props.cancelHandler();
+                cancel();
             }}>Cancel</button>
         );
-    }
-
-    if (!ready) {
-        return '';
     }
 
     const buttonDiv = buttons.length === 0 ?
@@ -3998,21 +3997,42 @@ function BitmapEditor(props) {
         </Content>;
 
     return (
-        <EditorCtx>
             <Stack vertical border fullHeight>
                 <Stack border fullHeight>
-                    <Content padded>Palette goes here</Content>
+                    <Content padded width={150}>
+                        <IndexPicker
+                            editorId="bitmap-colors"
+                            indexProvider={colorIndex}
+                            select={
+                                index => {
+                                    eContext.setSelection(
+                                        new CellSelection('rect', [[colorIndex.getIndex(index)]])
+                                    );
+                                    eContext.setRasterMode('bitmap', 'startPath', {})
+                                }
+
+                            }
+                        />
+                    </Content>
                     <Content flex>
                         <BasicRasterView
                             editorId="bitmap"
-                            cellProvider={cellProvider}
-                            defaults={{zoom: 5, border: 1, resizeable: false, width: cellProvider.getWidth(), height: cellProvider.getHeight()}}
+                            undoRedo
+                            cellProvider={gridProvider}
+                            defaults={
+                                {
+                                    zoom: 2,
+                                    border: 1,
+                                    resizeable: false,
+                                    width: gridProvider.getWidth(),
+                                    height: gridProvider.getHeight()
+                                }
+                            }
                         />
                     </Content>
                 </Stack>
                 {buttonDiv}
             </Stack>
-        </EditorCtx>
     )
 }
 
@@ -4054,5 +4074,8 @@ export {
     BaseCellProviderIndexRaster,
     useMountedReadyCellProvider,
     RasterScrollbar,
-    FlexRasterIndex
+    FlexRasterIndex,
+    HRuler,
+    VRuler,
+    CursorArea
 }

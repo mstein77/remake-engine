@@ -405,6 +405,51 @@ const getCanvasForDim = (width, height) => {
     return canvas;
 };
 
+const getCanvasForBitmap = bitmap => {
+    const canvas = getCanvasForDim(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(bitmap, 0, 0);
+    return canvas;
+};
+
+const toHex = value => {
+    return  ('0' + (value & 0xFF).toString(16)).slice(-2);
+};
+
+const getColorsFromCanvas = canvas => {
+    const ctx = canvas.getContext('2d');
+    return getColorsFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height));
+};
+
+const getColorsFromImageData = data => {
+    const colors = [];
+
+    let pos = 0;
+    for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+            const color =
+                '#'
+                + toHex(data.data[pos])
+                + toHex(data.data[pos + 1])
+                + toHex(data.data[pos + 2])
+                + toHex(data.data[pos + 3]);
+            if (!colors.includes(color)) {
+                colors.push(color);
+            }
+            pos += 4;
+        }
+    }
+    return colors;
+};
+
+const getEmptyImageData = (width, height, color = '#00000000') => {
+    const canvas = getCanvasForDim(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height);
+};
+
 const rebuilders = [];
 const rebuildObj = [];
 
@@ -562,7 +607,6 @@ const getTextBlockImage = (block, font, filterer = null) => {
     if (block.font !== font.id) {
         return null;
     }
-
     const blockDim = getBlockDim(block, font);
 
     // get new canvas for block
@@ -618,6 +662,24 @@ const getTextBlockImage = (block, font, filterer = null) => {
     return canvas;
 };
 
+const cloneDeep = obj => {
+    if (Array.isArray(obj)) {
+        const clone = [];
+        for (let item of obj) {
+            clone.push(cloneDeep(item));
+        }
+        return clone;
+    }
+    if (typeof obj === 'object') {
+        const clone = {};
+        for (let [id, value] of Object.entries(obj)) {
+            clone[id] = cloneDeep(value);
+        }
+        return clone;
+    }
+    return obj;
+};
+
 module.exports = {
     d,
     hex2rgb,
@@ -634,11 +696,16 @@ module.exports = {
     getObjectWithId,
     getNextUid,
     getCanvasForDim,
+    getCanvasForBitmap,
+    getColorsFromCanvas,
+    getColorsFromImageData,
+    getEmptyImageData,
     getRebuildJsonForModel,
     getJsonModelOfInstance,
     getResourceTreeForJsonModel,
     getInstanceFromInput,
     getTextBlockImage,
     getBlockDim,
-    getBlockPos
+    getBlockPos,
+    cloneDeep
 };

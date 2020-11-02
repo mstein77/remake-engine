@@ -1,10 +1,23 @@
 import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
 import {mat4} from 'gl-matrix';
-import {d} from '../helper/helper';
+import {d, hex2rgb, rgb2hex} from '../helper/helper';
+import {
+    RasterOverlays,
+    HRuler,
+    VRuler,
+    CellProviderRaster,
+    EditorContext,
+    RasterScrollbar,
+    useEditorContextPart, CursorArea
+} from "./Raster";
+import {WrappingIndexGrid} from "../classes/Grid";
+import {CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 
 
 const GlobalContext = React.createContext();
+const BackgroundContext = React.createContext();
+const CursorContext = React.createContext();
 
 function Color(props) {
     return (
@@ -1126,17 +1139,17 @@ function ActionBox(props) {
     );
 }
 
-function ActionFrame(props) {
+function ActionFrame({flex, name, fullHeight, sub, type, actions, children}) {
     return (
-        <Content boxed thin flex={props.flex}>
+        <Content boxed thin flex={flex} fullHeight={fullHeight}>
             <Stack vertical noGap>
                 <Content className="bottom-dashed">
                     <Stack className="full-v">
-                        <Content fullHeight className="boxed-bg"><Content padded><kbd>{props.type}</kbd></Content></Content>
-                        <Content padded className="head">{props.name}</Content>
-                        {props.sub ?
+                        <Content fullHeight className="boxed-bg"><Content padded><kbd>{type}</kbd></Content></Content>
+                        <Content padded className="head">{name}</Content>
+                        {sub ?
                             <Fragment>
-                                {Object.entries(props.sub).map(item => (
+                                {Object.entries(sub).map(item => (
                                     <Fragment key={item[0]}>
                                         <Content fullHeight className="boxed-bg less"><Content padded>{item[0]}</Content></Content>
                                         <Content padded className="head less"><kbd>{item[1]}</kbd></Content>
@@ -1147,12 +1160,546 @@ function ActionFrame(props) {
                             : ''
                         }
                         <Content flex></Content>
-                        <Content padded>{props.actions}</Content>
+                        <Content padded>{actions}</Content>
                     </Stack>
                 </Content>
-                <Content flex padded>{props.children}</Content>
+                <Content flex padded>{children}</Content>
             </Stack>
         </Content>
+    )
+}
+
+function GridCellSelector({gridProvider, zoom, border, width, height, pos, select, editorId}) {
+
+    const eContext = useContext(EditorContext);
+    const windowEvents = eContext.getWindowEvents(editorId);
+    const boundingRectRef = useRef(null);
+    const [highlight, setHighlight] = useState(false);
+
+    const mouseDown = (e, x, y) => {
+        const index = gridProvider.getCellValue(x, y);
+        if (index !== null) {
+            select(index);
+            setHighlight(true);
+            windowEvents.addListener('mouseup', mouseUp, {capture: false});
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const mouseUp = e => {
+        setHighlight(false);
+        windowEvents.removeListener('mouseup', mouseUp, {capture: false});
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    return (
+        <CursorArea
+            boundingRectRef={boundingRectRef}
+            cellProvider={gridProvider}
+            mouseDown={mouseDown}
+            mouseTrack={null}
+            highlight={highlight}
+            cursorWidth={1}
+            cursorHeight={1}
+            fixed={highlight}
+            cursorType="rect"
+            doubleClick={() => {d('DBL')}}
+            matrix={null}
+            inclusion={false}
+            width={width}
+            height={height}
+            zoom={zoom}
+            border={border}
+            valid={(x, y) => gridProvider.getCellValue(x, y) !== null}
+            size={gridProvider.getSize()}
+            posX={0}
+            posY={pos}
+        />
+    )
+}
+
+function IndexPicker({indexProvider, controls, editorId, select}) {
+
+    const [pos, setPos] = useState(0);
+    const [zoom, setZoom] = useState(1);
+    const [rulers, setRulers] = useState(false);
+    const [border, setBorder] = useState(1);
+    const [width, setWidth] = useState(1);
+    const [height, setHeight] = useState(1);
+
+    const gridProvider = useMemo(() => {
+        return new WrappingIndexGrid(indexProvider);
+    }, [indexProvider]);
+
+    return (
+        <Stack vertical fullHeight>
+            {controls && <Content padded>
+                <Stack>
+                    <Content>
+                        <Int name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
+                    </Content>
+                    <Content>
+                        <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+                    </Content>
+                    <Content>
+                        <Int name="Border:" buttons min={0} value={border} set={setBorder} />
+                    </Content>
+                    <Content>
+                        <Checkbox name="Rulers:" value={rulers} set={setRulers} />
+                    </Content>
+                </Stack>
+            </Content>}
+            <div className="full-v padded flex">
+                <CellGrid
+                    posX={0}
+                    setPosX={() => {}}
+                    posY={pos}
+                    setPosY={setPos}
+                    zoom={zoom}
+                    setZoom={setZoom}
+                    border={border}
+                    setBorder={setBorder}
+                    rulers={rulers}
+                    setRulers={setRulers}
+                    width={width}
+                    setWidth={setWidth}
+                    height={height}
+                    setHeight={setHeight}
+                    editorId={editorId}
+                    gridProvider={gridProvider}
+                >
+                    <GridCellSelector
+                        gridProvider={gridProvider}
+                        editorId={editorId}
+                        pos={pos}
+                        width={width}
+                        height={height}
+                        zoom={zoom}
+                        border={border}
+                        select={select}
+                    />
+                </CellGrid>
+            </div>
+        </Stack>
+    )
+}
+
+function IndexPicker2({indexProvider, controls, defaults = {}}) {
+
+    const context = useContext(GlobalContext);
+    const [pos, setPos] = useState(0);
+    const [zoom, setZoom] = useState(defaults.zoom || 1);
+    const [border, setBorder] = useState(1);
+    const [viewX, setViewX] = useState(1);
+    const [viewY, setViewY] = useState(1);
+    const update = useComponentUpdate();
+
+    useEffect(() => {
+        indexProvider.addListener(update);
+        return () => {
+            indexProvider.removeListener(update);
+        }
+    });
+
+    const maxElems = viewX;
+    const maxHeight = viewY;
+
+    const length = indexProvider.getLength();
+    const cellSizeX = indexProvider.getSizeX() * zoom;
+    const cellPlusBorderSizeX = cellSizeX + border;
+    const cellSizeY = indexProvider.getSizeY() * zoom;
+    const cellPlusBorderSizeY = cellSizeY + border;
+
+    const divRef = useResize({cellSizeX, cellSizeY, border, viewX, viewY, length}, [zoom, viewX, border, length],
+        (curr, rect) => {
+            const padding = 5;
+            const spaceX = rect.width - 2 * padding - curr.border;
+            const spaceY = rect.height - 2 * padding - curr.border;
+            const itemSizeX = curr.cellSizeX + curr.border;
+            const itemSizeY = curr.cellSizeY + curr.border;
+            const newViewX = Math.min(Math.floor(spaceX/itemSizeX), curr.length);
+            const maxRows = Math.ceil(curr.length/newViewX);
+            d('MAX-ROWS', maxRows, spaceY);
+            const newViewY = Math.min(Math.floor(spaceY/itemSizeY), maxRows);
+
+            if (newViewX !== curr.viewX) {
+                d('CHANGE X', viewX, '->', newViewX);
+                setViewX(newViewX);
+            }
+            if (newViewY !== curr.viewY) {
+                d('CHANGE Y', viewY, '->', newViewY);
+                setViewY(newViewY);
+            }
+        }
+    );
+
+    const rows = Math.ceil(length / maxElems);
+    const elemHeight = Math.min(rows, maxHeight);
+    const rowElems = (rows > 1 ? maxElems : length);
+
+    const gridWidth = cellPlusBorderSizeX * rowElems + border;
+    const gridHeight = cellPlusBorderSizeY * elemHeight + border;
+
+    const renderGrid = ctx => {
+        ctx.clearRect(0, 0, gridWidth, gridHeight);
+        ctx.fillStyle = context.contentTextColor;
+
+        let curr = 0;
+        if (border > 0) {
+            for (let x = 0; x <= rowElems; x++) {
+                ctx.fillRect(curr, 0, border, gridHeight);
+                curr += cellPlusBorderSizeX;
+            }
+            curr = 0;
+            for (let y = 0; y <= elemHeight; y++) {
+                ctx.fillRect(0, curr, gridWidth, border);
+                curr += cellPlusBorderSizeY;
+            }
+        }
+
+        let posY = border;
+        let index = pos * rowElems;
+        for (let j = 0; j < elemHeight; j++) {
+            let posX = border;
+            for (let i = 0; i < rowElems; i++) {
+                indexProvider.drawIndex(ctx, index, posX, posY, zoom);
+                posX += cellPlusBorderSizeX;
+                index++;
+            }
+            posY += cellPlusBorderSizeY;
+        }
+    };
+
+    return (
+        <Stack vertical fullHeight>
+            {controls && <Content padded>
+                <Stack>
+                    <Content flex>{name}</Content>
+                    <Content>
+                        <Int name="Pos:" buttons min={0} max={rows - elemHeight} value={pos} set={setPos} />
+                    </Content>
+                    <Content>
+                        <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+                    </Content>
+                    <Content>
+                        <Int name="Border:" buttons min={0} value={border} set={setBorder} />
+                    </Content>
+                </Stack>
+            </Content>}
+            <div ref={divRef} className="padded fullHeight flex">
+                <Canvas width={gridWidth} height={gridHeight} render={renderGrid}></Canvas>
+            </div>
+        </Stack>
+    )
+}
+
+function BackgroundControl() {
+    const bgContext = useContext(BackgroundContext);
+    return (
+        <Stack>
+            <Int name="Background:" min="0" max="26" set={bgContext.setBgOpacity} value={bgContext.bgOpacity} buttons />
+            <Color value={bgContext.bgColor} set={bgContext.setBgColor} />
+        </Stack>
+    )
+}
+
+function Background({width, height}) {
+    const context = useContext(BackgroundContext);
+    const style = {
+        width,
+        height,
+        top: 0,
+        position: 'absolute'
+    };
+    const bgColor = context.bgColor + (Math.min(context.bgOpacity * 10, 255)).toString(16).padStart(2, '0');
+    return (
+        <div style={style} className="checkbg">
+            <div style={{...style, backgroundColor: bgColor}} />
+        </div>
+    )
+}
+
+function Canvas({width, height, render, className}) {
+    const canvasRef = useRef(null);
+    useEffect(() => {
+        if (!canvasRef.current) {
+            return;
+        }
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        render(ctx);
+    });
+
+    if (height === 0 || width === 0) return '';
+
+    return (
+        <div style={{position: 'relative', height, width}}>
+            <Background width={width} height={height} />
+            <canvas style={{top: 0, position: 'absolute'}} className={className} width={width} height={height} ref={canvasRef} />
+        </div>
+    )
+}
+
+function useResize(props, deps, checkSize) {
+    const propsRef = useRef(null);
+    const observerRef = useRef(null);
+    const divRef = useRef(null);
+
+    propsRef.current = props;
+
+    useEffect(() => {
+
+        const observer = new ResizeObserver(e => {
+            if (!divRef.current) return;
+            checkSize(propsRef.current, divRef.current.getBoundingClientRect());
+        });
+        observerRef.current = observer;
+        observer.observe(divRef.current);
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        checkSize(propsRef.current, divRef.current.getBoundingClientRect());
+    }, deps);
+
+    return divRef;
+}
+
+function useComponentUpdate() {
+    const mounted = useMounted();
+    const [updates, setUpdates] = useState(false);
+    const updateRef = useRef(null);
+    updateRef.current = updates;
+    return () => {
+        if (mounted.curr) {
+            setUpdates(!updateRef.current);
+        }
+    }
+}
+
+function IndexController({newItem, importItems, startPos, doubleClick, rightClick, renderTitle, actions, titleHeight, minWidth, empty, indexProvider, matcher}) {
+    const [pos, setPos] = useState(startPos || 0);
+    const [zoom, setZoom] = useState(2);
+    const [page, setPage] = useState(0);
+    const [marked, setMarked] = useState([]);
+    const [filter, setFilterRaw] = useState('');
+    const setFilter = value => {
+        setPos(0);
+        setFilterRaw(value);
+    };
+
+    const update = useComponentUpdate();
+    useEffect(() => {
+        indexProvider.addListener(update);
+        return () => {
+            indexProvider.removeListener(update);
+        }
+    });
+    const propsRef = useRef(null);
+    propsRef.current = {pos};
+
+    if (minWidth === undefined) {
+        minWidth = 50;
+    }
+
+    if (!renderTitle) {
+        renderTitle = value => <Title>{value}</Title>
+    }
+
+    const divRef = useResize({zoom, page}, [zoom],
+        (curr, rect) => {
+            const padding = 5;
+            const boxSize = curr.zoom * indexProvider.getSizeX() + 2;
+            const itemSize =
+                Math.max(minWidth, boxSize) + 2 + 3 * padding;
+            const space = rect.width - 2 * padding;
+            const newPage = Math.floor(space/itemSize);
+
+            if (newPage !== curr.page) {
+                setPage(newPage);
+            }
+        }
+    );
+
+    matcher = matcher ? {...matcher, value: filter} : null;
+    const view = indexProvider.getIndexMatches(pos, page, matcher);
+    const sizeX = indexProvider.getSizeX();
+    const sizeY = indexProvider.getSizeY();
+    const viewEnd = Math.max(view.count - page, 0);
+    if (pos > viewEnd) {
+        setPos(viewEnd);
+    }
+
+    let scroller = '';
+    let height = 5 * 3 + (titleHeight + 2 + 10) + zoom * sizeY;
+    if (page < view.count) {
+        height += 31;
+        scroller = <RasterScrollbar auto pos={pos} set={setPos} page={page} min={0} max={view.count} />
+    }
+
+    const items = [];
+    const style = {
+        minWidth
+    };
+
+    const sensitivity = 0.25;
+    const onWheel = (e) => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        const newPos = Math.min(Math.max(propsRef.current.pos + deltaX, 0), max);
+        if (newPos !== propsRef.current.pos) {
+            setPos(newPos);
+        }
+        e.stopPropagation();
+    };
+
+    const toggleMarker = index => {
+        const newMarked = marked.concat();
+        const pos = marked.indexOf(index);
+        if (pos !== -1) {
+            newMarked.splice(pos, 1);
+        } else {
+            newMarked.push(index);
+        }
+        setMarked(newMarked);
+    };
+
+    const getDoubleClickAction = index => {
+        if (!doubleClick) {
+            return null;
+        }
+        return () => {
+            doubleClick(index);
+        };
+    };
+    const getRightClickAction = index => {
+        if (!rightClick) {
+            return null;
+        }
+        return () => {
+            rightClick(index);
+        };
+    };
+
+    let bottomItems = [];
+    bottomItems.push(
+        <Content key={'matching'}>Matching: {view.count} of {indexProvider.getLength()}</Content>
+    );
+    if (actions && marked.length > 0) {
+        bottomItems.push(<Content key="info">Marked: {marked.length}</Content>);
+
+        const bottomActions = [];
+        bottomActions.push(<button key="all" onClick={() => {
+            setMarked(view.matches);
+        }}>All</button>);
+        bottomActions.push(<button key="reverse" onClick={() => {
+            const indices = [];
+            for (let i = 0; i < view.matches.length; i++) {
+                const index = view.matches[i];
+                if (marked.indexOf(index) === -1) {
+                    indices.push(index);
+                }
+            }
+            setMarked(indices);
+        }}>Reverse</button>);
+        for (let action of actions) {
+            if (action.isHidden !== undefined && action.isHidden({marked})) {
+                continue;
+            }
+            bottomActions.push(
+                <button key={action.name} onClick={(e) => {
+                    action.doAction(marked);
+                    setMarked([]);
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}>{action.name}</button>
+            );
+        }
+        bottomActions.push(<button key="cancel" onClick={() => {setMarked([])}}>X</button>);
+        bottomItems.push(
+            <Stack fit key="actions">
+                {bottomActions}
+            </Stack>
+        );
+    }
+    const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
+
+    for (let index of view.matches) {
+        const cls = ['padded thin-boxed'];
+        if (marked.indexOf(index) !== -1) {
+            cls.push('marked-item');
+        } else {
+            cls.push('hover-item');
+        }
+        const click = actions ? () => {toggleMarker(index)} : null;
+        items.push(
+            <div key={index} className={cls.join(' ')}
+                 style={style}
+                 onDoubleClick={getDoubleClickAction(index)}
+                 onContextMenu={getRightClickAction(index)}
+                 onClick={click}
+            >
+                <Stack vertical>
+                    <Content height={titleHeight}>{renderTitle(index)}</Content>
+                    <Stack alignItems="center" align="center">
+                        <div className="thin-boxed min-content">
+                            <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => indexProvider.drawIndex(ctx, index, 0, 0, zoom)}></Canvas>
+                        </div>
+                    </Stack>
+                </Stack>
+            </div>
+        );
+    }
+
+    let content = items.length ?
+            <Stack alignItems="center" vertical>
+                <div className="rel-canvas" onWheel={onWheel}>
+                    <Stack vertical>
+                        <Stack padded>{items}</Stack>
+                        {scroller}
+                    </Stack>
+                </div>
+            </Stack> :
+            <Centered style={{height}}>{empty}</Centered>;
+
+    const topToolbar =
+        <Toolbar>
+            {
+                matcher &&
+                <Stack><Content>Filter: </Content><Content><TextField name="Filter" value={filter} set={setFilter}/></Content></Stack>
+            }
+            <Int name="Pos:" buttons min={0} max={viewEnd} value={pos} set={setPos} />
+            <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+            <BackgroundControl />
+        </Toolbar>;
+
+    const controller =
+        <Stack vertical fullHeight border>
+            {topToolbar}
+            <div className="padded" ref={divRef} style={{height}}>
+                {content}
+            </div>
+            {bottomToolbar}
+        </Stack>;
+
+    if (!newItem) {
+        return controller;
+    }
+    return (
+        <Stack fullHeight border>
+            <Toolbar padded>
+                <Stack vertical>
+                    {newItem && <ActionBox material click={newItem}>add</ActionBox>}
+                    {importItems && <ActionBox material click={importItems}>playlist_add</ActionBox>}
+                </Stack>
+            </Toolbar>
+            <Content flex>{controller}</Content>
+        </Stack>
     )
 }
 
@@ -1160,7 +1707,6 @@ function Scene3d(props) {
 
     /*
       TODO:
-       * second plane + texture
        - animation
        - border
      */
@@ -1173,7 +1719,19 @@ function Scene3d(props) {
     const [yDist, setYDist] = useState(-0.0);
     const [zDist, setZDist] = useState(-3.0);
     const [info, setInfo] = useState(null);
-    const paneAspectRatio = props.paneDim.x / props.paneDim.y;
+
+    let maxWidth = 0;
+    let maxRatio = 0;
+    for (let elem of props.elems) {
+        if (elem.width > maxWidth) {
+            maxWidth = elem.width;
+            maxRatio = elem.height / maxWidth * elem.height;
+        }
+    }
+    const normX = 1 / maxWidth;
+    const normY = normX;
+    // TODO normalize rects
+    const paneAspectRatio = props.width / props.height;
 
     const loadShader = (gl, type, source) => {
         const shader = gl.createShader(type);
@@ -1188,60 +1746,7 @@ function Scene3d(props) {
         return shader;
     };
 
-
-
     const initShaderProgram = gl => {
-        // Der Vertex-Shader bekommt 2 parameter aus Buffern:
-
-        //   - vertexPosition :vec4 = [float, float, float, float]
-        //     Der Buffer der an dieses Attribut gebunden wird, hat allerdings nur 3 Komponenten
-        //       => d.h. wohl dass die letzte Komponente 0 ist?
-        /*
-                    const numComponents = 3;
-                    const type = gl.FLOAT;
-                    const normalize = false;
-                    const stride = 0;
-                    const offset = 0;
-                    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-                    gl.vertexAttribPointer(
-                        programInfo.attribLocations.vertexPosition,
-                        numComponents = 3
-                        type = gl.FLOAT
-                        normalize = false
-                        stride = 0
-                        offset = 0
-                    );
-        */
-
-        //   - textureCoord :vec2 = [float, float]
-        //
-        /*
-                    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoord);
-                    gl.vertexAttribPointer(
-                        programInfo.attribLocations.textureCoord,
-                        numComponents = 2
-                        type = gl.FLOAT
-                        normalize = false
-                        stride = 0
-                        offset = 0
-                    );
-                    gl.enableVertexAttribArray(
-                        programInfo.attribLocations.textureCoord
-                    );
-
-            Ablauf:
-
-            1. Ausgangspunkt ist ein Vector3 auf Achsen von -1...1
-            2. Dieser Vector wird über die ModelViewMatrix
-                 a) skaliert
-                 b) rotiert
-                 c) translated
-            3. Über die Projection-Matrix perspektivisch verzerrt (Kamera)
-
-            Die TextureCoord die reinkommt wird nur an den Shader durchgereicht
-
-         */
-
         const vsSource = `
             attribute vec4 aVertexPosition;
             attribute vec2 aTextureCoord;
@@ -1256,7 +1761,6 @@ function Scene3d(props) {
               vTextureCoord = aTextureCoord;
             }        
           `;
-
 
         const fsSource = `
             precision mediump float;
@@ -1286,55 +1790,51 @@ function Scene3d(props) {
         return shaderProgram
     };
 
-    const getPlainTexture = (gl) => {
+    const getPlainTexture = (gl, color) => {
+        const rgb = color ? hex2rgb(color) : {r: 0, g: 0, b: 0};
         const colorTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-        const pixel = new Uint8Array([0, 0, 0, 255]);
+        const pixel = new Uint8Array([rgb.r, rgb.g, rgb.b, 255]);
         gl.texImage2D(
             gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0,
             gl.RGBA, gl.UNSIGNED_BYTE, pixel);
         return colorTexture;
     };
 
-    const loadTexture = (gl, url) => {
-        const textures = [
-            getPlainTexture(gl),
-            getPlainTexture(gl)
-        ];
-/*
-            gl.createTexture();
-
-
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-*/
+    const loadTextures = (gl) => {
+        const textures = [];
+        const iMax = props.elems.length;
+        let i = 0;
+        while (i < iMax) {
+            textures.push(getPlainTexture(gl, props.elems[i].color));
+            i++;
+        }
         const level = 0;
         const internalFormat = gl.RGBA;
-        const width = 1;
-        const height = 1;
-        const border = 0;
         const srcFormat = gl.RGBA;
         const srcType = gl.UNSIGNED_BYTE;
 
- /*
-        const pixel = new Uint8ClampedArray([0, 0, 255, 255]);
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
-   */
-        const image = new Image();
-        image.onload = function () {
-            gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-            gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        };
-        image.src = url;
-
+        i = 0;
+        for (let elem of props.elems) {
+            if (elem.texture) {
+                const image = new Image();
+                const index = i;
+                image.onload = function () {
+                    gl.bindTexture(gl.TEXTURE_2D, textures[index]);
+                    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                };
+                image.src = elem.texture;
+            }
+            i++;
+        }
         return textures;
     };
 
     const initBuffer = gl => {
         // Create a buffer for the cube's vertex positions.
-
         const positionBuffer = gl.createBuffer();
 
         // Select the positionBuffer as the one to apply buffer
@@ -1344,22 +1844,35 @@ function Scene3d(props) {
 
         // Now create an array of positions for the cube.
 
-        //
+        const positions = [];
+        let i = props.elems.length;
+        const zDist = 2/i;
+        let z = 0;
+        let j = 0;
+        const textureCoordinates = [];
+        const indices = [];
+        while (i > 0) {
+            const elem = props.elems[i - 1];
 
-        const positions = [
-            // first face
-            paneAspectRatio,  1.0,  0.0,
-            -paneAspectRatio,  1.0,  0.0,
-            -paneAspectRatio, -1.0,  0.0,
-            paneAspectRatio, -1.0,  0.0,
-
-            // second face
-            paneAspectRatio,  1.0,  -1.5,
-            -paneAspectRatio,  1.0,  -1.5,
-            -paneAspectRatio, -1.0,  -1.5,
-            paneAspectRatio, -1.0,  -1.5,
-
-        ];
+            positions.push(...[
+                elem.width * normX,  elem.height * normY,  z,
+                -elem.width * normX,  elem.height * normY,  z,
+                -elem.width * normX, -elem.height * normY,  z,
+                elem.width * normX, -elem.height * normY,  z,
+            ]);
+            textureCoordinates.push(...[
+                1.0,  0.0,
+                0.0,  0.0,
+                0.0,  1.0,
+                1.0,  1.0,
+            ]);
+            indices.push(...[
+                j,  j+ 2,  j + 3,      j,  j + 1,  j + 2
+            ]);
+            i--;
+            j += 4;
+            z -= zDist;
+        }
 
         // Now pass the list of positions into WebGL to build the
         // shape. We do this by creating a Float32Array from the
@@ -1372,20 +1885,6 @@ function Scene3d(props) {
         const textureCoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
 
-        const textureCoordinates = [
-            // first
-            1.0,  0.0,
-            0.0,  0.0,
-            0.0,  1.0,
-            1.0,  1.0,
-
-            // second
-            1.0,  0.0,
-            0.0,  0.0,
-            0.0,  1.0,
-            1.0,  1.0,
-        ];
-
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
             gl.STATIC_DRAW);
 
@@ -1394,18 +1893,6 @@ function Scene3d(props) {
 
         const indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-        // This array defines each face as two triangles, using the
-        // indices into the vertex array to specify each triangle's
-        // position.
-
-        const indices = [
-            0,  2,  3,      0,  1,  2,    // front
-
-            4,  6,  7,      4,  5,  6
-        ];
-
-        // Now send the element array to GL
 
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
             new Uint16Array(indices), gl.STATIC_DRAW);
@@ -1464,8 +1951,6 @@ function Scene3d(props) {
             modelViewMatrix,     // matrix to translate
             [xDist, yDist, zDist]);  // amount to translate
 
-
-
         {
             const numComponents = 3;
             const type = gl.FLOAT;
@@ -1520,31 +2005,23 @@ function Scene3d(props) {
             false,
             modelViewMatrix
         );
-
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, textures[0]);
 
-        gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+        let i = props.elems.length;
+        let j = 0;
+        while (i > 0) {
+            gl.bindTexture(gl.TEXTURE_2D, textures[j]);
+            gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
-        {
-            const vertexCount = 6;
-            const type = gl.UNSIGNED_SHORT;
-            const offset = 0;
-            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+            {
+                const vertexCount = 6;
+                const type = gl.UNSIGNED_SHORT;
+                const offset = 12 * j;
+                gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+                i--;
+                j++;
+            }
         }
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-
-        gl.uniform1i(programInfo.uniformLocations.uSampler, 1);
-
-        {
-            const vertexCount = 6;
-            const type = gl.UNSIGNED_SHORT;
-            const offset = 12;
-            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
-        }
-
     };
 
 
@@ -1573,7 +2050,7 @@ function Scene3d(props) {
                     uSampler: gl.getUniformLocation(shaderProgram, 'uSampler')
                 },
                 buffers: initBuffer(gl),
-                textures: loadTexture(gl, props.preview)
+                textures: loadTextures(gl)
             };
             setInfo(programInfo);
             return;
@@ -1763,6 +2240,31 @@ function Page(props) {
     );
 }
 
+class BackgroundCtx extends React.Component {
+
+    constructor(props) {
+        super(props);
+        this.state = {
+            bgColor: '#666677',
+            setBgColor: bgColor => {
+                this.setState({bgColor});
+            },
+            bgOpacity: 10,
+            setBgOpacity: bgOpacity => {
+                this.setState({bgOpacity});
+            }
+        }
+    }
+
+    render() {
+        return (
+            <BackgroundContext.Provider value={this.state}>
+                {this.props.children}
+            </BackgroundContext.Provider>
+        );
+    }
+}
+
 class GlobalCtx extends React.Component {
 
     constructor(props) {
@@ -1818,7 +2320,11 @@ class GlobalCtx extends React.Component {
     render() {
         return (
             <GlobalContext.Provider value={this.state}>
-                {this.props.children}
+                <CursorCtx>
+                    <BackgroundCtx>
+                        {this.props.children}
+                    </BackgroundCtx>
+                </CursorCtx>
             </GlobalContext.Provider>
         );
     }
@@ -1860,7 +2366,7 @@ function useModal() {
         paramsRef.current = modalParams;
         setIsActive(context.openModal());
     };
-    const render = (props) => {
+    const render = props => {
         const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
         const styleProps = useStyleProps(props);
         styleProps.zIndex = isActive;
@@ -1981,7 +2487,516 @@ function useEntity(prefix, defaults = {}) {
     return entityRef.current;
 }
 
+function FiltersSelector(props) {
+    const context = useContext(GlobalContext);
+    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const filterDefinitions = context.filters.getFilters();
+    const allFilters = useMemo(() => {
+        const keys = Object.keys(filterDefinitions).sort();
+        const items = [];
+        for (let key of keys) {
+            const item = {
+                name: key
+            };
+            const filterDefinition = filterDefinitions[key];
+            for (let def of filterDefinition.paramDefs) {
+                item[def.key] = def.default;
+            }
+            items.push({name: key, item});
+        }
+        return items;
+    }, []);
+
+    const [active, setActive] = useState(0);
+    const assignedFilters = [];
+    const filterExpressions = props.filters.split('|');
+    for (let expr of filterExpressions) {
+        if (expr === '') {
+            continue;
+        }
+        let name = expr;
+        let item = {};
+        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
+            const parts = expr.split('(', 2);
+            name = parts[0];
+            const values = parts[1].substr(0, parts[1].length - 1).split(',');
+            const params = filterDefinitions[name].params;
+            for (let i = 0; i < params.length; i++) {
+                params[i](values[i], item);
+            }
+        }
+        assignedFilters.push({name, ...item});
+    }
+    const previewRef = useRef(null);
+    const [filters, setFilters] = useState(assignedFilters);
+
+    useEffect(() => {
+        if (!previewRef.current || !props.canvas) {
+            return;
+        }
+        const ctx = previewRef.current.getContext('2d');
+        const baseCanvas = Array.isArray(props.canvas) ? props.canvas[previewIndex].canvas : props.canvas;
+        const width = baseCanvas.width;
+        const height = baseCanvas.height;
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+
+        const currFilters = getFilterString();
+
+        let filteredCanvas = baseCanvas;
+        if (currFilters) {
+            const transformed =
+                context.filters.getCanvasWithFiltersApplied(
+                    currFilters,
+                    {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
+            filteredCanvas = transformed[0].elem;
+        }
+        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
+    });
+
+    let preview = null;
+    if (props.canvas) {
+        let imageCtrl = '';
+        let previewCanvas = props.canvas;
+        if (Array.isArray(props.canvas)) {
+            const options = [];
+            for (let i = 0; i < props.canvas.length; i++) {
+                options.push({id: i, name: props.canvas[i].name});
+            }
+            if (options.length > 1) {
+                imageCtrl = <Select options={options} value={previewIndex} buttons set={setPreviewIndex} />;
+            }
+            previewCanvas = props.canvas[0].canvas;
+        }
+        preview =
+            <Stack vertical border fullHeight>
+                <Toolbar>
+                    <Content padded>Preview:</Content>
+                    {imageCtrl}
+                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
+                </Toolbar>
+                <Content scroll fullHeight><Centered><canvas className="thin-boxed" ref={previewRef} width={previewCanvas.width} height={previewCanvas.height} /></Centered></Content>
+            </Stack>;
+    }
+
+    const getItemProperties = (index) => {
+        const item = filters[index];
+        const paramDefs = filterDefinitions[item.name].paramDefs;
+        const inputs = [];
+        for (let def of paramDefs) {
+            switch(def.type) {
+                case 2:
+                    const colorValue = rgb2hex(item[def.key]);
+                    inputs.push(
+                        <ColorProp
+                            name={def.key + ':'}
+                            key={def.key}
+                            value={colorValue}
+                            set={(value) => {
+                                const newFilters = [...filters];
+                                newFilters[active][def.key] = value;
+                                setFilters(newFilters);
+                            }}
+                        />
+                    );
+                    break;
+
+                case 1:
+                    inputs.push(
+                        <RangeProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            min={def.min}
+                            max={def.max}
+                            step={def.step}
+                            value={item[def.key]}
+                            set={value => {
+                                const newFilters = [...filters];
+                                newFilters[active][def.key] = value;
+                                setFilters(newFilters);
+                            }}
+                        />
+                    );
+                    break;
+
+                case 4:
+                    inputs.push(
+                        <IntProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            buttons
+                            set={
+                                (value) => {
+                                    const newFilters = [...filters];
+                                    newFilters[active][def.key] = value;
+                                    setFilters(newFilters);
+                                }
+                            }
+                            value={item[def.key]}
+                        />
+                    );
+                    break;
+
+                default:
+                    d('???', def);
+                    break;
+            }
+        }
+        return (
+            <PropertyGrid>
+                {inputs}
+            </PropertyGrid>
+        );
+    };
+
+    const getFilterString = () => {
+        const values = [];
+        for (let filter of filters) {
+            let expr = filter.name;
+            const paramDefs = filterDefinitions[filter.name].paramDefs;
+            if (paramDefs.length > 0) {
+                expr += '(';
+                const params = [];
+                for (let def of paramDefs) {
+                    const rawValue = filter[def.key];
+                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
+                }
+                expr += params.join(',') + ')';
+            }
+            values.push(expr);
+        }
+        return values.join('|');
+    };
+
+    const currFilters = getFilterString();
+
+    return (
+        <Stack vertical border>
+            <Stack fullHeight border>
+                <ItemsStack
+                    empty="Assign filters from the left side"
+                    assignable={allFilters}
+                    active={active}
+                    setActive={setActive}
+                    items={filters}
+                    setItems={setFilters}
+                    getProperties={getItemProperties}
+                    getName={(item) => item.name}
+                    ordered
+                />
+                {preview}
+            </Stack>
+            <Content padded>
+                <Stack>
+                    <button disabled={currFilters === props.filters} onClick={() => {
+                        props.save(currFilters);
+                    }}>Save</button>
+                    <button onClick={props.cancel}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+function WrappingCellGrid({children, editorId, rulers, indexProvider, pos, setPos, width, setWidth, height, setHeight, border, zoom}) {
+    const context = useContext(GlobalContext);
+    const gridStyle = {
+        display: 'grid',
+        gridTemplateColumns: 'auto',
+        gridRowGap: context.defaultPadding,
+        gridColumnGap: context.defaultPadding
+    };
+
+    const propsRef = useRef(null);
+    const dim = indexProvider.getGridDim(width, height, border, zoom);
+    const rulerSpace = rulers ? 38 : 0;
+    const length = indexProvider.getLength();
+
+    const divRef = useResize({width, height, border, zoom, rulers, rulerSpace}, [border, zoom, rulers, length], (props, rect) => {
+        const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border;
+        const spaceY = rect.height - props.border;
+
+        const cellSizeX = (indexProvider.getSizeX() + props.border) * props.zoom;
+        const cellSizeY = (indexProvider.getSizeY() + props.border) * props.zoom;
+        const newWidth = Math.min(Math.floor(spaceX / cellSizeX), props.length);
+        const newHeight = Math.min(Math.ceil(props.length / newWidth), Math.ceil(spaceY / cellSizeY));
+
+        if (props.width !== newWidth) setWidth(newWidth);
+        if (props.height !== newHeight) setHeight(newHeight);
+    });
+
+    const maxPos = Math.ceil(length / width);
+    propsRef.current = {pos, maxPos, width, height, border, zoom, dim};
+
+    const render = useMemo(
+        () => {
+            return ctx => {
+                const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
+                ctx.clearRect(0, 0, dim.width, dim.height);
+                indexProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
+            }
+        },
+        [indexProvider]
+    );
+
+    if (pos > maxPos) {
+        setPos(maxPos);
+    }
+
+    const style = {
+        width: dim.width,
+        height: dim.height
+    };
+    let topRuler = '';
+    let leftRuler = '';
+
+    if (rulers) {
+        const rulerProps = {width, posX, border};
+        const hProps = {...rulerProps, width: dim.width, height: rulerSpaceY, max: width, start: posX, cellSize: gridProvider.getCellSizeX() * zoom};
+        topRuler =
+            <HRuler
+                digits={('' + gridProvider.getWidth()).length}
+                {...hProps}
+            />;
+        const vProps = {...rulerProps, width: rulerSpaceX, height: dim.height, max: height, start: posY, cellsPerLine: null, cellSize: gridProvider.getCellSizeY() * zoom};
+        leftRuler =
+            <VRuler
+                digits={('' + gridProvider.getHeight()).length}
+                {...vProps}
+            />;
+        style.marginTop = -(rulerSpaceY >> 1);
+    }
+
+    const sensitivity = 0.25;
+    const onWheel = e => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        let deltaY = Math.round(e.deltaY * sensitivity);
+
+        const newPosX = Math.min(Math.max(posX + deltaX, 0), maxPosX);
+        const newPosY = Math.min(Math.max(posY + deltaY, 0), maxPosY);
+        if (newPosX !== posX) {
+            setPosX(newPosX);
+        }
+        if (newPosY !== posY) {
+            setPosY(newPosY);
+        }
+        e.stopPropagation();
+    };
+
+    const firstCells = [
+        <div key={1} onWheel={onWheel}>
+            <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
+                <div className="stack-h centered items-centered">
+                    <div className="rel-canvas marker-space" style={style}>
+                        <Canvas render={render} width={dim.width} height={dim.height} />
+                        {topRuler}
+                        {leftRuler}
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </div>
+    ];
+
+    const hasScrollingY = height < gridProvider.getHeight();
+
+    if (hasScrollingY) {
+        firstCells.push(<div key={2}><RasterScrollbar editorId={editorId} auto vertical set={setPosY} pos={posY} page={height} max={gridProvider.getHeight()} /></div>);
+        gridStyle.gridTemplateColumns += ' 21px'
+    }
+    const secondCells = [];
+    if (width < gridProvider.getWidth()) {
+        secondCells.push(<div style={{height: 21}} key={3}><RasterScrollbar editorId={editorId} auto set={setPosX} pos={posX} page={width} max={gridProvider.getWidth()} /></div>);
+        gridStyle.gridTemplateRows = 'auto 21px';
+        if (hasScrollingY) {
+            secondCells.push(<div key={4}></div>);
+        }
+    }
+
+    return (
+        <div style={gridStyle} className="full-v">
+            {firstCells}
+            {secondCells}
+        </div>
+    );
+}
+
+
+//  New Grid component
+
+function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY, setPosY, width, setWidth, height, setHeight, border, zoom}) {
+    const context = useContext(GlobalContext);
+    const gridStyle = {
+        display: 'grid',
+        gridTemplateColumns: 'auto',
+        gridRowGap: context.defaultPadding,
+        gridColumnGap: context.defaultPadding
+    };
+    useEditorContextPart(editorId);
+
+    const propsRef = useRef(null);
+    const dim = gridProvider.getGridDim(width, height, border, zoom);
+    const rulerSpaceX = rulers ? 38 : 0;
+    const rulerSpaceY = rulers ? 20 : 0;
+    const hasScrollingY = height < gridProvider.getHeight();
+    const hasScrollingX = width < gridProvider.getWidth();
+
+    const divRef = useResize({width, height, border, zoom, rulers, rulerSpaceX, rulerSpaceY, hasScrollingX, hasScrollingY}, [border, zoom, rulers, hasScrollingX, hasScrollingY], (props, rect) => {
+        const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border - (props.hasScrollingY ? 26 : 0);
+        const spaceY = rect.height - (props.rulers ? props.rulerSpaceY : 0) - props.border - (props.hasScrollingX ? 26 : 0);
+
+        const cellSizeX = (gridProvider.getCellSizeX() + props.border) * props.zoom;
+        const cellSizeY = (gridProvider.getCellSizeY() + props.border) * props.zoom;
+        const wrapWidth = Math.floor(spaceX / cellSizeX);
+        if (gridProvider.setWrapWidth) {
+            gridProvider.setWrapWidth(wrapWidth);
+        }
+        const newWidth = Math.min(wrapWidth, gridProvider.getWidth());
+        const newHeight = Math.min(Math.floor(spaceY / cellSizeY), gridProvider.getHeight());
+
+        if (props.width !== newWidth) setWidth(newWidth);
+        if (props.height !== newHeight) setHeight(newHeight);
+    });
+    const maxPosX = gridProvider.getWidth() - width;
+    const maxPosY = gridProvider.getHeight() - height;
+
+    propsRef.current = {posX, maxPosX, posY, maxPosY, width, height, border, zoom, dim, rulers};
+
+    const render = useMemo(
+        () => {
+            return ctx => {
+                const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
+                ctx.clearRect(0, 0, dim.width, dim.height);
+                gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
+            }
+        },
+        [gridProvider]
+    );
+
+    if (posX > maxPosX) {
+        setPosX(maxPosX);
+    }
+    if (posY > maxPosY) {
+        setPosY(maxPosY);
+    }
+
+    const style = {
+        width: dim.width,
+        height: dim.height
+    };
+    let topRuler = '';
+    let leftRuler = '';
+
+    if (rulers) {
+        const rulerProps = {width, posX, border};
+        const hProps = {...rulerProps, width: dim.width, height: rulerSpaceY, max: width, start: posX, cellSize: gridProvider.getCellSizeX() * zoom};
+        topRuler =
+            <HRuler
+                digits={('' + gridProvider.getWidth()).length}
+                {...hProps}
+            />;
+        const vProps = {...rulerProps, width: rulerSpaceX, height: dim.height, max: height, start: posY, cellsPerLine: null, cellSize: gridProvider.getCellSizeY() * zoom};
+        leftRuler =
+            <VRuler
+                digits={('' + gridProvider.getHeight()).length}
+                {...vProps}
+            />;
+        style.marginTop = -(rulerSpaceY >> 1);
+    }
+
+    const sensitivity = 0.25;
+    const onWheel = e => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        let deltaY = Math.round(e.deltaY * sensitivity);
+
+        const newPosX = Math.min(Math.max(posX + deltaX, 0), maxPosX);
+        const newPosY = Math.min(Math.max(posY + deltaY, 0), maxPosY);
+        if (newPosX !== posX) {
+            setPosX(newPosX);
+        }
+        if (newPosY !== posY) {
+            setPosY(newPosY);
+        }
+        e.stopPropagation();
+    };
+
+    const firstCells = [
+        <div key={1} onWheel={onWheel}>
+            <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
+                <div className="stack-h centered items-centered">
+                    <div className="rel-canvas marker-space" style={style}>
+                        <Canvas render={render} width={dim.width} height={dim.height} />
+                        {topRuler}
+                        {leftRuler}
+                        {children}
+                    </div>
+                </div>
+            </div>
+        </div>
+    ];
+
+    if (hasScrollingY) {
+        firstCells.push(<div key={2}><RasterScrollbar editorId={editorId} auto vertical set={setPosY} pos={posY} page={height} max={gridProvider.getHeight()} /></div>);
+        gridStyle.gridTemplateColumns += ' 21px'
+    }
+    const secondCells = [];
+    if (hasScrollingX) {
+        secondCells.push(<div style={{height: 21}} key={3}><RasterScrollbar editorId={editorId} auto set={setPosX} pos={posX} page={width} max={gridProvider.getWidth()} /></div>);
+        gridStyle.gridTemplateRows = 'auto 21px';
+        if (hasScrollingY) {
+            secondCells.push(<div key={4}></div>);
+        }
+    }
+
+    return (
+        <div style={gridStyle} className="full-v">
+            {firstCells}
+            {secondCells}
+        </div>
+    );
+}
+
+class CursorCtx extends React.Component {
+
+    constructor(props) {
+        super(props);
+        this.divRef = React.createRef(null);
+        this.lastCursor = null;
+        this.state = {
+            setFixCursor: value => {
+                if (value === null) {
+                    this.divRef.current.classList.toggle('hidden', true);
+                } else {
+                    if (this.lastCursor) {
+                        this.divRef.current.classList.remove(this.lastCursor);
+                    }
+                    value = 'cursor-' + value;
+                    this.divRef.current.classList.toggle(value, true);
+                    this.lastCursor = value;
+                    this.divRef.current.classList.toggle('hidden', false);
+                }
+            }
+        };
+    }
+
+    render() {
+        return (
+            <>
+                <div className="hidden fix-overlay" ref={this.divRef}></div>
+                <CursorContext.Provider value={this.state}>
+                    {this.props.children}
+                </CursorContext.Provider>
+            </>
+        )
+    }
+}
+
+
+
 export {
+    CellGrid,
     Section,
     Tab,
     Tabs,
@@ -1999,6 +3014,7 @@ export {
     TabAccordion,
     Stack,
     Content,
+    Canvas,
     Page,
     Color,
     ColorProp,
@@ -2022,15 +3038,24 @@ export {
     ActionFrame,
     SwitchButton,
     FileDropZone,
+    IndexController,
+    IndexPicker,
     GlobalContext,
+    CursorContext,
+    BackgroundContext,
     MouseOverlay,
     GlobalCtx,
+    BackgroundCtx,
     useUpdates,
     useMounted,
     useModal,
+    useResize,
     useDimProps,
     useKeyListener,
     useEntity,
     useUniqueIds,
-    useUniqueResourceId
+    useUniqueResourceId,
+    useComponentUpdate,
+    FiltersSelector,
+    BackgroundControl
 }

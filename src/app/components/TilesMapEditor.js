@@ -8,43 +8,44 @@ import {
     Tab,
     Int,
     Content,
-    useModal
+    Canvas,
+    IndexPicker,
+    IndexController,
+    useModal, Page, ActionFrame
 } from './BaseComponents';
 import {EditorCtx, BasicRasterView, BaseCellProviderIndexRaster, EditorContext, CellProviderRaster, useMountedReadyCellProvider, BitmapEditor, useEditorContextPart} from './Raster';
 import {CellSelection, TilesCellProvider, TilesMapCellProvider, MapSelectionCellProvider, MapValueCellProvider} from '../classes/CellProvider.js';
 import {d} from '../helper/helper';
+import {TileIndex} from "../classes/IndexProvider";
+import {IndexGrid, TilesGrid} from "../classes/Grid";
 
-function TileTracker(props) {
-    const eContext = useEditorContextPart(props.editorId);
+function TileTracker({editorId, indexProvider, gridProvider}) {
+    const eContext = useEditorContextPart(editorId);
     const [trackX, setTrackX] = useState(null);
     const [trackY, setTrackY] = useState(null);
 
     const width = 180;
-    eContext.setTracker(props.editorId, (x, y) => {
+    eContext.setTracker(editorId, (x, y) => {
         setTrackX(x);
         setTrackY(y);
     });
 
     let content = '';
-    if (trackX !== null && props.cellProvider.hasData()) {
-        const selection = props.cellProvider.getRawSelection(trackX, trackY, 1, 1);
+    if (trackX !== null) {
+        const selection = gridProvider.getRawSelection(trackX, trackY, 1, 1);
         const tile = selection.getRow(0)[0];
         const index = Array.isArray(tile) ? tile[0] : tile;
-        const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
+
+        const selectionProvider = new IndexGrid(indexProvider, {map: selection.getCells()});
+        const zoom = 4;
+        const dim = selectionProvider.getGridDim(1, 1, 0, zoom);
+
         content = (
             <Fragment>
                 <Stack align="center" alignItems="center">
-                    <Content boxed className="min-content">
-                        <CellProviderRaster
-                            cellProvider={selectionProvider}
-                            editorId="hovered"
-                            zoom={4}
-                            posX={0}
-                            posY={0}
-                            width={selection.getWidth()}
-                            height={selection.getHeight()}
-                            border={0}
-                            renderOptions={{events: true, caching: false}}
+                    <Content boxed  className="min-content">
+                        <Canvas width={dim.width} height={dim.height}
+                                render={ctx => gridProvider.drawCellValue(ctx, tile, 0, 0, zoom)}
                         />
                     </Content>
                 </Stack>
@@ -56,7 +57,8 @@ function TileTracker(props) {
     return <Content width={width}>{content}</Content>;
 }
 
-function ActiveTile(props) {
+function ActiveTile({indexProvider}) {
+
     const eContext = useContext(EditorContext);
     const EditModal = useModal();
     const selection = eContext.selection;
@@ -68,47 +70,43 @@ function ActiveTile(props) {
         index = selection ? selection.getRow(0)[0] : 0;
     }
 
-    if (selection === null || !props.cellProvider.hasData()) {
+    if (selection === null) {
         return <Content width={180}></Content>;
     }
-    const selectionProvider = new MapSelectionCellProvider(props.cellProvider, selection);
+    const selectionProvider = new TilesGrid(indexProvider, {map: selection.getCells()});
 
     const editTile = () => {
         const index = selection.getCell();
-        const save = (provider) => {
-            const doImage = provider.getImageData();
-            const actionIndex = props.cellProvider.getIndexForValue(index);
-            const undoImage = props.cellProvider.getImageDataForValue(actionIndex);
-            eContext.doAction(() => {
-                props.cellProvider.setBitmapForValue(actionIndex, doImage);
-                props.indexProvider.setBitmapForValue(actionIndex, doImage);
-                eContext.updateRaster();
-            }, () => {
-                props.cellProvider.setBitmapForValue(actionIndex, undoImage);
-                props.indexProvider.setBitmapForValue(actionIndex, undoImage);
-                eContext.updateRaster();
-            });
-            EditModal.hide();
-        };
-        const bitmap = props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png');
-        EditModal.show({save, bitmap});
+        const image = indexProvider.getIndex(index);
+        EditModal.show({
+            save: provider => {
+                const doImage = provider.getImageData();
+                const undoImage = image;
+                eContext.doAction(() => {
+                    indexProvider.setIndex(index, doImage);
+                }, () => {
+                    indexProvider.setIndex(index, undoImage);
+                });
+                EditModal.hide();
+            },
+            image
+        });
     };
+    const zoom = 3;
+    const dim = selectionProvider.getGridDim(width, height, 0, zoom);
+
     return (
         <Content width={180} padded>
             <div>Type: {type}</div>
             <Content padded>
                 <Stack align="center" alignItems="center">
                     <Content boxed>
-                        <CellProviderRaster
-                            cellProvider={selectionProvider}
-                            editorId="active"
-                            zoom={4}
-                            posX={0}
-                            posY={0}
-                            width={selection.getWidth()}
-                            height={selection.getHeight()}
-                            border={0}
-                            renderOptions={{events: false, caching: false}}
+                        <Canvas
+                            width={dim.width}
+                            height={dim.height}
+                            render={
+                                ctx => selectionProvider.drawGrid(ctx, 0, 0, width, height, 0, zoom)
+                            }
                         />
                     </Content>
                 </Stack>
@@ -118,36 +116,35 @@ function ActiveTile(props) {
             <Content>Width: {width}</Content>
             <Content>Height: {height}</Content>
             <EditModal.render name="Edit" height={600} closeable>
-                <BitmapEditor
-                    resize={false}
-                    zoom="5"
-                    border="1"
-                    cancelHandler={EditModal.hide}
-                    saveHandler={EditModal.params.save}
-                    bitmap={EditModal.params.bitmap} />
+                <EditorCtx>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="5"
+                        border="1"
+                        cancelHandler={EditModal.hide}
+                        {...EditModal.params}
+                    />
+                </EditorCtx>
             </EditModal.render>
         </Content>
     );
 }
 
-function ActiveAliasSelection(props) {
+function ActiveAliasSelection({gridProvider, indexProvider}) {
     const eContext = useContext(EditorContext);
-    const ready = useMountedReadyCellProvider(props.cellProvider);
-    const aliases = props.cellProvider.getAliases();
+    const aliases = gridProvider.getAliases();
     const selection = [];
 
-    if (!ready) {
-        return '';
-    }
-
-    const setActive = (name) => {
+    const setActive = name => {
         eContext.setSelection(new CellSelection('rect', [[name]]));
         eContext.setRasterMode('map', 'startPath');
     };
 
+    const zoom = 2;
     for (let alias of aliases) {
-        const index = props.cellProvider.getIndexForTile(alias);
-        const selectionProvider = new MapValueCellProvider(props.cellProvider, index);
+        const index = gridProvider.getIndexForTile(alias);
+        const selectionProvider = new IndexGrid(indexProvider, {map: [[index]]});
+        const dim = selectionProvider.getGridDim(1, 1, 0, zoom);
         selection.push(
             <div key={alias} className="thin-boxed" onClick={(e) => {
                 setActive(alias);
@@ -156,15 +153,8 @@ function ActiveAliasSelection(props) {
             }}>
                 <Stack>
                     <Content padded>
-                        <CellProviderRaster
-                            cellProvider={selectionProvider}
-                            zoom={2}
-                            posX={0}
-                            posY={0}
-                            width={1}
-                            height={1}
-                            border={1}
-                            renderOptions={{events: false, caching: false}}
+                        <Canvas width={dim.width} height={dim.height}
+                                render={ctx => selectionProvider.drawGrid(ctx, 0, 0, 1, 1, 0, zoom)}
                         />
                     </Content>
                     <Content padded>
@@ -181,26 +171,37 @@ function ActiveAliasSelection(props) {
     );
 }
 
-function ActiveTileSelection(props) {
+function TilesController({indexProvider}) {
+    return <IndexController indexProvider={indexProvider} titleHeight={20} minWidth={50} />;
+}
+
+function ActiveTileSelection({indexProvider, defaults = {}}) {
+    const eContext = useContext(EditorContext);
+    const ControllerModal = useModal();
     const [rulers, setRulers] = useState(true);
-    const [zoom, setZoom] = useState(props.zoom || 1);
-    const ready = useMountedReadyCellProvider(props.cellProvider);
-    if (!ready) {
-        return '';
-    }
+    const [zoom, setZoom] = useState(defaults.zoom || 1);
+
     return (
         <Stack fullHeight scroll border>
             <Content padded>
-                <Content>Tiles: {props.cellProvider.getMaxIndex()}</Content>
+                <Content>Tiles: {indexProvider.getLength()}</Content>
                 <Content><Int min={1} max={4} value={zoom} set={setZoom} buttons /></Content>
                 <Content><Checkbox value={rulers} set={setRulers} name="Rulers" /></Content>
-                <Content><button>Import</button></Content>
-                <Content><button>Export</button></Content>
+                <Content><button onClick={() => ControllerModal.show()}>Manage...</button></Content>
             </Content>
 
             <Content flex scroll>
-                <BaseCellProviderIndexRaster
-                    auto width={10} height={5} mapProvider={props.mapProvider} cellProvider={props.cellProvider} editorId="tiles"
+                <IndexPicker
+                    editorId="tilesPicker"
+                    indexProvider={indexProvider}
+                    select={
+                        index => {
+                            eContext.setSelection(new CellSelection('rect', [[index]]));
+                            eContext.setRasterMode('map', 'startPath');
+                        }
+                    }
+                    controls
+                    defaults={{zoom}}
                 />
             </Content>
 
@@ -215,77 +216,91 @@ function ActiveTileSelection(props) {
                     <SwitchButton enabled={false}>Last used</SwitchButton>
                 </Content>
             </Content>
+
+            <ControllerModal.render name="Manage Tiles" {...ControllerModal.params} height={400} closeable fit>
+                <TilesController editorId="tilesController" indexProvider={indexProvider} />
+            </ControllerModal.render>
         </Stack>
     );
 }
 
-function TilesMapEditor(props) {
+function TilesMapEditor({model, resource, revert, cancel, play, tree}) {
 
-    const tilesImage = useMemo(() => {
-        return props.tilesMap.tilesImg.elem.toDataURL('image/png');
+    const eContext = useContext(EditorContext);
+    useEffect(() => {
+        eContext.setTracking({map: ['active', 'hover']});
     }, []);
 
     const indexProvider = useMemo(() => {
-        return new TilesCellProvider(
-            props.tilesMap.tileSize,
-            tilesImage
-        );
+        return new TileIndex(model);
     }, []);
 
     const cellProvider = useMemo(() => {
-
-        const cellProvider =
-            new TilesMapCellProvider(
-                props.tilesMap.tileSize,
-                tilesImage,
-                props.tilesMap.tiles,
-                props.tilesMap.getAnimations(),
-                props.tilesMap.getMap()
-            );
-
-        return cellProvider;
+        return new TilesGrid(indexProvider, model);
     }, []);
 
+    const saveTilesPane = () => {d('SAVE...')};
+    const exportTilesPane = () => {d('EXPORT...')};
+    const deployTilesPane = () => {d('DEPLOY...')};
+
+    const frameActions = (
+        <Stack>
+            <Content>
+                <button disabled={!eContext.hasPast()} onClick={() => eContext.undoAction()}>Undo</button>
+                <button disabled={!eContext.hasFuture()} onClick={() => eContext.redoAction()}>Redo</button>
+            </Content>
+            <Content>
+                <button onClick={revert}>Revert</button>
+                <button onClick={saveTilesPane}>Save</button>
+                <button onClick={deployTilesPane} disabled={!eContext.hasStorePos()}>Deploy</button>
+                <button onClick={exportTilesPane}>Export</button>
+            </Content>
+        </Stack>
+    );
     const trackerRef = useRef(null);
     return (
-        <Stack vertical>
-            <EditorCtx tracking={{
-                map: ['active', 'hover']
-            }}>
-                <Stack flex fullHeight>
-                    <Section name="Selected" collapse vertical>
-                        <ActiveTile cellProvider={cellProvider} indexProvider={indexProvider} />
-                    </Section>
+        <Page title="Edit TilesPane" resources={tree} cancel={cancel} play={play}>
+            <Stack vertical fullHeight>
+                <ActionFrame type="TilesPane: " name={resource.id + (eContext.hasStorePos() ? ' ' : '*')} fullHeight sub={{'from': tree[0].source, 'Resources': tree.length}} actions={frameActions}>
+                    <Stack vertical>
+                        <Stack flex fullHeight>
+                            <Section name="Selected" collapse vertical>
+                                <ActiveTile indexProvider={indexProvider} />
+                            </Section>
 
-                    <Section name="Map" flex>
-                        <BasicRasterView tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={0} zoom={1} />
-                    </Section>
+                            <Section name="Map" flex>
+                                <BasicRasterView undoRedo={false} tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={cellProvider} width={5} height={5} posX={0} posY={7} border={0} zoom={1} />
+                            </Section>
+                            <Section name="Cursor" collapse vertical>
+                                <Content padded>
+                                    <TileTracker editorId="hover" gridProvider={cellProvider} indexProvider={indexProvider} />
+                                </Content>
+                            </Section>
+                        </Stack>
+                        <Section name="Elements" height={350} collapse raw>
+                            <Tabs reverse active={0}>
+                                <Tab name="Tiles">
+                                    <ActiveTileSelection defaults={{zoom: 2}} indexProvider={indexProvider} />
+                                </Tab>
+                                <Tab name="Aliases">
+                                    <ActiveAliasSelection indexProvider={indexProvider} gridProvider={cellProvider} />
+                                </Tab>
 
-                    <Section name="Cursor" collapse vertical>
-                        <Content padded>
-                            <TileTracker editorId="hover" cellProvider={cellProvider} />
-                        </Content>
-                    </Section>
-                </Stack>
-
-                <Section name="Elements" height={350} collapse raw>
-                    <Tabs reverse active={0}>
-                        <Tab name="Tiles">
-                            <ActiveTileSelection mapProvider={cellProvider} cellProvider={indexProvider} />
-                        </Tab>
-                        <Tab name="Aliases">
-                            <ActiveAliasSelection indexProvider={indexProvider} cellProvider={cellProvider} />
-                        </Tab>
-                        <Tab name="Brushes">
-                            Brush selection here...
-                        </Tab>
-                        <Tab name="Events">
-                            Event selection here...
-                        </Tab>
-                    </Tabs>
-                </Section>
-            </EditorCtx>
-        </Stack>
+                                <Tab name="Brushes">
+                                    Brush picker and manager here...
+                                </Tab>
+                                <Tab name="Events">
+                                    Event picker and manager here...
+                                </Tab>
+                                <Tab name="Animations">
+                                    Animation picker and manager here...
+                                </Tab>
+                            </Tabs>
+                        </Section>
+                    </Stack>
+                </ActionFrame>
+            </Stack>
+        </Page>
     );
 }
 
