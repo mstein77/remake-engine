@@ -1312,7 +1312,7 @@ class TilesCellProvider extends CellProvider {
     }
 }
 
-class FontCharIndexProvider extends CellProvider {
+class FontCharentityIndex extends CellProvider {
 
     constructor(model) {
         // TODO das macht echt keinen Sinn hier
@@ -1415,7 +1415,7 @@ class FontCharIndexProvider extends CellProvider {
         return this.codes.indexOf(code) !== -1;
     }
 
-    deleteIndex(index, regenerate = true) {
+    deleteEntity(index, regenerate = true) {
         this.deleteChar(this.codes[index], regenerate);
     }
 
@@ -1542,6 +1542,6 @@ export {
     TilesMapCellProvider,
     MapSelectionCellProvider,
     MapValueCellProvider,
-    FontCharIndexProvider,
+    FontCharentityIndex,
     FontIndexCellProvider
 };

@@ -6720,6 +6720,10 @@ class TilesMapConfig extends Config {
         this.brushes = this.validateObject(value);
     }
 
+    getSubResources() {
+        return [{id: this.image.id, type: 'image', data: this.image}];
+    }
+
     addRebuildProps(obj, deep, base) {
         obj.tileBits = base.tileBits;
         obj.image = deep ? RL.makeImageResource(base.tilesImg.elem, base.tilesImgId) : base.tilesImgId;

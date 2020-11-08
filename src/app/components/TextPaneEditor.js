@@ -2,11 +2,10 @@ import React, {useMemo, useState, useContext, useEffect, useRef, Fragment} from 
 import {CellSelection} from "../classes/CellProvider";
 import {CellProviderRaster} from "./Raster";
 import {EmptyGrid} from "../classes/Grid";
-import {AssignIndex, CharIndex, ColorIndex} from "../classes/IndexProvider";
+import {AssignIndex, CharIndex, ColorIndex} from "../classes/EntityIndex";
 import {
     useModal,
     useKeyListener,
-    useEntity,
     useUniqueResourceId,
     ItemsStack,
     Page,
@@ -15,7 +14,6 @@ import {
     Centered,
     ActionFrame,
     CursorContext,
-    ActionBox,
     Checkbox,
     CheckboxProp,
     TextField,
@@ -27,7 +25,6 @@ import {
     RadioProp,
     FullProp,
     Title,
-    Select,
     Stack,
     Spacer,
     Canvas,
@@ -37,19 +34,17 @@ import {
     Int,
     IntProp,
     Color,
-    ColorProp,
-    RangeProp,
-    GlobalContext, useComponentUpdate, IndexController, IndexPicker
+    FiltersSelector,
+    GlobalContext,
+    useComponentUpdate,
+    EntityManager
 } from "./BaseComponents";
 
 import {
     d,
     isValidResourceId,
-    getItemsCloneWithUpdatedItem,
-    getRebuildJsonForModel,
     drawTextBlocks,
     getCanvasForDim,
-    rgb2hex,
     getIdToItems,
     getIdsFromObjects,
     getNextUid,
@@ -61,14 +56,12 @@ import {
 import {
     EditorCtx,
     EditorContext,
-    useMountedReadyCellProvider,
-    FlexRasterIndex,
     BitmapEditor,
     BitmapSelector,
     useEditorContextPart,
     CellMarker
 } from "./Raster";
-import {BitmapCellProvider, FontCharIndexProvider} from "../classes/CellProvider";
+import {BitmapCellProvider} from "../classes/CellProvider";
 
 
 function CharInput({value, setValue, index, focusIndex}) {
@@ -101,11 +94,11 @@ function CharInput({value, setValue, index, focusIndex}) {
     );
 }
 
-function CharAssign({assignIndex, cancel, save}) {
+function CharAssign({assignIndex, close, save}) {
     const [focusIndex, setFocusIndex] = useState(0);
     const update = useComponentUpdate();
     const saveRef = useRef(null);
-    const values = assignIndex.getPropValues('newChar');
+    const values = assignIndex.getPropValues('value');
 
     saveRef.current = values;
     const incPosRef = useRef(null);
@@ -113,12 +106,12 @@ function CharAssign({assignIndex, cancel, save}) {
 
     const setValueAtIndex = (index, value) => {
         if (value !== '') {
-            const oldIndex = assignIndex.getIndexByPropValue('newChar', value);
+            const oldIndex = assignIndex.getEntityByPropValue('value', value);
             if (oldIndex !== null) {
-                assignIndex.setIndexProp(oldIndex, 'newChar', '');
+                assignIndex.setEntityPropValue(oldIndex, 'value', '');
             }
         }
-        assignIndex.setIndexProp(index, 'newChar', value);
+        assignIndex.setEntityPropValue(index, 'value', value);
         values[index] = value;
         return value;
     };
@@ -152,23 +145,24 @@ function CharAssign({assignIndex, cancel, save}) {
     const canSave = () => saveRef.current.indexOf('') === -1;
 
     const doSave = () => {
-        save(assignIndex.getObjectsForIndices());
+        save(assignIndex.getEntityObjects());
     };
 
     return (
         <EditorCtx>
             <Stack vertical fit>
                 <Content>
-                    <IndexController
+                    <EntityManager
                         key={focusIndex}
-                        indexProvider={assignIndex}
+                        entityIndex={assignIndex}
                         startPos={Math.max(focusIndex - 1, 0)}
                         minWidth={50}
                         titleHeight={22}
                         incPosRef={incPosRef}
+                        fit
                         renderTitle={
                             index => {
-                                const char = assignIndex.getIndexProps(index).newChar;
+                                const char = assignIndex.getEntityValue(index);
                                 return (
                                     <Stack>
                                         <CharInput
@@ -193,7 +187,7 @@ function CharAssign({assignIndex, cancel, save}) {
                 <Content padded>
                     <Stack>
                         <button disabled={!canSave()} onClick={doSave}>Save</button>
-                        <button onClick={cancel}>Cancel</button>
+                        <button onClick={() => close()}>Cancel</button>
                     </Stack>
                 </Content>
             </Stack>
@@ -201,7 +195,7 @@ function CharAssign({assignIndex, cancel, save}) {
     );
 }
 
-function CharIndexController({fontIndex}) {
+function CharManager({fontIndex}) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
 
@@ -212,15 +206,15 @@ function CharIndexController({fontIndex}) {
     const ImportCharsModal = useModal();
 
     const newChar = () => {
-        NewCharModal.show({
+        NewCharModal.open({
             image: getEmptyImageData(
                 fontIndex.getSizeX(),
                 fontIndex.getSizeY()
             ),
             colors: new ColorIndex({colors: getColorsFromCanvas(fontIndex.img)}),
             save: provider => {
-                assignImagesToChars([{index: 0, value: provider.getImageData()}]);
-                NewCharModal.hide()
+                assignImagesToChars([{value: '', oldChar: '', image: provider.getImageData()}]);
+                NewCharModal.close()
             }
         });
     };
@@ -231,18 +225,20 @@ function CharIndexController({fontIndex}) {
             const chars = [];
             let index = 0;
             for(let cells of baseCells) {
-                const provider = new BitmapCellProvider(1); //size);
+                const provider = new BitmapCellProvider(1);
                 provider.setMap(cells);
                 chars.push({
                     index,
-                    value: provider.getImageData()
+                    value: '',
+                    oldChar: '',
+                    image: provider.getImageData()
                 });
                 index++;
             }
             assignImagesToChars(chars);
-            ImportCharsModal.hide();
+            ImportCharsModal.close();
         };
-        ImportCharsModal.show({
+        ImportCharsModal.open({
             selection: {
                 type: 'rect',
                 width: fontIndex.getSizeX(),
@@ -256,29 +252,29 @@ function CharIndexController({fontIndex}) {
     };
 
     const editChar = index => {
-        EditCharModal.show({
-            image: fontIndex.getIndex(index),
+        const image = fontIndex.getEntityPropValue(index, 'image');
+        EditCharModal.open({
+            image,
             colors: new ColorIndex({colors: getColorsFromCanvas(fontIndex.img)}),
             save: provider => {
                 const doImage = provider.getImageData();
-                const undoImage = fontIndex.getIndex(index);
                 eContext.doAction(
                     () => {
-                        fontIndex.setIndex(index, doImage);
+                        fontIndex.setEntityPropValue(index, 'image', doImage);
                     },
                     () => {
-                        fontIndex.setIndex(index, undoImage);
+                        fontIndex.setEntityPropValue(index, 'image', image);
                     },
                 );
-                EditCharModal.hide();
+                EditCharModal.close();
             }
         });
     };
 
     const assignImagesToChars = chars => {
-        const assignIndex = new AssignIndex(chars.length, fontIndex.getSizeX(), fontIndex.getSizeY(), {oldChar: '', newChar: ''});
-        assignIndex.setIndicesFromObjects(chars);
-        AssignCharsModal.show({
+        const assignIndex = new AssignIndex(fontIndex.getSizeX(), fontIndex.getSizeY());
+        assignIndex.setEntityObjects(chars);
+        AssignCharsModal.open({
             assignIndex,
             save: items => {
                 const newItems = [];
@@ -288,27 +284,27 @@ function CharIndexController({fontIndex}) {
                 const backup = {};
                 const newChars = [];
                 for (let item of items) {
-                    newChars.push(item.newChar);
+                    newChars.push(item.value);
                 }
 
                 for (let item of items) {
-                    if (item.oldChar === item.newChar) continue;
+                    if (item.oldChar === item.value) continue;
 
-                    const newIndex = fontIndex.getIndexByPropValue('code', item.newChar);
+                    const newIndex = fontIndex.getEntityByPropValue('value', item.value);
                     if (newIndex !== null) {
-                        backup[item.newChar] = fontIndex.getIndex(newIndex);
+                        backup[item.value] = fontIndex.getEntityPropValue(newIndex, 'image');
                         changeItems.push(
-                            {index: newIndex, code: item.newChar, value: item.value}
+                            {index: newIndex, value: item.value, image: item.image}
                         );
                     } else {
                         newItems.push(
-                            {code: item.newChar, value: item.value}
+                            {value: item.value, image: item.image}
                         );
                     }
 
                     if (item.oldChar !== '' && !newChars.includes(item.oldChar)) {
-                        const oldIndex = fontIndex.getIndexByPropValue('code', item.oldChar);
-                        backup[item.oldChar] = fontIndex.getIndex(oldIndex);
+                        const oldIndex = fontIndex.getEntityByPropValue('value', item.oldChar);
+                        backup[item.oldChar] = fontIndex.getEntityPropValue(oldIndex, 'image');
                         deleteIndices.push(oldIndex);
                         deleteChars.push(item.oldChar);
                     }
@@ -316,31 +312,32 @@ function CharIndexController({fontIndex}) {
 
                 eContext.doAction(
                     () => {
-                        fontIndex.setIndicesFromObjects(changeItems);
+                        fontIndex.setEntityObjects(changeItems, true);
                         if (deleteIndices) {
-                            fontIndex.deleteIndices(deleteIndices);
+                            fontIndex.deleteEntities(deleteIndices);
                         }
-                        fontIndex.setIndicesFromObjects(newItems);
+                        fontIndex.setEntityObjects(newItems);
                     },
                     () => {
                         const undoIndices = [];
                         for (let item of newItems) {
-                            undoIndices.push(fontIndex.getIndexByPropValue('code', item.code));
+                            undoIndices.push(fontIndex.getEntityByPropValue('value', item.value));
                         }
-                        fontIndex.deleteIndices(undoIndices);
+                        fontIndex.deleteEntities(undoIndices);
+
                         const items = [];
                         for (let char of deleteChars) {
-                            items.push({value: backup[char], code: char});
+                            items.push({image: backup[char], value: char});
                         }
-                        fontIndex.setIndicesFromObjects(items);
+                        fontIndex.setEntityObjects(items);
                         const undoItems = [];
                         for (let item of changeItems) {
-                            undoItems.push({...item, value: backup[item.code]});
+                            undoItems.push({...item, image: backup[item.value]});
                         }
-                        fontIndex.setIndicesFromObjects(undoItems);
+                        fontIndex.setEntityObjects(undoItems, true);
                     }
                 );
-                AssignCharsModal.hide();
+                AssignCharsModal.close();
             }
         });
     };
@@ -356,10 +353,10 @@ function CharIndexController({fontIndex}) {
         {
             name: 'Delete',
             doAction: indices => {
-                const undoChars = fontIndex.getObjectsForIndices(indices);
+                const undoChars = fontIndex.getEntityObjects(indices);
                 eContext.doAction(
-                    () => fontIndex.deleteIndices(indices),
-                    () => fontIndex.setIndicesFromObjects(undoChars)
+                    () => fontIndex.deleteEntities(indices),
+                    () => fontIndex.setEntityObjects(undoChars)
                 );
             }
         },
@@ -368,16 +365,16 @@ function CharIndexController({fontIndex}) {
             doAction: indices => {
                 const first = indices[0];
                 const second = indices[1];
-                const firstBitmap = fontIndex.getIndex(first);
-                const secondBitmap = fontIndex.getIndex(second);
+                const firstBitmap = fontIndex.getEntityPropValue(first, 'image');
+                const secondBitmap = fontIndex.getEntityPropValue(second, 'image');
                 eContext.doAction(
                     () => {
-                        fontIndex.setIndex(first, secondBitmap);
-                        fontIndex.setIndex(second, firstBitmap);
+                        fontIndex.setEntityPropValue(first, 'image', secondBitmap);
+                        fontIndex.setEntityPropValue(second, 'image', firstBitmap);
                     },
                     () => {
-                        fontIndex.setIndex(first, firstBitmap);
-                        fontIndex.setIndex(second, secondBitmap);
+                        fontIndex.setEntityPropValue(first, 'image', firstBitmap);
+                        fontIndex.setEntityPropValue(second, 'image', secondBitmap);
                     }
                 );
             },
@@ -389,17 +386,17 @@ function CharIndexController({fontIndex}) {
                 const emptyBitmap = getEmptyImageData(fontIndex.getSizeX(), fontIndex.getSizeY());
                 const undoChars = {};
                 for (let index of indices) {
-                    undoChars[index] = fontIndex.getIndex(index);
+                    undoChars[index] = fontIndex.getEntityPropValue(index, 'image');
                 }
                 eContext.doAction(
                     () => {
                         for (let index of indices) {
-                            fontIndex.setIndex(index, emptyBitmap);
+                            fontIndex.setEntityPropValue(index, 'image', emptyBitmap);
                         }
                     },
                     () => {
                         for (let [index, bitmap] of Object.entries(undoChars)) {
-                            fontIndex.setIndex(index, bitmap);
+                            fontIndex.setEntityPropValue(index, 'image', bitmap);
                         }
                     }
                 );
@@ -411,11 +408,11 @@ function CharIndexController({fontIndex}) {
                 indices.sort();
                 const items = [];
                 for (let index of indices) {
-                    const char = fontIndex.getIndexProps(index).code;
+                    const char = fontIndex.getEntityValue(index);
                     items.push({
-                        value: fontIndex.getIndex(index),
+                        image: fontIndex.getEntityPropValue(index, 'image'),
                         oldChar: char,
-                        newChar: char
+                        value: char
                     });
                 }
                 assignImagesToChars(items);
@@ -427,19 +424,19 @@ function CharIndexController({fontIndex}) {
                 const previewCanvas = [];
                 for (let index of indices) {
                     previewCanvas.push({
-                        name: fontIndex.getIndexProps(index).code,
-                        canvas: getCanvasForBitmap(fontIndex.getIndex(index))
+                        name: fontIndex.getEntityValue(index),
+                        canvas: getCanvasForBitmap(fontIndex.getEntityPropValue(index, 'image'))
                     });
                 }
-                ApplyFilterModal.show({
+                ApplyFilterModal.open({
                     canvas: previewCanvas,
                     save: filter => {
-                        const undoChars = fontIndex.getObjectsForIndices(indices);
+                        const undoChars = fontIndex.getEntityObjects(indices);
                         const doBitmaps = {};
                         const sizeX = fontIndex.getSizeX();
                         const sizeY = fontIndex.getSizeY();
                         for (let index of indices) {
-                            const canvas = getCanvasForBitmap(fontIndex.getIndex(index));
+                            const canvas = getCanvasForBitmap(fontIndex.getEntityPropValue(index, 'image'));
                             const newBitmap =
                                 context.filters.getCanvasWithFiltersApplied(
                                     filter,
@@ -454,16 +451,16 @@ function CharIndexController({fontIndex}) {
                         eContext.doAction(
                             () => {
                                 for(let [index, bitmap] of Object.entries(doBitmaps)) {
-                                    fontIndex.setIndex(index, bitmap);
+                                    fontIndex.setEntityPropValue(index, 'image', bitmap);
                                 }
                             },
                             () => {
                                 for(let obj of undoChars) {
-                                    fontIndex.setIndex(obj.index, obj.value);
+                                    fontIndex.setEntityPropValue(obj.index, 'image', obj.image);
                                 }
                             }
                         );
-                        ApplyFilterModal.hide()
+                        ApplyFilterModal.close()
                     }
                 });
             }
@@ -471,7 +468,7 @@ function CharIndexController({fontIndex}) {
         {
             name: 'Copy',
             doAction: indices => {
-                const bitmap = fontIndex.getIndex(indices[0]);
+                const bitmap = fontIndex.getEntityPropValue(indices[0], 'image');
                 const selection = new CellSelection('bitmap', [[bitmap]]);
                 eContext.setSelection(selection);
             },
@@ -480,16 +477,16 @@ function CharIndexController({fontIndex}) {
         {
             name: 'Paste',
             doAction: indices => {
-                const undoChars = fontIndex.getObjectsForIndices(indices);
+                const undoChars = fontIndex.getEntityObjects(indices);
                 const pasteBitmap = eContext.selection.getCell();
                 eContext.doAction(
                     () => {
                         for (let index of indices) {
-                            fontIndex.setIndex(index, pasteBitmap);
+                            fontIndex.setEntityPropValue(index, 'image', pasteBitmap);
                         }
                     },
                     () => {
-                        fontIndex.setIndicesFromObjects(undoChars);
+                        fontIndex.setEntityObjects(undoChars, true);
                     }
                 );
             },
@@ -504,35 +501,33 @@ function CharIndexController({fontIndex}) {
     ];
 
     const deleteCharAtIndex = () => {};
-    const incPosRef = {current: null};
     const charMatcher = {type: 'prefix', field: 'code'};
 
     return (
         <>
-            <IndexController
-                indexProvider={fontIndex}
+            <EntityManager
+                entityIndex={fontIndex}
                 empty="No characters yet, please import or create new ones"
-                incPosRef={incPosRef}
                 minWidth={50}
                 titleHeight={22}
                 newItem={newChar}
                 importItems={importChars}
                 rightClick={deleteCharAtIndex}
                 doubleClick={editChar}
+                filter
                 actions={actions}
                 matcher={charMatcher}
+                maxedZoom
                 renderTitle={
                     index => {
-                        const char = {
-                            code: fontIndex.getIndexProps(index).code.charCodeAt(0)
-                        };
+                        const code = fontIndex.getEntityValue(index).charCodeAt(0);
                         return (
                             <Stack>
                                 <Content flex>
-                                    <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + char.code + ';'}}></kbd>
+                                    <kbd className="padded title-area-active" dangerouslySetInnerHTML={{__html: '&#' + code + ';'}}></kbd>
                                 </Content>
                                 <Content>
-                                    <kbd>{char.code}</kbd>
+                                    <kbd>{code}</kbd>
                                 </Content>
                             </Stack>
                         );
@@ -540,262 +535,49 @@ function CharIndexController({fontIndex}) {
                 }
             />
 
-            <EditCharModal.render name="Edit Char" height={600} closeable>
-                <BitmapEditor
-                    resize={false}
-                    zoom="2"
-                    border="1"
-                    cancel={EditCharModal.hide}
-                    {...EditCharModal.params}
-                />
-            </EditCharModal.render>
+            <EditCharModal.content name="Edit Char" height={600} closeable>
+                <EditorCtx>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="2"
+                        border="1"
+                        cancel={EditCharModal.close}
+                        {...EditCharModal.props}
+                    />
+                </EditorCtx>
+            </EditCharModal.content>
 
-            <NewCharModal.render name="Edit Char" height={600} closeable>
-                <BitmapEditor
-                    resize={false}
-                    zoom="2"
-                    border="1"
-                    cancel={EditCharModal.hide}
-                    {...NewCharModal.params} />
-            </NewCharModal.render>
+            <NewCharModal.content name="Edit Char" height={600} closeable>
+                <EditorCtx>
+                    <BitmapEditor
+                        resize={false}
+                        zoom="2"
+                        border="1"
+                        {...NewCharModal.props} />
+                    </EditorCtx>
+            </NewCharModal.content>
 
-            <AssignCharsModal.render fit closeable>
-                <CharAssign
-                    {...AssignCharsModal.params}
-                    cancel={AssignCharsModal.hide}
-                />
-            </AssignCharsModal.render>
+            <AssignCharsModal.content fit closeable>
+                <CharAssign {...AssignCharsModal.props} />
+            </AssignCharsModal.content>
 
-            <ApplyFilterModal.render height={500} closeable>
-                <FiltersSelector bgColor="#000000" {...ApplyFilterModal.params} cancel={ApplyFilterModal.hide} filters="" />
-            </ApplyFilterModal.render>
+            <ApplyFilterModal.content height={500} closeable>
+                <FiltersSelector bgColor="#000000" {...ApplyFilterModal.props} cancel={ApplyFilterModal.close} filters="" />
+            </ApplyFilterModal.content>
 
-            <ImportCharsModal.render name="Select" height={600} width="90%" closeable>
+            <ImportCharsModal.content name="Select" height={600} width="90%" closeable>
                 <EditorCtx>
                     <BitmapSelector
                         zoom="1"
                         border="0"
-                        cancelHandler={ImportCharsModal.hide}
-                        saveHandler={ImportCharsModal.params.save}
-                        selection={ImportCharsModal.params.selection}
+                        cancelHandler={ImportCharsModal.close}
+                        saveHandler={ImportCharsModal.props.save}
+                        selection={ImportCharsModal.props.selection}
                         bitmaps={context.imageResources}
                     />
                 </EditorCtx>
-            </ImportCharsModal.render>
+            </ImportCharsModal.content>
         </>
-    )
-}
-
-function FiltersSelector(props) {
-    const context = useContext(GlobalContext);
-    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
-    const [previewIndex, setPreviewIndex] = useState(0);
-    const filterDefinitions = context.filters.getFilters();
-    const allFilters = useMemo(() => {
-        const keys = Object.keys(filterDefinitions).sort();
-        const items = [];
-        for (let key of keys) {
-            const item = {
-                name: key
-            };
-            const filterDefinition = filterDefinitions[key];
-            for (let def of filterDefinition.paramDefs) {
-                item[def.key] = def.default;
-            }
-            items.push({name: key, item});
-        }
-        return items;
-    }, []);
-
-    const [active, setActive] = useState(0);
-    const assignedFilters = [];
-    const filterExpressions = props.filters.split('|');
-    for (let expr of filterExpressions) {
-        if (expr === '') {
-            continue;
-        }
-        let name = expr;
-        let item = {};
-        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
-            const parts = expr.split('(', 2);
-            name = parts[0];
-            const values = parts[1].substr(0, parts[1].length - 1).split(',');
-            const params = filterDefinitions[name].params;
-            for (let i = 0; i < params.length; i++) {
-                params[i](values[i], item);
-            }
-        }
-        assignedFilters.push({name, ...item});
-    }
-    const previewRef = useRef(null);
-    const [filters, setFilters] = useState(assignedFilters);
-
-    useEffect(() => {
-        if (!previewRef.current || !props.canvas) {
-            return;
-        }
-        const ctx = previewRef.current.getContext('2d');
-        const baseCanvas = Array.isArray(props.canvas) ? props.canvas[previewIndex].canvas : props.canvas;
-        const width = baseCanvas.width;
-        const height = baseCanvas.height;
-
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, width, height);
-
-        const currFilters = getFilterString();
-
-        let filteredCanvas = baseCanvas;
-        if (currFilters) {
-            const transformed =
-                context.filters.getCanvasWithFiltersApplied(
-                    currFilters,
-                {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
-            filteredCanvas = transformed[0].elem;
-        }
-        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
-    });
-
-    let preview = null;
-    if (props.canvas) {
-        let imageCtrl = '';
-        let previewCanvas = props.canvas;
-        if (Array.isArray(props.canvas)) {
-            const options = [];
-            for (let i = 0; i < props.canvas.length; i++) {
-                options.push({id: i, name: props.canvas[i].name});
-            }
-            if (options.length > 1) {
-                imageCtrl = <Select options={options} value={previewIndex} buttons set={setPreviewIndex} />;
-            }
-            previewCanvas = props.canvas[0].canvas;
-        }
-        preview =
-            <Stack vertical border fullHeight>
-                <Toolbar>
-                    <Content padded>Preview:</Content>
-                    {imageCtrl}
-                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
-                </Toolbar>
-                <Content scroll fullHeight><Centered><canvas className="thin-boxed" ref={previewRef} width={previewCanvas.width} height={previewCanvas.height} /></Centered></Content>
-            </Stack>;
-    }
-
-    const getItemProperties = (index) => {
-        const item = filters[index];
-        const paramDefs = filterDefinitions[item.name].paramDefs;
-        const inputs = [];
-        for (let def of paramDefs) {
-            switch(def.type) {
-                case 2:
-                    const colorValue = rgb2hex(item[def.key]);
-                    inputs.push(
-                        <ColorProp
-                            name={def.key + ':'}
-                            key={def.key}
-                            value={colorValue}
-                            set={(value) => {
-                               const newFilters = [...filters];
-                               newFilters[active][def.key] = value;
-                               setFilters(newFilters);
-                           }}
-                        />
-                    );
-                    break;
-
-                case 1:
-                    inputs.push(
-                        <RangeProp
-                            key={def.key}
-                            name={def.key + ':'}
-                            min={def.min}
-                            max={def.max}
-                            step={def.step}
-                            value={item[def.key]}
-                            set={value => {
-                                const newFilters = [...filters];
-                                newFilters[active][def.key] = value;
-                                setFilters(newFilters);
-                            }}
-                        />
-                    );
-                    break;
-
-                case 4:
-                    inputs.push(
-                        <IntProp
-                            key={def.key}
-                            name={def.key + ':'}
-                            buttons
-                            set={
-                                (value) => {
-                                    const newFilters = [...filters];
-                                    newFilters[active][def.key] = value;
-                                    setFilters(newFilters);
-                                }
-                            }
-                            value={item[def.key]}
-                        />
-                    );
-                    break;
-
-                default:
-                    d('???', def);
-                    break;
-            }
-        }
-        return (
-            <PropertyGrid>
-                {inputs}
-            </PropertyGrid>
-        );
-    };
-
-    const getFilterString = () => {
-        const values = [];
-        for (let filter of filters) {
-            let expr = filter.name;
-            const paramDefs = filterDefinitions[filter.name].paramDefs;
-            if (paramDefs.length > 0) {
-                expr += '(';
-                const params = [];
-                for (let def of paramDefs) {
-                    const rawValue = filter[def.key];
-                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
-                }
-                expr += params.join(',') + ')';
-            }
-            values.push(expr);
-        }
-        return values.join('|');
-    };
-
-    const currFilters = getFilterString();
-
-    return (
-        <Stack vertical border>
-            <Stack fullHeight border>
-                <ItemsStack
-                    empty="Assign filters from the left side"
-                    assignable={allFilters}
-                    active={active}
-                    setActive={setActive}
-                    items={filters}
-                    setItems={setFilters}
-                    getProperties={getItemProperties}
-                    getName={(item) => item.name}
-                    ordered
-                />
-                {preview}
-            </Stack>
-            <Content padded>
-                <Stack>
-                    <button disabled={currFilters === props.filters} onClick={() => {
-                        props.save(currFilters);
-                    }}>Save</button>
-                    <button onClick={props.cancel}>Cancel</button>
-                </Stack>
-            </Content>
-        </Stack>
     )
 }
 
@@ -824,12 +606,12 @@ function BlockProperties(props) {
     const fontSize = fonts[font].provider.getIndexDim();
 
     const changeFilters = () => {
-        FiltersModal.show({
+        FiltersModal.open({
             title: 'Change assigned filters',
             filters,
             save: newFilters => {
                 setFilters(newFilters);
-                FiltersModal.hide();
+                FiltersModal.close();
             }
         });
     };
@@ -898,9 +680,9 @@ function BlockProperties(props) {
                 </PropLabel>
             </PropertyGrid>
 
-            <FiltersModal.render height={500} closeable>
-                <FiltersSelector bgColor={bgColor} canvas={canvas} cancel={FiltersModal.hide} save={FiltersModal.params.save} filters={FiltersModal.params.filters} />
-            </FiltersModal.render>
+            <FiltersModal.content height={500} closeable>
+                <FiltersSelector bgColor={bgColor} canvas={canvas} cancel={FiltersModal.close} save={FiltersModal.props.save} filters={FiltersModal.props.filters} />
+            </FiltersModal.content>
         </Fragment>
     );
 }
@@ -1240,11 +1022,11 @@ function FontPreview(props) {
     const blockIds = getIdsFromObjects(blocks);
 
     const getNewTextBlock = () => {
-        NewBlockIdModal.show({
+        NewBlockIdModal.open({
             id: 'New block #' + (blockIds.length + 1),
             validator: id => !blockIds.includes(id),
             save: blockId => {
-                NewBlockIdModal.hide();
+                NewBlockIdModal.close();
                 const newBlock = defaultConfig.getDefaults();
                 newBlock.id = blockId;
                 newBlock.font = props.activeFont === null ? null : props.model.fonts[props.activeFont].id;
@@ -1313,9 +1095,9 @@ function FontPreview(props) {
                 </Stack>
             </Section>
 
-            <NewBlockIdModal.render name="New Block Id" fit closeable>
-                <NewIdForm save={NewBlockIdModal.params.save} validator={NewBlockIdModal.params.validator} id={NewBlockIdModal.params.id} hide={NewBlockIdModal.hide} />
-            </NewBlockIdModal.render>
+            <NewBlockIdModal.content name="New Block Id" fit closeable>
+                <NewIdForm {...NewBlockIdModal.props} />
+            </NewBlockIdModal.content>
         </Stack>
     );
 }
@@ -1336,9 +1118,9 @@ function ResizeFontForm(props) {
     const selectDim = () => {
         const selected = (result) => {
             setState({width: result.getWidth(), height: result.getHeight()});
-            SelectDimModal.hide();
+            SelectDimModal.close();
         };
-        SelectDimModal.show({
+        SelectDimModal.open({
             selection: {
                 type: 'rect',
                 multi: false,
@@ -1447,18 +1229,18 @@ function ResizeFontForm(props) {
     return (
         <Stack vertical border>
             <Content padded>
-                <SelectDimModal.render closeable>
+                <SelectDimModal.content closeable>
                     <EditorCtx>
                         <BitmapSelector
                             zoom="1"
                             border="0"
-                            selection={SelectDimModal.params.selection}
-                            cancelHandler={SelectDimModal.hide}
-                            saveHandler={SelectDimModal.params.save}
+                            selection={SelectDimModal.props.selection}
+                            cancelHandler={SelectDimModal.close}
+                            saveHandler={SelectDimModal.props.save}
                             bitmaps={context.imageResources}
                         />
                     </EditorCtx>
-                </SelectDimModal.render>
+                </SelectDimModal.content>
                 <PropertyGrid>
                     <DimProp name="Old Size:" buttons readOnly
                              x={props.font.width}
@@ -1516,7 +1298,7 @@ function ResizeFontForm(props) {
                     <button onClick={() => {
                         props.save({width, height, offsetX, offsetY});
                     }}>Save</button>
-                    <button onClick={props.hide}>Cancel</button>
+                    <button onClick={props.close}>Cancel</button>
                 </Stack>
             </Content>
         </Stack>
@@ -1534,9 +1316,9 @@ function NewFontForm(props) {
         const selected = result => {
             setWidth(result.getWidth());
             setHeight(result.getHeight());
-            SelectDimModal.hide();
+            SelectDimModal.close();
         };
-        SelectDimModal.show({
+        SelectDimModal.open({
             selection: {
                 type: 'rect',
                 multi: false,
@@ -1560,25 +1342,25 @@ function NewFontForm(props) {
                         </Stack>
                     </PropLabel>
                 </PropertyGrid>
-                <SelectDimModal.render closeable>
+                <SelectDimModal.content closeable>
                     <EditorCtx>
                         <BitmapSelector
                             zoom="1"
                             border="0"
-                            selection={SelectDimModal.params.selection}
-                            cancelHandler={SelectDimModal.hide}
-                            saveHandler={SelectDimModal.params.save}
+                            selection={SelectDimModal.props.selection}
+                            cancelHandler={SelectDimModal.close}
+                            saveHandler={SelectDimModal.props.save}
                             bitmaps={context.imageResources}
                         />
                     </EditorCtx>
-                </SelectDimModal.render>
+                </SelectDimModal.content>
             </Content>
             <Content padded>
                 <Stack>
                     <button onClick={() => {
                         props.save({width, height, id});
                     }}>Save</button>
-                    <button onClick={props.hide}>Cancel</button>
+                    <button onClick={props.close}>Cancel</button>
                 </Stack>
             </Content>
         </Stack>
@@ -1609,7 +1391,7 @@ function NewIdForm(props) {
                     <button disabled={disabled} onClick={() => {
                         props.save(id);
                     }}>Save</button>
-                    <button onClick={props.hide}>Cancel</button>
+                    <button onClick={props.close}>Cancel</button>
                 </Stack>
             </Content>
         </Stack>
@@ -1658,11 +1440,11 @@ function TextPaneEditor(props) {
         const id = getNewFontUid(props.resource.id + '_font', fontIds);
         const jsonIds = context.resourceLoader.getAllResourceIds('json');
 
-        NewFontIdModal.show({
+        NewFontIdModal.open({
             id,
             validator: id => (isValidResourceId('json', id) && !(fontIds.includes(id) || jsonIds.includes(id))),
             save: fontId => {
-                NewFontIdModal.hide();
+                NewFontIdModal.close();
 
                 const defaults = {...defaultConfig.getDefaults(), id: fontId};
                 let fieldProps = defaultConfig.getFieldProps();
@@ -1672,7 +1454,7 @@ function TextPaneEditor(props) {
                     maxX: fieldProps.width.max,
                     maxY: fieldProps.height.max
                 };
-                NewFontModal.show({
+                NewFontModal.open({
                     defaults,
                     fieldProps,
                     save: item => {
@@ -1701,7 +1483,7 @@ function TextPaneEditor(props) {
                             setActive(undoIndex);
                         };
                         eContext.doAction(doAction, undoAction);
-                        NewFontModal.hide();
+                        NewFontModal.close();
                     }
                 });
             }
@@ -1748,10 +1530,10 @@ function TextPaneEditor(props) {
         const editFont = model.fonts[index];
 
         const resizeAction = () => {
-            ResizeFontModal.show({
+            ResizeFontModal.open({
                 font: editFont,
                 save: resize => {
-                    const undoObjects = editFont.provider.getObjectsForIndices();
+                    const undoObjects = editFont.provider.getEntityObjects();
                     const undoSizeX = editFont.provider.getSizeX();
                     const undoSizeY = editFont.provider.getSizeY();
                     eContext.doAction(
@@ -1760,10 +1542,10 @@ function TextPaneEditor(props) {
                         },
                         () => {
                             editFont.provider.resize(undoSizeX, undoSizeY);
-                            editFont.provider.setIndicesFromObjects(undoObjects);
+                            editFont.provider.setEntityObjects(undoObjects, true);
                         }
                     );
-                    ResizeFontModal.hide();
+                    ResizeFontModal.close();
                 }
             })
         };
@@ -1806,7 +1588,7 @@ function TextPaneEditor(props) {
             <Stack vertical fullHeight>
                 <ActionFrame type="TextPane: " name={props.resource.id + (eContext.hasStorePos() ? ' ' : '*')} sub={{'from': tree[0].source, 'Resources': tree.length}} actions={frameActions}>
                     <Stack fullHeight>
-                        <Section name="Fonts">
+                        <Section name="Fonts" height={250}>
                             <ItemsStack
                                 new={newFont}
                                 deleteActiveItem={deleteFont}
@@ -1833,7 +1615,7 @@ function TextPaneEditor(props) {
                             />
                         </Section>
                         <Section name="Characters" flex>
-                            <CharIndexController fontIndex={currFont.provider} />
+                            <CharManager fontIndex={currFont.provider} />
                         </Section>
                     </Stack>
                 </ActionFrame>
@@ -1851,17 +1633,17 @@ function TextPaneEditor(props) {
                 </ActionFrame>
                 </Stack>
 
-            <ResizeFontModal.render name="Resize Font" fit closeable>
-                <ResizeFontForm hide={ResizeFontModal.hide} {...ResizeFontModal.params} />
-            </ResizeFontModal.render>
+            <ResizeFontModal.content name="Resize Font" fit closeable>
+                <ResizeFontForm {...ResizeFontModal.props} />
+            </ResizeFontModal.content>
 
-            <NewFontModal.render name="New Font" fit closeable>
-                <NewFontForm save={NewFontModal.params.save} defaults={NewFontModal.params.defaults} fieldProps={NewFontModal.params.fieldProps} hide={NewFontModal.hide} />
-            </NewFontModal.render>
+            <NewFontModal.content name="New Font" fit closeable>
+                <NewFontForm {...NewFontModal.props} />
+            </NewFontModal.content>
 
-            <NewFontIdModal.render name="New Font Id" fit closeable>
-                <NewIdForm save={NewFontIdModal.params.save} validator={NewFontIdModal.params.validator} id={NewFontIdModal.params.id} hide={NewFontIdModal.hide} />
-            </NewFontIdModal.render>
+            <NewFontIdModal.content name="New Font Id" fit closeable>
+                <NewIdForm {...NewFontIdModal.props} />
+            </NewFontIdModal.content>
         </Page>
     );
 }

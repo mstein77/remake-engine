@@ -4,7 +4,7 @@ import {
     Color,
     GlobalContext,
     CellGrid,
-    IndexPicker,
+    EntityPicker,
     Dim,
     Int,
     Centered,
@@ -26,7 +26,7 @@ import {d, getItemsCloneWithUpdatedItem, getColorsFromImageData} from '../helper
 
 import {BitmapCellProvider, CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 import {BitmapGrid} from "../classes/Grid";
-import {ColorIndex} from "../classes/IndexProvider";
+import {ColorIndex} from "../classes/EntityIndex";
 
 function CellMarker(props) {
     if (props.posX === null || props.posY === null) {
@@ -1522,10 +1522,10 @@ function BaseCellProviderIndexRaster(props) {
                         props.mapProvider.setBitmapForValue(actionIndex, undoImage);
                         eContext.updateRaster();
                     });
-                    EditModal.hide();
+                    EditModal.close();
                 };
                 const bitmap = props.cellProvider.getBitmapForValue(index, 1, false).toDataURL('image/png');
-                EditModal.show({save, bitmap});
+                EditModal.open({save, bitmap});
             }
         });
     }, []);
@@ -1579,15 +1579,15 @@ function BaseCellProviderIndexRaster(props) {
                     />
                 </CellGrid>
             <MouseOverlay cursor="pointer" active={active} />
-            <EditModal.render name="Edit" height={600} closeable>
+            <EditModal.content name="Edit" height={600} closeable>
                 <BitmapEditor
                     resize={false}
                     zoom="5"
                     border="1"
-                    cancelHandler={EditModal.hide}
-                    saveHandler={EditModal.params.save}
-                    bitmap={EditModal.params.bitmap} />
-            </EditModal.render>
+                    cancelHandler={EditModal.close}
+                    saveHandler={EditModal.props.save}
+                    bitmap={EditModal.props.bitmap} />
+            </EditModal.content>
         </Content>
     );
 }
@@ -3844,14 +3844,12 @@ function BitmapSelector(props) {
         if (image instanceof HTMLCanvasElement) {
             image = image.getContext('2d').getImageData(0, 0, image.width, image.height);
         }
-        d(currItem, image);
         return new BitmapGrid({image});
     }, [active, currItemBitmap]);
 
     const resultRef = useRef(null);
     resultRef.current = eContext.selection;
 
-//    let ready = useMountedReadyCellProvider(cellProvider);
     const selectionType = eContext.selection ? eContext.selection.getType() : 'none';
 
     const select = () => {
@@ -3859,7 +3857,6 @@ function BitmapSelector(props) {
     };
 
     let selector = '';
-//    if (ready) {
     if (active === null) {
         const images = [];
         let i = 0;
@@ -3966,7 +3963,7 @@ function BitmapSelector(props) {
     )
 }
 
-function BitmapEditor({image, save, cancel, colors}) {
+function BitmapEditor({image, save, close, colors}) {
     const eContext = useContext(EditorContext);
     const gridProvider = useMemo(() => {
         return new BitmapGrid({image})
@@ -3982,10 +3979,10 @@ function BitmapEditor({image, save, cancel, colors}) {
             }}>Save</button>
         );
     }
-    if (cancel) {
+    if (close) {
         buttons.push(
             <button key="cancel" onClick={() => {
-                cancel();
+                close();
             }}>Cancel</button>
         );
     }
@@ -4000,13 +3997,13 @@ function BitmapEditor({image, save, cancel, colors}) {
             <Stack vertical border fullHeight>
                 <Stack border fullHeight>
                     <Content padded width={150}>
-                        <IndexPicker
+                        <EntityPicker
                             editorId="bitmap-colors"
-                            indexProvider={colorIndex}
+                            entityIndex={colorIndex}
                             select={
                                 index => {
                                     eContext.setSelection(
-                                        new CellSelection('rect', [[colorIndex.getIndex(index)]])
+                                        new CellSelection('rect', [[colorIndex.getEntityValue(index)]])
                                     );
                                     eContext.setRasterMode('bitmap', 'startPath', {})
                                 }

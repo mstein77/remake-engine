@@ -1,23 +1,107 @@
 import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
 import {mat4} from 'gl-matrix';
-import {d, hex2rgb, rgb2hex} from '../helper/helper';
+import {d, getEmptyImageData, hex2rgb, rgb2hex} from '../helper/helper';
 import {
     RasterOverlays,
     HRuler,
     VRuler,
-    CellProviderRaster,
     EditorContext,
     RasterScrollbar,
     useEditorContextPart, CursorArea
 } from "./Raster";
 import {WrappingIndexGrid} from "../classes/Grid";
-import {CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
-
+import {CellSelection} from "../classes/CellProvider";
 
 const GlobalContext = React.createContext();
 const BackgroundContext = React.createContext();
 const CursorContext = React.createContext();
+
+const TabContext = React.createContext();
+
+class SideTabs extends React.Component {
+
+    constructor(props) {
+        super(props);
+        this.items = [];
+        this.state = {
+            active: props.active || null,
+            add: name => {
+                if (!this.items.includes(name)) {
+                    this.items.push(name);
+                    this.setState({});
+                }
+            },
+            setActive: active => this.setState({active})
+        }
+    }
+
+    render() {
+        return (
+            <Stack fullHeight border>
+                <Content padded>
+                    <Stack vertical>{
+                        this.items.map(
+                            item =>
+                                <Content key={item} padded>
+                                    <Content className={item === this.state.active ? 'switch-button-enabled' : ''} thin boxed click={() => this.setState({active: item})} padded>
+                                        <Stack>
+                                            <Content>{' '}</Content>
+                                            <Content flex>{item}</Content>
+                                            <Content>{' '}</Content>
+                                            <Content><kbd>{' > '}</kbd></Content>
+                                        </Stack>
+                                    </Content>
+                                </Content>)
+                    }</Stack>
+                </Content>
+                <Content flex>
+                    <TabContext.Provider value={this.state}>
+                        {this.props.children}
+                    </TabContext.Provider>
+                </Content>
+            </Stack>
+        )
+    }
+}
+
+function SideTab({name, active, children}) {
+    const tabContext = useContext(TabContext);
+    useEffect(() => {
+        tabContext.add(name);
+        if (active) {
+            tabContext.setActive(name);
+        }
+    }, []);
+    if (tabContext.active !== name) {
+        return '';
+    }
+    return (
+        children
+    )
+}
+
+function PaneSelection({options, children}) {
+    const [active, setActive] = useState(0);
+
+    const items = [];
+    for (let i = 0; i < options.length; i++) {
+        const index = i;
+        const option = options[i];
+        items.push(<Content key={index} click={() => {setActive(index)}}>{option}</Content>);
+    }
+
+    return (
+        <Stack>
+            <Stack vertical>
+                {items}
+            </Stack>
+            <Content>
+                Content goes here...
+            </Content>
+        </Stack>
+    )
+}
 
 function Color(props) {
     return (
@@ -180,14 +264,14 @@ function TextField(props) {
 
 function PropLabel(props) {
     return (
-        <Fragment>
+        <>
             <Content>
                 {props.name}
             </Content>
             <Content>
                 {props.children}
             </Content>
-        </Fragment>
+        </>
     )
 }
 
@@ -198,9 +282,9 @@ function FullProp(props) {
     }
     items.push(<div key="1" style={{gridColumn: 'span 2'}}>{props.children}</div>);
     return (
-        <Fragment>
+        <>
             {items}
-        </Fragment>
+        </>
     )
 }
 
@@ -265,27 +349,27 @@ function IntField(props) {
             prevAttr.disabled = 'disabled';
         }
         buttonPrev =
-            <React.Fragment>
+            <>
                 <button {...prevAttr}>-</button>
-            </React.Fragment>;
+            </>;
 
         buttonNext =
-            <React.Fragment>
+            <>
                 <button {...nextAttr}>+</button>
-            </React.Fragment>;
+            </>;
     }
 
     const name = props.name ? <div>{props.name}</div> : '';
 
     return (
-        <React.Fragment>
+        <>
             {name}
             <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
                 {buttonNext}
             </Stack>
-        </React.Fragment>
+        </>
     );
 }
 
@@ -665,35 +749,7 @@ function Tabs(props) {
 
 function Tab(props) {
     return (
-        <Fragment>{props.children}</Fragment>
-    );
-}
-
-function TabAccordion(props) {
-    const [active, setActive] = useState(props.active !== undefined ? props.active : 0);
-    const items = [];
-    let current = 0;
-    for (let child of props.children) {
-        const isActive = (current === active);
-        const cls = ['padded'];
-        cls.push('title-area-' + (isActive ? 'active' : 'inactive'));
-        const itemNo = current;
-
-        items.push(
-            <div key={current} onClick={() => {setActive(itemNo)}} className={cls.join(' ')}>{child.props.name}</div>
-        );
-        if (isActive) {
-            items.push(<div key="-1" className="flex">{child}</div>);
-        }
-        current++;
-    }
-    const cls = [
-        'stack-v inner-border-v boxed full-v'
-    ];
-    return (
-        <div className={cls.join(' ')}>
-            {items}
-        </div>
+        <>{props.children}</>
     );
 }
 
@@ -765,10 +821,10 @@ function PropertyGrid(props) {
 }
 
 function LabelAndSubInfo(props) {
-    return <Fragment>
+    return <>
         <Title>{props.name}</Title>
         <div className="sub-info">{props.children}</div>
-    </Fragment>
+    </>
 }
 
 function ItemsStack(props) {
@@ -1078,7 +1134,7 @@ function Portal(props) {
 }
 
 const Modal = React.memo((props) => {
-    useKeyListener(27, () => {props.hide(); return true}, () => props.closeable);
+    useKeyListener(27, () => {props.close(); return true}, () => props.closeable);
 
     const styleProps = useStyleProps(props);
     const click = props.closeable ?
@@ -1090,7 +1146,7 @@ const Modal = React.memo((props) => {
                 }
                 target = target.parentNode;
             }
-            props.hide();
+            props.close();
         } : null;
 
     return (
@@ -1102,7 +1158,7 @@ const Modal = React.memo((props) => {
                         <Stack alignItems="center">
                             <Content flex>{props.name}</Content>
                             <Stack fit><ActionBox material click={(e) => {
-                                props.hide();
+                                props.close();
                                 e.stopPropagation();
                             }}>close</ActionBox></Stack>
                         </Stack>
@@ -1148,7 +1204,7 @@ function ActionFrame({flex, name, fullHeight, sub, type, actions, children}) {
                         <Content fullHeight className="boxed-bg"><Content padded><kbd>{type}</kbd></Content></Content>
                         <Content padded className="head">{name}</Content>
                         {sub ?
-                            <Fragment>
+                            <>
                                 {Object.entries(sub).map(item => (
                                     <Fragment key={item[0]}>
                                         <Content fullHeight className="boxed-bg less"><Content padded>{item[0]}</Content></Content>
@@ -1156,7 +1212,7 @@ function ActionFrame({flex, name, fullHeight, sub, type, actions, children}) {
                                     </Fragment>))
                                 }
                                 <Content fullHeight className="boxed-lg less"></Content>
-                            </Fragment>
+                            </>
                             : ''
                         }
                         <Content flex></Content>
@@ -1205,7 +1261,6 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
             cursorHeight={1}
             fixed={highlight}
             cursorType="rect"
-            doubleClick={() => {d('DBL')}}
             matrix={null}
             inclusion={false}
             width={width}
@@ -1220,7 +1275,7 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
     )
 }
 
-function IndexPicker({indexProvider, controls, editorId, select}) {
+function EntityPicker({entityIndex, controls, editorId, select}) {
 
     const [pos, setPos] = useState(0);
     const [zoom, setZoom] = useState(1);
@@ -1230,12 +1285,12 @@ function IndexPicker({indexProvider, controls, editorId, select}) {
     const [height, setHeight] = useState(1);
 
     const gridProvider = useMemo(() => {
-        return new WrappingIndexGrid(indexProvider);
-    }, [indexProvider]);
+        return new WrappingIndexGrid(entityIndex);
+    }, [entityIndex]);
 
     return (
-        <Stack vertical fullHeight>
-            {controls && <Content padded>
+        <Stack vertical fullHeight border>
+            {controls && <Toolbar>
                 <Stack>
                     <Content>
                         <Int name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
@@ -1250,8 +1305,8 @@ function IndexPicker({indexProvider, controls, editorId, select}) {
                         <Checkbox name="Rulers:" value={rulers} set={setRulers} />
                     </Content>
                 </Stack>
-            </Content>}
-            <div className="full-v padded flex">
+            </Toolbar>}
+            <div className="full-v flex">
                 <CellGrid
                     posX={0}
                     setPosX={() => {}}
@@ -1281,115 +1336,6 @@ function IndexPicker({indexProvider, controls, editorId, select}) {
                         select={select}
                     />
                 </CellGrid>
-            </div>
-        </Stack>
-    )
-}
-
-function IndexPicker2({indexProvider, controls, defaults = {}}) {
-
-    const context = useContext(GlobalContext);
-    const [pos, setPos] = useState(0);
-    const [zoom, setZoom] = useState(defaults.zoom || 1);
-    const [border, setBorder] = useState(1);
-    const [viewX, setViewX] = useState(1);
-    const [viewY, setViewY] = useState(1);
-    const update = useComponentUpdate();
-
-    useEffect(() => {
-        indexProvider.addListener(update);
-        return () => {
-            indexProvider.removeListener(update);
-        }
-    });
-
-    const maxElems = viewX;
-    const maxHeight = viewY;
-
-    const length = indexProvider.getLength();
-    const cellSizeX = indexProvider.getSizeX() * zoom;
-    const cellPlusBorderSizeX = cellSizeX + border;
-    const cellSizeY = indexProvider.getSizeY() * zoom;
-    const cellPlusBorderSizeY = cellSizeY + border;
-
-    const divRef = useResize({cellSizeX, cellSizeY, border, viewX, viewY, length}, [zoom, viewX, border, length],
-        (curr, rect) => {
-            const padding = 5;
-            const spaceX = rect.width - 2 * padding - curr.border;
-            const spaceY = rect.height - 2 * padding - curr.border;
-            const itemSizeX = curr.cellSizeX + curr.border;
-            const itemSizeY = curr.cellSizeY + curr.border;
-            const newViewX = Math.min(Math.floor(spaceX/itemSizeX), curr.length);
-            const maxRows = Math.ceil(curr.length/newViewX);
-            d('MAX-ROWS', maxRows, spaceY);
-            const newViewY = Math.min(Math.floor(spaceY/itemSizeY), maxRows);
-
-            if (newViewX !== curr.viewX) {
-                d('CHANGE X', viewX, '->', newViewX);
-                setViewX(newViewX);
-            }
-            if (newViewY !== curr.viewY) {
-                d('CHANGE Y', viewY, '->', newViewY);
-                setViewY(newViewY);
-            }
-        }
-    );
-
-    const rows = Math.ceil(length / maxElems);
-    const elemHeight = Math.min(rows, maxHeight);
-    const rowElems = (rows > 1 ? maxElems : length);
-
-    const gridWidth = cellPlusBorderSizeX * rowElems + border;
-    const gridHeight = cellPlusBorderSizeY * elemHeight + border;
-
-    const renderGrid = ctx => {
-        ctx.clearRect(0, 0, gridWidth, gridHeight);
-        ctx.fillStyle = context.contentTextColor;
-
-        let curr = 0;
-        if (border > 0) {
-            for (let x = 0; x <= rowElems; x++) {
-                ctx.fillRect(curr, 0, border, gridHeight);
-                curr += cellPlusBorderSizeX;
-            }
-            curr = 0;
-            for (let y = 0; y <= elemHeight; y++) {
-                ctx.fillRect(0, curr, gridWidth, border);
-                curr += cellPlusBorderSizeY;
-            }
-        }
-
-        let posY = border;
-        let index = pos * rowElems;
-        for (let j = 0; j < elemHeight; j++) {
-            let posX = border;
-            for (let i = 0; i < rowElems; i++) {
-                indexProvider.drawIndex(ctx, index, posX, posY, zoom);
-                posX += cellPlusBorderSizeX;
-                index++;
-            }
-            posY += cellPlusBorderSizeY;
-        }
-    };
-
-    return (
-        <Stack vertical fullHeight>
-            {controls && <Content padded>
-                <Stack>
-                    <Content flex>{name}</Content>
-                    <Content>
-                        <Int name="Pos:" buttons min={0} max={rows - elemHeight} value={pos} set={setPos} />
-                    </Content>
-                    <Content>
-                        <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
-                    </Content>
-                    <Content>
-                        <Int name="Border:" buttons min={0} value={border} set={setBorder} />
-                    </Content>
-                </Stack>
-            </Content>}
-            <div ref={divRef} className="padded fullHeight flex">
-                <Canvas width={gridWidth} height={gridHeight} render={renderGrid}></Canvas>
             </div>
         </Stack>
     )
@@ -1483,7 +1429,7 @@ function useComponentUpdate() {
     }
 }
 
-function IndexController({newItem, importItems, startPos, doubleClick, rightClick, renderTitle, actions, titleHeight, minWidth, empty, indexProvider, matcher}) {
+function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, actions, titleHeight, minWidth, empty, entityIndex, ...props}) {
     const [pos, setPos] = useState(startPos || 0);
     const [zoom, setZoom] = useState(2);
     const [page, setPage] = useState(0);
@@ -1493,52 +1439,37 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
         setPos(0);
         setFilterRaw(value);
     };
-
     const update = useComponentUpdate();
     useEffect(() => {
-        indexProvider.addListener(update);
+        entityIndex.addListener(update);
         return () => {
-            indexProvider.removeListener(update);
+            entityIndex.removeListener(update);
         }
-    });
+    }, []);
     const propsRef = useRef(null);
     propsRef.current = {pos};
 
     if (minWidth === undefined) {
         minWidth = 50;
     }
+    const sizeX = entityIndex.getSizeX();
+    const sizeY = entityIndex.getSizeY();
 
     if (!renderTitle) {
         renderTitle = value => <Title>{value}</Title>
     }
 
-    const divRef = useResize({zoom, page}, [zoom],
-        (curr, rect) => {
-            const padding = 5;
-            const boxSize = curr.zoom * indexProvider.getSizeX() + 2;
-            const itemSize =
-                Math.max(minWidth, boxSize) + 2 + 3 * padding;
-            const space = rect.width - 2 * padding;
-            const newPage = Math.floor(space/itemSize);
-
-            if (newPage !== curr.page) {
-                setPage(newPage);
-            }
-        }
-    );
-
-    matcher = matcher ? {...matcher, value: filter} : null;
-    const view = indexProvider.getIndexMatches(pos, page, matcher);
-    const sizeX = indexProvider.getSizeX();
-    const sizeY = indexProvider.getSizeY();
+    const matcher = props.filter && filter ? filter : null;
+    const view = entityIndex.getView(pos, page, matcher);
     const viewEnd = Math.max(view.count - page, 0);
     if (pos > viewEnd) {
         setPos(viewEnd);
     }
 
     let scroller = '';
+    const hasScrollbar = page < view.count;
     let height = 5 * 3 + (titleHeight + 2 + 10) + zoom * sizeY;
-    if (page < view.count) {
+    if (hasScrollbar) {
         height += 31;
         scroller = <RasterScrollbar auto pos={pos} set={setPos} page={page} min={0} max={view.count} />
     }
@@ -1548,8 +1479,32 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
         minWidth
     };
 
+    const divRef = useResize({zoom, page, sizeY, hasScrollbar}, [zoom, hasScrollbar],
+        (curr, rect) => {
+            const padding = 5;
+            const boxSize = curr.zoom * entityIndex.getSizeX() + 2;
+            const itemSize =
+                Math.max(minWidth, boxSize) + 2 + 3 * padding;
+            const space = rect.width - 2 * padding;
+            const newPage = Math.floor(space/itemSize);
+
+            if (maxedZoom) {
+                const spaceY = rect.height - 4 * padding - titleHeight - 2 - (hasScrollbar ? 31 : 0);
+                const maxZoom = Math.floor(spaceY/sizeY);
+                if (maxZoom !== zoom) {
+                    setZoom(maxZoom);
+                }
+            }
+
+            if (newPage !== curr.page) {
+                setPage(newPage);
+            }
+        }
+    );
+
+
     const sensitivity = 0.25;
-    const onWheel = (e) => {
+    const onWheel = e => {
         let deltaX = Math.round(e.deltaX * sensitivity);
         const newPos = Math.min(Math.max(propsRef.current.pos + deltaX, 0), max);
         if (newPos !== propsRef.current.pos) {
@@ -1588,7 +1543,7 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
 
     let bottomItems = [];
     bottomItems.push(
-        <Content key={'matching'}>Matching: {view.count} of {indexProvider.getLength()}</Content>
+        <Content key={'matching'}>Matching: {view.count} of {entityIndex.getLength()}</Content>
     );
     if (actions && marked.length > 0) {
         bottomItems.push(<Content key="info">Marked: {marked.length}</Content>);
@@ -1629,6 +1584,11 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
     }
     const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
 
+    const availWidth = sizeX * zoom;
+    const availHeight = sizeY * zoom;
+
+    const zoomOrAvail = maxedZoom ? {width: availWidth, height: availHeight} : zoom;
+
     for (let index of view.matches) {
         const cls = ['padded thin-boxed'];
         if (marked.indexOf(index) !== -1) {
@@ -1648,13 +1608,15 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
                     <Content height={titleHeight}>{renderTitle(index)}</Content>
                     <Stack alignItems="center" align="center">
                         <div className="thin-boxed min-content">
-                            <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => indexProvider.drawIndex(ctx, index, 0, 0, zoom)}></Canvas>
+                            <Canvas width={availWidth} height={availHeight} render={ctx => entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail)}></Canvas>
                         </div>
                     </Stack>
                 </Stack>
             </div>
         );
     }
+
+    const centerAttr = fit ? {style: {height}} : {style: {height: '100%'}};
 
     let content = items.length ?
             <Stack alignItems="center" vertical>
@@ -1665,23 +1627,25 @@ function IndexController({newItem, importItems, startPos, doubleClick, rightClic
                     </Stack>
                 </div>
             </Stack> :
-            <Centered style={{height}}>{empty}</Centered>;
+            <Centered {...centerAttr}>{empty}</Centered>;
 
     const topToolbar =
         <Toolbar>
             {
-                matcher &&
+                props.filter &&
                 <Stack><Content>Filter: </Content><Content><TextField name="Filter" value={filter} set={setFilter}/></Content></Stack>
             }
             <Int name="Pos:" buttons min={0} max={viewEnd} value={pos} set={setPos} />
-            <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+            {
+                maxedZoom ? '' : <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+            }
             <BackgroundControl />
         </Toolbar>;
 
     const controller =
         <Stack vertical fullHeight border>
             {topToolbar}
-            <div className="padded" ref={divRef} style={{height}}>
+            <div className="padded" ref={divRef} {...centerAttr}>
                 {content}
             </div>
             {bottomToolbar}
@@ -2110,8 +2074,10 @@ function Title(props) {
         setShowTooltip(false);
         setStart(null);
     };
+    const style = useDimProps(props, {flex: 1, minWidth: 0, position: 'relative'});
+
     return (
-        <div style={{flex: 1, minWidth: 0, position: 'relative'}}>
+        <div style={style}>
             <div ref={divRef} onMouseOver={checkEnter} onMouseLeave={checkLeave} className="nowrap ellipsis overflow-hidden">{props.children}</div>
             <Tooltip active={showTooltip}>{props.children}</Tooltip>
         </div>
@@ -2228,6 +2194,7 @@ function Page(props) {
                 <Content>
                     <Stack>
                         <Content flex>{props.cancel ? (<button onClick={props.cancel}> &lt; Back</button>) : ''}</Content>
+                        <Content><button onClick={props.play}>Replay</button></Content>
                         <Content><button onClick={props.play}>Play</button></Content>
                     </Stack>
                 </Content>
@@ -2355,33 +2322,34 @@ function useMounted() {
 
 function useModal() {
     const context = useContext(GlobalContext);
-    const [isActive, setIsActive] = useState(false);
-    const paramsRef = useRef(null);
-    const hide = () => {
-        paramsRef.current = null;
-        context.closeModal(isActive);
-        setIsActive(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const propsRef = useRef(null);
+    const close = () => {
+        propsRef.current = null;
+        context.closeModal(isOpen);
+        setIsOpen(false);
     };
-    const show = (modalParams) => {
-        paramsRef.current = modalParams;
-        setIsActive(context.openModal());
+    const open = props => {
+        propsRef.current = props;
+        setIsOpen(context.openModal());
     };
-    const render = props => {
-        const title = paramsRef.current && paramsRef.current.title ? paramsRef.current.title : props.name;
+    const content = props => {
+        const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
         const styleProps = useStyleProps(props);
-        styleProps.zIndex = isActive;
+        styleProps.zIndex = isOpen;
         return (
-            <Fragment>
-                {isActive && <Modal hide={hide} name={title} fit={props.fit} closeable={props.closeable} {...styleProps}>{props.children}</Modal>}
-            </Fragment>
+            <>
+                {isOpen && <Modal close={close} name={title} fit={props.fit} closeable={props.closeable} {...styleProps}>{props.children}</Modal>}
+            </>
         );
     };
     return {
-        render,
-        show,
-        hide,
-        get params() {
-            return paramsRef.current === null ? {} : paramsRef.current;
+        content,
+        open,
+        close,
+        get props() {
+            const props = propsRef.current === null ? {} : propsRef.current;
+            return props.close ? props : {...props, close};
         }
     };
 }
@@ -2487,6 +2455,7 @@ function useEntity(prefix, defaults = {}) {
     return entityRef.current;
 }
 
+/*
 function FiltersSelector(props) {
     const context = useContext(GlobalContext);
     const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
@@ -2699,8 +2668,9 @@ function FiltersSelector(props) {
         </Stack>
     )
 }
+ */
 
-function WrappingCellGrid({children, editorId, rulers, indexProvider, pos, setPos, width, setWidth, height, setHeight, border, zoom}) {
+function WrappingCellGrid({children, editorId, rulers, entityIndex, pos, setPos, width, setWidth, height, setHeight, border, zoom}) {
     const context = useContext(GlobalContext);
     const gridStyle = {
         display: 'grid',
@@ -2710,16 +2680,16 @@ function WrappingCellGrid({children, editorId, rulers, indexProvider, pos, setPo
     };
 
     const propsRef = useRef(null);
-    const dim = indexProvider.getGridDim(width, height, border, zoom);
+    const dim = entityIndex.getGridDim(width, height, border, zoom);
     const rulerSpace = rulers ? 38 : 0;
-    const length = indexProvider.getLength();
+    const length = entityIndex.getLength();
 
     const divRef = useResize({width, height, border, zoom, rulers, rulerSpace}, [border, zoom, rulers, length], (props, rect) => {
         const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border;
         const spaceY = rect.height - props.border;
 
-        const cellSizeX = (indexProvider.getSizeX() + props.border) * props.zoom;
-        const cellSizeY = (indexProvider.getSizeY() + props.border) * props.zoom;
+        const cellSizeX = (entityIndex.getSizeX() + props.border) * props.zoom;
+        const cellSizeY = (entityIndex.getSizeY() + props.border) * props.zoom;
         const newWidth = Math.min(Math.floor(spaceX / cellSizeX), props.length);
         const newHeight = Math.min(Math.ceil(props.length / newWidth), Math.ceil(spaceY / cellSizeY));
 
@@ -2735,10 +2705,10 @@ function WrappingCellGrid({children, editorId, rulers, indexProvider, pos, setPo
             return ctx => {
                 const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
                 ctx.clearRect(0, 0, dim.width, dim.height);
-                indexProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
+                entityIndex.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
             }
         },
-        [indexProvider]
+        [entityIndex]
     );
 
     if (pos > maxPos) {
@@ -2993,7 +2963,335 @@ class CursorCtx extends React.Component {
     }
 }
 
+function FiltersSelector(props) {
+    const context = useContext(GlobalContext);
+    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const filterDefinitions = context.filters.getFilters();
+    const allFilters = useMemo(() => {
+        const keys = Object.keys(filterDefinitions).sort();
+        const items = [];
+        for (let key of keys) {
+            const item = {
+                name: key
+            };
+            const filterDefinition = filterDefinitions[key];
+            for (let def of filterDefinition.paramDefs) {
+                item[def.key] = def.default;
+            }
+            items.push({name: key, item});
+        }
+        return items;
+    }, []);
 
+    const [active, setActive] = useState(0);
+    const assignedFilters = [];
+    const filterExpressions = props.filters.split('|');
+    for (let expr of filterExpressions) {
+        if (expr === '') {
+            continue;
+        }
+        let name = expr;
+        let item = {};
+        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
+            const parts = expr.split('(', 2);
+            name = parts[0];
+            const values = parts[1].substr(0, parts[1].length - 1).split(',');
+            const params = filterDefinitions[name].params;
+            for (let i = 0; i < params.length; i++) {
+                params[i](values[i], item);
+            }
+        }
+        assignedFilters.push({name, ...item});
+    }
+    const previewRef = useRef(null);
+    const [filters, setFilters] = useState(assignedFilters);
+
+    useEffect(() => {
+        if (!previewRef.current || !props.canvas) {
+            return;
+        }
+        const ctx = previewRef.current.getContext('2d');
+        const baseCanvas = Array.isArray(props.canvas) ? props.canvas[previewIndex].canvas : props.canvas;
+        const width = baseCanvas.width;
+        const height = baseCanvas.height;
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, width, height);
+
+        const currFilters = getFilterString();
+
+        let filteredCanvas = baseCanvas;
+        if (currFilters) {
+            const transformed =
+                context.filters.getCanvasWithFiltersApplied(
+                    currFilters,
+                    {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
+            filteredCanvas = transformed[0].elem;
+        }
+        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
+    });
+
+    let preview = null;
+    if (props.canvas) {
+        let imageCtrl = '';
+        let previewCanvas = props.canvas;
+        if (Array.isArray(props.canvas)) {
+            const options = [];
+            for (let i = 0; i < props.canvas.length; i++) {
+                options.push({id: i, name: props.canvas[i].name});
+            }
+            if (options.length > 1) {
+                imageCtrl = <Select options={options} value={previewIndex} buttons set={setPreviewIndex} />;
+            }
+            previewCanvas = props.canvas[0].canvas;
+        }
+        preview =
+            <Stack vertical border fullHeight>
+                <Toolbar>
+                    <Content padded>Preview:</Content>
+                    {imageCtrl}
+                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
+                </Toolbar>
+                <Content scroll fullHeight><Centered><canvas className="thin-boxed" ref={previewRef} width={previewCanvas.width} height={previewCanvas.height} /></Centered></Content>
+            </Stack>;
+    }
+
+    const getItemProperties = (index) => {
+        const item = filters[index];
+        const paramDefs = filterDefinitions[item.name].paramDefs;
+        const inputs = [];
+        for (let def of paramDefs) {
+            switch(def.type) {
+                case 2:
+                    const colorValue = rgb2hex(item[def.key]);
+                    inputs.push(
+                        <ColorProp
+                            name={def.key + ':'}
+                            key={def.key}
+                            value={colorValue}
+                            set={(value) => {
+                                const newFilters = [...filters];
+                                newFilters[active][def.key] = value;
+                                setFilters(newFilters);
+                            }}
+                        />
+                    );
+                    break;
+
+                case 1:
+                    inputs.push(
+                        <RangeProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            min={def.min}
+                            max={def.max}
+                            step={def.step}
+                            value={item[def.key]}
+                            set={value => {
+                                const newFilters = [...filters];
+                                newFilters[active][def.key] = value;
+                                setFilters(newFilters);
+                            }}
+                        />
+                    );
+                    break;
+
+                case 4:
+                    inputs.push(
+                        <IntProp
+                            key={def.key}
+                            name={def.key + ':'}
+                            buttons
+                            set={
+                                (value) => {
+                                    const newFilters = [...filters];
+                                    newFilters[active][def.key] = value;
+                                    setFilters(newFilters);
+                                }
+                            }
+                            value={item[def.key]}
+                        />
+                    );
+                    break;
+
+                default:
+                    d('???', def);
+                    break;
+            }
+        }
+        return (
+            <PropertyGrid>
+                {inputs}
+            </PropertyGrid>
+        );
+    };
+
+    const getFilterString = () => {
+        const values = [];
+        for (let filter of filters) {
+            let expr = filter.name;
+            const paramDefs = filterDefinitions[filter.name].paramDefs;
+            if (paramDefs.length > 0) {
+                expr += '(';
+                const params = [];
+                for (let def of paramDefs) {
+                    const rawValue = filter[def.key];
+                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
+                }
+                expr += params.join(',') + ')';
+            }
+            values.push(expr);
+        }
+        return values.join('|');
+    };
+
+    const currFilters = getFilterString();
+
+    return (
+        <Stack vertical border>
+            <Stack fullHeight border>
+                <ItemsStack
+                    empty="Assign filters from the left side"
+                    assignable={allFilters}
+                    active={active}
+                    setActive={setActive}
+                    items={filters}
+                    setItems={setFilters}
+                    getProperties={getItemProperties}
+                    getName={(item) => item.name}
+                    ordered
+                />
+                {preview}
+            </Stack>
+            <Content padded>
+                <Stack>
+                    <button disabled={currFilters === props.filters} onClick={() => {
+                        props.save(currFilters);
+                    }}>Save</button>
+                    <button onClick={props.cancel}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+const useAddIndexActions = (entityIndex, actions, result = []) => {
+    const eContext = useContext(EditorContext);
+    const context = useContext(GlobalContext);
+
+    for (let action of actions) {
+        switch(action) {
+            case 'delete':
+                result.push({
+                    name: 'Delete',
+                    doAction: indices => {
+                        const undoItems = entityIndex.getEntityObjects(indices);
+                        eContext.doAction(
+                            () => entityIndex.deleteEntities(indices),
+                            () => entityIndex.setEntityObjects(undoItems)
+                        );
+                    }
+                });
+                break;
+
+            case 'swap':
+                result.push({
+                    name: 'Swap',
+                    doAction: indices => {
+                        const first = indices[0];
+                        const second = indices[1];
+                        const firstBitmap = entityIndex.getEntityPropValue(first, 'image');
+                        const secondBitmap = entityIndex.getEntityPropValue(second, 'image');
+                        eContext.doAction(
+                            () => {
+                                entityIndex.setEntityPropValue(first, 'image', secondBitmap);
+                                entityIndex.setEntityPropValue(second, 'image', firstBitmap);
+                            },
+                            () => {
+                                entityIndex.setEntityPropValue(first, 'image', firstBitmap);
+                                entityIndex.setEntityPropValue(second, 'image', secondBitmap);
+                            }
+                        );
+                    },
+                    isHidden: props => props.marked.length !== 2
+                });
+                break;
+
+            case 'clear':
+                result.push({
+                    name: 'Clear',
+                    doAction: indices => {
+                        const emptyBitmap = getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY());
+                        const undoTiles = {};
+                        for (let index of indices) {
+                            undoTiles[index] = entityIndex.getEntityPropValue(index, 'image');
+                        }
+                        eContext.doAction(
+                            () => {
+                                for (let index of indices) {
+                                    entityIndex.setEntityPropValue(index, 'image', emptyBitmap);
+                                }
+                            },
+                            () => {
+                                for (let [index, bitmap] of Object.entries(undoTiles)) {
+                                    entityIndex.setEntityPropValue(index, 'image', bitmap);
+                                }
+                            }
+                        );
+                    },
+                });
+                break;
+
+            case 'copy':
+                result.push({
+                    name: 'Copy',
+                    doAction: indices => {
+                        const bitmap = entityIndex.getEntityPropValue(indices[0], 'image');
+                        const selection = new CellSelection('bitmap', [[bitmap]]);
+                        eContext.setSelection(selection);
+                    },
+                    isHidden: props => props.marked.length !== 1
+                });
+                break;
+
+            case 'paste':
+                result.push({
+                    name: 'Paste',
+                    doAction: indices => {
+                        const undoObjects = entityIndex.getEntityObjects(indices);
+                        const pasteBitmap = eContext.selection.getCell();
+                        eContext.doAction(
+                            () => {
+                                for (let index of indices) {
+                                    entityIndex.setEntityPropValue(index, 'image', pasteBitmap);
+                                }
+                            },
+                            () => {
+                                entityIndex.setEntityObjects(undoObjects, true);
+                            }
+                        );
+                    },
+                    isHidden: () => {
+                        if (!eContext.selection || !eContext.selection.isBitmap()) {
+                            return true;
+                        }
+                        const cell = eContext.selection.getCell();
+                        return (cell.width !== entityIndex.getSizeX() || cell.height !== entityIndex.getSizeY());
+                    }
+                });
+                break;
+
+            case 'apply':
+                // TODO
+                break;
+
+            default:
+                console.error(`No definition found for index action "${action}"!`);
+        }
+    }
+    return result;
+};
 
 export {
     CellGrid,
@@ -3011,7 +3309,6 @@ export {
     Checkbox,
     CheckboxProp,
     Toolbar,
-    TabAccordion,
     Stack,
     Content,
     Canvas,
@@ -3038,8 +3335,8 @@ export {
     ActionFrame,
     SwitchButton,
     FileDropZone,
-    IndexController,
-    IndexPicker,
+    EntityManager,
+    EntityPicker,
     GlobalContext,
     CursorContext,
     BackgroundContext,
@@ -3054,8 +3351,12 @@ export {
     useKeyListener,
     useEntity,
     useUniqueIds,
+    useAddIndexActions,
     useUniqueResourceId,
     useComponentUpdate,
     FiltersSelector,
-    BackgroundControl
+    BackgroundControl,
+    PaneSelection,
+    SideTabs,
+    SideTab
 }

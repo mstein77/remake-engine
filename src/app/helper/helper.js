@@ -680,6 +680,71 @@ const cloneDeep = obj => {
     return obj;
 };
 
+const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
+    const sizeX = dim === null ? canvas.width : dim.x;
+    const sizeY = dim === null ? canvas.height : dim.y;
+    const posX = pos === null ? 0 : pos.x;
+    const posY = pos === null ? 0 : pos.y;
+    const maxZoom = Math.min(Math.floor(avail.width/sizeX), Math.floor(avail.height/sizeY));
+    if (maxZoom >= 1) {
+        const targetWidth = sizeX * maxZoom;
+        const targetHeight = sizeY * maxZoom;
+        const offsetX = (avail.width - targetWidth) >> 1;
+        const offsetY = (avail.height - targetHeight) >> 1;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetWidth, targetHeight);
+    } else {
+        let targetX = avail.width;
+        let targetY = avail.height;
+        let offsetX = 0;
+        let offsetY = 0;
+        if (sizeX > sizeY) {
+            offsetY = targetY;
+            targetY = Math.round(targetY * (sizeY / sizeX));
+            offsetY = (offsetY - targetY) >> 1;
+        } else if (sizeY > sizeX) {
+            offsetX = targetX;
+            targetX = Math.round(targetX * (sizeX / sizeY));
+            offsetX = (offsetX - targetX) >> 1;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetX, targetY);
+    }
+};
+
+const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
+    const sizeX = entityProvider.getSizeX();
+    const sizeY = entityProvider.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let tile of matrix[y]) {
+            if (plain) {
+                if (tile !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                entityProvider.drawEntity(tilesCtx, tile, posX, posY);
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+};
+
+
 module.exports = {
     d,
     hex2rgb,
@@ -707,5 +772,7 @@ module.exports = {
     getTextBlockImage,
     getBlockDim,
     getBlockPos,
-    cloneDeep
+    cloneDeep,
+    drawCanvasToAvail,
+    getCanvasForIndexMatrix
 };

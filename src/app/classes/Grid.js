@@ -377,7 +377,7 @@ class IndexGrid extends Grid {
     }
 
     drawCellValue(ctx, value, x, y, zoom) {
-        this.index.drawIndex(ctx, value, x, y, zoom);
+        this.index.drawEntity(ctx, value, x, y, zoom);
     }
 }
 
