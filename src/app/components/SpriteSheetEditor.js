@@ -68,7 +68,7 @@ function SpriteSheetEditor(props) {
     const SelectModal = useModal();
 
     const selectSprite = () => {
-        SelectModal.show({bitmap: props.spriteSheet.sheet.elem.toDataURL('image/png'), save: () => {}});
+        SelectModal.open({bitmap: props.spriteSheet.sheet.elem.toDataURL('image/png'), save: () => {}});
     };
 
 //    return <StackExamples />;
@@ -84,16 +84,16 @@ function SpriteSheetEditor(props) {
                 </Section>
             </Content>
 
-            <SelectModal.render name="Select Sprite" height={600} closeable>
+            <SelectModal.content name="Select Sprite" height={600} closeable>
                 <BitmapEditor
                     resize={false}
                     zoom="2"
                     border="0"
-                    cancelHandler={SelectModal.hide}
-                    saveHandler={SelectModal.params.save}
-                    bitmap={SelectModal.params.bitmap}
+                    cancelHandler={SelectModal.close}
+                    saveHandler={SelectModal.props.save}
+                    bitmap={SelectModal.props.bitmap}
                 />
-            </SelectModal.render>
+            </SelectModal.content>
         </EditorCtx>
     );
 }

@@ -405,6 +405,51 @@ const getCanvasForDim = (width, height) => {
     return canvas;
 };
 
+const getCanvasForBitmap = bitmap => {
+    const canvas = getCanvasForDim(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(bitmap, 0, 0);
+    return canvas;
+};
+
+const toHex = value => {
+    return  ('0' + (value & 0xFF).toString(16)).slice(-2);
+};
+
+const getColorsFromCanvas = canvas => {
+    const ctx = canvas.getContext('2d');
+    return getColorsFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height));
+};
+
+const getColorsFromImageData = data => {
+    const colors = [];
+
+    let pos = 0;
+    for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+            const color =
+                '#'
+                + toHex(data.data[pos])
+                + toHex(data.data[pos + 1])
+                + toHex(data.data[pos + 2])
+                + toHex(data.data[pos + 3]);
+            if (!colors.includes(color)) {
+                colors.push(color);
+            }
+            pos += 4;
+        }
+    }
+    return colors;
+};
+
+const getEmptyImageData = (width, height, color = '#00000000') => {
+    const canvas = getCanvasForDim(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height);
+};
+
 const rebuilders = [];
 const rebuildObj = [];
 
@@ -562,7 +607,6 @@ const getTextBlockImage = (block, font, filterer = null) => {
     if (block.font !== font.id) {
         return null;
     }
-
     const blockDim = getBlockDim(block, font);
 
     // get new canvas for block
@@ -618,6 +662,89 @@ const getTextBlockImage = (block, font, filterer = null) => {
     return canvas;
 };
 
+const cloneDeep = obj => {
+    if (Array.isArray(obj)) {
+        const clone = [];
+        for (let item of obj) {
+            clone.push(cloneDeep(item));
+        }
+        return clone;
+    }
+    if (typeof obj === 'object') {
+        const clone = {};
+        for (let [id, value] of Object.entries(obj)) {
+            clone[id] = cloneDeep(value);
+        }
+        return clone;
+    }
+    return obj;
+};
+
+const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
+    const sizeX = dim === null ? canvas.width : dim.x;
+    const sizeY = dim === null ? canvas.height : dim.y;
+    const posX = pos === null ? 0 : pos.x;
+    const posY = pos === null ? 0 : pos.y;
+    const maxZoom = Math.min(Math.floor(avail.width/sizeX), Math.floor(avail.height/sizeY));
+    if (maxZoom >= 1) {
+        const targetWidth = sizeX * maxZoom;
+        const targetHeight = sizeY * maxZoom;
+        const offsetX = (avail.width - targetWidth) >> 1;
+        const offsetY = (avail.height - targetHeight) >> 1;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetWidth, targetHeight);
+    } else {
+        let targetX = avail.width;
+        let targetY = avail.height;
+        let offsetX = 0;
+        let offsetY = 0;
+        if (sizeX > sizeY) {
+            offsetY = targetY;
+            targetY = Math.round(targetY * (sizeY / sizeX));
+            offsetY = (offsetY - targetY) >> 1;
+        } else if (sizeY > sizeX) {
+            offsetX = targetX;
+            targetX = Math.round(targetX * (sizeX / sizeY));
+            offsetX = (offsetX - targetX) >> 1;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetX, targetY);
+    }
+};
+
+const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
+    const sizeX = entityProvider.getSizeX();
+    const sizeY = entityProvider.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let tile of matrix[y]) {
+            if (plain) {
+                if (tile !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                entityProvider.drawEntity(tilesCtx, tile, posX, posY);
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+};
+
+
 module.exports = {
     d,
     hex2rgb,
@@ -634,11 +761,18 @@ module.exports = {
     getObjectWithId,
     getNextUid,
     getCanvasForDim,
+    getCanvasForBitmap,
+    getColorsFromCanvas,
+    getColorsFromImageData,
+    getEmptyImageData,
     getRebuildJsonForModel,
     getJsonModelOfInstance,
     getResourceTreeForJsonModel,
     getInstanceFromInput,
     getTextBlockImage,
     getBlockDim,
-    getBlockPos
+    getBlockPos,
+    cloneDeep,
+    drawCanvasToAvail,
+    getCanvasForIndexMatrix
 };

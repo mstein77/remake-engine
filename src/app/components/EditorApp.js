@@ -1,22 +1,39 @@
 import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
-import {Page, Stack, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal} from "./BaseComponents";
+import {
+    Page,
+    Stack,
+    Scene3d,
+    Content,
+    Section,
+    PropertyGrid,
+    RadioProp,
+    useUpdates,
+    TextArea,
+    GlobalContext,
+    GlobalCtx,
+    useModal
+} from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
-import {d, getJsonModelOfInstance, getRebuildJsonForModel, getResourceTreeForJsonModel} from '../helper/helper';
+import {
+    d,
+    getJsonModelOfInstance,
+    getRebuildJsonForModel,
+    getResourceTreeForJsonModel
+} from '../helper/helper';
 import ReactDOM from "react-dom";
-
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
     const ConfirmModal = useModal();
     props.confirmRef.current = (confirmedAction) => {
         if (!eContext.hasStorePos()) {
-            ConfirmModal.show({
+            ConfirmModal.open({
                 action: () => {
-                    ConfirmModal.hide();
+                    ConfirmModal.close();
                     confirmedAction()
                 }
             });
@@ -40,7 +57,7 @@ function RestorableContent(props) {
     return <Fragment>
         {props.children}
 
-        <ConfirmModal.render name="Please confirm" fit closeable>
+        <ConfirmModal.content name="Please confirm" fit closeable>
             <Stack vertical border>
                 <Content padded>
                     <Stack vertical alignItems="center">
@@ -52,12 +69,12 @@ function RestorableContent(props) {
                 </Content>
                 <Content padded>
                     <Stack>
-                        <button onClick={ConfirmModal.params.action}>OK</button>
-                        <button onClick={ConfirmModal.hide}>Cancel</button>
+                        <button onClick={ConfirmModal.props.action}>OK</button>
+                        <button onClick={ConfirmModal.close}>Cancel</button>
                     </Stack>
                 </Content>
             </Stack>
-        </ConfirmModal.render>
+        </ConfirmModal.content>
     </Fragment>;
 }
 
@@ -213,14 +230,24 @@ function PageSelector(props) {
     };
     const actions = (
         <Fragment>
-            <button onClick={props.play}>Play</button>
+            <button onClick={play}>xPlay</button>
         </Fragment>
     );
 
     if (active === null) {
         const items = [];
         let key = 0;
+        let preview = [];
+        let paneDim = null;
+        const sceneElems = [];
         for (let resource of props.resources) {
+            if (resource.elem) {
+                sceneElems.push(resource.elem);
+            }
+            if (resource.preview) {
+                preview.push(resource.preview);
+                paneDim = resource.dim;
+            }
             const index = key;
             items.push(
                 <div className="padded" key={key}>
@@ -230,8 +257,17 @@ function PageSelector(props) {
             key++;
         }
         return (
-            <Page title="Game" actions={actions}>
-                <Section name="Resources">{items}</Section>
+            <Page title="Game" actions={actions} play={play}>
+                <Section name="Resources">
+                    <Stack>
+                        <Content flex padded>
+                            {items}
+                        </Content>
+                        <Content padded>
+                            <Scene3d width={600} height={400} elems={sceneElems.reverse()} />
+                        </Content>
+                    </Stack>
+                </Section>
             </Page>
         )
     }
@@ -251,7 +287,7 @@ function PageSelector(props) {
     const revert = () => {
         resourceLoader.checkServerResources(resourcesInfo).then(
             serverResources => {
-                RevertModal.show({
+                RevertModal.open({
                     resourcesInfo,
                     serverResources,
                     revert: (result) => {
@@ -266,7 +302,7 @@ function PageSelector(props) {
                             }
                         }
                         resourceLoader.deleteServerResources(resources).then(() => {
-                            RevertModal.hide();
+                            RevertModal.close();
                             const game = props.game;
                             ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
                             game.reloadScreen(active);
@@ -315,7 +351,7 @@ function PageSelector(props) {
             const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
             lines.push(getResourceDef(res.type, res.id, data));
         }
-        ExportModal.show({
+        ExportModal.open({
             code: lines.join('\n')
         });
     };
@@ -325,26 +361,38 @@ function PageSelector(props) {
         updates.update();
     };
 
-    const save = model => {
-        context.resourceLoader.storeScreenResource(context.game.currentScreen, getModelConfig(model));
+    const saveModel = model => {
+        const rebuildJSON = getModelConfig(model);
+        context.resourceLoader.storeScreenResource(context.game.currentScreen, rebuildJSON);
         resource.data = null;
         update();
     };
 
-    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), save, revert, deploy, export: exportModel};
+    const editorProps = {cancel: getConfirmed(cancel), play: getConfirmed(play), saveModel, revert, deploy, exportModel};
+    let model, tree;
 
     switch (resource.type) {
-        case 'tilesMap':
-            editor = <TilesMapEditor tilesMap={resource.data} {...editorProps} />;
+        case 'TilesMap':
+            if (resource.data === null) {
+                resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+            }
+            model = getJsonModelOfInstance(resource.data);
+
+            tree = getResourceTreeForJsonModel(resource.cls, model);
+            editor = (
+                <Restorable confirmRef={confirmRef}>
+                    <TilesMapEditor key={'tilesMap_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
+                </Restorable>
+            );
             break;
 
         case 'TextPane':
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
-            const model = getJsonModelOfInstance(resource.data);
+            model = getJsonModelOfInstance(resource.data);
 
-            const tree = getResourceTreeForJsonModel(resource.cls, model);
+            tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
                     <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
@@ -361,58 +409,68 @@ function PageSelector(props) {
         <Fragment>
             {editor}
 
-            <ExportModal.render name="Export resources" width="80%" height="50%" closeable>
+            <ExportModal.content name="Export resources" width="80%" height="50%" closeable>
                 <Content padded>
                     Use this in your code:
-                    <TextArea wrap="off" width="100%" height="80%" value={ExportModal.params.code} readOnly />
+                    <TextArea wrap="off" width="100%" height="80%" value={ExportModal.props.code} readOnly />
                 </Content>
-            </ExportModal.render>
+            </ExportModal.content>
 
-            <RevertModal.render name="Revert resources" fit closeable>
+            <RevertModal.content name="Revert resources" fit closeable>
                 <RevertSelector
-                    serverResources={RevertModal.params.serverResources}
-                    resourcesInfo={RevertModal.params.resourcesInfo}
-                    revert={RevertModal.params.revert}
-                    cancel={RevertModal.hide}
+                    serverResources={RevertModal.props.serverResources}
+                    resourcesInfo={RevertModal.props.resourcesInfo}
+                    revert={RevertModal.props.revert}
+                    cancel={RevertModal.close}
                 />
-            </RevertModal.render>
+            </RevertModal.content>
         </Fragment>
     );
 }
 
 function EditorApp(props) {
     const resources = props.game.getEditableResources();
+
     let filters = null;
     let imageResources = [];
+    let tilesModel = null;
+    let fontModel = null;
     for (let resource of resources) {
         switch(resource.type) {
             case 'filters':
                 filters = resource.data;
                 break;
 
-            case 'tilesMap':
+            case 'TilesMap':
+                tilesModel = getJsonModelOfInstance(resource.data);
+                /*
                 imageResources.push({
                     name: 'Tiles Map image',
                     bitmap: resource.data.tilesImg.elem.toDataURL('image/png')
                 });
+
+                 */
                 break;
 
             case 'TextPane':
                 // TODO: use this for all resource-types and prevent double ids
+                fontModel = getJsonModelOfInstance(resource.data);
                 const resources = resource.data.getResources('image').resources;
                 for (let resource of resources) {
+                    const canvas = resource.data.getCanvas().elem;
                     imageResources.push({
                         id: resource.id,
                         name: resource.id,
-                        bitmap: resource.data.getDataUrl()
+                        bitmap: canvas
                     });
                 }
                 break;
 
             case 'spriteSheet':
+                const canvas = resource.data.sheet.elem;
                 imageResources.push({
                     name: 'Sprite Sheet image',
-                    bitmap: resource.data.sheet.elem.toDataURL('image/png')
+                    bitmap: canvas
                 });
                 break;
 
