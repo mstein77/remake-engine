@@ -25,7 +25,7 @@ import {
 } from './Raster';
 import {CellSelection} from '../classes/CellProvider.js';
 import {d, getColorsFromCanvas, getCanvasForBitmap, getEmptyImageData} from '../helper/helper';
-import {TileIndex, ColorIndex, AliasIndex, BrushIndex} from "../classes/EntityIndex";
+import {TileIndex, ColorIndex, AliasIndex, BrushIndex, AnimationIndex} from "../classes/EntityIndex";
 import {IndexGrid, TilesGrid} from "../classes/Grid";
 import {BitmapCellProvider} from "../classes/CellProvider";
 
@@ -619,6 +619,56 @@ function ActiveTilePicker({tileIndex}) {
     )
 }
 
+function AnimationManager({animationIndex, spriteIndex}) {
+    const EditAnimationModal = useModal();
+
+    const actions = [];
+    const addAnimation = () => {
+    };
+
+    const editAnimation = index => {
+        EditAnimationModal.open({
+            name: animationIndex.getEntityValue(index),
+            spriteIndex,
+            animation: animationIndex.getEntityObject(index),
+            save: animation => {
+                d('SAVE...', animation);
+            }
+        });
+    };
+
+    return (
+        <>
+            <EntityManager
+                entityIndex={animationIndex}
+                actions={actions}
+                titleHeight={20}
+                bottomHeight={20}
+                minWidth={100}
+                filter
+                maxedZoom
+                player
+                newItem={addAnimation}
+                empty="No animations defined. Add new one"
+                doubleClick={editAnimation}
+                renderTitle={index => {
+                    const name = animationIndex.getEntityValue(index);
+                    return <Title maxWidth={100}>{name}</Title>
+                }}
+                renderBottom={index => {
+                    const frames = animationIndex.getEntityPropValue(index, 'frames').length;
+                    return <kbd className="less">Frames: {frames}</kbd>
+                }}
+            />
+
+            <EditAnimationModal.content name="Edit Animation" closeable width="1200" height="500">
+                {/* <AnimationForm {...EditAnimationModal.props} /> */}
+            </EditAnimationModal.content>
+        </>
+    )
+}
+
+
 function TilesMapEditor({model, resource, revert, cancel, play, tree, exportModel, saveModel}) {
 
     const eContext = useContext(EditorContext);
@@ -643,6 +693,10 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
     const brushIndex = useMemo(() => {
         return new BrushIndex(model, tileIndex)
+    }, []);
+
+    const animationIndex = useMemo(() => {
+        return new AnimationIndex(tileIndex, model)
     }, []);
 
     const saveTilesPane = () => {
@@ -747,7 +801,11 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                     Event picker and manager here...
                                 </SideTab>
                                 <SideTab name="Animations">
-                                    Animation picker and manager here...
+                                    <SideTabs>
+                                        <SideTab name="Manage" active>
+                                            <AnimationManager animationIndex={animationIndex} />
+                                        </SideTab>
+                                    </SideTabs>
                                 </SideTab>
                             </SideTabs>
                         </Section>

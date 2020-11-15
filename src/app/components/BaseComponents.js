@@ -1,7 +1,7 @@
 import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
 import {mat4} from 'gl-matrix';
-import {d, getEmptyImageData, hex2rgb, rgb2hex} from '../helper/helper';
+import {d, getEmptyImageData, Players, hex2rgb, rgb2hex} from '../helper/helper';
 import {
     RasterOverlays,
     HRuler,
@@ -325,12 +325,14 @@ function IntField(props) {
         props.set(e.target.value);
     };
 
-    const incValue = () => {
+    const incValue = e => {
         props.set(parseInt(value, 10) + step);
+        e.stopPropagation();
     };
 
-    const decValue = () => {
+    const decValue = e => {
         props.set(parseInt(value, 10) - step);
+        e.stopPropagation();
     };
 
     let buttonPrev = '';
@@ -944,10 +946,8 @@ function ItemsStack(props) {
                             disabled={props.items.length === 0 || active === null || props.min && props.items.length === props.min}
                             click={() => {
                                 if (props.deleteActiveItem) {
-                                    d('DEL OK');
                                     props.deleteActiveItem();
                                 } else {
-                                    d('DEL WRONG');
                                     const newItems = [...props.items];
                                     newItems.splice(props.active, 1);
                                     if (props.cleanUp) {
@@ -1423,32 +1423,80 @@ function useComponentUpdate() {
     const updateRef = useRef(null);
     updateRef.current = updates;
     return () => {
-        if (mounted.curr) {
+        if (mounted.current) {
             setUpdates(!updateRef.current);
         }
     }
 }
 
-function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, actions, titleHeight, minWidth, empty, entityIndex, ...props}) {
+function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, renderBottom, actions, titleHeight, bottomHeight, minWidth, empty, entityIndex, ...props}) {
+    const context = useContext(GlobalContext);
+
+    const mounted = useMounted();
     const [pos, setPos] = useState(startPos || 0);
     const [zoom, setZoom] = useState(2);
     const [page, setPage] = useState(0);
+    const [speed, setSpeed] = useState(1);
     const [marked, setMarked] = useState([]);
     const [filter, setFilterRaw] = useState('');
     const setFilter = value => {
         setPos(0);
         setFilterRaw(value);
     };
+
+    const players = useMemo(() => {
+        if (!player) return null;
+
+        return new Players(entityIndex);
+    }, [player]);
+
+    if (players && players.getSpeed() != speed) {
+        players.setSpeed(speed);
+    }
+
     const update = useComponentUpdate();
     useEffect(() => {
-        entityIndex.addListener(update);
+        const compUpdate = () => {
+            if (player) {
+                players.clear();
+            }
+            update();
+        };
+        entityIndex.addListener(compUpdate);
         return () => {
-            entityIndex.removeListener(update);
+            entityIndex.removeListener(compUpdate);
         }
     }, []);
     const propsRef = useRef(null);
     propsRef.current = {pos};
 
+    const frameRef = useRef(null);
+
+    useEffect(() => {
+        if (!players) {
+            return;
+        }
+        const level = context.getModalLevel();
+
+        const runAnimations = () => {
+            frameRef.current = requestAnimationFrame(() => {
+                if (!mounted.current) {
+                    return;
+                }
+                if (level === context.getModalLevel()) {
+                    if (players.nextStep()) {
+                        update();
+                    }
+                }
+                runAnimations();
+            });
+        };
+        runAnimations();
+        return () => {
+            cancelAnimationFrame(frameRef.current);
+            players.clear();
+        };
+    }, [players]);
     if (minWidth === undefined) {
         minWidth = 50;
     }
@@ -1482,15 +1530,16 @@ function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleCl
     const divRef = useResize({zoom, page, sizeY, hasScrollbar}, [zoom, hasScrollbar],
         (curr, rect) => {
             const padding = 5;
-            const boxSize = curr.zoom * entityIndex.getSizeX() + 2;
+            const boxSize = curr.zoom * sizeY + 2;
             const itemSize =
                 Math.max(minWidth, boxSize) + 2 + 3 * padding;
             const space = rect.width - 2 * padding;
             const newPage = Math.floor(space/itemSize);
 
             if (maxedZoom) {
-                const spaceY = rect.height - 4 * padding - titleHeight - 2 - (hasScrollbar ? 31 : 0);
-                const maxZoom = Math.floor(spaceY/sizeY);
+                const spaceY =
+                    rect.height - 4 * padding - titleHeight - 2 - (hasScrollbar ? 31 : 0) - (bottomHeight ? bottomHeight : 0);
+                const maxZoom = Math.max(Math.floor(spaceY/sizeY), 1);
                 if (maxZoom !== zoom) {
                     setZoom(maxZoom);
                 }
@@ -1582,12 +1631,19 @@ function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleCl
             </Stack>
         );
     }
+
+    if (players) {
+        players.setIndices(view.matches);
+    }
+
     const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
 
     const availWidth = sizeX * zoom;
     const availHeight = sizeY * zoom;
+    const avail = availHeight;
+//    const avail = Math.min(availWidth, availHeight);
 
-    const zoomOrAvail = maxedZoom ? {width: availWidth, height: availHeight} : zoom;
+    const zoomOrAvail = maxedZoom ? {width: avail, height: avail} : zoom;
 
     for (let index of view.matches) {
         const cls = ['padded thin-boxed'];
@@ -1608,9 +1664,10 @@ function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleCl
                     <Content height={titleHeight}>{renderTitle(index)}</Content>
                     <Stack alignItems="center" align="center">
                         <div className="thin-boxed min-content">
-                            <Canvas width={availWidth} height={availHeight} render={ctx => entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail)}></Canvas>
+                            <Canvas width={avail} height={avail} render={ctx => entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players)}></Canvas>
                         </div>
                     </Stack>
+                    {renderBottom ? <Content height={bottomHeight}>{renderBottom(index)}</Content> : ''}
                 </Stack>
             </div>
         );
@@ -1632,6 +1689,9 @@ function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleCl
     const topToolbar =
         <Toolbar>
             {
+                undoRedo && <UndoRedoButtons />
+            }
+            {
                 props.filter &&
                 <Stack><Content>Filter: </Content><Content><TextField name="Filter" value={filter} set={setFilter}/></Content></Stack>
             }
@@ -1640,6 +1700,7 @@ function EntityManager({newItem, fit, maxedZoom, importItems, startPos, doubleCl
                 maxedZoom ? '' : <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
             }
             <BackgroundControl />
+            {player ? <Range value={speed} step={0.01} set={value => setSpeed(parseFloat('' + value))} min={0.0} max={2.0} /> : ''}
         </Toolbar>;
 
     const controller =
@@ -2265,6 +2326,9 @@ class GlobalCtx extends React.Component {
             setBgOpacity: (bgOpacity) => {
                 this.setState({bgOpacity});
             },
+            getModalLevel: () => {
+                return this.modalStack.length;
+            },
             openModal: () => {
                 let zIndex = 10000;
                 const len = this.modalStack.length;
@@ -2324,9 +2388,11 @@ function useModal() {
     const context = useContext(GlobalContext);
     const [isOpen, setIsOpen] = useState(false);
     const propsRef = useRef(null);
+    const currRef = useRef(null);
+    currRef.current = isOpen;
     const close = () => {
         propsRef.current = null;
-        context.closeModal(isOpen);
+        context.closeModal(currRef.current);
         setIsOpen(false);
     };
     const open = props => {
@@ -3176,6 +3242,49 @@ function FiltersSelector(props) {
     )
 }
 
+function UndoRedoButtons() {
+    const eContext = useContext(EditorContext);
+
+    const undoAttr = {
+        onClick: () => {
+            eContext.undoAction()
+        }
+    };
+    if (!eContext.hasPast()) {
+        undoAttr.disabled = 'disabled'
+    }
+    const redoAttr = {
+        onClick: () => {
+            eContext.redoAction();
+        }
+    };
+    if (!eContext.hasFuture()) {
+        redoAttr.disabled = 'disabled'
+    }
+    return (
+        <div>
+            <button {...undoAttr}>Undo</button>
+            <button {...redoAttr}>Redo</button>
+        </div>
+
+    )
+}
+
+function useUpdateOnEntityIndexChanges(entityIndex) {
+    const update = useComponentUpdate();
+
+    useEffect(
+        () => {
+            entityIndex.addListener(update);
+            return () => {
+                entityIndex.removeListener(update);
+            }
+        },
+        [entityIndex]
+    );
+    return update;
+}
+
 const useAddIndexActions = (entityIndex, actions, result = []) => {
     const eContext = useContext(EditorContext);
     const context = useContext(GlobalContext);
@@ -3188,7 +3297,7 @@ const useAddIndexActions = (entityIndex, actions, result = []) => {
                     doAction: indices => {
                         const undoItems = entityIndex.getEntityObjects(indices);
                         eContext.doAction(
-                            () => entityIndex.deleteEntities(indices),
+                            () => {entityIndex.deleteEntities(indices); d('DEL', indices, entityIndex)},
                             () => entityIndex.setEntityObjects(undoItems)
                         );
                     }
@@ -3354,6 +3463,7 @@ export {
     useAddIndexActions,
     useUniqueResourceId,
     useComponentUpdate,
+    useUpdateOnEntityIndexChanges,
     FiltersSelector,
     BackgroundControl,
     PaneSelection,

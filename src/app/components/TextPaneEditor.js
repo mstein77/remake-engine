@@ -1229,6 +1229,7 @@ function ResizeFontForm(props) {
     return (
         <Stack vertical border>
             <Content padded>
+
                 <SelectDimModal.content closeable>
                     <EditorCtx>
                         <BitmapSelector
@@ -1241,6 +1242,7 @@ function ResizeFontForm(props) {
                         />
                     </EditorCtx>
                 </SelectDimModal.content>
+
                 <PropertyGrid>
                     <DimProp name="Old Size:" buttons readOnly
                              x={props.font.width}

@@ -3963,7 +3963,7 @@ function BitmapSelector(props) {
     )
 }
 
-function BitmapEditor({image, save, close, colors}) {
+function BitmapEditor({image, save, close, colors, resize}) {
     const eContext = useContext(EditorContext);
     const gridProvider = useMemo(() => {
         return new BitmapGrid({image})
@@ -4016,11 +4016,11 @@ function BitmapEditor({image, save, close, colors}) {
                             editorId="bitmap"
                             undoRedo
                             cellProvider={gridProvider}
+                            resizeable={resize}
                             defaults={
                                 {
                                     zoom: 2,
                                     border: 1,
-                                    resizeable: false,
                                     width: gridProvider.getWidth(),
                                     height: gridProvider.getHeight()
                                 }

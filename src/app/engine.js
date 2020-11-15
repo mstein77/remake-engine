@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, BitmapPlayer, ANIMATION, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -2119,7 +2119,7 @@ class Game {
                                     config: TilesMapConfig,
                                     cls: TilesMap,
                                     data: pane.tilesMap.config,
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim
                                 }
                             );
@@ -2152,10 +2152,10 @@ class Game {
                                 dim: pane.viewPortDim,
 
                             });
-                        } else if (pane.spriteSheet) {
+                        } else if (pane instanceof SpritePane) {
                             resources.push(
                                 {
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim,
                                     type: 'spriteSheet',
                                     data: pane.spriteSheet
@@ -7043,39 +7043,6 @@ class FontMap {
 FontMap.Config = FontMapConfig;
 
 
-/**
- *  BitmapPlayer-Modes
- * ----------------------------
- *
- *   DIR: forward, backwards, forward-backward, backward-forward
- *   END: loop, stop, delete
- *
- * ----------------------------
- *
- */
-
-const ANIMATION = {
-    DIR: {
-        FORWARD: 0,
-        BACKWARD: 1,
-        FORWARD_BACKWARD: 2,
-        BACKWARD_FORWARD: 3
-    },
-    END: {
-        LOOP: 0,
-        STOP: 1,
-        DELETE: 2
-    },
-    STATE: {
-        EMPTY: -1,
-        WAITING: 0,
-        RUNNING: 1,
-        DONE: 2,
-        DESTROYED: 3,
-        PAUSED: 4
-    }
-};
-
 class PlayerProxy {
 
     constructor() {
@@ -7134,167 +7101,6 @@ class PlayerProxy {
 
     reverse() {
         this.players[this.active].reverse();
-    }
-}
-
-
-/**
- * TODO: setSync(null|frameState)
- *
- *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
- *   addStep(value) -> führt diesen auf frameState aus
- *
- */
-class BitmapPlayer {
-
-    constructor() {
-        this.speed = 1;
-        this.state = ANIMATION.STATE.EMPTY;
-        this.frameNo = null;
-        this.pauseState = null;
-        this.dirty = false;
-    }
-
-    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
-        this.frames = frames;
-        this.direction = dir;
-        this.end = end;
-        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
-        this.step = 0;
-        this.frameNo = this.isForward ? 0 : frames.length - 1;
-        this.state = ANIMATION.STATE.WAITING;
-        this.dirty = true;
-    }
-
-    setSpeed(speed) {
-        this.speed = speed;
-    }
-
-    getState() {
-        return this.state;
-    }
-
-    handleForward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo++;
-            if (this.frameNo === this.frames.length) {
-                this.frameNo--;
-                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                    this.frameNo--;
-                    this.isForward = false;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else {
-                            this.frameNo = 0;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    handleBackward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo--;
-            if (this.frameNo < 0) {
-                this.frameNo = 0;
-                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                    this.frameNo++;
-                    this.isForward = true;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                            this.isForward = true;
-                            this.frameNo = 0;
-                        } else {
-                            this.frameNo =  this.frames.length - 1;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    nextStep() {
-        if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
-            this.dirty = false;
-            return;
-        }
-        const oldFrameNo = this.frameNo;
-        this.state = ANIMATION.STATE.RUNNING;
-        this.step += this.speed;
-        if (this.isForward) {
-            this.handleForward();
-            if (!this.isForward) {
-                this.handleBackward();
-            }
-        } else {
-            this.handleBackward();
-            if (this.isForward) {
-                this.handleForward();
-            }
-        }
-        this.dirty = (oldFrameNo !== this.frameNo);
-    }
-
-    getFrame() {
-        if (this.frameNo === null) {
-            return null;
-        }
-        return this.frames[this.frameNo];
-    }
-
-    pause() {
-        this.pauseState = this.state;
-        this.state = ANIMATION.STATE.PAUSED;
-        this.dirty = false;
-    }
-
-    continue() {
-        if (this.state === ANIMATION.STATE.PAUSED) {
-            this.state = this.pauseState;
-        }
-    }
-
-    reverse() {
-        switch(this.dir) {
-            case ANIMATION.DIR.FORWARD:
-                this.dir = ANIMATION.DIR.BACKWARD;
-                break;
-            case ANIMATION.DIR.BACKWARD:
-                this.dir = ANIMATION.DIR.FORWARD;
-                break;
-        }
-        if (this.state === ANIMATION.STATE.DONE) {
-            this.state = ANIMATION.STATE.WAITING;
-        }
-        this.isForward = !this.isForward;
-    }
-
-    isDirty() {
-        return this.dirty;
     }
 }
 
@@ -8549,7 +8355,6 @@ module.exports = {
     DependencyManager,
     StorageManager,
     Position,
-    Animation: BitmapPlayer,
     d,
     FontMap,
     SpriteSheet,
@@ -8560,8 +8365,8 @@ module.exports = {
     Force,
     TILE,
     INPUT,
-    ANIMATION,
     OCM,
+    ANIMATION,
     COLLISION,
     PATH
 };

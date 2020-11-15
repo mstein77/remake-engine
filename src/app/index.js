@@ -31,8 +31,8 @@ import {
     TILE,
     INPUT,
     PATH,
-    ANIMATION,
-    COLLISION
+    COLLISION,
+    ANIMATION
 } from './engine';
 
 

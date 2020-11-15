@@ -16,6 +16,7 @@ import {
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
+import {SpriteIndex} from "../classes/EntityIndex"
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
 import {
@@ -401,7 +402,10 @@ function PageSelector(props) {
             break;
 
         case 'spriteSheet':
-            editor = <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />;
+            editor =
+                <Restorable confirmRef={confirmRef}>
+                    <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />
+                </Restorable>
             break;
     }
 
