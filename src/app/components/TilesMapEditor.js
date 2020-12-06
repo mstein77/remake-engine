@@ -5,13 +5,29 @@ import {
     Content,
     Canvas,
     Title,
+    Button,
+    Centered,
+    TextAreaProp,
     PropertyGrid,
     TextFieldProp,
-    IntProp,
+    TextArea,
+    Toolbar,
+    PositionPickerProp,
+    DimProp,
+    Bitmap,
+    ItemsStack,
+    Entity,
+    BitmapProp,
+    EntityProp,
     PropLabel,
+    FullProp,
+    ValueProp,
+    SaveAndCancel,
+    EntityTextPicker,
     EntityPicker,
     FiltersSelector,
     EntityManager,
+    AnimationManager,
     useModal, Page, ActionFrame,
     SideTabs, SideTab, GlobalContext, useAddIndexActions
 } from './BaseComponents';
@@ -19,13 +35,12 @@ import {
     EditorCtx,
     BasicRasterView,
     EditorContext,
-    BitmapEditor,
     useEditorContextPart,
     BitmapSelector
 } from './Raster';
-import {CellSelection} from '../classes/CellProvider.js';
-import {d, getColorsFromCanvas, getCanvasForBitmap, getEmptyImageData} from '../helper/helper';
-import {TileIndex, ColorIndex, AliasIndex, BrushIndex, AnimationIndex} from "../classes/EntityIndex";
+import {CellSelection, BrushSelection, EventSelection} from '../classes/CellProvider.js';
+import {d, getColorsFromCanvas, getCanvasForDim, getCanvasForIndexMatrix, getCanvasForBitmap, getEmptyImageData} from '../helper/helper';
+import {TileIndex, ColorIndex, AliasIndex, BrushIndex, EventIndex, AnimationIndex} from "../classes/EntityIndex";
 import {IndexGrid, TilesGrid} from "../classes/Grid";
 import {BitmapCellProvider} from "../classes/CellProvider";
 
@@ -67,7 +82,308 @@ function TileTracker({editorId, tileIndex, tilesGrid}) {
     return <Content width={width}>{content}</Content>;
 }
 
-function ActiveTile({tileIndex, brushIndex, editTile}) {
+function useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid}) {
+    const eContext = useContext(EditorContext);
+
+    const selection = eContext.selection;
+    if (!selection || selection.getType() === 'none') {
+        return false;
+    }
+
+    const width = selection.getWidth();
+    const height = selection.getHeight();
+
+    if (width === 1 && height === 1) {
+        const value = selection.getCell();
+        switch (typeof value) {
+
+            case 'string':
+                const index = aliasIndex.getEntityByPropValue('value', value);
+                if (index === null) {
+                    return false;
+                }
+                return {
+                    entity: aliasIndex,
+                    index,
+                    name: value,
+                    tile: aliasIndex.getEntityPropValue(index, 'tile'),
+                    animation: aliasIndex.getEntityPropValue(index, 'animation'),
+                    props: aliasIndex.getEntityPropValue(index, 'props'),
+                    type: 'Alias',
+                    content: 'elem'
+                };
+
+            case 'object':
+                const sizeX = tilesGrid.getCellSizeX();
+                const sizeY = tilesGrid.getCellSizeY();
+                const canvas = getCanvasForDim(sizeX, sizeY);
+                const ctx = canvas.getContext('2d');
+                let hasImage = false;
+                for (let event of value) {
+                    if (tilesGrid.drawEvent(ctx, event, 0, 0, 1)) {
+                        hasImage = true;
+                    }
+                }
+                return {
+                    type: 'events',
+                    content: 'events',
+                    image: hasImage ? ctx.getImageData(0, 0, sizeX, sizeY) : null,
+                    events: value
+                };
+
+            default:
+                if (value >= tileIndex.getLength()) {
+                    return false;
+                }
+                return {
+                    entity: tileIndex,
+                    index: value,
+                    animation: tileIndex.getEntityPropValue(value, 'animation'),
+                    props: tileIndex.getEntityPropValue(value, 'props'),
+                    content: 'elem',
+                    type: 'Tile'
+                };
+        }
+    }
+
+    const cells = selection.getCells();
+    const type = selection.getType();
+    let index;
+    if (type === 'brush') {
+        if (!brushIndex.hasIndex(selection.index)) {
+            return false;
+        }
+    }
+    let image;
+
+    const canvas = getCanvasForIndexMatrix(tileIndex, cells, 20);
+    const ctx = canvas.getContext('2d');
+    image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    return {
+        type,
+        content: 'dim',
+        index,
+        name: selection.getName(),
+        image,
+        width,
+        height,
+        cells
+    }
+
+}
+
+function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid}) {
+    const eContext = useContext(EditorContext);
+
+    const AddEventModal = useModal();
+
+    const selection = useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid});
+    const SaveAsBrushModal = useModal();
+
+    const [active, setActive] = useState(null);
+
+    const avail = selection && selection.content === 'dim' ? 150 : 80;
+    const zoomOrAvail = useMemo(() => {
+        return {
+            width: avail,
+            height: avail
+        };
+    }, [avail]);
+
+    if (selection === false) {
+        requestAnimationFrame(() => {
+            eContext.setSelection(new CellSelection('rect', [[0]]));
+        });
+        return '';
+    }
+
+    let editAction;
+
+    const editSelection = () => {
+        const index = selection.index;
+        editAction(index);
+    };
+
+    const clearSelection = () => {
+        eContext.setSelection(new CellSelection('rect', [[0]]));
+    };
+
+    const saveAsBrush = () => {
+        SaveAsBrushModal.open({
+            name: '',
+            tiles: selection.cells,
+            isValid: name => !brushIndex.hasPropValue('value', name),
+            save: (name, tiles) => {
+                let index = null;
+                eContext.doAction(
+                    () => {
+                        index = brushIndex.setEntityObject(
+                            {value: name, tiles}
+                        );
+                    },
+                    () => {
+                        brushIndex.deleteEntity(index);
+                    }
+                );
+                eContext.setSelection(new BrushSelection(brushIndex, index));
+                SaveAsBrushModal.close()
+            }
+        });
+    };
+
+    const addEvent = () => {
+        AddEventModal.open({
+            editorId: 'addEvent',
+            entityIndex: eventIndex,
+            filter: true,
+            sizeX: 50,
+            sizeY: 50,
+            textSize: 120,
+            zoom: 1,
+            border: 0,
+            controls: true,
+            base: index => !selection.events.includes(eventIndex.getEntityValue(index)),
+            select:
+                index => {
+                    AddEventModal.close();
+                    const event = eventIndex.getEntityValue(index);
+                    selection.events.push(event);
+                    eContext.setSelection(new EventSelection(selection.events));
+                }
+        });
+    };
+
+    let content;
+    let brushAction = false;
+    switch(selection.content) {
+        case 'events':
+            content =
+                <FullProp name="Events:">
+                    <Content thin boxed>
+                        <ItemsStack
+                            hasProps={false}
+                            width={178}
+                            empty="No event"
+                            active={active}
+                            setActive={setActive}
+                            ordered
+                            setItems={events => {
+                                eContext.setSelection(new EventSelection(events));
+                            }}
+                            new={addEvent}
+                            getName={value => value}
+                            getProperties={null}
+                            items={selection.events}
+                        />
+                    </Content>
+                </FullProp>;
+            break;
+
+        case 'dim':
+            const name = selection.name;
+            brushAction = selection.type !== 'brush';
+            if (selection.type === 'brush') {
+                editAction = editBrush;
+            }
+            content = <>
+                {name && <ValueProp name="Name:">{name}</ValueProp>}
+                <ValueProp name="Size:"><kbd>{selection.width}<kbd className="less">x</kbd>{selection.height}</kbd></ValueProp>
+            </>;
+            break;
+
+        case 'elem':
+            switch(selection.type) {
+                case 'Alias':
+                    editAction = editAlias;
+                    break;
+                case 'Tile':
+                    editAction = editTile;
+                    break;
+            }
+            content = <>
+                {
+                    selection.name ?
+                        <ValueProp name="Name:">
+                            {selection.name}
+                        </ValueProp> :
+                        <ValueProp name="Index:">
+                            <kbd>{selection.index}</kbd>
+                        </ValueProp>
+                }
+                {
+                    selection.tile !== undefined &&
+                    <ValueProp name="Tile:">
+                        <kbd>{selection.tile}</kbd>
+                    </ValueProp>
+                }
+                <ValueProp name="Animation:">
+                    {selection.animation}
+                </ValueProp>
+
+                <FullProp name="Properties:">
+                    <TextArea wrap="off" rows={8} readOnly value={JSON.stringify(selection.props, null, 2)} />
+                </FullProp>
+
+            </>;
+            break;
+    }
+
+    return (
+        <Stack vertical border>
+            <Toolbar>
+                <Stack>
+                    {editAction && <Button click={editSelection}>Edit</Button>}
+                    {brushAction && <Button click={saveAsBrush}>Brush</Button>}
+                    <Button click={clearSelection}>Clear</Button>
+                </Stack>
+            </Toolbar>
+
+            <Content padded width="180" flex>
+                <PropertyGrid>
+                    <FullProp>
+                        <Centered>
+                            {
+                                selection.entity ?
+                                    <Entity
+                                        entityIndex={selection.entity}
+                                        value={selection.name ? selection.name : selection.index}
+                                        player={selection.animation != ''}
+                                        readOnly
+                                        zoomOrAvail={zoomOrAvail}
+                                    /> :
+                                    (
+                                        selection.image ?
+                                        <Bitmap
+                                            editable={false}
+                                            value={selection.image}
+                                            zoomOrAvail={zoomOrAvail}
+                                        /> : <Content width={avail} height={avail} boxed thin></Content>
+                                    )
+                            }
+                        </Centered>
+                    </FullProp>
+                    <ValueProp name="Type:">
+                        {selection.type}
+                    </ValueProp>
+                    {content}
+                </PropertyGrid>
+
+                <AddEventModal.content name="Add Event" width="600" height="500">
+                    <EditorCtx>
+                        <EntityTextPicker {...AddEventModal.props} />
+                    </EditorCtx>
+                </AddEventModal.content>
+
+                <SaveAsBrushModal.content name="Save as Brush" fit closeable>
+                    <BrushForm {...SaveAsBrushModal.props} />
+                </SaveAsBrushModal.content>
+            </Content>
+        </Stack>
+    )
+}
+
+function ActiveTile2({tileIndex, brushIndex, editTile}) {
     const eContext = useContext(EditorContext);
     const SaveAsBrushModal = useModal();
 
@@ -139,12 +455,12 @@ function ActiveTile({tileIndex, brushIndex, editTile}) {
     );
 }
 
-function ActiveBrushPicker({brushIndex}) {
+function ActiveBrushPicker({brushIndex, editBrush}) {
     const eContext = useContext(EditorContext);
 
     const setActive = index => {
-        const brush = brushIndex.getEntityObject(index);
-        eContext.setSelection(new CellSelection('rect', brush.tiles));
+        // const brush = brushIndex.getEntityObject(index);
+        eContext.setSelection(new BrushSelection(brushIndex, index));
         eContext.setRasterMode('map', 'startPath');
     };
 
@@ -153,50 +469,35 @@ function ActiveBrushPicker({brushIndex}) {
             zoom={2}
             border={1}
             entityIndex={brushIndex}
+            doubleClick={editBrush}
             controls
             select={setActive}
         />
     )
 }
 
-function ActiveAliasPicker({tilesGrid, tileIndex}) {
+function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
     const eContext = useContext(EditorContext);
-    const aliases = tilesGrid.getAliases();
-    const selection = [];
 
-    const setActive = name => {
+    const select = index => {
+        const name = aliasIndex.getEntityValue(index);
         eContext.setSelection(new CellSelection('rect', [[name]]));
         eContext.setRasterMode('map', 'startPath');
     };
-
-    const zoom = 2;
-    for (let alias of aliases) {
-        const index = tilesGrid.getIndexForTile(alias);
-        const selectionProvider = new IndexGrid(tileIndex, {map: [[index]]});
-        const dim = selectionProvider.getGridDim(1, 1, 0, zoom);
-        selection.push(
-            <div key={alias} className="thin-boxed" onClick={(e) => {
-                setActive(alias);
-                e.preventDefault();
-                e.stopPropagation();
-            }}>
-                <Stack>
-                    <Content padded>
-                        <Canvas width={dim.width} height={dim.height}
-                                render={ctx => selectionProvider.drawGrid(ctx, 0, 0, 1, 1, 0, zoom)}
-                        />
-                    </Content>
-                    <Content padded>
-                        <kbd>{alias}</kbd><br />Index: <kbd>{index}</kbd>
-                    </Content>
-                </Stack>
-            </div>
-        );
-    }
     return (
-        <div className="padded">
-            <Stack wrap>{selection}</Stack>
-        </div>
+        <EntityTextPicker
+            filter
+            entityIndex={aliasIndex}
+            doubleClick={editAlias}
+            controls
+            editorId="aliasPicker"
+            sizeX={tileIndex.getSizeX()}
+            sizeY={tileIndex.getSizeY()}
+            textSize={120}
+            zoom={2}
+            border={0}
+            select={select}
+        />
     );
 }
 
@@ -204,55 +505,60 @@ function BrushForm({save, close, isValid, ...props}) {
     const [name, setName] = useState(props.name);
     const [tiles, setTiles] = useState(props.tiles);
 
-    const canSave = () => name !== '' && isValid(name);
+    const canSave = name !== '' && isValid(name);
+
+    const saveBrush = () => {
+        save(name, tiles);
+    };
 
     return (
-        <Stack vertical>
-            <Content flex padded>
-                <TextFieldProp name="Name:" value={name} set={setName} invalid={!canSave()} />
-            </Content>
-
-            <Content padded>
-                <Stack>
-                    <button disabled={!canSave()} onClick={() => save(name, tiles)}>Save</button>
-                    <button onClick={() => close()}>Cancel</button>
-                </Stack>
-            </Content>
-        </Stack>
+        <SaveAndCancel canSave={canSave} padded save={saveBrush} close={close}>
+            <PropertyGrid>
+                <TextFieldProp name="Name:" value={name} set={setName} invalid={!canSave} />
+                <PropLabel name="Tiles:">
+                    Tiles go here...
+                </PropLabel>
+            </PropertyGrid>
+        </SaveAndCancel>
     )
 }
 
-function AliasForm({save, close, isValid, tileIndex, ...props}) {
+function AliasForm({save, close, isValid, alias, tileIndex}) {
     const TilePickerModal = useModal();
-    const [name, setName] = useState(props.name);
-    const [tile, setTile] = useState(props.tile);
 
-    const canSave = () => name !== '' && isValid(name);
+    const [name, setName] = useState(alias.value);
+    const [tile, setTile] = useState(alias.tile);
+    const [props, setProps] = useState(JSON.stringify(alias.props, null, 2));
+
+    const avail = useMemo(() => {
+        return {width: 100, height: 100}
+    }, []);
+
+    const saveAlias = () => {
+        save({...alias, value: name, tile, props: JSON.parse(props)});
+    };
+
+    let isValidJson = true;
+    try {
+        JSON.parse(props);
+    } catch (e) {
+        isValidJson = false;
+    }
+
+    let isValidName = name !== '' && isValid(name);
+
+    const canSave = isValidName && isValidJson;
 
     return (
         <>
-            <Stack vertical border>
-                <Content flex padded>
-                    <PropertyGrid>
-                        <TextFieldProp name="Name:" value={name} set={setName} invalid={!canSave()} />
-                        <IntProp name="Index:" max={tileIndex.getLength() - 1} min={0} value={tile} buttons set={setTile} />
-                        <PropLabel name="">
-                            <Content align="center">
-                                <Canvas width={tileIndex.getSizeX() * 2} height={tileIndex.getSizeY() * 2} render={ctx => {
-                                    tileIndex.drawEntity(ctx, tile, 0, 0, 2);
-                                }} />
-                                <button onClick={e => TilePickerModal.open({})}>Pick</button>
-                            </Content>
-                        </PropLabel>
-                    </PropertyGrid>
-                </Content>
-                <Content padded>
-                    <Stack>
-                        <button disabled={!canSave()} onClick={() => save(name, tile)}>Save</button>
-                        <button onClick={() => close()}>Cancel</button>
-                    </Stack>
-                </Content>
-            </Stack>
+            <SaveAndCancel padded canSave={canSave} close={close} save={saveAlias}>
+                <PropertyGrid>
+                    <TextFieldProp name="Name:" value={name} set={setName} invalid={!isValidName} />
+                    <EntityProp name="Tile:" value={tile} zoomOrAvail={avail} entityIndex={tileIndex} set={setTile} />
+                    <TextAreaProp name="Properties:" invalid={!isValidJson} cols={30} rows={10} value={props} set={setProps} />
+                </PropertyGrid>
+            </SaveAndCancel>
+
             <TilePickerModal.content name="Pick Tile" {...TilePickerModal.props} height={400} width={400} closeable>
                 <EditorCtx>
                     <EntityPicker entityIndex={tileIndex} zoom={2} select={index => {setTile(index); TilePickerModal.close()}} />
@@ -262,10 +568,10 @@ function AliasForm({save, close, isValid, tileIndex, ...props}) {
     )
 }
 
-function BrushManager({brushIndex}) {
+function BrushManager({brushIndex, editBrush}) {
     const eContext = useContext(EditorContext);
+
     const NewBrushModal = useModal();
-    const EditBrushModal = useModal();
 
     const actions = useAddIndexActions(brushIndex, ['delete']);
 
@@ -291,28 +597,6 @@ function BrushManager({brushIndex}) {
         });
     };
 
-    const editBrush = index => {
-        const brush = brushIndex.getEntityObject(index);
-        EditBrushModal.open({
-            name: brush.value,
-            tiles: brush.tiles,
-            isValid: name => name === brush.value || !brushIndex.hasPropValue('value', name),
-            save: (name, tiles) => {
-                let lastIndex = index;
-                tiles = brush.tiles;
-                eContext.doAction(
-                    () => {
-                        lastIndex = brushIndex.setEntityObject({index: lastIndex, value: name, tiles}, true);
-                    },
-                    () => {
-                        lastIndex = brushIndex.setEntityObject({...brush, index: lastIndex}, true);
-                    }
-                );
-                EditBrushModal.close()
-            }
-        });
-    };
-
     return (
         <>
             <EntityManager
@@ -334,18 +618,14 @@ function BrushManager({brushIndex}) {
             <NewBrushModal.content name="New Brush" fit closeable>
                 <BrushForm {...NewBrushModal.props} />
             </NewBrushModal.content>
-
-            <EditBrushModal.content name="Edit Brush" fit closeable>
-                <BrushForm {...EditBrushModal.props} />
-            </EditBrushModal.content>
         </>
     );
 }
 
-function AliasManager({aliasIndex, tileIndex}) {
+function AliasManager({aliasIndex, tileIndex, editAlias}) {
     const eContext = useContext(EditorContext);
+
     const NewAliasModal = useModal();
-    const EditAliasModal = useModal();
 
     const actions = [
         {
@@ -361,42 +641,23 @@ function AliasManager({aliasIndex, tileIndex}) {
     const newAlias = () => {
         NewAliasModal.open({
             tileIndex,
-            tile: 0,
-            name: '',
+            alias: {
+                tile: 0,
+                value: '',
+                props: {}
+            },
             isValid: value => !aliasIndex.hasPropValue('value', value),
-            save: (name, tile) => {
+            save: alias => {
                 let index = null;
                 eContext.doAction(
                     () => {
-                        index = aliasIndex.setEntityObject({value: name, tile});
+                        index = aliasIndex.setEntityObject({...alias});
                     },
                     () => {
                         aliasIndex.deleteEntity(index);
                     }
                 );
                 NewAliasModal.close();
-            }
-        });
-    };
-
-    const editAlias = index => {
-        const obj = aliasIndex.getEntityObject(index);
-        EditAliasModal.open({
-            tileIndex,
-            tile: obj.tile,
-            name: obj.value,
-            isValid: value => obj.value === value || !aliasIndex.hasPropValue('value', value),
-            save: (name, tile) => {
-                let lastIndex = index;
-                eContext.doAction(
-                    () => {
-                        lastIndex = aliasIndex.setEntityObject({index: lastIndex, value: name, tile}, true);
-                    },
-                    () => {
-                        lastIndex = aliasIndex.setEntityObject({...obj, index: lastIndex}, true);
-                    }
-                );
-                EditAliasModal.close();
             }
         });
     };
@@ -420,17 +681,14 @@ function AliasManager({aliasIndex, tileIndex}) {
             <NewAliasModal.content name="New Alias" fit closeable>
                 <AliasForm {...NewAliasModal.props} />
             </NewAliasModal.content>
-
-            <EditAliasModal.content name="Edit Alias" fit closeable>
-                <AliasForm {...EditAliasModal.props} />
-            </EditAliasModal.content>
         </>
     )
 }
 
-function TilesManager({tileIndex, editTile}) {
+function TilesManager({tileIndex, animationIndex, editTile}) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
+
     const NewTileModal = useModal();
     const ImportTilesModal = useModal();
     const ApplyFilterModal = useModal();
@@ -503,12 +761,14 @@ function TilesManager({tileIndex, editTile}) {
 
     const newTile = () => {
         NewTileModal.open({
-            save: provider => {
-                const image = provider.getImageData();
+            tileIndex,
+            animationIndex,
+            save: tile => {
                 let index = null;
                 eContext.doAction(
                     () => {
-                        index = tileIndex.setEntityObject({value: null, image});
+                        d('INSERT', tile);
+                        index = tileIndex.setEntityObject(tile);
                     },
                     () => {
                         tileIndex.deleteEntity(index);
@@ -516,8 +776,13 @@ function TilesManager({tileIndex, editTile}) {
                 );
                 NewTileModal.close();
             },
+            tile: {
+                value: null,
+                image: getEmptyImageData(tileIndex.getSizeX(), tileIndex.getSizeY()),
+                animation: '',
+                props: {}
+            },
             colors: getColorIndexFromTiles(),
-            image: getEmptyImageData(tileIndex.getSizeX(), tileIndex.getSizeY())
         });
     };
 
@@ -571,10 +836,8 @@ function TilesManager({tileIndex, editTile}) {
                 doubleClick={editTile}
             />
 
-            <NewTileModal.content name="New Tile" closeable>
-                <EditorCtx>
-                    <BitmapEditor {...NewTileModal.props} />
-                </EditorCtx>
+            <NewTileModal.content name="New Tile" closeable fit>
+                <TileForm {...NewTileModal.props} />
             </NewTileModal.content>
 
             <ImportTilesModal.content name="Import Tiles" closeable>
@@ -593,12 +856,11 @@ function TilesManager({tileIndex, editTile}) {
             <ApplyFilterModal.content height={500} closeable>
                 <FiltersSelector bgColor="#000000" {...ApplyFilterModal.props} cancel={ApplyFilterModal.close} filters="" />
             </ApplyFilterModal.content>
-
         </>
     );
 }
 
-function ActiveTilePicker({tileIndex}) {
+function ActiveTilePicker({tileIndex, editTile, base = null}) {
     const eContext = useContext(EditorContext);
     return (
         <Stack fullHeight scroll border>
@@ -606,6 +868,9 @@ function ActiveTilePicker({tileIndex}) {
                 <EntityPicker
                     editorId="tilesPicker"
                     entityIndex={tileIndex}
+                    base={base}
+                    filter
+                    doubleClick={index => editTile(index)}
                     select={
                         index => {
                             eContext.setSelection(new CellSelection('rect', [[index]]));
@@ -619,20 +884,99 @@ function ActiveTilePicker({tileIndex}) {
     )
 }
 
-function AnimationManager({animationIndex, spriteIndex}) {
-    const EditAnimationModal = useModal();
+function ActiveEventPicker({eventIndex, editEvent}) {
+    const eContext = useContext(EditorContext);
+    return (
+        <EntityTextPicker
+            filter
+            sizeX={50}
+            sizeY={50}
+            textSize={120}
+            select={
+                index => {
+                    const event = eventIndex.getEntityValue(index);
+                    eContext.setSelection(new EventSelection(event));
+                }
+            }
+            zoom={1}
+            border={0}
+            doubleClick={editEvent}
+            controls
+            entityIndex={eventIndex}
+        />
+    )
+}
 
-    const actions = [];
-    const addAnimation = () => {
+function EventForm({isValid, event, close, save, tileIndex, eventIndex}) {
+    const [value, setValue] = useState(event.value);
+    const [width, setWidth] = useState(event.width);
+    const [height, setHeight] = useState(event.height);
+    const [offsetX, setOffsetX] = useState(event.offsetX);
+    const [offsetY, setOffsetY] = useState(event.offsetY);
+    const [image, setImageRaw] = useState(event.image);
+    const setImage = value => {
+        setWidth(value ? value.width : 0);
+        setHeight(value ? value.height : 0);
+        setImageRaw(value)
     };
 
-    const editAnimation = index => {
-        EditAnimationModal.open({
-            name: animationIndex.getEntityValue(index),
-            spriteIndex,
-            animation: animationIndex.getEntityObject(index),
-            save: animation => {
-                d('SAVE...', animation);
+    const canSave = value !== '' && isValid(value);
+
+    const avail = useMemo(() => {
+        return {width: 100, height: 100}
+    }, []);
+
+    const saveEvent = () => {
+        save({...event, value, width, height, offsetX, offsetY, image});
+    };
+
+    return (
+        <SaveAndCancel padded save={saveEvent} close={close} canSave={canSave}>
+            <PropertyGrid>
+                <TextFieldProp invalid={!canSave} name="Name:" value={value} set={setValue} />
+                <BitmapProp name="Image:" colors={new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)})} zoomOrAvail={avail} value={image} set={setImage} resizeable editable empty={() => getEmptyImageData(tileIndex.getSizeX(), tileIndex.getSizeY())} entityIndex={eventIndex} />
+                {image &&
+                    <>
+                        <DimProp name="Size:" readOnly x={width} y={height} buttons />
+                        <DimProp name="Offset:" min={-1000} max={1000} x={offsetX} setX={setOffsetX} y={offsetY} setY={setOffsetY} buttons />
+                    </>
+                }
+            </PropertyGrid>
+        </SaveAndCancel>
+    )
+}
+
+function EventManager({eventIndex, tileIndex, editEvent}) {
+    const eContext = useContext(EditorContext);
+
+    const NewEventModal = useModal();
+
+    const actions = useAddIndexActions(eventIndex, ['delete']);
+
+    const addEvent = () => {
+        NewEventModal.open({
+            event: {
+                value: '',
+                width: 0,
+                height: 0,
+                offsetX: 0,
+                offsetY: 0,
+                image: null
+            },
+            tileIndex,
+            eventIndex,
+            isValid: value => !eventIndex.hasPropValue('value', value),
+            save: event => {
+                let index = null;
+                eContext.doAction(
+                    () => {
+                        index = eventIndex.setEntityObject({...event});
+                    },
+                    () => {
+                        eventIndex.deleteEntity(index);
+                    }
+                );
+                NewEventModal.close();
             }
         });
     };
@@ -640,40 +984,81 @@ function AnimationManager({animationIndex, spriteIndex}) {
     return (
         <>
             <EntityManager
-                entityIndex={animationIndex}
+                entityIndex={eventIndex}
                 actions={actions}
                 titleHeight={20}
-                bottomHeight={20}
                 minWidth={100}
                 filter
                 maxedZoom
-                player
-                newItem={addAnimation}
-                empty="No animations defined. Add new one"
-                doubleClick={editAnimation}
+                newItem={addEvent}
+                empty="No event defined. Add new one"
+                doubleClick={editEvent}
                 renderTitle={index => {
-                    const name = animationIndex.getEntityValue(index);
+                    const name = eventIndex.getEntityValue(index);
                     return <Title maxWidth={100}>{name}</Title>
-                }}
-                renderBottom={index => {
-                    const frames = animationIndex.getEntityPropValue(index, 'frames').length;
-                    return <kbd className="less">Frames: {frames}</kbd>
                 }}
             />
 
-            <EditAnimationModal.content name="Edit Animation" closeable width="1200" height="500">
-                {/* <AnimationForm {...EditAnimationModal.props} /> */}
-            </EditAnimationModal.content>
+            <NewEventModal.content name="New Event" closeable fit>
+                <EventForm {...NewEventModal.props} />
+            </NewEventModal.content>
         </>
     )
 }
 
+function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
+    const [image, setImage] = useState(tile.image);
+    const [props, setProps] = useState(JSON.stringify(tile.props, null, 4));
+    const [position, setPosition] = useState('end');
+    const [entity, setEntity] = useState(0);
+    const zoomOrAvail = useMemo(() => {
+        return {width: 100, height: 100}
+    }, []);
+    const [animation, setAnimation] = useState(tile.animation || '');
+
+    let isValidJson = true;
+    try {
+        JSON.parse(props)
+    } catch (e) {
+        isValidJson = false;
+    }
+
+    const saveTile = () => {
+        const newTile = {...tile, animation, props: JSON.parse(props), image};
+        if (tile.index === undefined && position !== 'end') {
+            newTile.index = (position === 'start') ? 0 : entity;
+            if (position === 'after') {
+                newTile.index++;
+            }
+        }
+        save(newTile);
+    };
+
+    const canSave = isValidJson;
+
+    return (
+        <SaveAndCancel padded save={saveTile} close={close} canSave={canSave}>
+            <PropertyGrid>
+                {tile.index !== undefined ?
+                    <TextFieldProp name="Index:" value={tile.index} size={4} readOnly /> :
+                    <PositionPickerProp position={position} setPosition={setPosition} entity={entity} setEntity={setEntity} name="Insert:" entityIndex={tileIndex} />
+                }
+                <BitmapProp name="Image:" value={image} set={setImage} entityIndex={tileIndex} editable zoomOrAvail={zoomOrAvail} colors={colors} />
+                <EntityProp entityIndex={animationIndex} reset player name="Animation:" value={animation} set={setAnimation} zoomOrAvail={zoomOrAvail} />
+                <TextAreaProp name="Properties:" invalid={!isValidJson} cols={30} rows={10} value={props} set={setProps} />
+            </PropertyGrid>
+        </SaveAndCancel>
+    )
+}
 
 function TilesMapEditor({model, resource, revert, cancel, play, tree, exportModel, saveModel}) {
 
     const eContext = useContext(EditorContext);
 
     const EditTileModal = useModal();
+    const EditAliasModal = useModal();
+    const EditBrushModal = useModal();
+    const EditEventModal = useModal();
 
     useEffect(() => {
         eContext.setTracking({map: ['active', 'hover']});
@@ -699,6 +1084,10 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
         return new AnimationIndex(tileIndex, model)
     }, []);
 
+    const eventIndex = useMemo(() => {
+        return new EventIndex(model)
+    }, []);
+
     const saveTilesPane = () => {
         saveModel(model)
     };
@@ -709,10 +1098,13 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
     const deployTilesPane = () => {d('DEPLOY...')};
 
     const editTile = index => {
-        const image = tileIndex.getEntityPropValue(index, 'image');
+        const tile = tileIndex.getEntityObject(index);
         EditTileModal.open({
-            save: provider => {
-                const editedTile = {index, value: index, image: provider.getImageData()};
+            tile,
+            tileIndex,
+            animationIndex,
+            colors: new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)}),
+            save: editedTile => {
                 const undoTile = tileIndex.getEntityObject(index);
                 eContext.doAction(
                     () => {
@@ -724,8 +1116,71 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                 );
                 EditTileModal.close();
             },
-            colors: new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)}),
-            image
+        });
+    };
+
+    const editAlias = index => {
+        const alias = aliasIndex.getEntityObject(index);
+        EditAliasModal.open({
+            tileIndex,
+            alias,
+            isValid: value => alias.value === value || !aliasIndex.hasPropValue('value', value),
+            save: changedAlias => {
+                let lastIndex = index;
+                eContext.doAction(
+                    () => {
+                        lastIndex = aliasIndex.setEntityObject({...changedAlias, index: lastIndex}, true);
+                    },
+                    () => {
+                        lastIndex = aliasIndex.setEntityObject({...alias, index: lastIndex}, true);
+                    }
+                );
+                EditAliasModal.close();
+            }
+        });
+    };
+
+    const editBrush = index => {
+        const brush = brushIndex.getEntityObject(index);
+        EditBrushModal.open({
+            name: brush.value,
+            tiles: brush.tiles,
+            isValid: name => name === brush.value || !brushIndex.hasPropValue('value', name),
+            save: (name, tiles) => {
+                let lastIndex = index;
+                tiles = brush.tiles;
+                eContext.doAction(
+                    () => {
+                        lastIndex = brushIndex.setEntityObject({index: lastIndex, value: name, tiles}, true);
+                    },
+                    () => {
+                        lastIndex = brushIndex.setEntityObject({...brush, index: lastIndex}, true);
+                    }
+                );
+                EditBrushModal.close()
+            }
+        });
+    };
+
+    const editEvent = index => {
+        const event = eventIndex.getEntityObject(index);
+        EditEventModal.open({
+            event,
+            tileIndex,
+            eventIndex,
+            isValid: value => value === event.value || !eventIndex.hasPropValue('value', value),
+            save: changedEvent => {
+                let lastIndex = index;
+                eContext.doAction(
+                    () => {
+                        lastIndex = eventIndex.setEntityObject({...changedEvent, index: lastIndex}, true);
+                    },
+                    () => {
+                        lastIndex = eventIndex.setEntityObject({...event, index: lastIndex}, true);
+                    }
+                );
+                EditEventModal.close();
+            }
         });
     };
 
@@ -751,7 +1206,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                     <Stack vertical>
                         <Stack flex fullHeight>
                             <Section name="Selected" collapse vertical>
-                                <ActiveTile editTile={editTile} tileIndex={tileIndex} brushIndex={brushIndex} />
+                                <ActiveTile editTile={editTile} tileIndex={tileIndex} aliasIndex={aliasIndex} brushIndex={brushIndex} eventIndex={eventIndex} editAlias={editAlias} editBrush={editBrush} tilesGrid={tilesGrid} />
                             </Section>
 
                             <Section name="Map" flex>
@@ -766,23 +1221,25 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
                         <Section name="Elements" height={400} collapse>
                             <SideTabs>
+
                                 <SideTab name="Tiles" active>
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveTilePicker defaults={{zoom: 2}} tileIndex={tileIndex} />
+                                            <ActiveTilePicker tileIndex={tileIndex} editTile={editTile} />
                                         </SideTab>
                                         <SideTab name="Manage">
-                                            <TilesManager tileIndex={tileIndex} editTile={editTile} editorId="tileManager" />
+                                            <TilesManager tileIndex={tileIndex} animationIndex={animationIndex} editTile={editTile} editorId="tileManager" />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
+
                                 <SideTab name="Aliases">
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveAliasPicker tileIndex={tileIndex} tilesGrid={tilesGrid} />
+                                            <ActiveAliasPicker aliasIndex={aliasIndex} tileIndex={tileIndex} editAlias={editAlias} />
                                         </SideTab>
                                         <SideTab name="Manage">
-                                            <AliasManager aliasIndex={aliasIndex} tileIndex={tileIndex} editorId="aliasManager" />
+                                            <AliasManager aliasIndex={aliasIndex} tileIndex={tileIndex} editAlias={editAlias} editorId="aliasManager" />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
@@ -790,34 +1247,57 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                 <SideTab name="Brushes">
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveBrushPicker brushIndex={brushIndex} />
+                                            <ActiveBrushPicker brushIndex={brushIndex} editBrush={editBrush} />
                                         </SideTab>
                                         <SideTab name="Manage">
-                                            <BrushManager brushIndex={brushIndex} editorId="brushManager" />
+                                            <BrushManager brushIndex={brushIndex} editBrush={editBrush} editorId="brushManager" />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
+
                                 <SideTab name="Events">
-                                    Event picker and manager here...
+                                    <SideTabs>
+                                        <SideTab name="Pick" active>
+                                            <ActiveEventPicker eventIndex={eventIndex} editEvent={editEvent} />
+                                        </SideTab>
+                                        <SideTab name="Manage">
+                                            <EventManager eventIndex={eventIndex} tileIndex={tileIndex} editEvent={editEvent} />
+                                        </SideTab>
+                                    </SideTabs>
                                 </SideTab>
+
                                 <SideTab name="Animations">
                                     <SideTabs>
-                                        <SideTab name="Manage" active>
-                                            <AnimationManager animationIndex={animationIndex} />
+                                        <SideTab name="Pick" active>
+                                            <ActiveTilePicker tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} editTile={editTile} />
+                                        </SideTab>
+                                        <SideTab name="Manage">
+                                            <AnimationManager animationIndex={animationIndex} spriteIndex={tileIndex} />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
+
                             </SideTabs>
                         </Section>
                     </Stack>
                 </ActionFrame>
             </Stack>
 
-            <EditTileModal.content name="Edit Tile" closeable>
-                <EditorCtx>
-                    <BitmapEditor {...EditTileModal.props} />
-                </EditorCtx>
+            <EditTileModal.content name="Edit Tile" closeable fit>
+                <TileForm {...EditTileModal.props} />
             </EditTileModal.content>
+
+            <EditAliasModal.content name="Edit Alias" fit closeable>
+                <AliasForm {...EditAliasModal.props} />
+            </EditAliasModal.content>
+
+            <EditBrushModal.content name="Edit Brush" fit closeable>
+                <BrushForm {...EditBrushModal.props} />
+            </EditBrushModal.content>
+
+            <EditEventModal.content name="Edit Event" closeable fit>
+                <EventForm {...EditEventModal.props} />
+            </EditEventModal.content>
         </Page>
     );
 }

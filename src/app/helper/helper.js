@@ -814,7 +814,7 @@ class BitmapPlayer {
     }
 
     handleForward() {
-        let frame = this.getFrame();
+        let frame = this.getFrame()
         while (this.step >= frame.duration) {
             this.step -= frame.duration;
             this.frameNo++;
@@ -877,7 +877,7 @@ class BitmapPlayer {
     }
 
     nextStep() {
-        if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
+        if (this.frames.length === 0 || this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
             this.dirty = false;
             return;
         }
@@ -899,7 +899,7 @@ class BitmapPlayer {
     }
 
     getFrame() {
-        if (this.frameNo === null) {
+        if (this.frameNo === null || !this.frames) {
             return null;
         }
         return this.frames[this.frameNo];
@@ -911,7 +911,7 @@ class BitmapPlayer {
 
     reset() {
         this.step = 0;
-        this.frameNo = this.isForward ? 0 : this.frames.length - 1;
+        this.frameNo = this.frames.length === 0 ? null : (this.isForward ? 0 : this.frames.length - 1);
         this.state = ANIMATION.STATE.WAITING;
         this.dirty = true;
         this.isForward = (this.direction === ANIMATION.DIR.FORWARD || this.direction === ANIMATION.DIR.FORWARD_BACKWARD);

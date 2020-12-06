@@ -1,17 +1,28 @@
-import React, {useState, useRef, useEffect, useContext, useMemo, Fragment} from "react";
+import React, {useState, useRef, useEffect, useContext, useLayoutEffect, useMemo, Fragment} from "react";
 import ReactDOM from 'react-dom';
 import {mat4} from 'gl-matrix';
-import {d, getEmptyImageData, Players, hex2rgb, rgb2hex} from '../helper/helper';
+import {
+    d,
+    getEmptyImageData,
+    drawCanvasToAvail,
+    getCanvasForBitmap,
+    Players,
+    hex2rgb,
+    rgb2hex,
+    BitmapPlayer
+} from '../helper/helper';
 import {
     RasterOverlays,
     HRuler,
     VRuler,
     EditorContext,
     RasterScrollbar,
-    useEditorContextPart, CursorArea
+    BitmapEditor,
+    useEditorContextPart, CursorArea, EditorCtx, BitmapSelector
 } from "./Raster";
 import {WrappingIndexGrid} from "../classes/Grid";
-import {CellSelection} from "../classes/CellProvider";
+import {CellSelection, BitmapCellProvider} from "../classes/CellProvider";
+import {AnimationIndex, ColorIndex, FrameIndex} from "../classes/EntityIndex";
 
 const GlobalContext = React.createContext();
 const BackgroundContext = React.createContext();
@@ -81,35 +92,13 @@ function SideTab({name, active, children}) {
     )
 }
 
-function PaneSelection({options, children}) {
-    const [active, setActive] = useState(0);
-
-    const items = [];
-    for (let i = 0; i < options.length; i++) {
-        const index = i;
-        const option = options[i];
-        items.push(<Content key={index} click={() => {setActive(index)}}>{option}</Content>);
-    }
-
-    return (
-        <Stack>
-            <Stack vertical>
-                {items}
-            </Stack>
-            <Content>
-                Content goes here...
-            </Content>
-        </Stack>
-    )
-}
-
-function Color(props) {
+function Color({value, set}) {
     return (
         <div>
             <input
                 type="color"
-                value={props.value}
-                onChange={(e) => { props.set(e.target.value); }}
+                value={value}
+                onChange={e => {set(e.target.value)}}
             />
         </div>
     );
@@ -124,27 +113,27 @@ function ColorProp(props) {
     );
 }
 
-function Range(props) {
+function Range({value, set, min, max, step = 0.01}) {
     return (
         <Stack alignItems="center">
             <Content>
-                <kbd>{props.min}</kbd>
+                <kbd>{min}</kbd>
             </Content>
             <Content>
                 <input
                     type="range"
-                    onChange={e => props.set(e.target.value)}
-                    min={props.min}
-                    max={props.max}
-                    step={props.step ? props.step : 0.01}
-                    value={props.value}
+                    onChange={e => set(parseFloat(e.target.value))}
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={value}
                 />
             </Content>
             <Content>
-                <kbd>{props.max}</kbd>
+                <kbd>{max}</kbd>
             </Content>
             <Content>
-                <TextField size={String(props.max).length + 3} readOnly value={props.value} />
+                <TextField size={String(max).length + 3} readOnly value={value} />
             </Content>
         </Stack>
     );
@@ -159,35 +148,33 @@ function RangeProp(props) {
     )
 }
 
-function SwitchButton(props) {
-    const cls = ['switch-div switch-button' + (props.enabled ? '-enabled' : '')];
+function SwitchButton({enabled, children, material, disabled, ...props}) {
+    const cls = ['switch-div switch-button' + (enabled ? '-enabled' : '')];
     const style = useStyleProps(props);
-    if (props.disabled) {
+    if (disabled) {
         style.opacity = '0.5';
     }
-    let children = props.children;
-    if (props.material) {
-        children = <i className="material-icons md-18 center-h">{props.children}</i>;
+    if (material) {
+        children = <i className="material-icons md-18 center-h">{children}</i>;
     }
     return (
-        <div style={style} onClick={() => {props.switch(!props.enabled)}} className={cls.join(' ')}>
+        <div style={style} onClick={() => {props.switch(!enabled)}} className={cls.join(' ')}>
             {children}
         </div>
     );
 }
 
-function Radio(props) {
+function Radio({disabled = [], options, value, set, material}) {
     const buttons = [];
-    const disabled = props.disabled ? props.disabled : [];
-    for (let key in props.options) {
-        const name = props.options[key];
+    for (let key in options) {
+        const name = options[key];
         buttons.push(
             <SwitchButton
                 key={key}
-                enabled={props.value == key}
+                enabled={value == key}
                 disabled={disabled.indexOf(key) !== -1}
-                material={props.material}
-                switch={() => {disabled.indexOf(key) === -1 && props.set(key)}}
+                material={material}
+                switch={() => {disabled.indexOf(key) === -1 && set(key)}}
             >
                 {name}
             </SwitchButton>
@@ -210,14 +197,14 @@ function RadioProp(props) {
     )
 }
 
-function Checkbox(props) {
-    const name = props.name ? <div>{props.name}</div> : '';
+function Checkbox({name, value, set}) {
+    name = name ? <div>{name}</div> : '';
     return (
         <div className="stack-h">
             {name}
             <div><input onChange={(e) => {
-                props.set(e.target.checked);
-            }} type="checkbox" checked={!!props.value} /></div>
+                set(e.target.checked);
+            }} type="checkbox" checked={!!value} /></div>
         </div>
     );
 }
@@ -231,56 +218,64 @@ function CheckboxProp(props) {
     )
 }
 
-function TextField(props) {
+function TextField({readOnly, name, set, size, onClick, invalid, className, value}) {
     const attr = {
     };
-    if (!props.readOnly) {
-        attr.onChange = e => props.set(e.target.value);
+    if (!readOnly) {
+        attr.onChange = e => set(e.target.value);
     } else {
+        attr.onChange = () => {};
         attr.readOnly = true;
     }
-    if (props.size) {
-        attr.size = props.size
+    if (size) {
+        attr.size = size
     }
-    if (props.onClick) {
-        attr.onClick = props.onClick;
+    if (onClick) {
+        attr.onClick = onClick;
     }
     const cls = [];
-    if (props.invalid) {
+    if (invalid) {
         cls.push('invalid');
     }
-    if (props.className) {
-        cls.push(props.className);
+    if (className) {
+        cls.push(className);
+    }
+    const input = <input
+        type="text"
+        value={value}
+        {...attr}
+        className={cls.join(' ')}
+    />;
+    if (!name) {
+        return input;
     }
     return (
-        <input
-            type="text"
-            value={props.value}
-            {...attr}
-            className={cls.join(' ')}
-        />
-    );
+        <Stack>
+            <Content>{name}</Content>
+            <Content>{input}</Content>
+        </Stack>
+    )
 }
 
-function PropLabel(props) {
+function PropLabel({name, children}) {
     return (
         <>
             <Content>
-                {props.name}
+                {name}
             </Content>
             <Content>
-                {props.children}
+                {children}
             </Content>
         </>
     )
 }
 
-function FullProp(props) {
+function FullProp({name, children}) {
     const items = [];
-    if (props.name) {
-        items.push(<div key="0" style={{gridColumn: 'span 2'}}>{props.name}</div>);
+    if (name) {
+        items.push(<div key="0" style={{gridColumn: 'span 2'}}>{name}</div>);
     }
-    items.push(<div key="1" style={{gridColumn: 'span 2'}}>{props.children}</div>);
+    items.push(<div key="1" style={{gridColumn: 'span 2'}}>{children}</div>);
     return (
         <>
             {items}
@@ -297,57 +292,316 @@ function TextFieldProp(props) {
     );
 }
 
-function TextArea(props) {
-    const style = useStyleProps(props);
+function ValueProp({name, children}) {
     return (
-        <textarea style={style} wrap={props.wrap} rows={props.rows} cols={props.cols} readOnly={props.readOnly} value={props.value} onChange={e => props.set(e.target.value)}></textarea>
+        <PropLabel name={name}>
+            <Title>{children}</Title>
+        </PropLabel>
     )
 }
 
-function IntField(props) {
+function TextArea({wrap, rows, cols, invalid, readOnly, value, set, ...props}) {
+    const style = useStyleProps(props);
+    const cls = [];
+    if (invalid) {
+        cls.push('invalid');
+    }
+    return (
+        <textarea className={cls.join(' ')} style={style} wrap={wrap} rows={rows} cols={cols} readOnly={readOnly} value={value} onChange={e => set(e.target.value)}></textarea>
+    )
+}
+
+function TextAreaProp(props) {
+    const {name, ...areaProps} = props;
+    return (
+        <PropLabel name={name}>
+            <TextArea {...areaProps} />
+        </PropLabel>
+    )
+}
+
+function PositionPicker({entityIndex, position, entity, setPosition, setEntity}) {
+    const EntityPickerModal = useModal();
+
+    const pick = () => {
+        EntityPickerModal.open({
+            controls: true,
+            entityIndex,
+            select: index => {
+                setEntity(index);
+                EntityPickerModal.close();
+            }
+        });
+    };
+    const picker = <TextField onClick={pick} size={5} readOnly value={entity} />;
+
+    return (
+        <>
+            <Stack noGap>
+                <SwitchButton switch={value => value && setPosition('start')} enabled={position === 'start'}>Start</SwitchButton>
+                <SwitchButton switch={value => value && setPosition('before')}  enabled={position === 'before'}>Before</SwitchButton>
+                {position === 'before' && picker}
+                <SwitchButton switch={value => value && setPosition('after')} enabled={position === 'after'}>After</SwitchButton>
+                {position === 'after' && picker}
+                <SwitchButton switch={value => value && setPosition('end')} enabled={position === 'end'}>End</SwitchButton>
+            </Stack>
+
+            <EntityPickerModal.content width={400} height={400}>
+                <EditorCtx>
+                    <EntityPicker {...EntityPickerModal.props} />
+                </EditorCtx>
+            </EntityPickerModal.content>
+        </>
+    )
+}
+
+function PositionPickerProp({name, ...props}) {
+    return (
+        <PropLabel name={name}>
+            <PositionPicker {...props} />
+        </PropLabel>
+    )
+}
+
+
+function Bitmap({value, set, colors, empty, resizeable, entityIndex, editable, zoomOrAvail = 1}) {
+    const context = useContext(GlobalContext);
+
+    const EditBitmapModal = useModal();
+    const ImportBitmapModal = useModal();
+    const CopyBitmapModal = useModal();
+
+    const edit = () => {
+        EditBitmapModal.open({
+            save: provider => {
+                set(provider.getImageData());
+                EditBitmapModal.close();
+            },
+            resize: resizeable,
+            colors,
+            image: value
+        })
+    };
+
+    const importBitmap = () => {
+        const selected = selection => {
+            const provider = new BitmapCellProvider(1);
+            provider.setMap(selection.getCells());
+            set(provider.getImageData());
+            ImportBitmapModal.close();
+        };
+        ImportBitmapModal.open({
+            zoom: 1,
+            border: 0,
+            cancelHandler: ImportBitmapModal.close,
+            saveHandler: selected,
+            selection: {
+                type: 'rect',
+                width: entityIndex.hasEntityDim() ? 1 : entityIndex.getSizeX(),
+                height: entityIndex.hasEntityDim() ? 1 : entityIndex.getSizeY(),
+                fixed: !entityIndex.hasEntityDim(),
+                multi: false,
+                doubleClick: selected
+            },
+            bitmaps: context.imageResources
+        });
+    };
+
+    const copy = () => {
+        CopyBitmapModal.open({
+            entityIndex,
+            controls: true,
+            select: index => {
+                set(entityIndex.getEntityPropValue(index, 'image'));
+                CopyBitmapModal.close();
+            }
+        });
+    };
+
+    const width = value ? (typeof zoomOrAvail === 'object' ? zoomOrAvail.width : zoomOrAvail * value.width) : 0;
+    const height = value ? (typeof zoomOrAvail === 'object' ? zoomOrAvail.height : zoomOrAvail * value.height) : 0;
+
+    const render = ctx => {
+        ctx.clearRect(0, 0, width, height);
+        drawCanvasToAvail(getCanvasForBitmap(value), ctx, 0, 0, {width, height});
+    };
+    return (
+        <>
+            <Stack vertical>
+                {value && <Content className="min-content">
+                    {editable &&
+                        <Stack noGap>
+                            <Button click={edit}>Edit</Button>
+                            <Button click={importBitmap}>Import</Button>
+                            {entityIndex && <Button click={copy}>Copy</Button>}
+                            {empty && <Button click={() => set(null)}>Delete</Button>}
+                        </Stack>
+                    }
+                    <Content padded>
+                        <Content className="thin-boxed min-content" click={edit}>
+                            <Canvas width={width} height={height} render={render} />
+                        </Content>
+                    </Content>
+                </Content>}
+
+                {!value && <Content><Button click={() => set(empty())}>Add</Button></Content>}
+            </Stack>
+
+            <EditBitmapModal.content closeable width="800" height="400">
+                <EditorCtx>
+                    <BitmapEditor {...EditBitmapModal.props} />
+                </EditorCtx>
+            </EditBitmapModal.content>
+
+            <ImportBitmapModal.content closeable width="800" height="400">
+                <EditorCtx>
+                    <BitmapSelector {...ImportBitmapModal.props} />
+                </EditorCtx>
+            </ImportBitmapModal.content>
+
+            {entityIndex &&
+                <CopyBitmapModal.content closeable width="500" height="500">
+                    <EntityPicker {...CopyBitmapModal.props} />
+                </CopyBitmapModal.content>
+            }
+        </>
+    )
+}
+
+function BitmapProp(props) {
+    const {name, ...bitmapProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Bitmap {...bitmapProps} />
+        </PropLabel>
+    )
+}
+
+function Entity({entityIndex, readOnly, value, player, set, reset, zoomOrAvail = 1}) {
+    const EntityPickerModal = useModal();
+
+    const index = entityIndex.getEntityByPropValue('value', value);
+    let width = null;
+    let height = null;
+
+    if (index !== null) {
+        width = typeof zoomOrAvail === 'object' ? zoomOrAvail.width : zoomOrAvail * value.width;
+        height = typeof zoomOrAvail === 'object' ? zoomOrAvail.height : zoomOrAvail * value.height;
+    }
+
+    const playerRef = useRef(null);
+    const prePlayers = useMemo(() => {
+        if (!player || !value) {
+            return null;
+        }
+        const obj = new Players(entityIndex);
+        obj.setIndices([index]);
+        return obj;
+    }, [value]);
+    const players = useAnimationPlayers(entityIndex, player, 1, prePlayers);
+
+    playerRef.current = players;
+
+    const pick = () => {
+        EntityPickerModal.open({
+            entityIndex,
+            player: true,
+            controls: true,
+            select: index => {
+                set(entityIndex.getEntityPropValue(index, 'value'));
+                EntityPickerModal.close();
+            }
+        });
+    };
+
+    const render = ctx => {
+        entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, playerRef.current);
+    };
+
+    return (
+        <>
+            <Stack vertical>
+                {!readOnly &&
+                    <Content>
+                        <Stack noGap>
+                            <Content>
+                                <Button click={pick}>Pick</Button>
+                            </Content>
+                            <Content click={pick}>
+                                <TextField value={value} readOnly />
+                            </Content>
+                            {reset && <ActionBox material click={() => set('')}>delete</ActionBox>}
+                        </Stack>
+                    </Content>
+                }
+                <Content className="min-content">
+                    {width !== null &&
+                            <Content className="thin-boxed" click={pick}>
+                                <Canvas width={width} height={height} render={render}/>
+                            </Content>
+                    }
+                </Content>
+            </Stack>
+
+            <EntityPickerModal.content closeable width="800" height="400">
+                <EditorCtx>
+                    <EntityPicker {...EntityPickerModal.props} />
+                </EditorCtx>
+            </EntityPickerModal.content>
+        </>
+    )
+}
+
+function EntityProp(props) {
+    const {name, ...entityProps} = props;
+    return (
+        <PropLabel name={name}>
+            <Entity {...entityProps} />
+        </PropLabel>
+    )
+}
+
+function IntField({readOnly, name, size = 3, step = 1, value = 0, min, set, buttons, max}) {
     const attr = {};
-    if (props.readOnly) {
+    if (readOnly) {
         attr.readOnly = 'readOnly';
     }
-    if (props.size) {
-        attr.size = props.size;
-    } else if (props.max !== undefined) {
-        attr.size = ('' + props.max).length;
+    if (size) {
+        attr.size = size;
+    } else if (max !== undefined) {
+        attr.size = ('' + max).length;
     } else {
         attr.size = 3;
     }
-    const step = props.step || 1;
-
-    const value = props.value !== undefined ? props.value : 0;
     attr.value = value;
     attr.type = 'text';
     attr.onChange = (e) => {
-        props.set(e.target.value);
+        set(e.target.value);
     };
 
     const incValue = e => {
-        props.set(parseInt(value, 10) + step);
+        set(parseInt(value, 10) + step);
         e.stopPropagation();
     };
 
     const decValue = e => {
-        props.set(parseInt(value, 10) - step);
+        set(parseInt(value, 10) - step);
         e.stopPropagation();
     };
 
     let buttonPrev = '';
     let buttonNext = '';
-    if (props.buttons) {
+    if (buttons) {
         const nextAttr = {
             onClick: incValue
         };
-        if (props.readOnly || (props.max !== undefined && parseInt(value, 10) + step > parseInt(props.max, 10))) {
+        if (readOnly || (max !== undefined && parseInt(value, 10) + step > parseInt(max, 10))) {
             nextAttr.disabled = 'disabled';
         }
         const prevAttr = {
             onClick: decValue
         };
-        if (props.readOnly || (props.min !== undefined && parseInt(value, 10) - step < parseInt(props.min, 10))) {
+        if (readOnly || (min !== undefined && parseInt(value, 10) - step < parseInt(min, 10))) {
             prevAttr.disabled = 'disabled';
         }
         buttonPrev =
@@ -361,11 +615,9 @@ function IntField(props) {
             </>;
     }
 
-    const name = props.name ? <div>{props.name}</div> : '';
-
     return (
         <>
-            {name}
+            {name ? <div>{name}</div> : ''}
             <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
@@ -482,7 +734,7 @@ function useDimProps(props, style = {}) {
 
 function Content(props) {
     const cls = [];
-    const style = useDimProps(props);
+    const style = useDimProps(props, props.style ? props.style : {});
     if (props.flex) {
         cls.push('flex');
     }
@@ -801,17 +1053,59 @@ function SelectProp(props) {
     );
 }
 
-function Grid(props) {
+function DivGrid({render, sizeX, sizeY, border, width, height}) {
+    const cellSizeX = sizeX;
+    const cellSizeY = sizeY;
+    const rowStyle = useMemo(
+        () => {
+            return {width: cellSizeX, maxWidth: cellSizeX, height: cellSizeY, maxHeight: cellSizeY}
+        },
+        [cellSizeX, cellSizeY]
+    );
+    const gridStyle = useMemo(
+        () => {
+            return {
+                padding: border + 'px'
+            }
+        },
+        [border]
+    );
+    const columns = [];
+    const gridRows = [];
+    let i = 0;
+    let first = true;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (first) {
+                columns.push(cellSizeX + 'px');
+            }
+            gridRows.push(
+                <div className="content-bg" key={i} style={rowStyle}>{render(x, y)}</div>);
+            i++;
+        }
+        first = false;
+    }
+
+    return (
+        <Content className="border-bg min-content" style={gridStyle}>
+            <Grid gap={border} columns={columns.join(' ')}>
+                {gridRows}
+            </Grid>
+        </Content>
+    )
+}
+
+function Grid({columns, gap, children}) {
     const style = {
         display: 'grid',
-        gridTemplateColumns: props.columns
+        gridTemplateColumns: columns
     };
-    if (props.gap) {
-        style.gridGap = props.gap;
+    if (gap) {
+        style.gridGap = gap;
     }
     return (
         <div style={style}>
-            {props.children}
+            {children}
         </div>
     );
 }
@@ -829,8 +1123,8 @@ function LabelAndSubInfo(props) {
     </>
 }
 
-function ItemsStack(props) {
-    const [collapsed, setCollapsed] = useState(props.collapsed === true);
+function ItemsStack({hasProps = true, ...props}) {
+    const [collapsed, setCollapsed] = useState(hasProps === false || props.collapsed === true);
     const [dragIndex, setDragIndex] = useState(null);
     const dimProps = useDimProps(props);
 
@@ -922,7 +1216,7 @@ function ItemsStack(props) {
         <Stack fullHeight border>
             {assignContent}
             <Stack vertical border fullHeight {...dimProps}>
-                <Toolbar end={<ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>}>
+                <Toolbar end={hasProps && <ActionBox material click={toggleCollapse}>{'keyboard_arrow_' + (collapsed ? 'right' : 'left')}</ActionBox>}>
                     <Stack>
                         {(props.new || props.getNewItem) && <ActionBox
                             material
@@ -1138,7 +1432,7 @@ const Modal = React.memo((props) => {
 
     const styleProps = useStyleProps(props);
     const click = props.closeable ?
-        (e) => {
+        e => {
             let target = e.target;
             while(target.classList !== undefined) {
                 if (target.classList.contains('modal-centered')) {
@@ -1147,6 +1441,8 @@ const Modal = React.memo((props) => {
                 target = target.parentNode;
             }
             props.close();
+            e.stopPropagation();
+            e.preventDefault();
         } : null;
 
     return (
@@ -1225,9 +1521,14 @@ function ActionFrame({flex, name, fullHeight, sub, type, actions, children}) {
     )
 }
 
-function GridCellSelector({gridProvider, zoom, border, width, height, pos, select, editorId}) {
+function GridCellSelector({gridProvider, cellType, zoom, border, doubleClick, width, height, pos, select, editorId}) {
 
     const eContext = useContext(EditorContext);
+
+    const mounted = useMounted();
+
+    const cellSize = cellType.getCellSize(0, 0, zoom, border);
+
     const windowEvents = eContext.getWindowEvents(editorId);
     const boundingRectRef = useRef(null);
     const [highlight, setHighlight] = useState(false);
@@ -1235,8 +1536,8 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
     const mouseDown = (e, x, y) => {
         const index = gridProvider.getCellValue(x, y);
         if (index !== null) {
-            select(index);
             setHighlight(true);
+            select(index);
             windowEvents.addListener('mouseup', mouseUp, {capture: false});
         }
         e.stopPropagation();
@@ -1244,7 +1545,9 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
     };
 
     const mouseUp = e => {
-        setHighlight(false);
+        if (mounted.current) {
+            setHighlight(false);
+        }
         windowEvents.removeListener('mouseup', mouseUp, {capture: false});
         e.stopPropagation();
         e.preventDefault();
@@ -1255,6 +1558,7 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
             boundingRectRef={boundingRectRef}
             cellProvider={gridProvider}
             mouseDown={mouseDown}
+            doubleClick={doubleClick}
             mouseTrack={null}
             highlight={highlight}
             cursorWidth={1}
@@ -1265,38 +1569,143 @@ function GridCellSelector({gridProvider, zoom, border, width, height, pos, selec
             inclusion={false}
             width={width}
             height={height}
-            zoom={zoom}
+            zoom={1}
             border={border}
             valid={(x, y) => gridProvider.getCellValue(x, y) !== null}
-            size={gridProvider.getSize()}
+            sizeX={cellSize.x}
+            sizeY={cellSize.y}
             posX={0}
             posY={pos}
         />
     )
 }
 
-function EntityPicker({entityIndex, controls, editorId, select}) {
-
+function EntityTextPicker({entityIndex, textSize, sizeX, sizeY, select, editorId, player, controls, base, ...props}) {
     const [pos, setPos] = useState(0);
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(props.zoom !== undefined ? props.zoom : 1);
+    const [maxZoom, setMaxZoom] = useState(10);
     const [rulers, setRulers] = useState(false);
-    const [border, setBorder] = useState(1);
+    const [border, setBorder] = useState(props.border !== undefined ? props.border :1);
     const [width, setWidth] = useState(1);
     const [height, setHeight] = useState(1);
+    const [speed, setSpeed] = useState(0.5);
+    const [filter, setFilterRaw] = useState('');
+
+    const players = useAnimationPlayers(entityIndex, player, speed);
 
     const gridProvider = useMemo(() => {
-        return new WrappingIndexGrid(entityIndex);
+        return new WrappingIndexGrid(entityIndex, base, players);
     }, [entityIndex]);
+
+    const cellType = useMemo(() => {
+        return new PictureAndTextCell(sizeX, sizeY, textSize);
+    }, [sizeX, sizeY, textSize]);
+
+    const render = (x, y) => {
+        const index = gridProvider.getCellValue(x, y);
+        if (index === null) {
+            return '';
+        }
+        const textWidth = textSize + (zoom === 0 ? sizeX : 0);
+        return (
+            <Stack alignItems="center" align="center" vertical fullHeight>
+                <Stack flex nogap>
+                    {zoom > 0 &&
+                        <Content className="min-content thin-boxed">
+                            {
+                                entityIndex.hasEntityImage(index) ?
+                                    <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => gridProvider.index.drawEntity(ctx, index, 0, 0, {width: sizeX * zoom, height: sizeY * zoom})} /> :
+                                    <Content width={sizeX * zoom} height={sizeY * zoom} />
+                            }
+                        </Content>
+                    }
+                    <Title width={textWidth} maxWidth={textWidth}>{entityIndex.getEntityValue(index)}</Title>
+                </Stack>
+            </Stack>
+        )
+    };
+
+    const doubleClick = props.doubleClick ? (e, x, y) => {
+        const index = gridProvider.getCellValue(x, y);
+        if (index < entityIndex.getLength()) {
+            props.doubleClick(index);
+        }
+    } : null;
+
+    const setFilter = value => {
+        gridProvider.setMatch(value);
+        setFilterRaw(value);
+        setPos(0);
+    };
+
+    if (players) {
+        gridProvider.updatePlayers(pos, width, height);
+    }
+
+    if (zoom > maxZoom) {
+        setZoom(maxZoom);
+    }
+
+    const cellSizeX = sizeX;
+    const cellSizeY = sizeY;
+
+    const content = gridProvider.getWidth() === 0 ?
+        <Centered>No result...</Centered> :
+        <CellGrid
+            cellType={cellType}
+            match={filter}
+            posX={0}
+            sizeX={cellSizeX}
+            sizeY={cellSizeY}
+            setPosX={() => {}}
+            posY={pos}
+            setPosY={setPos}
+            zoom={zoom}
+            maxZoom={maxZoom}
+            setZoom={setZoom}
+            setMaxZoom={setMaxZoom}
+            border={border}
+            setBorder={setBorder}
+            rulers={rulers}
+            render={render}
+            setRulers={setRulers}
+            width={width}
+            setWidth={setWidth}
+            height={height}
+            setHeight={setHeight}
+            editorId={editorId}
+            gridProvider={gridProvider}
+        >
+            <GridCellSelector
+                gridProvider={gridProvider}
+                cellType={cellType}
+                sizeX={cellSizeX}
+                sizeY={cellSizeY}
+                editorId={editorId}
+                pos={pos}
+                width={width}
+                height={height}
+                zoom={zoom}
+                border={border}
+                select={select}
+                doubleClick={doubleClick}
+            />
+        </CellGrid>;
 
     return (
         <Stack vertical fullHeight border>
             {controls && <Toolbar>
                 <Stack>
+                    {props.filter &&
+                        <Content>
+                            <TextField name="Filter:" value={filter} set={setFilter} />
+                        </Content>
+                    }
                     <Content>
                         <Int name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
                     </Content>
                     <Content>
-                        <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
+                        <Int name="Zoom:" buttons min={cellType.getMinZoom()} value={zoom} set={setZoom} max={maxZoom} />
                     </Content>
                     <Content>
                         <Int name="Border:" buttons min={0} value={border} set={setBorder} />
@@ -1307,35 +1716,120 @@ function EntityPicker({entityIndex, controls, editorId, select}) {
                 </Stack>
             </Toolbar>}
             <div className="full-v flex">
-                <CellGrid
-                    posX={0}
-                    setPosX={() => {}}
-                    posY={pos}
-                    setPosY={setPos}
-                    zoom={zoom}
-                    setZoom={setZoom}
-                    border={border}
-                    setBorder={setBorder}
-                    rulers={rulers}
-                    setRulers={setRulers}
-                    width={width}
-                    setWidth={setWidth}
-                    height={height}
-                    setHeight={setHeight}
-                    editorId={editorId}
-                    gridProvider={gridProvider}
-                >
-                    <GridCellSelector
-                        gridProvider={gridProvider}
-                        editorId={editorId}
-                        pos={pos}
-                        width={width}
-                        height={height}
-                        zoom={zoom}
-                        border={border}
-                        select={select}
-                    />
-                </CellGrid>
+                {content}
+            </div>
+        </Stack>
+    )
+}
+
+function EntityPicker({entityIndex, player, controls, editorId, select, base = null, ...props}) {
+
+    const [pos, setPos] = useState(0);
+    const [zoom, setZoom] = useState(1);
+    const [maxZoom, setMaxZoom] = useState(10);
+    const [rulers, setRulers] = useState(false);
+    const [border, setBorder] = useState(1);
+    const [width, setWidth] = useState(1);
+    const [height, setHeight] = useState(1);
+    const [speed, setSpeed] = useState(0.5);
+    const [filter, setFilterRaw] = useState('');
+
+    if (zoom > maxZoom) {
+        setZoom(maxZoom);
+    }
+
+    const players = useAnimationPlayers(entityIndex, player, speed);
+
+    const gridProvider = useMemo(() => {
+        return new WrappingIndexGrid(entityIndex, base, players);
+    }, [entityIndex]);
+
+    const sizeX = gridProvider.getCellSizeX();
+    const sizeY = gridProvider.getCellSizeY();
+    const cellType = useMemo(() => {
+        return new PictureCell(sizeX, sizeY)
+    }, [sizeX, sizeY]);
+
+    const doubleClick = props.doubleClick ? (e, x, y) => {
+        const index = gridProvider.getCellValue(x, y);
+        if (index < entityIndex.getLength()) {
+            props.doubleClick(index);
+        }
+    } : null;
+
+    const setFilter = value => {
+        gridProvider.setMatch(value);
+        setFilterRaw(value);
+        setPos(0);
+    };
+
+    if (players) {
+        gridProvider.updatePlayers(pos, width, height);
+    }
+
+    const content = gridProvider.getWidth() === 0 ?
+        <Centered>No result...</Centered> :
+        <CellGrid
+            match={filter}
+            cellType={cellType}
+            posX={0}
+            setPosX={() => {}}
+            posY={pos}
+            setPosY={setPos}
+            zoom={zoom}
+            maxZoom={maxZoom}
+            setZoom={setZoom}
+            setMaxZoom={setMaxZoom}
+            border={border}
+            setBorder={setBorder}
+            rulers={rulers}
+            setRulers={setRulers}
+            width={width}
+            setWidth={setWidth}
+            height={height}
+            setHeight={setHeight}
+            editorId={editorId}
+            gridProvider={gridProvider}
+        >
+            <GridCellSelector
+                gridProvider={gridProvider}
+                cellType={cellType}
+                editorId={editorId}
+                pos={pos}
+                width={width}
+                height={height}
+                zoom={zoom}
+                border={border}
+                select={select}
+                doubleClick={doubleClick}
+            />
+        </CellGrid>;
+
+    return (
+        <Stack vertical fullHeight border>
+            {controls && <Toolbar>
+                <Stack>
+                    {props.filter &&
+                        <Content>
+                            <TextField name="Filter:" value={filter} set={setFilter} />
+                        </Content>
+                    }
+                    <Content>
+                        <Int name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
+                    </Content>
+                    <Content>
+                        <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} max={maxZoom} />
+                    </Content>
+                    <Content>
+                        <Int name="Border:" buttons min={0} value={border} set={setBorder} />
+                    </Content>
+                    <Content>
+                        <Checkbox name="Rulers:" value={rulers} set={setRulers} />
+                    </Content>
+                </Stack>
+            </Toolbar>}
+            <div className="full-v flex">
+                {content}
             </div>
         </Stack>
     )
@@ -1367,7 +1861,14 @@ function Background({width, height}) {
     )
 }
 
-function Canvas({width, height, render, className}) {
+function Button({children, click, disabled}) {
+    const onClick = e => {click(); e.stopPropagation(); e.preventDefault()};
+    return (
+        <button onClick={onClick} disabled={disabled}>{children}</button>
+    );
+}
+
+function Canvas({width, height, render, background = true, className}) {
     const canvasRef = useRef(null);
     useEffect(() => {
         if (!canvasRef.current) {
@@ -1382,7 +1883,7 @@ function Canvas({width, height, render, className}) {
 
     return (
         <div style={{position: 'relative', height, width}}>
-            <Background width={width} height={height} />
+            {background && <Background width={width} height={height} />}
             <canvas style={{top: 0, position: 'absolute'}} className={className} width={width} height={height} ref={canvasRef} />
         </div>
     )
@@ -1395,8 +1896,7 @@ function useResize(props, deps, checkSize) {
 
     propsRef.current = props;
 
-    useEffect(() => {
-
+    useLayoutEffect(() => {
         const observer = new ResizeObserver(e => {
             if (!divRef.current) return;
             checkSize(propsRef.current, divRef.current.getBoundingClientRect());
@@ -1410,7 +1910,7 @@ function useResize(props, deps, checkSize) {
         }
     }, []);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         checkSize(propsRef.current, divRef.current.getBoundingClientRect());
     }, deps);
 
@@ -1429,26 +1929,19 @@ function useComponentUpdate() {
     }
 }
 
-function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, renderBottom, actions, titleHeight, bottomHeight, minWidth, empty, entityIndex, ...props}) {
+function useAnimationPlayers(entityIndex, player, speed, prePlayers = null) {
     const context = useContext(GlobalContext);
 
     const mounted = useMounted();
-    const [pos, setPos] = useState(startPos || 0);
-    const [zoom, setZoom] = useState(2);
-    const [page, setPage] = useState(0);
-    const [speed, setSpeed] = useState(1);
-    const [marked, setMarked] = useState([]);
-    const [filter, setFilterRaw] = useState('');
-    const setFilter = value => {
-        setPos(0);
-        setFilterRaw(value);
-    };
 
     const players = useMemo(() => {
         if (!player) return null;
 
+        if (prePlayers) {
+            return prePlayers;
+        }
         return new Players(entityIndex);
-    }, [player]);
+    }, [player, prePlayers]);
 
     if (players && players.getSpeed() != speed) {
         players.setSpeed(speed);
@@ -1466,9 +1959,7 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
         return () => {
             entityIndex.removeListener(compUpdate);
         }
-    }, []);
-    const propsRef = useRef(null);
-    propsRef.current = {pos};
+    }, [prePlayers]);
 
     const frameRef = useRef(null);
 
@@ -1497,11 +1988,32 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
             players.clear();
         };
     }, [players]);
+
+    return players;
+}
+
+function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, renderBottom, actions, titleHeight, bottomHeight, minWidth, empty, entityIndex, ...props}) {
+    const [pos, setPos] = useState(startPos || 0);
+    const [zoom, setZoom] = useState(2);
+    const [page, setPage] = useState(0);
+    const [speed, setSpeed] = useState(1);
+    const [marked, setMarked] = useState([]);
+    const [filter, setFilterRaw] = useState('');
+    const setFilter = value => {
+        setPos(0);
+        setFilterRaw(value);
+    };
+
     if (minWidth === undefined) {
         minWidth = 50;
     }
     const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
+
+    const players = useAnimationPlayers(entityIndex, player, speed);
+
+    const propsRef = useRef(null);
+    propsRef.current = {pos};
 
     if (!renderTitle) {
         renderTitle = value => <Title>{value}</Title>
@@ -1664,7 +2176,10 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
                     <Content height={titleHeight}>{renderTitle(index)}</Content>
                     <Stack alignItems="center" align="center">
                         <div className="thin-boxed min-content">
-                            <Canvas width={avail} height={avail} render={ctx => entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players)}></Canvas>
+                            {entityIndex.hasEntityImage(index) ?
+                                <Canvas width={avail} height={avail} render={ctx => entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players)}></Canvas> :
+                                <Content width={avail} height={avail}></Content>
+                            }
                         </div>
                     </Stack>
                     {renderBottom ? <Content height={bottomHeight}>{renderBottom(index)}</Content> : ''}
@@ -1693,7 +2208,7 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
             }
             {
                 props.filter &&
-                <Stack><Content>Filter: </Content><Content><TextField name="Filter" value={filter} set={setFilter}/></Content></Stack>
+                <TextField name="Filter:" value={filter} set={setFilter}/>
             }
             <Int name="Pos:" buttons min={0} max={viewEnd} value={pos} set={setPos} />
             {
@@ -2521,348 +3036,8 @@ function useEntity(prefix, defaults = {}) {
     return entityRef.current;
 }
 
-/*
-function FiltersSelector(props) {
-    const context = useContext(GlobalContext);
-    const [bgColor, setBgColor] = useState(props.bgColor ? props.bgColor : '#000000');
-    const [previewIndex, setPreviewIndex] = useState(0);
-    const filterDefinitions = context.filters.getFilters();
-    const allFilters = useMemo(() => {
-        const keys = Object.keys(filterDefinitions).sort();
-        const items = [];
-        for (let key of keys) {
-            const item = {
-                name: key
-            };
-            const filterDefinition = filterDefinitions[key];
-            for (let def of filterDefinition.paramDefs) {
-                item[def.key] = def.default;
-            }
-            items.push({name: key, item});
-        }
-        return items;
-    }, []);
-
-    const [active, setActive] = useState(0);
-    const assignedFilters = [];
-    const filterExpressions = props.filters.split('|');
-    for (let expr of filterExpressions) {
-        if (expr === '') {
-            continue;
-        }
-        let name = expr;
-        let item = {};
-        if (expr.indexOf('(') !== -1 && expr.endsWith(')')) {
-            const parts = expr.split('(', 2);
-            name = parts[0];
-            const values = parts[1].substr(0, parts[1].length - 1).split(',');
-            const params = filterDefinitions[name].params;
-            for (let i = 0; i < params.length; i++) {
-                params[i](values[i], item);
-            }
-        }
-        assignedFilters.push({name, ...item});
-    }
-    const previewRef = useRef(null);
-    const [filters, setFilters] = useState(assignedFilters);
-
-    useEffect(() => {
-        if (!previewRef.current || !props.canvas) {
-            return;
-        }
-        const ctx = previewRef.current.getContext('2d');
-        const baseCanvas = Array.isArray(props.canvas) ? props.canvas[previewIndex].canvas : props.canvas;
-        const width = baseCanvas.width;
-        const height = baseCanvas.height;
-
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, width, height);
-
-        const currFilters = getFilterString();
-
-        let filteredCanvas = baseCanvas;
-        if (currFilters) {
-            const transformed =
-                context.filters.getCanvasWithFiltersApplied(
-                    currFilters,
-                    {elem: baseCanvas, ctx: baseCanvas.getContext('2d')}, 0, 0, width, height);
-            filteredCanvas = transformed[0].elem;
-        }
-        ctx.drawImage(filteredCanvas, 0, 0, filteredCanvas.width, filteredCanvas.height);
-    });
-
-    let preview = null;
-    if (props.canvas) {
-        let imageCtrl = '';
-        let previewCanvas = props.canvas;
-        if (Array.isArray(props.canvas)) {
-            const options = [];
-            for (let i = 0; i < props.canvas.length; i++) {
-                options.push({id: i, name: props.canvas[i].name});
-            }
-            if (options.length > 1) {
-                imageCtrl = <Select options={options} value={previewIndex} buttons set={setPreviewIndex} />;
-            }
-            previewCanvas = props.canvas[0].canvas;
-        }
-        preview =
-            <Stack vertical border fullHeight>
-                <Toolbar>
-                    <Content padded>Preview:</Content>
-                    {imageCtrl}
-                    {props.bgChange && <Color value={bgColor} set={setBgColor} />}
-                </Toolbar>
-                <Content scroll fullHeight><Centered><canvas className="thin-boxed" ref={previewRef} width={previewCanvas.width} height={previewCanvas.height} /></Centered></Content>
-            </Stack>;
-    }
-
-    const getItemProperties = (index) => {
-        const item = filters[index];
-        const paramDefs = filterDefinitions[item.name].paramDefs;
-        const inputs = [];
-        for (let def of paramDefs) {
-            switch(def.type) {
-                case 2:
-                    const colorValue = rgb2hex(item[def.key]);
-                    inputs.push(
-                        <ColorProp
-                            name={def.key + ':'}
-                            key={def.key}
-                            value={colorValue}
-                            set={(value) => {
-                                const newFilters = [...filters];
-                                newFilters[active][def.key] = value;
-                                setFilters(newFilters);
-                            }}
-                        />
-                    );
-                    break;
-
-                case 1:
-                    inputs.push(
-                        <RangeProp
-                            key={def.key}
-                            name={def.key + ':'}
-                            min={def.min}
-                            max={def.max}
-                            step={def.step}
-                            value={item[def.key]}
-                            set={value => {
-                                const newFilters = [...filters];
-                                newFilters[active][def.key] = value;
-                                setFilters(newFilters);
-                            }}
-                        />
-                    );
-                    break;
-
-                case 4:
-                    inputs.push(
-                        <IntProp
-                            key={def.key}
-                            name={def.key + ':'}
-                            buttons
-                            set={
-                                (value) => {
-                                    const newFilters = [...filters];
-                                    newFilters[active][def.key] = value;
-                                    setFilters(newFilters);
-                                }
-                            }
-                            value={item[def.key]}
-                        />
-                    );
-                    break;
-
-                default:
-                    d('???', def);
-                    break;
-            }
-        }
-        return (
-            <PropertyGrid>
-                {inputs}
-            </PropertyGrid>
-        );
-    };
-
-    const getFilterString = () => {
-        const values = [];
-        for (let filter of filters) {
-            let expr = filter.name;
-            const paramDefs = filterDefinitions[filter.name].paramDefs;
-            if (paramDefs.length > 0) {
-                expr += '(';
-                const params = [];
-                for (let def of paramDefs) {
-                    const rawValue = filter[def.key];
-                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
-                }
-                expr += params.join(',') + ')';
-            }
-            values.push(expr);
-        }
-        return values.join('|');
-    };
-
-    const currFilters = getFilterString();
-
-    return (
-        <Stack vertical border>
-            <Stack fullHeight border>
-                <ItemsStack
-                    empty="Assign filters from the left side"
-                    assignable={allFilters}
-                    active={active}
-                    setActive={setActive}
-                    items={filters}
-                    setItems={setFilters}
-                    getProperties={getItemProperties}
-                    getName={(item) => item.name}
-                    ordered
-                />
-                {preview}
-            </Stack>
-            <Content padded>
-                <Stack>
-                    <button disabled={currFilters === props.filters} onClick={() => {
-                        props.save(currFilters);
-                    }}>Save</button>
-                    <button onClick={props.cancel}>Cancel</button>
-                </Stack>
-            </Content>
-        </Stack>
-    )
-}
- */
-
-function WrappingCellGrid({children, editorId, rulers, entityIndex, pos, setPos, width, setWidth, height, setHeight, border, zoom}) {
-    const context = useContext(GlobalContext);
-    const gridStyle = {
-        display: 'grid',
-        gridTemplateColumns: 'auto',
-        gridRowGap: context.defaultPadding,
-        gridColumnGap: context.defaultPadding
-    };
-
-    const propsRef = useRef(null);
-    const dim = entityIndex.getGridDim(width, height, border, zoom);
-    const rulerSpace = rulers ? 38 : 0;
-    const length = entityIndex.getLength();
-
-    const divRef = useResize({width, height, border, zoom, rulers, rulerSpace}, [border, zoom, rulers, length], (props, rect) => {
-        const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border;
-        const spaceY = rect.height - props.border;
-
-        const cellSizeX = (entityIndex.getSizeX() + props.border) * props.zoom;
-        const cellSizeY = (entityIndex.getSizeY() + props.border) * props.zoom;
-        const newWidth = Math.min(Math.floor(spaceX / cellSizeX), props.length);
-        const newHeight = Math.min(Math.ceil(props.length / newWidth), Math.ceil(spaceY / cellSizeY));
-
-        if (props.width !== newWidth) setWidth(newWidth);
-        if (props.height !== newHeight) setHeight(newHeight);
-    });
-
-    const maxPos = Math.ceil(length / width);
-    propsRef.current = {pos, maxPos, width, height, border, zoom, dim};
-
-    const render = useMemo(
-        () => {
-            return ctx => {
-                const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
-                ctx.clearRect(0, 0, dim.width, dim.height);
-                entityIndex.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
-            }
-        },
-        [entityIndex]
-    );
-
-    if (pos > maxPos) {
-        setPos(maxPos);
-    }
-
-    const style = {
-        width: dim.width,
-        height: dim.height
-    };
-    let topRuler = '';
-    let leftRuler = '';
-
-    if (rulers) {
-        const rulerProps = {width, posX, border};
-        const hProps = {...rulerProps, width: dim.width, height: rulerSpaceY, max: width, start: posX, cellSize: gridProvider.getCellSizeX() * zoom};
-        topRuler =
-            <HRuler
-                digits={('' + gridProvider.getWidth()).length}
-                {...hProps}
-            />;
-        const vProps = {...rulerProps, width: rulerSpaceX, height: dim.height, max: height, start: posY, cellsPerLine: null, cellSize: gridProvider.getCellSizeY() * zoom};
-        leftRuler =
-            <VRuler
-                digits={('' + gridProvider.getHeight()).length}
-                {...vProps}
-            />;
-        style.marginTop = -(rulerSpaceY >> 1);
-    }
-
-    const sensitivity = 0.25;
-    const onWheel = e => {
-        let deltaX = Math.round(e.deltaX * sensitivity);
-        let deltaY = Math.round(e.deltaY * sensitivity);
-
-        const newPosX = Math.min(Math.max(posX + deltaX, 0), maxPosX);
-        const newPosY = Math.min(Math.max(posY + deltaY, 0), maxPosY);
-        if (newPosX !== posX) {
-            setPosX(newPosX);
-        }
-        if (newPosY !== posY) {
-            setPosY(newPosY);
-        }
-        e.stopPropagation();
-    };
-
-    const firstCells = [
-        <div key={1} onWheel={onWheel}>
-            <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
-                <div className="stack-h centered items-centered">
-                    <div className="rel-canvas marker-space" style={style}>
-                        <Canvas render={render} width={dim.width} height={dim.height} />
-                        {topRuler}
-                        {leftRuler}
-                        {children}
-                    </div>
-                </div>
-            </div>
-        </div>
-    ];
-
-    const hasScrollingY = height < gridProvider.getHeight();
-
-    if (hasScrollingY) {
-        firstCells.push(<div key={2}><RasterScrollbar editorId={editorId} auto vertical set={setPosY} pos={posY} page={height} max={gridProvider.getHeight()} /></div>);
-        gridStyle.gridTemplateColumns += ' 21px'
-    }
-    const secondCells = [];
-    if (width < gridProvider.getWidth()) {
-        secondCells.push(<div style={{height: 21}} key={3}><RasterScrollbar editorId={editorId} auto set={setPosX} pos={posX} page={width} max={gridProvider.getWidth()} /></div>);
-        gridStyle.gridTemplateRows = 'auto 21px';
-        if (hasScrollingY) {
-            secondCells.push(<div key={4}></div>);
-        }
-    }
-
-    return (
-        <div style={gridStyle} className="full-v">
-            {firstCells}
-            {secondCells}
-        </div>
-    );
-}
-
-
-//  New Grid component
-
-function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY, setPosY, width, setWidth, height, setHeight, border, zoom}) {
+function CellGrid({children, cellType, editorId, rulers, gridProvider, posX, setPosX, posY, setPosY, width, setWidth, height,
+                      match, setHeight, border, zoom, maxZoom, setMaxZoom, ...props}) {
     const context = useContext(GlobalContext);
     const gridStyle = {
         display: 'grid',
@@ -2873,42 +3048,59 @@ function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY
     useEditorContextPart(editorId);
 
     const propsRef = useRef(null);
-    const dim = gridProvider.getGridDim(width, height, border, zoom);
+    const gridWidth = gridProvider.getWidth();
+    const gridHeight = gridProvider.getHeight();
+
+    const cellSize = cellType.getCellSize(0, 0, zoom, border);
+    const dim = {width: Math.min(width, gridWidth) * cellSize.xPlusBorder + border, height: Math.min(height, gridHeight) * cellSize.yPlusBorder + border};
+
+    // TODO calc
+    const rulerPaddingX = rulers ? 20 : 0;
+    const rulerPaddingY = rulers ? 12 : 0;
     const rulerSpaceX = rulers ? 38 : 0;
-    const rulerSpaceY = rulers ? 20 : 0;
-    const hasScrollingY = height < gridProvider.getHeight();
-    const hasScrollingX = width < gridProvider.getWidth();
+    const rulerSpaceY = rulers ? 22 : 0;
+    const hasScrollingY = height < gridHeight;
+    const hasScrollingX = width < gridWidth;
 
-    const divRef = useResize({width, height, border, zoom, rulers, rulerSpaceX, rulerSpaceY, hasScrollingX, hasScrollingY}, [border, zoom, rulers, hasScrollingX, hasScrollingY], (props, rect) => {
-        const spaceX = rect.width - (props.rulers ? props.rulerSpaceX : 0) - props.border - (props.hasScrollingY ? 26 : 0);
-        const spaceY = rect.height - (props.rulers ? props.rulerSpaceY : 0) - props.border - (props.hasScrollingX ? 26 : 0);
-
-        const cellSizeX = (gridProvider.getCellSizeX() + props.border) * props.zoom;
-        const cellSizeY = (gridProvider.getCellSizeY() + props.border) * props.zoom;
-        const wrapWidth = Math.floor(spaceX / cellSizeX);
-        if (gridProvider.setWrapWidth) {
-            gridProvider.setWrapWidth(wrapWidth);
+    const divRef = useResize({width, height, border, zoom, maxZoom, rulers, rulerSpaceX, rulerSpaceY, hasScrollingX, hasScrollingY}, [border, zoom, maxZoom, match, rulers, hasScrollingX, hasScrollingY], (curr, rect) => {
+        const spaceX = rect.width - 2 * context.defaultPadding - (curr.rulers ? curr.rulerSpaceX * 2 : 0) - curr.border;
+        const spaceY = rect.height - 2 * context.defaultPadding - (curr.rulers ? curr.rulerSpaceY * 2 : 0) - curr.border;
+        const cellSize = cellType.getCellSize(spaceX, spaceY, curr.zoom, curr.border);
+        if (cellSize.maxZoom < curr.zoom) {
+            setMaxZoom(cellSize.maxZoom);
+            return;
         }
-        const newWidth = Math.min(wrapWidth, gridProvider.getWidth());
-        const newHeight = Math.min(Math.floor(spaceY / cellSizeY), gridProvider.getHeight());
+        if (gridProvider.setWrapWidth) {
+            gridProvider.setWrapWidth(cellSize.wrapWidth);
+        }
+        const newWidth = Math.min(cellSize.wrapWidth, gridProvider.getWidth());
+        const newHeight = Math.min(Math.floor(spaceY / cellSize.yPlusBorder), gridProvider.getHeight());
 
-        if (props.width !== newWidth) setWidth(newWidth);
-        if (props.height !== newHeight) setHeight(newHeight);
+        if (curr.width !== newWidth) setWidth(newWidth);
+        if (curr.height !== newHeight) setHeight(newHeight);
+        if (curr.maxZoom !== cellSize.maxZoom) setMaxZoom(cellSize.maxZoom);
     });
-    const maxPosX = gridProvider.getWidth() - width;
-    const maxPosY = gridProvider.getHeight() - height;
+    const maxPosX = Math.max(0, gridProvider.getWidth() - width);
+    const maxPosY = Math.max(0, gridProvider.getHeight() - height);
 
-    propsRef.current = {posX, maxPosX, posY, maxPosY, width, height, border, zoom, dim, rulers};
+    propsRef.current = {posX, maxPosX, posY, maxPosY, width, height, maxZoom, border, zoom,
+        dim, rulers};
 
     const render = useMemo(
-        () => {
-            return ctx => {
-                const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
-                ctx.clearRect(0, 0, dim.width, dim.height);
-                gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
-            }
+    () => {
+        return (
+            cellType.hasText() ?
+                (x, y) => {
+                    return props.render(posX + x, posY + y);
+                } :
+                ctx => {
+                    const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
+                    ctx.clearRect(0, 0, dim.width, dim.height);
+                    gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
+                }
+            )
         },
-        [gridProvider]
+        [gridProvider, props.render]
     );
 
     if (posX > maxPosX) {
@@ -2927,13 +3119,13 @@ function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY
 
     if (rulers) {
         const rulerProps = {width, posX, border};
-        const hProps = {...rulerProps, width: dim.width, height: rulerSpaceY, max: width, start: posX, cellSize: gridProvider.getCellSizeX() * zoom};
+        const hProps = {...rulerProps, width: dim.width, height: rulerSpaceY, max: width, start: posX, cellSize: cellSize.x};
         topRuler =
             <HRuler
                 digits={('' + gridProvider.getWidth()).length}
                 {...hProps}
             />;
-        const vProps = {...rulerProps, width: rulerSpaceX, height: dim.height, max: height, start: posY, cellsPerLine: null, cellSize: gridProvider.getCellSizeY() * zoom};
+        const vProps = {...rulerProps, width: rulerSpaceX, height: dim.height, max: height, start: posY, cellsPerLine: gridProvider.setWrapWidth ? gridProvider.wrapWidth : null, cellSize: cellSize.y};
         leftRuler =
             <VRuler
                 digits={('' + gridProvider.getHeight()).length}
@@ -2960,10 +3152,13 @@ function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY
 
     const firstCells = [
         <div key={1} onWheel={onWheel}>
-            <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerSpaceX, paddingTop: rulerSpaceY}}>
+            <div ref={divRef} className="full-v stack-h centered" style={{paddingLeft: rulerPaddingX, paddingTop: rulerPaddingY}}>
                 <div className="stack-h centered items-centered">
                     <div className="rel-canvas marker-space" style={style}>
-                        <Canvas render={render} width={dim.width} height={dim.height} />
+                        {cellType.hasText() ?
+                            <DivGrid render={render} sizeX={cellSize.x} sizeY={cellSize.y} width={width} height={height} border={border} zoom={zoom} /> :
+                            <Canvas render={render} width={dim.width} height={dim.height} />
+                        }
                         {topRuler}
                         {leftRuler}
                         {children}
@@ -2985,13 +3180,93 @@ function CellGrid({children, editorId, rulers, gridProvider, posX, setPosX, posY
             secondCells.push(<div key={4}></div>);
         }
     }
-
     return (
         <div style={gridStyle} className="full-v">
             {firstCells}
             {secondCells}
         </div>
     );
+}
+
+class PictureCell {
+
+    constructor(sizeX, sizeY) {
+        this.sizeX = sizeX;
+        this.sizeY = sizeY;
+    }
+
+    hasText() {
+        return false;
+    }
+
+    getMinZoom() {
+        return 1;
+    }
+
+    getCellSize(spaceX, spaceY, zoom, border = 0) {
+        const fixSpace = border;
+
+        const maxZoom =
+            Math.min(
+                Math.floor((spaceX - fixSpace) / this.sizeX),
+                Math.floor((spaceY - fixSpace) / this.sizeY),
+            );
+
+        const x = this.sizeX * zoom;
+        const xPlusBorder = x + border;
+        const y = this.sizeY * zoom;
+        const wrapWidth = Math.floor(spaceX / xPlusBorder);
+        return {
+            x,
+            xPlusBorder,
+            y,
+            yPlusBorder: y + border,
+            maxZoom,
+            wrapWidth
+        };
+    }
+}
+
+class PictureAndTextCell {
+
+    constructor(sizeX, sizeY, textSize) {
+        this.sizeX = sizeX;
+        this.sizeY = sizeY;
+        this.textSize = textSize;
+    }
+
+    hasText() {
+        return true;
+    }
+
+    getMinZoom() {
+        return 0;
+    }
+
+    getCellSize(spaceX, spaceY, zoom, border = 0) {
+        const fixSpaceX = 3 * 5 + this.textSize + (zoom === 0 ? this.sizeX : 0);
+        const fixSpaceY = 2 * (5 + 1) + (zoom === 0 ? 15 : 0);
+        const maxZoom =
+            Math.max(
+                Math.min(
+                    Math.floor((spaceX - fixSpaceX - border) / this.sizeX),
+                    Math.floor((spaceY - fixSpaceY - border) / this.sizeY)
+                ),
+                this.getMinZoom()
+            );
+        const x = fixSpaceX + this.sizeX * zoom;
+        const xPlusBorder = x + border;
+        const y = fixSpaceY + this.sizeY * zoom;
+        const wrapWidth = Math.floor(spaceX / xPlusBorder);
+        return {
+            x,
+            xPlusBorder,
+            y,
+            yPlusBorder: y + border,
+            maxZoom,
+            wrapWidth
+        };
+    }
 }
 
 class CursorCtx extends React.Component {
@@ -3297,7 +3572,7 @@ const useAddIndexActions = (entityIndex, actions, result = []) => {
                     doAction: indices => {
                         const undoItems = entityIndex.getEntityObjects(indices);
                         eContext.doAction(
-                            () => {entityIndex.deleteEntities(indices); d('DEL', indices, entityIndex)},
+                            () => {entityIndex.deleteEntities(indices)},
                             () => entityIndex.setEntityObjects(undoItems)
                         );
                     }
@@ -3402,6 +3677,391 @@ const useAddIndexActions = (entityIndex, actions, result = []) => {
     return result;
 };
 
+function SaveAndCancel({save, close, padded, canSave = true, children}) {
+    return (
+        <Stack vertical border>
+            <Content  padded={padded}>{children}</Content>
+            <Content padded>
+                <Button disabled={!canSave} click={save}>OK</Button>
+                <Button click={close}>Cancel</Button>
+            </Content>
+        </Stack>
+    );
+}
+
+function DurationToggler({frame}) {
+    const update = useComponentUpdate();
+    return (
+        <Stack>
+            <Content>Duration: </Content>
+            <Content>
+                <Int buttons min={1} value={frame.duration} set={duration => {frame.duration = duration; update()}} />
+            </Content>
+        </Stack>
+    );
+}
+
+function FrameManager({frameIndex, fixSize, width, height}) {
+    const eContext = useContext(EditorContext);
+
+    const NewFrameModal = useModal();
+    const actions = useAddIndexActions(frameIndex, ['delete']);
+
+    const addFrame = () => {
+        NewFrameModal.open({
+            select: index => {
+                const sprite = frameIndex.index.getEntityValue(index);
+                let undoIndex = null;
+                eContext.doAction(
+                    () => {
+                        undoIndex = frameIndex.setEntityObject({value: {id: sprite, duration: 1, padding: {x: 0, y: 0}}});
+                    },
+                    () => {
+                        frameIndex.deleteEntity(undoIndex);
+                    }
+                );
+                NewFrameModal.close();
+            }
+        });
+    };
+
+    return (
+        <>
+            <EntityManager
+                entityIndex={frameIndex}
+                actions={actions}
+                undoRedo
+                titleHeight={20}
+                bottomHeight={20}
+                minWidth={100}
+                filter
+                maxedZoom
+                newItem={addFrame}
+                empty="No sprites defined. Add new one"
+                renderTitle={index => {
+                    const name = frameIndex.getEntityValue(index).id;
+                    return <Title maxWidth={100}>#{index + 1} {name}</Title>
+                }}
+                renderBottom={index => {
+                    const value = frameIndex.getEntityValue(index);
+                    return (
+                        <DurationToggler frame={value} />
+                    )
+                }}
+            />
+
+            <NewFrameModal.content name="Pick Sprite for frame" closeable width={600} height={500}>
+                <EditorCtx>
+                    <EntityPicker
+                        filter
+                        editorId="frameSprite"
+                        base={
+                            fixSize ? null :
+                                index => (
+                                    frameIndex.index.getEntityPropValue(index, 'width') === width &&
+                                    frameIndex.index.getEntityPropValue(index, 'height') === height
+                                )
+                        }
+                        entityIndex={frameIndex.index}
+                        controls
+                        {...NewFrameModal.props}
+                    />
+                </EditorCtx>
+            </NewFrameModal.content>
+        </>
+    )
+}
+
+function AnimationForm({animation, spriteIndex, save, close, isValid}) {
+    const update = useComponentUpdate();
+
+    const animationIndex = useMemo(
+        () => {
+            const animationIndex = new AnimationIndex(spriteIndex, {animations: []});
+            animationIndex.setEntityObject({...animation, index: 0});
+            animationIndex.addListener(update);
+            return animationIndex
+        },
+        [animation]
+    );
+
+    const width = animation.sizeX;
+    const height = animation.sizeY;
+    const frameIndex = useMemo(
+        () => {
+            return new FrameIndex(animation, spriteIndex, width, height)
+        },
+        [animation]
+    );
+
+    const name = animationIndex.getEntityValue(0);
+    const canSave = () => name !== '' && isValid(name);
+
+    return (
+        <>
+            <Stack vertical border fullHeight>
+                <Content>
+                    <AnimationProps canSave={canSave} animationIndex={animationIndex} />
+                </Content>
+                <Stack border flex>
+                    <Content flex>
+                        <EditorCtx>
+                            <FrameManager fixSize={animationIndex.fixSize} width={width} height={height} frameIndex={frameIndex} />
+                        </EditorCtx>
+                    </Content>
+                    <PreviewAnimation animationIndex={animationIndex} frameIndex={frameIndex} spriteIndex={spriteIndex} />
+                </Stack>
+                <Content padded>
+                    <Stack>
+                        <button disabled={!canSave()} onClick={e => save({
+                            ...animationIndex.getEntityObject(0),
+                            frames: [...frameIndex.getPropValues('value')]
+                        })}>OK</button>
+                        <button onClick={e => close()}>Cancel</button>
+                    </Stack>
+                </Content>
+            </Stack>
+        </>
+    )
+}
+
+function AnimationFormNew({save, close, isValid, ...props}) {
+    const [name, setName] = useState(props.name);
+    const [width, setWidth] = useState(props.width);
+    const [height, setHeight] = useState(props.height);
+
+    const canSave = () => name !== '' && isValid(name);
+
+    return (
+        <Stack vertical border>
+            <Content padded>
+                <PropertyGrid>
+                    <TextFieldProp invalid={!canSave()} name="Name" value={name} set={setName} />
+                    <DimProp name="Size" x={width} setX={setWidth} y={height} setY={setHeight} min={1} max={32} buttons />
+                </PropertyGrid>
+            </Content>
+            <Content padded>
+                <Stack>
+                    <button disabled={!canSave()} onClick={e => save({
+                        value: name,
+                        frames: [],
+                        end: 0,
+                        dir: 0,
+                        synchronous: true,
+                        sizeX: width,
+                        sizeY: height
+                    })}>OK</button>
+                    <button onClick={e => close()}>Cancel</button>
+                </Stack>
+            </Content>
+        </Stack>
+    )
+}
+
+function AnimationProps({animationIndex, canSave}) {
+    const animation = animationIndex.getEntityObject(0);
+    const dirOptions = {
+        0: 'Forward',
+        1: 'Backward',
+        2: 'Forward Backward',
+        3: 'Backward Forward'
+    };
+    const endOptions = {
+        0: 'Loop',
+        1: 'Stop',
+        2: 'Destroy'
+    };
+    const setProp = (prop, value) => {
+        animationIndex.setEntityPropValue(0, prop, value);
+    };
+
+    return (
+        <Content padded>
+            <PropertyGrid>
+                <TextFieldProp invalid={!canSave()} name="Name" value={animation.value} set={value => animationIndex.setEntityObject({...animationIndex.getEntityObject(0), value}, true)} />
+                <RadioProp name="Direction" options={dirOptions} value={animation.dir} set={value => setProp( 'dir', parseInt('' + value, 10))}  />
+                <RadioProp name="End" options={endOptions} value={animation.end} set={value => setProp( 'end', parseInt('' + value, 10))}  />
+                <CheckboxProp name="Synchronous" value={animation.synchronous} set={value => setProp( 'synchronous', value)} />
+            </PropertyGrid>
+        </Content>
+    )
+}
+
+function PlayerCanvas({player, width, height, spriteIndex}) {
+    const context = useContext(GlobalContext);
+
+    const update = useComponentUpdate();
+    const mounted = useMounted();
+    const lastRef = useRef(null);
+    const lastPlayer = useRef(null);
+    lastPlayer.current = player;
+
+    useEffect(() => {
+        const level = context.getModalLevel();
+
+        const run = () => {
+            lastRef.current = requestAnimationFrame(() => {
+                if (lastPlayer.current !== player && !mounted.current) {
+                    return;
+                }
+                if (!(player.isPaused() || level !== context.getModalLevel())) {
+                    if (player.hasEnded()) {
+                        player.reset();
+                    } else {
+                        player.nextStep();
+                    }
+                    if (player.isDirty()) {
+                        update();
+                    }
+                }
+                run();
+            })
+        };
+        run();
+
+        return () => {
+            if (lastRef.current) {
+                cancelAnimationFrame(lastRef.current);
+            }
+        }
+    }, [player]);
+
+    return (
+        <Canvas width={width} height={height} render={ctx => {
+
+            const frame = lastPlayer.current.getFrame();
+            if (!frame) {
+                return;
+            }
+            spriteIndex.drawEntity(ctx, spriteIndex.getEntityByPropValue('value', frame.id) , 0, 0, {width, height});
+        }} />
+    )
+}
+
+function PreviewAnimation({frameIndex, animationIndex}) {
+    useUpdateOnEntityIndexChanges(frameIndex);
+
+    const [stopped, setStopped] = useState(false);
+    const [speed, setSpeed] = useState(0.1);
+
+    const player = new BitmapPlayer();
+    const frames = frameIndex.getPropValues('value');
+    const dir = animationIndex.getEntityPropValue(0, 'dir');
+    const end = animationIndex.getEntityPropValue(0, 'end');
+    player.loadAnimation(frames, end, dir);
+    player.setSpeed(speed);
+
+    if (stopped) {
+        player.pause();
+    }
+
+    const toggleStopped = () => {
+        setStopped(!stopped)
+    };
+
+    return (
+        <Section name="Preview">
+            <Content>
+                <Stack vertical>
+                    <Centered flex>
+                        <PlayerCanvas height={200} width={200} spriteIndex={animationIndex.index} player={player} />
+                    </Centered>
+                    <Content padded>
+                        <Stack align="center">
+                            <ActionBox click={toggleStopped} material>{stopped ? 'play_arrow' : 'stop'}</ActionBox>
+                        </Stack>
+                    </Content>
+                    <Content padded><Range value={speed} set={value => setSpeed(value)} min={0.0} max={2.0} /></Content>
+                </Stack>
+            </Content>
+        </Section>
+    );
+}
+
+function AnimationManager({animationIndex, spriteIndex}) {
+    const eContext = useContext(EditorContext);
+
+    const NewAnimationModal = useModal();
+    const EditAnimationModal = useModal();
+
+    const actions = [];
+    const addAnimation = () => {
+        NewAnimationModal.open({
+            name: '',
+            width: animationIndex.fixSize ? animationIndex.getSizeX() : 16,
+            height: animationIndex.fixSize ? animationIndex.getSizeY() : 16,
+            isValid: value => !animationIndex.hasPropValue('value', value),
+            save: newAnimation => {
+                let index = null;
+                eContext.doAction(
+                    () => {
+                        index = animationIndex.setEntityObject({...newAnimation});
+                    },
+                    () => {
+                        animationIndex.deleteEntity(index);
+                    }
+                );
+                NewAnimationModal.close();
+            }
+        });
+    };
+
+    const editAnimation = index => {
+        const animation = animationIndex.getEntityObject(index);
+        EditAnimationModal.open({
+            name: animationIndex.getEntityValue(index),
+            spriteIndex,
+            animation,
+            isValid: value => animation.value === value || !animationIndex.hasPropValue('value', value),
+            save: newAnimation => {
+                eContext.doAction(
+                    () => {
+                        animationIndex.setEntityObject({...newAnimation, index}, true);
+                    },
+                    () => {
+                        animationIndex.setEntityObject(animation, true);
+                    }
+                );
+                EditAnimationModal.close();
+            }
+        });
+    };
+
+    return (
+        <>
+            <EntityManager
+                entityIndex={animationIndex}
+                actions={actions}
+                titleHeight={20}
+                bottomHeight={20}
+                minWidth={100}
+                filter
+                player
+                maxedZoom
+                newItem={addAnimation}
+                empty="No animations defined. Add new one"
+                doubleClick={editAnimation}
+                renderTitle={index => {
+                    const name = animationIndex.getEntityValue(index);
+                    return <Title maxWidth={100}>{name}</Title>
+                }}
+                renderBottom={index => {
+                    const frames = animationIndex.getEntityPropValue(index, 'frames').length;
+                    return <kbd className="less">Frames: {frames}</kbd>
+                }}
+            />
+
+            <EditAnimationModal.content name="Edit Animation" closeable width="1200" height="500">
+                <AnimationForm {...EditAnimationModal.props} />
+            </EditAnimationModal.content>
+
+            <NewAnimationModal.content name="New Animation" closeable fit>
+                <AnimationFormNew {...NewAnimationModal.props} />
+            </NewAnimationModal.content>
+        </>
+    )
+}
+
 export {
     CellGrid,
     Section,
@@ -3415,6 +4075,7 @@ export {
     TextField,
     TextFieldProp,
     TextArea,
+    TextAreaProp,
     Checkbox,
     CheckboxProp,
     Toolbar,
@@ -3433,19 +4094,29 @@ export {
     SelectProp,
     Range,
     RangeProp,
+    Bitmap,
+    BitmapProp,
+    PositionPickerProp,
+    Entity,
+    EntityProp,
     Grid,
+    DivGrid,
     Title,
     Scene3d,
     PropertyGrid,
     PropLabel,
     FullProp,
+    ValueProp,
     Centered,
     Spacer,
+    Button,
     ActionFrame,
     SwitchButton,
     FileDropZone,
     EntityManager,
     EntityPicker,
+    EntityTextPicker,
+    AnimationManager,
     GlobalContext,
     CursorContext,
     BackgroundContext,
@@ -3466,7 +4137,8 @@ export {
     useUpdateOnEntityIndexChanges,
     FiltersSelector,
     BackgroundControl,
-    PaneSelection,
+    SaveAndCancel,
     SideTabs,
-    SideTab
+    SideTab,
+    PictureCell
 }

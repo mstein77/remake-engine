@@ -6,6 +6,10 @@ class Grid {
 
     constructor() {}
 
+    hasEvents() {
+        return false;
+    }
+
     getWidth() {
         return this.map.length === 0 ? 0 : this.map[0].length;
     }
@@ -20,11 +24,6 @@ class Grid {
 
     getCellSizeY() {
         return 1;
-    }
-
-    getSize() {
-        // TODO: remove this
-        return Math.max(this.getCellSizeX(), this.getCellSizeY());
     }
 
     getGridDim(width, height, grid, zoom) {
@@ -376,14 +375,18 @@ class IndexGrid extends Grid {
         return this.index.getSizeY();
     }
 
-    drawCellValue(ctx, value, x, y, zoom) {
-        this.index.drawEntity(ctx, value, x, y, zoom);
+    drawCellValue(ctx, value, x, y, zoomOrAvail, players = null) {
+        this.index.drawEntity(ctx, value, x, y, zoomOrAvail, players);
     }
 }
 
 class TilesGrid extends IndexGrid {
     constructor(tilesIndex, model, key = 'map') {
         super(tilesIndex, model, key);
+    }
+
+    hasEvents() {
+        return true;
     }
 
     getAliases() {
@@ -404,6 +407,16 @@ class TilesGrid extends IndexGrid {
         return obj.index;
     }
 
+    drawEvent(ctx, value, x, y, zoom) {
+        const event = this.index.model.events && this.index.model.events[value];
+        if (!event || !event.width) {
+            return false;
+        }
+        const pos = this.index.model.pos[value];
+        ctx.drawImage(this.index.model.eventsImg, pos.x, pos.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
+        return true;
+    }
+
     drawCellValue(ctx, value, x, y, zoom) {
         let events = [];
         if (Array.isArray(value)) {
@@ -418,13 +431,15 @@ class TilesGrid extends IndexGrid {
         }
         super.drawCellValue(ctx, value, x, y, zoom);
         if (events.length) {
-            ctx.fillStyle = '#00FF0088';
-            ctx.fillRect(x + 2, y + 2, 12, 12);
-            ctx.strokeStyle = '#000000';
-            ctx.strokeRect(x + 2, y + 2, 12, 12);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '10px';
-            ctx.fillText('' + events.length, x + 6, y + 12, 12);
+            let hasNoImage = true;
+            if (this.index.model.events) {
+                for (let event of events) {
+                    if (this.index.model.events[event]) {
+                        hasNoImage = false;
+                        break;
+                    }
+                }
+            }
         }
         if (alias) {
             const size = this.getCellSizeX() * zoom;
@@ -439,9 +454,17 @@ class TilesGrid extends IndexGrid {
 
 class WrappingIndexGrid extends IndexGrid {
 
-    constructor(tilesIndex) {
+    constructor(tilesIndex, base = null, players = null) {
         super(tilesIndex, {map: []});
-        this.wrapWidth = tilesIndex.getLength();
+        this.base = base;
+        this.mapping = tilesIndex.getView(0, tilesIndex.getLength(), [null, base]);
+        this.wrapWidth = this.mapping.count;
+        this.players = players;
+    }
+
+    setMatch(match) {
+        this.mapping = this.index.getView(0, this.index.getLength(), [match, this.base]);
+        this.wrapWidth = this.mapping.count;
     }
 
     setWrapWidth(value) {
@@ -449,19 +472,40 @@ class WrappingIndexGrid extends IndexGrid {
     }
 
     getWidth() {
-        return Math.min(this.wrapWidth, this.index.getLength());
+        return Math.min(this.wrapWidth, this.mapping.count);
     }
 
     getHeight() {
-        return Math.ceil(this.index.getLength() / this.wrapWidth);
+        return Math.ceil(this.mapping.count / this.wrapWidth);
     }
 
     getCellValue(x, y, raw = false) {
         const index = y * this.wrapWidth + x;
-        if (index >= this.index.getLength()) {
+        if (index >= this.mapping.count) {
             return null;
         }
-        return index;
+        return this.mapping.matches[index];
+    }
+
+    updatePlayers(posY, width, height) {
+        if (!this.players) {
+            return;
+        }
+        const indices = [];
+        const viewX = Math.min(width, this.getWidth());
+        const viewY = Math.min(height, this.getHeight());
+        for (let y = 0; y < viewY; y++) {
+            let currIndex = (posY + y) * this.wrapWidth;
+            for (let x = 0; x < viewX; x++) {
+                indices.push(currIndex);
+                currIndex++;
+            }
+        }
+        this.players.setIndices(indices);
+    }
+
+    drawCellValue(ctx, value, x, y, zoomOrAvail) {
+        super.drawCellValue(ctx, this.mapping.matches[value], x, y, zoomOrAvail, this.players);
     }
 
     drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1) {
@@ -494,7 +538,7 @@ class WrappingIndexGrid extends IndexGrid {
             let currX = grid;
             let currIndex = (posY + y) * this.wrapWidth;
             for (let x = 0; x < viewX; x++) {
-                this.drawCellValue(ctx, currIndex, currX, currY, zoom);
+                this.drawCellValue(ctx, currIndex, currX, currY, {width: tileX, height: tileY}, this.players);
                 currX += tileXPlusBorder;
                 currIndex++;
             }

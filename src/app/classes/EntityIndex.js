@@ -56,6 +56,14 @@ class EntityIndex {
         return this.hasPropValueMatch(prop, item => value === item);
     }
 
+    hasEntityDim() {
+        return this.getEntityProps().includes('width');
+    }
+
+    hasEntityImage(index) {
+        return true;
+    }
+
     getSizeX() {
         return this.sizeX;
     }
@@ -135,17 +143,6 @@ class EntityIndex {
         return values;
     }
 
-    /*
-    getEntityObject(index) {
-        const objs = this.getEntityObjects([index]);
-        if (objs.length === 0) {
-            return null;
-        }
-        return objs[0];
-    }
-
-     */
-
     getEntityObjects(indices = null) {
         const result = [];
         if (indices === null) {
@@ -157,12 +154,19 @@ class EntityIndex {
         return result
     }
 
-    getMatchingEntities(match) {
-        return this.getAllIndices();
+    getMatchingEntities(indices, match) {
+        return indices;
     }
 
     getView(start, length = null, match = null, sort = null) {
-        const items = match ? this.getMatchingEntities(match) : this.getAllIndices();
+        let indices = this.getAllIndices();
+        if (Array.isArray(match)) {
+            if (match.length == 2 && typeof match[1] === 'function') {
+                indices = indices.filter(match[1]);
+            }
+            match = match.length ? match[0] : null;
+        }
+        const items = this.getMatchingEntities(indices, match);
 
         // TODO sorting here
 
@@ -303,7 +307,6 @@ class EntityIndex {
         }
 
         this.setItems(newIndex);
-
         this.doUpdates(updates, overwrite);
 
         this.suspendNotifications = false;
@@ -359,7 +362,7 @@ class EntityIndex {
 
     doUpdates(updates, overwrite) {
         const props = [];
-        const autoProps = overwrite ? [] : this.getAutoProps();
+        const autoProps = overwrite && !this.hasEntityDim() ? [] : this.getAutoProps();
         for (let prop of this.getEntityProps()) {
             if (prop === 'index' || autoProps.includes(prop)) {
                 continue;
@@ -412,16 +415,23 @@ class ColorIndex extends EntityIndex {
         this.notify();
     }
 
-    drawEntity(targetCtx, pos, x, y, zoom = 1) {
+    drawEntity(targetCtx, pos, x, y, zoomOrAvail = 1) {
         const value = this.getEntityValue(pos);
         if (value === undefined) {
             return;
         }
+        let width = this.sizeX;
+        let height = this.sizeY;
+        if (typeof zoomOrAvail !== 'object') {
+            width *= zoomOrAvail;
+            height *= zoomOrAvail;
+        } else {
+            width = zoomOrAvail.width;
+            height = zoomOrAvail.height;
+        }
         targetCtx.fillStyle = value;
-        targetCtx.fillRect(x, y, this.sizeX * zoom, this.sizeY * zoom);
+        targetCtx.fillRect(x, y, width, height);
     }
-
-    // TODO matcher
 }
 
 class AssignIndex extends EntityIndex {
@@ -432,7 +442,6 @@ class AssignIndex extends EntityIndex {
         this.length = 0;
         this.sizeX = sizeX;
         this.sizeY = sizeY;
-
         this.img = null;
         this.items = [];
         this.oldChars = {};
@@ -642,8 +651,7 @@ class CharIndex extends EntityIndex {
         }
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -696,6 +704,33 @@ class TileIndex extends EntityIndex {
             ctx.putImageData(value, pos.x, pos.y);
             this.notify();
         }
+        if (prop === 'animation') {
+            const tile = this.model.tiles[index];
+            if (value === '') {
+                if (tile && tile.animation) {
+                    delete tile.animation;
+                }
+                if (JSON.stringify(tile) === '{}') {
+                    delete this.model.tiles[index];
+                }
+            } else {
+                if (!tile) {
+                    this.model.tiles[index] = {animation: value};
+                } else {
+                    tile.animation = value;
+                }
+            }
+            this.notify();
+        }
+        if (prop === 'props') {
+            const tile = this.model.tiles[index];
+            if (tile && JSON.stringify(value) === '{}') {
+                delete this.model.tiles[index];
+            } else {
+                this.model.tiles[index] = value;
+            }
+            this.notify();
+        }
     }
 
     getEntityPropValue(index, prop) {
@@ -704,11 +739,26 @@ class TileIndex extends EntityIndex {
             const pos = this.getIndexPos(index);
             return ctx.getImageData(pos.x, pos.y, this.getSizeX(), this.getSizeY());
         }
+        if (prop === 'animation') {
+            const tile = this.model.tiles[index];
+            if (!tile || !tile.animation) {
+                return '';
+            }
+            return tile.animation;
+        }
+        if (prop === 'props') {
+            const tile = this.model.tiles[index];
+            if (!tile) {
+                return {};
+            }
+            const {animation, ...result} = tile;
+            return result;
+        }
         return super.getEntityPropValue(index, prop);
     }
 
     getEntityProps() {
-        return  [...super.getEntityProps(), 'image'];
+        return  [...super.getEntityProps(), 'props', 'animation', 'image'];
     }
 
     getAutoProps() {
@@ -768,8 +818,7 @@ class TileIndex extends EntityIndex {
         }
     }
 
-    getMatchingEntities(match) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, match) {
         if (match === null) {
             return indices;
         }
@@ -807,8 +856,16 @@ class AliasIndex extends EntityIndex {
             const name = this.getEntityValue(index);
             this.model.tiles[name].index = value;
             this.notify();
-        } else if (prop === 'value') {
-            this.model.tiles[value] = {};
+        }
+        if (prop === 'value') {
+            if (!this.model.tiles[value]) {
+                this.model.tiles[value] = {};
+            }
+        }
+        if (prop === 'props') {
+            const name = this.getEntityValue(index);
+            this.model.tiles[name] = value;
+            this.notify();
         }
     }
 
@@ -824,6 +881,15 @@ class AliasIndex extends EntityIndex {
             const name = this.getEntityValue(index);
             return this.model.tiles[name].index;
         }
+        if (prop === 'props') {
+            const tile = this.model.tiles[this.getEntityValue(index)];
+            if (!tile) {
+                return {};
+            }
+            const {...result} = tile;
+            delete result.index;
+            return result;
+        }
         return super.getEntityPropValue(index, prop);
     }
 
@@ -833,7 +899,7 @@ class AliasIndex extends EntityIndex {
     }
 
     getEntityProps() {
-        return  [...super.getEntityProps(), 'tile'];
+        return  [...super.getEntityProps(), 'props', 'tile'];
     }
 
     getSizeX() {
@@ -852,8 +918,7 @@ class AliasIndex extends EntityIndex {
         this.tileIndex.drawEntity(targetCtx, tile, x, y, zoomOrAvail);
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -941,8 +1006,7 @@ class BrushIndex extends EntityIndex {
         }
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -1033,7 +1097,7 @@ class SpriteIndex extends EntityIndex {
             }
             spaceBlocks = newBlocks;
         }
-        const canvas = getCanvasForDim(canvasWidth, canvasWidth);
+        const canvas = getCanvasForDim(canvasWidth, canvasHeight);
         const ctx = canvas.getContext('2d');
 
         for (let [name, offset] of Object.entries(offsets)) {
@@ -1134,8 +1198,6 @@ class SpriteIndex extends EntityIndex {
                 );
             }
         }
-
-
         ctx.drawImage(
             this.img,
             sprite.off.x, sprite.off.y,
@@ -1146,8 +1208,7 @@ class SpriteIndex extends EntityIndex {
         );
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -1169,6 +1230,7 @@ class AnimationIndex extends EntityIndex {
         this.model = model;
         this.key = key;
         this.index = entityIndex;
+        this.fixSize = !this.index.getEntityProps().includes('width');
         this.items = Object.keys(model[key]).sort();
         this.sizeX = null;
         this.sizeY = null;
@@ -1181,28 +1243,36 @@ class AnimationIndex extends EntityIndex {
 
     getSizeX() {
         if (this.sizeX === null) {
-            let i = 0;
-            let sizeX = 0;
-            const iMax = this.getLength();
-            while(i < iMax) {
-                const index = i++;
-                sizeX = Math.max(this.getEntityPropValue(index,'sizeX'), sizeX);
+            if (this.fixSize) {
+                this.sizeX = this.index.getSizeX();
+            } else {
+                let i = 0;
+                let sizeX = 0;
+                const iMax = this.getLength();
+                while(i < iMax) {
+                    const index = i++;
+                    sizeX = Math.max(this.getEntityPropValue(index,'sizeX'), sizeX);
+                }
+                this.sizeX = sizeX;
             }
-            this.sizeX = sizeX;
         }
         return this.sizeX
     }
 
     getSizeY() {
         if (this.sizeY === null) {
-            let i = 0;
-            let sizeY = 0;
-            const iMax = this.getLength();
-            while(i < iMax) {
-                const index = i++;
-                sizeY = Math.max(this.getEntityPropValue(index,'sizeY'), sizeY);
+            if (this.fixSize) {
+                this.sizeY = this.index.getSizeY();
+            } else {
+                let i = 0;
+                let sizeY = 0;
+                const iMax = this.getLength();
+                while(i < iMax) {
+                    const index = i++;
+                    sizeY = Math.max(this.getEntityPropValue(index,'sizeY'), sizeY);
+                }
+                this.sizeY = sizeY;
             }
-            this.sizeY = sizeY;
         }
         return this.sizeY;
     }
@@ -1210,17 +1280,14 @@ class AnimationIndex extends EntityIndex {
     getEntityPropValue(index, prop) {
         switch(prop) {
             case 'sizeX': {
-                    return this.index.getSizeX();
-                    // TODO check
                     const animation = this.model[this.key][this.getEntityValue(index)];
-                    return animation.dim.x;
+                    return this.fixSize ? this.index.getSizeX() : animation.dim.x;
                 }
                 break;
 
             case 'sizeY': {
-                return this.index.getSizeY();
                     const animation = this.model[this.key][this.getEntityValue(index)];
-                    return animation.dim.x;
+                    return this.fixSize ? this.index.getSizeY() : animation.dim.y;
                 }
                 break;
 
@@ -1237,21 +1304,29 @@ class AnimationIndex extends EntityIndex {
     }
 
     setEntityValue(index, value) {
-        this.model[this.key][value] = {
-            dim: {}
-        };
+        if (this.model[this.key][value] === undefined) {
+            const obj = {};
+            if (!this.fixSize) {
+                obj.dim = {};
+            }
+            this.model[this.key][value] = obj;
+        }
     }
 
     setEntityPropValue(index, prop, value) {
         switch(prop) {
-            case 'sizeX': {
+            case 'sizeX':
+                if (this.fixSize) return;
+                {
                     const animation = this.model[this.key][this.getEntityValue(index)];
                     animation.dim.x = value;
                     this.notify()
                 }
                 break;
 
-            case 'sizeY': {
+            case 'sizeY':
+                if (this.fixSize) return;
+                {
                     const animation = this.model[this.key][this.getEntityValue(index)];
                     animation.dim.y = value;
                     this.notify()
@@ -1273,8 +1348,7 @@ class AnimationIndex extends EntityIndex {
         }
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -1291,6 +1365,11 @@ class AnimationIndex extends EntityIndex {
     drawEntity(ctx, index, x, y, zoomOrAvail = 1, players = null) {
         const frame = players.getCurrFrame(index);
         if (!frame) {
+            if (typeof zoomOrAvail === 'object') {
+                ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
+            } else {
+                ctx.clearRect(x, y, zoomOrAvail * this.getSizeX(), zoomOrAvail * this.getSizeY())
+            }
             return;
         }
         this.index.drawEntity(ctx, this.index.getEntityByPropValue('value', frame.id), x, y, zoomOrAvail);
@@ -1316,8 +1395,7 @@ class FrameIndex extends EntityIndex {
         return this.sizeY;
     }
 
-    getMatchingEntities(matchValue) {
-        const indices = this.getAllIndices();
+    getMatchingEntities(indices, matchValue) {
         if (matchValue === null) {
             return indices;
         }
@@ -1337,6 +1415,261 @@ class FrameIndex extends EntityIndex {
     }
 }
 
+class EventIndex extends EntityIndex {
+
+    constructor(model, key = 'events') {
+        super();
+        this.model = model;
+        this.key = key;
+        const events = model[key] ? Object.keys(model[key]) : [];
+        for (let row of model.map) {
+            for (let cell of row) {
+                if (Array.isArray(cell)) {
+                    const [index, ...items] = cell;
+                    for (let item of items) {
+                        if (!events.includes(item)) {
+                            events.push(item);
+                        }
+                    }
+                }
+            }
+        }
+        if (model.eventsImg === undefined) {
+            model.eventsImg = getCanvasForDim(0, 0);
+            model.pos = {};
+        }
+        this.img = model.eventsImg;
+        this.items = events.sort();
+        this.setSizes();
+        this.indexSorting = (a, b) => a === b ? 0 : (a < b ? -1 : 1);
+    }
+
+    getSizeX() {
+        return this.sizeX;
+    }
+
+    getSizeY() {
+        return this.sizeY;
+    }
+
+    getEntityProps() {
+        return [...super.getEntityProps(), 'offsetX', 'offsetY', 'width', 'height', 'image'];
+    }
+
+    setEntityValue(index, value) {
+        if (this.model[this.key] === undefined) {
+            this.model[this.key] = {};
+        }
+        if (this.model[this.key][value] === undefined) {
+            this.model[this.key][value] = {
+                width: 0,
+                height: 0,
+                offsetX: 0,
+                offsetY: 0
+            };
+            this.model.pos[value] = {x: null, y: null};
+        }
+        super.setEntityValue(index, value);
+    }
+
+    setEntityPropValue(index, name, value) {
+        if (['offsetX', 'offsetY', 'width', 'height'].includes(name)) {
+            const id = this.getEntityValue(index);
+            this.model[this.key][id][name] = value;
+            this.notify()
+        }
+        if (name === 'image') {
+            if (value !== null) {
+                const pos = this.model.pos[this.getEntityValue(index)];
+                const ctx = this.img.getContext('2d');
+                ctx.putImageData(
+                    value,
+                    pos.x,
+                    pos.y
+                );
+            }
+            this.notify()
+        }
+        super.setEntityPropValue(index, name, value)
+    }
+
+    getEntityPropValue(index, name) {
+        if (['offsetX', 'offsetY', 'width', 'height'].includes(name)) {
+            const id = this.getEntityValue(index);
+            const event = this.model[this.key] && this.model[this.key][id];
+            if (!event) {
+                return 0;
+            }
+            return event[name];
+        }
+        if (name === 'image') {
+            const width = this.getEntityPropValue(index, 'width');
+            if (width === 0) {
+                return null;
+            }
+            const height = this.getEntityPropValue(index, 'height');
+            const pos = this.model.pos[this.getEntityValue(index)];
+            const ctx = this.img.getContext('2d');
+            return ctx.getImageData(pos.x, pos.y, width, height);
+        }
+        return super.getEntityPropValue(index, name);
+    }
+
+    getMatchingEntities(indices, matchValue) {
+        if (matchValue === null) {
+            return indices;
+        }
+        const result = [];
+        matchValue = matchValue.toLowerCase();
+        for (let index of indices) {
+            if (this.getEntityValue(index).toLowerCase().indexOf(matchValue) !== -1) {
+                result.push(index);
+            }
+        }
+        return result;
+    }
+
+    getAutoProps() {
+        return ['image'];
+    }
+
+    assignAutoProps(updateIndices = []) {
+        let maxWidth = 500;
+        const sprites = [];
+        let iMax = this.getLength();
+        let i = 0;
+        while(i < iMax) {
+            const value = this.items[i];
+            const dim = {
+                x: this.model.events[value] ? this.model.events[value].width : 0,
+                y: this.model.events[value] ? this.model.events[value].height : 0
+            };
+            maxWidth = Math.max(maxWidth, dim.x);
+            sprites.push([value, dim.x, dim.y, i]);
+            i++;
+        }
+        sprites.sort((a, b) => a[2] === b[2] ? (a[1] === b[1] ? 0 : (a[1] > b[1] ? -1 : 1)) : (a[2] > b[2] ? -1 : 1));
+
+        // now them to free space blocks
+        let spaceBlocks = [[0, 0, maxWidth, null]];
+        let canvasWidth  = 0;
+        let canvasHeight = 0;
+        let offsets = {};
+
+        for (let sprite of sprites) {
+            const [name, width, height, index] = sprite;
+            // find free block matching width and height
+            let found = false;
+            const newBlocks = [];
+            for (let block of spaceBlocks) {
+                if (!found) {
+                    const [x, y, blockWidth, blockHeight] = block;
+                    if (blockHeight !== null && (blockWidth < width || blockHeight < height)) {
+                        newBlocks.push(block);
+                        continue;
+                    }
+                    offsets[name] = {x, y, index};
+                    if (blockHeight === null) {
+                        if (blockWidth > width) {
+                            newBlocks.push([x + width, y, blockWidth - width, height]);
+                        }
+                        newBlocks.push([0, y + height, maxWidth, null]);
+                    } else {
+                        if (blockWidth > width) {
+                            newBlocks.push([x + width, y, blockWidth - width, height]);
+                        }
+                        if (blockHeight > height) {
+                            newBlocks.push([x, y + height, blockWidth, blockHeight - height]);
+                        }
+                    }
+                    found = true;
+                    canvasWidth = Math.max(x + width, canvasWidth);
+                    canvasHeight = Math.max(y + height, canvasHeight);
+                } else {
+                    newBlocks.push(block);
+                }
+            }
+            spaceBlocks = newBlocks;
+        }
+        const canvas = getCanvasForDim(canvasWidth, canvasHeight);
+        const ctx = canvas.getContext('2d');
+
+        for (let [name, offset] of Object.entries(offsets)) {
+            if (!updateIndices.includes(offset.index)) {
+                this.drawEntity(ctx, offset.index, offset.x, offset.y);
+            }
+            this.model.pos[name] = {x: offset.x, y: offset.y};
+        }
+        this.model.eventsImg = canvas;
+        this.img = canvas;
+
+        return ['image'];
+    }
+
+    setSizes() {
+        let maxX = 0;
+        let maxY = 0;
+        for (let item of this.items) {
+            if (!this.model.events || !this.model.events[item]) {
+                continue;
+            }
+            maxX = Math.max(maxX, this.model.events[item].width);
+            maxY = Math.max(maxY, this.model.events[item].height);
+        }
+        this.sizeX = Math.max(maxX, 10);
+        this.sizeY = Math.max(maxY, 10);
+    }
+
+    hasEntityImage(index) {
+        const width = this.getEntityPropValue(index, 'width');
+        return (width !== 0)
+    }
+
+    drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
+
+        const width = this.getEntityPropValue(index, 'width');
+        if (width === 0) {
+            return;
+        }
+        const height = this.getEntityPropValue(index, 'height');
+        const dim = {x: width, y: height};
+        const pos = this.model.pos[this.getEntityValue(index)];
+
+        if (typeof zoomOrAvail === 'object') {
+            ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
+            if (pos !== null) {
+                drawCanvasToAvail(this.img, ctx, x, y, zoomOrAvail, dim, pos);
+            }
+        } else {
+            const targetWidth = dim.x * zoomOrAvail;
+            const targetHeight = dim.y * zoomOrAvail;
+            ctx.clearRect(x, y, targetWidth, targetHeight);
+            if (pos !== null) {
+                ctx.drawImage(
+                    this.img,
+                    pos.x,
+                    pos.y,
+                    dim.x,
+                    dim.y,
+                    x,
+                    y,
+                    targetWidth,
+                    targetHeight
+                );
+                return;
+            }
+        }
+        ctx.drawImage(
+            this.img,
+            pos.x, pos.y,
+            dim.x, dim.y,
+            x, y,
+            zoomOrAvail * dim.x,
+            zoomOrAvail * dim.y
+        );
+    }
+}
+
 export {
     SimpleIndex,
     ColorIndex,
@@ -1347,5 +1680,6 @@ export {
     BrushIndex,
     SpriteIndex,
     AnimationIndex,
-    FrameIndex
+    FrameIndex,
+    EventIndex
 };

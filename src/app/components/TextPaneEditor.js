@@ -914,7 +914,7 @@ function FontPreview(props) {
                 eContext.addListener(
                     props.editorId,
                     'mouseup',
-                    (e) => {
+                    e => {
                         eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
                         cContext.setFixCursor(null);
                         setHighlight(false);
@@ -944,7 +944,8 @@ function FontPreview(props) {
                 top={showMarker}
                 left={showMarker}
                 right={showMarker && (pos.x + pos.width < screenX)}
-                size={1}
+                sizeX={1}
+                sizeY={1}
                 width={Math.min(pos.width, screenX - pos.x)}
                 height={Math.min(pos.height, screenY - pos.y)}
                 highlight={highlight}

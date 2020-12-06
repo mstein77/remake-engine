@@ -621,6 +621,14 @@ input[type=range][orient=vertical] {
     background-color: transparent;
 }
 
+.border-bg {
+    background-color: var(--box-border-color);
+}
+
+.content-bg {
+    background-color: var(--content-bg-color);
+}
+
 .marked-item {
     background-color: var(--marker-color-highlight);
 }
@@ -629,6 +637,7 @@ input[type=range][orient=vertical] {
     background-color: var(--marker-color);
 }
 
+textarea.invalid,
 input.invalid,
 input:invalid {
     -webkit-animation-name: blinker;
