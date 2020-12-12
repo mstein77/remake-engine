@@ -1,4 +1,5 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import {CellValue} from "../classes/Grid";
 import {
     Stack,
     Section,
@@ -27,6 +28,7 @@ import {
     EntityPicker,
     FiltersSelector,
     EntityManager,
+    JsonView,
     AnimationManager,
     useModal, Page, ActionFrame,
     SideTabs, SideTab, GlobalContext, useAddIndexActions
@@ -36,10 +38,11 @@ import {
     BasicRasterView,
     EditorContext,
     useEditorContextPart,
-    BitmapSelector
+    BitmapSelector,
+    drawEventsValue
 } from './Raster';
 import {CellSelection, BrushSelection, EventSelection} from '../classes/CellProvider.js';
-import {d, getColorsFromCanvas, getCanvasForDim, getCanvasForIndexMatrix, getCanvasForBitmap, getEmptyImageData} from '../helper/helper';
+import {d, cloneDeep, getColorsFromCanvas, getCanvasForDim, getCanvasForIndexMatrix, getCanvasForBitmap, getEmptyImageData, getCanvasForEventMatrix} from '../helper/helper';
 import {TileIndex, ColorIndex, AliasIndex, BrushIndex, EventIndex, AnimationIndex} from "../classes/EntityIndex";
 import {IndexGrid, TilesGrid} from "../classes/Grid";
 import {BitmapCellProvider} from "../classes/CellProvider";
@@ -147,16 +150,26 @@ function useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid}) {
     }
 
     const cells = selection.getCells();
-    const type = selection.getType();
+    let type = selection.getType();
+    if (type !== 'brush') {
+        type = eContext.targetCellValue.getName() + '-' + type;
+    }
     let index;
+    let name;
     if (type === 'brush') {
         if (!brushIndex.hasIndex(selection.index)) {
             return false;
         }
+        index = selection.index;
+        name = selection.getName();
     }
     let image;
 
-    const canvas = getCanvasForIndexMatrix(tileIndex, cells, 20);
+    const canvas =
+        selection.getCellValue() === CellValue.events ?
+            getCanvasForEventMatrix(tileIndex, tilesGrid, cells, 20) :
+            getCanvasForIndexMatrix(tileIndex, aliasIndex, cells, 20);
+
     const ctx = canvas.getContext('2d');
     image = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
@@ -164,16 +177,15 @@ function useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid}) {
         type,
         content: 'dim',
         index,
-        name: selection.getName(),
+        name,
         image,
         width,
         height,
         cells
     }
-
 }
 
-function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid}) {
+function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid, editTiles}) {
     const eContext = useContext(EditorContext);
 
     const AddEventModal = useModal();
@@ -191,35 +203,45 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
         };
     }, [avail]);
 
+    const clearSelection = () => {
+        const cellValue = eContext.targetCellValue;
+        eContext.setSelection(new CellSelection('rect', [[cellValue.getEmpty()]], cellValue));
+        eContext.setRasterMode('map', 'startPath');
+    };
+
     if (selection === false) {
         requestAnimationFrame(() => {
-            eContext.setSelection(new CellSelection('rect', [[0]]));
+            eContext.setSelection(new CellSelection('rect', [[0]], CellValue.tile));
+            eContext.setRasterMode('map', 'startPath');
         });
+        return '';
+    } else if (eContext.selection.getCellValue() !== eContext.targetCellValue) {
+        requestAnimationFrame(clearSelection);
         return '';
     }
 
     let editAction;
-
     const editSelection = () => {
         const index = selection.index;
         editAction(index);
-    };
-
-    const clearSelection = () => {
-        eContext.setSelection(new CellSelection('rect', [[0]]));
     };
 
     const saveAsBrush = () => {
         SaveAsBrushModal.open({
             name: '',
             tiles: selection.cells,
+            tileIndex: tilesGrid.index,
+            tilesGrid,
+            aliasIndex,
+            editTiles,
+            brushIndex,
             isValid: name => !brushIndex.hasPropValue('value', name),
-            save: (name, tiles) => {
+            save: brush => {
                 let index = null;
                 eContext.doAction(
                     () => {
                         index = brushIndex.setEntityObject(
-                            {value: name, tiles}
+                            brush
                         );
                     },
                     () => {
@@ -227,6 +249,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                     }
                 );
                 eContext.setSelection(new BrushSelection(brushIndex, index));
+                eContext.setRasterMode('map', 'startPath');
                 SaveAsBrushModal.close()
             }
         });
@@ -250,14 +273,17 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                     const event = eventIndex.getEntityValue(index);
                     selection.events.push(event);
                     eContext.setSelection(new EventSelection(selection.events));
+                    eContext.setRasterMode('map', 'startPath');
                 }
         });
     };
 
     let content;
     let brushAction = false;
+    let clearAction = true;
     switch(selection.content) {
         case 'events':
+            clearAction = selection.events.length > 0;
             content =
                 <FullProp name="Events:">
                     <Content thin boxed>
@@ -270,6 +296,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                             ordered
                             setItems={events => {
                                 eContext.setSelection(new EventSelection(events));
+                                eContext.setRasterMode('map', 'startPath');
                             }}
                             new={addEvent}
                             getName={value => value}
@@ -282,7 +309,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
 
         case 'dim':
             const name = selection.name;
-            brushAction = selection.type !== 'brush';
+            brushAction = eContext.targetCellValue === CellValue.tile && selection.type !== 'brush';
             if (selection.type === 'brush') {
                 editAction = editBrush;
             }
@@ -299,6 +326,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                     break;
                 case 'Tile':
                     editAction = editTile;
+                    clearAction = selection.index !== 0;
                     break;
             }
             content = <>
@@ -322,7 +350,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                 </ValueProp>
 
                 <FullProp name="Properties:">
-                    <TextArea wrap="off" rows={8} readOnly value={JSON.stringify(selection.props, null, 2)} />
+                    <JsonView skipKeys={['index', 'animation']} json={selection.props} defaultJson={tilesGrid.index.model.defaultTile} />
                 </FullProp>
 
             </>;
@@ -334,8 +362,8 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
             <Toolbar>
                 <Stack>
                     {editAction && <Button click={editSelection}>Edit</Button>}
-                    {brushAction && <Button click={saveAsBrush}>Brush</Button>}
-                    <Button click={clearSelection}>Clear</Button>
+                    {brushAction && <Button click={saveAsBrush}>To Brush</Button>}
+                    <Button disabled={!clearAction} click={clearSelection}>Clear</Button>
                 </Stack>
             </Toolbar>
 
@@ -383,83 +411,10 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
     )
 }
 
-function ActiveTile2({tileIndex, brushIndex, editTile}) {
-    const eContext = useContext(EditorContext);
-    const SaveAsBrushModal = useModal();
-
-    const selection = eContext.selection;
-    const width = selection ? selection.getWidth() : 1;
-    const height = selection ? selection.getHeight() : 1;
-    const type = (width !== 1 || height !== 1) ? selection.getType() : 'cell';
-    let index = null;
-    if (type === 'cell') {
-        index = selection ? selection.getRow(0)[0] : 0;
-    }
-
-    if (selection === null || selection.isBitmap()) {
-        return <Content width={180}></Content>;
-    }
-    const selectionProvider = new TilesGrid(tileIndex, {map: selection.getCells()});
-
-    const saveAsBrush = () => {
-        SaveAsBrushModal.open({
-            name: '',
-            tiles: selection.getCells(),
-            isValid: name => !brushIndex.hasPropValue('value', name),
-            save: (name, tiles) => {
-                let index = null;
-                eContext.doAction(
-                    () => {
-                        index = brushIndex.setEntityObject(
-                            {value: name, tiles}
-                        );
-                    },
-                    () => {
-                        brushIndex.deleteEntity(index);
-                    }
-                );
-                SaveAsBrushModal.close()
-            }
-        });
-    };
-
-    const zoom = 3;
-    const dim = selectionProvider.getGridDim(width, height, 0, zoom);
-
-    return (
-        <Content width={180} padded>
-            <div>Type: {type}</div>
-            <Content padded>
-                <Stack align="center" alignItems="center">
-                    <Content boxed>
-                        <Canvas
-                            width={dim.width}
-                            height={dim.height}
-                            render={
-                                ctx => selectionProvider.drawGrid(ctx, 0, 0, width, height, 0, zoom)
-                            }
-                        />
-                    </Content>
-                </Stack>
-            </Content>
-            <button disabled={width !== 1 || height !== 1} onClick={e => editTile(selection.getCell())}>Edit</button>
-            {type === 'rect' && <button onClick={saveAsBrush}>Save as Brush</button>}
-            <Content>Index: {index}</Content>
-            <Content>Width: {width}</Content>
-            <Content>Height: {height}</Content>
-
-            <SaveAsBrushModal.content name="Save as Brush" fit closeable>
-                <BrushForm {...SaveAsBrushModal.props} />
-            </SaveAsBrushModal.content>
-        </Content>
-    );
-}
-
 function ActiveBrushPicker({brushIndex, editBrush}) {
     const eContext = useContext(EditorContext);
 
     const setActive = index => {
-        // const brush = brushIndex.getEntityObject(index);
         eContext.setSelection(new BrushSelection(brushIndex, index));
         eContext.setRasterMode('map', 'startPath');
     };
@@ -468,6 +423,7 @@ function ActiveBrushPicker({brushIndex, editBrush}) {
         <EntityPicker
             zoom={2}
             border={1}
+            filter
             entityIndex={brushIndex}
             doubleClick={editBrush}
             controls
@@ -481,7 +437,7 @@ function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
 
     const select = index => {
         const name = aliasIndex.getEntityValue(index);
-        eContext.setSelection(new CellSelection('rect', [[name]]));
+        eContext.setSelection(new CellSelection('rect', [[name]], CellValue.tile));
         eContext.setRasterMode('map', 'startPath');
     };
     return (
@@ -501,24 +457,71 @@ function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
     );
 }
 
-function BrushForm({save, close, isValid, ...props}) {
+function BrushForm({save, close, isValid, editTiles, brushIndex, aliasIndex, tilesGrid, tileIndex, ...props}) {
+
+    const EditTilesModal = useModal();
+    const CopyBrushModal = useModal();
+
     const [name, setName] = useState(props.name);
-    const [tiles, setTiles] = useState(props.tiles);
+    const [tiles, setTiles] = useState(cloneDeep(props.tiles));
 
     const canSave = name !== '' && isValid(name);
 
     const saveBrush = () => {
-        save(name, tiles);
+        save({value: name, tiles});
     };
+
+    const editBrushTiles = () => {
+        EditTilesModal.open({
+            tiles: cloneDeep(tiles),
+            aliasIndex,
+            tilesGrid,
+            save: editTiles => {
+                setTiles(editTiles);
+                EditTilesModal.close()
+            },
+            canSave
+        });
+    };
+
+    const copyBrush = () => {
+        CopyBrushModal.open({
+            zoom: 2,
+            entityIndex: brushIndex,
+            select: index => {
+                setTiles(brushIndex.getEntityPropValue(index, 'tiles'));
+                CopyBrushModal.close();
+            }
+        });
+    };
+
+    const canvas = getCanvasForIndexMatrix(tileIndex, aliasIndex, tiles, 20);
+    const ctx = canvas.getContext('2d');
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
     return (
         <SaveAndCancel canSave={canSave} padded save={saveBrush} close={close}>
             <PropertyGrid>
                 <TextFieldProp name="Name:" value={name} set={setName} invalid={!canSave} />
                 <PropLabel name="Tiles:">
-                    Tiles go here...
+                    <Stack noGap>
+                        <Button click={editBrushTiles}>Edit</Button>
+                        <Button click={copyBrush}>Copy</Button>
+                    </Stack>
+                    <Bitmap value={image} zoomOrAvail={{width: 200, height: 200}} editable={false} />
                 </PropLabel>
+                <DimProp name="Size:" readOnly x={tiles[0].length} y={tiles.length} />
             </PropertyGrid>
+
+            <EditTilesModal.content name="Edit Tiles" width={800} height={600} closeable fit>
+                <EditorCtx>
+                    <TilesEditor {...EditTilesModal.props} />
+                </EditorCtx>
+            </EditTilesModal.content>
+
+            <CopyBrushModal.content name="Pick Brush" width={600} height={600}>
+                <EntityPicker {...CopyBrushModal.props} />
+            </CopyBrushModal.content>
         </SaveAndCancel>
     )
 }
@@ -568,7 +571,7 @@ function AliasForm({save, close, isValid, alias, tileIndex}) {
     )
 }
 
-function BrushManager({brushIndex, editBrush}) {
+function BrushManager({brushIndex, tilesGrid, editBrush, editTiles, aliasIndex, tileIndex}) {
     const eContext = useContext(EditorContext);
 
     const NewBrushModal = useModal();
@@ -578,14 +581,18 @@ function BrushManager({brushIndex, editBrush}) {
     const newBrush = () => {
         NewBrushModal.open({
             name: '',
-            tiles: [[]], // TODO: we should get some tiles from a matrix here
+            aliasIndex,
+            tileIndex,
+            tilesGrid,
+            brushIndex,
+            tiles: [[0]], // TODO: we should get some tiles from a matrix here
             isValid: name => !brushIndex.hasPropValue('value', name),
-            save: (name, tiles) => {
+            save: brush => {
                 let index = null;
                 eContext.doAction(
                     () => {
                         index = brushIndex.setEntityObject(
-                            {value: name, tiles}
+                            brush
                         );
                     },
                     () => {
@@ -767,7 +774,6 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
                 let index = null;
                 eContext.doAction(
                     () => {
-                        d('INSERT', tile);
                         index = tileIndex.setEntityObject(tile);
                     },
                     () => {
@@ -873,7 +879,7 @@ function ActiveTilePicker({tileIndex, editTile, base = null}) {
                     doubleClick={index => editTile(index)}
                     select={
                         index => {
-                            eContext.setSelection(new CellSelection('rect', [[index]]));
+                            eContext.setSelection(new CellSelection('rect', [[index]], CellValue.tile));
                             eContext.setRasterMode('map', 'startPath');
                         }
                     }
@@ -896,6 +902,7 @@ function ActiveEventPicker({eventIndex, editEvent}) {
                 index => {
                     const event = eventIndex.getEntityValue(index);
                     eContext.setSelection(new EventSelection(event));
+                    eContext.setRasterMode('map', 'startPath');
                 }
             }
             zoom={1}
@@ -1051,6 +1058,70 @@ function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
     )
 }
 
+function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
+    const eContext = useContext(EditorContext);
+
+    const editGrid = useMemo(() => {
+        return new TilesGrid(
+            tilesGrid.index,
+            {...tilesGrid.model, map: tiles}
+        );
+    }, [tiles]);
+
+    return (
+        <SaveAndCancel fullHeight save={() => {save(editGrid.map)}} canSave={() => true} close={close}>
+            <Stack vertical border fullHeight>
+                <Stack flex fullHeight border>
+                    <Content padded fullHeight>
+                        <Entity readOnly zoomOrAvail={{width: 100, height: 100}} entityIndex={editGrid.index} value={eContext.selection.getCell()} />
+                    </Content>
+                    <Content flex>
+                        <BasicRasterView
+                            cellProvider={editGrid}
+                            resizeable
+                            undoRedo
+                            editorId="editTiles" /></Content>
+                </Stack>
+
+                <Content height={150}>
+                    <SideTabs>
+                        <SideTab name="Tiles" active>
+                            <EntityPicker entityIndex={tilesGrid.index} select={
+                                index => {
+                                    eContext.setSelection(
+                                        new CellSelection('rect', [[index]], CellValue.tile)
+                                    );
+                                    eContext.setRasterMode('editTiles', 'startPath');
+                                }
+                            } />
+                        </SideTab>
+
+                        <SideTab name="Alias">
+                            <EntityTextPicker
+                                entityIndex={aliasIndex}
+                                select={
+                                    index => {
+                                            eContext.setSelection(
+                                                new CellSelection('rect', [[aliasIndex.getEntityValue(index)]], CellValue.tile)
+                                            );
+                                            eContext.setRasterMode('editTiles', 'startPath');
+                                    }
+                                }
+                                sizeX={aliasIndex.getSizeX()}
+                                sizeY={aliasIndex.getSizeY()}
+                                textSize={120}
+                                zoom={2}
+                                border={0}
+                                />
+                        </SideTab>
+                    </SideTabs>
+                </Content>
+            </Stack>
+        </SaveAndCancel>
+    )
+}
+
+
 function TilesMapEditor({model, resource, revert, cancel, play, tree, exportModel, saveModel}) {
 
     const eContext = useContext(EditorContext);
@@ -1059,6 +1130,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
     const EditAliasModal = useModal();
     const EditBrushModal = useModal();
     const EditEventModal = useModal();
+    const EditTilesModal = useModal();
 
     useEffect(() => {
         eContext.setTracking({map: ['active', 'hover']});
@@ -1077,7 +1149,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
     }, []);
 
     const brushIndex = useMemo(() => {
-        return new BrushIndex(model, tileIndex)
+        return new BrushIndex(model, tileIndex, aliasIndex)
     }, []);
 
     const animationIndex = useMemo(() => {
@@ -1086,6 +1158,10 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
     const eventIndex = useMemo(() => {
         return new EventIndex(model)
+    }, []);
+
+    const modeTargets = useMemo(() => {
+        return [CellValue.tile, CellValue.events]
     }, []);
 
     const saveTilesPane = () => {
@@ -1145,13 +1221,16 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
         EditBrushModal.open({
             name: brush.value,
             tiles: brush.tiles,
+            aliasIndex,
+            tileIndex,
+            tilesGrid,
+            brushIndex,
             isValid: name => name === brush.value || !brushIndex.hasPropValue('value', name),
-            save: (name, tiles) => {
+            save: changedBrush => {
                 let lastIndex = index;
-                tiles = brush.tiles;
                 eContext.doAction(
                     () => {
-                        lastIndex = brushIndex.setEntityObject({index: lastIndex, value: name, tiles}, true);
+                        lastIndex = brushIndex.setEntityObject({...changedBrush, index: lastIndex}, true);
                     },
                     () => {
                         lastIndex = brushIndex.setEntityObject({...brush, index: lastIndex}, true);
@@ -1210,7 +1289,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                             </Section>
 
                             <Section name="Map" flex>
-                                <BasicRasterView undoRedo={false} tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={tilesGrid} width={5} height={5} posX={0} posY={7} border={0} zoom={1} />
+                                <BasicRasterView modeTargets={modeTargets} undoRedo={false} tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={tilesGrid} width={5} height={5} posX={0} posY={7} border={0} events={true} zoom={1} />
                             </Section>
                             <Section name="Cursor" collapse vertical>
                                 <Content padded>
@@ -1250,7 +1329,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                             <ActiveBrushPicker brushIndex={brushIndex} editBrush={editBrush} />
                                         </SideTab>
                                         <SideTab name="Manage">
-                                            <BrushManager brushIndex={brushIndex} editBrush={editBrush} editorId="brushManager" />
+                                            <BrushManager brushIndex={brushIndex} aliasIndex={aliasIndex} tileIndex={tileIndex} editBrush={editBrush} tilesGrid={tilesGrid} editorId="brushManager" />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
@@ -1269,7 +1348,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                 <SideTab name="Animations">
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveTilePicker tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} editTile={editTile} />
+                                            <ActiveTilePicker tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} />
                                         </SideTab>
                                         <SideTab name="Manage">
                                             <AnimationManager animationIndex={animationIndex} spriteIndex={tileIndex} />
@@ -1298,6 +1377,12 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             <EditEventModal.content name="Edit Event" closeable fit>
                 <EventForm {...EditEventModal.props} />
             </EditEventModal.content>
+
+            <EditTilesModal.content name="Edit Tiles" width={800} height={600} closeable fit>
+                <EditorCtx>
+                    <TilesEditor {...EditTilesModal.props} />
+                </EditorCtx>
+            </EditTilesModal.content>
         </Page>
     );
 }

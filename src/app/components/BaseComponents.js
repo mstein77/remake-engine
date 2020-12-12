@@ -371,7 +371,7 @@ function Bitmap({value, set, colors, empty, resizeable, entityIndex, editable, z
     const ImportBitmapModal = useModal();
     const CopyBitmapModal = useModal();
 
-    const edit = () => {
+    const edit = !editable ? null : () => {
         EditBitmapModal.open({
             save: provider => {
                 set(provider.getImageData());
@@ -502,7 +502,7 @@ function Entity({entityIndex, readOnly, value, player, set, reset, zoomOrAvail =
 
     playerRef.current = players;
 
-    const pick = () => {
+    const pick = readOnly ? null : () => {
         EntityPickerModal.open({
             entityIndex,
             player: true,
@@ -1751,17 +1751,18 @@ function EntityPicker({entityIndex, player, controls, editorId, select, base = n
     }, [sizeX, sizeY]);
 
     const doubleClick = props.doubleClick ? (e, x, y) => {
-        const index = gridProvider.getCellValue(x, y);
+        const index = gridProvider.getCellValue(x, pos + y);
         if (index < entityIndex.getLength()) {
             props.doubleClick(index);
         }
     } : null;
 
     const setFilter = value => {
-        gridProvider.setMatch(value);
         setFilterRaw(value);
         setPos(0);
     };
+
+    gridProvider.setMatch(filter === '' ? null : filter);
 
     if (players) {
         gridProvider.updatePlayers(pos, width, height);
@@ -3677,10 +3678,10 @@ const useAddIndexActions = (entityIndex, actions, result = []) => {
     return result;
 };
 
-function SaveAndCancel({save, close, padded, canSave = true, children}) {
+function SaveAndCancel({save, close, fullHeight, padded, canSave = true, children}) {
     return (
-        <Stack vertical border>
-            <Content  padded={padded}>{children}</Content>
+        <Stack vertical border fullHeight={fullHeight}>
+            <Content fullHeight={fullHeight} padded={padded}>{children}</Content>
             <Content padded>
                 <Button disabled={!canSave} click={save}>OK</Button>
                 <Button click={close}>Cancel</Button>
@@ -4062,7 +4063,35 @@ function AnimationManager({animationIndex, spriteIndex}) {
     )
 }
 
+function JsonView({json, defaultJson = {}, skipKeys = [], ...props}) {
+    const base = {...defaultJson, ...json};
+    for (let key of skipKeys) {
+        delete base[key];
+    }
+    const lines = JSON.stringify(base, null, 2).split("\n");
+    const defLines = JSON.stringify(defaultJson, null, 2).split("\n");
+    const render = line => {
+        if (line.match(/^[ ]+\"[^"]*\"\:/)) {
+            return line.replace(/\"/, '').replace(/\"/, '');
+        }
+        return line
+    };
+
+    return (
+        <Content padded thin boxed scroll {...props}>
+            <pre>
+            {
+                lines.map(
+                    (line, index) =>
+                        <span key={index} className={defLines.includes(line) || defLines.includes(line + ',') ? 'less' : ''}>{render(line)}{"\n"}</span>)
+            }
+            </pre>
+        </Content>
+    )
+}
+
 export {
+    JsonView,
     CellGrid,
     Section,
     Tab,

@@ -935,10 +935,11 @@ class AliasIndex extends EntityIndex {
 
 class BrushIndex extends EntityIndex {
 
-    constructor(model, tileIndex) {
+    constructor(model, tileIndex, aliasIndex) {
         super();
         this.model = model;
         this.tileIndex = tileIndex;
+        this.aliasIndex = aliasIndex;
         this.items = Object.keys(this.model.brushes).sort();
         this.indexSorting = (a, b) => (a === b ? 0 : (a < b ? -1 : 1));
     }
@@ -956,6 +957,7 @@ class BrushIndex extends EntityIndex {
         const name = this.getEntityValue(index);
         if (name) {
             delete this.model.brushes[name];
+            this.notify();
         }
     }
 
@@ -986,7 +988,7 @@ class BrushIndex extends EntityIndex {
 
     drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
         const tiles = this.getEntityPropValue(index, 'tiles');
-        const canvas = getCanvasForIndexMatrix(this.tileIndex, tiles, 10);
+        const canvas = getCanvasForIndexMatrix(this.tileIndex, this.aliasIndex, tiles, 10);
         if (typeof zoomOrAvail === 'object') {
             ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             if (canvas === null) {

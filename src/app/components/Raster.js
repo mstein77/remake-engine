@@ -22,7 +22,8 @@ import {
     Select,
     Canvas
 } from "./BaseComponents";
-import {d, getItemsCloneWithUpdatedItem, getColorsFromImageData} from '../helper/helper';
+import {CellValue} from "../classes/Grid";
+import {d, getItemsCloneWithUpdatedItem, getColorsFromImageData, drawEventsValue} from '../helper/helper';
 
 import {CellSelection, FontIndexCellProvider} from "../classes/CellProvider";
 import {BitmapGrid} from "../classes/Grid";
@@ -713,10 +714,15 @@ class EditorCtx extends React.Component {
 
         this.state = {
 
+            targetCellValue: CellValue.raw,
+            setTargetCellValue: targetCellValue => {
+                this.setState({targetCellValue: CellValue[targetCellValue]});
+            },
+
             // Selection
             selection: new CellSelection(),
             setSelection: selection => {
-                this.setState({selection});
+                this.setState({selection, targetCellValue: selection.getCellValue()});
             },
 
             // Settings
@@ -1275,42 +1281,56 @@ const CellProviderRaster = React.memo((props) => {
     );
 });
 
-function EventArea(props) {
+function EventArea({editorId, ...props}) {
     const [cellSizeX, cellPlusBorderSizeX, cellSizeY, cellPlusBorderSizeY, rasterWidth, rasterHeight] = useRasterDimXY(props);
     const {cellProvider, width, height, posX, posY, zoom, border} = props;
 
     const render = ctx => {
+        if (!ctx) {
+            return;
+        }
+        const cells = cellProvider.getSelection(posX, posY, width, height, CellValue.events).getCells();
+
         ctx.clearRect(0, 0, rasterWidth, rasterHeight);
-        const cells = cellProvider.getRawSelection(posX, posY, width, height).getCells();
         let currY = border;
         const yMax = Math.min(height, cells.length);
         const xMax = yMax === 0 ? 0 : Math.min(width, cells[0].length);
         for (let y = 0; y < yMax; y++) {
             let currX = border;
             for (let x = 0; x < xMax; x++) {
-                const value = cells[y][x];
-                if (Array.isArray(value)) {
-                    let box = 0;
-                    for (let i = 1; i < value.length; i++) {
-                        if (!cellProvider.drawEvent(ctx, value[i], currX, currY, zoom)) {
-                            box++;
-                        };
-                    }
-                    if (box) {
-                        ctx.fillStyle = '#00FF0088';
-                        ctx.fillRect(currX + 2, currY + 2, 12, 12);
-                        ctx.strokeStyle = '#000000';
-                        ctx.strokeRect(currX + 2, currY + 2, 12, 12);
-                        ctx.fillStyle = '#FFFFFF';
-                        ctx.font = '10px';
-                        ctx.fillText('' + box, currX + 6, currY + 12, 12);
-                    }
+                drawEventsValue(
+                    ctx,
+                    cellProvider,
+                    cells[y][x],
+                    currX,
+                    currY,
+                    zoom
+                );
+                /*
+                const values = cells[y][x];
+                let box = 0;
+                for (let value of values) {
+                    if (!cellProvider.drawEvent(ctx, value, currX, currY, zoom)) {
+                        box++;
+                    };
                 }
+                if (box) {
+                    ctx.fillStyle = '#00FF0088';
+                    ctx.fillRect(currX + 2, currY + 2, 12, 12);
+                    ctx.strokeStyle = '#000000';
+                    ctx.strokeRect(currX + 2, currY + 2, 12, 12);
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '10px';
+                    ctx.fillText('' + box, currX + 6, currY + 12, 12);
+                }
+                 */
                 currX += cellPlusBorderSizeX;
             }
             currY += cellPlusBorderSizeY;
         }
     };
+
+    useEditorContextPart(editorId, render);
 
     return (
         <div
@@ -1600,7 +1620,7 @@ function RasterOverlays(props) {
         let mouseUpPickAgain = null;
         hasMode('pick') && overlay.addMode(
             'pick',
-            (data) => {
+            data => {
                 setCursorType('rect');
                 setCursorWidth(1);
                 setCursorHeight(1);
@@ -1615,7 +1635,7 @@ function RasterOverlays(props) {
                     }
                 };
                 setCursorMouseDown(() => (e, x, y) => {
-                    eCtxRef.current.setSelection(props.cellProvider.getSelection(x, y, 1, 1));
+                    eCtxRef.current.setSelection(d(props.cellProvider.getSelection(x, y, 1, 1, eCtxRef.current.targetCellValue), 'QT'));
                     propsRef.current.setMarkerX(x);
                     propsRef.current.setMarkerY(y);
                     propsRef.current.setMarkerType('rect');
@@ -1693,7 +1713,7 @@ function RasterOverlays(props) {
         );
         hasMode('startPath') && overlay.addMode(
             'startPath',
-            (data) => {
+            data => {
                 const selection = eCtxRef.current.selection;
                 setCursorMatrix(matrix);
                 setCursorType(selection.getType());
@@ -1706,15 +1726,14 @@ function RasterOverlays(props) {
                 if (markerType === 'rows' || markerType === 'columns') {
                     const isRows = markerType === 'rows';
                     setCursorMouseTrack(() => (x, y) => {
-                        matrix = eCtxRef.current.selection.getMatchMatrix(
-                            props.cellProvider.getEmptyCell(),
+                        matrix = eCtxRef.current.selection.getNotEmptyMatrix(
                             propsRef.current[isRows ? 'posX' : 'posY'],
                             propsRef.current[isRows ? 'width' : 'height']
                         );
                         setCursorMatrix(matrix);
                     });
                 } else if (markerType === 'rect') {
-                    matrix = selection.getMatchMatrix(props.cellProvider.getEmptyCell());
+                    matrix = selection.getNotEmptyMatrix();
                 }
                 setCursorMatrix(matrix);
                 setCursorMouseDown(() => (e, x, y) => {
@@ -1736,7 +1755,7 @@ function RasterOverlays(props) {
         let mouseUpSavePath;
         hasMode('writePath') && overlay.addMode(
             'writePath',
-            (data) => {
+            data => {
                 setCursorMatrix(matrix);
                 const path = {
                     new: {},
@@ -1755,9 +1774,9 @@ function RasterOverlays(props) {
                         y = 0;
                     }
                     if (data.clear) {
-                        segment = props.cellProvider.writeSelection(x, y, selection, props.cellProvider.getEmptyCell(), true);
+                        segment = props.cellProvider.writeSelection(x, y, selection, props.cellProvider.getEmptyCell(selection.cellValue), true);
                     } else {
-                        segment = props.cellProvider.writeSelection(x, y, selection, null,  propsRef.current.writeTransparent);
+                        segment = props.cellProvider.writeSelection(x, y, selection, null,  selection.isCell() || propsRef.current.writeTransparent);
                     }
                     Object.assign(path.new, segment.new);
                     for(let key in segment.old) {
@@ -1765,7 +1784,7 @@ function RasterOverlays(props) {
                             path.old[key] = segment.old[key];
                         }
                     }
-                    eCtxRef.current.updateRaster(props.editorId);
+                    eCtxRef.current.updateRaster(props.editorId + (selection.getCellValue() === CellValue.events ? '_events' : ''));
                 };
                 setCursorHighlight(true);
                 track(data.start.x, data.start.y);
@@ -1773,12 +1792,13 @@ function RasterOverlays(props) {
                 mouseUpSavePath = (e, x, y) => {
                     const doPath = path.new;
                     const undoPath = path.old;
+                    const cellValue = eCtxRef.current.selection.getCellValue();
                     const doAction = () => {
-                        props.cellProvider.writePath(doPath);
+                        props.cellProvider.writePath(doPath, cellValue);
                         eCtxRef.current.updateRaster(props.editorId);
                     };
                     const undoAction = () => {
-                        props.cellProvider.writePath(undoPath);
+                        props.cellProvider.writePath(undoPath, cellValue);
                         eCtxRef.current.updateRaster(props.editorId);
                     };
                     eContext.doAction(doAction, undoAction);
@@ -2254,20 +2274,22 @@ function RasterOverlays(props) {
 
         overlay.addMarkerAction(
             'clear',
-            (props) => {
+            props => {
                 const markerX = props.markerX;
                 const markerY = props.markerY;
                 const markerType = props.markerType;
+                const cellValue = eCtxRef.current.selection.getCellValue();
                 const width = markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth;
                 const height = markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight;
-                const undoSelection = props.cellProvider.getSelection(markerX, markerY, width, height);
+                const undoSelection = props.cellProvider.getSelection(markerX, markerY, width, height, cellValue);
                 const doAction = () => {
                     props.cellProvider.fillRect(
                         markerX,
                         markerY,
                         width,
                         height,
-                        props.cellProvider.getEmptyCell()
+                        props.cellProvider.getEmptyCell(cellValue),
+                        cellValue
                     );
                     eCtxRef.current.updateRaster(props.editorId);
                 };
@@ -2283,7 +2305,7 @@ function RasterOverlays(props) {
                 };
                 eCtxRef.current.doAction(doAction, undoAction);
             },
-            (props) => {
+            props => {
                 return (props.markerX !== null && !props.markerType.endsWith('gap'));
             }
         );
@@ -2291,12 +2313,13 @@ function RasterOverlays(props) {
         overlay.addMarkerAction(
             'copy',
             (props, copyOnly = false) => {
-
+                const cellValue = eCtxRef.current.targetCellValue;
                 const rect = props.cellProvider.getRect(
                     props.markerX,
                     props.markerY,
                     props.markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth,
-                    props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight
+                    props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight,
+                    cellValue
                 );
                 if (props.modeParams && props.modeParams.multi) {
                     eCtxRef.current.setSelection(
@@ -2308,34 +2331,37 @@ function RasterOverlays(props) {
                                 baseX: cursorRef.current.cursorWidth,
                                 baseY: cursorRef.current.cursorHeight,
                                 rect
-                            }
+                            },
+                            cellValue
                         )
                     );
                 } else {
-                    eCtxRef.current.setSelection(new CellSelection(props.markerType, rect));
+                    eCtxRef.current.setSelection(new CellSelection(props.markerType, rect, cellValue));
                 }
                 if (!copyOnly) {
                     overlay.setMode(hasMode('startPath') ? 'startPath' : 'display');
                 }
             },
-            (props) => {
+            props => {
                 return (props.markerX !== null && !props.markerType.endsWith('gap'));
             }
         );
 
         overlay.addMarkerAction(
             'fill',
-            (props) => {
+            props => {
                 const markerX = props.markerX;
                 const markerY = props.markerY;
                 const width = props.markerType === 'rows' ? props.cellProvider.getWidth() : props.markerWidth;
                 const height = props.markerType === 'columns' ? props.cellProvider.getHeight() : props.markerHeight;
-                const doSelection = new CellSelection(props.markerType, eCtxRef.current.selection.getCells());
+                const cellValue = eCtxRef.current.selection.getCellValue();
+                const doSelection = new CellSelection(props.markerType, eCtxRef.current.selection.getCells(), cellValue);
                 const undoSelection = props.cellProvider.getSelection(
                     markerX,
                     markerY,
                     width,
-                    height
+                    height,
+                    cellValue
                 );
                 const doAction = () => {
                     props.cellProvider.fillRectWithSelection(
@@ -2359,14 +2385,14 @@ function RasterOverlays(props) {
                 };
                 eCtxRef.current.doAction(doAction, undoAction);
             },
-            (props) => {
+            props => {
                 return (props.markerX !== null && !props.markerType.endsWith('gap'));
             }
         );
 
         overlay.addMarkerAction(
             'goto',
-            (props) => {
+            props => {
                 if (!props.markerType.startsWith('row')) {
                     props.setPosX(props.markerX);
                 }
@@ -2374,7 +2400,7 @@ function RasterOverlays(props) {
                     props.setPosY(props.markerY);
                 }
             },
-            (props) => {
+            props => {
                 return (props.markerX !== null);
             }
         );
@@ -2435,6 +2461,7 @@ function RasterOverlays(props) {
                     sizeY={sizeX}
                     posX={props.posX}
                     posY={props.posY}
+                    editorId={props.editorId + '_events'}
                 />
             }
             <CursorArea
@@ -2553,7 +2580,7 @@ function RasterViewGrid(props) {
                     const undoAction = () => {
                         props.cellProvider.addRows(start, -added);
                         if (undoSelection) {
-                            props.cellProvider.fillRectWithRawSelection(
+                            props.cellProvider.fillRectWithSelection(
                                 0, start ? 0 : props.cellProvider.getHeight() + added,
                                 props.cellProvider.getWidth(), -added,
                                 undoSelection
@@ -2593,7 +2620,7 @@ function RasterViewGrid(props) {
                     const undoAction = () => {
                         props.cellProvider.addColumns(start, -added);
                         if (undoSelection) {
-                            props.cellProvider.fillRectWithRawSelection(
+                            props.cellProvider.fillRectWithSelection(
                                 start ? 0 : props.cellProvider.getWidth() + added, 0,
                                 -added, props.cellProvider.getHeight(),
                                 undoSelection
@@ -2642,14 +2669,14 @@ function RasterViewGrid(props) {
                         eCtxRef.current.doAction(doAction, undoAction);
                     }
                 },
-                (props) => {
+                props => {
                     return (props.markerX !== null && props.markerType.endsWith('gap'));
                 }
             );
 
             overlay.addMarkerAction(
                 'crop',
-                (props) => {
+                props => {
                     const markerX = props.markerX;
                     const markerY = props.markerY;
                     const markerType = props.markerType;
@@ -2675,15 +2702,16 @@ function RasterViewGrid(props) {
                         props.setPosX(props.posX);
                     };
                     eCtxRef.current.doAction(doAction, undoAction);
+                    eCtxRef.current.setRasterMode(editorId, 'startPath');
                 },
-                (props) => {
+                props => {
                     return (props.markerX !== null && !props.markerType.endsWith('gap'));
                 }
             );
 
             overlay.addMarkerAction(
                 'delete',
-                (props) => {
+                props => {
                     const markerType = props.markerType;
                     const markerY = props.markerY;
                     const markerX = props.markerX;
@@ -2704,14 +2732,14 @@ function RasterViewGrid(props) {
                     };
                     eCtxRef.current.doAction(doAction, undoAction);
                 },
-                (props) => {
+                props => {
                     return (props.markerX !== null && (props.markerType === 'rows' || props.markerType === 'columns'));
                 }
             );
         }
     }, []);
 
-    const shiftRow = (start) => {
+    const shiftRow = start => {
         const width = props.cellProvider.getWidth();
         const height = props.cellProvider.getHeight();
         const undoSelection =
@@ -3005,7 +3033,7 @@ function useOverlay(id) {
  * @returns {*}
  * @constructor
  */
-function BasicRasterView(props) {
+function BasicRasterView({modeTargets = [], ...props}) {
     const defaults = props.defaults ? props.defaults : {};
 
     const [border, setBorder] = useState(defaults.border !== undefined ? defaults.border : 0);
@@ -3045,9 +3073,10 @@ function BasicRasterView(props) {
 
     const bottomActions = [];
     const bottomTools = [];
-    if (overlay.current && isWriteMode) {
-        bottomActions.push(
-            <Checkbox key="trans" name="Write opaque" value={writeTransparent} set={setWriteTransparent} />
+    const modeOptions = [];
+    if (overlay.current && isWriteMode && !eContext.selection.isCell()) {
+        modeOptions.push(
+            <Checkbox key="trans" name="Opaque" value={writeTransparent} set={setWriteTransparent} />
         );
     }
     if (overlay.current && isSelectionMode && markerX !== null) {
@@ -3191,16 +3220,35 @@ function BasicRasterView(props) {
     } else if (isWriteMode) {
         modeInfo = 'Write'
     }
+
+    const modeTargetSelection = (modeTargets && modeTargets.length > 1) ?
+        <Content>
+            <Select
+                value={eContext.targetCellValue.getId()}
+                buttons
+                options={
+                    modeTargets.map(
+                        cellValue => {
+                            return {
+                                id: cellValue.getId(),
+                                name: cellValue.getName()
+                            };
+                        }
+                    )
+                }
+                set={id => eContext.setTargetCellValue(id)}
+            />
+        </Content> : '';
+
     const bottomToolbar =
         <Toolbar>
-            <Content>
-                <Stack fullHeight>
-                    <Content>Mode: {modeInfo}</Content>
-                    <Content><Select value={0} buttons options={[{id: 0, name: 'Tiles'}, {id: 1, name: 'Events'}]} /></Content>
-                </Stack>
-            </Content>
-            {bottomTools}
-            {bottomActions}
+            <Stack>
+                <Content>Mode: {modeInfo}</Content>
+                {modeTargetSelection}
+                {modeOptions}
+            </Stack>
+            {bottomTools.length > 0 ? <Stack>{bottomTools}</Stack> : ''}
+            {bottomActions.length > 0 ? <Stack>{bottomActions}</Stack> : ''}
         </Toolbar>;
 
     let undoRedo = '';
@@ -3253,9 +3301,10 @@ function BasicRasterView(props) {
         );
     }
 
+    const targetEvents = eContext.targetCellValue === CellValue.events;
     const eventsButton =
-        props.cellProvider.hasEvents() &&
-        <Content><SwitchButton enabled={events} switch={value => setEvents(!events)}>Events</SwitchButton></Content>;
+        props.events && props.cellProvider.hasEvents() &&
+        <Content><SwitchButton enabled={events || targetEvents} switch={value => {if (!targetEvents) setEvents(!events)}}>Events</SwitchButton></Content>;
 
 
     const posSize =
@@ -3284,7 +3333,7 @@ function BasicRasterView(props) {
             <Content flex fullHeight>
                 <RasterViewGrid
                     auto
-                    events={events}
+                    events={events || targetEvents}
                     resizeable={resizeable}
                     shifteable={shifteable}
                     renderOptions={renderOptions}
@@ -3510,7 +3559,7 @@ function BitmapEditor({image, save, close, colors, resize}) {
                             select={
                                 index => {
                                     eContext.setSelection(
-                                        new CellSelection('rect', [[colorIndex.getEntityValue(index)]])
+                                        new CellSelection('rect', [[colorIndex.getEntityValue(index)]], CellValue.color)
                                     );
                                     eContext.setRasterMode('bitmap', 'startPath', {})
                                 }

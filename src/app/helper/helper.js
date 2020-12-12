@@ -662,6 +662,7 @@ const getTextBlockImage = (block, font, filterer = null) => {
     return canvas;
 };
 
+/*
 const cloneDeep = obj => {
     if (Array.isArray(obj)) {
         const clone = [];
@@ -680,7 +681,12 @@ const cloneDeep = obj => {
     return obj;
 };
 
+ */
+
 const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
+    if (!canvas.width) {
+        return;
+    }
     const sizeX = dim === null ? canvas.width : dim.x;
     const sizeY = dim === null ? canvas.height : dim.y;
     const posX = pos === null ? 0 : pos.x;
@@ -711,9 +717,60 @@ const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => 
     }
 };
 
-const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
-    const sizeX = entityProvider.getSizeX();
-    const sizeY = entityProvider.getSizeY();
+function drawEventsValue(ctx, eventIndex, values, x, y, zoom = 1) {
+    let box = 0;
+    for (let value of values) {
+        if (!eventIndex.drawEvent(ctx, value, x, y, zoom)) {
+            box++;
+        }
+    }
+    if (box) {
+        ctx.fillStyle = '#00FF0088';
+        ctx.fillRect(x + 2, y + 2, 12, 12);
+        ctx.strokeStyle = '#000000';
+        ctx.strokeRect(x + 2, y + 2, 12, 12);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '10px';
+        ctx.fillText('' + box, x + 6, y + 12, 12);
+    }
+}
+
+function getCanvasForEventMatrix(tilesIndex, eventIndex, matrix, maxDim = null) {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let cell of matrix[y]) {
+            if (plain) {
+                if (cell.length !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                drawEventsValue(tilesCtx, eventIndex, cell, posX, posY);
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+}
+
+const getCanvasForIndexMatrix = (tilesIndex, aliasIndex, matrix, maxDim = null) => {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
     const cellsY = matrix.length;
     const cellsX = cellsY === 0 ? 0 : matrix[0].length;
     const tilesWidth = cellsX * sizeX;
@@ -735,7 +792,12 @@ const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
                     tilesCtx.fillRect(posX, posY, sizeX, sizeY);
                 }
             } else {
-                entityProvider.drawEntity(tilesCtx, tile, posX, posY);
+                if (typeof tile === 'string') {
+                    const index = aliasIndex.getEntityByPropValue('value', tile);
+                    aliasIndex.drawEntity(tilesCtx, index, posX, posY);
+                } else {
+                    tilesIndex.drawEntity(tilesCtx, tile, posX, posY);
+                }
             }
             posX += sizeX;
         }
@@ -1031,8 +1093,22 @@ class Players {
     }
 }
 
+function cloneDeep(value) {
+    if (Array.isArray(value)) {
+        return value.map(item => cloneDeep(item));
+    } else if (typeof value === 'object') {
+        const obj = {};
+        for (let [key, subValue] of Object.entries(value)) {
+            obj[key] = cloneDeep(subValue);
+        }
+        return obj;
+    }
+    return value;
+}
+
 module.exports = {
     d,
+    cloneDeep,
     hex2rgb,
     rgb2hex,
     isValidResourceId,
@@ -1060,7 +1136,9 @@ module.exports = {
     getBlockPos,
     cloneDeep,
     drawCanvasToAvail,
+    drawEventsValue,
     getCanvasForIndexMatrix,
+    getCanvasForEventMatrix,
     BitmapPlayer,
     ANIMATION,
     Players

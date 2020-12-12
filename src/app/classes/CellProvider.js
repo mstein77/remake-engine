@@ -1,10 +1,16 @@
 const {d, getCanvasForDim} = require('../helper/helper');
+import {CellValue} from '../classes/Grid';
 
 class Selection {
 
-    constructor(type) {
+    constructor(type, cellValue) {
         this.type = type;
         this.cells = [[]];
+        this.cellValue = cellValue;
+    }
+
+    getCellValue() {
+        return this.cellValue
     }
 
     getWidth() {
@@ -79,6 +85,10 @@ class Selection {
 
     getName() {}
 
+    isCell() {
+        return (this.isRect() && this.getWidth() === 1 && this.getHeight() === 1)
+    }
+
     isRect() {
         return this.type === 'rect';
     }
@@ -95,7 +105,7 @@ class Selection {
         return this.type === 'bitmap';
     }
 
-    getMatchMatrix(value, offset = null, length = null) {
+    getNotEmptyMatrix(offset = null, length = null) {
         const rows = [];
         const xMin = !this.isRows() || offset === null ? 0 : offset;
         const xMax = this.isRows() && length !== null ? xMin + length : this.cells[0].length;
@@ -105,7 +115,7 @@ class Selection {
         for (let y = yMin; y < yMax; y++) {
             const row = [];
             for (let x = xMin; x < xMax; x++) {
-                row.push(this.cells[y][x] === value);
+                row.push(this.cellValue.isEmpty(this.cells[y][x]));
             }
             rows.push(row);
         }
@@ -116,7 +126,7 @@ class Selection {
 class BrushSelection extends Selection {
 
     constructor(brushIndex, index) {
-        super('brush');
+        super('brush', CellValue.tile);
         this.brushIndex = brushIndex;
         this.index = index;
         this.cells = brushIndex.getEntityPropValue(index, 'tiles');
@@ -130,17 +140,22 @@ class BrushSelection extends Selection {
 class EventSelection extends Selection {
 
     constructor(event) {
-        super('events');
+        super('events', CellValue.events);
         if (!Array.isArray(event)) {
             event = [event];
         }
-        this.cells = [[event]];
+        this.cells =[[event]];
+    }
+
+    isCell() {
+        return true;
     }
 }
 
 class CellSelection extends Selection {
-    constructor(type = 'none', cells = [[]]) {
-        super(type);
+
+    constructor(type = 'none', cells = [[]], cellValue = CellValue.raw) {
+        super(type, cellValue);
         if (type === 'multi') {
             this.cells = cells.rect;
             this.gapX = cells.gapX;
@@ -360,6 +375,7 @@ class CellProvider {
         let xMax = Math.min(selection.getWidth(), this.getWidth() - posX);
         let iMax = Math.min(selection.getHeight(), this.getHeight() - posY);
         let row;
+        const cellValue = selection.getCellValue();
         const result = {
             old: {},
             new: {}
@@ -372,9 +388,9 @@ class CellProvider {
                 const value = overwrite !== null ? overwrite : row[x];
                 if (writeEmpty || (!writeEmpty && value !== empty)) {
                     const key = (posX + x) + ' ' + posY;
-                    result.old[key] = this.getClonedValue(this.map[posY][posX + x]);
-                    this.overwriteCell(posX + x, posY, this.getClonedValue(value));
-                    result.new[key] = this.getClonedValue(value);
+                    result.old[key] = cellValue.get(this.map[posY][posX + x]);
+                    this.overwriteCell(posX + x, posY, value, cellValue);
+                    result.new[key] = value;
                 }
             }
             posY++;
