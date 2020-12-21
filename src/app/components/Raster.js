@@ -71,6 +71,9 @@ function CellMarker(props) {
         clsCenter.push(markerCls);
     }
     let centerClickHandler = null;
+    if (props.pointer) {
+        clsCenter.push('cursor-' + props.pointer);
+    }
     if (hasMove) {
         clsCenter.push(props.moveCursor === undefined ? 'cursor-move' : props.moveCursor);
         centerClickHandler = (e) => {
@@ -609,6 +612,7 @@ function CursorArea(props) {
                 highlight={props.highlight}
                 posX={offX}
                 posY={offY}
+                pointer={props.cursorPointer}
                 width={markerWidth}
                 height={markerHeight}
                 top={hasTop}
@@ -851,6 +855,13 @@ class EditorCtx extends React.Component {
                 if (raster && raster.overlay && raster.mounted) {
                     raster.overlay.setMode(mode, data);
                 }
+            },
+            getRasterMode: id => {
+                const raster = this.raster[id];
+                if (raster && raster.overlay && raster.mounted) {
+                    return raster.overlay.modeId;
+                }
+                return null;
             },
             doRasterAction: (id, action, data = {}) => {
                 const raster = this.raster[id];
@@ -1364,6 +1375,7 @@ function RasterOverlays(props) {
     const [cursorHighlight, setCursorHighlight] = useState(false);
     const [cursorMouseTrack, setCursorMouseTrack] = useState(null);
     const [cursorMatrix, setCursorMatrix] = useState(null);
+    const [cursorPointer, setCursorPointer] = useState(null);
 
     const cursorRef = useRef(null);
     let trackX = true;
@@ -1593,6 +1605,40 @@ function RasterOverlays(props) {
 
 
     useEffect(() => {
+
+        const getEventRasterPos = (e, outside = false) => {
+            if (!boundingRectRef.current) {
+                return null;
+            }
+            const rect = boundingRectRef.current;
+
+            const adjustPosX = 0;
+            const adjustPosY = 0;
+            const rasterPos = {
+                x: Math.floor(Math.round(e.clientX - rect.left + adjustPosX)/rect.cellSizeX),
+                y: Math.floor(Math.round(e.clientY - rect.top + adjustPosY)/rect.cellSizeY),
+            };
+            let maxX = propsRef.current.width;
+            let maxY = propsRef.current.height;
+            maxX++;
+            maxY++;
+            rasterPos.rawX = rasterPos.x;
+            rasterPos.rawY = rasterPos.y;
+            if (!outside) {
+                if (rasterPos.x < 0) {
+                    rasterPos.x = 0;
+                } else if (rasterPos.x > maxX) {
+                    rasterPos.x = maxX;
+                }
+                if (rasterPos.y < 0) {
+                    rasterPos.y = 0;
+                } else if (rasterPos.y > maxY) {
+                    rasterPos.y = maxY;
+                }
+            }
+            return rasterPos;
+        };
+
         const autoScroll = autoScrollRef.current;
 
         overlay.addMode = overlay.addMode.bind(overlay);
@@ -1609,7 +1655,7 @@ function RasterOverlays(props) {
 
         hasMode('display') && overlay.addMode(
             'display',
-            (callback) => {
+            callback => {
                 if (callback) {
                     callback();
                 }
@@ -1628,14 +1674,14 @@ function RasterOverlays(props) {
                 propsRef.current.setMarkerHeight(1);
                 propsRef.current.setMarkerWidth(1);
                 setCursorHighlight(false);
-                mouseUpPickAgain = (e) => {
+                mouseUpPickAgain = e => {
                     overlay.setMode('pick', data);
                     if (props.editorId !== 'map') {
                         eCtxRef.current.setRasterMode('map', 'startPath');
                     }
                 };
                 setCursorMouseDown(() => (e, x, y) => {
-                    eCtxRef.current.setSelection(d(props.cellProvider.getSelection(x, y, 1, 1, eCtxRef.current.targetCellValue), 'QT'));
+                    eCtxRef.current.setSelection(props.cellProvider.getSelection(x, y, 1, 1, eCtxRef.current.targetCellValue));
                     propsRef.current.setMarkerX(x);
                     propsRef.current.setMarkerY(y);
                     propsRef.current.setMarkerType('rect');
@@ -1663,10 +1709,132 @@ function RasterOverlays(props) {
                 setCursorDoubleClick(null);
             }
         );
+
+        let mouseUpAdd = null;
+        hasMode('add') && overlay.addMode(
+            'add',
+            data => {
+                setCursorType('rect');
+                setCursorWidth(1);
+                setCursorHeight(1);
+                propsRef.current.setMarkerX(null);
+                propsRef.current.setMarkerHeight(1);
+                propsRef.current.setMarkerWidth(1);
+                setCursorHighlight(false);
+                setCursorMouseTrack(() => (x, y) => {
+                    eCtxRef.current.updateTracking(propsRef.current.editorId, x, y);
+                });
+
+                mouseUpAdd = e => {
+                    setCursorHighlight(false);
+                };
+
+                setCursorMouseDown(() => (e, x, y) => {
+                    const provider = propsRef.current.cellProvider;
+                    const cellValue = eCtxRef.current.targetCellValue;
+                    const selection = eCtxRef.current.selection;
+                    if (!selection.isCell() || cellValue.isEmpty(selection.getCell())) {
+                        const value = provider.getCellValue(x, y, cellValue);
+                        if (!cellValue.isEmpty(value)) {
+                            eCtxRef.current.setSelection(new CellSelection('rect', [[value]], cellValue));
+                        }
+                    } else {
+                        const undoValue = provider.getCellValue(x, y, cellValue);
+                        const isClear = (e.button === 2);
+                        const doValue = isClear ?
+                            cellValue.sub(undoValue, selection.getCell()) :
+                            cellValue.add(undoValue, selection.getCell());
+
+                        eCtxRef.current.doAction(
+                            () => {
+                                provider.overwriteCell(x, y, doValue, cellValue);
+                            },
+                            () => {
+                                provider.overwriteCell(x, y, undoValue, cellValue);
+                            }
+                        );
+                    }
+                    setCursorHighlight(true);
+                    windowEvent.addListener('mouseup', mouseUpAdd, {capture: false, once: true});
+                });
+            },
+            () => {
+                if (props.tracker && props.tracker.current) {
+                    props.tracker.current(null, null);
+                }
+                setCursorHighlight(false);
+                setCursorPointer(null);
+                setCursorMouseDown(null);
+            }
+        );
+
+        let mouseUpDrop = null;
+        hasMode('drag') && overlay.addMode(
+            'drag',
+            data => {
+                setCursorType('rect');
+                setCursorWidth(1);
+                setCursorHeight(1);
+                propsRef.current.setMarkerX(null);
+                propsRef.current.setMarkerHeight(1);
+                propsRef.current.setMarkerWidth(1);
+                setCursorHighlight(false);
+                setCursorMouseTrack(() => (x, y) => {
+                    eCtxRef.current.updateTracking(propsRef.current.editorId, x, y);
+                });
+
+                let dragCell = null;
+
+                mouseUpDrop = e => {
+                    const pos = getEventRasterPos(e, false);
+                    if (pos.x === pos.rawX && pos.y === pos.rawY) {
+                        const provider = propsRef.current.cellProvider;
+                        const cellValue = eCtxRef.current.targetCellValue;
+                        const sourceCell = {...dragCell};
+                        const dropPos = {x: propsRef.current.posX + pos.x, y: propsRef.current.posY + pos.y};
+                        const undoCell = provider.getCellValue(dropPos.x, dropPos.y, cellValue);
+
+                        eCtxRef.current.doAction(
+                            () => {
+                                propsRef.current.cellProvider.overwriteCell(sourceCell.x, sourceCell.y, cellValue.getEmpty(), cellValue);
+                                propsRef.current.cellProvider.overwriteCell(dropPos.x, dropPos.y, sourceCell.value, cellValue);
+                            },
+                            () => {
+                                propsRef.current.cellProvider.overwriteCell(sourceCell.x, sourceCell.y, sourceCell.value, cellValue);
+                                propsRef.current.cellProvider.overwriteCell(dropPos.x, dropPos.y, undoCell, cellValue);
+                            }
+                        );
+                    }
+                    setCursorPointer('grab');
+                    setCursorHighlight(false);
+                    windowEvent.removeListener('mouseup', mouseUpDrop, {capture: false, once: true})
+                    eCtxRef.current.setFixCursor(null);
+                };
+                setCursorMouseDown(() => (e, x, y) => {
+                    const cellValue = eCtxRef.current.targetCellValue;
+                    const value = props.cellProvider.getCellValue(x, y, cellValue);
+                    dragCell = {x, y, value};
+                    eContext.setSelection(new CellSelection('rect', [[value]], cellValue));
+                    setCursorPointer('grabbing');
+                    setCursorHighlight(true);
+                    windowEvent.addListener('mouseup', mouseUpDrop, {capture: false, once: true});
+                });
+                setCursorPointer('grab');
+            },
+            () => {
+                if (props.tracker && props.tracker.current) {
+                    props.tracker.current(null, null);
+                }
+                setCursorPointer(null);
+                setCursorMouseDown(null);
+            }
+        );
+
+
         let matrix = null;
         hasMode('select') && overlay.addMode(
             'select',
-            (data) => {
+            data => {
                 const markerType = data.type ? data.type : 'rect';
                 setCursorType(markerType);
                 overlay.selectionType = markerType;
@@ -2474,6 +2642,7 @@ function RasterOverlays(props) {
                 cursorWidth={cursorWidth}
                 cursorHeight={cursorHeight}
                 cursorType={cursorType}
+                cursorPointer={cursorPointer}
                 doubleClick={cursorDoubleClick}
                 matrix={props.writeTransparent ? null : cursorMatrix}
                 inclusion={props.autoSelect === true}
@@ -3062,7 +3231,7 @@ function BasicRasterView({modeTargets = [], ...props}) {
     if (props.selectOnly) {
         defaultMode = 'select';
         modeParams = props.selectOnly;
-    };
+    }
 
     const maxWidth = props.cellProvider.getWidth();
     const maxHeight = props.cellProvider.getHeight();
@@ -3291,7 +3460,9 @@ function BasicRasterView({modeTargets = [], ...props}) {
         };
         modeSelect = (
             <Stack>
-                <SwitchButton enabled={mode === 'pick'} switch={(enabled) => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
+                <SwitchButton enabled={mode === 'pick'} switch={enabled => {overlay.current.setMode(enabled ? 'pick' : 'startPath')}}>Pick</SwitchButton>
+                <SwitchButton enabled={mode === 'add'} switch={enabled => {overlay.current.setMode(enabled ? 'add' : 'startPath')}}>Add</SwitchButton>
+                <SwitchButton enabled={mode === 'drag'} switch={enabled => {overlay.current.setMode(enabled ? 'drag' : 'startPath')}}>Drag</SwitchButton>
                 <SwitchButton enabled={false} switch={() => overlay.current.setMode('select', {type: 'rect', all: true})}>All</SwitchButton>
                 <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rect'} switch={(enabled) => {selectMode(enabled, 'rect')}}>Rect</SwitchButton>
                 <SwitchButton enabled={isSelectionMode && overlay.current.selectionType === 'rows'} switch={(enabled) => {selectMode(enabled, 'rows')}}>Rows</SwitchButton>
@@ -3304,7 +3475,7 @@ function BasicRasterView({modeTargets = [], ...props}) {
     const targetEvents = eContext.targetCellValue === CellValue.events;
     const eventsButton =
         props.events && props.cellProvider.hasEvents() &&
-        <Content><SwitchButton enabled={events || targetEvents} switch={value => {if (!targetEvents) setEvents(!events)}}>Events</SwitchButton></Content>;
+        <Checkbox name="Show events" value={events || targetEvents} disabled={targetEvents} set={setEvents} />;
 
 
     const posSize =
@@ -3318,10 +3489,10 @@ function BasicRasterView({modeTargets = [], ...props}) {
 
     const topToolbar = <Toolbar>
         {undoRedo}
-        {eventsButton}
         {modeSelect}
         {posSize}
         {zoomInput}
+        {eventsButton}
         <Checkbox name="Rulers" value={rulers} set={setRulers} />
         <Int name="Border:" min="0" max="5" set={setBorder} value={border} buttons />
         <BackgroundControl />

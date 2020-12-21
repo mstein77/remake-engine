@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, BitmapPlayer, ANIMATION, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, BitmapPlayer, ANIMATION, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, getCanvasForDim, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -1211,6 +1211,9 @@ class Config {
     validateInt(value, props = {}) {
         if (value === undefined) {
             throw Error('Undefined value');
+        }
+        if (props.null && value === null) {
+            return null;
         }
         if (typeof value !== 'number') {
             throw Error('value must be an integer');
@@ -6654,8 +6657,10 @@ class TilesMapConfig extends Config {
             tileBits: 5,
             defaultTile: {},
             tiles: {},
+            eventsImage: null,
             animations: {},
             brushes: {},
+            events: {},
             map: [[]]
         }
     }
@@ -6672,6 +6677,30 @@ class TilesMapConfig extends Config {
 
     setImage(value) {
         this.image = this.validateImageResource(value)
+    }
+
+    setEvents(value) {
+        this.events = {};
+        for (let [name, obj] of Object.entries(this.validateObject(value))) {
+            this.validateObject(obj, {});
+            this.addEvent(name, obj.x, obj.y, obj.width, obj.height, obj.offsetX, obj.offsetY);
+        }
+    }
+
+    addEvent(name, x = 0, y = 0, width = 0, height = 0, offsetX = 0, offsetY = 0) {
+        this.events[this.validateString(name)] =
+            {
+                x: this.validateInt(x, {min: 0, null: true}),
+                y: this.validateInt(y, {min: 0, null: true}),
+                width: this.validateInt(width, {min: 0}),
+                height: this.validateInt(height, {min: 0}),
+                offsetX: this.validateInt(offsetX),
+                offsetY: this.validateInt(offsetY)
+            };
+    }
+
+    setEventsImage(value) {
+        this.eventsImage = value === null ? null : this.validateImageResource(value)
     }
 
     setDefaultTile(value) {
@@ -6721,17 +6750,30 @@ class TilesMapConfig extends Config {
     }
 
     getSubResources() {
-        return [{id: this.image.id, type: 'image', data: this.image}];
+        const resources = [
+            {id: this.image.id, type: 'image', data: this.image}
+        ];
+        if (this.eventsImage) {
+            resources.push(
+                {id: this.eventsImage.id, type: 'image', data: this.eventsImage}
+            );
+        }
+        return resources;
     }
 
     addRebuildProps(obj, deep, base) {
         obj.tileBits = base.tileBits;
         obj.image = deep ? RL.makeImageResource(base.tilesImg.elem, base.tilesImgId) : base.tilesImgId;
+        if (base.eventsImg && base.eventsImg.width !== 0) {
+            const eventsImgId = base.eventsImgId ? base.eventsImgId : base.id + '_events.png';
+            obj.eventsImage = deep ? RL.makeImageResource(base.eventsImg, eventsImgId) : eventsImgId;
+        }
         obj.map = [...base.map];
         obj.defaultTile = base.defaultTile;
         obj.tiles = base.tiles;
         obj.animations = base.animations;
         obj.brushes = base.brushes;
+        obj.events = base.events;
         return obj;
     }
 
@@ -6741,20 +6783,13 @@ class TilesMapConfig extends Config {
         json.tileSize = 1 << this.tileBits;
         json.tilesImgId = this.image.id;
         let canvas = this.image.getCanvas();
-        if (canvas.height !== json.tileSize) {
-            const tilesPerLine = Math.floor(canvas.width / json.tileSize);
-            const lines = Math.floor(canvas.height / json.tileSize);
-            const flatCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * json.tileSize, json.tileSize);
-            for (let i = 0; i < lines; i++) {
-                const width = tilesPerLine * json.tileSize;
-                flatCanvas.ctx.drawImage(canvas.elem, 0, i * json.tileSize, width, json.tileSize, i * width, 0, width, json.tileSize);
-            }
-            canvas = flatCanvas;
-        }
         json.tilesImg = canvas;
+        json.eventsImg = this.eventsImage ? this.eventsImage.getCanvas().elem : getCanvasForDim(0, 0);
+        json.eventsImgId = this.eventsImage ? this.eventsImage.id : null;
+        json.events = cloneDeep(this.events);
         json.map = cloneDeep(this.map);
-        json.defaultTile = this.defaultTile;
-        json.tiles  = this.tiles;
+        json.defaultTile = cloneDeep(this.defaultTile);
+        json.tiles = this.tiles;
         json.animations = this.animations;
         json.brushes = this.brushes; // TODO only in editor mode
         json.mapTiles = {
@@ -7002,6 +7037,8 @@ class TilesMap {
             yIndices.push(index);
         }
 
+        const maxTiles = Math.floor(this.tilesImg.elem.width/this.tileSize);
+
         for (let j = 0; j < yIndices.length; j++) {
             const y = yIndices[j];
             if (y === null) {
@@ -7016,10 +7053,11 @@ class TilesMap {
                 if (index === 0) {
                     continue;
                 }
+                const row = Math.floor(index/maxTiles);
                 target.drawImage(
                     this.tilesImg.elem,
-                    index << this.tileBits,
-                    0,
+                    (index - row * maxTiles) * this.tileSize,
+                    row * this.tileSize,
                     this.tileSize,
                     this.tileSize,
                     offset.x + (i << this.tileBits),

@@ -1,12 +1,24 @@
-const {d, getCanvasForDim} = require('../helper/helper');
+const {d} = require('../helper/helper');
 import {CellValue} from '../classes/Grid';
 
-class Selection {
+class CellSelection {
 
-    constructor(type, cellValue) {
+    constructor(type = 'none', cells = [[]], cellValue = CellValue.raw) {
         this.type = type;
-        this.cells = [[]];
         this.cellValue = cellValue;
+        if (type === 'multi') {
+            this.cells = cells.rect;
+            this.gapX = cells.gapX;
+            this.gapY = cells.gapY;
+            this.baseX = cells.baseX;
+            this.baseY = cells.baseY;
+        } else if (type === 'entity') {
+            this.value = cells.value;
+            const index = cells.entityIndex.getEntityByPropValue('value', cells.value);
+            this.cells = cells.entityIndex.getEntityPropValue(index, cells.cellsProp);
+        } else {
+            this.cells = type === 'none' ? [[]] : cells;
+        }
     }
 
     getCellValue() {
@@ -42,7 +54,6 @@ class Selection {
 
     getBaseRect(x, y) {
         const cells = [];
-        const pos = y;
         while(cells.length < this.baseY) {
             cells.push(this.cells[y].slice(x, x + this.baseX));
             y++;
@@ -101,6 +112,14 @@ class Selection {
         return this.type === 'columns';
     }
 
+    isEntity() {
+        return this.type === 'entity';
+    }
+
+    getEntityValue() {
+        return this.value;
+    }
+
     isBitmap() {
         return this.type === 'bitmap';
     }
@@ -120,51 +139,6 @@ class Selection {
             rows.push(row);
         }
         return rows;
-    }
-}
-
-class BrushSelection extends Selection {
-
-    constructor(brushIndex, index) {
-        super('brush', CellValue.tile);
-        this.brushIndex = brushIndex;
-        this.index = index;
-        this.cells = brushIndex.getEntityPropValue(index, 'tiles');
-    }
-
-    getName() {
-        return this.brushIndex.getEntityValue(this.index)
-    }
-}
-
-class EventSelection extends Selection {
-
-    constructor(event) {
-        super('events', CellValue.events);
-        if (!Array.isArray(event)) {
-            event = [event];
-        }
-        this.cells =[[event]];
-    }
-
-    isCell() {
-        return true;
-    }
-}
-
-class CellSelection extends Selection {
-
-    constructor(type = 'none', cells = [[]], cellValue = CellValue.raw) {
-        super(type, cellValue);
-        if (type === 'multi') {
-            this.cells = cells.rect;
-            this.gapX = cells.gapX;
-            this.gapY = cells.gapY;
-            this.baseX = cells.baseX;
-            this.baseY = cells.baseY;
-        } else {
-            this.cells = type === 'none' ? [[]] : cells;
-        }
     }
 }
 
@@ -907,196 +881,6 @@ class TilesCellProvider extends CellProvider {
     }
 }
 
-class FontCharentityIndex extends CellProvider {
-
-    constructor(model) {
-        // TODO das macht echt keinen Sinn hier
-        const size = Math.max(model.width, model.height);
-        super(size);
-        this.data = true;
-        this.model = model;
-        const codes = Object.keys(this.model.map);
-        this.codes = codes;
-        this.codes.sort();
-        this.map = [];
-        this.map.push(codes);
-        this.width = codes.length;
-        this.height = 1;
-    }
-
-    hasData() {
-        return this.data;
-    }
-
-    load(callback) {
-        if (this.hasData()) {
-            callback(this.codes);
-            return;
-        }
-        this.generateFlatImage();
-        this.data = false;
-    }
-
-    generateFlatImage() {
-        let pos = 0;
-        const canvas = getCanvasForDim(this.codes.length * this.model.width, this.model.height);
-        const ctx = canvas.getContext('2d');
-        for(let code of this.codes) {
-            this.drawBitmapForValue(ctx, code, pos);
-            this.model.map[code] = {
-                x: pos,
-                y: 0
-            };
-            pos += this.model.width;
-        }
-        this.model.image = canvas;
-    }
-
-    addSpaceForChars(number) {
-        if (number <= 0) {
-            return;
-        }
-        const canvas = getCanvasForDim(this.model.image.width + number * this.model.width, this.model.image.height);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(this.model.image, 0, 0);
-        this.model.image = canvas;
-    }
-
-    getCharSize() {
-        return {x: this.model.width, y: this.model.height};
-    }
-
-    getWidth() {
-        return this.width;
-    }
-
-    getHeight() {
-        return this.height;
-    }
-
-    getMaxIndex() {
-        return this.codes.length;
-    }
-
-    getEventCount() {
-        return null;
-    }
-
-    getCellType() {
-        return 'pure-bitmap';
-    }
-
-    isResizeable() {
-        return false;
-    }
-
-    getEmptyCell() {
-        return ' ';
-    }
-
-    getCharAt(index) {
-        const value = this.codes[index];
-        return {
-            char: value,
-            code: value.charCodeAt(0)
-        };
-    }
-
-    getCharAtIndex(index) {
-        return this.getCharAt(index).char;
-    }
-
-    hasCode(code) {
-        return this.codes.indexOf(code) !== -1;
-    }
-
-    deleteEntity(index, regenerate = true) {
-        this.deleteChar(this.codes[index], regenerate);
-    }
-
-    deleteChar(code, regenerate = true) {
-        if (this.model.map[code] === undefined) {
-            return;
-        }
-        delete this.model.map[code];
-        this.codes.splice(this.codes.indexOf(code), 1);
-        this.map = [this.codes];
-        this.width--;
-        if (regenerate) {
-            this.generateFlatImage();
-        }
-    }
-
-    addCharCode(code, regenerate = true) {
-        if (this.codes.indexOf(code) !== -1) {
-            return;
-        }
-        const x = this.codes.length * this.model.width;
-        this.codes.push(code);
-        this.codes.sort();
-
-        this.map = [this.codes];
-        this.width++;
-
-        this.model.map[code] = {x, y: 0};
-        if (regenerate) {
-            this.generateFlatImage();
-        }
-    }
-
-    drawBitmapForIndex(target, index, x, y, zoom = 1) {
-        if (index > this.getMaxIndex()) {
-            return null;
-        }
-        const value = this.codes[index];
-        this.drawBitmapForValue(target, value, x, y, zoom)
-    }
-
-    drawBitmapForValue(target, value, x = 0, y = 0, zoom = 1) {
-        const width = this.model.width * zoom;
-        const height = this.model.height * zoom;
-        target.clearRect(x, y, width, height);
-        const pos = this.model.map[value];
-        if (!pos || pos.x === null || !this.model.image.width) {
-            return;
-        }
-        const smoothing = target.imageSmoothingEnabled;
-        if (smoothing) {
-            target.imageSmoothingEnabled = false;
-        }
-        target.drawImage(
-            this.model.image,
-            pos.x, pos.y, this.model.width, this.model.height,
-            x, y, width, height
-        );
-        if (smoothing) {
-            target.imageSmoothingEnabled = true;
-        }
-    }
-
-    setBitmapForIndex(index, bitmap) {
-        const value = this.codes[index];
-        this.setBitmapForValue(value, bitmap);
-    }
-
-    setBitmapForValue(value, bitmap) {
-        const pos = this.model.map[value];
-        const ctx = this.model.image.getContext('2d');
-        ctx.putImageData(bitmap, pos.x, pos.y);
-    }
-
-    getBitmapForIndex(index, zoom = 1) {
-        const value = this.codes[index];
-        return this.getBitmapForValue(value, zoom);
-    }
-
-    getBitmapForValue(value, zoom = 1) {
-        const canvas = getCanvasForDim(this.model.width * zoom, this.model.height * zoom);
-        this.drawBitmapForValue(canvas.getContext('2d'), value, 0, 0, zoom);
-        return canvas;
-    }
-}
-
 class FontIndexCellProvider extends CellProvider {
     constructor(provider, index) {
         super(provider.size);
@@ -1131,14 +915,11 @@ class FontIndexCellProvider extends CellProvider {
 }
 
 export {
-    BrushSelection,
-    EventSelection,
     CellSelection,
     TilesCellProvider,
     BitmapCellProvider,
     TilesMapCellProvider,
     MapSelectionCellProvider,
     MapValueCellProvider,
-    FontCharentityIndex,
     FontIndexCellProvider
 };

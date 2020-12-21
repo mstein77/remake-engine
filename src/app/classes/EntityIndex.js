@@ -674,8 +674,10 @@ class TileIndex extends EntityIndex {
         this.sizeX = model.tileSize;
         this.sizeY = model.tileSize;
         this.img = model.tilesImg.elem;
+
         this.tilesX = Math.floor(this.img.width/this.sizeX);
         this.tilesY = Math.floor(this.img.height/this.sizeY);
+
         // we could analyse how many empty tiles are at the end
         this.items = this.getAllIndices();
         this.valueIndexing = true;
@@ -768,22 +770,35 @@ class TileIndex extends EntityIndex {
     assignAutoProps(updateIndices = []) {
         const length = this.getLength();
         const sizeX = this.getSizeX();
-        const newWidth = length * sizeX;
-        const canvas = getCanvasForDim(newWidth, this.getSizeY());
+        const sizeY = this.getSizeY();
+
+        const maxTiles = Math.floor(1000 / sizeX);
+
+        const tilesX = Math.min(length, maxTiles);
+        const newWidth = tilesX * sizeX;
+        const rows = Math.ceil(length / maxTiles);
+
+        const canvas = getCanvasForDim(newWidth, this.getSizeY() * rows);
         const ctx = canvas.getContext('2d');
+
         let index = 0;
         let x = 0;
+        let y = 0;
         while(index < length) {
             if (!updateIndices.includes(index)) {
-                this.drawEntity(ctx, index, x, 0);
+                this.drawEntity(ctx, index, x, y);
             }
             x += sizeX;
+            if (x >= newWidth) {
+                y += sizeY;
+                x = 0;
+            }
             index++;
         }
         this.model.tilesImg.elem = canvas;
         this.img = canvas;
-        this.tilesX = this.getLength();
-        this.tilesY = 1;
+        this.tilesX = tilesX;
+        this.tilesY = rows;
 
         return ['image'];
     }
@@ -1431,6 +1446,17 @@ class EventIndex extends EntityIndex {
                     for (let item of items) {
                         if (!events.includes(item)) {
                             events.push(item);
+                            if (!this.model.events[item]) {
+                                this.model.events[item] = {
+                                    width: 0,
+                                    height: 0,
+                                    offsetX: 0,
+                                    offsetY: 0,
+                                    x: null,
+                                    y: null
+                                };
+                            }
+
                         }
                     }
                 }
@@ -1438,7 +1464,6 @@ class EventIndex extends EntityIndex {
         }
         if (model.eventsImg === undefined) {
             model.eventsImg = getCanvasForDim(0, 0);
-            model.pos = {};
         }
         this.img = model.eventsImg;
         this.items = events.sort();
@@ -1467,9 +1492,10 @@ class EventIndex extends EntityIndex {
                 width: 0,
                 height: 0,
                 offsetX: 0,
-                offsetY: 0
+                offsetY: 0,
+                x: null,
+                y: null
             };
-            this.model.pos[value] = {x: null, y: null};
         }
         super.setEntityValue(index, value);
     }
@@ -1482,7 +1508,7 @@ class EventIndex extends EntityIndex {
         }
         if (name === 'image') {
             if (value !== null) {
-                const pos = this.model.pos[this.getEntityValue(index)];
+                const pos = this.model[this.key][this.getEntityValue(index)];
                 const ctx = this.img.getContext('2d');
                 ctx.putImageData(
                     value,
@@ -1510,7 +1536,7 @@ class EventIndex extends EntityIndex {
                 return null;
             }
             const height = this.getEntityPropValue(index, 'height');
-            const pos = this.model.pos[this.getEntityValue(index)];
+            const pos = this.model[this.key][this.getEntityValue(index)];
             const ctx = this.img.getContext('2d');
             return ctx.getImageData(pos.x, pos.y, width, height);
         }
@@ -1600,7 +1626,9 @@ class EventIndex extends EntityIndex {
             if (!updateIndices.includes(offset.index)) {
                 this.drawEntity(ctx, offset.index, offset.x, offset.y);
             }
-            this.model.pos[name] = {x: offset.x, y: offset.y};
+            const pos = this.model.events[name];
+            pos.x = offset.x;
+            pos.y = offset.y;
         }
         this.model.eventsImg = canvas;
         this.img = canvas;
@@ -1635,7 +1663,7 @@ class EventIndex extends EntityIndex {
         }
         const height = this.getEntityPropValue(index, 'height');
         const dim = {x: width, y: height};
-        const pos = this.model.pos[this.getEntityValue(index)];
+        const pos = this.model.events[this.getEntityValue(index)];
 
         if (typeof zoomOrAvail === 'object') {
             ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);

@@ -502,7 +502,29 @@ const getRebuildJsonForModel = (cls, model, deep) => {
     return obj.getRebuildJson(true, model)
 };
 
+/**
+ * Wandelt die gegebene Resource (PaneModel) bzw. ResourceConfig in ein
+ * JSON um, wobei Canvas gecloned werden
+ *
+ * null => null
+ * array => [self(item1), ...self(itemN)]
+ * !object(x) => x
+ * (x.config === undef && x.getJson === undef)
+ *   => x instanceof Canvas ? clone Canvas : x;
+ *
+ * config = x.config ? x.config : x;
+ * json = config.getJson()
+ * for (let key in json) {
+ *     json[key] = self(json[key])
+ * }
+ *
+ * @param instance
+ * @returns {null|undefined|[]|HTMLCanvasElement|*}
+ */
 const getJsonModelOfInstance = instance => {
+    if (instance === null) {
+        return null
+    }
     if (Array.isArray(instance)) {
         const json = [];
         for (let item of instance) {
@@ -516,8 +538,10 @@ const getJsonModelOfInstance = instance => {
     if (instance.config === undefined && instance.getJson === undefined) {
         if (instance instanceof HTMLCanvasElement) {
             const canvas = getCanvasForDim(instance.width, instance.height);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(instance, 0, 0);
+            if (canvas.width > 0 && canvas.height > 0) {
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(instance, 0, 0);
+            }
             return canvas;
         }
         return instance;
@@ -661,27 +685,6 @@ const getTextBlockImage = (block, font, filterer = null) => {
     }
     return canvas;
 };
-
-/*
-const cloneDeep = obj => {
-    if (Array.isArray(obj)) {
-        const clone = [];
-        for (let item of obj) {
-            clone.push(cloneDeep(item));
-        }
-        return clone;
-    }
-    if (typeof obj === 'object') {
-        const clone = {};
-        for (let [id, value] of Object.entries(obj)) {
-            clone[id] = cloneDeep(value);
-        }
-        return clone;
-    }
-    return obj;
-};
-
- */
 
 const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
     if (!canvas.width) {
@@ -1094,6 +1097,8 @@ class Players {
 }
 
 function cloneDeep(value) {
+    if (value === undefined) return;
+    if (value === null) return null;
     if (Array.isArray(value)) {
         return value.map(item => cloneDeep(item));
     } else if (typeof value === 'object') {

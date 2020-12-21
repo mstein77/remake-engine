@@ -9,7 +9,7 @@ import {
     Players,
     hex2rgb,
     rgb2hex,
-    BitmapPlayer
+    BitmapPlayer, getRebuildJsonForModel
 } from '../helper/helper';
 import {
     RasterOverlays,
@@ -197,12 +197,12 @@ function RadioProp(props) {
     )
 }
 
-function Checkbox({name, value, set}) {
-    name = name ? <div>{name}</div> : '';
+function Checkbox({name, value, set, disabled}) {
+    name = name ? <div className="small-font">{name}</div> : '';
     return (
-        <div className="stack-h">
+        <div className="stack-h small-font">
             {name}
-            <div><input onChange={(e) => {
+            <div><input disabled={disabled} onChange={(e) => {
                 set(e.target.checked);
             }} type="checkbox" checked={!!value} /></div>
         </div>
@@ -251,7 +251,7 @@ function TextField({readOnly, name, set, size, onClick, invalid, className, valu
     }
     return (
         <Stack>
-            <Content>{name}</Content>
+            <Content className="small-font">{name}</Content>
             <Content>{input}</Content>
         </Stack>
     )
@@ -260,7 +260,7 @@ function TextField({readOnly, name, set, size, onClick, invalid, className, valu
 function PropLabel({name, children}) {
     return (
         <>
-            <Content>
+            <Content className="small-font">
                 {name}
             </Content>
             <Content>
@@ -273,7 +273,7 @@ function PropLabel({name, children}) {
 function FullProp({name, children}) {
     const items = [];
     if (name) {
-        items.push(<div key="0" style={{gridColumn: 'span 2'}}>{name}</div>);
+        items.push(<div key="0" style={{gridColumn: 'span 2'}} className="small-font">{name}</div>);
     }
     items.push(<div key="1" style={{gridColumn: 'span 2'}}>{children}</div>);
     return (
@@ -617,7 +617,7 @@ function IntField({readOnly, name, size = 3, step = 1, value = 0, min, set, butt
 
     return (
         <>
-            {name ? <div>{name}</div> : ''}
+            {name ? <div className="small-font">{name}</div> : ''}
             <Stack fit fullHeight align="center" alignItems="center">
                 {buttonPrev}
                 <input {...attr} />
@@ -1190,7 +1190,7 @@ function ItemsStack({hasProps = true, ...props}) {
 
     let itemsContent = props.items.length === 0 ?
         <Stack flex vertical fullHeight alignItems="center" align="center">
-            <Content padded>
+            <Content padded className="less">
                 {props.empty}
             </Content>
         </Stack>
@@ -2832,16 +2832,8 @@ class GlobalCtx extends React.Component {
             contentTextColor: style.getPropertyValue('--content-text-color'),
             defaultPadding: getNumFromPx(style.getPropertyValue('--default-padding')),
             markerWidth: getNumFromPx(style.getPropertyValue('--marker-width')),
-            bgColor: '#666677',
             filters: props.filters,
             imageResources: {current: props.imageResources},
-            setBgColor: (bgColor) => {
-                this.setState({bgColor});
-            },
-            bgOpacity: 10,
-            setBgOpacity: (bgOpacity) => {
-                this.setState({bgOpacity});
-            },
             getModalLevel: () => {
                 return this.modalStack.length;
             },
@@ -2854,7 +2846,7 @@ class GlobalCtx extends React.Component {
                 this.modalStack.push(zIndex);
                 return zIndex;
             },
-            closeModal: (zIndex) => {
+            closeModal: zIndex => {
                 const index = this.modalStack.indexOf(zIndex);
                 if (index === -1) {
                     return;
@@ -4063,15 +4055,24 @@ function AnimationManager({animationIndex, spriteIndex}) {
     )
 }
 
-function JsonView({json, defaultJson = {}, skipKeys = [], ...props}) {
+function JsonView({json, defaultJson = {}, skipKeys = [], trim, ...props}) {
     const base = {...defaultJson, ...json};
     for (let key of skipKeys) {
         delete base[key];
     }
-    const lines = JSON.stringify(base, null, 2).split("\n");
-    const defLines = JSON.stringify(defaultJson, null, 2).split("\n");
+    let jsonString = JSON.stringify(base, null, 2);
+    if (jsonString === '{}') {
+        jsonString = '{\n}';
+    }
+    const lines = jsonString.split("\n");
+
+    let defJsonString = JSON.stringify(defaultJson, null, 2);
+    if (defJsonString === '{}') {
+        defJsonString = '{\n}';
+    }
+    const defLines = defJsonString.split("\n");
     const render = line => {
-        if (line.match(/^[ ]+\"[^"]*\"\:/)) {
+        if (trim && line.match(/^[ ]+\"[^"]*\"\:/)) {
             return line.replace(/\"/, '').replace(/\"/, '');
         }
         return line
@@ -4088,6 +4089,94 @@ function JsonView({json, defaultJson = {}, skipKeys = [], ...props}) {
             </pre>
         </Content>
     )
+}
+
+function useExportModal(resource) {
+    const ExportModal = useModal();
+
+    const getModelConfig = model => {
+        const rebuildJson = getRebuildJsonForModel(resource.cls, model,true);
+        return new resource.config(rebuildJson);
+    };
+
+    const getResourceDef = (type, id, value, details) => {
+        if (type === 'image') {
+            value = '"' + value + '"';
+        } else if (type === 'json') {
+            const lines = JSON.stringify(value, null, 4).split('\n');
+            let jsonLines = [];
+            if (details.compact) {
+                let no = 0;
+                let trackLevel = -1;
+                let track;
+                let prefix;
+                for (let line of lines) {
+                    if (trackLevel < 0) {
+                        if (line.trim().startsWith('"map": [')) {
+                            trackLevel = 0;
+                            track = [];
+                        }
+                        jsonLines.push(line);
+                    } else {
+                        if (line.match(/\[$/)) {
+                            trackLevel++;
+                            if (trackLevel === 1) {
+                                prefix = line.substr(0, line.indexOf('['));
+                                track = [line.trim()];
+                            } else {
+                                track.push(line.trim());
+                            }
+                        } else if (line.match(/\],?$/)) {
+                            trackLevel--;
+                            if (trackLevel === 0) {
+                                track.push(line.trim());
+                                jsonLines.push(prefix + track.join(' '));
+                            } else if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        } else {
+                            if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        }
+                    }
+                    no++;
+                }
+            } else {
+                jsonLines = lines;
+            }
+            value = jsonLines.join('\n    ');
+        }
+        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
+    };
+
+    const getModelCode = (model, details = {}) => {
+        const resources = getModelConfig(model).getResources();
+        const lines = [];
+        for (let res of resources.resources.reverse()) {
+            const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
+            lines.push(getResourceDef(res.type, res.id, data, details));
+        }
+        return lines.join('\n')
+    };
+
+    return {
+        open: (model, details = {}) => {
+            ExportModal.open({
+                code: getModelCode(model, details)
+            });
+        },
+        render: <ExportModal.content name="Export resources" width="80%" height="50%" closeable>
+            <Content padded>
+                Use this in your code:
+                <TextArea wrap="off" width="100%" height="80%" value={ExportModal.props.code} readOnly />
+            </Content>
+        </ExportModal.content>
+    };
 }
 
 export {
@@ -4164,6 +4253,7 @@ export {
     useUniqueResourceId,
     useComponentUpdate,
     useUpdateOnEntityIndexChanges,
+    useExportModal,
     FiltersSelector,
     BackgroundControl,
     SaveAndCancel,

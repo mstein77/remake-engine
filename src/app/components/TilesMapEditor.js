@@ -1,17 +1,15 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {Fragment, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {CellValue} from "../classes/Grid";
 import {
     Stack,
     Section,
     Content,
-    Canvas,
     Title,
     Button,
     Centered,
     TextAreaProp,
     PropertyGrid,
     TextFieldProp,
-    TextArea,
     Toolbar,
     PositionPickerProp,
     DimProp,
@@ -30,8 +28,14 @@ import {
     EntityManager,
     JsonView,
     AnimationManager,
-    useModal, Page, ActionFrame,
-    SideTabs, SideTab, GlobalContext, useAddIndexActions
+    useModal,
+    Page,
+    ActionFrame,
+    SideTabs,
+    SideTab,
+    GlobalContext,
+    useExportModal,
+    useAddIndexActions
 } from './BaseComponents';
 import {
     EditorCtx,
@@ -41,16 +45,49 @@ import {
     BitmapSelector,
     drawEventsValue
 } from './Raster';
-import {CellSelection, BrushSelection, EventSelection} from '../classes/CellProvider.js';
-import {d, cloneDeep, getColorsFromCanvas, getCanvasForDim, getCanvasForIndexMatrix, getCanvasForBitmap, getEmptyImageData, getCanvasForEventMatrix} from '../helper/helper';
+import {CellSelection} from '../classes/CellProvider.js';
+import {
+    d,
+    cloneDeep,
+    getColorsFromCanvas,
+    getCanvasForDim,
+    getCanvasForIndexMatrix,
+    getCanvasForBitmap,
+    getEmptyImageData,
+    getCanvasForEventMatrix,
+    getRebuildJsonForModel
+} from '../helper/helper';
 import {TileIndex, ColorIndex, AliasIndex, BrushIndex, EventIndex, AnimationIndex} from "../classes/EntityIndex";
-import {IndexGrid, TilesGrid} from "../classes/Grid";
+import {TilesGrid} from "../classes/Grid";
 import {BitmapCellProvider} from "../classes/CellProvider";
 
-function TileTracker({editorId, tileIndex, tilesGrid}) {
+function getEventsImage(tilesGrid, events, zoomOrAvail) {
+    const sizeX = tilesGrid.getCellSizeX();
+    const sizeY = tilesGrid.getCellSizeY();
+    const canvas = getCanvasForDim(sizeX, sizeY);
+    const ctx = canvas.getContext('2d');
+    let hasImage = false;
+    for (let event of events) {
+        if (tilesGrid.drawEvent(ctx, event, 0, 0, 1)) {
+            hasImage = true;
+        }
+    }
+    return hasImage ?
+        <Bitmap editable={false} value={ctx.getImageData(0, 0, sizeX, sizeY)} zoomOrAvail={zoomOrAvail} /> :
+        <Content padded><Content width={zoomOrAvail.width} height={zoomOrAvail.height} boxed thin></Content></Content>
+}
+
+function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
     const eContext = useEditorContextPart(editorId);
     const [trackX, setTrackX] = useState(null);
     const [trackY, setTrackY] = useState(null);
+
+    const zoomOrAvail = useMemo(() => {
+        return {
+            width: 80,
+            height: 80
+        };
+    }, []);
 
     const width = 180;
     eContext.setTracker(editorId, (x, y) => {
@@ -59,143 +96,93 @@ function TileTracker({editorId, tileIndex, tilesGrid}) {
     });
 
     let content = '';
-    if (trackX !== null) {
-        const selection = tilesGrid.getRawSelection(trackX, trackY, 1, 1);
-        const tile = selection.getRow(0)[0];
-        const index = Array.isArray(tile) ? tile[0] : tile;
+    if (trackX !== null && eContext.selection.isCell()) {
+        const cellValue = eContext.targetCellValue;
+        const cell = tilesGrid.getCellValue(trackX, trackY, CellValue.tile);
+        const events = tilesGrid.getCellValue(trackX, trackY, CellValue.events);
 
-        const selectionProvider = new IndexGrid(tileIndex, {map: selection.getCells()});
-        const zoom = 4;
-        const dim = selectionProvider.getGridDim(1, 1, 0, zoom);
+        let image = '';
+        let type;
+        let infoProps = [];
+
+        if (cellValue === CellValue.tile) {
+            const isAlias = typeof cell === 'string';
+            type = isAlias ? 'Alias' : 'Tile';
+
+            let index = cell;
+            if (isAlias) {
+                infoProps.push(
+                    <ValueProp key="name" name="Name:">{cell}</ValueProp>
+                );
+                index = aliasIndex.getEntityByPropValue('value', cell);
+                infoProps.push(
+                    <ValueProp key="tile" name="Tile:">
+                        {index ? aliasIndex.getEntityPropValue(index, 'tile') : '?'}
+                    </ValueProp>
+                );
+            } else {
+                infoProps.push(
+                    <ValueProp key="index" name="Index:">{cell}</ValueProp>
+                );
+            }
+            const entityIndex = isAlias ? aliasIndex : tileIndex;
+            const animation = entityIndex.getEntityPropValue(index, 'animation');
+            image =
+                <Entity
+                    entityIndex={entityIndex}
+                    value={entityIndex.getEntityValue(index)}
+                    player={animation != ''}
+                    readOnly
+                    zoomOrAvail={zoomOrAvail}
+                />;
+            infoProps =
+                <>
+                    {infoProps}
+                    <>
+                        <ValueProp name="Animation:">
+                            {animation}
+                        </ValueProp>
+                        <FullProp name="Properties:">
+                            <JsonView trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
+                        </FullProp>
+                    </>
+                </>;
+        } else {
+            image = getEventsImage(tilesGrid, events, zoomOrAvail);
+            type = 'Events';
+        }
 
         content = (
-            <>
-                <Stack align="center" alignItems="center">
-                    <Content boxed  className="min-content">
-                        <Canvas width={dim.width} height={dim.height}
-                                render={ctx => tilesGrid.drawCellValue(ctx, tile, 0, 0, zoom)}
-                        />
-                    </Content>
-                </Stack>
-                <Content>Position: <kbd>{trackX}x{trackY}</kbd></Content>
-                <Content>Tile: <kbd>{index}</kbd></Content>
-            </>
+            <PropertyGrid>
+                <DimProp name="Position:" readOnly x={trackX} y={trackY} />
+                <FullProp>
+                    <Centered>
+                        {image}
+                    </Centered>
+                </FullProp>
+                <ValueProp name="Type:">{type}</ValueProp>
+                {infoProps}
+                <FullProp name="Events:">
+                    {events.map((event, index) => <Title key={index}>{' - '}{event}</Title>)}
+                </FullProp>
+            </PropertyGrid>
         );
     }
-    return <Content width={width}>{content}</Content>;
+    return (
+        <Content width={width}>{content}</Content>
+    )
 }
 
-function useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid}) {
-    const eContext = useContext(EditorContext);
-
-    const selection = eContext.selection;
-    if (!selection || selection.getType() === 'none') {
-        return false;
-    }
-
-    const width = selection.getWidth();
-    const height = selection.getHeight();
-
-    if (width === 1 && height === 1) {
-        const value = selection.getCell();
-        switch (typeof value) {
-
-            case 'string':
-                const index = aliasIndex.getEntityByPropValue('value', value);
-                if (index === null) {
-                    return false;
-                }
-                return {
-                    entity: aliasIndex,
-                    index,
-                    name: value,
-                    tile: aliasIndex.getEntityPropValue(index, 'tile'),
-                    animation: aliasIndex.getEntityPropValue(index, 'animation'),
-                    props: aliasIndex.getEntityPropValue(index, 'props'),
-                    type: 'Alias',
-                    content: 'elem'
-                };
-
-            case 'object':
-                const sizeX = tilesGrid.getCellSizeX();
-                const sizeY = tilesGrid.getCellSizeY();
-                const canvas = getCanvasForDim(sizeX, sizeY);
-                const ctx = canvas.getContext('2d');
-                let hasImage = false;
-                for (let event of value) {
-                    if (tilesGrid.drawEvent(ctx, event, 0, 0, 1)) {
-                        hasImage = true;
-                    }
-                }
-                return {
-                    type: 'events',
-                    content: 'events',
-                    image: hasImage ? ctx.getImageData(0, 0, sizeX, sizeY) : null,
-                    events: value
-                };
-
-            default:
-                if (value >= tileIndex.getLength()) {
-                    return false;
-                }
-                return {
-                    entity: tileIndex,
-                    index: value,
-                    animation: tileIndex.getEntityPropValue(value, 'animation'),
-                    props: tileIndex.getEntityPropValue(value, 'props'),
-                    content: 'elem',
-                    type: 'Tile'
-                };
-        }
-    }
-
-    const cells = selection.getCells();
-    let type = selection.getType();
-    if (type !== 'brush') {
-        type = eContext.targetCellValue.getName() + '-' + type;
-    }
-    let index;
-    let name;
-    if (type === 'brush') {
-        if (!brushIndex.hasIndex(selection.index)) {
-            return false;
-        }
-        index = selection.index;
-        name = selection.getName();
-    }
-    let image;
-
-    const canvas =
-        selection.getCellValue() === CellValue.events ?
-            getCanvasForEventMatrix(tileIndex, tilesGrid, cells, 20) :
-            getCanvasForIndexMatrix(tileIndex, aliasIndex, cells, 20);
-
-    const ctx = canvas.getContext('2d');
-    image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    return {
-        type,
-        content: 'dim',
-        index,
-        name,
-        image,
-        width,
-        height,
-        cells
-    }
-}
-
-function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid, editTiles}) {
+function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid, editTiles, compact}) {
     const eContext = useContext(EditorContext);
 
     const AddEventModal = useModal();
-
-    const selection = useSelectionProps({aliasIndex, tileIndex, brushIndex, tilesGrid});
     const SaveAsBrushModal = useModal();
 
     const [active, setActive] = useState(null);
 
-    const avail = selection && selection.content === 'dim' ? 150 : 80;
+    const selection = eContext.selection;
+    const avail = selection && selection.isCell() ? 80 : 150;
     const zoomOrAvail = useMemo(() => {
         return {
             width: avail,
@@ -204,25 +191,73 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
     }, [avail]);
 
     const clearSelection = () => {
+        const currMode = eContext.getRasterMode('map');
+        let newMode = 'startPath';
+        if (['pick', 'select', 'drag', 'add'].includes(currMode)) {
+            newMode = currMode;
+        }
         const cellValue = eContext.targetCellValue;
         eContext.setSelection(new CellSelection('rect', [[cellValue.getEmpty()]], cellValue));
-        eContext.setRasterMode('map', 'startPath');
+        if (currMode === 'startPath' || currMode !== newMode) {
+            eContext.setRasterMode('map', newMode);
+        }
     };
 
-    if (selection === false) {
+    const currType = selection.getType();
+
+    const cellValue = eContext.selection.getCellValue();
+    const isInvalidCell = cellValue === CellValue.tile ?
+        value => {
+            if (typeof value === 'string') {
+                return (aliasIndex.getEntityByPropValue('value', value) === null)
+            }
+            return !tileIndex.hasIndex(value);
+        } :
+        events => {
+            if (cellValue !== CellValue.events) {
+                return false;
+            }
+            for (let event of events) {
+                if (eventIndex.getEntityByPropValue('value', event) === null) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+    const hasInvalidCells = cells => {
+        for (let row of cells) {
+            for (let cell of row) {
+                if (isInvalidCell(cell)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    if (currType === 'none' || hasInvalidCells(selection.getCells()) ||
+        (currType === 'entity' && brushIndex.getEntityByPropValue('value', selection.getEntityValue()) === null)) {
         requestAnimationFrame(() => {
-            eContext.setSelection(new CellSelection('rect', [[0]], CellValue.tile));
+            const isEvent = eContext.targetCellValue === CellValue.events;
+            eContext.setSelection(
+                new CellSelection('rect', [[isEvent ? [] : 0]],  isEvent ? CellValue.events : CellValue.tile)
+            );
             eContext.setRasterMode('map', 'startPath');
         });
         return '';
-    } else if (eContext.selection.getCellValue() !== eContext.targetCellValue) {
+    }
+    if (cellValue !== eContext.targetCellValue) {
         requestAnimationFrame(clearSelection);
         return '';
     }
 
     let editAction;
+    let brushAction = false;
+    let clearAction = true;
+    let index;
+
     const editSelection = () => {
-        const index = selection.index;
         editAction(index);
     };
 
@@ -248,151 +283,175 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                         brushIndex.deleteEntity(index);
                     }
                 );
-                eContext.setSelection(new BrushSelection(brushIndex, index));
+                eContext.setSelection(new CellSelection('entity', {entityIndex: brushIndex, value: brush.value, cellsProp: 'tiles'}, CellValue.tile));
                 eContext.setRasterMode('map', 'startPath');
                 SaveAsBrushModal.close()
             }
         });
     };
 
-    const addEvent = () => {
-        AddEventModal.open({
-            editorId: 'addEvent',
-            entityIndex: eventIndex,
-            filter: true,
-            sizeX: 50,
-            sizeY: 50,
-            textSize: 120,
-            zoom: 1,
-            border: 0,
-            controls: true,
-            base: index => !selection.events.includes(eventIndex.getEntityValue(index)),
-            select:
-                index => {
-                    AddEventModal.close();
-                    const event = eventIndex.getEntityValue(index);
-                    selection.events.push(event);
-                    eContext.setSelection(new EventSelection(selection.events));
-                    eContext.setRasterMode('map', 'startPath');
-                }
-        });
-    };
-
     let content;
-    let brushAction = false;
-    let clearAction = true;
-    switch(selection.content) {
-        case 'events':
-            clearAction = selection.events.length > 0;
-            content =
-                <FullProp name="Events:">
-                    <Content thin boxed>
-                        <ItemsStack
-                            hasProps={false}
-                            width={178}
-                            empty="No event"
-                            active={active}
-                            setActive={setActive}
-                            ordered
-                            setItems={events => {
-                                eContext.setSelection(new EventSelection(events));
-                                eContext.setRasterMode('map', 'startPath');
-                            }}
-                            new={addEvent}
-                            getName={value => value}
-                            getProperties={null}
-                            items={selection.events}
-                        />
-                    </Content>
-                </FullProp>;
-            break;
+    let type;
+    let image;
 
-        case 'dim':
-            const name = selection.name;
-            brushAction = eContext.targetCellValue === CellValue.tile && selection.type !== 'brush';
-            if (selection.type === 'brush') {
-                editAction = editBrush;
-            }
-            content = <>
-                {name && <ValueProp name="Name:">{name}</ValueProp>}
-                <ValueProp name="Size:"><kbd>{selection.width}<kbd className="less">x</kbd>{selection.height}</kbd></ValueProp>
-            </>;
-            break;
+    if (selection.isCell()) {
 
-        case 'elem':
-            switch(selection.type) {
-                case 'Alias':
-                    editAction = editAlias;
-                    break;
-                case 'Tile':
-                    editAction = editTile;
-                    clearAction = selection.index !== 0;
-                    break;
-            }
-            content = <>
-                {
-                    selection.name ?
-                        <ValueProp name="Name:">
-                            {selection.name}
-                        </ValueProp> :
-                        <ValueProp name="Index:">
-                            <kbd>{selection.index}</kbd>
+        // build single cell info
+        const cell = selection.getCell();
+        switch(cellValue) {
+
+            case CellValue.tile:
+                const isAlias = typeof cell === 'string';
+                type = isAlias ? 'Alias' : 'Tile';
+                editAction = isAlias ? editAlias : editTile;
+                clearAction = cell !== 0;
+
+                const infoProps = [];
+                index = cell;
+
+                if (isAlias) {
+                    infoProps.push(
+                        <ValueProp key="name" name="Name:">{cell}</ValueProp>
+                    );
+                    index = aliasIndex.getEntityByPropValue('value', cell);
+                    infoProps.push(
+                        <ValueProp key="tile" name="Tile:">
+                            {index ? aliasIndex.getEntityPropValue(index, 'tile') : '?'}
                         </ValueProp>
+                    );
+                } else {
+                    infoProps.push(
+                        <ValueProp key="index" name="Index:">{cell}</ValueProp>
+                    );
                 }
-                {
-                    selection.tile !== undefined &&
-                    <ValueProp name="Tile:">
-                        <kbd>{selection.tile}</kbd>
-                    </ValueProp>
-                }
-                <ValueProp name="Animation:">
-                    {selection.animation}
-                </ValueProp>
+                const entityIndex = isAlias ? aliasIndex : tileIndex;
+                const animation = entityIndex.getEntityPropValue(index, 'animation');
+                image =
+                    <Entity
+                        entityIndex={entityIndex}
+                        value={entityIndex.getEntityValue(index)}
+                        player={animation != ''}
+                        readOnly
+                        zoomOrAvail={zoomOrAvail}
+                    />;
+                content =
+                    <>
+                        {infoProps}
+                        {!compact &&
+                            <>
+                                <ValueProp name="Animation:">
+                                    {animation}
+                                </ValueProp>
+                                <FullProp name="Properties:">
+                                    <JsonView trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
+                                </FullProp>
+                            </>
+                        }
+                    </>;
 
-                <FullProp name="Properties:">
-                    <JsonView skipKeys={['index', 'animation']} json={selection.props} defaultJson={tilesGrid.index.model.defaultTile} />
-                </FullProp>
+                break;
 
-            </>;
-            break;
+            case CellValue.events:
+                type = 'Events';
+                clearAction = cell.length > 0;
+
+                const addEvent = () => {
+                    AddEventModal.open({
+                        editorId: 'addEvent',
+                        entityIndex: eventIndex,
+                        filter: true,
+                        sizeX: 50,
+                        sizeY: 50,
+                        textSize: 120,
+                        zoom: 1,
+                        border: 0,
+                        controls: true,
+                        base: index => !cell.includes(eventIndex.getEntityValue(index)),
+                        select:
+                            index => {
+                                AddEventModal.close();
+                                const event = eventIndex.getEntityValue(index);
+                                cell.push(event);
+                                eContext.setSelection(new CellSelection('rect', [[cell]], CellValue.events));
+                                eContext.setRasterMode('map', 'startPath');
+                            }
+                    });
+                };
+
+                image = getEventsImage(tilesGrid, cell, zoomOrAvail);
+                content =
+                    <FullProp name="Events:">
+                        <Content thin boxed>
+                            <ItemsStack
+                                hasProps={false}
+                                width={178}
+                                empty="No event"
+                                active={active}
+                                setActive={setActive}
+                                ordered
+                                setItems={events => {
+                                    eContext.setSelection(new CellSelection('rect', [[events]], CellValue.events));
+                                    eContext.setRasterMode('map', 'startPath');
+                                }}
+                                new={addEvent}
+                                getName={value => value}
+                                getProperties={null}
+                                items={cell}
+                            />
+                        </Content>
+                    </FullProp>;
+                break;
+        }
+    } else if (selection.getType() !== 'none') {
+        // build multi cell info
+        let name;
+        const cells = selection.getCells();
+
+        brushAction = eContext.targetCellValue === CellValue.tile && !selection.isEntity();
+        if (selection.isEntity()) {
+            editAction = editBrush;
+            name = selection.getEntityValue();
+            type = 'Brush';
+            index = brushIndex.getEntityByPropValue('value', name);
+        } else {
+            type = cellValue.getName() + '-' + selection.getType();
+        }
+        const canvas =
+            selection.getCellValue() === CellValue.events ?
+                getCanvasForEventMatrix(tileIndex, tilesGrid, cells, 20) :
+                getCanvasForIndexMatrix(tileIndex, aliasIndex, cells, 20);
+
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        image =
+            <Bitmap editable={false} value={imageData} zoomOrAvail={zoomOrAvail} />;
+
+        content = <>
+            {name && <ValueProp name="Name:">{name}</ValueProp>}
+            <ValueProp name="Size:"><kbd>{selection.getWidth()}<kbd className="less">x</kbd>{selection.getHeight()}</kbd></ValueProp>
+        </>;
     }
 
     return (
         <Stack vertical border>
-            <Toolbar>
-                <Stack>
-                    {editAction && <Button click={editSelection}>Edit</Button>}
-                    {brushAction && <Button click={saveAsBrush}>To Brush</Button>}
-                    <Button disabled={!clearAction} click={clearSelection}>Clear</Button>
-                </Stack>
-            </Toolbar>
-
+            {!compact &&
+                <Toolbar>
+                    <Stack>
+                        {editAction && <Button click={editSelection}>Edit</Button>}
+                        {brushAction && <Button click={saveAsBrush}>To Brush</Button>}
+                        <Button disabled={!clearAction} click={clearSelection}>Clear</Button>
+                    </Stack>
+                </Toolbar>
+            }
             <Content padded width="180" flex>
                 <PropertyGrid>
                     <FullProp>
                         <Centered>
-                            {
-                                selection.entity ?
-                                    <Entity
-                                        entityIndex={selection.entity}
-                                        value={selection.name ? selection.name : selection.index}
-                                        player={selection.animation != ''}
-                                        readOnly
-                                        zoomOrAvail={zoomOrAvail}
-                                    /> :
-                                    (
-                                        selection.image ?
-                                        <Bitmap
-                                            editable={false}
-                                            value={selection.image}
-                                            zoomOrAvail={zoomOrAvail}
-                                        /> : <Content width={avail} height={avail} boxed thin></Content>
-                                    )
-                            }
+                            {image ? image : <Content width={avail} height={avail} boxed thin></Content>}
                         </Centered>
                     </FullProp>
                     <ValueProp name="Type:">
-                        {selection.type}
+                        {type}
                     </ValueProp>
                     {content}
                 </PropertyGrid>
@@ -415,7 +474,7 @@ function ActiveBrushPicker({brushIndex, editBrush}) {
     const eContext = useContext(EditorContext);
 
     const setActive = index => {
-        eContext.setSelection(new BrushSelection(brushIndex, index));
+        eContext.setSelection(new CellSelection('entity', {entityIndex: brushIndex, value: brushIndex.getEntityValue(index), cellsProp: 'tiles'}, CellValue.tile));
         eContext.setRasterMode('map', 'startPath');
     };
 
@@ -901,8 +960,8 @@ function ActiveEventPicker({eventIndex, editEvent}) {
             select={
                 index => {
                     const event = eventIndex.getEntityValue(index);
-                    eContext.setSelection(new EventSelection(event));
-                    eContext.setRasterMode('map', 'startPath');
+                    eContext.setSelection(new CellSelection('rect', [[[event]]], CellValue.events));
+                    eContext.setRasterMode('map', 'add');
                 }
             }
             zoom={1}
@@ -1072,15 +1131,16 @@ function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
         <SaveAndCancel fullHeight save={() => {save(editGrid.map)}} canSave={() => true} close={close}>
             <Stack vertical border fullHeight>
                 <Stack flex fullHeight border>
-                    <Content padded fullHeight>
-                        <Entity readOnly zoomOrAvail={{width: 100, height: 100}} entityIndex={editGrid.index} value={eContext.selection.getCell()} />
-                    </Content>
+                    <ActiveTile tileIndex={tilesGrid.index} aliasIndex={aliasIndex} tilesGrid={tilesGrid} compact />
+
                     <Content flex>
                         <BasicRasterView
                             cellProvider={editGrid}
                             resizeable
                             undoRedo
-                            editorId="editTiles" /></Content>
+                            editorId="editTiles"
+                        />
+                    </Content>
                 </Stack>
 
                 <Content height={150}>
@@ -1121,7 +1181,6 @@ function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
     )
 }
 
-
 function TilesMapEditor({model, resource, revert, cancel, play, tree, exportModel, saveModel}) {
 
     const eContext = useContext(EditorContext);
@@ -1132,44 +1191,46 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
     const EditEventModal = useModal();
     const EditTilesModal = useModal();
 
+    const ExportModal = useExportModal(resource);
+
     useEffect(() => {
         eContext.setTracking({map: ['active', 'hover']});
     }, []);
 
     const tileIndex = useMemo(() => {
         return new TileIndex(model);
-    }, []);
+    }, [model]);
 
     const tilesGrid = useMemo(() => {
         return new TilesGrid(tileIndex, model);
-    }, []);
+    }, [model]);
 
     const aliasIndex = useMemo(() => {
         return new AliasIndex(model, tileIndex);
-    }, []);
+    }, [model]);
 
     const brushIndex = useMemo(() => {
         return new BrushIndex(model, tileIndex, aliasIndex)
-    }, []);
+    }, [model]);
 
     const animationIndex = useMemo(() => {
         return new AnimationIndex(tileIndex, model)
-    }, []);
+    }, [model]);
 
     const eventIndex = useMemo(() => {
         return new EventIndex(model)
-    }, []);
+    }, [model]);
 
     const modeTargets = useMemo(() => {
         return [CellValue.tile, CellValue.events]
-    }, []);
+    }, [model]);
 
     const saveTilesPane = () => {
-        saveModel(model)
+        saveModel(model);
+        eContext.updateRestorePos();
     };
     const exportTilesPane = () => {
-        exportModel(model);
-
+        ExportModal.open(model, {compact: ['map']});
     };
     const deployTilesPane = () => {d('DEPLOY...')};
 
@@ -1293,7 +1354,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                             </Section>
                             <Section name="Cursor" collapse vertical>
                                 <Content padded>
-                                    <TileTracker editorId="hover" tilesGrid={tilesGrid} tileIndex={tileIndex} />
+                                    <TileTracker editorId="hover" tilesGrid={tilesGrid} tileIndex={tileIndex} aliasIndex={aliasIndex} eventIndex={eventIndex} />
                                 </Content>
                             </Section>
                         </Stack>
@@ -1348,7 +1409,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                 <SideTab name="Animations">
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveTilePicker tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} />
+                                            <ActiveTilePicker editTile={editTile} tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} />
                                         </SideTab>
                                         <SideTab name="Manage">
                                             <AnimationManager animationIndex={animationIndex} spriteIndex={tileIndex} />
@@ -1383,6 +1444,8 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                     <TilesEditor {...EditTilesModal.props} />
                 </EditorCtx>
             </EditTilesModal.content>
+
+            {ExportModal.render}
         </Page>
     );
 }

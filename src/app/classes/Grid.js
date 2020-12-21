@@ -13,6 +13,18 @@ class CellValue {
     getId() {
         return 'raw'
     }
+
+    add(base, add) {
+        return add;
+    }
+
+    getEmpty() {
+        return undefined;
+    }
+
+    sub(base, sub) {
+        return (base === sub) ? this.getEmpty() : base;
+    }
 }
 
 class CellRawValue extends CellValue {
@@ -118,6 +130,26 @@ class CellEventsValue extends CellValue {
 
     isEmpty(curr) {
         return curr.length === 0
+    }
+
+    add(base, addItems) {
+        const result = [...base];
+        for (let item of addItems) {
+            if (!result.includes(item)) {
+                result.push(item);
+            }
+        }
+        return result
+    }
+
+    sub(base, subItems) {
+        const result = [];
+        for (let item of base) {
+            if (!subItems.includes(item)) {
+                result.push(item);
+            }
+        }
+        return result;
     }
 
     getName() {
@@ -561,8 +593,7 @@ class TilesGrid extends IndexGrid {
         if (!event || !event.width) {
             return false;
         }
-        const pos = this.index.model.pos[value];
-        ctx.drawImage(this.index.model.eventsImg, pos.x, pos.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
+        ctx.drawImage(this.index.model.eventsImg, event.x, event.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
         return true;
     }
 
