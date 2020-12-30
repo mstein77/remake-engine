@@ -2696,7 +2696,7 @@ function RasterOverlays(props) {
 /**
  *
  */
-function RasterViewGrid(props) {
+function RasterViewGrid({animationIndex, ...props}) {
     const eContext = useContext(EditorContext);
     const eCtxRef = useRef(null);
     eCtxRef.current = eContext;
@@ -3110,6 +3110,7 @@ function RasterViewGrid(props) {
             <div className="full-v padded">
                 <CellGrid
                     auto={auto}
+                    animationIndex={animationIndex}
                     cellType={cellType}
                     setWidth={setWidth}
                     setHeight={setHeight}
@@ -3202,7 +3203,7 @@ function useOverlay(id) {
  * @returns {*}
  * @constructor
  */
-function BasicRasterView({modeTargets = [], ...props}) {
+function BasicRasterView({animationIndex, modeTargets = [], ...props}) {
     const defaults = props.defaults ? props.defaults : {};
 
     const [border, setBorder] = useState(defaults.border !== undefined ? defaults.border : 0);
@@ -3504,6 +3505,7 @@ function BasicRasterView({modeTargets = [], ...props}) {
             <Content flex fullHeight>
                 <RasterViewGrid
                     auto
+                    animationIndex={animationIndex}
                     events={events || targetEvents}
                     resizeable={resizeable}
                     shifteable={shifteable}

@@ -1,4 +1,5 @@
 const {d, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail} = require('../helper/helper');
+const {CellValue} = require('../classes/Grid');
 
 class EntityIndex {
 
@@ -57,7 +58,11 @@ class EntityIndex {
     }
 
     hasEntityDim() {
-        return this.getEntityProps().includes('width');
+        return this.hasEntityProp('width');
+    }
+
+    hasEntityProp(name) {
+        return this.getEntityProps().includes(name);
     }
 
     hasEntityImage(index) {
@@ -676,16 +681,137 @@ class TileIndex extends EntityIndex {
         this.img = model.tilesImg.elem;
 
         this.tilesX = Math.floor(this.img.width/this.sizeX);
+        if (model.count !== null) {
+            this.tilesX = Math.min(this.tilesX, model.count);
+        }
         this.tilesY = Math.floor(this.img.height/this.sizeY);
+        if (model.count !== null) {
+            this.tilesY = Math.min(this.tilesY, Math.ceil(model.count/this.tilesX));
+        }
 
         // we could analyse how many empty tiles are at the end
+        this.count = model.count !== null ? model.count : this.tilesX * this.tilesY;
         this.items = this.getAllIndices();
         this.valueIndexing = true;
     }
 
+    notify() {
+        this.model.count = this.getLength();
+        this.count = this.model.count;
+        return super.notify();
+    }
+
+    getDeleteInfo(indices, safe = false) {
+        const avail = [];
+        indices.sort();
+        for (let index of indices) {
+            if (this.hasIndex(index)) {
+                avail.push(index);
+            }
+        }
+        let left = avail.length;
+        let index = this.items.length - 1;
+        const changes = [];
+        // [old, new|null]
+
+        while(left > 0 && index >= 0) {
+            if (!avail.includes(index)) {
+                if (safe) {
+                    changes.push([index, index - left]);
+                }
+            } else {
+                changes.push([index, null]);
+                left--;
+            }
+            index--;
+        }
+
+        const old2new = {};
+        for (let change of changes) {
+            old2new[change[0]] = change[1];
+        }
+
+        const mapChanges = [];
+        // [x, y, old, new]
+
+        const map = this.model.map;
+        for (let y = 0; y < map.length; y++) {
+            const row = map[y];
+            for (let x = 0; x < row.length; x++) {
+                const index = CellValue.tile.get(row[x]);
+                const newIndex = old2new[index];
+                if (newIndex !== undefined) {
+                    mapChanges.push([x, y, index, newIndex === null ? 0 : newIndex]);
+                }
+            }
+        }
+
+        // MAP: D E L E T E :
+
+        // 1. Bestimme count(new = null) in "changes"
+        // 2. naue old2new aus length - count(new = null) ... length - 1 => null
+        // 2. mapChange, wenn index >= length - count(new = null) dann 0
+
+        // MAP: S A F E - D E L E T E :
+
+        // 1. baue old2new aus changes
+        // 2. falls index in old2new dann old2new[index] oder 0 falls null
+
+        // DO: model.map[mapChange[1]][mapChange[0]] = mapChange[3]
+        // UNDO: model.map[mapChange[1]][mapChange[0]] = mapChange[2]
+
+        // TODO durchlaufe brush-tiles nach gleichem Schema
+
+        // TILES: (S A F E -) D E L E T E :
+
+        // arbeitet immer auf "changes"
+
+        // DO: verarbeite rückwärts, mit copy: tiles[new] = tiles[old], null: backup[old] = tiles[old]
+
+        // 1. backup.3 = tiles[3]
+        // 2. copy 4 => 3
+        // 3. copy 5 => 4
+        // reindex => delete 5
+
+        // UNDO: verarbeite vorwärts, mit copy: tiles[old] = tiles[new], null: tiles[old] = backup[old]
+        // 1. copy 4 => 5
+        // 2. copy 3 => 4
+        // 3. copy backup.3 => 3
+
+        // INDEX-PROP:
+
+        // Durchlaufe model.tiles
+        //   Falls <key> und map.tiles<key>.index:
+        //      Wenn index in old2new dann:
+        //        propChange = [<key>, old, new]
+
+        // DO: model.tiles[propChange[0]].index = propChange[2]
+        // UNDO: model.tiles[propChange[0]].index = propChange[1]
+
+        // FRAME-ID:
+
+        // Durchlaufe model.animations:
+        //   Durchlaufe frames:
+        //      Falls id in old2new:
+        //         new = null => frameBackup[animation] = {<index>: <frame>}
+        //         else: frameIdChange = [frame, old, new]
+
+        // DO: Durchlaufe frameBackup:
+        //        bilde animation-Array neu ohne die indices
+        //     frameIdChange[0].id = frameIdChange[2]
+
+        // UNDO: Durchlaufe frameBackup:
+        //        für jeden key in animation setze <frame> in den Array
+        //     frameIdChange[0].id = frameIdChange[1]
+
+
+        d('CHANGES', changes);
+        d('MAP-CHANGES', mapChanges);
+    }
+
     getLength() {
         if (this.items === undefined) {
-            return this.tilesX * this.tilesY;
+            return this.count;
         }
         return this.items.length;
     }
@@ -803,9 +929,18 @@ class TileIndex extends EntityIndex {
         return ['image'];
     }
 
-    drawEntity(targetCtx, index, x, y, zoomOrAvail = 1) {
+    drawEntity(targetCtx, index, x, y, zoomOrAvail = 1, players = null) {
         if (index >= this.length) {
             return;
+        }
+        if (players) {
+            const animation = this.getEntityPropValue(index, 'animation');
+            if (animation) {
+                const frame = players.getCurrFrame(animation);
+                if (frame) {
+                    index = frame.id;
+                }
+            }
         }
         const pos = this.getIndexPos(index);
         if (typeof zoomOrAvail === 'object') {
@@ -850,14 +985,18 @@ class TileIndex extends EntityIndex {
 
 class AliasIndex extends EntityIndex {
 
-    constructor(model, tileIndex) {
+    constructor(model, tileIndex, animationIndex) {
         super();
         this.tileIndex = tileIndex;
         this.tileIndex.addListener(() => this.notify());
+        this.animationIndex = animationIndex;
         this.model = model;
         const names = [];
         for (let [name, tile] of Object.entries(model.tiles)) {
-            if (tile.index !== undefined && name != tile.index) {
+            if (typeof name === 'string' && name.match(/[^0-9]/)) {
+                if (tile.index === undefined || !Number.isInteger(tile.index)) {
+                    tile.index = 0;
+                }
                 names.push(name);
             }
         }
@@ -877,6 +1016,18 @@ class AliasIndex extends EntityIndex {
                 this.model.tiles[value] = {};
             }
         }
+        if (prop === 'animation') {
+            const name =  this.getEntityValue(index);
+            const tile = this.model.tiles[name];
+            if (value === '') {
+                if (tile && tile.animation) {
+                    delete tile.animation;
+                }
+            } else {
+                tile.animation = value;
+            }
+            this.notify();
+        }
         if (prop === 'props') {
             const name = this.getEntityValue(index);
             this.model.tiles[name] = value;
@@ -891,21 +1042,27 @@ class AliasIndex extends EntityIndex {
         }
     }
 
-    getEntityPropValue(index, prop) {
+    getEntityPropValue(aIndex, prop) {
         if (prop === 'tile') {
-            const name = this.getEntityValue(index);
+            const name = this.getEntityValue(aIndex);
             return this.model.tiles[name].index;
         }
+        if (prop === 'animation') {
+            const tile = this.model.tiles[this.getEntityValue(aIndex)];
+            if (!tile || !tile.animation) {
+                return '';
+            }
+            return tile.animation;
+        }
         if (prop === 'props') {
-            const tile = this.model.tiles[this.getEntityValue(index)];
+            const tile = this.model.tiles[this.getEntityValue(aIndex)];
             if (!tile) {
                 return {};
             }
-            const {...result} = tile;
-            delete result.index;
+            const {index, animation, ...result} = tile;
             return result;
         }
-        return super.getEntityPropValue(index, prop);
+        return super.getEntityPropValue(aIndex, prop);
     }
 
     handleEntityValueReplace(oldValue, newValue) {
@@ -914,7 +1071,7 @@ class AliasIndex extends EntityIndex {
     }
 
     getEntityProps() {
-        return  [...super.getEntityProps(), 'props', 'tile'];
+        return  [...super.getEntityProps(), 'props', 'animation', 'tile'];
     }
 
     getSizeX() {
@@ -925,10 +1082,20 @@ class AliasIndex extends EntityIndex {
         return this.tileIndex.getSizeY();
     }
 
-    drawEntity(targetCtx, index, x, y, zoomOrAvail = 1) {
-        const tile = this.getEntityPropValue(index, 'tile');
+    drawEntity(targetCtx, index, x, y, zoomOrAvail = 1, player = null) {
+        let tile = this.getEntityPropValue(index, 'tile');
         if (tile === null) {
             return;
+        }
+        if (player !== null) {
+            const animation = this.getEntityPropValue(index, 'animation');
+            if (animation !== '') {
+                const frame = player.getCurrFrame(animation);
+                if (!frame) {
+                    return;
+                }
+                tile = frame.id;
+            }
         }
         this.tileIndex.drawEntity(targetCtx, tile, x, y, zoomOrAvail);
     }
@@ -1255,7 +1422,7 @@ class AnimationIndex extends EntityIndex {
     }
 
     getEntityProps() {
-        return [...super.getEntityProps(), 'sizeX', 'sizeY', 'dir', 'end', 'synchronous', 'frames'];
+        return [...super.getEntityProps(), 'sizeX', 'sizeY', 'dir', 'end', 'speed', 'synchronous', 'frames'];
     }
 
     getSizeX() {
@@ -1295,6 +1462,7 @@ class AnimationIndex extends EntityIndex {
     }
 
     getEntityPropValue(index, prop) {
+        let def;
         switch(prop) {
             case 'sizeX': {
                     const animation = this.model[this.key][this.getEntityValue(index)];
@@ -1308,12 +1476,14 @@ class AnimationIndex extends EntityIndex {
                 }
                 break;
 
+            case 'speed':
+                def = 1;
             case 'dir':
             case 'end':
             case 'synchronous':
             case 'frames': {
                     const animation = this.model[this.key][this.getEntityValue(index)];
-                    return animation[prop];
+                    return animation[prop] === undefined ? def : animation[prop];
                 }
                 break;
         }
@@ -1350,6 +1520,7 @@ class AnimationIndex extends EntityIndex {
                 }
                 break;
 
+            case 'speed':
             case 'dir':
             case 'end':
             case 'synchronous':
@@ -1380,7 +1551,8 @@ class AnimationIndex extends EntityIndex {
     }
 
     drawEntity(ctx, index, x, y, zoomOrAvail = 1, players = null) {
-        const frame = players.getCurrFrame(index);
+        const animation = this.getEntityValue(index);
+        const frame = players ? players.getCurrFrame(animation) : null;
         if (!frame) {
             if (typeof zoomOrAvail === 'object') {
                 ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);

@@ -420,6 +420,7 @@ function PageSelector(props) {
     let model, tree;
 
     switch (resource.type) {
+
         case 'TilesMap':
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));

@@ -6,6 +6,8 @@ class CellSelection {
     constructor(type = 'none', cells = [[]], cellValue = CellValue.raw) {
         this.type = type;
         this.cellValue = cellValue;
+        this.entityIndex = null;
+        this.cellsProp = null;
         if (type === 'multi') {
             this.cells = cells.rect;
             this.gapX = cells.gapX;
@@ -13,11 +15,21 @@ class CellSelection {
             this.baseX = cells.baseX;
             this.baseY = cells.baseY;
         } else if (type === 'entity') {
+            this.entityIndex = cells.entityIndex;
+            this.cellsProp = cells.cellsProp;
             this.value = cells.value;
-            const index = cells.entityIndex.getEntityByPropValue('value', cells.value);
-            this.cells = cells.entityIndex.getEntityPropValue(index, cells.cellsProp);
+            this.setCellsFromEntity();
         } else {
             this.cells = type === 'none' ? [[]] : cells;
+        }
+    }
+
+    setCellsFromEntity() {
+        if (this.type === 'entity') {
+            const index = this.entityIndex.getEntityByPropValue('value', this.value);
+            if (index !== null) {
+                this.cells = this.entityIndex.getEntityPropValue(index, this.cellsProp);
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 import {CellSelection} from "./CellProvider";
 
-const {d} = require('../helper/helper');
+const {d, cloneDeep} = require('../helper/helper');
 
 class CellValue {
     constructor() {
@@ -28,6 +28,7 @@ class CellValue {
 }
 
 class CellRawValue extends CellValue {
+
     constructor(id, empty = null) {
         super();
         this.id = id;
@@ -46,7 +47,7 @@ class CellRawValue extends CellValue {
     }
 
     set(curr, value) {
-        return value
+        return cloneDeep(value)
     }
 
     isEmpty(curr) {
@@ -206,7 +207,7 @@ class Grid {
 
     drawCellValue(ctx, value, x, y, zoom) {};
 
-    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1) {
+    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1, players = null) {
         const viewX = Math.min(width, this.getWidth());
         const viewY = Math.min(height, this.getHeight());
         const tileX = this.getCellSizeX() * zoom;
@@ -236,7 +237,7 @@ class Grid {
             let currX = grid;
             for (let x = 0; x < viewX; x++) {
                 const index = this.map[posY + y][posX + x];
-                this.drawCellValue(ctx, index, currX, currY, zoom);
+                this.drawCellValue(ctx, index, currX, currY, zoom, players);
                 currX += tileXPlusBorder;
             }
             currY += tileYPlusBorder;
@@ -597,17 +598,37 @@ class TilesGrid extends IndexGrid {
         return true;
     }
 
-    drawCellValue(ctx, value, x, y, zoom) {
+    updatePlayers(players, posX, posY, width, height) {
+        const animations = [];
+        const rect = this.getRect(posX, posY, width, height, CellValue.tile);
+        for (let row of rect) {
+            for (let tile of row) {
+                const obj = this.index.model.tiles[tile];
+                if (obj && obj.animation && !animations.includes(obj.animation)) {
+                    animations.push(obj.animation);
+                }
+            }
+        }
+        players.setAnimations(animations);
+    }
+
+    drawCellValue(ctx, value, x, y, zoom, players = null) {
         let events = [];
         if (Array.isArray(value)) {
             events = value.slice(1);
             value = value[0];
         }
         const alias = typeof(value) === 'string' ? value : null;
-        value = this.getIndexForTile(value);
         const obj = this.index.model.tiles[value];
-        if (obj && obj.animation) {
-            value = this.index.model.animations[obj.animation].frames[0].id;
+        if (obj) {
+            if (players && obj.animation) {
+                const frame = players.getCurrFrame(obj.animation);
+                if (frame) {
+                    value = frame.id;
+                }
+            } else {
+                value = this.getIndexForTile(value);
+            }
         }
         super.drawCellValue(ctx, value, x, y, zoom);
         if (events.length) {
@@ -640,6 +661,7 @@ class WrappingIndexGrid extends IndexGrid {
         this.mapping = tilesIndex.getView(0, tilesIndex.getLength(), [null, base]);
         this.wrapWidth = Math.max(this.mapping.count, 1);
         this.players = players;
+        this.hasAnimationProp = players && tilesIndex.hasEntityProp('animation');
     }
 
     setMatch(match) {
@@ -670,17 +692,26 @@ class WrappingIndexGrid extends IndexGrid {
         if (!this.players) {
             return;
         }
-        const indices = [];
+        const animations = [];
         const viewX = Math.min(width, this.getWidth());
         const viewY = Math.min(height, this.getHeight());
         for (let y = 0; y < viewY; y++) {
             let currIndex = (posY + y) * this.wrapWidth;
             for (let x = 0; x < viewX; x++) {
-                indices.push(currIndex);
+                const animation =
+                    this.hasAnimationProp ?
+                        this.index.getEntityPropValue(
+                            this.mapping.matches[currIndex],
+                            'animation'
+                        ) :
+                        this.index.getEntityValue(this.mapping.matches[currIndex]);
+                if (animation != '') {
+                    animations.push(animation);
+                }
                 currIndex++;
             }
         }
-        this.players.setIndices(indices);
+        this.players.setAnimations(animations)
     }
 
     drawCellValue(ctx, value, x, y, zoomOrAvail) {

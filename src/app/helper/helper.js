@@ -544,12 +544,13 @@ const getJsonModelOfInstance = instance => {
             }
             return canvas;
         }
-        return instance;
+    } else {
+        const config = instance.config ? instance.config : instance;
+        instance = config.getJson();
     }
-    const config = instance.config ? instance.config : instance;
-    const json = config.getJson();
-    for (let key in json) {
-        json[key] = getJsonModelOfInstance(json[key]);
+    const json = {};
+    for (let [key, value] of Object.entries(instance)) {
+        json[key] = getJsonModelOfInstance(value);
     }
     return json;
 };
@@ -859,11 +860,12 @@ class BitmapPlayer {
         this.dirty = false;
     }
 
-    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
+    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, speed = 1) {
         this.frames = frames;
         this.direction = dir;
         this.end = end;
         this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
+        this.speed = speed;
         this.step = 0;
         this.frameNo = this.isForward ? 0 : frames.length - 1;
         this.state = ANIMATION.STATE.WAITING;
@@ -1023,22 +1025,23 @@ class Players {
     constructor(animationIndex) {
         this.index = animationIndex;
         this.players = {};
-        this.speed = 1;
     }
 
-    setIndices(indices) {
-        for (let index of Object.keys(this.players)) {
-            if (!indices.includes(parseInt(index, 10))) {
-                delete this.players[index];
+    setAnimations(animations) {
+        for (let name of Object.keys(this.players)) {
+            if (!animations.includes(name)) {
+                delete this.players[name];
             }
         }
-        for (let index of indices) {
-            if (this.players[index] === undefined) {
-                const animation = this.index.getEntityObject(index);
-                const player = new BitmapPlayer();
-                player.setSpeed(this.speed);
-                player.loadAnimation(animation.frames, animation.end, animation.dir);
-                this.players[index] = player;
+        for (let name of animations) {
+            if (this.players[name] === undefined) {
+                const index = this.index.getEntityByPropValue('value', name);
+                if (index !== null) {
+                    const animation = this.index.getEntityObject(index);
+                    const player = new BitmapPlayer();
+                    player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
+                    this.players[name] = player;
+                }
             }
         }
     }
@@ -1061,11 +1064,11 @@ class Players {
         return hasNewFrame;
     }
 
-    getCurrFrame(index) {
-        if (this.players[index] === undefined) {
+    getCurrFrame(animation) {
+        if (this.players[animation] === undefined) {
             return null;
         }
-        return this.players[index].getFrame();
+        return this.players[animation].getFrame();
     }
 
     allPlayers(callback) {
@@ -1085,7 +1088,7 @@ class Players {
     reset() {
         this.allPlayers(player => player.reset())
     }
-
+/*
     setSpeed(speed) {
         this.speed = speed;
         this.allPlayers(player => player.setSpeed(speed))
@@ -1094,6 +1097,7 @@ class Players {
     getSpeed() {
         return this.speed;
     }
+ */
 }
 
 function cloneDeep(value) {

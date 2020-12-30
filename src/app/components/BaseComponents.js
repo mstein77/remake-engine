@@ -20,7 +20,7 @@ import {
     BitmapEditor,
     useEditorContextPart, CursorArea, EditorCtx, BitmapSelector
 } from "./Raster";
-import {WrappingIndexGrid} from "../classes/Grid";
+import {WrappingIndexGrid, CellValue} from "../classes/Grid";
 import {CellSelection, BitmapCellProvider} from "../classes/CellProvider";
 import {AnimationIndex, ColorIndex, FrameIndex} from "../classes/EntityIndex";
 
@@ -320,13 +320,14 @@ function TextAreaProp(props) {
     )
 }
 
-function PositionPicker({entityIndex, position, entity, setPosition, setEntity}) {
+function PositionPicker({entityIndex, position, entity, setPosition, setEntity, animationIndex}) {
     const EntityPickerModal = useModal();
 
     const pick = () => {
         EntityPickerModal.open({
             controls: true,
             entityIndex,
+            animationIndex,
             select: index => {
                 setEntity(index);
                 EntityPickerModal.close();
@@ -477,7 +478,7 @@ function BitmapProp(props) {
     )
 }
 
-function Entity({entityIndex, readOnly, value, player, set, reset, zoomOrAvail = 1}) {
+function Entity({entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, animationIndex = null}) {
     const EntityPickerModal = useModal();
 
     const index = entityIndex.getEntityByPropValue('value', value);
@@ -490,22 +491,29 @@ function Entity({entityIndex, readOnly, value, player, set, reset, zoomOrAvail =
     }
 
     const playerRef = useRef(null);
+
+    let animation = '';
+    if (animationIndex && index !== null) {
+        animation = entityIndex.hasEntityProp('animation') ?
+            entityIndex.getEntityPropValue(index, 'animation') : value
+    }
+
     const prePlayers = useMemo(() => {
-        if (!player || !value) {
+        if (!animationIndex || !animation) {
             return null;
         }
-        const obj = new Players(entityIndex);
-        obj.setIndices([index]);
+        const obj = new Players(animationIndex);
+        obj.setAnimations([animation]);
         return obj;
-    }, [value]);
-    const players = useAnimationPlayers(entityIndex, player, 1, prePlayers);
+    }, [animation]);
+    const players = useAnimationPlayers(entityIndex, animationIndex, prePlayers);
 
     playerRef.current = players;
 
     const pick = readOnly ? null : () => {
         EntityPickerModal.open({
             entityIndex,
-            player: true,
+            animationIndex,
             controls: true,
             select: index => {
                 set(entityIndex.getEntityPropValue(index, 'value'));
@@ -797,6 +805,9 @@ function Stack(props) {
     }
     if (!props.noGap) {
         cls.push('inner-' + (props.border ? 'border' : 'space') + '-' + dir);
+    }
+    if (props.flex) {
+        cls.push('flex');
     }
     if (props.fit) {
         cls.push('fit-content-' + dir);
@@ -1110,9 +1121,9 @@ function Grid({columns, gap, children}) {
     );
 }
 
-function PropertyGrid(props) {
+function PropertyGrid({propWidth = 'min-content', ...props}) {
     return (
-        <Grid gap={5} columns="min-content auto" {...props} />
+        <Grid gap={5} columns={propWidth + " auto"} {...props} />
     );
 }
 
@@ -1580,7 +1591,7 @@ function GridCellSelector({gridProvider, cellType, zoom, border, doubleClick, wi
     )
 }
 
-function EntityTextPicker({entityIndex, textSize, sizeX, sizeY, select, editorId, player, controls, base, ...props}) {
+function EntityTextPicker({entityIndex, animationIndex, textSize, sizeX, sizeY, select, editorId, player, controls, base, ...props}) {
     const [pos, setPos] = useState(0);
     const [zoom, setZoom] = useState(props.zoom !== undefined ? props.zoom : 1);
     const [maxZoom, setMaxZoom] = useState(10);
@@ -1588,10 +1599,9 @@ function EntityTextPicker({entityIndex, textSize, sizeX, sizeY, select, editorId
     const [border, setBorder] = useState(props.border !== undefined ? props.border :1);
     const [width, setWidth] = useState(1);
     const [height, setHeight] = useState(1);
-    const [speed, setSpeed] = useState(0.5);
     const [filter, setFilterRaw] = useState('');
 
-    const players = useAnimationPlayers(entityIndex, player, speed);
+    const players = useAnimationPlayers(entityIndex, animationIndex);
 
     const gridProvider = useMemo(() => {
         return new WrappingIndexGrid(entityIndex, base, players);
@@ -1614,7 +1624,7 @@ function EntityTextPicker({entityIndex, textSize, sizeX, sizeY, select, editorId
                         <Content className="min-content thin-boxed">
                             {
                                 entityIndex.hasEntityImage(index) ?
-                                    <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => gridProvider.index.drawEntity(ctx, index, 0, 0, {width: sizeX * zoom, height: sizeY * zoom})} /> :
+                                    <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => gridProvider.index.drawEntity(ctx, index, 0, 0, {width: sizeX * zoom, height: sizeY * zoom}, players)} /> :
                                     <Content width={sizeX * zoom} height={sizeY * zoom} />
                             }
                         </Content>
@@ -1722,7 +1732,7 @@ function EntityTextPicker({entityIndex, textSize, sizeX, sizeY, select, editorId
     )
 }
 
-function EntityPicker({entityIndex, player, controls, editorId, select, base = null, ...props}) {
+function EntityPicker({entityIndex, animationIndex, controls, editorId, select, base = null, ...props}) {
 
     const [pos, setPos] = useState(0);
     const [zoom, setZoom] = useState(1);
@@ -1731,14 +1741,13 @@ function EntityPicker({entityIndex, player, controls, editorId, select, base = n
     const [border, setBorder] = useState(1);
     const [width, setWidth] = useState(1);
     const [height, setHeight] = useState(1);
-    const [speed, setSpeed] = useState(0.5);
     const [filter, setFilterRaw] = useState('');
 
     if (zoom > maxZoom) {
         setZoom(maxZoom);
     }
 
-    const players = useAnimationPlayers(entityIndex, player, speed);
+    const players = useAnimationPlayers(entityIndex, animationIndex);
 
     const gridProvider = useMemo(() => {
         return new WrappingIndexGrid(entityIndex, base, players);
@@ -1930,35 +1939,36 @@ function useComponentUpdate() {
     }
 }
 
-function useAnimationPlayers(entityIndex, player, speed, prePlayers = null) {
+function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     const context = useContext(GlobalContext);
 
     const mounted = useMounted();
 
     const players = useMemo(() => {
-        if (!player) return null;
+        if (!animationIndex) return null;
 
         if (prePlayers) {
             return prePlayers;
         }
-        return new Players(entityIndex);
-    }, [player, prePlayers]);
-
-    if (players && players.getSpeed() != speed) {
-        players.setSpeed(speed);
-    }
+        return new Players(animationIndex);
+    }, [animationIndex, prePlayers]);
 
     const update = useComponentUpdate();
     useEffect(() => {
+        if (!animationIndex) {
+            return;
+        }
         const compUpdate = () => {
-            if (player) {
+            if (animationIndex) {
                 players.clear();
             }
             update();
         };
         entityIndex.addListener(compUpdate);
+        animationIndex.addListener(compUpdate)
         return () => {
             entityIndex.removeListener(compUpdate);
+            animationIndex.removeListener(compUpdate);
         }
     }, [prePlayers]);
 
@@ -1993,13 +2003,13 @@ function useAnimationPlayers(entityIndex, player, speed, prePlayers = null) {
     return players;
 }
 
-function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, renderBottom, actions, titleHeight, bottomHeight, minWidth, empty, entityIndex, ...props}) {
+function EntityManager({newItem, animationIndex, fit, undoRedo, maxedZoom, importItems, startPos, doubleClick, rightClick, renderTitle, renderBottom, actions, titleHeight, bottomHeight, minWidth, empty, entityIndex, ...props}) {
     const [pos, setPos] = useState(startPos || 0);
     const [zoom, setZoom] = useState(2);
     const [page, setPage] = useState(0);
-    const [speed, setSpeed] = useState(1);
     const [marked, setMarked] = useState([]);
     const [filter, setFilterRaw] = useState('');
+    const hasAnimationProp = animationIndex && entityIndex.hasEntityProp('animation');
     const setFilter = value => {
         setPos(0);
         setFilterRaw(value);
@@ -2008,10 +2018,9 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
     if (minWidth === undefined) {
         minWidth = 50;
     }
-    const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
 
-    const players = useAnimationPlayers(entityIndex, player, speed);
+    const players = useAnimationPlayers(entityIndex, animationIndex);
 
     const propsRef = useRef(null);
     propsRef.current = {pos};
@@ -2146,15 +2155,21 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
     }
 
     if (players) {
-        players.setIndices(view.matches);
+        const animations = [];
+        for (let index of view.matches) {
+            const animation = hasAnimationProp ?
+                entityIndex.getEntityPropValue(index, 'animation') :
+                entityIndex.getEntityValue(index);
+            if (animation !== '') {
+                animations.push(animation);
+            }
+        }
+        players.setAnimations(animations);
     }
 
     const bottomToolbar = bottomItems.length > 0 ? <Toolbar>{bottomItems}</Toolbar> : '';
 
-    const availWidth = sizeX * zoom;
-    const availHeight = sizeY * zoom;
-    const avail = availHeight;
-//    const avail = Math.min(availWidth, availHeight);
+    const avail = sizeY * zoom;
 
     const zoomOrAvail = maxedZoom ? {width: avail, height: avail} : zoom;
 
@@ -2216,7 +2231,6 @@ function EntityManager({newItem, player, fit, undoRedo, maxedZoom, importItems, 
                 maxedZoom ? '' : <Int name="Zoom:" buttons min={1} value={zoom} set={setZoom} />
             }
             <BackgroundControl />
-            {player ? <Range value={speed} step={0.01} set={value => setSpeed(parseFloat('' + value))} min={0.0} max={2.0} /> : ''}
         </Toolbar>;
 
     const controller =
@@ -2661,7 +2675,7 @@ function Title(props) {
     );
 }
 
-function Section(props) {
+function Section({hidden, ...props}) {
     const [collapsed, setCollapsed] = useState(false);
 
     const {width, minWidth, maxWidth, height, minHeight, maxHeight} = props;
@@ -2704,6 +2718,9 @@ function Section(props) {
     );
     let headItems = isVCollapse ? [actionsDiv, nameDiv] : [nameDiv, actionsDiv];
 
+    const hiddenElems = (collapsed && hidden) ?
+        <div className="hidden">{hidden()}</div> : '';
+
     return (
         <Content flex={props.flex} fullHeight={isVCollapse} boxed={boxed} {...dim}>
             <Stack vertical={!isVCollapse} border noGap={props.raw} fit={collapsed} fullHeight={!collapsed || isVCollapse}>
@@ -2720,6 +2737,7 @@ function Section(props) {
                     )
                 }
             </Stack>
+            {hiddenElems}
         </Content>
     );
 }
@@ -3030,7 +3048,7 @@ function useEntity(prefix, defaults = {}) {
 }
 
 function CellGrid({children, cellType, editorId, rulers, gridProvider, posX, setPosX, posY, setPosY, width, setWidth, height,
-                      match, setHeight, border, zoom, maxZoom, setMaxZoom, ...props}) {
+                      animationIndex, match, setHeight, border, zoom, maxZoom, setMaxZoom, ...props}) {
     const context = useContext(GlobalContext);
     const gridStyle = {
         display: 'grid',
@@ -3039,6 +3057,8 @@ function CellGrid({children, cellType, editorId, rulers, gridProvider, posX, set
         gridColumnGap: context.defaultPadding
     };
     useEditorContextPart(editorId);
+
+    const players = useAnimationPlayers(gridProvider.index, animationIndex);
 
     const propsRef = useRef(null);
     const gridWidth = gridProvider.getWidth();
@@ -3089,7 +3109,7 @@ function CellGrid({children, cellType, editorId, rulers, gridProvider, posX, set
                 ctx => {
                     const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
                     ctx.clearRect(0, 0, dim.width, dim.height);
-                    gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom);
+                    gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom, players);
                 }
             )
         },
@@ -3142,6 +3162,10 @@ function CellGrid({children, cellType, editorId, rulers, gridProvider, posX, set
         }
         e.stopPropagation();
     };
+
+    if (players) {
+        gridProvider.updatePlayers(players, posX, posY, width, height);
+    }
 
     const firstCells = [
         <div key={1} onWheel={onWheel}>
@@ -3872,9 +3896,10 @@ function AnimationProps({animationIndex, canSave}) {
         <Content padded>
             <PropertyGrid>
                 <TextFieldProp invalid={!canSave()} name="Name" value={animation.value} set={value => animationIndex.setEntityObject({...animationIndex.getEntityObject(0), value}, true)} />
-                <RadioProp name="Direction" options={dirOptions} value={animation.dir} set={value => setProp( 'dir', parseInt('' + value, 10))}  />
-                <RadioProp name="End" options={endOptions} value={animation.end} set={value => setProp( 'end', parseInt('' + value, 10))}  />
-                <CheckboxProp name="Synchronous" value={animation.synchronous} set={value => setProp( 'synchronous', value)} />
+                <RadioProp name="Direction:" options={dirOptions} value={animation.dir} set={value => setProp( 'dir', parseInt('' + value, 10))}  />
+                <RadioProp name="End:" options={endOptions} value={animation.end} set={value => setProp( 'end', parseInt('' + value, 10))}  />
+                <CheckboxProp name="Synchronous:" value={animation.synchronous} set={value => setProp( 'synchronous', value)} />
+                <RangeProp name="Speed:" value={animation.speed} set={value => setProp('speed', value)} min={0.0} max={2.0} />
             </PropertyGrid>
         </Content>
     )
@@ -3935,14 +3960,13 @@ function PreviewAnimation({frameIndex, animationIndex}) {
     useUpdateOnEntityIndexChanges(frameIndex);
 
     const [stopped, setStopped] = useState(false);
-    const [speed, setSpeed] = useState(0.1);
 
     const player = new BitmapPlayer();
     const frames = frameIndex.getPropValues('value');
     const dir = animationIndex.getEntityPropValue(0, 'dir');
     const end = animationIndex.getEntityPropValue(0, 'end');
-    player.loadAnimation(frames, end, dir);
-    player.setSpeed(speed);
+    const speed = animationIndex.getEntityPropValue(0, 'speed');
+    player.loadAnimation(frames, end, dir, speed);
 
     if (stopped) {
         player.pause();
@@ -3964,7 +3988,6 @@ function PreviewAnimation({frameIndex, animationIndex}) {
                             <ActionBox click={toggleStopped} material>{stopped ? 'play_arrow' : 'stop'}</ActionBox>
                         </Stack>
                     </Content>
-                    <Content padded><Range value={speed} set={value => setSpeed(value)} min={0.0} max={2.0} /></Content>
                 </Stack>
             </Content>
         </Section>
@@ -3981,6 +4004,7 @@ function AnimationManager({animationIndex, spriteIndex}) {
     const addAnimation = () => {
         NewAnimationModal.open({
             name: '',
+            speed: 1,
             width: animationIndex.fixSize ? animationIndex.getSizeX() : 16,
             height: animationIndex.fixSize ? animationIndex.getSizeY() : 16,
             isValid: value => !animationIndex.hasPropValue('value', value),
@@ -4024,12 +4048,12 @@ function AnimationManager({animationIndex, spriteIndex}) {
         <>
             <EntityManager
                 entityIndex={animationIndex}
+                animationIndex={animationIndex}
                 actions={actions}
                 titleHeight={20}
                 bottomHeight={20}
                 minWidth={100}
                 filter
-                player
                 maxedZoom
                 newItem={addAnimation}
                 empty="No animations defined. Add new one"

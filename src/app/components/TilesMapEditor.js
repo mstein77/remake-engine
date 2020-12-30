@@ -77,7 +77,7 @@ function getEventsImage(tilesGrid, events, zoomOrAvail) {
         <Content padded><Content width={zoomOrAvail.width} height={zoomOrAvail.height} boxed thin></Content></Content>
 }
 
-function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
+function TileTracker({editorId, tileIndex, aliasIndex, tilesGrid, animationIndex}) {
     const eContext = useEditorContextPart(editorId);
     const [trackX, setTrackX] = useState(null);
     const [trackY, setTrackY] = useState(null);
@@ -131,7 +131,7 @@ function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
                 <Entity
                     entityIndex={entityIndex}
                     value={entityIndex.getEntityValue(index)}
-                    player={animation != ''}
+                    animationIndex={animation != '' ? animationIndex : null}
                     readOnly
                     zoomOrAvail={zoomOrAvail}
                 />;
@@ -143,7 +143,7 @@ function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
                             {animation}
                         </ValueProp>
                         <FullProp name="Properties:">
-                            <JsonView trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
+                            <JsonView width="165" trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
                         </FullProp>
                     </>
                 </>;
@@ -153,7 +153,7 @@ function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
         }
 
         content = (
-            <PropertyGrid>
+            <PropertyGrid propWidth="70px">
                 <DimProp name="Position:" readOnly x={trackX} y={trackY} />
                 <FullProp>
                     <Centered>
@@ -173,7 +173,7 @@ function TileTracker({editorId, tileIndex, aliasIndex, eventIndex, tilesGrid}) {
     )
 }
 
-function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid, editTiles, compact}) {
+function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, editAlias, editBrush, tilesGrid, editTiles, compact, animationIndex}) {
     const eContext = useContext(EditorContext);
 
     const AddEventModal = useModal();
@@ -204,6 +204,9 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
     };
 
     const currType = selection.getType();
+    if (currType === 'entity') {
+        selection.setCellsFromEntity();
+    }
 
     const cellValue = eContext.selection.getCellValue();
     const isInvalidCell = cellValue === CellValue.tile ?
@@ -316,7 +319,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                     index = aliasIndex.getEntityByPropValue('value', cell);
                     infoProps.push(
                         <ValueProp key="tile" name="Tile:">
-                            {index ? aliasIndex.getEntityPropValue(index, 'tile') : '?'}
+                            {index !== undefined ? aliasIndex.getEntityPropValue(index, 'tile') : '?'}
                         </ValueProp>
                     );
                 } else {
@@ -330,7 +333,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                     <Entity
                         entityIndex={entityIndex}
                         value={entityIndex.getEntityValue(index)}
-                        player={animation != ''}
+                        animationIndex={animation != '' ? animationIndex : null}
                         readOnly
                         zoomOrAvail={zoomOrAvail}
                     />;
@@ -343,7 +346,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                                     {animation}
                                 </ValueProp>
                                 <FullProp name="Properties:">
-                                    <JsonView trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
+                                    <JsonView width={170} trim skipKeys={['index', 'animation']} json={entityIndex.getEntityPropValue(index, 'props')} defaultJson={tilesGrid.index.model.defaultTile} />
                                 </FullProp>
                             </>
                         }
@@ -444,7 +447,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
                 </Toolbar>
             }
             <Content padded width="180" flex>
-                <PropertyGrid>
+                <PropertyGrid propWidth="70px">
                     <FullProp>
                         <Centered>
                             {image ? image : <Content width={avail} height={avail} boxed thin></Content>}
@@ -491,7 +494,7 @@ function ActiveBrushPicker({brushIndex, editBrush}) {
     )
 }
 
-function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
+function ActiveAliasPicker({tileIndex, aliasIndex, animationIndex, editAlias}) {
     const eContext = useContext(EditorContext);
 
     const select = index => {
@@ -503,6 +506,7 @@ function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
         <EntityTextPicker
             filter
             entityIndex={aliasIndex}
+            animationIndex={animationIndex}
             doubleClick={editAlias}
             controls
             editorId="aliasPicker"
@@ -516,7 +520,7 @@ function ActiveAliasPicker({tileIndex, aliasIndex, editAlias}) {
     );
 }
 
-function BrushForm({save, close, isValid, editTiles, brushIndex, aliasIndex, tilesGrid, tileIndex, ...props}) {
+function BrushForm({save, close, isValid, editTiles, animationIndex, brushIndex, aliasIndex, tilesGrid, tileIndex, ...props}) {
 
     const EditTilesModal = useModal();
     const CopyBrushModal = useModal();
@@ -534,6 +538,7 @@ function BrushForm({save, close, isValid, editTiles, brushIndex, aliasIndex, til
         EditTilesModal.open({
             tiles: cloneDeep(tiles),
             aliasIndex,
+            animationIndex,
             tilesGrid,
             save: editTiles => {
                 setTiles(editTiles);
@@ -585,19 +590,20 @@ function BrushForm({save, close, isValid, editTiles, brushIndex, aliasIndex, til
     )
 }
 
-function AliasForm({save, close, isValid, alias, tileIndex}) {
+function AliasForm({save, close, isValid, alias, tileIndex, animationIndex}) {
     const TilePickerModal = useModal();
 
     const [name, setName] = useState(alias.value);
     const [tile, setTile] = useState(alias.tile);
     const [props, setProps] = useState(JSON.stringify(alias.props, null, 2));
+    const [animation, setAnimation] = useState(alias.animation);
 
     const avail = useMemo(() => {
         return {width: 100, height: 100}
     }, []);
 
     const saveAlias = () => {
-        save({...alias, value: name, tile, props: JSON.parse(props)});
+        save({...alias, value: name, tile, animation, props: JSON.parse(props)});
     };
 
     let isValidJson = true;
@@ -617,6 +623,7 @@ function AliasForm({save, close, isValid, alias, tileIndex}) {
                 <PropertyGrid>
                     <TextFieldProp name="Name:" value={name} set={setName} invalid={!isValidName} />
                     <EntityProp name="Tile:" value={tile} zoomOrAvail={avail} entityIndex={tileIndex} set={setTile} />
+                    <EntityProp entityIndex={animationIndex} animationIndex={animationIndex} reset name="Animation:" value={animation} set={setAnimation} zoomOrAvail={avail} />
                     <TextAreaProp name="Properties:" invalid={!isValidJson} cols={30} rows={10} value={props} set={setProps} />
                 </PropertyGrid>
             </SaveAndCancel>
@@ -630,7 +637,7 @@ function AliasForm({save, close, isValid, alias, tileIndex}) {
     )
 }
 
-function BrushManager({brushIndex, tilesGrid, editBrush, editTiles, aliasIndex, tileIndex}) {
+function BrushManager({brushIndex, tilesGrid, editBrush, aliasIndex, tileIndex}) {
     const eContext = useContext(EditorContext);
 
     const NewBrushModal = useModal();
@@ -642,6 +649,7 @@ function BrushManager({brushIndex, tilesGrid, editBrush, editTiles, aliasIndex, 
             name: '',
             aliasIndex,
             tileIndex,
+            animationIndex,
             tilesGrid,
             brushIndex,
             tiles: [[0]], // TODO: we should get some tiles from a matrix here
@@ -688,7 +696,7 @@ function BrushManager({brushIndex, tilesGrid, editBrush, editTiles, aliasIndex, 
     );
 }
 
-function AliasManager({aliasIndex, tileIndex, editAlias}) {
+function AliasManager({aliasIndex, tileIndex, editAlias, animationIndex}) {
     const eContext = useContext(EditorContext);
 
     const NewAliasModal = useModal();
@@ -707,9 +715,11 @@ function AliasManager({aliasIndex, tileIndex, editAlias}) {
     const newAlias = () => {
         NewAliasModal.open({
             tileIndex,
+            animationIndex,
             alias: {
                 tile: 0,
                 value: '',
+                animation: '',
                 props: {}
             },
             isValid: value => !aliasIndex.hasPropValue('value', value),
@@ -732,6 +742,7 @@ function AliasManager({aliasIndex, tileIndex, editAlias}) {
         <>
             <EntityManager
                 entityIndex={aliasIndex}
+                animationIndex={animationIndex}
                 actions={actions}
                 titleHeight={20}
                 minWidth={100}
@@ -891,6 +902,7 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
         <>
             <EntityManager
                 entityIndex={tileIndex}
+                animationIndex={animationIndex}
                 actions={actions}
                 titleHeight={20}
                 minWidth={50}
@@ -925,7 +937,7 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
     );
 }
 
-function ActiveTilePicker({tileIndex, editTile, base = null}) {
+function ActiveTilePicker({tileIndex, animationIndex, editTile, base = null}) {
     const eContext = useContext(EditorContext);
     return (
         <Stack fullHeight scroll border>
@@ -933,6 +945,7 @@ function ActiveTilePicker({tileIndex, editTile, base = null}) {
                 <EntityPicker
                     editorId="tilesPicker"
                     entityIndex={tileIndex}
+                    animationIndex={animationIndex}
                     base={base}
                     filter
                     doubleClick={index => editTile(index)}
@@ -1107,17 +1120,17 @@ function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
             <PropertyGrid>
                 {tile.index !== undefined ?
                     <TextFieldProp name="Index:" value={tile.index} size={4} readOnly /> :
-                    <PositionPickerProp position={position} setPosition={setPosition} entity={entity} setEntity={setEntity} name="Insert:" entityIndex={tileIndex} />
+                    <PositionPickerProp position={position} setPosition={setPosition} entity={entity} setEntity={setEntity} name="Insert:" entityIndex={tileIndex} animationIndex={animationIndex} />
                 }
                 <BitmapProp name="Image:" value={image} set={setImage} entityIndex={tileIndex} editable zoomOrAvail={zoomOrAvail} colors={colors} />
-                <EntityProp entityIndex={animationIndex} reset player name="Animation:" value={animation} set={setAnimation} zoomOrAvail={zoomOrAvail} />
+                <EntityProp entityIndex={animationIndex} animationIndex={animationIndex} reset name="Animation:" value={animation} set={setAnimation} zoomOrAvail={zoomOrAvail} />
                 <TextAreaProp name="Properties:" invalid={!isValidJson} cols={30} rows={10} value={props} set={setProps} />
             </PropertyGrid>
         </SaveAndCancel>
     )
 }
 
-function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
+function TilesEditor({tilesGrid, aliasIndex, animationIndex, tiles, save, close, canSave}) {
     const eContext = useContext(EditorContext);
 
     const editGrid = useMemo(() => {
@@ -1131,11 +1144,12 @@ function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
         <SaveAndCancel fullHeight save={() => {save(editGrid.map)}} canSave={() => true} close={close}>
             <Stack vertical border fullHeight>
                 <Stack flex fullHeight border>
-                    <ActiveTile tileIndex={tilesGrid.index} aliasIndex={aliasIndex} tilesGrid={tilesGrid} compact />
+                    <ActiveTile animationIndex={animationIndex} tileIndex={tilesGrid.index} aliasIndex={aliasIndex} tilesGrid={tilesGrid} compact />
 
                     <Content flex>
                         <BasicRasterView
                             cellProvider={editGrid}
+                            animationIndex={animationIndex}
                             resizeable
                             undoRedo
                             editorId="editTiles"
@@ -1146,7 +1160,7 @@ function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
                 <Content height={150}>
                     <SideTabs>
                         <SideTab name="Tiles" active>
-                            <EntityPicker entityIndex={tilesGrid.index} select={
+                            <EntityPicker entityIndex={tilesGrid.index} animationIndex={animationIndex} select={
                                 index => {
                                     eContext.setSelection(
                                         new CellSelection('rect', [[index]], CellValue.tile)
@@ -1159,6 +1173,7 @@ function TilesEditor({tilesGrid, aliasIndex, tiles, save, close, canSave}) {
                         <SideTab name="Alias">
                             <EntityTextPicker
                                 entityIndex={aliasIndex}
+                                animationIndex={animationIndex}
                                 select={
                                     index => {
                                             eContext.setSelection(
@@ -1189,7 +1204,6 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
     const EditAliasModal = useModal();
     const EditBrushModal = useModal();
     const EditEventModal = useModal();
-    const EditTilesModal = useModal();
 
     const ExportModal = useExportModal(resource);
 
@@ -1205,16 +1219,16 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
         return new TilesGrid(tileIndex, model);
     }, [model]);
 
+    const animationIndex = useMemo(() => {
+        return new AnimationIndex(tileIndex, model)
+    }, [model]);
+
     const aliasIndex = useMemo(() => {
-        return new AliasIndex(model, tileIndex);
+        return new AliasIndex(model, tileIndex, animationIndex);
     }, [model]);
 
     const brushIndex = useMemo(() => {
         return new BrushIndex(model, tileIndex, aliasIndex)
-    }, [model]);
-
-    const animationIndex = useMemo(() => {
-        return new AnimationIndex(tileIndex, model)
     }, [model]);
 
     const eventIndex = useMemo(() => {
@@ -1223,6 +1237,10 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
     const modeTargets = useMemo(() => {
         return [CellValue.tile, CellValue.events]
+    }, [model]);
+
+    const xxx = useMemo(() => {
+        tileIndex.getDeleteInfo([922, 923]);
     }, [model]);
 
     const saveTilesPane = () => {
@@ -1260,6 +1278,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
         const alias = aliasIndex.getEntityObject(index);
         EditAliasModal.open({
             tileIndex,
+            animationIndex,
             alias,
             isValid: value => alias.value === value || !aliasIndex.hasPropValue('value', value),
             save: changedAlias => {
@@ -1284,6 +1303,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             tiles: brush.tiles,
             aliasIndex,
             tileIndex,
+            animationIndex,
             tilesGrid,
             brushIndex,
             isValid: name => name === brush.value || !brushIndex.hasPropValue('value', name),
@@ -1292,9 +1312,17 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                 eContext.doAction(
                     () => {
                         lastIndex = brushIndex.setEntityObject({...changedBrush, index: lastIndex}, true);
+                        const entityValue = eContext.selection.getEntityValue();
+                        if (entityValue !== undefined && entityValue === brushIndex.getEntityValue(lastIndex)) {
+                            eContext.selection.setCellsFromEntity();
+                        }
                     },
                     () => {
                         lastIndex = brushIndex.setEntityObject({...brush, index: lastIndex}, true);
+                        const entityValue = eContext.selection.getEntityValue();
+                        if (entityValue !== undefined && entityValue === brushIndex.getEntityValue(lastIndex)) {
+                            eContext.selection.setCellsFromEntity();
+                        }
                     }
                 );
                 EditBrushModal.close()
@@ -1338,34 +1366,38 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             </Content>
         </Stack>
     );
+    const getActiveTileElem = () => {
+        return <ActiveTile editTile={editTile} animationIndex={animationIndex} tileIndex={tileIndex} aliasIndex={aliasIndex} brushIndex={brushIndex} eventIndex={eventIndex} editAlias={editAlias} editBrush={editBrush} tilesGrid={tilesGrid} />
+    };
+
     const trackerRef = useRef(null);
     return (
         <Page title="Edit TilesPane" resources={tree} cancel={cancel} play={play}>
             <Stack vertical fullHeight>
                 <ActionFrame type="TilesPane: " name={resource.id + (eContext.hasStorePos() ? ' ' : '*')} fullHeight sub={{'from': tree[0].source, 'Resources': tree.length}} actions={frameActions}>
                     <Stack vertical>
-                        <Stack flex fullHeight>
-                            <Section name="Selected" collapse vertical>
-                                <ActiveTile editTile={editTile} tileIndex={tileIndex} aliasIndex={aliasIndex} brushIndex={brushIndex} eventIndex={eventIndex} editAlias={editAlias} editBrush={editBrush} tilesGrid={tilesGrid} />
+                        <Stack flex>
+                            <Section name="Selected" hidden={getActiveTileElem} collapse vertical>
+                                {getActiveTileElem()}
                             </Section>
 
                             <Section name="Map" flex>
-                                <BasicRasterView modeTargets={modeTargets} undoRedo={false} tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={tilesGrid} width={5} height={5} posX={0} posY={7} border={0} events={true} zoom={1} />
+                                <BasicRasterView modeTargets={modeTargets} animationIndex={animationIndex} undoRedo={false} tracker={trackerRef} editorId="map" resizeable auto mode="pick" cellProvider={tilesGrid} width={5} height={5} posX={0} posY={7} border={0} events={true} zoom={1} />
                             </Section>
                             <Section name="Cursor" collapse vertical>
                                 <Content padded>
-                                    <TileTracker editorId="hover" tilesGrid={tilesGrid} tileIndex={tileIndex} aliasIndex={aliasIndex} eventIndex={eventIndex} />
+                                    <TileTracker editorId="hover" tilesGrid={tilesGrid} tileIndex={tileIndex} aliasIndex={aliasIndex} animationIndex={animationIndex} />
                                 </Content>
                             </Section>
                         </Stack>
 
-                        <Section name="Elements" height={400} collapse>
+                        <Section name="Elements" height={260} collapse>
                             <SideTabs>
 
                                 <SideTab name="Tiles" active>
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveTilePicker tileIndex={tileIndex} editTile={editTile} />
+                                            <ActiveTilePicker tileIndex={tileIndex} animationIndex={animationIndex} editTile={editTile} />
                                         </SideTab>
                                         <SideTab name="Manage">
                                             <TilesManager tileIndex={tileIndex} animationIndex={animationIndex} editTile={editTile} editorId="tileManager" />
@@ -1376,10 +1408,10 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
                                 <SideTab name="Aliases">
                                     <SideTabs>
                                         <SideTab name="Pick" active>
-                                            <ActiveAliasPicker aliasIndex={aliasIndex} tileIndex={tileIndex} editAlias={editAlias} />
+                                            <ActiveAliasPicker aliasIndex={aliasIndex} tileIndex={tileIndex} animationIndex={animationIndex} editAlias={editAlias} />
                                         </SideTab>
                                         <SideTab name="Manage">
-                                            <AliasManager aliasIndex={aliasIndex} tileIndex={tileIndex} editAlias={editAlias} editorId="aliasManager" />
+                                            <AliasManager aliasIndex={aliasIndex} tileIndex={tileIndex} editAlias={editAlias} animationIndex={animationIndex} editorId="aliasManager" />
                                         </SideTab>
                                     </SideTabs>
                                 </SideTab>
@@ -1408,10 +1440,7 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
                                 <SideTab name="Animations">
                                     <SideTabs>
-                                        <SideTab name="Pick" active>
-                                            <ActiveTilePicker editTile={editTile} tileIndex={tileIndex} base={index => tileIndex.getEntityPropValue(index, 'animation') !== ''} />
-                                        </SideTab>
-                                        <SideTab name="Manage">
+                                        <SideTab name="Manage" active>
                                             <AnimationManager animationIndex={animationIndex} spriteIndex={tileIndex} />
                                         </SideTab>
                                     </SideTabs>
@@ -1438,12 +1467,6 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             <EditEventModal.content name="Edit Event" closeable fit>
                 <EventForm {...EditEventModal.props} />
             </EditEventModal.content>
-
-            <EditTilesModal.content name="Edit Tiles" width={800} height={600} closeable fit>
-                <EditorCtx>
-                    <TilesEditor {...EditTilesModal.props} />
-                </EditorCtx>
-            </EditTilesModal.content>
 
             {ExportModal.render}
         </Page>

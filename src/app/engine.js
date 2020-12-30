@@ -6209,7 +6209,7 @@ class SpriteSheet {
         }
     }
 
-    addTransformedAnimation(id, base, transformers, synchronous = false) {
+    addTransformedAnimation(id, base, transformers, synchronous = false, speed = 1) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -6225,13 +6225,14 @@ class SpriteSheet {
             synchronous,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
+            speed: speed,
             dir: baseAnimation.dir,
             end: baseAnimation.end
         };
         this.animations[id] = animation;
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.players[id] = player;
         }
     }
@@ -6268,7 +6269,7 @@ class SpriteSheet {
         }
     }
 
-    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false, speed = 1) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -6294,6 +6295,7 @@ class SpriteSheet {
             synchronous,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
+            speed,
             dir,
             end
         };
@@ -6314,7 +6316,7 @@ class SpriteSheet {
 
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, end, dir);
+            player.loadAnimation(animation.frames, end, dir, speed);
             this.players[name] = player;
         }
     }
@@ -6346,7 +6348,7 @@ class SpriteSheet {
             proxy.setPlayer(this.players[name]);
         } else {
             // creates a new player by lazy loading in the proxy
-            proxy.loadAnimation(animation.frames, animation.end, animation.dir);
+            proxy.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
         }
     }
 
@@ -6661,6 +6663,7 @@ class TilesMapConfig extends Config {
             animations: {},
             brushes: {},
             events: {},
+            count: null,
             map: [[]]
         }
     }
@@ -6669,6 +6672,10 @@ class TilesMapConfig extends Config {
         return {
             tileBits: {min: 3, max: 16}
         }
+    }
+
+    setCount(value) {
+        this.count = this.validateInt(value, {min: 0, null: true});
     }
 
     setTileBits(value) {
@@ -6774,6 +6781,7 @@ class TilesMapConfig extends Config {
         obj.animations = base.animations;
         obj.brushes = base.brushes;
         obj.events = base.events;
+        obj.count = base.count;
         return obj;
     }
 
@@ -6784,19 +6792,21 @@ class TilesMapConfig extends Config {
         json.tilesImgId = this.image.id;
         let canvas = this.image.getCanvas();
         json.tilesImg = canvas;
+        const maxTiles = Math.floor(canvas.elem.width/json.tileSize) * Math.floor(canvas.elem.height/json.tileSize);
+        json.count = this.count === null ? maxTiles : Math.min(this.count, maxTiles);
         json.eventsImg = this.eventsImage ? this.eventsImage.getCanvas().elem : getCanvasForDim(0, 0);
         json.eventsImgId = this.eventsImage ? this.eventsImage.id : null;
         json.events = cloneDeep(this.events);
         json.map = cloneDeep(this.map);
         json.defaultTile = cloneDeep(this.defaultTile);
-        json.tiles = this.tiles;
-        json.animations = this.animations;
-        json.brushes = this.brushes; // TODO only in editor mode
+        json.tiles = cloneDeep(this.tiles);
+        json.animations = cloneDeep(this.animations);
+        json.brushes = cloneDeep(this.brushes); // TODO only in editor mode
         json.mapTiles = {
             x: this.map[0].length,
             y: this.map.length
         };
-        return json;
+        return json
     }
 }
 
@@ -6809,7 +6819,7 @@ class TilesMap {
         for (let id in this.animations) {
             const player = new BitmapPlayer();
             const animation = this.animations[id];
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.player[id] = player;
         }
         this.animatedIndices = [];
@@ -6817,33 +6827,6 @@ class TilesMap {
 
     getAnimations() {
         return this.player;
-    }
-
-    getMap() {
-        return this.getMapClone(this.map);
-    }
-
-    getMapClone(map) {
-        const clone = [];
-        for (let row of map) {
-            const mapRow = [];
-            for (let item of row) {
-                if (Array.isArray(item)) {
-                    const eventItems = [];
-                    for (let event of item) {
-                        if (Array.isArray(event)) {
-                            throw 'Invalid event in map definition found!';
-                        }
-                        eventItems.push(event);
-                    }
-                    mapRow.push(eventItems);
-                } else {
-                    mapRow.push(item);
-                }
-            }
-            clone.push(mapRow);
-        }
-        return clone;
     }
 
     getTileObj(x, y) {
@@ -7100,12 +7083,12 @@ class PlayerProxy {
         return this.active === 1;
     }
 
-    loadAnimation(frames, end, dir) {
+    loadAnimation(frames, end, dir, speed) {
         this.active = 0;
         if (this.players[0] === null) {
             this.players[0] = new BitmapPlayer();
         }
-        this.players[0].loadAnimation(frames, end, dir);
+        this.players[0].loadAnimation(frames, end, dir, speed);
         this.players[1] = null;
     }
 

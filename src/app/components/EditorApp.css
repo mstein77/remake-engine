@@ -536,6 +536,10 @@ input[type=range][orient=vertical] {
     border: 1px solid black;
 }
 
+pre {
+    margin: var(--default-padding);
+}
+
 .auto-scroll {
     width: min-content;
     display: inline-block;

@@ -489,7 +489,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addAnimation('bowser-fire', ['bowser-fire1', 'bowser-fire2'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('explode', 307, 34, 16, 16, 3, 1);
             spriteSheet.addAnimation('explode', ['explode1', 'explode2', 'explode3']);
-            spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.25);
             spriteSheet.addSprite('1up', 32, 219, 16, 7);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
             spriteSheet.addSpriteSeq('num_', 4, 219, 4, 8, 5, 0);
@@ -2330,9 +2330,9 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                     {id: getTileFromSet(25), duration: 10},
                     {id: getTileFromSet(26), duration: 10}
                 ],
-                    end: ANIMATION.END.LOOP,
-                    dir: ANIMATION.DIR.FORWARD_BACKWARD,
-                    synchronous: true
+                end: ANIMATION.END.LOOP,
+                dir: ANIMATION.DIR.FORWARD_BACKWARD,
+                synchronous: true
             };
             const coinAnimation = {
                 frames: [
@@ -3987,7 +3987,6 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         for (let k in fireCirclePathX) {
                             const id = obj.id + '_' + k;
                             spritePane.addSprite(id, 'fireball', obj.startX, obj.startY + parseInt(k, 10));
-                            spritePane.setAnimationSpeed(id, 0.25);
                             obj.sprites.push(id);
                             if (i % 2 === 0) {
                                 obj.collideIds.push(id);
