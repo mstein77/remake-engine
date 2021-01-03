@@ -10,6 +10,7 @@ import {
     TextAreaProp,
     PropertyGrid,
     TextFieldProp,
+    CheckboxProp,
     Toolbar,
     PositionPickerProp,
     DimProp,
@@ -209,6 +210,7 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
     }
 
     const cellValue = eContext.selection.getCellValue();
+    /*
     const isInvalidCell = cellValue === CellValue.tile ?
         value => {
             if (typeof value === 'string') {
@@ -238,8 +240,9 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
         }
         return false;
     };
+    */
 
-    if (currType === 'none' || hasInvalidCells(selection.getCells()) ||
+    if (currType === 'none' || /* hasInvalidCells(selection.getCells())  || */
         (currType === 'entity' && brushIndex.getEntityByPropValue('value', selection.getEntityValue()) === null)) {
         requestAnimationFrame(() => {
             const isEvent = eContext.targetCellValue === CellValue.events;
@@ -698,6 +701,8 @@ function BrushManager({brushIndex, tilesGrid, editBrush, aliasIndex, tileIndex})
 
 function AliasManager({aliasIndex, tileIndex, editAlias, animationIndex}) {
     const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
 
     const NewAliasModal = useModal();
 
@@ -708,9 +713,22 @@ function AliasManager({aliasIndex, tileIndex, editAlias, animationIndex}) {
                 editAlias(indices[0]);
             },
             isHidden: props => props.marked.length !== 1
+        },
+        {
+            name: 'Delete',
+            doAction: indices => {
+                const plan = aliasIndex.getDeletePlan(indices);
+                eContext.doAction(
+                    () => {
+                        aliasIndex.doDeletePlan(plan, eCtxRef.current.selection);
+                    },
+                    () => {
+                        aliasIndex.undoDeletePlan(plan, eCtxRef.current.selection);
+                    }
+                );
+            },
         }
     ];
-    useAddIndexActions(aliasIndex, ['delete'], actions);
 
     const newAlias = () => {
         NewAliasModal.open({
@@ -762,12 +780,29 @@ function AliasManager({aliasIndex, tileIndex, editAlias, animationIndex}) {
     )
 }
 
+function TileDeletionForm({save, count, ...props}) {
+    const [safe, setSafe] = useState(true);
+    return (
+        <SaveAndCancel padded save={() => {save(safe)}} {...props}>
+            <PropertyGrid propWidth="75">
+                <FullProp>
+                        Do you really want to delete the {count} tiles?
+                </FullProp>
+                <CheckboxProp name="Preserve tiles" value={safe} set={setSafe} />
+            </PropertyGrid>
+        </SaveAndCancel>
+    );
+}
+
 function TilesManager({tileIndex, animationIndex, editTile}) {
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
 
     const NewTileModal = useModal();
     const ImportTilesModal = useModal();
+    const ConfirmDeleteModal = useModal();
     const ApplyFilterModal = useModal();
 
     const getColorIndexFromTiles = () => {
@@ -781,11 +816,35 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
                 editTile(indices[0]);
             },
             isHidden: props => props.marked.length !== 1
+        },
+        {
+            name: 'Delete',
+            doAction: indices => {
+                ConfirmDeleteModal.open({
+                    count: indices.length,
+                    save: safe => {
+                        const plan = tileIndex.getDeletePlan(indices, safe, eContext.selection);
+                        eContext.doAction(
+                            () => {
+                                tileIndex.doDeletePlan(plan, eCtxRef.current.selection);
+                                tileIndex.notify();
+                                animationIndex.notify();
+                            },
+                            () => {
+                                tileIndex.undoDeletePlan(plan, eCtxRef.current.selection);
+                                tileIndex.notify();
+                                animationIndex.notify();
+                            }
+                        );
+                        ConfirmDeleteModal.close()
+                    }
+                });
+            }
         }
     ];
     useAddIndexActions(
         tileIndex,
-        ['delete', 'swap', 'clear', 'copy', 'paste'],
+        ['swap', 'clear', 'copy', 'paste'],
         actions
     );
     actions.push({
@@ -840,14 +899,15 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
         NewTileModal.open({
             tileIndex,
             animationIndex,
-            save: tile => {
-                let index = null;
+            save: (tile, preserve) => {
+                const plan = tileIndex.getInsertPlan(tile.index, [tile], preserve);
                 eContext.doAction(
                     () => {
-                        index = tileIndex.setEntityObject(tile);
+                        tileIndex.doInsertPlan(plan, eCtxRef.current.selection);
                     },
                     () => {
-                        tileIndex.deleteEntity(index);
+                        tileIndex.undoInsertPlan(plan, eCtxRef.current.selection);
+                        tileIndex.notify();
                     }
                 );
                 NewTileModal.close();
@@ -929,6 +989,10 @@ function TilesManager({tileIndex, animationIndex, editTile}) {
                     />
                 </EditorCtx>
             </ImportTilesModal.content>
+
+            <ConfirmDeleteModal.content fit closeable>
+                <TileDeletionForm {...ConfirmDeleteModal.props} />
+            </ConfirmDeleteModal.content>
 
             <ApplyFilterModal.content height={500} closeable>
                 <FiltersSelector bgColor="#000000" {...ApplyFilterModal.props} cancel={ApplyFilterModal.close} filters="" />
@@ -1027,10 +1091,27 @@ function EventForm({isValid, event, close, save, tileIndex, eventIndex}) {
 
 function EventManager({eventIndex, tileIndex, editEvent}) {
     const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
 
     const NewEventModal = useModal();
 
-    const actions = useAddIndexActions(eventIndex, ['delete']);
+    const actions = [
+        {
+            name: 'Delete',
+            doAction: indices => {
+                const plan = eventIndex.getDeletePlan(indices);
+                eContext.doAction(
+                    () => {
+                        eventIndex.doDeletePlan(plan, eCtxRef.current.selection);
+                    },
+                    () => {
+                        eventIndex.undoDeletePlan(plan, eCtxRef.current.selection);
+                    }
+                );
+            }
+        }
+    ];
 
     const addEvent = () => {
         NewEventModal.open({
@@ -1089,6 +1170,7 @@ function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
     const [image, setImage] = useState(tile.image);
     const [props, setProps] = useState(JSON.stringify(tile.props, null, 4));
     const [position, setPosition] = useState('end');
+    const [preserve, setPreserve] = useState(true);
     const [entity, setEntity] = useState(0);
     const zoomOrAvail = useMemo(() => {
         return {width: 100, height: 100}
@@ -1110,7 +1192,7 @@ function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
                 newTile.index++;
             }
         }
-        save(newTile);
+        save(newTile, preserve);
     };
 
     const canSave = isValidJson;
@@ -1120,7 +1202,7 @@ function TileForm({save, close, tile, colors, animationIndex, tileIndex}) {
             <PropertyGrid>
                 {tile.index !== undefined ?
                     <TextFieldProp name="Index:" value={tile.index} size={4} readOnly /> :
-                    <PositionPickerProp position={position} setPosition={setPosition} entity={entity} setEntity={setEntity} name="Insert:" entityIndex={tileIndex} animationIndex={animationIndex} />
+                    <PositionPickerProp position={position} preserve={preserve} setPreserve={setPreserve} setPosition={setPosition} entity={entity} setEntity={setEntity} name="Insert:" entityIndex={tileIndex} animationIndex={animationIndex} />
                 }
                 <BitmapProp name="Image:" value={image} set={setImage} entityIndex={tileIndex} editable zoomOrAvail={zoomOrAvail} colors={colors} />
                 <EntityProp entityIndex={animationIndex} animationIndex={animationIndex} reset name="Animation:" value={animation} set={setAnimation} zoomOrAvail={zoomOrAvail} />
@@ -1199,6 +1281,8 @@ function TilesEditor({tilesGrid, aliasIndex, animationIndex, tiles, save, close,
 function TilesMapEditor({model, resource, revert, cancel, play, tree, exportModel, saveModel}) {
 
     const eContext = useContext(EditorContext);
+    const eCtxRef = useRef(null);
+    eCtxRef.current = eContext;
 
     const EditTileModal = useModal();
     const EditAliasModal = useModal();
@@ -1237,10 +1321,6 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
 
     const modeTargets = useMemo(() => {
         return [CellValue.tile, CellValue.events]
-    }, [model]);
-
-    const xxx = useMemo(() => {
-        tileIndex.getDeleteInfo([922, 923]);
     }, [model]);
 
     const saveTilesPane = () => {
@@ -1282,12 +1362,16 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             alias,
             isValid: value => alias.value === value || !aliasIndex.hasPropValue('value', value),
             save: changedAlias => {
+                const plan = alias.value !== changedAlias.value ?
+                    aliasIndex.getRenamePlan(alias.value, changedAlias.value) : null;
                 let lastIndex = index;
                 eContext.doAction(
                     () => {
+                        if (plan) aliasIndex.doRenamePlan(plan, eCtxRef.current.selection);
                         lastIndex = aliasIndex.setEntityObject({...changedAlias, index: lastIndex}, true);
                     },
                     () => {
+                        if (plan) aliasIndex.undoRenamePlan(plan, eCtxRef.current.selection);
                         lastIndex = aliasIndex.setEntityObject({...alias, index: lastIndex}, true);
                     }
                 );
@@ -1338,12 +1422,15 @@ function TilesMapEditor({model, resource, revert, cancel, play, tree, exportMode
             eventIndex,
             isValid: value => value === event.value || !eventIndex.hasPropValue('value', value),
             save: changedEvent => {
+                const plan = event.value !== changedEvent.value ? eventIndex.getRenamePlan(event.value, changedEvent.value) : null;
                 let lastIndex = index;
                 eContext.doAction(
                     () => {
+                        if (plan) eventIndex.doRenamePlan(plan, eCtxRef.current.selection);
                         lastIndex = eventIndex.setEntityObject({...changedEvent, index: lastIndex}, true);
                     },
                     () => {
+                        if (plan) eventIndex.undoRenamePlan(plan, eCtxRef.current.selection);
                         lastIndex = eventIndex.setEntityObject({...event, index: lastIndex}, true);
                     }
                 );

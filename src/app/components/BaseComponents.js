@@ -320,7 +320,7 @@ function TextAreaProp(props) {
     )
 }
 
-function PositionPicker({entityIndex, position, entity, setPosition, setEntity, animationIndex}) {
+function PositionPicker({entityIndex, position, entity, setPosition, setEntity, preserve, setPreserve, animationIndex}) {
     const EntityPickerModal = useModal();
 
     const pick = () => {
@@ -346,6 +346,9 @@ function PositionPicker({entityIndex, position, entity, setPosition, setEntity, 
                 {position === 'after' && picker}
                 <SwitchButton switch={value => value && setPosition('end')} enabled={position === 'end'}>End</SwitchButton>
             </Stack>
+            {preserve !== undefined &&
+                <Checkbox name="Preserve tiles" disabled={position === 'end'} value={preserve} set={setPreserve} />
+            }
 
             <EntityPickerModal.content width={400} height={400}>
                 <EditorCtx>
@@ -4000,7 +4003,21 @@ function AnimationManager({animationIndex, spriteIndex}) {
     const NewAnimationModal = useModal();
     const EditAnimationModal = useModal();
 
-    const actions = [];
+    const actions = [{
+        name: 'Delete',
+        doAction: indices => {
+            const plan = animationIndex.getDeletePlan(indices);
+            eContext.doAction(
+                () => {
+                    animationIndex.doDeletePlan(plan);
+                },
+                () => {
+                    animationIndex.undoDeletePlan(plan);
+                }
+            );
+        }
+
+    }];
     const addAnimation = () => {
         NewAnimationModal.open({
             name: '',
@@ -4031,11 +4048,21 @@ function AnimationManager({animationIndex, spriteIndex}) {
             animation,
             isValid: value => animation.value === value || !animationIndex.hasPropValue('value', value),
             save: newAnimation => {
+                let plan = null;
+                if (animation.value !== newAnimation.value) {
+                    plan = animationIndex.getRenamePlan(animation.value, newAnimation.value);
+                }
                 eContext.doAction(
                     () => {
+                        if (plan) {
+                            animationIndex.doRenamePlan(plan);
+                        }
                         animationIndex.setEntityObject({...newAnimation, index}, true);
                     },
                     () => {
+                        if (plan) {
+                            animationIndex.undoRenamePlan(plan);
+                        }
                         animationIndex.setEntityObject(animation, true);
                     }
                 );

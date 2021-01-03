@@ -671,6 +671,228 @@ class CharIndex extends EntityIndex {
     }
 }
 
+function getMapChanges(map, old2new) {
+    const mapChanges = [];
+
+    for (let y = 0; y < map.length; y++) {
+        const row = map[y];
+        for (let x = 0; x < row.length; x++) {
+            const index = CellValue.tile.get(row[x]);
+            const newIndex = old2new[index];
+            if (newIndex !== undefined) {
+                mapChanges.push([x, y, index, newIndex === null ? 0 : newIndex]);
+            }
+        }
+    }
+    return mapChanges;
+}
+
+function getMapEventChanges(map, old2new, raw = false) {
+    const eventChanges = [];
+    for (let y = 0; y < map.length; y++) {
+        const row = map[y];
+        for (let x = 0; x < row.length; x++) {
+            const events = raw ? row[x] : CellValue.events.get(row[x]);
+            for (let i = 0; i < events.length; i++) {
+                const event = events[i];
+                const newEvent = old2new[event];
+                if (newEvent !== undefined) {
+                    eventChanges.push([x, y, i, event, newEvent]);
+                }
+            }
+        }
+    }
+    return eventChanges;
+}
+
+function doEventChange(map, item, no, raw = false) {
+    const curr = map[item[1]][item[0]];
+    const events = raw ? curr : CellValue.events.get(curr);
+    const index = item[2];
+    const target = item[no];
+    if (target === null) {
+        events.splice(index, 1);
+    } else {
+        events.splice(index, 1, target);
+    }
+    map[item[1]][item[0]] = raw ? events : CellValue.events.set(curr, events);
+}
+
+function doPlanOnModel(model, plan, selection) {
+    if (plan.mapChanges) {
+        for (let item of plan.mapChanges) {
+            model.map[item[1]][item[0]] = item[3];
+        }
+    }
+
+    if (plan.eventChanges) {
+        for (let item of plan.eventChanges) {
+            doEventChange(model.map, item, 4);
+        }
+    }
+
+    if (plan.brushChanges) {
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                model.brushes[brush][item[1]][item[0]] = item[3];
+            }
+        }
+    }
+
+    // selection changes
+    if (plan.selectionChanges !== undefined) {
+        let selectionChanges = null;
+        if (selection !== null && selection.getType() !== 'entity') {
+            const cells = selection.getCells();
+            const cellValue = selection.getCellValue();
+            if (!plan.event && cellValue === CellValue.tile) {
+                selectionChanges = {
+                    ref: selection,
+                    changes: getMapChanges(cells, plan.old2new)
+                };
+                for (let item of selectionChanges.changes) {
+                    selection.cells[item[1]][item[0]] = item[3];
+                }
+            } else if (cellValue === CellValue.events) {
+                selectionChanges = {
+                    ref: selection,
+                    changes: getMapEventChanges(selection.cells, plan.old2new, true)
+                };
+                for (let item of selectionChanges.changes) {
+                    doEventChange(selection.cells, item, 4, true);
+                }
+            }
+        }
+        plan.selectionChanges = selectionChanges;
+    }
+
+    if (plan.propChanges) {
+        const prop = plan.prop ? plan.prop : 'index';
+        for (let item of plan.propChanges) {
+            model.tiles[item[0]][prop] = item[2]
+        }
+    }
+
+    if (plan.frameIdChanges) {
+        for (let item of plan.frameIdChanges) {
+            model.animations[item[0]].frames[item[1]].id = item[3];
+        }
+    }
+
+    if (plan.propRemovals) {
+        for (let item of plan.propRemovals) {
+            delete model.tiles[item[0]][item[1]]
+        }
+    }
+}
+
+function undoPlanOnModel(model, plan, selection) {
+    if (plan.mapChanges) {
+        for (let item of plan.mapChanges) {
+            model.map[item[1]][item[0]] = item[2];
+        }
+    }
+
+    if (plan.eventChanges) {
+        for (let item of plan.eventChanges) {
+            doEventChange(model.map, item, 3);
+        }
+    }
+
+    if (plan.brushChanges) {
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                model.brushes[brush][item[1]][item[0]] = item[2];
+            }
+        }
+    }
+
+    if (plan.selectionChanges) {
+        if (plan.selectionChanges && selection === plan.selectionChanges.ref) {
+            if (!plan.event) {
+                for (let item of plan.selectionChanges.changes) {
+                    selection.cells[item[1]][item[0]] = item[2];
+                }
+            } else {
+                for (let item of plan.selectionChanges.changes) {
+                    doEventChange(selection.cells, item, 3, true);
+                }
+            }
+        }
+    }
+    /*
+    if (plan.changes) {
+        for (let item of plan.changes) {
+            const target = item[1];
+            if (target !== null) {
+                if (model.tiles[target] !== undefined) {
+                    model.tiles[item[0]] = model.tiles[target];
+                } else {
+                    delete model.tiles[item[0]];
+                }
+            } else {
+                this.items.push(this.items.length);
+                this.model.tiles[item[0]] = {};
+            }
+        }
+    }
+    /*
+    this.model.count = plan.count;
+    this.model.tilesImg.elem = canvas;
+    this.img = canvas;
+    this.tilesX = dim.tilesX;
+    this.tilesY = dim.tilesY;
+    */
+
+    // restore entity-backups
+    if (plan.backupTiles) {
+        for (let [index, obj] of Object.entries(plan.backupTiles)) {
+            this.setEntityObject(obj, true);
+        }
+    }
+
+    // 4. propChanges
+    if (plan.propChanges) {
+        const prop = plan.prop ? plan.prop : 'index';
+        for (let item of plan.propChanges) {
+            model.tiles[item[0]][prop] = item[1]
+        }
+    }
+    if (plan.frameBackup) {
+        for (let [animation, frames] of Object.entries(plan.frameBackup)) {
+            const currAnimation = model.animations[animation];
+            for (let item of frames) {
+                currAnimation.frames.splice(item[0], 0, item[1]);
+            }
+        }
+    }
+    if (plan.frameIdChanges) {
+        for (let item of plan.frameIdChanges) {
+            model.animations[item[0]].frames[item[1]].id = item[2];
+        }
+    }
+
+    if (plan.propRemovals) {
+        for (let item of plan.propRemovals) {
+            model.tiles[item[0]][item[1]] = item[2];
+        }
+    }
+}
+
+function getPropChanges(prop, model, old2new) {
+    const changes = [];
+    for (let [key, obj] of Object.entries(model.tiles)) {
+        const old = obj[prop];
+        if (old !== undefined) {
+            const target = old2new[old];
+            if (target !== undefined) {
+                changes.push([key, old, target]);
+            }
+        }
+    }
+    return changes;
+}
+
 class TileIndex extends EntityIndex {
 
     constructor(model) {
@@ -701,25 +923,272 @@ class TileIndex extends EntityIndex {
         return super.notify();
     }
 
-    getDeleteInfo(indices, safe = false) {
+    getInsertPlan(insertIndex, objects, preserve) {
+        const count = objects.length;
+        let value = insertIndex === undefined ? this.items.length : insertIndex;
+        for (let object of objects) {
+            object.index = value;
+            object.value = value;
+            value++;
+        }
+
+        const changes = [];
+        const old2new = {};
+        let mapChanges = [];
+        const brushChanges = {};
+        const propChanges = [];
+        const frameIdChanges = [];
+
+        if (insertIndex < this.items.length) {
+            let index = this.items.length - 1;
+            while (index >= insertIndex) {
+                changes.push([index, index + count]);
+                old2new[index] = index + count;
+                index--;
+            }
+
+            if (preserve) {
+                mapChanges = getMapChanges(this.model.map, old2new);
+
+                for (let [key, brush] of Object.entries(this.model.brushes)) {
+                    const changes = getMapChanges(brush, old2new);
+                    if (changes.length > 0) {
+                        brushChanges[key] = changes;
+                    }
+                }
+
+                for (let [key, obj] of Object.entries(this.model.tiles)) {
+                    if (obj.index !== undefined) {
+                        const target = old2new[obj.index];
+                        if (target !== undefined) {
+                            propChanges.push([key, obj.index, target === null ? 0 : target]);
+                        }
+                    }
+                }
+
+                for (let [animation, obj] of Object.entries(this.model.animations)) {
+                    for (let i = 0; i < obj.frames.length; i++) {
+                        const frame = obj.frames[i];
+                        const target = old2new[frame.id];
+                        frameIdChanges.push(
+                            [animation, i, frame.id, target]
+                        );
+                    }
+                }
+            }
+        }
+
+        return {
+            changes,
+            old2new,
+            mapChanges,
+            brushChanges,
+            propChanges,
+            frameIdChanges,
+            count,
+            objects,
+            selectionChanges: null
+        }
+    }
+
+    doInsertPlan(plan, selection) {
+        const length = this.items.length + plan.count;
+
+        // 1. image
+        const dim = this.getDimForLength(length);
+        const canvas = getCanvasForDim(dim.width, dim.height);
+        const ctx = canvas.getContext('2d');
+
+        const new2old = {};
+        for (let item of plan.changes) {
+            const [old, target] = item;
+            new2old[target] = old;
+        }
+
+        let x = 0;
+        let y = 0;
+        let i = 0;
+        while (i < length) {
+            const old = new2old[i];
+            if (old !== undefined) {
+                this.drawEntity(ctx, old, x, y);
+            } else {
+                this.drawEntity(ctx, i, x, y);
+            }
+            x += dim.sizeX;
+            if (x >= dim.width) {
+                x = 0;
+                y += dim.sizeY;
+            }
+            i++;
+        }
+
+        // 2. map
+        for (let item of plan.mapChanges) {
+            this.model.map[item[1]][item[0]] = item[3];
+        }
+
+        // 3. brushes
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                this.model.brushes[brush][item[1]][item[0]] = item[3];
+            }
+        }
+
+        let selectionChanges = null;
+        if (selection !== null && selection.getCellValue() === CellValue.tile &&
+            selection.getType() !== 'entity') {
+            const cells = selection.getCells();
+            selectionChanges = {
+                ref: selection,
+                changes: getMapChanges(cells, plan.old2new)
+            };
+            for (let item of selectionChanges.changes) {
+                selection.cells[item[1]][item[0]] = item[3];
+            }
+        }
+        plan.selectionChanges = selectionChanges;
+
+        // 4. propChanges
+        for (let item of plan.propChanges) {
+            this.model.tiles[item[0]].index = item[2]
+        }
+
+        // 5. animationChanges
+        for (let item of plan.frameIdChanges) {
+            this.model.animations[item[0]].frames[item[1]].id = item[3];
+        }
+
+        i = plan.changes.length - 1;
+        while (i > 0) {
+            const item = plan.changes[i];
+            const target = item[1];
+            if (target !== null) {
+                const old = this.model.tiles[item[0]];
+                if (old === undefined) {
+                    delete this.model.tiles[target];
+                } else {
+                    this.model.tiles[target] = old;
+                }
+            }
+            i--;
+        }
+
+        // entity-changes:
+        while (this.items.length < length) {
+            this.items.push(this.items.length);
+        }
+
+        this.model.count = plan.count;
+        this.model.tilesImg.elem = canvas;
+        this.img = canvas;
+        this.tilesX = dim.tilesX;
+        this.tilesY = dim.tilesY;
+
+        this.setEntityObjects(plan.objects, true);
+    }
+
+    undoInsertPlan(plan, selection) {
+        const length = this.items.length - plan.count;
+
+        const dim = this.getDimForLength(length);
+        const canvas = getCanvasForDim(dim.width, dim.height);
+        const ctx = canvas.getContext('2d');
+
+        const old2new = {};
+        for (let item of plan.changes) {
+            const [old, target] = item;
+            old2new[old] = target;
+        }
+
+        let x = 0;
+        let y = 0;
+        let i = 0;
+        while (i < length) {
+            const target = old2new[i];
+            if (target !== undefined) {
+                this.drawEntity(ctx, target, x, y);
+            } else {
+                this.drawEntity(ctx, i, x, y);
+            }
+            x += dim.sizeX;
+            if (x >= dim.width) {
+                x = 0;
+                y += dim.sizeY;
+            }
+            i++;
+        }
+
+        // 2. map
+        for (let item of plan.mapChanges) {
+            this.model.map[item[1]][item[0]] = item[2];
+        }
+
+        // 3. brushes
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                this.model.brushes[brush][item[1]][item[0]] = item[2];
+            }
+        }
+
+        // selection changes
+        if (plan.selectionChanges && selection === plan.selectionChanges.ref) {
+            for (let item of plan.selectionChanges.changes) {
+                selection.cells[item[1]][item[0]] = item[2];
+            }
+        }
+
+        for (let item of plan.changes) {
+            const target = item[1];
+            if (this.model.tiles[target] !== undefined) {
+                this.model.tiles[item[0]] = this.model.tiles[target];
+            } else {
+                delete this.model.tiles[item[0]];
+            }
+        }
+
+        while(this.items.length > length) {
+            const index = this.items.pop();
+            delete this.model.tiles[index];
+        }
+
+        this.model.count = length;
+        this.model.tilesImg.elem = canvas;
+        this.img = canvas;
+        this.tilesX = dim.tilesX;
+        this.tilesY = dim.tilesY;
+
+        // 4. propChanges
+        for (let item of plan.propChanges) {
+            this.model.tiles[item[0]].index = item[1]
+        }
+
+        for (let item of plan.frameIdChanges) {
+            this.model.animations[item[0]].frames[item[1]].id = item[2];
+        }
+    }
+
+    getDeletePlan(indices, safe, selection = null) {
         const avail = [];
         indices.sort();
+        const backupTiles = {};
         for (let index of indices) {
             if (this.hasIndex(index)) {
                 avail.push(index);
+                backupTiles[index] = this.getEntityObject(index);
             }
         }
         let left = avail.length;
         let index = this.items.length - 1;
+        let count = 0;
         const changes = [];
-        // [old, new|null]
 
+        // [old, new|null]
         while(left > 0 && index >= 0) {
             if (!avail.includes(index)) {
-                if (safe) {
-                    changes.push([index, index - left]);
-                }
+                changes.push([index, index - left]);
             } else {
+                count++;
                 changes.push([index, null]);
                 left--;
             }
@@ -727,86 +1196,286 @@ class TileIndex extends EntityIndex {
         }
 
         const old2new = {};
-        for (let change of changes) {
-            old2new[change[0]] = change[1];
+        if (safe) {
+            for (let change of changes) {
+                old2new[change[0]] = change[1];
+            }
+        } else {
+            index = this.items.length - count;
+            while (index < this.items.length) {
+                old2new[index] = null;
+                index++;
+            }
         }
 
-        const mapChanges = [];
-        // [x, y, old, new]
+        const mapChanges = getMapChanges(this.model.map, old2new);
 
-        const map = this.model.map;
-        for (let y = 0; y < map.length; y++) {
-            const row = map[y];
-            for (let x = 0; x < row.length; x++) {
-                const index = CellValue.tile.get(row[x]);
-                const newIndex = old2new[index];
-                if (newIndex !== undefined) {
-                    mapChanges.push([x, y, index, newIndex === null ? 0 : newIndex]);
+        const brushChanges = {};
+        for (let [key, brush] of Object.entries(this.model.brushes)) {
+            const changes = getMapChanges(brush, old2new);
+            if (changes.length > 0) {
+                brushChanges[key] = changes;
+            }
+        }
+
+        const propChanges = [];
+        for (let [key, obj] of Object.entries(this.model.tiles)) {
+            if (obj.index !== undefined) {
+                const target = old2new[obj.index];
+                if (target !== undefined) {
+                    propChanges.push([key, obj.index, target === null ? 0 : target]);
                 }
             }
         }
 
-        // MAP: D E L E T E :
+        const frameBackup = {};
+        const frameIdChanges = [];
+        for (let [animation, obj] of Object.entries(this.model.animations)) {
+            for (let i = 0; i < obj.frames.length; i++) {
+                const frame = obj.frames[i];
+                const target = old2new[frame.id];
+                if (target === undefined) continue;
 
-        // 1. Bestimme count(new = null) in "changes"
-        // 2. naue old2new aus length - count(new = null) ... length - 1 => null
-        // 2. mapChange, wenn index >= length - count(new = null) dann 0
+                if (target === null) {
+                    if (frameBackup[animation] === undefined) {
+                        frameBackup[animation] = [];
+                    }
+                    frameBackup[animation].push([
+                        i, frame
+                    ]);
+                } else {
+                    frameIdChanges.push(
+                        [animation, i, frame.id, target]
+                    );
+                }
+            }
+        }
 
-        // MAP: S A F E - D E L E T E :
+        return {
+            safe,
+            count,
+            changes,
+            old2new,
+            backupTiles,
+            mapChanges,
+            brushChanges,
+            propChanges,
+            frameBackup,
+            frameIdChanges,
+            selectionChanges: null
+        };
+    }
 
-        // 1. baue old2new aus changes
-        // 2. falls index in old2new dann old2new[index] oder 0 falls null
+    doDeletePlan(plan, selection) {
+        const length = this.items.length - plan.count;
 
-        // DO: model.map[mapChange[1]][mapChange[0]] = mapChange[3]
-        // UNDO: model.map[mapChange[1]][mapChange[0]] = mapChange[2]
+        // 1. image
+        const dim = this.getDimForLength(length);
+        const canvas = getCanvasForDim(dim.width, dim.height);
+        const ctx = canvas.getContext('2d');
 
-        // TODO durchlaufe brush-tiles nach gleichem Schema
+        const new2old = {};
+        for (let item of plan.changes) {
+            const [old, target] = item;
+            if (target !== null) {
+                new2old[target] = old;
+            }
+        }
 
-        // TILES: (S A F E -) D E L E T E :
+        let x = 0;
+        let y = 0;
+        let i = 0;
+        while (i < length) {
+            const old = new2old[i];
+            if (old !== undefined) {
+                this.drawEntity(ctx, old, x, y);
+            } else {
+                this.drawEntity(ctx, i, x, y);
+            }
+            x += dim.sizeX;
+            if (x >= dim.width) {
+                x = 0;
+                y += dim.sizeY;
+            }
+            i++;
+        }
 
-        // arbeitet immer auf "changes"
+        // 2. map
+        for (let item of plan.mapChanges) {
+            this.model.map[item[1]][item[0]] = item[3];
+        }
 
-        // DO: verarbeite rückwärts, mit copy: tiles[new] = tiles[old], null: backup[old] = tiles[old]
+        // 3. brushes
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                this.model.brushes[brush][item[1]][item[0]] = item[3];
+            }
+        }
 
-        // 1. backup.3 = tiles[3]
-        // 2. copy 4 => 3
-        // 3. copy 5 => 4
-        // reindex => delete 5
+        // selection changes
 
-        // UNDO: verarbeite vorwärts, mit copy: tiles[old] = tiles[new], null: tiles[old] = backup[old]
-        // 1. copy 4 => 5
-        // 2. copy 3 => 4
-        // 3. copy backup.3 => 3
+        let selectionChanges = null;
+        if (selection !== null && selection.getCellValue() === CellValue.tile &&
+            selection.getType() !== 'entity') {
+            const cells = selection.getCells();
+            selectionChanges = {
+                ref: selection,
+                changes: getMapChanges(cells, plan.old2new)
+            };
+            for (let item of selectionChanges.changes) {
+                selection.cells[item[1]][item[0]] = item[3];
+            }
+        }
+        plan.selectionChanges = selectionChanges;
 
-        // INDEX-PROP:
+        // 4. propChanges
+        for (let item of plan.propChanges) {
+            this.model.tiles[item[0]].index = item[2]
+        }
 
-        // Durchlaufe model.tiles
-        //   Falls <key> und map.tiles<key>.index:
-        //      Wenn index in old2new dann:
-        //        propChange = [<key>, old, new]
+        // 5. animationChanges
+        for (let item of plan.frameIdChanges) {
+            this.model.animations[item[0]].frames[item[1]].id = item[3];
+        }
 
-        // DO: model.tiles[propChange[0]].index = propChange[2]
-        // UNDO: model.tiles[propChange[0]].index = propChange[1]
+        for (let [animation, frames] of Object.entries(plan.frameBackup)) {
+            const ids = [];
+            for (let item of frames) {
+                ids.push(item[0]);
+            }
+            const currAnimation = this.model.animations[animation];
+            const newFrames = [];
+            let i = 0;
 
-        // FRAME-ID:
+            while (i < currAnimation.frames.length) {
+                if (!ids.includes(i)) {
+                    newFrames.push(currAnimation.frames[i]);
+                }
+                i++;
+            }
+            currAnimation.frames = newFrames;
+        }
 
-        // Durchlaufe model.animations:
-        //   Durchlaufe frames:
-        //      Falls id in old2new:
-        //         new = null => frameBackup[animation] = {<index>: <frame>}
-        //         else: frameIdChange = [frame, old, new]
+        // 5. tileChanges
+        i = plan.changes.length - 1;
+        while (i > 0) {
+            const item = plan.changes[i];
+            const target = item[1];
+            if (target !== null) {
+                const old = this.model.tiles[item[0]];
+                if (old === undefined) {
+                    delete this.model.tiles[target];
+                } else {
+                    this.model.tiles[target] = old;
+                }
+            }
+            i--;
+        }
 
-        // DO: Durchlaufe frameBackup:
-        //        bilde animation-Array neu ohne die indices
-        //     frameIdChange[0].id = frameIdChange[2]
+        // entity-changes:
+        while (this.items.length > length) {
+            const index = this.items.pop();
+            delete this.model.tiles[index];
+        }
 
-        // UNDO: Durchlaufe frameBackup:
-        //        für jeden key in animation setze <frame> in den Array
-        //     frameIdChange[0].id = frameIdChange[1]
+        this.model.count = plan.count;
+        this.model.tilesImg.elem = canvas;
+        this.img = canvas;
+        this.tilesX = dim.tilesX;
+        this.tilesY = dim.tilesY;
+    }
 
+    undoDeletePlan(plan, selection) {
+        const length = this.items.length + plan.count;
 
-        d('CHANGES', changes);
-        d('MAP-CHANGES', mapChanges);
+        // 1. image
+        const dim = this.getDimForLength(length);
+        const canvas = getCanvasForDim(dim.width, dim.height);
+        const ctx = canvas.getContext('2d');
+
+        const old2new = {};
+        for (let item of plan.changes) {
+            const [old, target] = item;
+            old2new[old] = target;
+        }
+
+        let x = 0;
+        let y = 0;
+        let i = 0;
+        while (i < length) {
+            const target = old2new[i];
+            if (target !== undefined) {
+                if (target !== null) {
+                    this.drawEntity(ctx, target, x, y);
+                }
+            } else {
+                this.drawEntity(ctx, i, x, y);
+            }
+            x += dim.sizeX;
+            if (x >= dim.width) {
+                x = 0;
+                y += dim.sizeY;
+            }
+            i++;
+        }
+
+        // 2. map
+        for (let item of plan.mapChanges) {
+            this.model.map[item[1]][item[0]] = item[2];
+        }
+
+        // 3. brushes
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                this.model.brushes[brush][item[1]][item[0]] = item[2];
+            }
+        }
+
+        // selection changes
+        if (plan.selectionChanges && selection === plan.selectionChanges.ref) {
+            for (let item of plan.selectionChanges.changes) {
+                selection.cells[item[1]][item[0]] = item[2];
+            }
+        }
+
+        for (let item of plan.changes) {
+            const target = item[1];
+            if (target !== null) {
+                if (this.model.tiles[target] !== undefined) {
+                    this.model.tiles[item[0]] = this.model.tiles[target];
+                } else {
+                    delete this.model.tiles[item[0]];
+                }
+            } else {
+                this.items.push(this.items.length);
+                this.model.tiles[item[0]] = {};
+            }
+        }
+        this.model.count = plan.count;
+        this.model.tilesImg.elem = canvas;
+        this.img = canvas;
+        this.tilesX = dim.tilesX;
+        this.tilesY = dim.tilesY;
+
+        // restore entity-backups
+        for (let [index, obj] of Object.entries(plan.backupTiles)) {
+            this.setEntityObject(obj, true);
+        }
+
+        // 4. propChanges
+        for (let item of plan.propChanges) {
+            this.model.tiles[item[0]].index = item[1]
+        }
+
+        for (let [animation, frames] of Object.entries(plan.frameBackup)) {
+            const currAnimation = this.model.animations[animation];
+            for (let item of frames) {
+                currAnimation.frames.splice(item[0], 0, item[1]);
+            }
+        }
+        for (let item of plan.frameIdChanges) {
+            this.model.animations[item[0]].frames[item[1]].id = item[2];
+        }
     }
 
     getLength() {
@@ -893,18 +1562,30 @@ class TileIndex extends EntityIndex {
         return ['image'];
     }
 
-    assignAutoProps(updateIndices = []) {
-        const length = this.getLength();
+    getDimForLength(length) {
         const sizeX = this.getSizeX();
         const sizeY = this.getSizeY();
 
         const maxTiles = Math.floor(1000 / sizeX);
-
         const tilesX = Math.min(length, maxTiles);
-        const newWidth = tilesX * sizeX;
-        const rows = Math.ceil(length / maxTiles);
+        const width = tilesX * sizeX;
+        const tilesY = Math.ceil(length / maxTiles);
+        const height = tilesY * sizeY;
+        return {
+            width,
+            height,
+            tilesX,
+            tilesY,
+            sizeX,
+            sizeY
+        }
+    }
 
-        const canvas = getCanvasForDim(newWidth, this.getSizeY() * rows);
+    assignAutoProps(updateIndices = []) {
+        const length = this.getLength();
+        const dim = this.getDimForLength(length);
+
+        const canvas = getCanvasForDim(dim.width, dim.height);
         const ctx = canvas.getContext('2d');
 
         let index = 0;
@@ -914,17 +1595,17 @@ class TileIndex extends EntityIndex {
             if (!updateIndices.includes(index)) {
                 this.drawEntity(ctx, index, x, y);
             }
-            x += sizeX;
-            if (x >= newWidth) {
-                y += sizeY;
+            x += dim.sizeX;
+            if (x >= dim.width) {
+                y += dim.sizeY;
                 x = 0;
             }
             index++;
         }
         this.model.tilesImg.elem = canvas;
         this.img = canvas;
-        this.tilesX = tilesX;
-        this.tilesY = rows;
+        this.tilesX = dim.tilesX;
+        this.tilesY = dim.tilesY;
 
         return ['image'];
     }
@@ -1112,6 +1793,76 @@ class AliasIndex extends EntityIndex {
             }
         }
         return result;
+    }
+
+    getRenamePlan(oldName, newName) {
+        const old2new = {[oldName]: newName};
+        const mapChanges = getMapChanges(this.model.map, old2new);
+        const brushChanges = {};
+        for (let [key, brush] of Object.entries(this.model.brushes)) {
+            const changes = getMapChanges(brush, old2new);
+            if (changes.length > 0) {
+                brushChanges[key] = changes;
+            }
+        }
+        return {
+            mapChanges,
+            brushChanges,
+            old2new,
+            selectionChanges: null
+        };
+    }
+
+    doRenamePlan(plan, selection) {
+        doPlanOnModel(this.model, plan, selection);
+    }
+
+    undoRenamePlan(plan, selection) {
+        undoPlanOnModel(this.model, plan, selection);
+    }
+
+    getDeletePlan(indices) {
+        const names = [];
+        const old2new = {};
+        const backupEntities = [];
+        for (let index of indices) {
+            const name = this.getEntityValue(index);
+            if (name === null) continue;
+
+            const obj = this.getEntityObject(index);
+            obj.index = null;
+            backupEntities.push(obj);
+            names.push(name);
+            old2new[name] = null;
+        }
+        const mapChanges = getMapChanges(this.model.map, old2new);
+
+        const brushChanges = {};
+        for (let [key, brush] of Object.entries(this.model.brushes)) {
+            const changes = getMapChanges(brush, old2new);
+            if (changes.length > 0) {
+                brushChanges[key] = changes;
+            }
+        }
+
+        return {
+            backupEntities,
+            indices,
+            old2new,
+            mapChanges,
+            brushChanges,
+            selectionChanges: null
+        }
+    }
+
+    doDeletePlan(plan, selection) {
+        doPlanOnModel(this.model, plan, selection);
+        this.deleteEntities(plan.indices);
+    }
+
+    undoDeletePlan(plan, selection) {
+        undoPlanOnModel(this.model, plan, selection);
+        this.setEntityObjects(plan.backupEntities, false);
     }
 }
 
@@ -1563,6 +2314,61 @@ class AnimationIndex extends EntityIndex {
         }
         this.index.drawEntity(ctx, this.index.getEntityByPropValue('value', frame.id), x, y, zoomOrAvail);
     }
+
+    getDeletePlan(indices) {
+        const names = [];
+        for (let index of indices) {
+            const name = this.getEntityValue(index);
+            if (!name) continue;
+            names.push(name);
+        }
+        const propRemovals = [];
+        for (let [key, obj] of Object.entries(this.model.tiles)) {
+            const old = obj.animation;
+            if (old !== undefined && names.includes(old)) {
+                propRemovals.push([key, 'animation',  old]);
+            }
+        }
+        const backupEntities = [];
+        for (let index of indices) {
+            const entity = this.getEntityObject(index);
+            entity.index = null;
+            backupEntities.push(entity);
+        }
+        return {
+            indices,
+            backupEntities,
+            propRemovals
+        };
+    }
+
+    doDeletePlan(plan) {
+        doPlanOnModel(this.model, plan);
+        this.deleteEntities(plan.indices);
+    }
+
+    undoDeletePlan(plan) {
+        undoPlanOnModel(this.model, plan);
+        this.setEntityObjects(plan.backupEntities);
+    }
+
+    getRenamePlan(oldName, newName) {
+        const old2new = {[oldName]: newName};
+        return {
+            old2new,
+            prop: 'animation',
+            propChanges: getPropChanges('animation', this.model, old2new)
+        }
+    };
+
+    doRenamePlan(plan) {
+        doPlanOnModel(this.model, plan);
+    }
+
+    undoRenamePlan(plan) {
+        undoPlanOnModel(this.model, plan);
+    }
+
 }
 
 class FrameIndex extends EntityIndex {
@@ -1869,6 +2675,59 @@ class EventIndex extends EntityIndex {
             zoomOrAvail * dim.x,
             zoomOrAvail * dim.y
         );
+    }
+
+    getRenamePlan(oldName, newName) {
+        const old2new = {[oldName]: newName};
+        const eventChanges = getMapEventChanges(this.model.map, old2new);
+        return {
+            event: true,
+            old2new,
+            eventChanges,
+            selectionChanges: null
+        }
+    }
+
+    doRenamePlan(plan, selection) {
+        doPlanOnModel(this.model, plan, selection)
+    }
+
+    undoRenamePlan(plan, selection) {
+        undoPlanOnModel(this.model, plan, selection)
+    }
+
+    getDeletePlan(indices) {
+        const old2new = {};
+        const backupEntities = [];
+        const names = [];
+        for (let index of indices) {
+            const name = this.getEntityValue(index);
+            if (!name) continue;
+            names.push(name);
+            const obj = this.getEntityObject(index);
+            obj.index = null;
+            backupEntities.push(obj);
+            old2new[name] = null;
+        }
+        const eventChanges = getMapEventChanges(this.model.map, old2new);
+        return {
+            event: true,
+            indices,
+            backupEntities,
+            old2new,
+            eventChanges,
+            selectionChanges: null
+        }
+    }
+
+    doDeletePlan(plan, selection) {
+        doPlanOnModel(this.model, plan, selection);
+        this.deleteEntities(plan.indices)
+    }
+
+    undoDeletePlan(plan, selection) {
+        undoPlanOnModel(this.model, plan, selection);
+        this.setEntityObjects(plan.backupEntities)
     }
 }
 
