@@ -16,6 +16,7 @@ import {
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
+import {SpriteIndex} from "../classes/EntityIndex"
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
 import {
@@ -209,6 +210,7 @@ function RevertSelector(props) {
 
 function PageSelector(props) {
     const context = useContext(GlobalContext);
+
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
     const confirmRef = useRef(null);
     const updates = useUpdates();
@@ -334,22 +336,68 @@ function PageSelector(props) {
         );
     };
 
-    const getResourceDef = (type, id, value) => {
+    const getResourceDef = (type, id, value, details) => {
         if (type === 'image') {
             value = '"' + value + '"';
         } else if (type === 'json') {
             const lines = JSON.stringify(value, null, 4).split('\n');
-            value = lines.join('\n    ');
+            let jsonLines = [];
+            if (details.compact) {
+                let no = 0;
+                let trackLevel = -1;
+                let track;
+                let prefix;
+                for (let line of lines) {
+                    if (trackLevel < 0) {
+                        // TODO remove hardcoded key
+                        if (line.trim().startsWith('"map": [')) {
+                            trackLevel = 0;
+                            track = [];
+                        }
+                        jsonLines.push(line);
+                    } else {
+                        if (line.match(/\[$/)) {
+                            trackLevel++;
+                            if (trackLevel === 1) {
+                                prefix = line.substr(0, line.indexOf('['));
+                                track = [line.trim()];
+                            } else {
+                                track.push(line.trim());
+                            }
+                        } else if (line.match(/\],?$/)) {
+                            trackLevel--;
+                            if (trackLevel === 0) {
+                                track.push(line.trim());
+                                jsonLines.push(prefix + track.join(' '));
+                            } else if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        } else {
+                            if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        }
+                    }
+                    no++;
+                }
+            } else {
+                jsonLines = lines;
+            }
+            value = jsonLines.join('\n    ');
         }
         return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
     };
 
-    const exportModel = model => {
+    const exportModel = (model, details = {}) => {
         const resources = getModelConfig(model).getResources();
         const lines = [];
         for (let res of resources.resources.reverse()) {
             const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
-            lines.push(getResourceDef(res.type, res.id, data));
+            lines.push(getResourceDef(res.type, res.id, data, details));
         }
         ExportModal.open({
             code: lines.join('\n')
@@ -372,6 +420,7 @@ function PageSelector(props) {
     let model, tree;
 
     switch (resource.type) {
+
         case 'TilesMap':
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
@@ -401,7 +450,10 @@ function PageSelector(props) {
             break;
 
         case 'spriteSheet':
-            editor = <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />;
+            editor =
+                <Restorable confirmRef={confirmRef}>
+                    <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />
+                </Restorable>
             break;
     }
 
@@ -484,7 +536,6 @@ function EditorApp(props) {
     window.oncontextmenu = (e) => {
         e.preventDefault();
     };
-
     return (
         <GlobalCtx game={props.game} filters={filters} imageResources={imageResources}>
             <PageSelector {...props} resources={resources} />

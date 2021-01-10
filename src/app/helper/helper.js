@@ -502,7 +502,29 @@ const getRebuildJsonForModel = (cls, model, deep) => {
     return obj.getRebuildJson(true, model)
 };
 
+/**
+ * Wandelt die gegebene Resource (PaneModel) bzw. ResourceConfig in ein
+ * JSON um, wobei Canvas gecloned werden
+ *
+ * null => null
+ * array => [self(item1), ...self(itemN)]
+ * !object(x) => x
+ * (x.config === undef && x.getJson === undef)
+ *   => x instanceof Canvas ? clone Canvas : x;
+ *
+ * config = x.config ? x.config : x;
+ * json = config.getJson()
+ * for (let key in json) {
+ *     json[key] = self(json[key])
+ * }
+ *
+ * @param instance
+ * @returns {null|undefined|[]|HTMLCanvasElement|*}
+ */
 const getJsonModelOfInstance = instance => {
+    if (instance === null) {
+        return null
+    }
     if (Array.isArray(instance)) {
         const json = [];
         for (let item of instance) {
@@ -516,16 +538,19 @@ const getJsonModelOfInstance = instance => {
     if (instance.config === undefined && instance.getJson === undefined) {
         if (instance instanceof HTMLCanvasElement) {
             const canvas = getCanvasForDim(instance.width, instance.height);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(instance, 0, 0);
+            if (canvas.width > 0 && canvas.height > 0) {
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(instance, 0, 0);
+            }
             return canvas;
         }
-        return instance;
+    } else {
+        const config = instance.config ? instance.config : instance;
+        instance = config.getJson();
     }
-    const config = instance.config ? instance.config : instance;
-    const json = config.getJson();
-    for (let key in json) {
-        json[key] = getJsonModelOfInstance(json[key]);
+    const json = {};
+    for (let [key, value] of Object.entries(instance)) {
+        json[key] = getJsonModelOfInstance(value);
     }
     return json;
 };
@@ -662,25 +687,10 @@ const getTextBlockImage = (block, font, filterer = null) => {
     return canvas;
 };
 
-const cloneDeep = obj => {
-    if (Array.isArray(obj)) {
-        const clone = [];
-        for (let item of obj) {
-            clone.push(cloneDeep(item));
-        }
-        return clone;
-    }
-    if (typeof obj === 'object') {
-        const clone = {};
-        for (let [id, value] of Object.entries(obj)) {
-            clone[id] = cloneDeep(value);
-        }
-        return clone;
-    }
-    return obj;
-};
-
 const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
+    if (!canvas.width) {
+        return;
+    }
     const sizeX = dim === null ? canvas.width : dim.x;
     const sizeY = dim === null ? canvas.height : dim.y;
     const posX = pos === null ? 0 : pos.x;
@@ -711,9 +721,60 @@ const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => 
     }
 };
 
-const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
-    const sizeX = entityProvider.getSizeX();
-    const sizeY = entityProvider.getSizeY();
+function drawEventsValue(ctx, eventIndex, values, x, y, zoom = 1) {
+    let box = 0;
+    for (let value of values) {
+        if (!eventIndex.drawEvent(ctx, value, x, y, zoom)) {
+            box++;
+        }
+    }
+    if (box) {
+        ctx.fillStyle = '#00FF0088';
+        ctx.fillRect(x + 2, y + 2, 12, 12);
+        ctx.strokeStyle = '#000000';
+        ctx.strokeRect(x + 2, y + 2, 12, 12);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '10px';
+        ctx.fillText('' + box, x + 6, y + 12, 12);
+    }
+}
+
+function getCanvasForEventMatrix(tilesIndex, eventIndex, matrix, maxDim = null) {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let cell of matrix[y]) {
+            if (plain) {
+                if (cell.length !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                drawEventsValue(tilesCtx, eventIndex, cell, posX, posY);
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+}
+
+const getCanvasForIndexMatrix = (tilesIndex, aliasIndex, matrix, maxDim = null) => {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
     const cellsY = matrix.length;
     const cellsX = cellsY === 0 ? 0 : matrix[0].length;
     const tilesWidth = cellsX * sizeX;
@@ -735,7 +796,12 @@ const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
                     tilesCtx.fillRect(posX, posY, sizeX, sizeY);
                 }
             } else {
-                entityProvider.drawEntity(tilesCtx, tile, posX, posY);
+                if (typeof tile === 'string') {
+                    const index = aliasIndex.getEntityByPropValue('value', tile);
+                    aliasIndex.drawEntity(tilesCtx, index, posX, posY);
+                } else {
+                    tilesIndex.drawEntity(tilesCtx, tile, posX, posY);
+                }
             }
             posX += sizeX;
         }
@@ -744,9 +810,314 @@ const getCanvasForIndexMatrix = (entityProvider, matrix, maxDim = null) => {
     return canvas;
 };
 
+/**
+ *  BitmapPlayer-Modes
+ * ----------------------------
+ *
+ *   DIR: forward, backwards, forward-backward, backward-forward
+ *   END: loop, stop, delete
+ *
+ * ----------------------------
+ *
+ */
+
+const ANIMATION = {
+    DIR: {
+        FORWARD: 0,
+        BACKWARD: 1,
+        FORWARD_BACKWARD: 2,
+        BACKWARD_FORWARD: 3
+    },
+    END: {
+        LOOP: 0,
+        STOP: 1,
+        DELETE: 2
+    },
+    STATE: {
+        EMPTY: -1,
+        WAITING: 0,
+        RUNNING: 1,
+        DONE: 2,
+        DESTROYED: 3,
+        PAUSED: 4
+    }
+};
+
+/**
+ * TODO: setSync(null|frameState)
+ *
+ *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
+ *   addStep(value) -> führt diesen auf frameState aus
+ *
+ */
+class BitmapPlayer {
+
+    constructor() {
+        this.speed = 1;
+        this.state = ANIMATION.STATE.EMPTY;
+        this.frameNo = null;
+        this.pauseState = null;
+        this.dirty = false;
+    }
+
+    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, speed = 1) {
+        this.frames = frames;
+        this.direction = dir;
+        this.end = end;
+        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
+        this.speed = speed;
+        this.step = 0;
+        this.frameNo = this.isForward ? 0 : frames.length - 1;
+        this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
+    }
+
+    setSpeed(speed) {
+        this.speed = speed;
+    }
+
+    getState() {
+        return this.state;
+    }
+
+    handleForward() {
+        let frame = this.getFrame()
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
+            this.frameNo++;
+            if (this.frameNo === this.frames.length) {
+                this.frameNo--;
+                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                    this.frameNo--;
+                    this.isForward = false;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else {
+                            this.frameNo = 0;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    handleBackward() {
+        let frame = this.getFrame();
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
+            this.frameNo--;
+            if (this.frameNo < 0) {
+                this.frameNo = 0;
+                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                    this.frameNo++;
+                    this.isForward = true;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                            this.isForward = true;
+                            this.frameNo = 0;
+                        } else {
+                            this.frameNo =  this.frames.length - 1;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    nextStep() {
+        if (this.frames.length === 0 || this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
+            this.dirty = false;
+            return;
+        }
+        const oldFrameNo = this.frameNo;
+        this.state = ANIMATION.STATE.RUNNING;
+        this.step += this.speed;
+        if (this.isForward) {
+            this.handleForward();
+            if (!this.isForward) {
+                this.handleBackward();
+            }
+        } else {
+            this.handleBackward();
+            if (this.isForward) {
+                this.handleForward();
+            }
+        }
+        this.dirty = (oldFrameNo !== this.frameNo);
+    }
+
+    getFrame() {
+        if (this.frameNo === null || !this.frames) {
+            return null;
+        }
+        return this.frames[this.frameNo];
+    }
+
+    hasEnded() {
+        return (this.state === ANIMATION.STATE.DONE || this.state === ANIMATION.STATE.DESTROYED);
+    }
+
+    reset() {
+        this.step = 0;
+        this.frameNo = this.frames.length === 0 ? null : (this.isForward ? 0 : this.frames.length - 1);
+        this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
+        this.isForward = (this.direction === ANIMATION.DIR.FORWARD || this.direction === ANIMATION.DIR.FORWARD_BACKWARD);
+    }
+
+    pause() {
+        this.pauseState = this.state;
+        this.state = ANIMATION.STATE.PAUSED;
+        this.dirty = false;
+    }
+
+    isPaused() {
+        return this.state === ANIMATION.STATE.PAUSED;
+    }
+
+    continue() {
+        if (this.state === ANIMATION.STATE.PAUSED) {
+            this.state = this.pauseState;
+        }
+    }
+
+    reverse() {
+        switch(this.dir) {
+            case ANIMATION.DIR.FORWARD:
+                this.dir = ANIMATION.DIR.BACKWARD;
+                break;
+            case ANIMATION.DIR.BACKWARD:
+                this.dir = ANIMATION.DIR.FORWARD;
+                break;
+        }
+        if (this.state === ANIMATION.STATE.DONE) {
+            this.state = ANIMATION.STATE.WAITING;
+        }
+        this.isForward = !this.isForward;
+    }
+
+    isDirty() {
+        return this.dirty;
+    }
+}
+
+class Players {
+
+    constructor(animationIndex) {
+        this.index = animationIndex;
+        this.players = {};
+    }
+
+    setAnimations(animations) {
+        for (let name of Object.keys(this.players)) {
+            if (!animations.includes(name)) {
+                delete this.players[name];
+            }
+        }
+        for (let name of animations) {
+            if (this.players[name] === undefined) {
+                const index = this.index.getEntityByPropValue('value', name);
+                if (index !== null) {
+                    const animation = this.index.getEntityObject(index);
+                    const player = new BitmapPlayer();
+                    player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
+                    this.players[name] = player;
+                }
+            }
+        }
+    }
+
+    clear() {
+        this.players = {};
+    }
+
+    nextStep() {
+        let hasNewFrame = false;
+        for (let player of Object.values(this.players)) {
+            if (player.hasEnded()) {
+                player.reset();
+            }
+            player.nextStep();
+            if (!hasNewFrame && player.isDirty()) {
+                hasNewFrame = true;
+            }
+        }
+        return hasNewFrame;
+    }
+
+    getCurrFrame(animation) {
+        if (this.players[animation] === undefined) {
+            return null;
+        }
+        return this.players[animation].getFrame();
+    }
+
+    allPlayers(callback) {
+        for (let player of Object.values(this.players)) {
+            callback(player);
+        }
+    }
+
+    pause() {
+        this.allPlayers(player => player.pause())
+    }
+
+    play() {
+        this.allPlayers(player => player.play())
+    }
+
+    reset() {
+        this.allPlayers(player => player.reset())
+    }
+/*
+    setSpeed(speed) {
+        this.speed = speed;
+        this.allPlayers(player => player.setSpeed(speed))
+    }
+
+    getSpeed() {
+        return this.speed;
+    }
+ */
+}
+
+function cloneDeep(value) {
+    if (value === undefined) return;
+    if (value === null) return null;
+    if (Array.isArray(value)) {
+        return value.map(item => cloneDeep(item));
+    } else if (typeof value === 'object') {
+        const obj = {};
+        for (let [key, subValue] of Object.entries(value)) {
+            obj[key] = cloneDeep(subValue);
+        }
+        return obj;
+    }
+    return value;
+}
 
 module.exports = {
     d,
+    cloneDeep,
     hex2rgb,
     rgb2hex,
     isValidResourceId,
@@ -774,5 +1145,10 @@ module.exports = {
     getBlockPos,
     cloneDeep,
     drawCanvasToAvail,
-    getCanvasForIndexMatrix
+    drawEventsValue,
+    getCanvasForIndexMatrix,
+    getCanvasForEventMatrix,
+    BitmapPlayer,
+    ANIMATION,
+    Players
 };

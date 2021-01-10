@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, BitmapPlayer, ANIMATION, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, getCanvasForDim, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -1212,6 +1212,9 @@ class Config {
         if (value === undefined) {
             throw Error('Undefined value');
         }
+        if (props.null && value === null) {
+            return null;
+        }
         if (typeof value !== 'number') {
             throw Error('value must be an integer');
         }
@@ -2119,7 +2122,7 @@ class Game {
                                     config: TilesMapConfig,
                                     cls: TilesMap,
                                     data: pane.tilesMap.config,
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim
                                 }
                             );
@@ -2152,10 +2155,10 @@ class Game {
                                 dim: pane.viewPortDim,
 
                             });
-                        } else if (pane.spriteSheet) {
+                        } else if (pane instanceof SpritePane) {
                             resources.push(
                                 {
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim,
                                     type: 'spriteSheet',
                                     data: pane.spriteSheet
@@ -6206,7 +6209,7 @@ class SpriteSheet {
         }
     }
 
-    addTransformedAnimation(id, base, transformers, synchronous = false) {
+    addTransformedAnimation(id, base, transformers, synchronous = false, speed = 1) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -6222,13 +6225,14 @@ class SpriteSheet {
             synchronous,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
+            speed: speed,
             dir: baseAnimation.dir,
             end: baseAnimation.end
         };
         this.animations[id] = animation;
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.players[id] = player;
         }
     }
@@ -6265,7 +6269,7 @@ class SpriteSheet {
         }
     }
 
-    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false, speed = 1) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -6291,6 +6295,7 @@ class SpriteSheet {
             synchronous,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
+            speed,
             dir,
             end
         };
@@ -6311,7 +6316,7 @@ class SpriteSheet {
 
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, end, dir);
+            player.loadAnimation(animation.frames, end, dir, speed);
             this.players[name] = player;
         }
     }
@@ -6343,7 +6348,7 @@ class SpriteSheet {
             proxy.setPlayer(this.players[name]);
         } else {
             // creates a new player by lazy loading in the proxy
-            proxy.loadAnimation(animation.frames, animation.end, animation.dir);
+            proxy.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
         }
     }
 
@@ -6654,8 +6659,11 @@ class TilesMapConfig extends Config {
             tileBits: 5,
             defaultTile: {},
             tiles: {},
+            eventsImage: null,
             animations: {},
             brushes: {},
+            events: {},
+            count: null,
             map: [[]]
         }
     }
@@ -6666,12 +6674,40 @@ class TilesMapConfig extends Config {
         }
     }
 
+    setCount(value) {
+        this.count = this.validateInt(value, {min: 0, null: true});
+    }
+
     setTileBits(value) {
         this.tileBits = this.validateInt(value, this.getFieldProp('tileBits'))
     }
 
     setImage(value) {
         this.image = this.validateImageResource(value)
+    }
+
+    setEvents(value) {
+        this.events = {};
+        for (let [name, obj] of Object.entries(this.validateObject(value))) {
+            this.validateObject(obj, {});
+            this.addEvent(name, obj.x, obj.y, obj.width, obj.height, obj.offsetX, obj.offsetY);
+        }
+    }
+
+    addEvent(name, x = 0, y = 0, width = 0, height = 0, offsetX = 0, offsetY = 0) {
+        this.events[this.validateString(name)] =
+            {
+                x: this.validateInt(x, {min: 0, null: true}),
+                y: this.validateInt(y, {min: 0, null: true}),
+                width: this.validateInt(width, {min: 0}),
+                height: this.validateInt(height, {min: 0}),
+                offsetX: this.validateInt(offsetX),
+                offsetY: this.validateInt(offsetY)
+            };
+    }
+
+    setEventsImage(value) {
+        this.eventsImage = value === null ? null : this.validateImageResource(value)
     }
 
     setDefaultTile(value) {
@@ -6721,17 +6757,31 @@ class TilesMapConfig extends Config {
     }
 
     getSubResources() {
-        return [{id: this.image.id, type: 'image', data: this.image}];
+        const resources = [
+            {id: this.image.id, type: 'image', data: this.image}
+        ];
+        if (this.eventsImage) {
+            resources.push(
+                {id: this.eventsImage.id, type: 'image', data: this.eventsImage}
+            );
+        }
+        return resources;
     }
 
     addRebuildProps(obj, deep, base) {
         obj.tileBits = base.tileBits;
         obj.image = deep ? RL.makeImageResource(base.tilesImg.elem, base.tilesImgId) : base.tilesImgId;
+        if (base.eventsImg && base.eventsImg.width !== 0) {
+            const eventsImgId = base.eventsImgId ? base.eventsImgId : base.id + '_events.png';
+            obj.eventsImage = deep ? RL.makeImageResource(base.eventsImg, eventsImgId) : eventsImgId;
+        }
         obj.map = [...base.map];
         obj.defaultTile = base.defaultTile;
         obj.tiles = base.tiles;
         obj.animations = base.animations;
         obj.brushes = base.brushes;
+        obj.events = base.events;
+        obj.count = base.count;
         return obj;
     }
 
@@ -6741,27 +6791,22 @@ class TilesMapConfig extends Config {
         json.tileSize = 1 << this.tileBits;
         json.tilesImgId = this.image.id;
         let canvas = this.image.getCanvas();
-        if (canvas.height !== json.tileSize) {
-            const tilesPerLine = Math.floor(canvas.width / json.tileSize);
-            const lines = Math.floor(canvas.height / json.tileSize);
-            const flatCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * json.tileSize, json.tileSize);
-            for (let i = 0; i < lines; i++) {
-                const width = tilesPerLine * json.tileSize;
-                flatCanvas.ctx.drawImage(canvas.elem, 0, i * json.tileSize, width, json.tileSize, i * width, 0, width, json.tileSize);
-            }
-            canvas = flatCanvas;
-        }
         json.tilesImg = canvas;
+        const maxTiles = Math.floor(canvas.elem.width/json.tileSize) * Math.floor(canvas.elem.height/json.tileSize);
+        json.count = this.count === null ? maxTiles : Math.min(this.count, maxTiles);
+        json.eventsImg = this.eventsImage ? this.eventsImage.getCanvas().elem : getCanvasForDim(0, 0);
+        json.eventsImgId = this.eventsImage ? this.eventsImage.id : null;
+        json.events = cloneDeep(this.events);
         json.map = cloneDeep(this.map);
-        json.defaultTile = this.defaultTile;
-        json.tiles  = this.tiles;
-        json.animations = this.animations;
-        json.brushes = this.brushes; // TODO only in editor mode
+        json.defaultTile = cloneDeep(this.defaultTile);
+        json.tiles = cloneDeep(this.tiles);
+        json.animations = cloneDeep(this.animations);
+        json.brushes = cloneDeep(this.brushes); // TODO only in editor mode
         json.mapTiles = {
             x: this.map[0].length,
             y: this.map.length
         };
-        return json;
+        return json
     }
 }
 
@@ -6774,7 +6819,7 @@ class TilesMap {
         for (let id in this.animations) {
             const player = new BitmapPlayer();
             const animation = this.animations[id];
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.player[id] = player;
         }
         this.animatedIndices = [];
@@ -6782,33 +6827,6 @@ class TilesMap {
 
     getAnimations() {
         return this.player;
-    }
-
-    getMap() {
-        return this.getMapClone(this.map);
-    }
-
-    getMapClone(map) {
-        const clone = [];
-        for (let row of map) {
-            const mapRow = [];
-            for (let item of row) {
-                if (Array.isArray(item)) {
-                    const eventItems = [];
-                    for (let event of item) {
-                        if (Array.isArray(event)) {
-                            throw 'Invalid event in map definition found!';
-                        }
-                        eventItems.push(event);
-                    }
-                    mapRow.push(eventItems);
-                } else {
-                    mapRow.push(item);
-                }
-            }
-            clone.push(mapRow);
-        }
-        return clone;
     }
 
     getTileObj(x, y) {
@@ -7002,6 +7020,8 @@ class TilesMap {
             yIndices.push(index);
         }
 
+        const maxTiles = Math.floor(this.tilesImg.elem.width/this.tileSize);
+
         for (let j = 0; j < yIndices.length; j++) {
             const y = yIndices[j];
             if (y === null) {
@@ -7016,10 +7036,11 @@ class TilesMap {
                 if (index === 0) {
                     continue;
                 }
+                const row = Math.floor(index/maxTiles);
                 target.drawImage(
                     this.tilesImg.elem,
-                    index << this.tileBits,
-                    0,
+                    (index - row * maxTiles) * this.tileSize,
+                    row * this.tileSize,
                     this.tileSize,
                     this.tileSize,
                     offset.x + (i << this.tileBits),
@@ -7043,39 +7064,6 @@ class FontMap {
 FontMap.Config = FontMapConfig;
 
 
-/**
- *  BitmapPlayer-Modes
- * ----------------------------
- *
- *   DIR: forward, backwards, forward-backward, backward-forward
- *   END: loop, stop, delete
- *
- * ----------------------------
- *
- */
-
-const ANIMATION = {
-    DIR: {
-        FORWARD: 0,
-        BACKWARD: 1,
-        FORWARD_BACKWARD: 2,
-        BACKWARD_FORWARD: 3
-    },
-    END: {
-        LOOP: 0,
-        STOP: 1,
-        DELETE: 2
-    },
-    STATE: {
-        EMPTY: -1,
-        WAITING: 0,
-        RUNNING: 1,
-        DONE: 2,
-        DESTROYED: 3,
-        PAUSED: 4
-    }
-};
-
 class PlayerProxy {
 
     constructor() {
@@ -7095,12 +7083,12 @@ class PlayerProxy {
         return this.active === 1;
     }
 
-    loadAnimation(frames, end, dir) {
+    loadAnimation(frames, end, dir, speed) {
         this.active = 0;
         if (this.players[0] === null) {
             this.players[0] = new BitmapPlayer();
         }
-        this.players[0].loadAnimation(frames, end, dir);
+        this.players[0].loadAnimation(frames, end, dir, speed);
         this.players[1] = null;
     }
 
@@ -7134,167 +7122,6 @@ class PlayerProxy {
 
     reverse() {
         this.players[this.active].reverse();
-    }
-}
-
-
-/**
- * TODO: setSync(null|frameState)
- *
- *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
- *   addStep(value) -> führt diesen auf frameState aus
- *
- */
-class BitmapPlayer {
-
-    constructor() {
-        this.speed = 1;
-        this.state = ANIMATION.STATE.EMPTY;
-        this.frameNo = null;
-        this.pauseState = null;
-        this.dirty = false;
-    }
-
-    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
-        this.frames = frames;
-        this.direction = dir;
-        this.end = end;
-        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
-        this.step = 0;
-        this.frameNo = this.isForward ? 0 : frames.length - 1;
-        this.state = ANIMATION.STATE.WAITING;
-        this.dirty = true;
-    }
-
-    setSpeed(speed) {
-        this.speed = speed;
-    }
-
-    getState() {
-        return this.state;
-    }
-
-    handleForward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo++;
-            if (this.frameNo === this.frames.length) {
-                this.frameNo--;
-                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                    this.frameNo--;
-                    this.isForward = false;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else {
-                            this.frameNo = 0;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    handleBackward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo--;
-            if (this.frameNo < 0) {
-                this.frameNo = 0;
-                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                    this.frameNo++;
-                    this.isForward = true;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                            this.isForward = true;
-                            this.frameNo = 0;
-                        } else {
-                            this.frameNo =  this.frames.length - 1;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    nextStep() {
-        if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
-            this.dirty = false;
-            return;
-        }
-        const oldFrameNo = this.frameNo;
-        this.state = ANIMATION.STATE.RUNNING;
-        this.step += this.speed;
-        if (this.isForward) {
-            this.handleForward();
-            if (!this.isForward) {
-                this.handleBackward();
-            }
-        } else {
-            this.handleBackward();
-            if (this.isForward) {
-                this.handleForward();
-            }
-        }
-        this.dirty = (oldFrameNo !== this.frameNo);
-    }
-
-    getFrame() {
-        if (this.frameNo === null) {
-            return null;
-        }
-        return this.frames[this.frameNo];
-    }
-
-    pause() {
-        this.pauseState = this.state;
-        this.state = ANIMATION.STATE.PAUSED;
-        this.dirty = false;
-    }
-
-    continue() {
-        if (this.state === ANIMATION.STATE.PAUSED) {
-            this.state = this.pauseState;
-        }
-    }
-
-    reverse() {
-        switch(this.dir) {
-            case ANIMATION.DIR.FORWARD:
-                this.dir = ANIMATION.DIR.BACKWARD;
-                break;
-            case ANIMATION.DIR.BACKWARD:
-                this.dir = ANIMATION.DIR.FORWARD;
-                break;
-        }
-        if (this.state === ANIMATION.STATE.DONE) {
-            this.state = ANIMATION.STATE.WAITING;
-        }
-        this.isForward = !this.isForward;
-    }
-
-    isDirty() {
-        return this.dirty;
     }
 }
 
@@ -8549,7 +8376,6 @@ module.exports = {
     DependencyManager,
     StorageManager,
     Position,
-    Animation: BitmapPlayer,
     d,
     FontMap,
     SpriteSheet,
@@ -8560,8 +8386,8 @@ module.exports = {
     Force,
     TILE,
     INPUT,
-    ANIMATION,
     OCM,
+    ANIMATION,
     COLLISION,
     PATH
 };

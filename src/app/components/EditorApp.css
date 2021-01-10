@@ -37,6 +37,8 @@
     --marker-width: 8px;
     --marker-color-highlight: #FF474799;
     --marker-color: #FFFFFF77;
+
+    --small-font-size: 14px;
 }
 
 body {
@@ -71,6 +73,10 @@ body {
     opacity: 0.5;
     user-select: none;
     pointer-events: none;
+}
+
+.small-font {
+    font-size: var(--small-font-size);
 }
 
 .flex {
@@ -530,6 +536,10 @@ input[type=range][orient=vertical] {
     border: 1px solid black;
 }
 
+pre {
+    margin: var(--default-padding);
+}
+
 .auto-scroll {
     width: min-content;
     display: inline-block;
@@ -546,6 +556,14 @@ input[type=range][orient=vertical] {
 
 .cursor-pointer {
     cursor: pointer;
+}
+
+.cursor-grab {
+    cursor: grab;
+}
+
+.cursor-grabbing {
+    cursor: grabbing;
 }
 
 .cursor-move {
@@ -621,6 +639,14 @@ input[type=range][orient=vertical] {
     background-color: transparent;
 }
 
+.border-bg {
+    background-color: var(--box-border-color);
+}
+
+.content-bg {
+    background-color: var(--content-bg-color);
+}
+
 .marked-item {
     background-color: var(--marker-color-highlight);
 }
@@ -629,6 +655,7 @@ input[type=range][orient=vertical] {
     background-color: var(--marker-color);
 }
 
+textarea.invalid,
 input.invalid,
 input:invalid {
     -webkit-animation-name: blinker;
