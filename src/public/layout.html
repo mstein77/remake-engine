@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Editor : CSS layout</title>
+    <style>
+        .bg1 {
+            background-color: #F0D090;
+        }
+
+        .bg2 {
+            background-color: #90D0F0;
+        }
+
+        .bg3 {
+            background-color: #D0F090;
+        }
+
+        .fix-screen {
+            width: 400px;
+            min-width: 400px;
+            height: 300px;
+            overflow: hidden;
+            border: 1px dotted #303050;
+        }
+
+        /* Layout CSS */
+
+        .content {
+            overflow: hidden
+        }
+
+        .scroll {
+            overflow: auto !important;
+        }
+
+        .stack-h {
+            display: flex;
+        }
+
+        .stack-v {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .flex {
+            flex: 1
+        }
+
+        .wrap {
+            flex-wrap: wrap;
+        }
+
+        .min-content-h {
+            width: min-content
+        }
+
+        .flex-items-centered {
+            justify-content: center;
+        }
+
+        .flex-item-centered {
+            align-items: center;
+        }
+
+        .full-v {
+            height: 100%
+        }
+
+        .max-v {
+            max-height: 100%
+        }
+
+        .max-h {
+            max-width: 100%
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .nowrap-shorten {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .flow-padding > .content {
+            margin-top: 5px;
+            margin-left: 5px;
+        }
+
+        .flow-padding {
+            padding-bottom: 5px;
+            padding-right: 5px;
+            box-sizing: border-box;
+        }
+
+        .grid {
+            display: grid
+        }
+
+        .grid-cells-centered {
+            justify-items: center;
+            align-items: center;
+        }
+
+        .overlays {
+            position: relative
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0px
+        }
+
+        .padded-grid {
+            display: grid;
+            grid-template-columns: 5px minmax(auto, max-content) 5px;
+            grid-template-rows: 5px minmax(auto, max-content) 5px
+        }
+
+        .padded-grid-h {
+            display: grid;
+            grid-template-columns: 5px minmax(auto, max-content) 5px;
+        }
+
+        .padded-grid-v {
+            display: grid;
+            grid-template-rows: 5px minmax(auto, max-content) 5px;
+        }
+
+        .padded-cell {
+            grid-row: 2;
+            grid-column: 2
+        }
+
+        .padded-cell-h {
+            grid-column: 2
+        }
+
+        .padded-cell-v {
+            grid-row: 2;
+        }
+        .padded-end-h {
+            grid-row: 2;
+            grid-column: 3;
+        }
+
+        .padded-end-v {
+            grid-row: 3;
+            grid-column: 2;
+        }
+
+        .inner-space-v > div:not(:first-child) {
+            margin-top: 5px
+        }
+
+        .inner-space-h > div:not(:first-child) {
+            margin-left: 5px
+        }
+
+        .inner-border-v > div:not(:first-child) {
+            border-top: 5px solid #000;
+            box-sizing: border-box;
+        }
+
+        .inner-border-h > div:not(:first-child) {
+            border-left: 5px solid #000;
+            box-sizing: border-box;
+        }
+
+        .boxed {
+            border: 5px solid #000;
+        }
+
+        .thin-boxed {
+            border: 1px solid #000;
+        }
+
+        div.boxed, div.thin-boxed {
+            box-sizing: border-box;
+        }
+
+    </style>
+</head>
+<body>
+
+<h1>Content-Sizing</h1>
+<hr>
+
+<h3>Horizontal (min-content: vertical)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h">
+            <div class="content bg1" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack&gt;
+            &lt;Content width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Horizontal (min-content: vertical + min-height)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h" style="min-height: 150px">
+            <div class="content bg1" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack minHeight={150}&gt;
+            &lt;Content width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+
+<h3>Horizontal (max-content: vertical)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h full-v">
+            <div class="content bg1" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack fullHeight&gt;
+            &lt;Content width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+
+<h3>Vertical (min-content: horizontal)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v min-content-h">
+            <div class="content bg1" style="height: 100px">Fix size ooooooooooooooooooooover</div>
+            <!-- min-content is default in vertical direction! -->
+            <div class="content bg2">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical&gt;
+            &lt;Content height={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Vertical (min-content: horizontal + max-width)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v min-content-h" style="max-width: 200px">
+            <div class="content bg1" style="height: 100px">Fix size ooooooooooooooooooooover</div>
+            <!-- min-content is default in vertical direction! -->
+            <div class="content bg2">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical maxWidth={200}&gt;
+            &lt;Content height={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Vertical (max-content: horizontal)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content bg1" style="height: 100px">Fix size ooooooooooooooooooooover</div>
+            <!-- min-content is default in vertical direction! -->
+            <div class="content bg2">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical fullWidth&gt;
+            &lt;Content height={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<!--
+    If set a normal width or height on a div, the content itself
+    will be rendered outside of these bounds by default
+     => by default we would expect: hidden (and on request: auto/scroll)
+
+    max-width/height does not prevent this behaviour, because the content
+    elements have their own dimension
+
+    If we only set max-width/height then we have the following behaviour:
+     - max-width: element has always width = max-width
+     - max-height: element will only grow until max-height
+     => if we want the element to be as small as
+
+    We need:
+      - min-content:
+          element only requires as much space as needed
+          overflow: hidden or scroll
+          optional: min-<dim>, max-<dim>
+
+      - fix-content:
+          element always has assigned space
+          overflow: hidden or  scroll
+
+      - max-content:
+          element takes as much space as possible from the
+          parent (or the screen if no paren exists)
+          overflow: hidden or scroll
+  -->
+
+<h1>Nested-Sizing</h1>
+<hr>
+
+<h3>Vertical: max-content surrounded by 2 wrapping min-contents)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content bg1">
+                <div class="stack-h wrap">
+                    <div class="content min-content-h nowrap">Sub 1 verr u wuewueuwew uweu weuwe e</div>
+                    <div class="content min-content-h nowrap">Sub 2 hhwehw hwehwe hwehw whewh e</div>
+                    <div class="content min-content-h nowrap">Sub 3</div>
+                </div>
+            </div>
+
+            <div class="content bg2 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+
+            <div class="content bg3">
+                <div class="stack-h wrap">
+                    <div class="content min-content-h nowrap">Sub 1 verr u wuewueuwew uweu weuwe e</div>
+                    <div class="content min-content-h nowrap">Sub 2 hhwehw hwehwe hwehw whewh e</div>
+                    <div class="content min-content-h nowrap">Sub 3</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical fullWidth&gt;
+            &lt;Stack wrap&gt;
+                &lt;Content noWrap&gt;Sub 1 verr u wuewueuwew uweu weuwe e&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 2 hhwehw hwehwe hwehw whewh e&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 3&lt;/Content&gt;
+            &lt;/Stack&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+            &lt;Stack wrap&gt;
+                &lt;Content noWrap&gt;Sub 1 verr u wuewueuwew uweu weuwe e&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 2 hhwehw hwehwe hwehw whewh e&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 3&lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Horizontal: max-content surrounded by 2 wrapping min-contents)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h full-v">
+            <div class="content bg1">
+                <div class="stack-h wrap" style="max-width: 100px">
+                    <div class="content nowrap">Master on Sub 1</div>
+                    <div class="content nowrap">Sub 2</div>
+                    <div class="content nowrap">Sub 3</div>
+                </div>
+            </div>
+
+            <div class="content bg2 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+
+            <div class="content bg3">
+                <div class="stack-v wrap">
+                    <div class="content nowrap">Sub 1</div>
+                    <div class="content nowrap">Sub 2</div>
+                    <div class="content nowrap">Sub 3</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack fullHeight&gt;
+            &lt;Stack wrap&gt;
+                &lt;Content noWrap&gt;Master on Sub 1&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 2&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 3&lt;/Content&gt;
+            &lt;/Stack&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+            &lt;Stack wrap&gt;
+                &lt;Content noWrap&gt;Sub 1&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 2&lt;/Content&gt;
+                &lt;Content noWrap&gt;Sub 3&lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h1>Text-Shortening</h1>
+<hr>
+
+<h3>Simple content (fix width)</h3>
+<div class="stack-h">
+    <div class="bg1 content nowrap-shorten" style="width: 80px">
+        Test1<br />
+        Thisisalittlebitlongerthanexpected
+    </div>
+    <pre>
+        &lt;Content shorten width={80}&gt;
+            Test1&lt;br /&gt;
+            Thisisalittlebitlongerthanexpected
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+
+<h3>Simple content (max-width)</h3>
+<div class="stack-h">
+    <div class="bg1 content nowrap-shorten" style="max-width: 80px">
+        Test1<br />
+        Thisisalittlebitlongerthanexpected
+    </div>
+    <pre>
+        &lt;Content shorten maxWidth={80}&gt;
+            Test1&lt;br /&gt;
+            Thisisalittlebitlongerthanexpected
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Nested content (max-width inherited)</h3>
+<div class="stack-h">
+    <div class="content min-content-h" style="max-width: 80px">
+        <div class="bg1 content nowrap-shorten">
+            Test1<br />
+            Thisisalittlebitlongerthanexpected
+        </div>
+
+        <div class="bg2 content nowrap-shorten">
+            Test1
+        </div>
+    </div>
+    <pre>
+        &lt;Content maxWidth={80}&gt;
+            &lt;Content shorten&gt;
+                Test1&lt;br /&gt;
+                Thisisalittlebitlongerthanexpected
+            &lt;/Content&gt;
+            &lt;Content shorten&gt;
+                Test1
+            &lt;/Content&gt;
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Nested (no width)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content nowrap-shorten bg1">HSH HASHSAHS HS HASH SHS AHSSHASHSAHSSHH SHASHAHS HSHHS S</div>
+    </div>
+    <pre>
+            &lt;Content shorten&gt;
+                HSH HASHSAHS HS HASH SHS AHSSHASHSAHSSHH SHASHAHS HSHHS S
+            &lt;/Content&gt;
+    </pre>
+</div>
+
+<h1>Content-Scrolling</h1>
+<hr>
+
+<h3>Horizontal overflow</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content scroll full-v bg1">HSHAHASHSAHSAHSAHASHASHSAAHSSHASHSAHSSHHASHASHAHSAHSHHSAS</div>
+    </div>
+    <pre>
+        &lt;Content scroll fullHeight&gt;
+            HSHAHASHSAHSAHSAHASHASHSAAHSSHASHSAHSSHHASHASHAHSAHSHHSAS
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Vertical overflow</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <!-- vertical scrollbar requires a height here -->
+        <div class="content scroll bg1" style="max-height: 100%">
+            H<br>SHA<br>HASH<br>SAHSAH<br>SAHASH<br>ASHSAA<br>HSSHA<br>SHSAH<br>SSHHA<br>SHASH<br>AHSAH<br>SHHSAS
+            H<br>SHA<br>HASH<br>SAHSAH<br>SAHASH<br>ASHSAA<br>HSSHA<br>SHSAH<br>SSHHA<br>SHASH<br>AHSAH<br>SHHSAS
+        </div>
+    </div>
+    <pre>
+        &lt;Content scroll fullWidth&gt;
+            H&lt;br&gt;SHA&lt;br&gt;HASH&lt;br&gt;SAHSAH&lt;br&gt;SAHASH&lt;br&gt;ASHSAA&lt;br&gt;HSSHA&lt;br&gt;SHSAH&lt;br&gt;SSHHA&lt;br&gt;SHASH&lt;br&gt;AHSAH&lt;br&gt;SHHSAS
+            H&lt;br&gt;SHA&lt;br&gt;HASH&lt;br&gt;SAHSAH&lt;br&gt;SAHASH&lt;br&gt;ASHSAA&lt;br&gt;HSSHA&lt;br&gt;SHSAH&lt;br&gt;SSHHA&lt;br&gt;SHASH&lt;br&gt;AHSAH&lt;br&gt;SHHSAS
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Stack horizontal (horizontal overflow)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h">
+            <div class="content bg1 scroll" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg3 flex scroll">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack&gt;
+            &lt;Content scroll width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content scroll flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Stack horizontal (max-height with vertical overflow)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h" style="max-height: 50px">
+            <div class="content bg1 scroll" style="width: 100px">Fix size
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+
+            <div class="content bg2 min-content-h scroll">
+                Min contenteeeeeee
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+
+            <div class="content bg3 flex scroll">
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack maxHeight={50}&gt;
+            &lt;Content scroll width={100}&gt;
+                Fix size
+                &lt;br&gt;ooooooooooooooooooooover
+                &lt;br&gt;aaa
+                &lt;br&gt;bbb
+            &lt;/Content&gt;
+            &lt;Content scroll&gt;
+                Min contenteeeeeee
+                &lt;br&gt;ooooooooooooooooooooover
+                &lt;br&gt;aaa
+                &lt;br&gt;bbb
+            &lt;/Content&gt;
+            &lt;Content scroll flex&gt;
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                &lt;br&gt;ooooooooooooooooooooover
+                &lt;br&gt;aaa
+                &lt;br&gt;bbb
+            &lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Stack horizontal (full-height with vertical overflow)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h full-v">
+            <div class="content bg1 scroll" style="width: 100px">Fix size
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+
+            <div class="content bg2 min-content-h scroll">
+                Min contenteeeeeee
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+
+            <div class="content bg3 flex scroll">
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack fullHeight&gt;
+            &lt;Content scroll width={100}&gt;
+                Fix size
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;/Content&gt;
+            &lt;Content scroll&gt;
+                Min contenteeeeeee
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;/Content&gt;
+            &lt;Content scroll flex&gt;
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+
+<!-- TODO: vertical min-content will probably not work with parent dim -->
+<h3>Stack vertical (horizontal overflow)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content bg1 scroll" style="height: 100px">
+                Fix size ooooooooooooooooooooover
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+            <div class="content bg2">
+                Min contenteeeeeee<br>
+                row 2
+            </div>
+            <div class="content bg3 flex scroll">
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack fullWidth&gt;
+            &lt;Content scroll height={100}&gt;
+                Fix size ooooooooooooooooooooover
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;/Content&gt;
+            &lt;Content scroll&gt;
+                Min contenteeeeeee&lt;br&gt;
+                row 2
+            &lt;/Content&gt;
+            &lt;Content scroll flex&gt;
+                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+                &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h1>Centering</h1>
+<hr>
+
+<h3>Vertical centered</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered full-v stack-v">
+            <div class="min-content-h bg1">
+                Abcde
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center="v"&gt;
+            Abcde
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Horizontal centered</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered stack-h">
+            <div class="min-content-h bg1">
+                Abcde
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center="h"&gt;
+            Abcde
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Centered</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered flex-item-centered full-v stack-h">
+            <div class="min-content-h bg1">
+                Abcde
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center&gt;
+            Abcde
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Centered (overflow-x)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered flex-item-centered full-v stack-h">
+            <div class="content min-content-h bg1 scroll max-v">
+                Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe<br>
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center scroll&gt;
+            Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Centered (overflow-y)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered flex-item-centered full-v stack-h">
+            <div class="content min-content-h bg1 scroll max-v">
+                Abcdeiwqeqwjiew<br>
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center scroll&gt;
+            Abcdeiwqeqwjiew&lt;br&gt;
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Centered (overflow)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="flex-items-centered flex-item-centered full-v stack-h">
+            <div class="content min-content-h bg1 scroll max-v">
+                Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe<br>
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content center scroll&gt;
+            Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe&lt;br&gt;
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h1>Grid</h1>
+<hr>
+
+<h3>Normal 2x2 grid with gap</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="grid" style="grid-gap: 5px; grid-template-columns: minmax(80px, 120px) auto; grid-rows: min-content min-content">
+            <div class="content bg1 nowrap-shorten">Cellwewewewwew wew wew wewe</div>
+            <div class="content bg2 scroll">Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq
+            </div>
+            <div class="content bg2">Cell 3</div>
+            <div class="content bg1">Cell 4</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Grid gap columns="minmax(80px, 120px) auto" rows="min-content min-content"&gt;
+            &lt;Content shorten&gt;Cellwewewewwew wew wew wewe&lt;/Content&gt;
+            &lt;Content scroll&gt;Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq&lt;/Content&gt;
+            &lt;Content&gt;Cell 3&lt;/Content&gt;
+            &lt;Content&gt;Cell 4&lt;/Content&gt;
+        &lt;/Grid&gt;
+    </pre>
+</div>
+
+<h3>Scrollable 2x... grid with gap</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content scroll max-v">
+            <div class="grid" style="grid-gap: 5px; grid-template-columns: minmax(80px, 120px) auto">
+                <div class="content bg1 nowrap-shorten">Cellwewewewwew wew wew wewe</div>
+                <div class="content bg2">Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                    weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq
+                </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+                <div class="content bg2">Cell 3weqweqqwewqewqeqwewqeq</div>
+                <div class="content bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw </div>
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content scroll&gt;
+            &lt;Grid gap columns="minmax(80px, 120px) auto"&gt;
+                &lt;Content shorten&gt;Cellwewewewwew wew wew wewe&lt;/Content&gt;
+                &lt;Content scroll&gt;Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                    weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+                &lt;Content&gt;Cell 3weqweqqwewqewqeqwewqeq&lt;/Content&gt;
+                &lt;Content&gt;Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw&lt;/Content&gt;
+            &lt;/Grid&gt;
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Flex Grid 3x3</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="grid full-v grid-cells-centered" style="grid-gap: 5px; grid-template-columns: 20px auto 20px; grid-template-rows: 20px auto 20px">
+            <div class="content bg1">1</div>
+            <div class="content bg2">2</div>
+            <div class="content bg1">3</div>
+            <div class="content bg2">4</div>
+            <div class="content bg1 max-h max-v scroll">
+                wwew ewqe wqewq ewqe wqewqe wqe wqewqe wqewqe qwewqe wqe wqe ewqe
+                wqewe wqe qwe wqewq ewqe qwe qweqwe wqe qwe qwewqe wqe wqe qwewqe wqeqw e
+                wqewqe wqe wqeqw e ewe qw ewqewq e qwewqe wqewqewqewq ewqe eqw ewqe qwe
+                wqe wqewqe wq
+                ewqewqe qwewqewqewqewqe wqeq weqw ewqewqewqew qewqe wqewqewqewqewqewqewqe wqe eq wqe qew qwe
+                qweqwewqe qweqw eqw wqeqw eqwewqeqwe wqe ewqe wqewqeq wewqe weqw qwe
+                qwexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx xqwewq ewq
+                ewq ewqe qwewqewqe wqe qwe wqewq eqw ewqe wqeqw ewqewqe wqewqe
+                qe qwe wqeqwe
+                qwe qwe qwewq eqwe wqe qweqw
+                e qweqwe w
+                qweqwewqe qweqw eqw wqeqw eqwewqeqwe wqe ewqe wqewqeq wewqe weqw qwe
+                qwe qwewq ewq
+                ewq ewqe qwewqewqe wqe qwe wqewq eqw ewqe wqeqw ewqewqe wqewqe
+                qe qwe wqeqwe
+                qwe qwe qwewq eqwe wqe qweqw
+                e qweqwe w
+            </div>
+            <div class="content bg2">6</div>
+            <div class="content bg1">7</div>
+            <div class="content bg2">8</div>
+            <div class="content bg1">9</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Grid gap centerAll columns="20px auto 20px" rows="20px auto 20px"&gt;
+            &lt;Content&gt;1&lt;/Content&gt;
+            &lt;Content&gt;2&lt;/Content&gt;
+            &lt;Content&gt;3&lt;/Content&gt;
+            &lt;Content&gt;4&lt;/Content&gt;
+            &lt;Content scroll&gt;
+                wwew ewqe wqewq ewqe wqewqe wqe wqewqe wqewqe qwewqe wqe wqe ewqe
+                wqewe wqe qwe wqewq ewqe qwe qweqwe wqe qwe qwewqe wqe wqe qwewqe wqeqw e
+                wqewqe wqe wqeqw e ewe qw ewqewq e qwewqe wqewqewqewq ewqe eqw ewqe qwe
+                wqe wqewqe wq
+                ewqewqe qwewqewqewqewqe wqeq weqw ewqewqewqew qewqe wqewqewqewqewqewqewqe wqe eq wqe qew qwe
+                qweqwewqe qweqw eqw wqeqw eqwewqeqwe wqe ewqe wqewqeq wewqe weqw qwe
+                qwexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx xqwewq ewq
+                ewq ewqe qwewqewqe wqe qwe wqewq eqw ewqe wqeqw ewqewqe wqewqe
+                qe qwe wqeqwe
+                qwe qwe qwewq eqwe wqe qweqw
+                e qweqwe w
+                qweqwewqe qweqw eqw wqeqw eqwewqeqwe wqe ewqe wqewqeq wewqe weqw qwe
+                qwe qwewq ewq
+                ewq ewqe qwewqewqe wqe qwe wqewq eqw ewqe wqeqw ewqewqe wqewqe
+                qe qwe wqeqwe
+                qwe qwe qwewq eqwe wqe qweqw
+                e qweqwe w
+            &lt;/Content&gt;
+            &lt;Content&gt;6&lt;/Content&gt;
+            &lt;Content&gt;7&lt;/Content&gt;
+            &lt;Content&gt;8&lt;/Content&gt;
+            &lt;Content&gt;9&lt;/Content&gt;
+        &lt;/Grid&gt;
+    </pre>
+</div>
+
+<h1>Overlays</h1>
+<hr>
+
+<h3>Simple overlay (relative only)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content" style="height: 40px">
+                Top...
+            </div>
+            <div class="content flex">
+                <div class="content bg1" style="width: 200px; height: 150px">
+                    base
+                </div>
+                <div class="content bg2" style="opacity: 0.5; position: relative; top: -150px; width: 200px; height: 150px">
+                    Overlay 1
+                </div>
+                <div class="content bg3" style="opacity: 0.2; position: relative; top: -300px; width: 200px; height: 150px">
+                    Overlay 2
+                </div>
+                Where are we?
+            </div>
+            <div class="content" style="height: 40px">
+                Bottom...
+            </div>
+        </div>
+    </div>
+    <pre>
+        Unsupported
+    </pre>
+</div>
+
+<h3>Simple overlay (relative-absolute)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content" style="height: 40px">
+                Top...
+            </div>
+            <div class="content flex">
+                <div class="overlays">
+                    <div class="content overlay bg1" style="width: 200px; height: 150px">
+                        base
+                    </div>
+                    <div class="content overlay bg2" style="opacity: 0.5; width: 200px; height: 150px">
+                        Overlay 1
+                    </div>
+                    <div class="content overlay bg3" style="opacity: 0.2; width: 200px; height: 150px">
+                        Overlay 2
+                    </div>
+                </div>
+            </div>
+            <div class="content" style="height: 40px">
+                Bottom...
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical fullWidth&gt;
+            &lt;Content height={40}&gt;
+                Top...
+            &lt;/Content&gt;
+            &lt;Content flex&gt;
+                &lt;Overlays width={200} height={150}&gt;
+                    &lt;Overlay width={200} height={150}&gt;
+                        base
+                    &lt;/Overlay&gt;
+                    &lt;Overlay width={200} height={150}&gt;
+                        Overlay 1
+                    &lt;/Overlay&gt;
+                    &lt;Overlay width={200} height={150}&gt;
+                        Overlay 2
+                    &lt;/Overlay&gt;
+                &lt;/Overlays&gt;
+            &lt;/Content&gt;
+            &lt;Content height={40}&gt;
+                Bottom...
+            &lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Centered overlay (relative-absolute) with overflow</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v full-v">
+            <div class="content" style="height: 40px">
+                Top...
+            </div>
+            <div class="content flex">
+                <div class="stack-v flex-items-centered flex-item-centered full-v">
+                    <div class="overlays scroll" style="width: 500px; height: 150px; max-width: 400px">
+                        <div class="content overlay bg1" style="width: 500px; height: 150px">
+                            base
+                        </div>
+                        <div class="content overlay bg2" style="opacity: 0.5; width: 500px; height: 150px">
+                            Overlay 1
+                        </div>
+                        <div class="content overlay bg3" style="opacity: 0.2; width: 500px; height: 150px">
+                            Overlay 2
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="content" style="height: 40px">
+                Bottom...
+            </div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical fullWidth&gt;
+            &lt;Content height={40}&gt;
+                Top...
+            &lt;/Content&gt;
+            &lt;Content flex center&gt;
+                &lt;Overlays width={500} height={150}&gt;
+                    &lt;Overlay width={500} height={150}&gt;
+                        base
+                    &lt;/Overlay&gt;
+                    &lt;Overlay width={500} height={150}&gt;
+                        Overlay 1
+                    &lt;/Overlay&gt;
+                    &lt;Overlay width={500} height={150}&gt;
+                        Overlay 2
+                    &lt;/Overlay&gt;
+                &lt;/Overlays&gt;
+            &lt;/Content&gt;
+            &lt;Content height={40}&gt;
+                Bottom...
+            &lt;/Content&gt;
+        &lt;/Stack&gt;
+
+    </pre>
+</div>
+
+<h1>Padding</h1>
+<hr>
+
+<h3>Content-Padding (Grid)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid">
+            <div class="padded-cell content nowrap">
+                Children go here....
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded&gt;
+            Children go here...
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Content-Padding (Grid) with horizontal Overflow scrolling</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid scroll">
+            <div class="padded-cell content min-content-h">
+                jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded&gt;
+            jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Content-Padding (Grid) with shortening</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 max-h padded-grid">
+            <div class="padded-cell content nowrap-shorten">
+                jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded shorten&gt;
+            jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Content-Padding (Grid) with vertical Overflow scrolling</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid scroll max-v">
+            <div class="padded-cell content min-content-h">
+                jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+                <br>ooooooooooooooooooooover
+                <br>aaa
+                <br>bbb
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded scroll&gt;
+            jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+            &lt;br&gt;ooooooooooooooooooooover&lt;br&gt;aaa&lt;br&gt;bbb
+        &lt;/Content&gt;
+
+    </pre>
+</div>
+
+<h3>Horizontal Content-Padding (Grid)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid-h">
+            <div class="padded-cell-h content nowrap">
+                Children go here....
+            </div>
+            <div class="padded-end-h"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded="h"&gt;
+            Children go here...
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Vertical Content-Padding (Grid)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid-v">
+            <div class="padded-cell-v content nowrap">
+                Children go here....
+            </div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded="v"&gt;
+            Children go here...
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h1>Stack-Spacing</h1>
+
+<h3>No-Gap</h3>
+
+<h3>Empty Gap Horizontal</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h inner-space-h">
+            <div class="content bg1" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack gap&gt;
+            &lt;Content width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Empty Gap Vertical</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v inner-space-v full-v">
+            <div class="content bg1" style="height: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg2">Min contenteeeeeee</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical gap&gt;
+            &lt;Content height={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Border-Gap horizontal</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h full-v inner-border-h">
+            <div class="content bg2 min-content-h">Min contenteeeeeee</div>
+            <div class="content bg1" style="width: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack border&gt;
+            &lt;Content width={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Border-Gap vertical</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-v inner-border-v full-v">
+            <div class="content bg2">Min contenteeeeeee</div>
+            <div class="content bg1" style="height: 100px">Fix size ooooooooooooooooooooover</div>
+            <div class="content bg3 flex">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack vertical border&gt;
+            &lt;Content height={100}&gt;Fix size ooooooooooooooooooooover&lt;/Content&gt;
+            &lt;Content&gt;Min contenteeeeeee&lt;/Content&gt;
+            &lt;Content flex&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Flow-Gap (same height)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h wrap flow-padding bg1">
+            <div class="content nowrap thin-boxed">Elem One</div>
+            <div class="content nowrap thin-boxed">Elem HWHEhwehwehwe</div>
+            <div class="content nowrap thin-boxed">Elem wjwjewje</div>
+            <div class="content nowrap thin-boxed">Elem</div>
+            <div class="content nowrap thin-boxed">Elem geee haw</div>
+            <div class="content nowrap thin-boxed">Elem geee haw</div>
+            <div class="content nowrap thin-boxed">Elem geee haw</div>
+            <div class="content nowrap thin-boxed">Elem Bababsabs</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack wrap gap&gt;
+            &lt;Content noWrap thin boxed&gt;Elem one&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem HWHEhwehwehwe&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem wjwjewje&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Bababsabs&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Flow-Gap (multi-height centering)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="stack-h wrap flow-padding bg1" style="align-items: center">
+            <div class="content nowrap thin-boxed">Elem One</div>
+            <div class="content min-content-h thin-boxed">Elem HWHEhwehwehwe</div>
+            <div class="content thin-boxed">Elem wjwjewje</div>
+            <div class="content nowrap boxed">Elem</div>
+            <div class="content nowrap boxed">Elem geee haw</div>
+            <div class="content min-content-h thin-boxed">Elem geee haw</div>
+            <div class="content nowrap thin-boxed">Elem geee haw</div>
+            <div class="content nowrap thin-boxed">Elem Bababsabs</div>
+        </div>
+    </div>
+    <pre>
+        &lt;Stack wrap gap centerAll&gt;
+            &lt;Content noWrap thin boxed&gt;Elem one&lt;/Content&gt;
+            &lt;Content thin boxed&gt;Elem HWHEhwehwehwe&lt;/Content&gt;
+            &lt;Content thin boxed&gt;Elem wjwjewje&lt;/Content&gt;
+            &lt;Content noWrap boxed&gt;Elem&lt;/Content&gt;
+            &lt;Content noWrap boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content thin boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Elem geee haw&lt;/Content&gt;
+            &lt;Content noWrap thin boxed&gt;Bababsabs&lt;/Content&gt;
+        &lt;/Stack&gt;
+    </pre>
+</div>
+
+<h3>Flow-Gap with Spacer</h3>
+TODO
+
+<h1>Borders</h1>
+
+<h3>Boxed (fixed size)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid">
+            <div class="padded-cell content nowrap">
+                <div class="stack-h inner-space-h">
+                    <div class="boxed bg2" style="width: 100px; height: 100px"></div>
+                    <div class="thin-boxed bg3" style="width: 100px; height: 100px"></div>
+                </div>
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded&gt;
+            &lt;Stack gap&gt;
+                &lt;Content boxed width={100} height={100}&gt;&lt;/Content&gt;
+                &lt;Content thin boxed width={100} height={100}&gt;&lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Canvas (fixed size)</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid">
+            <div class="padded-cell content nowrap">
+                <div class="stack-h inner-space-h">
+                    <div class="content">
+                        <canvas width="100" height="100" class="boxed" />
+                    </div>
+
+                    <div class="content">
+                        <canvas width="100" height="100" class="thin-boxed" />
+                    </div>
+                </div>
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded&gt;
+            &lt;Stack gap&gt;
+                &lt;Canvas boxed width={100} height={100}&gt;&lt;/Content&gt;
+                &lt;Canvas thin boxed width={100} height={100}&gt;&lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Content&gt;
+    </pre>
+</div>
+
+<h3>Boxed Stack with border spacing</h3>
+<div class="stack-h">
+    <div class="fix-screen">
+        <div class="content bg1 padded-grid">
+            <div class="padded-cell content nowrap">
+                <div class="stack-h inner-border-h boxed">
+                    <div class="bg2" style="width: 100px; height: 100px"></div>
+                    <div class="bg3" style="width: 100px; height: 100px"></div>
+                </div>
+            </div>
+            <div class="padded-end-h"></div>
+            <div class="padded-end-v"></div>
+        </div>
+    </div>
+    <pre>
+        &lt;Content padded&gt;
+            &lt;Stack border boxed&gt;
+                &lt;Content width={100} height={100}&gt;&lt;/Content&gt;
+                &lt;Content width={100} height={100}&gt;&lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Content&gt;
+
+    </pre>
+</div>
+
+</body>
+</html>
