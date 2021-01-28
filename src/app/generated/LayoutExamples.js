@@ -53,13 +53,13 @@ function getExamples() {
     );
     examples.push(
         <Stack vertical full>
-            <Stack wrap className="bg1">
+            <Stack full="h" wrap className="bg1">
                 <Content>Sub 1 verr u wuewueuwew uweu weuwe e</Content>
                 <Content>Sub 2 hhwehw hwehwe hwehw whewh e</Content>
                 <Content>Sub 3</Content>
             </Stack>
             <Content flex wrap className="bg2">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
-            <Stack wrap className="bg3">
+            <Stack full="h" wrap className="bg3">
                 <Content>Sub 1 verr u wuewueuwew uweu weuwe e</Content>
                 <Content>Sub 2 hhwehw hwehwe hwehw whewh e</Content>
                 <Content>Sub 3</Content>
@@ -406,7 +406,7 @@ function getExamples() {
     
     );
     examples.push(
-        <Content padded className="bg1">
+        <Content padded scroll className="bg1">
             jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
         </Content>
     
@@ -754,8 +754,8 @@ function getExamples() {
             <Content padded width={100} className="bg1">
                     fix
             </Content>
-            <Content>
-                <Stack padded gap flex className="bg1">
+            <Content flex>
+                <Stack full="v" padded gap flex className="bg1">
                     <Content padded className="bg3">
                         First
                     </Content>
@@ -764,12 +764,33 @@ function getExamples() {
                     </Content>
                 </Stack>
             </Content>
-
+            <Content padded width={100} className="bg3">
+                    last
+            </Content>
         </Stack>
                     
     );
     examples.push(
         <Stack full gap padded className="bg2">
+            <Content padded width={100} className="bg1">
+                    fix
+            </Content>
+            <Stack full="v" padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>
+            <Content padded width={100} className="bg3">
+                    last
+            </Content>
+        </Stack>
+                    
+    );
+    examples.push(
+        <Stack full gap padded scroll className="bg2">
             <Content padded width={100} className="bg1">
                     fix
             </Content>
@@ -779,6 +800,9 @@ function getExamples() {
                 </Content>
                 <Content padded wrap className="bg3">
                     Second Box
+                </Content>
+                <Content padded className="bg3">
+                    Veryveryveryveryveryveryveryveryveryverylong Box
                 </Content>
             </Stack>
         </Stack>

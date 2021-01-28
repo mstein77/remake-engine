@@ -37,12 +37,18 @@
             overflow: hidden
         }
 
+        .bounds {
+            max-width: 100%;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
         .scroll {
             overflow: auto !important;
         }
 
         .stack-h {
-            display: flex;
+            display: inline-flex;
         }
 
         .stack-v {
@@ -75,6 +81,10 @@
 
         .stack-h > div.full-v {
             height: revert;
+        }
+
+        .stack-h > div:not(.flex) {
+            width: min-content;
         }
 
         .min-content-h {
@@ -116,6 +126,7 @@
         .nowrap-shorten {
             white-space: nowrap;
             text-overflow: ellipsis;
+            flex-shrink: 1 !important
         }
 
         .flow-padding > .content {
@@ -420,13 +431,13 @@
                         </div>
                         <pre>
         &lt;Stack vertical full&gt;
-            &lt;Stack wrap className="bg1"&gt;
+            &lt;Stack full="h" wrap className="bg1"&gt;
                 &lt;Content&gt;Sub 1 verr u wuewueuwew uweu weuwe e&lt;/Content&gt;
                 &lt;Content&gt;Sub 2 hhwehw hwehwe hwehw whewh e&lt;/Content&gt;
                 &lt;Content&gt;Sub 3&lt;/Content&gt;
             &lt;/Stack&gt;
             &lt;Content flex wrap className="bg2"&gt;Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&lt;/Content&gt;
-            &lt;Stack wrap className="bg3"&gt;
+            &lt;Stack full="h" wrap className="bg3"&gt;
                 &lt;Content&gt;Sub 1 verr u wuewueuwew uweu weuwe e&lt;/Content&gt;
                 &lt;Content&gt;Sub 2 hhwehw hwehwe hwehw whewh e&lt;/Content&gt;
                 &lt;Content&gt;Sub 3&lt;/Content&gt;
@@ -1407,7 +1418,7 @@
                             </div>
                         </div>
                         <pre>
-        &lt;Content padded className="bg1"&gt;
+        &lt;Content padded scroll className="bg1"&gt;
             jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
         &lt;/Content&gt;
     </pre>
@@ -2124,8 +2135,8 @@
             &lt;Content padded width={100} className="bg1"&gt;
                     fix
             &lt;/Content&gt;
-            &lt;Content&gt;
-                &lt;Stack padded gap flex className="bg1"&gt;
+            &lt;Content flex&gt;
+                &lt;Stack full="v" padded gap flex className="bg1"&gt;
                     &lt;Content padded className="bg3"&gt;
                         First
                     &lt;/Content&gt;
@@ -2134,7 +2145,9 @@
                     &lt;/Content&gt;
                 &lt;/Stack&gt;
             &lt;/Content&gt;
-
+            &lt;Content padded width={100} className="bg3"&gt;
+                    last
+            &lt;/Content&gt;
         &lt;/Stack&gt;
                     </pre>
                 </div>
@@ -2149,7 +2162,7 @@
             &lt;Content padded width={100} className="bg1"&gt;
                     fix
             &lt;/Content&gt;
-            &lt;Stack padded gap flex className="bg1"&gt;
+            &lt;Stack full="v" padded gap flex className="bg1"&gt;
                 &lt;Content padded className="bg3"&gt;
                     First
                 &lt;/Content&gt;
@@ -2157,6 +2170,9 @@
                     Second Box
                 &lt;/Content&gt;
             &lt;/Stack&gt;
+            &lt;Content padded width={100} className="bg3"&gt;
+                    last
+            &lt;/Content&gt;
         &lt;/Stack&gt;
                     </pre>
                 </div>
@@ -2166,10 +2182,10 @@
                 min-content in flex item (direct)
                 <div class="stack-h">
                     <div class="fix-screen">
-                        <div class="max-h full-h max-v padded bg2">
-                            <div class="stack-h inner-space-h bg1">
-                                <div style="width:300px" class="bg3 padded">1</div>
-                                <div style="width:300px" class="bg3 padded">2</div>
+                        <div class="max-h max-v scroll">
+                            <div class="stack-h padded bg2 inner-space-h min-content-h">
+                                <div style="xwidth: 300px" class="content fix nowrap bg3 min-content-h padded">1 2 2 2 2 2 3 3 3 3 333 3 3 3 33 3 3 5 5 55 5 3 6 566 565 56 5 6 5 6 56 56 56 6  65</div>
+                                <div style="xwidth: 300px" class="content fix bg3 min-content-h padded wrap-normal">2 oink</div>
                             </div>
                         </div>
                     </div>
@@ -2194,6 +2210,37 @@
                 </div>
             </li>
 
+            <li>
+                min-content in flex item (direct)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="max-v max-v scroll full-v">
+                            <div class="stack-v padded bg2 inner-space-v full-v full-h min-content-h">
+                                <div style="xheight: 300px" class="content min-content-h nowrap bg3 xmin-content-h padded">1 2 2 2 2 2 3 3 3 3 333 3 3 3 33 3 3 5 5 55 5 3 6 566 565 56 5 6 5 6 56 56 56 6  65</div>
+                                <div style="xheight: 300px" class="content bg3 flex min-content-h padded wrap-normal">2 oink</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre>
+        &lt;Stack full gap padded scroll className="bg2"&gt;
+            &lt;Content padded width={100} className="bg1"&gt;
+                    fix
+            &lt;/Content&gt;
+            &lt;Stack padded gap flex className="bg1"&gt;
+                &lt;Content padded className="bg3"&gt;
+                    First
+                &lt;/Content&gt;
+                &lt;Content padded wrap className="bg3"&gt;
+                    Second Box
+                &lt;/Content&gt;
+                &lt;Content padded className="bg3"&gt;
+                    Veryveryveryveryveryveryveryveryveryverylong Box
+                &lt;/Content&gt;
+            &lt;/Stack&gt;
+        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
 
         </ul>
     </li>

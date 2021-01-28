@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>base</title>
+    <style>
+        html, body, #baseApp {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0
+        }
+
+        .bg1 {
+            background-color: #F0D090;
+        }
+
+        .bg2 {
+            background-color: #90D0F0;
+        }
+
+        .bg3 {
+            background-color: #D0F090;
+        }
+
+        .fix-screen {
+            width: 400px;
+            min-width: 400px;
+            height: 300px;
+            overflow: hidden;
+            border: 1px dotted #303050;
+        }
+
+        /* Layout CSS */
+
+        .content {
+            overflow: hidden
+        }
+
+        .bounds {
+            max-width: 100%;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        .scroll {
+            overflow: auto !important;
+        }
+
+        .stack-h {
+            display: inline-flex;
+        }
+
+        .stack-v {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stack-h > div:not(.flex):not(.full-h),
+        .stack-v > div:not(.flex):not(.full-v) {
+            flex-shrink: 0
+        }
+
+        .stack-v > .min-content-h {
+            width: inherit !important;
+        }
+
+        .flex {
+            flex: 1
+        }
+
+        .wrap {
+            flex-wrap: wrap;
+        }
+
+        .stack-v > .min-content-h,
+        .grid:not(.grid-cells-centered) > .min-content-h
+        {
+            width: 100% !important;
+        }
+
+        .stack-h > div.full-v {
+            height: revert;
+        }
+
+        .stack-h > div:not(.flex) {
+            width: min-content;
+        }
+
+        .min-content-h {
+            width: min-content
+        }
+
+        .flex-items-centered {
+            justify-content: center;
+        }
+
+        .flex-item-centered {
+            align-items: center;
+        }
+
+        .full-v {
+            height: 100%
+        }
+
+        .full-h {
+            width: 100%
+        }
+
+        .max-v {
+            max-height: 100%
+        }
+
+        .max-h {
+            max-width: 100%
+        }
+
+        .nowrap {
+            white-space: nowrap
+        }
+
+        .wrap-normal {
+            white-space: normal
+        }
+
+        .nowrap-shorten {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex-shrink: 1 !important
+        }
+
+        .flow-padding > .content {
+            margin-top: 5px;
+            margin-left: 5px;
+        }
+
+        .flow-padding {
+            padding-bottom: 5px;
+            padding-right: 5px;
+            box-sizing: border-box;
+        }
+
+        .grid {
+            display: grid
+        }
+
+        .grid-gap {
+            grid-gap: 5px
+        }
+
+        .grid-cells-centered {
+            justify-items: center;
+            align-items: center;
+        }
+
+        .overlays {
+            position: relative
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0px
+        }
+
+        .padded {
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        .padded-h {
+            padding-left: 5px;
+            padding-right: 5px;
+            box-sizing: border-box;
+        }
+
+        .padded-v {
+            padding-top: 5px;
+            padding-bottom: 5px;
+            box-sizing: border-box;
+        }
+
+        .padded-grid {
+            display: grid;
+            grid-template-columns: 5px minmax(auto, max-content) 5px;
+            grid-template-rows: 5px minmax(auto, max-content) 5px
+        }
+
+        .padded-grid-h {
+            display: grid;
+            grid-template-columns: 5px minmax(auto, max-content) 5px;
+        }
+
+        .padded-grid-v {
+            display: grid;
+            grid-template-rows: 5px minmax(auto, max-content) 5px;
+        }
+
+        .center-items {
+            align-items: center;
+        }
+
+        .padded-cell {
+            grid-row: 2;
+            grid-column: 2
+        }
+
+        .padded-cell-h {
+            grid-column: 2
+        }
+
+        .padded-cell-v {
+            grid-row: 2;
+        }
+        .padded-end-h {
+            grid-row: 2;
+            grid-column: 3;
+        }
+
+        .padded-end-v {
+            grid-row: 3;
+            grid-column: 2;
+        }
+
+        .inner-space-v > div:not(:first-child) {
+            margin-top: 5px
+        }
+
+        .inner-space-h > div:not(:first-child) {
+            margin-left: 5px
+        }
+
+        .inner-border-v > div:not(:first-child) {
+            border-top: 5px solid #000;
+            box-sizing: border-box;
+        }
+
+        .inner-border-h > div:not(:first-child) {
+            border-left: 5px solid #000;
+            box-sizing: border-box;
+        }
+
+        .boxed {
+            border: 5px solid #000;
+        }
+
+        .thin-boxed {
+            border: 1px solid #000;
+        }
+
+        div.boxed, div.thin-boxed {
+            box-sizing: border-box;
+        }
+
+        .hidden {
+            display: none
+        }
+
+        /* */
+
+        .material-icons.md-18 {
+            font-size: 18px;
+        }
+
+        .text-vertical {
+            writing-mode: vertical-lr
+        }
+
+        .tooltip {
+            position: fixed;
+            z-index: 10000;
+            background-color: #b3bbb1;
+            color: #000000;
+            font-size: 12px;
+            display: none
+        }
+
+        .tooltip-parent:hover > .tooltip {
+            display: block
+        }
+
+        /* ---------------- */
+        .highlight {
+            color: #000000;
+        }
+
+        pre {
+            color: #A0A0A0;
+        }
+
+        .hover-inverse:hover {
+            background-color: #888888;
+            color: white;
+            cursor: pointer;
+        }
+
+        .less {
+            opacity: 0.5
+        }
+
+        .move-in {
+            transition: opacity 0.8s ease-out
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet">
+</head>
+
+<body>
+    <div id="baseApp"></div>
+    <script src="/base.bundle.js"></script>
+</body>
+</html>

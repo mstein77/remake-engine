@@ -139,6 +139,119 @@ function LayoutApp() {
             );
             no++;
         }
+
+        let n = 0;
+        const vsItems = [
+            <Stack full="v" padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack full="h" padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack full padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack full padded gap flex className="bg1">
+                <Content flex padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+
+            <Stack vertical full="v" padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack vertical full="h" padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack vertical padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack vertical full padded gap flex className="bg1">
+                <Content padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>,
+            <Stack vertical full padded gap flex className="bg1">
+                <Content flex padded className="bg3">
+                    First
+                </Content>
+                <Content padded wrap className="bg3">
+                    Second Box
+                </Content>
+            </Stack>
+        ];
+
+
+        result.push(
+            <Fragment key="add">
+                <hr />
+                <h1>Direct VS indirect</h1>
+                <hr />
+                    {
+                        vsItems.map((item, no) =>
+                            <div key={no} className="stack-h inner-space-h">
+                                <div className="fix-screen">
+                                    <Stack full gap>
+                                        <Content width={100}>Eins</Content>
+                                        {item}
+                                    </Stack>
+                                </div>
+
+                                <div className="fix-screen">
+                                    <Stack full gap>
+                                        <Content width={100}>Eins</Content>
+                                        <Content full="h">{item}</Content>
+                                    </Stack>
+                                </div>
+                            </div>
+                        )
+                    }
+            </Fragment>
+        );
         return result
     };
 
