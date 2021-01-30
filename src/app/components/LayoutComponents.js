@@ -5,9 +5,51 @@ import {d} from '../helper/helper';
  * @module LayoutComponents
  */
 
-function Tooltip({children}) {
+function Tooltip({ children }) {
+    const divRef = useRef(null);
+    const [ absLeft, setAbsLeft ] = useState(null);
+    const [ absTop, setAbsTop ] = useState(null);
+
+    useEffect(() => {
+        if (!divRef.current) return;
+
+        let span = divRef.current.previousSibling;
+        let baseRect = null;
+        if (!span || span.tagName !== 'SPAN') {
+            span = null;
+        } else {
+            baseRect = span.getBoundingClientRect()
+        }
+        const rect = divRef.current.getBoundingClientRect();
+        const out = {
+            top: rect.top < 0,
+            left: rect.left < 0,
+            bottom: rect.bottom > window.innerHeight,
+            right: rect.right > window.innerWidth
+        };
+        if (out.right) {
+            setAbsLeft(window.innerWidth - rect.right)
+        } else if (out.left) {
+            setAbsLeft(-rect.left)
+        }
+        if (out.bottom) {
+            setAbsTop(-(rect.height + (baseRect ? baseRect.height : 0)));
+        } else if (out.top) {
+            setAbsTop(-rect.top);
+        }
+    }, []);
+
+    const style = {
+        maxWidth: '50vw',
+    };
+    if (absLeft) {
+        style.marginLeft = absLeft;
+    }
+    if (absTop) {
+        style.marginTop = absTop;
+    }
     return (
-        <div className="tooltip padded thin-boxed">{children}</div>
+        <div ref={divRef} style={style} className="tooltip padded thin-boxed wrap-normal">{children}</div>
     );
 }
 
@@ -109,8 +151,9 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
     } else {
         cls.push('wrap-normal');
     }
+    let childText = '';
     if (doShorten) {
-        attr.onMouseOver = () => {
+        const mouseOver = () => {
             if (!ref) return;
 
             const elem = ref.current;
@@ -126,9 +169,13 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
             }, 1000);
         };
 
-        attr.onMouseLeave = () => {
+        const mouseLeave = () => {
             setShowTooltip(false);
             setStart(null);
+        };
+        children = <span onMouseOver={mouseOver} onMouseLeave={mouseLeave}>{children}</span>;
+        if (ref.current) {
+            childText = ref.current.textContent;
         }
     }
     if (showTooltip) {
@@ -177,7 +224,7 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
     const div = (
         <div style={style} {...attr} className={cls.join(' ')}>
             {children}
-            {showTooltip && <Tooltip>{children}</Tooltip>}
+            {showTooltip && <Tooltip>{childText}</Tooltip>}
         </div>
     );
 

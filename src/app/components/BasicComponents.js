@@ -1,6 +1,7 @@
 import React, {useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect} from "react";
 import {d} from "../helper/helper"
 import {Content, Stack, Grid, Overlays, Overlay} from "./LayoutComponents";
+import {EditorContext} from "./Raster";
 
 function Background({width, height}) {
 /*
@@ -22,7 +23,7 @@ function Background({width, height}) {
     return '';
 }
 
-function Canvas({width, height, render, plain, className}) {
+function Canvas({ width, height, render, plain, className }) {
     const canvasRef = useRef(null);
     useEffect(() => {
         if (!canvasRef.current || !render) {
@@ -122,7 +123,7 @@ function Section({ name, children, rev, full, flex, collapse, ...props }) {
     )
 }
 
-function Button({name, icon, disabled, click}) {
+function Button({ name, icon, disabled, click }) {
     const cls = [];
     const bCls = [];
     if (disabled) {
@@ -145,7 +146,7 @@ function Button({name, icon, disabled, click}) {
     )
 }
 
-function PropertyGrid({propWidth = '-', valueWidth = '*', ...props}) {
+function PropertyGrid({ propWidth = '-', valueWidth = '*', ...props }) {
     return (
         <Grid gap={5} columns={propWidth + " " + valueWidth} {...props} />
     );
@@ -211,7 +212,7 @@ function FlexCanvas({ render, size, viewX, viewY, width, setViewX, height, setVi
     );
 }
 
-function IntField({readOnly, name, size = 3, step = 1, value = 0, min, set, buttons, max}) {
+function IntField({ readOnly, name, size = 3, step = 1, value = 0, min, set, buttons, max }) {
     const attr = {};
     if (readOnly) {
         attr.readOnly = 'readOnly';
@@ -285,20 +286,135 @@ function Int(props) {
     );
 }
 
-function useResize(props, deps, checkSize) {
+function Scrollbar({ pos, page, max, auto, vertical, size, set, editorId }) {
+    const eContext = useContext(EditorContext);
+    const divRef = useRef(null);
+
+    const pagePerc = Math.round(page / max * 100);
+    if (auto && pagePerc === 100) {
+        return '';
+    }
+    const space = 15;
+    const windowEvents = eContext.getWindowEvents(editorId);
+
+    const spacePerc = 100 - pagePerc;
+    const maxSteps = max - page;
+    const minPerc = maxSteps === 0 ? 0 : pos * (spacePerc / maxSteps);
+    const maxPerc = 100 - (pagePerc + minPerc);
+
+    const axis = vertical ? 'y' : 'x';
+    const axisKey = vertical ? 'height' : 'width';
+    const oppAxisKey = vertical ? 'width' : 'height';
+    const client = 'client' + axis.toUpperCase();
+    const dirKey = (axis === 'x' ? 'h' : 'v');
+
+    const dimMin = {
+        [axisKey]: minPerc + '%',
+        [oppAxisKey]: space
+    };
+    const dimMax = {
+        [axisKey]: maxPerc + '%',
+        [oppAxisKey]: space
+    };
+
+    const mouseDown = e => {
+        const rect = divRef.current.getBoundingClientRect();
+        const anchorPos =  e[client];
+        const pixelSteps = rect[axisKey] / max;
+        const maxDistRight = (maxSteps - pos) * pixelSteps;
+        const minDistLeft = -pos * pixelSteps;
+
+        const getOffset = (value) => {
+            const dist = value - anchorPos;
+            const relPos = Math.max(Math.min(dist, maxDistRight), minDistLeft);
+            return Math.round(relPos / pixelSteps);
+        };
+        let lastPos = 0;
+
+        const trackMouse = e => {
+            const relPos = getOffset(e[client]);
+            if (relPos !== lastPos) {
+                lastPos = relPos;
+                set(pos + relPos);
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        };
+        windowEvents.addListener('mousemove', trackMouse, false);
+
+        windowEvents.addListener('mouseup', e => {
+            eContext.setFixCursor(null);
+            windowEvents.removeListener('mousemove', trackMouse, false);
+            e.stopPropagation();
+            e.preventDefault();
+        }, {capture: false, once: true});
+
+        eContext.setFixCursor(dirKey + 'resize');
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const setMouseDown = e => {
+        const rect = divRef.current.getBoundingClientRect();
+        const pixelSteps = rect[axisKey] / max;
+        const pageSize = Math.round(page * pixelSteps / 2);
+        const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), max));
+
+        set(offPos);
+        e.preventDefault();
+        e.stopPropagation();
+    };
+    const cls = ['scrollbar-div'];
+    const dim = {[oppAxisKey]: space};
+    if (size) {
+        dim[axisKey] = size;
+    } else {
+        dim[axisKey] = 'calc(100% - 6px)';
+    }
+
+    const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
+    const stackCls = ['stack-' + dirKey + ' full-' + dirKey];
+    if (vertical) {
+        stackCls.push('full-v');
+    }
+
+    return (
+        <div style={dim} ref={divRef} className={cls.join(' ')}>
+            <div className={stackCls.join(' ')}>
+                <div onMouseDown={setMouseDown} style={dimMin}></div>
+                <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
+                <div onMouseDown={setMouseDown} style={dimMax}></div>
+            </div>
+        </div>
+    );
+}
+
+const AvailContext = React.createContext();
+
+function AvailContextProvider({children}) {
+    const [ width, setWidth ] = useState(0);
+    const [ height, setHeight] = useState(0);
     const propsRef = useRef(null);
     const observerRef = useRef(null);
     const divRef = useRef(null);
 
-    propsRef.current = props;
+    propsRef.current = {width, height};
 
     useLayoutEffect(() => {
-        const observer = new ResizeObserver(e => {
+        const checkSize = () => {
             if (!divRef.current) return;
-            checkSize(propsRef.current, divRef.current.getBoundingClientRect());
-        });
+            const rect = divRef.current.getBoundingClientRect();
+            if (rect.width !== propsRef.current.width) {
+                setWidth(rect.width);
+            }
+            if (rect.height !== propsRef.current.height) {
+                setHeight(rect.height);
+            }
+        };
+        const observer = new ResizeObserver(checkSize);
         observerRef.current = observer;
         observer.observe(divRef.current);
+        checkSize();
         return () => {
             if (observerRef.current) {
                 observerRef.current.disconnect();
@@ -306,19 +422,35 @@ function useResize(props, deps, checkSize) {
         }
     }, []);
 
-    useLayoutEffect(() => {
-        checkSize(propsRef.current, divRef.current.getBoundingClientRect());
-    }, deps);
+    const value = useMemo(
+        () => {
+            return {
+                width, height
+            }
+        },
+        [width, height]
+    );
 
-    return divRef;
+    return (
+        <div ref={divRef} className="full-v full-h overlays">
+            <AvailContext.Provider value={value}>
+                <div className="bounds overlay" style={value}>
+                    {children}
+                </div>
+            </AvailContext.Provider>
+        </div>
+    )
 }
 
 export {
+    AvailContext,
+    AvailContextProvider,
     PropertyGrid,
     ValueProp,
     Section,
     Button,
     Canvas,
     Int,
+    Scrollbar,
     FlexCanvas
 }

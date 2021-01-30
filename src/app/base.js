@@ -1,8 +1,45 @@
-import React, {useMemo, useEffect, useState, Fragment} from "react";
+import React, {useMemo, useEffect, useState, Fragment, useContext} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {Section, Button, Canvas, FlexCanvas, PropertyGrid, ValueProp, Int} from "./components/BasicComponents"
+import {Section, Button, Canvas, Scrollbar, AvailContext, AvailContextProvider, FlexCanvas, PropertyGrid, ValueProp, Int} from "./components/BasicComponents"
 import {Content, Stack, Grid, Overlays, Overlay} from "./components/LayoutComponents";
+import { EditorCtx } from "./components/Raster";
+
+function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, setViewY, border, zoom }) {
+    const aContext = useContext(AvailContext);
+    const cellSize = size * zoom;
+
+    let spaceY = (aContext.height - border);
+    let newViewY = Math.min(height, Math.floor( spaceY / (cellSize + border)));
+
+    let spaceX = (aContext.width - border);
+    const newViewX = Math.min(width, Math.floor( spaceX / (cellSize + border)));
+
+    if (viewX !== newViewX) {
+        setViewX(newViewX);
+    }
+    if (viewY !== newViewY) {
+        setViewY(newViewY);
+    }
+
+    let elem;
+    if (viewX > 0 && viewY > 0) {
+        const dim = {
+            width: border + (cellSize + border) * viewX,
+            height: border + (cellSize + border) * viewY
+        };
+
+        elem = <Canvas width={dim.width} height={dim.height} render={render} />
+    } else {
+        elem = <Content shorten className="small-font">No space to render!</Content>;
+    }
+
+    return (
+        <Content full center>
+            {elem}
+        </Content>
+    )
+}
 
 function GridCanvas({size, width, height, ...props}) {
     const [ posX, setPosX ] = useState(0);
@@ -54,17 +91,19 @@ function GridCanvas({size, width, height, ...props}) {
     const columns = ['*'];
     const rows = ['*'];
     if (scrollbarX) {
-        rows.push('30px');
+        rows.push('-');
     }
     if (scrollbarY) {
-        columns.push('30px');
+        columns.push('-');
     }
 
     const scrollGrid =
         <Grid columns={columns.join(' ')} rows={rows.join(' ')} full gap={5}>
-            <Content full><FlexCanvas render={render} size={size} width={width} viewX={viewX} setViewX={setViewX} viewY={viewY} setViewY={setViewY} height={height} border={border} zoom={zoom} /></Content>
-            {scrollbarY && <Content full className="bg1">X</Content>}
-            {scrollbarX && <Content full className="bg1">Scroll me!</Content>}
+            <AvailContextProvider>
+                <FlexScrollGrid render={render} size={size} width={width} height={height} viewX={viewX} viewY={viewY} setViewX={setViewX} setViewY={setViewY} height={height} border={border} zoom={zoom} />
+            </AvailContextProvider>
+            {scrollbarY && <Scrollbar vertical max={height} page={viewY} pos={posY} set={setPosY} />}
+            {scrollbarX && <Scrollbar max={width} page={viewX} pos={posX} set={setPosX} />}
         </Grid>;
 
     return (
@@ -78,7 +117,7 @@ function GridCanvas({size, width, height, ...props}) {
                 <Content padded thin boxed>Black & White</Content>
                 <Content padded thin boxed>DAXX!</Content>
             </Stack>
-            <Grid centerAll flex columns="- * -" rows="- * -">
+            <Grid centerAll full flex columns="- * -" rows="- * -">
                 <Content padded><Button disabled name="+" /></Content>
                 <Content padded><Stack gap><Button name="+" /><Button name="-" /></Stack></Content>
                 <Content padded><Button disabled name="+" /></Content>
@@ -99,6 +138,7 @@ function GridCanvas({size, width, height, ...props}) {
 
 function BaseApp({}) {
     return (
+        <EditorCtx>
         <Stack vertical gap full padded>
             <Section full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section</Section>
 
@@ -140,6 +180,7 @@ function BaseApp({}) {
                 XXX Bottom Section
             </Section>
         </Stack>
+        </EditorCtx>
     )
 }
 
