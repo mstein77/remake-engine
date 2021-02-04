@@ -4,11 +4,18 @@
     <meta charset="UTF-8">
     <title>base</title>
     <style>
+        :root {
+            --brightness-factor: 1;
+        }
+
+
         html, body, #baseApp {
             width: 100%;
             height: 100%;
             margin: 0;
-            padding: 0
+            padding: 0;
+            cursor: auto;
+            overscroll-behavior-x: contain;
         }
 
         .bg1 {
@@ -271,7 +278,9 @@
             background-color: #b3bbb1;
             color: #000000;
             font-size: 12px;
-            display: none
+            display: none;
+            width: max-content;
+            max-width: 50vw
         }
 
         .tooltip-parent:hover > .tooltip {
@@ -289,6 +298,25 @@
             flex: 1;
             border: 2px outset #6060F0;
             background-color: #6060F0;
+            filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
+        }
+
+        .scrollbar-handle:hover {
+            filter: brightness(1);
+        }
+
+        .scrollbar-handle.active {
+            filter: brightness(calc(1 + var(--brightness-factor) * 0.25));
+        }
+
+        .fix-overlay {
+            top: 0;
+            left: 0;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            z-index: 999999;
         }
 
         /* ---------------- */

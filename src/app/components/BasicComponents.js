@@ -1,7 +1,6 @@
 import React, {useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect} from "react";
 import {d} from "../helper/helper"
 import {Content, Stack, Grid, Overlays, Overlay} from "./LayoutComponents";
-import {EditorContext} from "./Raster";
 
 function Background({width, height}) {
 /*
@@ -286,17 +285,54 @@ function Int(props) {
     );
 }
 
-function Scrollbar({ pos, page, max, auto, vertical, size, set, editorId }) {
-    const eContext = useContext(EditorContext);
+function ScrollbarGrid({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto }) {
+    const scrollbarX = x !== undefined && (!auto || (x > 0 || maxX > pageX));
+    const scrollbarY = y !== undefined && (!auto || (y > 0 || maxY > pageY));
+
+    const columns = ['*'];
+    const rows = ['*'];
+    if (scrollbarX) {
+        rows.push('-');
+    }
+    if (scrollbarY) {
+        columns.push('-');
+    }
+
+    const sensitivity = 0.25;
+    const onWheel = e => {
+        let deltaX = Math.round(e.deltaX * sensitivity);
+        let deltaY = Math.round(e.deltaY * sensitivity);
+
+        const newX = Math.min(Math.max(x + deltaX, 0), maxX);
+        const newY = Math.min(Math.max(y + deltaY, 0), maxY);
+        if (x !== undefined && newX !== x) {
+            setX(newX);
+        }
+        if (y !== undefined && newY !== y) {
+            setY(newY);
+        }
+        e.stopPropagation();
+    };
+
+    return (
+        <Grid full gap={5} columns={columns.join(' ')} rows={rows.join(' ')}>
+            <Content full flex wheel={onWheel}>{children}</Content>
+            {scrollbarY && <Scrollbar vertical pos={y} max={maxY} page={pageY} set={setY} />}
+            {scrollbarX && <Scrollbar pos={x} max={maxX} page={pageX} set={setX} />}
+        </Grid>
+    )
+}
+
+function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
+    const wContext = useContext(WindowContext);
+    const [ tracking, setTracking ] = useState(false);
     const divRef = useRef(null);
 
-    const pagePerc = Math.round(page / max * 100);
+    const pagePerc = max ? Math.round(page / max * 100) : 100;
     if (auto && pagePerc === 100) {
         return '';
     }
     const space = 15;
-    const windowEvents = eContext.getWindowEvents(editorId);
-
     const spacePerc = 100 - pagePerc;
     const maxSteps = max - page;
     const minPerc = maxSteps === 0 ? 0 : pos * (spacePerc / maxSteps);
@@ -331,39 +367,37 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set, editorId }) {
         };
         let lastPos = 0;
 
-        const trackMouse = e => {
+        wContext.startExclusiveMode('scroll-handle');
+        wContext.addEventListener('mousemove', e => {
             const relPos = getOffset(e[client]);
             if (relPos !== lastPos) {
                 lastPos = relPos;
                 set(pos + relPos);
             }
-            e.stopPropagation();
-            e.preventDefault();
-        };
-        windowEvents.addListener('mousemove', trackMouse, false);
+        });
+        wContext.addEventListener('mouseup', () => {
+            setTracking(false);
+            wContext.endExclusiveMode('scroll-handle')
+        }, {once: true});
 
-        windowEvents.addListener('mouseup', e => {
-            eContext.setFixCursor(null);
-            windowEvents.removeListener('mousemove', trackMouse, false);
-            e.stopPropagation();
-            e.preventDefault();
-        }, {capture: false, once: true});
-
-        eContext.setFixCursor(dirKey + 'resize');
-        e.preventDefault();
+        setTracking(true);
         e.stopPropagation();
     };
 
-    const setMouseDown = e => {
-        const rect = divRef.current.getBoundingClientRect();
-        const pixelSteps = rect[axisKey] / max;
-        const pageSize = Math.round(page * pixelSteps / 2);
-        const offPos = Math.max(0, Math.min(Math.round((e[client] - rect[axis] - pageSize) / pixelSteps), max));
-
-        set(offPos);
-        e.preventDefault();
+    const nextPage = e => {
+        if (pos < maxSteps) {
+            set(Math.min(maxSteps, pos + page));
+        }
         e.stopPropagation();
     };
+
+    const prevPage = e => {
+        if (pos > 0) {
+            set(Math.max(0, pos - page));
+        }
+        e.stopPropagation();
+    };
+
     const cls = ['scrollbar-div'];
     const dim = {[oppAxisKey]: space};
     if (size) {
@@ -372,26 +406,100 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set, editorId }) {
         dim[axisKey] = 'calc(100% - 6px)';
     }
 
-    const handleCls = ['scrollbar-handle flex cursor-' + dirKey + 'resize'];
-    const stackCls = ['stack-' + dirKey + ' full-' + dirKey];
-    if (vertical) {
-        stackCls.push('full-v');
+    const handleCls = ['scrollbar-handle'];
+    if (tracking) {
+        handleCls.push('active');
     }
 
     return (
-        <div style={dim} ref={divRef} className={cls.join(' ')}>
-            <div className={stackCls.join(' ')}>
-                <div onMouseDown={setMouseDown} style={dimMin}></div>
-                <div onMouseDown={mouseDown} className={handleCls.join(' ')}></div>
-                <div onMouseDown={setMouseDown} style={dimMax}></div>
-            </div>
-        </div>
+        <Content full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
+            <Stack full={dirKey} vertical={vertical}>
+                <Content mouseDown={prevPage} {...dimMin} />
+                <Content flex mouseDown={mouseDown} className={handleCls.join(' ')}/>
+                <Content mouseDown={nextPage} {...dimMax} />
+            </Stack>
+        </Content>
     );
+}
+
+const WindowContext = React.createContext();
+
+function WindowCtx({ children }) {
+    const [ fixCursor, setFixCursor ] = useState(null);
+    const modeRef = useRef(null);
+
+    const listeners = useMemo(() => { return {} }, []);
+
+    const startExclusiveMode = (id, cursor = 'auto') => {
+        if (modeRef.current !== null) {
+            endExclusiveMode(modeRef.current);
+        }
+        modeRef.current = id;
+        setFixCursor(cursor);
+    };
+
+    const endExclusiveMode = id => {
+        if (!id || modeRef.current !== id) {
+            return;
+        }
+        if (listeners) {
+            for (let type of Object.keys(listeners)) {
+                removeEventListener(type)
+            }
+        }
+        modeRef.current = null;
+        setFixCursor(null);
+    };
+
+    const addEventListener = (type, listener, options = false) => {
+        if (!modeRef.current) throw Error(`No call of start exclusive mode before addEventListener`);
+
+        const handler = (event, ...params) => {
+            let result = false;
+            try {
+                result = listener(event, ...params);
+            } catch (e) {
+                console.error(`An error occured in the event handler "${type}": ${e}`);
+                endExclusiveMode(modeRef.current);
+            }
+            if (options.once) {
+                removeEventListener(type)
+            }
+            if (!options.propagate) {
+                event.stopPropagation();
+            }
+            return result
+        };
+        window.addEventListener(type, handler, options);
+        if (!listeners[type]) {
+            listeners[type] = [];
+        }
+        listeners[type].push({handler, options});
+    };
+
+    const removeEventListener = type => {
+        const handlers = listeners[type];
+        if (!handlers || handlers.length === 0) {
+            return;
+        }
+        const last = handlers.pop();
+        window.removeEventListener(type, last.handler, last.options);
+    };
+
+    const value = { fixCursor, startExclusiveMode, endExclusiveMode, addEventListener, removeEventListener };
+    return (
+        <WindowContext.Provider value={value}>
+            {children}
+            {fixCursor !== null &&
+                <div style={{cursor: (fixCursor ? fixCursor : 'auto')}} className={'fix-overlay ' + fixCursor}></div>
+            }
+        </WindowContext.Provider>
+    )
 }
 
 const AvailContext = React.createContext();
 
-function AvailContextProvider({children}) {
+function AvailContextProvider({ children }) {
     const [ width, setWidth ] = useState(0);
     const [ height, setHeight] = useState(0);
     const propsRef = useRef(null);
@@ -452,5 +560,6 @@ export {
     Canvas,
     Int,
     Scrollbar,
-    FlexCanvas
+    WindowCtx,
+    ScrollbarGrid
 }

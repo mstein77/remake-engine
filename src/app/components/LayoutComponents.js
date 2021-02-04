@@ -5,6 +5,15 @@ import {d} from '../helper/helper';
  * @module LayoutComponents
  */
 
+/**
+ *
+ * @todo tooltips on the right side might be too small because of
+ * wrapping
+ *
+ * @param children
+ * @returns {*}
+ * @constructor
+ */
 function Tooltip({ children }) {
     const divRef = useRef(null);
     const [ absLeft, setAbsLeft ] = useState(null);
@@ -39,9 +48,7 @@ function Tooltip({ children }) {
         }
     }, []);
 
-    const style = {
-        maxWidth: '50vw',
-    };
+    const style = {};
     if (absLeft) {
         style.marginLeft = absLeft;
     }
@@ -119,7 +126,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Content = React.forwardRef(({children, className, flex, center, full, shorten, scroll, boxed, padded, wrap, click, ...props}, ref) => {
+const Content = React.forwardRef(({children, className, flex, center, full, shorten, scroll, boxed, padded, wrap, click, mouseDown, wheel, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -131,6 +138,12 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
 
     if (click) {
         attr['onClick'] = click;
+    }
+    if (mouseDown) {
+        attr['onMouseDown'] = mouseDown;
+    }
+    if (wheel) {
+        attr['onWheel'] = wheel;
     }
     if (ref) {
         attr['ref'] = ref;

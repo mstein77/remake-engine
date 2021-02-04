@@ -1,7 +1,7 @@
 import React, {useMemo, useEffect, useState, Fragment, useContext} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {Section, Button, Canvas, Scrollbar, AvailContext, AvailContextProvider, FlexCanvas, PropertyGrid, ValueProp, Int} from "./components/BasicComponents"
+import {Section, Button, Canvas, ScrollbarGrid, WindowCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Int} from "./components/BasicComponents"
 import {Content, Stack, Grid, Overlays, Overlay} from "./components/LayoutComponents";
 import { EditorCtx } from "./components/Raster";
 
@@ -85,26 +85,12 @@ function GridCanvas({size, width, height, ...props}) {
         setPosY(maxPosY);
     }
 
-    const scrollbarX = posX > 0 || width > viewX;
-    const scrollbarY = posY > 0 || height > viewY;
-
-    const columns = ['*'];
-    const rows = ['*'];
-    if (scrollbarX) {
-        rows.push('-');
-    }
-    if (scrollbarY) {
-        columns.push('-');
-    }
-
     const scrollGrid =
-        <Grid columns={columns.join(' ')} rows={rows.join(' ')} full gap={5}>
+        <ScrollbarGrid auto x={posX} y={posY} setX={setPosX} setY={setPosY} maxX={width} maxY={height} pageX={viewX} pageY={viewY}>
             <AvailContextProvider>
                 <FlexScrollGrid render={render} size={size} width={width} height={height} viewX={viewX} viewY={viewY} setViewX={setViewX} setViewY={setViewY} height={height} border={border} zoom={zoom} />
             </AvailContextProvider>
-            {scrollbarY && <Scrollbar vertical max={height} page={viewY} pos={posY} set={setPosY} />}
-            {scrollbarX && <Scrollbar max={width} page={viewX} pos={posX} set={setPosX} />}
-        </Grid>;
+        </ScrollbarGrid>
 
     return (
         <Stack vertical border full>
@@ -138,49 +124,51 @@ function GridCanvas({size, width, height, ...props}) {
 
 function BaseApp({}) {
     return (
-        <EditorCtx>
-        <Stack vertical gap full padded>
-            <Section full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section</Section>
+        <WindowCtx>
+            <EditorCtx>
+                <Stack vertical gap full padded>
+                    <Section full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section</Section>
 
-            <Stack gap full flex>
-                <Section width="100" collapse="h" full="v" className="bg1" name="First Section">
-                    <Stack vertical full="h" scroll padded gap>
-                        <Content padded center>
-                            <Canvas width={75} height={75} boxed className="thin-boxed" />
-                        </Content>
-                        <Content wrap>Property Grid Here And so many more cool things :-)</Content>
-                        <PropertyGrid propWidth="-">
-                            <ValueProp name="Just a test">Working or not?</ValueProp>
-                            <ValueProp name="DAng">
-                                <Content wrap>Herer  wewo woe oweo woew eo ow ewe</Content>
-                            </ValueProp>
-                        </PropertyGrid>
+                    <Stack gap full flex>
+                        <Section width="100" collapse="h" full="v" className="bg1" name="First Section">
+                            <Stack vertical full="h" scroll padded gap>
+                                <Content padded center>
+                                    <Canvas width={75} height={75} boxed className="thin-boxed" />
+                                </Content>
+                                <Content wrap>Property Grid Here And so many more cool things :-)</Content>
+                                <PropertyGrid propWidth="-">
+                                    <ValueProp name="Just a test">Working or not?</ValueProp>
+                                    <ValueProp name="DAng">
+                                        <Content wrap>Herer  wewo woe oweo woew eo ow ewe</Content>
+                                    </ValueProp>
+                                </PropertyGrid>
+                            </Stack>
+                        </Section>
+                        <Section full flex name="Second Section">
+                            <GridCanvas size={10} width={50} height={10} />
+                        </Section>
+                        <Section width={100} collapse="h" rev full="v" shorten className="bg1" padded name="Last Section">
+                            Here I am you fucker!
+                        </Section>
                     </Stack>
-                </Section>
-                <Section full flex name="Second Section">
-                    <GridCanvas size={10} width={50} height={10} />
-                </Section>
-                <Section width={100} collapse="h" rev full="v" shorten className="bg1" padded name="Last Section">
-                    Here I am you fucker!
-                </Section>
-            </Stack>
 
-            <Section full="h" wrap collapsed collapse name="Bottom Section" padded className="bg2">
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-                XXX Bottom Section
-            </Section>
-        </Stack>
-        </EditorCtx>
+                    <Section full="h" shorten collapsed collapse name="Bottom Section" padded className="bg2">
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                        XXX Bottom Section
+                    </Section>
+                </Stack>
+            </EditorCtx>
+        </WindowCtx>
     )
 }
 
