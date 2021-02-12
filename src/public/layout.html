@@ -3,14 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Editor : CSS layout</title>
+    <link href="css/layout.css" rel="stylesheet" />
     <style>
-        html, body, #layoutApp {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0
-        }
-
         .bg1 {
             background-color: #F0D090;
         }
@@ -31,231 +25,6 @@
             border: 1px dotted #303050;
         }
 
-        /* Layout CSS */
-
-        .content {
-            overflow: hidden
-        }
-
-        .bounds {
-            max-width: 100%;
-            max-height: 100%;
-            overflow: hidden;
-        }
-
-        .scroll {
-            overflow: auto !important;
-        }
-
-        .stack-h {
-            display: inline-flex;
-        }
-
-        .stack-v {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .stack-h > div:not(.flex):not(.full-h),
-        .stack-v > div:not(.flex):not(.full-v) {
-            flex-shrink: 0
-        }
-
-        .stack-v > .min-content-h {
-            width: inherit !important;
-        }
-
-        .flex {
-            flex: 1
-        }
-
-        .wrap {
-            flex-wrap: wrap;
-        }
-
-        .stack-v > .min-content-h,
-        .grid:not(.grid-cells-centered) > .min-content-h
-        {
-            width: 100% !important;
-        }
-
-        .stack-h > div.full-v {
-            height: revert;
-        }
-
-        .stack-h > div:not(.flex) {
-            width: min-content;
-        }
-
-        .min-content-h {
-             width: min-content
-        }
-
-        .flex-items-centered {
-            justify-content: center;
-        }
-
-        .flex-item-centered {
-            align-items: center;
-        }
-
-        .full-v {
-            height: 100%
-        }
-
-        .full-h {
-            width: 100%
-        }
-
-        .max-v {
-            max-height: 100%
-        }
-
-        .max-h {
-            max-width: 100%
-        }
-
-        .nowrap {
-            white-space: nowrap
-        }
-
-        .wrap-normal {
-            white-space: normal
-        }
-
-        .nowrap-shorten {
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            flex-shrink: 1 !important
-        }
-
-        .flow-padding > .content {
-            margin-top: 5px;
-            margin-left: 5px;
-        }
-
-        .flow-padding {
-            padding-bottom: 5px;
-            padding-right: 5px;
-            box-sizing: border-box;
-        }
-
-        .grid {
-            display: grid
-        }
-
-        .grid-gap {
-            grid-gap: 5px
-        }
-
-        .grid-cells-centered {
-            justify-items: center;
-            align-items: center;
-        }
-
-        .overlays {
-            position: relative
-        }
-
-        .overlay {
-            position: absolute;
-            top: 0px
-        }
-
-        .padded {
-            padding: 5px;
-            box-sizing: border-box;
-        }
-
-        .padded-h {
-            padding-left: 5px;
-            padding-right: 5px;
-            box-sizing: border-box;
-        }
-
-        .padded-v {
-            padding-top: 5px;
-            padding-bottom: 5px;
-            box-sizing: border-box;
-        }
-
-        .padded-grid {
-            display: grid;
-            grid-template-columns: 5px minmax(auto, max-content) 5px;
-            grid-template-rows: 5px minmax(auto, max-content) 5px
-        }
-
-        .padded-grid-h {
-            display: grid;
-            grid-template-columns: 5px minmax(auto, max-content) 5px;
-        }
-
-        .padded-grid-v {
-            display: grid;
-            grid-template-rows: 5px minmax(auto, max-content) 5px;
-        }
-
-        .center-items {
-            align-items: center;
-        }
-
-        .padded-cell {
-            grid-row: 2;
-            grid-column: 2
-        }
-
-        .padded-cell-h {
-            grid-column: 2
-        }
-
-        .padded-cell-v {
-            grid-row: 2;
-        }
-        .padded-end-h {
-            grid-row: 2;
-            grid-column: 3;
-        }
-
-        .padded-end-v {
-            grid-row: 3;
-            grid-column: 2;
-        }
-
-        .inner-space-v > div:not(:first-child) {
-            margin-top: 5px
-        }
-
-        .inner-space-h > div:not(:first-child) {
-            margin-left: 5px
-        }
-
-        .inner-border-v > div:not(:first-child) {
-            border-top: 5px solid #000;
-            box-sizing: border-box;
-        }
-
-        .inner-border-h > div:not(:first-child) {
-            border-left: 5px solid #000;
-            box-sizing: border-box;
-        }
-
-        .boxed {
-            border: 5px solid #000;
-        }
-
-        .thin-boxed {
-            border: 1px solid #000;
-        }
-
-        div.boxed, div.thin-boxed {
-            box-sizing: border-box;
-        }
-
-        .hidden {
-            display: none
-        }
-
-        /* ---------------- */
         .highlight {
             color: #000000;
         }
@@ -268,11 +37,128 @@
 </head>
 
 <body>
-<div id="layoutApp"></div>
+<div id="app"></div>
 
 
 
 <ul id="examples">
+    <li>
+        Overlays
+        <ul>
+            <li>
+                Nested centering
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h full-h full-v flex-items-centered center-items">
+                            <div class="bg1" style="width: 90%; height: 90%">
+                                <div class="stack-h full-h full-v flex-items-centered center-items">
+                                    <div class="bg2 boxed">Fuck you 4ever!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Content&gt;
+                        1
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+            <li>
+                Nested centering (full-h)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h full-h full-v flex-items-centered center-items">
+                            <div class="bg1" style="width: 90%; height: 90%">
+                                <div class="stack-h full-h full-v center-items">
+                                    <div class="bg2 boxed full-h">Fuck you 4ever!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Content&gt;
+                        2
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+            <li>
+                Nested centering (full-v)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h full-h full-v flex-items-centered center-items">
+                            <div class="bg1" style="width: 90%; height: 90%">
+                                <div class="stack-h full-h full-v flex-items-centered">
+                                    <div class="bg2 boxed">Fuck you 4ever!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Content&gt;
+                        3
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+            <li>
+                Simple Overlays
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="relative bg1" style="width: 200px; height: 100px; overflow: hidden">
+                            <div class="absolute bg2" style="top: 10px; left: 10px; width: 150px; height: 50px">
+                                xxx
+                            </div>
+                            <div class="absolute bg3" style="top: 20px; left: 0px; width: 150px; height: 50px">
+                                yyy
+                            </div>
+                            <div class="absolute bg2" style="top: -40px; left: 40px; width: 20px; height: 250px">
+                                1
+                            </div>
+                        </div>
+                    </div>
+                    <pre>
+                        &lt;Overlays width={200} height={100} className="bg1"&gt;
+                            &lt;Overlay width={150} height={50} top={10} left={10} className="bg2"&gt;xxx&lt;/Overlay&gt;
+                            &lt;Overlay width={150} height={50} top={20} left={0} className="bg3"&gt;yyy&lt;/Overlay&gt;
+                            &lt;Overlay width={20} height={250} top={-40} left={40} className="bg2"&gt;1&lt;/Overlay&gt;
+                        &lt;/Overlays&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                Overlays with origin
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="relative bg1" style="width: 200px; height: 100px; overflow: hidden">
+                            <div class="relative" style="margin-left: 30px; margin-top: 30px">
+                                <div class="absolute bg2" style="top: 10px; left: 10px; width: 150px; height: 50px">
+                                    xxx
+                                </div>
+                                <div class="absolute bg3" style="top: 20px; left: 0px; width: 150px; height: 50px">
+                                    yyy
+                                </div>
+                                <div class="absolute bg2" style="top: -40px; left: 40px; width: 20px; height: 250px">
+                                    1
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre>
+                        &lt;Overlays width={200} height={100} originX={30} originY={30} className="bg1"&gt;
+                            &lt;Overlay width={150} height={50} top={10} left={10} className="bg2"&gt;xxx&lt;/Overlay&gt;
+                            &lt;Overlay width={150} height={50} top={20} left={0} className="bg3"&gt;yyy&lt;/Overlay&gt;
+                            &lt;Overlay width={20} height={250} top={-40} left={40} className="bg2"&gt;1&lt;/Overlay&gt;
+                        &lt;/Overlays&gt;
+                    </pre>
+                </div>
+            </li>
+
+        </ul>
+    </li>
+
         <li>
             Content-Sizing
             <ul>

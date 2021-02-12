@@ -257,7 +257,8 @@ function LayoutApp() {
 
     const regenerate = () => {
         let code = "import React from \"react\";\n" +
-            "import {Content, Stack, Grid, Overlays, Overlay, Canvas} from \"../components/LayoutComponents\";\n" +
+            "import {Content, Stack, Grid, Overlays, Overlay} from \"../components/LayoutComponents\";\n" +
+            "function Canvas() { return <div></div> };\n" +
             "\n" +
             "function getExamples() {\n" +
             "    const examples = [];\n";
@@ -306,5 +307,5 @@ function LayoutApp() {
 
 ReactDOM.render(
     <LayoutApp />,
-    document.getElementById('layoutApp')
+    document.getElementById('app')
 );

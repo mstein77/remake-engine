@@ -1,0 +1,119 @@
+/* Base CSS */
+
+:root {
+    --brightness-factor: -1;
+    --modal-overlay-bg-color: #000000a3;
+
+    --scrollbar-color: #B0B0B0;
+    --scrollbar-bg-color: #EFEFEF;
+}
+
+html, body {
+    cursor: auto;
+    overscroll-behavior-x: contain;
+}
+
+.hidden {
+    display: none
+}
+
+.less {
+    opacity: 0.5
+}
+
+.content-box {
+    box-sizing: content-box !important;
+}
+
+.material-icons.md-18 {
+    font-size: 18px;
+}
+
+.text-vertical {
+    writing-mode: vertical-lr
+}
+
+.checkerboard-bg {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAIAAAACUFjqAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3ggRDQENU0dyawAAACZJREFUGNNjPHXqDAMSMDY2ROYyMeAFNJVm/Pv3LzL/7Nnzg8VpAKebCGpIIxHBAAAAAElFTkSuQmCC');
+    background-repeat: repeat
+}
+
+.noGap {
+    margin-left: 0px !important
+}
+
+.separator-h {
+    margin-left: 2px;
+    margin-right: 2px;
+    background-color: var(--box-border-color)
+}
+
+.transparent {
+    background-color: transparent
+}
+
+.pos-0 {
+    top: 0;
+    left: 0
+}
+
+/* TODO */
+.tooltip {
+    background-color: #b3bbb1;
+    color: #000000;
+    width: max-content;
+    max-width: 50vw
+}
+
+.tooltip-parent:hover > .tooltip {
+    display: block !important
+}
+
+/* Scrollbar */
+
+.scrollbar-div {
+    border: 2px inset var(--scrollbar-color);
+    padding: 1px;
+    margin: 0px;
+    background-color: var(--scrollbar-bg-color);
+}
+
+.scrollbar-handle {
+    flex: 1;
+    border: 2px outset var(--scrollbar-color);
+    background-color: var(--scrollbar-color);
+    filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
+}
+
+.scrollbar-handle:hover {
+    filter: brightness(1);
+}
+
+.scrollbar-handle.active {
+    filter: brightness(calc(1 + var(--brightness-factor) * 0.25));
+}
+
+
+/* ALL:   */
+
+.modal-overlay {
+    background-color: var(--modal-overlay-bg-color);
+}
+
+.modal-centered {}
+
+.modal-bounds {
+    width: calc(100% - 40px);
+    height: calc(100% - 40px);
+    overflow: hidden;
+}
+
+.hover-inverse:hover {
+    background-color: #888888;
+    color: white;
+    cursor: pointer;
+}
+
+.font-small {
+    font-size: 14px;
+}

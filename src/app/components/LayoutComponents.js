@@ -7,8 +7,6 @@ import {d} from '../helper/helper';
 
 /**
  *
- * @todo tooltips on the right side might be too small because of
- * wrapping
  *
  * @param children
  * @returns {*}
@@ -48,15 +46,18 @@ function Tooltip({ children }) {
         }
     }, []);
 
-    const style = {};
+    const style = {
+        zIndex: 10000
+    };
     if (absLeft) {
         style.marginLeft = absLeft;
     }
     if (absTop) {
         style.marginTop = absTop;
     }
+
     return (
-        <div ref={divRef} style={style} className="tooltip padded thin-boxed wrap-normal">{children}</div>
+        <div ref={divRef} style={style} className="tooltip hidden font-small fixed padded thin-boxed wrap-normal">{children}</div>
     );
 }
 
@@ -104,6 +105,14 @@ function Tooltip({ children }) {
  *     overflow if the new assigned space is greater than the old
  *   - A full prop on a stack will set the required size of the stack to the assigned size???
  *
+ * Center cases:
+ *   default => keine auswirkung
+ *   full => stack mit 100% child centered
+ *   dim=X => stack mit dim X
+ *
+ *
+ *
+ *
  * @function
  * @param {object} [props={}]
  * @param {Object|Array} [props.children] - Child components
@@ -126,7 +135,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Content = React.forwardRef(({children, className, flex, center, full, shorten, scroll, boxed, padded, wrap, click, mouseDown, wheel, ...props}, ref) => {
+const Content = React.forwardRef(({children, className, flex, center, full, shorten, scroll, boxed, padded, wrap, click, mouseDown, wheel, zIndex, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -232,6 +241,9 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
     }
     if (!style.width && !stretchH) {
         cls.push('min-content-h');
+    }
+    if (zIndex !== undefined) {
+        style.zIndex = zIndex;
     }
 
     const div = (
@@ -430,8 +442,13 @@ function Grid({children, columns, rows, gap, flex, full, centerAll, className, .
     )
 }
 
-function Overlays({width, maxWidth, height, scroll, children}) {
-    const cls = ['overlays'];
+const OverlayContext = React.createContext();
+
+function Overlays({ width, maxWidth, height, originX = 0, originY = 0, scroll, className, children }) {
+    const cls = ['relative content'];
+    if (className) {
+        cls.push(className);
+    }
     const style = {
         width,
         maxWidth,
@@ -442,25 +459,38 @@ function Overlays({width, maxWidth, height, scroll, children}) {
         cls.push('max-v');
         cls.push('max-h');
     }
+    const overlay = {
+        width,
+        height,
+        originX,
+        originY
+    };
+    if (originX !== 0 || originY !== 0) {
+        overlay.width -= originX;
+        overlay.height -= originY;
+        const originStyle = {marginLeft: originX, marginTop: originY};
+        children = <div className="relative" style={originStyle}>{children}</div>;
+    }
     return (
-        <div style={style} className={cls.join(' ')}>{children}</div>
+        <OverlayContext.Provider value={overlay}>
+            <div style={style} className={cls.join(' ')}>{children}</div>
+        </OverlayContext.Provider>
     )
 }
 
-function Overlay({width, height, children}) {
-    const cls = ['overlay'];
+function Overlay({ width, height, top = 0, left = 0, className, children }) {
+    const cls = ['absolute'];
+    if (className) {
+        cls.push(className);
+    }
     const style = {
         width,
-        height
+        height,
+        top,
+        left
     };
     return (
         <div style={style} className={cls.join(' ')}>{children}</div>
-    )
-}
-
-function Canvas() {
-    return (
-        <div></div>
     )
 }
 
@@ -470,5 +500,5 @@ export {
     Grid,
     Overlays,
     Overlay,
-    Canvas
+    OverlayContext
 }

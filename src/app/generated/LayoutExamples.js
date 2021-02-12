@@ -1,8 +1,43 @@
 import React from "react";
-import {Content, Stack, Grid, Overlays, Overlay, Canvas} from "../components/LayoutComponents";
+import {Content, Stack, Grid, Overlays, Overlay} from "../components/LayoutComponents";
+function Canvas() { return <div></div> };
 
 function getExamples() {
     const examples = [];
+    examples.push(
+                        <Content>
+                        1
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content>
+                        2
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content>
+                        3
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Overlays width={200} height={100} className="bg1">
+                            <Overlay width={150} height={50} top={10} left={10} className="bg2">xxx</Overlay>
+                            <Overlay width={150} height={50} top={20} left={0} className="bg3">yyy</Overlay>
+                            <Overlay width={20} height={250} top={-40} left={40} className="bg2">1</Overlay>
+                        </Overlays>
+                    
+    );
+    examples.push(
+                        <Overlays width={200} height={100} originX={30} originY={30} className="bg1">
+                            <Overlay width={150} height={50} top={10} left={10} className="bg2">xxx</Overlay>
+                            <Overlay width={150} height={50} top={20} left={0} className="bg3">yyy</Overlay>
+                            <Overlay width={20} height={250} top={-40} left={40} className="bg2">1</Overlay>
+                        </Overlays>
+                    
+    );
     examples.push(
         <Stack>
             <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
