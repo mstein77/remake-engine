@@ -55,7 +55,6 @@ function Tooltip({ children }) {
     if (absTop) {
         style.marginTop = absTop;
     }
-
     return (
         <div ref={divRef} style={style} className="tooltip hidden font-small fixed padded thin-boxed wrap-normal">{children}</div>
     );
@@ -119,7 +118,8 @@ function Tooltip({ children }) {
  * @param {string} [props.className] - Additional CSS classes for this container
  * @param {boolean} [props.flex] - Makes the component flexible if it's parent is a stack component (=flex box container)
  * @param {boolean|string} [props.full] - Extend component to all available space in horizontal ('h'), vertical ('v') or both dimensions (true)
- * @param {boolean|string} [props.center] - Center children of this component horizontally ('h'), vertically ('v') or in both directions (true)
+ * @param {boolean|string} [props.center] - Center container of this component horizontally ('h'), vertically ('v') or in both directions (true)
+ * @param {boolean|string} [props.centerItems] - Center children of this component horizontally ('h'), vertically ('v') or in both directions (true)
  * @param {boolean|number} [props.boxed] - Draws a full (true) or a 1 pixel (1) border around this component
  * @param {boolean} [props.scroll] - Show vertical and/or horizontal scrollbar when content overflows
  * @param {boolean} [props.padded] - Use default padding for the content
@@ -135,16 +135,36 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Content = React.forwardRef(({children, className, flex, center, full, shorten, scroll, boxed, padded, wrap, click, mouseDown, wheel, zIndex, ...props}, ref) => {
+const Content = React.forwardRef(({children, className, flex, center, centerItems, full, shorten, scroll, boxed, padded, wrap, click, mouseDown, wheel, zIndex, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
     const timeRef = useRef(null);
     timeRef.current = start;
 
-    const cls = ['content'];
-    const attr = {};
+    const fullH = full && full !== 'v';
+    const fullV = full && full !== 'h';
+    const isMinH = !props.width && !fullH;
+    const isMinV = !props.height && !fullV;
 
+    const parentCls = [];
+    const childCls = [];
+    const dimCls = ['content'];
+    if (className) {
+        dimCls.push(className);
+    }
+    if (padded) {
+        if (padded === 'h') {
+            dimCls.push('padded-h');
+        } else {
+            dimCls.push('padded' + (padded === 'v' ? '-v' : ''));
+        }
+    }
+    if (boxed) {
+        dimCls.push((boxed !== true ? 'thin-' : '') + 'boxed');
+    }
+
+    const attr = {};
     if (click) {
         attr['onClick'] = click;
     }
@@ -160,18 +180,92 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
         attr['ref'] = divRef;
         ref = divRef;
     }
-    if (className) {
-        cls.push(className);
+
+    const dimStyle = {};
+    for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
+        let value = props[prop];
+        if (!value) continue;
+
+        if (typeof value === 'string' && value.match(/^\d+$/)) {
+            value = parseInt(value, 10);
+        }
+        dimStyle[prop] = value;
     }
-    if (!center && flex) {
-        cls.push('flex');
+
+    if (isMinH) {
+        dimCls.push('min-content-h');
+    } else if (fullH) {
+        dimCls.push('full-h');
     }
+    if (fullV) {
+        dimCls.push('full-v');
+    }
+    if (center) {
+        if (center !== 'v' && !fullH) {
+            dimCls.push('center-h');
+        }
+        if (center !== 'h' && !fullV) {
+            parentCls.push('full-v center-v');
+            if (dimStyle.height) {
+                dimStyle.minHeight = dimStyle.height;
+            }
+        }
+    }
+
+    if (centerItems) {
+        let childFull = false;
+        let childRel = false;
+        if (typeof children === 'object' && !Array.isArray(children) && children.props) {
+            if (children.props.full) {
+                childFull = children.props.full;
+            }
+            if (children.props.width && children.props.width.indexOf('%') !== -1) {
+                childRel = 'h';
+            }
+            if (children.props.height && children.props.height.indexOf('%') !== -1) {
+                childRel = childRel ? true : 'v';
+            }
+        }
+
+        let width = '';
+        if (childRel && centerItems === 'h') {
+            dimCls.push('center-child-h full-h');
+            width = false;
+        } else if (centerItems !== 'v' && !isMinH) {
+            childCls.push('center-h');
+            if (!childFull) {
+                width = 'min-content-h';
+            }
+            if (center && centerItems === 'h') {
+                childCls.push('full-v');
+            }
+        }
+
+        if (centerItems !== 'h' && !isMinV) {
+            dimCls.push('center-v');
+            if (dimStyle.height) {
+                dimStyle.minHeight = dimStyle.height
+            }
+            if ((childFull && childFull !== 'h') || (childRel && childRel !== 'h')) {
+                childCls.push('full-v center-v');
+                if (childFull !== 'v' || childRel !== 'v') {
+                    childCls.push('full-h center-' + (centerItems !== 'v' ? 'child-' : '') + 'h');
+                }
+            } else if (isMinH) {
+                width = 'min-content-h';
+            }
+        }
+        if (width !== false) {
+            childCls.push(width);
+        }
+    }
+
     let doShorten = false;
     if (!wrap) {
         doShorten = shorten;
-        cls.push('nowrap' + (shorten ? '-shorten' : ''));
+        dimCls.push('nowrap' + (shorten ? '-shorten' : ''));
     } else {
-        cls.push('wrap-normal');
+        dimCls.push('wrap-normal');
     }
     let childText = '';
     if (doShorten) {
@@ -201,80 +295,48 @@ const Content = React.forwardRef(({children, className, flex, center, full, shor
         }
     }
     if (showTooltip) {
-        cls.push('tooltip-parent');
+        dimCls.push('tooltip-parent');
     }
-    if (padded) {
-        if (padded === 'h') {
-            cls.push('padded-h');
-        } else {
-            cls.push('padded' + (padded === 'v' ? '-v' : ''));
-        }
-    }
-    if (boxed) {
-        cls.push((boxed == 1 ? 'thin-' : '') + 'boxed');
-    }
-    const style = {};
-    for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
-        const value = props[prop];
-        if (value) {
-            style[prop] = value;
-        }
-    }
-
-    let stretchH = false;
-    if (full) {
-        if (full !== 'h') {
-            cls.push('full-v');
-        }
-        if (full !== 'v') {
-            cls.push('full-h');
-            stretchH = true;
-        }
-    }
-
     if (scroll) {
-        cls.push('scroll');
-        cls.push('max-v');
+        parentCls.push('scroll max-v max-h');
+        if (!isMinH) {
+            parentCls.push('full-h');
+        }
+        if (!isMinV) {
+            parentCls.push('full-v');
+        }
     }
-    if (scroll || shorten) {
-        cls.push('max-h');
-    }
-    if (!style.width && !stretchH) {
-        cls.push('min-content-h');
+    if (shorten) {
+        dimCls.push('max-h');
     }
     if (zIndex !== undefined) {
-        style.zIndex = zIndex;
+        dimStyle.zIndex = zIndex;
     }
-
-    const div = (
-        <div style={style} {...attr} className={cls.join(' ')}>
+    if (flex) {
+        if (parentCls.length > 0) {
+            parentCls.push('flex');
+        } else {
+            dimCls.push('flex');
+        }
+    }
+    if (childCls.length) {
+        children = <div className={childCls.join(' ')}>{children}</div>
+    }
+    const dimDiv = (
+        <div {...attr}  className={dimCls.join(' ')} style={dimStyle}>
             {children}
             {showTooltip && <Tooltip>{childText}</Tooltip>}
         </div>
     );
-
-    if (!center) {
-        return div;
+    if (!parentCls.length) {
+        return dimDiv;
     }
-    const stackCls = ['stack-' + (center === 'v' ? 'v' : 'h') + ' flex-items-centered full-h'];
-    if (flex) {
-        stackCls.push('flex');
-    }
-    if (center !== 'v') {
-        stackCls.push('max-h');
-    }
-    if (center !== 'h') {
-        stackCls.push('full-v max-v');
-        if (center !== 'h') {
-            stackCls.push('flex-item-centered');
-        }
-    }
-
+    parentCls.push('parent');
     return (
-        <div className={stackCls.join(' ')}>
-            {div}
+        <div className={parentCls.join(' ')}>
+            {dimDiv}
         </div>
-    )
+    );
 });
 
 /**

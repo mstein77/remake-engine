@@ -4,91 +4,2007 @@
     <meta charset="UTF-8">
     <title>Title</title>
     <style>
-        /* STACK */
+        .bg1 {
+            background-color: #F0D090;
+        }
+
+        .bg2 {
+            background-color: #90D0F0;
+        }
+
+        .bg3 {
+            background-color: #D0F090;
+        }
+
+        .fix-screen {
+            width: 400px;
+            min-width: 400px;
+            height: 300px;
+            overflow: hidden;
+            border: 1px dotted #303050;
+        }
+
+        :root {
+            --default-padding: 5px;
+            --box-border-width: 5px;
+            --box-border-color: #000000;
+        }
+
+        html, body, #app {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .content {
+            overflow: hidden
+        }
+
+        .bounds {
+            max-width: 100%;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        .scroll {
+            overflow: auto !important;
+        }
+
+        .stack-h {
+            display: inline-flex;
+        }
 
         .stack-v {
             display: flex;
             flex-direction: column;
         }
 
-        .stack-h {
-            display: flex;
-            flex-direction: row;
+        .stack-h > div:not(.flex):not(.full-h),
+        .stack-v > div:not(.flex):not(.full-v) {
+            flex-shrink: 0
+        }
+
+        .stack-v > .min-content-h {
+            width: inherit !important;
         }
 
         .flex {
             flex: 1
         }
 
-        .bg {
-            background-color: #AAAAAA;
+        .wrap {
+            flex-wrap: wrap;
         }
 
-        .cell {
-            background-color: #FFFFFF;
-            border: 1px solid red;
-            padding: 5px;
+        .stack-v > .min-content-h,
+        .grid:not(.grid-cells-centered) > .min-content-h
+        {
+            width: 100% !important;
         }
 
-        .no-overflow {
-            overflow: auto;
+        .stack-h > div.full-v {
+            height: revert;
         }
 
-        .inner-space-h > div:not(:first-child) {
-            margin-left: 10px;
+        .stack-h > div:not(.flex):not(.modal-bounds) {
+            width: min-content;
         }
 
-        .big {
-            border: 1px solid green;
-            width: 2000px;
-            position: absolute;
+        .min-content-h {
+            width: min-content
         }
 
-        .over {
-            position: relative;
-            left: 0px;
-            top: 0px;
+        .flex-items-centered {
+            margin-left: auto;
+            margin-right: auto;
+            xjustify-content: center;
         }
 
-        .padded {
-            padding: 5px;
+        .flex-item-centered {
+            align-items: center;
         }
 
         .full-v {
-            height: 100%;
+            height: 100%
         }
 
-        .padded.full-v {
-            padding: 0;
+        .full-h {
+            width: 100%
         }
 
-        full-v > div.padded {
-            height: calc(100% - 2 * 5px) !important;
+        .max-v {
+            max-height: 100%
         }
 
-        full-v.padded {
-            height: calc(100% - 2 * 5px) !important;
-            padding: 5px;
+        .max-h {
+            max-width: 100%
         }
 
-        .checkdiv {
-            background-color: #AAAAAA;
+        .nowrap {
+            white-space: nowrap
         }
 
-        .rootdiv {
-            height: 400px;
-            width: 800px;
-            border: 1px solid red;
+        .wrap-normal {
+            white-space: normal
         }
+
+        .nowrap-shorten {
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            flex-shrink: 1 !important
+        }
+
+        .flow-padding > div {
+            margin-top: var(--default-padding);
+            margin-left: var(--default-padding)
+        }
+
+        .flow-padding {
+            padding-bottom: var(--default-padding);
+            padding-right: var(--default-padding);
+            box-sizing: border-box
+        }
+
+        .grid {
+            display: grid
+        }
+
+        .grid-gap {
+            grid-gap: var(--default-padding)
+        }
+
+        .grid-cells-centered {
+            justify-items: center;
+            align-items: center
+        }
+
+        .padded {
+            padding: var(--default-padding);
+            box-sizing: border-box
+        }
+
+        .padded-h {
+            padding-left: var(--default-padding);
+            padding-right: var(--default-padding);
+            box-sizing: border-box
+        }
+
+        .padded-v {
+            padding-top: var(--default-padding);
+            padding-bottom: var(--default-padding);
+            box-sizing: border-box
+        }
+
+        .center-items {
+            align-items: center;
+        }
+
+        .inner-space-v > div:not(:first-child) {
+            margin-top: var(--default-padding)
+        }
+
+        .inner-space-h > div:not(:first-child) {
+            margin-left: var(--default-padding)
+        }
+
+        .inner-border-v > div:not(:first-child) {
+            border-top: var(--box-border-width) solid var(--box-border-color);
+            box-sizing: border-box;
+        }
+
+        .inner-border-h > div:not(:first-child) {
+            border-left: var(--box-border-width) solid var(--box-border-color);
+            box-sizing: border-box;
+        }
+
+        .boxed {
+            border: var(--box-border-width) solid var(--box-border-color);
+        }
+
+        .thin-boxed {
+            border: 1px solid var(--box-border-color);
+        }
+
+        div.boxed, div.thin-boxed {
+            box-sizing: border-box;
+        }
+
+        .absolute {
+            position: absolute;
+        }
+
+        .relative {
+            position: relative
+        }
+
+        .fixed {
+            position: fixed
+        }
+
+
+
+        .center-h {
+            margin-left: auto;
+            margin-right: auto
+        }
+
+        .center-v {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .center-v > div {
+            margin-top: auto;
+            margin-bottom: auto;
+        }
+
     </style>
 </head>
 
 <body>
-    <div class="rootdiv full-v padded">
-        <div class="checkdiv padded full-v">
-            <div class="padded">Test</div>
+
+<ul>
+    <li>Boxed
+<ul>
+<li>
+    default (min, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="min-content-h
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (min, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="min-content-h full-v
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content full="v" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (min, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="min-content-h
+           content thin-boxed padded bg1"
+         style="height: 50%">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content height="50%" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (min, oversize)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="min-content-h
+           content thin-boxed padded bg1"
+         style="height: 350px">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content height="350" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (full, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-h
+            content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content full="h" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (full, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-h full-v
+            content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content full thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (full, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-h
+            content thin-boxed padded bg1"
+         style="height: 50%">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content full="h" height="50%" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (full, oversize)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-h
+            content thin-boxed padded bg1"
+         style="height: 350px">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content full="h" height="350" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+<li>
+    default (rel, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 50%" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="50%" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (rel, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 50%" class="full-v
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="50%" full="v" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (rel, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 50%; height: 50%" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="50%" height="50%" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    default (rel, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 50%; height: 350px" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="50%" height="350" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+<li>
+    default (over, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 500px;" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="500" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>default (over, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 500px;" class="full-v
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="500" full="v" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>default (over, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 500px; height: 50%" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="500" height="50%" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>default (over, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 500px; height: 350px" class="
+            content thin-boxed padded bg1
+        ">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content width="500" height="350" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+</ul></li>
+    <li>
+        Center
+    <ul>
+    <li>
+        h (min, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h center-h
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content center="h" thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+    <li>
+        h (min, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h center-h full-v
+               content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (min, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h center-h
+                   content thin-boxed padded bg1"
+        style="height: 50%">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (min, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h center-h
+                       content thin-boxed padded bg1"
+             style="height: 350px">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+            content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h full-v
+                content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+                    content thin-boxed padded bg1"
+            style="height: 50%">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+                        content thin-boxed padded bg1"
+             style="height: 350px">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="width: 50%" class="center-h
+            content thin-boxed padded bg1
+            ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%" class="center-h full-v
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%; height: 50%" class="center-h
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%; height: 350px" class="center-h
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        h (over, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="width: 500px" class="center-h
+            content thin-boxed padded bg1
+            ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px" class="center-h full-v
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px; height: 50%" class="center-h
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px; height: 350px" class="center-h
+                content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        v (min, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v min-content-h center-v">
+            <div class="min-content-h
+                   content thin-boxed padded bg1">Feuer und Wasser</div>
         </div>
     </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v full-h center-v">
+            <div class="full-h
+                       content thin-boxed padded bg1">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div class="
+                           content thin-boxed padded bg1"
+                style="width: 50%">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div class="
+                               content thin-boxed padded bg1"
+                 style="width: 450px">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        v (min, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v min-content-h
+            content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v full-h
+                content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v
+                    content thin-boxed padded bg1"
+            style="width: 50%"
+        >Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v
+                        content thin-boxed padded bg1"
+             style="width: 450px"
+        >Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        v (min, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v min-content-h center-v">
+            <div
+                    style="height: 50%" class="min-content-h
+                      content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v full-h center-v">
+            <div
+                    style="height: 50%" class="full-h
+                          content thin-boxed padded bg1
+                    ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div
+                    style="height: 50%; width: 50%" class="
+                              content thin-boxed padded bg1
+                        ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div
+                    style="height: 50%; width: 450px" class="
+                                  content thin-boxed padded bg1
+                            ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (min, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v min-content-h center-v">
+            <div
+                    style="min-height: 350px;" class="min-content-h
+                    content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v full-h center-v">
+            <div
+                    style="min-height: 350px;" class="full-h
+                        content thin-boxed padded bg1
+                    ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div
+                    style="min-height: 350px; width: 50%" class="
+                            content thin-boxed padded bg1
+                        ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v">
+            <div
+                    style="min-height: 350px; width: 450px" class="
+                                content thin-boxed padded bg1
+                            ">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (min, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div class="min-content-h center-h
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (full, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div class="
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (rel, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div class=" center-h
+           content thin-boxed padded bg1"
+        style="width: 50%">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (over, min)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div class=" center-h
+           content thin-boxed padded bg1"
+             style="width: 450px">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (min, full)
+    <div class="stack-h">
+<div class="fix-screen">
+        <div class="min-content-h center-h full-v
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (full, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v
+       content thin-boxed padded bg1">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (rel, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-h
+       content thin-boxed padded bg1"
+    style="width: 50%">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (over, full)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-h
+       content thin-boxed padded bg1"
+         style="width: 450px">Feuer und Wasser</div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (min, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v full-h">
+        <div
+                style="height: 50%" class="min-content-h center-h
+                      content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (full, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div
+                style="height: 50%" class="full-h
+                      content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (rel, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div
+                style="height: 50%; width: 50%" class="center-h
+                      content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+<li>
+    h+v (over, rel)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v center-v">
+        <div
+                style="height: 50%; width: 450px" class="center-h
+                      content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+<li>
+    h+v (min, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v full-h center-v">
+        <div
+                style="min-height: 350px;" class="center-h min-content-h
+                    content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (full, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v full-h center-v">
+        <div
+                style="min-height: 350px;" class="center-h full-h
+                    content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (rel, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v full-h center-v">
+        <div
+                style="min-height: 350px; width: 50%" class="center-h
+                    content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    h+v (over, over)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div class="full-v full-h center-v">
+        <div
+                style="min-height: 350px; width: 450px" class="center-h
+                    content thin-boxed padded bg1
+                ">Feuer und Wasser</div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+    </ul></li>
+    <li>
+        CenterItems
+    <ul>
+    <li>
+        h (min, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (min, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h full-v
+               content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (min, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h
+                   content thin-boxed padded bg1"
+        style="height: 50%">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (min, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h
+                       content thin-boxed padded bg1"
+             style="height: 350px">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+            content thin-boxed padded bg1">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h full-v
+                content thin-boxed padded bg1">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+                    content thin-boxed padded bg1"
+        style="height: 50%">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (full, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+                        content thin-boxed padded bg1"
+             style="height: 350px">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        h (rel, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%" class="
+            content thin-boxed padded bg1
+        ">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%" class="full-v
+                content thin-boxed padded bg1
+            ">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%; height: 50%" class="
+                content thin-boxed padded bg1
+            ">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (rel, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 50%; height: 350px" class="
+                    content thin-boxed padded bg1
+                ">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px;" class="
+            content thin-boxed padded bg1
+        "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px;" class="full-v
+                content thin-boxed padded bg1
+            "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px; height: 50%" class="
+                    content thin-boxed padded bg1
+                "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h (over, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="width: 500px; height: 350px" class="
+                        content thin-boxed padded bg1
+                    "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (min, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h
+           content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+               content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="
+                   content thin-boxed padded bg1"
+        style="width: 50%">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="
+                       content thin-boxed padded bg1"
+             style="width: 450px">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        v (min, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v min-content-h
+            content thin-boxed padded bg1">
+            <div class="min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v full-h
+                content thin-boxed padded bg1">
+            <div class="full-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v
+                    content thin-boxed padded bg1"
+            style="width: 50%">
+            <div>Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v
+                        content thin-boxed padded bg1"
+             style="width: 450px">
+            <div>Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (min, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%" class="center-v min-content-h
+            content thin-boxed padded bg1
+        ">
+            <div class="min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%" class="center-v full-h
+                content thin-boxed padded bg1
+            ">
+            <div class="full-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%; width: 50%" class="center-v
+                    content thin-boxed padded bg1
+                ">
+            <div class="full-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%; width: 450px" class="center-v
+                        content thin-boxed padded bg1
+                    ">
+            <div class="full-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (min, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="min-height: 350px;" class="center-v min-content-h
+            content thin-boxed padded bg1
+        "><div class="min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (full, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="min-height: 350px;" class="center-v full-h
+                content thin-boxed padded bg1
+            "><div class="full-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (rel, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="min-height: 350px; width: 50%" class="center-v
+                    content thin-boxed padded bg1
+                "><div class="full-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        v (over, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="min-height: 350px; width: 450px" class="center-v
+                    content thin-boxed padded bg1
+                "><div class="full-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+    <li>
+        h+v (min, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="min-content-h
+               content thin-boxed padded bg1">Feuer und Wasser</div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (full, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-h
+                content thin-boxed padded bg1">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (rel, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="
+                    content thin-boxed padded bg1"
+            style="width: 50%">
+            <div class="min-content-h center-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (over, min)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="
+                        content thin-boxed padded bg1"
+             style="width: 450px">
+            <div class="min-content-h center-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (min, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v min-content-h
+                content thin-boxed padded bg1">
+            <div class="">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (full, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v full-h
+                    content thin-boxed padded bg1">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (rel, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v
+                        content thin-boxed padded bg1"
+            style="width: 50%">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (over, full)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div class="full-v center-v
+                            content thin-boxed padded bg1"
+             style="width: 450px">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (min, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%" class="center-v min-content-h
+                content thin-boxed padded bg1
+            ">
+            <div class="min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (full, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%" class="center-v full-h
+                    content thin-boxed padded bg1
+                ">
+            <div class="min-content-h center-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (rel, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%; width: 50%" class="center-v
+                        content thin-boxed padded bg1
+                    ">
+            <div class="min-content-h center-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (over, rel)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+                style="height: 50%; width: 450px" class="center-v
+                            content thin-boxed padded bg1
+                        ">
+            <div class="min-content-h center-h">Feuer und Wasser</div>
+        </div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (min, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="min-height: 350px;" class="center-v min-content-h
+            content thin-boxed padded bg1
+            "><div class="min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (full, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="min-height: 350px;" class="center-v full-h
+                content thin-boxed padded bg1
+            "><div class="min-content-h center-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (rel, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="min-height: 350px; width: 50%" class="center-v
+                    content thin-boxed padded bg1
+                "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+    <li>
+        h+v (over, over)
+        <div class="stack-h">
+    <div class="fix-screen">
+        <div
+            style="min-height: 350px; width: 450px" class="center-v
+                    content thin-boxed padded bg1
+                "><div class="center-h min-content-h">Feuer und Wasser</div></div>
+    </div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+
+<li>
+    h overflow-width (nested)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="width: 500px;" class="
+            content thin-boxed padded bg1
+        "><div class="center-h min-content-h">
+        <div style="width: 250px" class="content boxed">
+            <div class="center-h min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+
+<li>
+    v overflow-width (nested)
+    <div class="stack-h">
+<div class="fix-screen">
+    <div
+            style="height: 400px;" class="center-v min-content-h
+            content thin-boxed padded bg1
+        "><div class="min-content-h">
+        <div style="height: 225px" class="content boxed center-v padded">
+            <div class="min-content-h">Feuer und Wasser</div>
+        </div>
+    </div>
+    </div>
+</div>
+<pre class="example">
+    &lt;Content thin boxed padded className="bg1"&gt;
+        Feuer und Wasser
+    &lt;/Content&gt;
+</pre></div></li>
+    </ul>
+    </li>
+</ul>
+
 
 </body>
 </html>

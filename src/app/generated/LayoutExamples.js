@@ -5,22 +5,880 @@ function Canvas() { return <div></div> };
 function getExamples() {
     const examples = [];
     examples.push(
-                        <Content>
-                        1
+                        <Content width="90%" height="90%" center centerItems="h" wrap className="bg1">
+                            Feuer und Wasser
                         </Content>
                     
     );
     examples.push(
-                        <Content>
-                        2
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
                         </Content>
                     
     );
     examples.push(
-                        <Content>
-                        3
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content width="233" boxed wrap className="bg2">Feuer und Wasser</Content>
                         </Content>
                     
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content width="233" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content width="50%" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content width="50%" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content full="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content full="h" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            Feuer und Wasser
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center wrap className="bg1">
+                            <Content center="v" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Content height="175" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center wrap className="bg1">
+                            <Content center="v" height="175" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Content height="33%" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center wrap className="bg1">
+                            <Content center="v" height="33%" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Content full="v" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center wrap className="bg1">
+                            <Content center="v" full="v" boxed>Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems wrap className="bg1">
+                            Feuer und Wasser
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content center boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Content center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems className="bg1">
+                            <Content width="233" height="175" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content width="233" height="175" center boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content width="233" height="175" center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Content width="233" height="175" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems className="bg1">
+                            <Content width="50%" height="33%" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content width="50%" height="33%" center boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Content width="50%" height="33%" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content width="50%" height="33%" center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems className="bg1">
+                            <Content full boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center className="bg1">
+                            <Content full center boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Content center="v" full boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Content full center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
+                        </Content>
+                    
+    );
+    examples.push(
+    <Content boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content full="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="50%" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="500" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="500" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="500" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content width="500" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" full="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="50%" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="500" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="500" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="500" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="h" width="500" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" width="450" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="50%" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="50%" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="50%" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="350" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center="v" height="350" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="v" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="v" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center height="50%" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center height="50%" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content center height="350" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" full="h" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="50%" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="500" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="500" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="500" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="h" width="500" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="450" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" height="50%" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" height="50%" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" height="50%" width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" full="h" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems="v" width="450" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="450" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems full boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="50%" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="450" full="v" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems height="50%" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems height="50%" width="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="450" height="50%" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems height="350" full="h" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="50%" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content centerItems width="450" height="350" boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
+    );
+    examples.push(
+    <Content boxed="1" padded wrap className="bg1">
+        Feuer und Wasser
+    </Content>
+
     );
     examples.push(
                         <Overlays width={200} height={100} className="bg1">

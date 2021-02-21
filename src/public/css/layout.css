@@ -53,12 +53,29 @@ html, body, #app {
     flex-wrap: wrap;
 }
 
+.center-child-h > div,
+.center-child-h > .parent > div,
+.center-h {
+    margin-left: auto;
+    margin-right: auto
+}
+
+.center-v {
+    display: flex;
+    flex-direction: column;
+}
+
+.center-v > div {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
 .stack-v > .min-content-h,
 .grid:not(.grid-cells-centered) > .min-content-h
 {
     width: 100% !important;
 }
-
+/*
 .stack-h > div.full-v {
     height: revert;
 }
@@ -66,7 +83,7 @@ html, body, #app {
 .stack-h > div:not(.flex):not(.modal-bounds) {
     width: min-content;
 }
-
+*/
 .min-content-h {
     width: min-content
 }
