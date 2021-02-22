@@ -45,11 +45,11 @@ function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, s
                 {rulers && <Overlay className="bg1" top={-originY} height={originY - 5} width={dim.width} />}
             </Overlays>
     } else {
-        elem = <Content shorten className="small-font">No space to render!</Content>;
+        elem = <Content shorten center className="small-font">No space to render!</Content>;
     }
 
     return (
-        <Content full center>
+        <Content full centerItems>
             {elem}
         </Content>
     )
@@ -129,9 +129,9 @@ function GridCanvas({size, width, height, ...props}) {
                         <Checkbox name="Rulers" value={rulers} set={setRulers} />
                     </ToolGroup>
                     <ToolGroup>
-                        <Content click={showModal} padded thin boxed>White</Content>
-                        <Content padded thin boxed>Black & White</Content>
-                        <Content padded thin boxed>DAXX!</Content>
+                        <Content click={showModal} padded boxed="1">White</Content>
+                        <Content padded boxed={1}>Black & White</Content>
+                        <Content padded thin boxed={1}>DAXX!</Content>
                     </ToolGroup>
                     <BackgroundControl />
                 </Stack>
@@ -147,8 +147,8 @@ function GridCanvas({size, width, height, ...props}) {
                     <Content padded>9</Content>
                 </Grid>
                 <Stack className="bg3" wrap gap full="h">
-                    <Content padded thin boxed>Black & White</Content>
-                    <Content padded thin boxed>DAXX!</Content>
+                    <Content padded boxed={1}>Black & White</Content>
+                    <Content padded boxed={1}>DAXX!</Content>
                 </Stack>
             </Stack>
             <TestModal.content name="Arasaka is down" closeable>
@@ -170,7 +170,7 @@ function BaseApp({}) {
                             <Section width="100" collapse="h" full="v" className="bg1" name="First Section">
                                 <Stack vertical full="h" scroll padded gap>
                                     <Content padded center>
-                                        <Canvas width={75} height={75} thin boxed />
+                                        <Canvas width={75} height={75} boxed={1} />
                                     </Content>
                                     <Content wrap>Property Grid Here And so many more cool things :-)</Content>
                                     <PropertyGrid propWidth="-">

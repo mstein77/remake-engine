@@ -45,7 +45,7 @@ function BackgroundControl() {
     )
 }
 
-function Canvas({ width, height, smoothing, render, plain, boxed, thin, className }) {
+function Canvas({ width, height, smoothing, render, plain, boxed, className }) {
     const canvasRef = useRef(null);
     useEffect(() => {
         if (!canvasRef.current || !render) {
@@ -63,7 +63,7 @@ function Canvas({ width, height, smoothing, render, plain, boxed, thin, classNam
         cls.push(className);
     }
     if (boxed) {
-        cls.push((thin ? 'thin-' : '') + 'boxed');
+        cls.push((boxed !== true ? 'thin-' : '') + 'boxed');
     }
 
     return (
@@ -168,7 +168,7 @@ function Button({ name, icon, disabled, click }) {
     }
 
     return (
-        <Content className={cls.join(' ')} thin boxed>
+        <Content className={cls.join(' ')} boxed={1}>
             <Content center click={click} className={bCls.join(' ')}>
                 {text}
             </Content>
@@ -610,7 +610,7 @@ function ToolGroup({ children }) {
     return (
         <>
             {children}
-            <Content xcenter="h" className="noGap">
+            <Content>
                 <Content width={1} height={25} className="separator-h less"></Content>
             </Content>
         </>
@@ -637,7 +637,7 @@ function SideTabs({ children, ...props }) {
     for(let item of items.current) {
         tabs.push(
             <Content key={item} padded>
-                <Content className={item === active ? 'switch-button-enabled' : ''} thin boxed click={() => setActive(item)} padded full="h">
+                <Content className={item === active ? 'switch-button-enabled' : ''} boxed="1" click={() => setActive(item)} padded full="h">
                     <Stack gap full="h">
                         <Content>{' '}</Content>
                         <Content flex>{item}</Content>

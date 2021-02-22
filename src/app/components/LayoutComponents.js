@@ -216,13 +216,14 @@ const Content = React.forwardRef(({children, className, flex, center, centerItem
         let childFull = false;
         let childRel = false;
         if (typeof children === 'object' && !Array.isArray(children) && children.props) {
-            if (children.props.full) {
-                childFull = children.props.full;
+            const cProps = children.props;
+            if (cProps.full) {
+                childFull = cProps.full;
             }
-            if (children.props.width && children.props.width.indexOf('%') !== -1) {
+            if (cProps.width && typeof cProps.width === 'string' && cProps.width.indexOf('%') !== -1) {
                 childRel = 'h';
             }
-            if (children.props.height && children.props.height.indexOf('%') !== -1) {
+            if (cProps.height && typeof cProps.height === 'string' && cProps.height.indexOf('%') !== -1) {
                 childRel = childRel ? true : 'v';
             }
         }
