@@ -435,7 +435,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         <Content full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
             <Stack full={dirKey} vertical={vertical}>
                 <Content mouseDown={prevPage} {...dimMin} />
-                <Content width={vertical ? 11 : false} flex mouseDown={mouseDown} className={handleCls.join(' ')}/>
+                <Content full={vertical ? false : 'v'} width={vertical ? 11 : false} flex mouseDown={mouseDown} className={handleCls.join(' ')}/>
                 <Content mouseDown={nextPage} {...dimMax} />
             </Stack>
         </Content>
@@ -636,16 +636,12 @@ function SideTabs({ children, ...props }) {
     const tabs = [];
     for(let item of items.current) {
         tabs.push(
-            <Content key={item} padded>
-                <Content className={item === active ? 'switch-button-enabled' : ''} boxed="1" click={() => setActive(item)} padded full="h">
-                    <Stack gap full="h">
-                        <Content>{' '}</Content>
-                        <Content flex>{item}</Content>
-                        <Content>{' '}</Content>
-                        <Content><kbd>{' > '}</kbd></Content>
-                    </Stack>
-                </Content>
-            </Content>
+            <Stack key={item} gap className={item === active ? 'switch-button-enabled' : ''} boxed="1" click={() => setActive(item)} padded full="h">
+                <Content>{' '}</Content>
+                <Content full="h">{item}</Content>
+                <Content>{' '}</Content>
+                <Content><kbd>{' > '}</kbd></Content>
+            </Stack>
         );
     }
 
@@ -695,13 +691,13 @@ function useModal() {
         propsRef.current = props;
         setIsOpen(context.openModal());
     };
-    const content = props => {
+    const content = function ({full, width, maxWidth, minWidth, height, maxHeight, minHeight, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
-        const styleProps = {}; // useStyleProps(props);
-        styleProps.zIndex = isOpen;
+        const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
+        dimProps.zIndex = isOpen;
         return (
             <>
-                {isOpen && <Modal close={close} name={title} closeable={props.closeable} {...styleProps}>{props.children}</Modal>}
+                {isOpen && <Modal close={close} name={title} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
             </>
         );
     };
@@ -782,10 +778,10 @@ function Portal({ id, children }) {
  *
  *
  */
-const Modal = function ({ name, close, closeable, zIndex = 0, children, ...props }) {
+const Modal = function ({ name, close, closeable, zIndex = 0, full, width, height, children, ...props }) {
     useKeyListener(27, () => {close(); return true}, () => closeable);
 
-    const styleProps = {zIndex}; // useStyleProps(props);
+    const styleProps = {zIndex, width, height}; // useStyleProps(props);
     const click = closeable ?
         e => {
             let target = e.target;
@@ -802,30 +798,22 @@ const Modal = function ({ name, close, closeable, zIndex = 0, children, ...props
 
     return (
         <Portal id="modals-container">
-            <Content full className="modal-overlay fixed pos-0" click={click} zIndex={styleProps.zIndex - 1}>
-                <Content center className="modal-bounds">
-                    <Content flex full xcenter className="bg3">
-                        <Stack full="v" vertical border boxed {...styleProps} className="modal-centered">
-                            <Stack centerAll gap full="h" padded>
-                                <Content shorten center="v" flex>{name}</Content>
-                                <Button name="close" icon click={e => {
-                                    close();
-                                    e.stopPropagation();
-                                }} />
-                            </Stack>
-
-                            <Content flex>
-                                {children}
-                            </Content>
+            <Content full centerItems className="modal-overlay fixed pos-0" click={click} zIndex={styleProps.zIndex - 1}>
+                <Content width="90%" height="90%" centerItems className="modal-bounds">
+                    <Stack full={full} vertical border boxed {...styleProps} className="modal-centered bg2">
+                        <Stack gap full="h" centerAll padded>
+                            <Content shorten flex>{name}</Content>
+                            <Button name="close" icon click={e => {
+                                close();
+                                e.stopPropagation();
+                            }} />
                         </Stack>
-                    </Content>
 
+                        <Content flex>
+                            {children}
+                        </Content>
+                    </Stack>
                 </Content>
-                {/*
-                <Content xcenter full className="bg1">
-                </Content>
-
-                */}
             </Content>
         </Portal>
     );

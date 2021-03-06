@@ -43,8 +43,1311 @@
 
 <ul id="examples">
     <li>
+        Stack Centering
+        <ul>
+            <li>
+                V-Stack full center
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" center boxed border full&gt;
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full center
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="center-h full-h">
+                            <div class="stack-h center-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                                <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                                <div class="stretch min-content-h">
+                                    <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" center boxed border full&gt;
+                            &lt;Content center="v" wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack full=h center=v
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" center="v" boxed border full="h"&gt;
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" width="50%" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full=v center=h
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="center-h full-h">
+                            <div class="stack-h center-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                                <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                                <div class="stretch min-content-h">
+                                    <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" center="h" boxed border full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: center
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="center-v full-v">
+                            <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                                <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                                <div class="stretch min-content-h">
+                                    <div class="min-content-h bg2 thin-boxed" style="height: 75px">Children</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" center border boxed="1"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                ChildrenX
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2" height={150}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: center-v
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="center-v full-v">
+                            <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                                <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                                <div class="stretch min-content-h">
+                                    <div class="min-content-h bg2 thin-boxed" style="height: 75px">Children</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" center="v" border boxed="1"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                ChildrenX
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2" height={150}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: center
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v center-h content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack center vertical className="bg1" boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content width="50%" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="250" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: center-h
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v center-h content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack center="h" vertical className="bg1" boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content width="50%" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="250" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+
+            </li>
+        </ul>
+    </li>
+
+    <li>
+        Stack Inner Border
+        <ul>
+            <li>
+                V-Stack full + gap: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" boxed border gap full&gt;
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" center="h" width="50%" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" width="450" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack full: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" boxed border full="h"&gt;
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" width="50%" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack rel: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" boxed border width="60%"&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack border + gap full: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" boxed border gap full&gt;
+                            &lt;Content center="v" wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" full="h" height="75%" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" boxed border full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack min: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" boxed border&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+        </ul>
+    </li>
+
+    <li>
+        Stack Cross-Axis-Sizing
+        <ul>
+            <li>
+                V-Stack rel: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width="60%"&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="h" boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack rel: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 75%">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width="60%"&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="75%" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack rel: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="full-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width="60%"&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" full="h" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack rel: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 60%">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width="60%"&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" center="h" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack abs: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 200px">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 275px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width={200}&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" center="h" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="275" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack abs: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 200px">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 75%">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width={200}&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="75%" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack abs: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 200px">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="full-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width={200}&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" full="h" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack abs: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded inner-space-v thin-boxed bg1" style="width: 200px">
+                            <div class="nowrap bg2 min-content-h thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap width={200}&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: (min, abs)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded min-content-h inner-space-v thin-boxed bg1">
+                            <div class="nowrap bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 75px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width={75} className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded min-content-h inner-space-v thin-boxed bg1">
+                            <div class="nowrap bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="bg2 thin-boxed" style="width: 75%">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" width="75%" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded min-content-h inner-space-v thin-boxed bg1">
+                            <div class="nowrap bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="full-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" full="h" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                V-Stack min: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-v content padded min-content-h inner-space-v thin-boxed bg1">
+                            <div class="nowrap bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack vertical className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" center="h" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1 full-v">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 75%">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height="75%"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h full-v content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="full-v min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack full: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h full-v content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap full="v"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack rel: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 75%">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height="75%"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack rel: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 75%">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 75%">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height="75%"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height="75%"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack rel: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 75%">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="full-v min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height="75%"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack rel: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 75%">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height="75%"&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack abs: (min, over)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 150px">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed stretch" style="height: 350px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height={150}&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={350}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack abs: (min, abs)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 150px">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed stretch" style="height: 50px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height={150}&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={50}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack abs: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 150px">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 75%">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height={150}&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height="75%"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack abs: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 150px">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="full-v min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height={150}&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack abs: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1" style="height: 150px">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap height={150}&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack min: (min, abs)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed stretch" style="height: 50px">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height={50}&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack min: (min, rel)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="stretch min-content-h">
+                                <div class="min-content-h bg2 thin-boxed stretch" style="height: 75%">Children</div>
+                            </div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2" height="75%"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack min: (min, full)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="full-v min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content full="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                H-Stack min: (min, min)
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        <div class="stack-h content padded min-content-h inner-space-h thin-boxed bg1">
+                            <div class="min-content-h bg2 thin-boxed">Feuer und Wasser</div>
+                            <div class="min-content-h bg2 thin-boxed">Children</div>
+                        </div>
+                    </div>
+                    <pre class="example">
+                        &lt;Stack className="bg1" padded boxed="1" gap&gt;
+                            &lt;Content wrap boxed="1" className="bg2"&gt;
+                                Feuer und Wasser
+                            &lt;/Content&gt;
+
+                            &lt;Content center="v" boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+
+                            &lt;Content boxed="1" className="bg2"&gt;
+                                Children
+                            &lt;/Content&gt;
+                        &lt;/Stack&gt;
+                    </pre>
+                </div>
+            </li>
+        </ul>
+    </li>
+
+
+    <li>
         Nested centering
         <ul>
+
+            <li>
+                h-abs stack full-v
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack full="v" center vertical border boxed width={275} className="bg2"&gt;
+                                &lt;Content xfull="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                v-abs stack full-h
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center full="h" vertical border boxed height={115} className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                abs stack full
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center vertical border boxed width={233} height={115} className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+
+            <li>
+                h-rel stack full-v
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center full="v" vertical border boxed width="75%" className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                h-rel stack full-h
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center full="h" vertical border boxed height="75%" className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                h-rel stack
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center vertical border boxed width="75%" className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                v-rel stack
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center vertical border boxed height="75%" className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
+            <li>
+                rel stack
+                <div class="stack-h">
+                    <div class="fix-screen">
+                        Here we go...
+                    </div>
+                    <pre class="example">
+                        &lt;Content width="90%" height="90%" center centerItems&gt;
+                            &lt;Stack center vertical border boxed width="75%" height="75%" className="bg2"&gt;
+                                &lt;Content full="h"&gt;
+                                    Feuer und Wasser
+                                &lt;/Content&gt;
+
+                                &lt;Content flex&gt;
+                                    Children?
+                                &lt;/Content&gt;
+                            &lt;/Stack&gt;
+                        &lt;/Content&gt;
+                    </pre>
+                </div>
+            </li>
+
 
             <li>
                 h (text, centerItems)

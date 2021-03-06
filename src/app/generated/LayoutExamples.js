@@ -5,6 +5,722 @@ function Canvas() { return <div></div> };
 function getExamples() {
     const examples = [];
     examples.push(
+                        <Stack vertical className="bg1" center boxed border full>
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center boxed border full>
+                            <Content center="v" wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" center="v" boxed border full="h">
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" width="50%" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center="h" boxed border full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center border boxed="1">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                ChildrenX
+                            </Content>
+
+                            <Content boxed="1" className="bg2" height={150}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center="v" border boxed="1">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                ChildrenX
+                            </Content>
+
+                            <Content boxed="1" className="bg2" height={150}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack center vertical className="bg1" boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content width="50%" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="250" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack center="h" vertical className="bg1" boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content width="50%" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="250" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" boxed border gap full>
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" center="h" width="50%" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" width="450" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" boxed border full="h">
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" width="50%" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" boxed border width="60%">
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" boxed border gap full>
+                            <Content center="v" wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" full="h" height="75%" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content center="v" full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" boxed border full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" boxed border>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="h" boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="75%" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" full="h" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" center="h" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" center="h" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="275" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="75%" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" full="h" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width={75} className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" width="75%" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" full="h" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" padded boxed="1" gap>
+                            <Content boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" center="h" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height="75%">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap full="v">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height="75%">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height="75%">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height="75%">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height="75%">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height="75%">
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height={150}>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={350}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height={150}>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={50}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height={150}>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height="75%">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height={150}>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap height={150}>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height={50}>
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2" height="75%">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content full="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" padded boxed="1" gap>
+                            <Content wrap boxed="1" className="bg2">
+                                Feuer und Wasser
+                            </Content>
+
+                            <Content center="v" boxed="1" className="bg2">
+                                Children
+                            </Content>
+
+                            <Content boxed="1" className="bg2">
+                                Children
+                            </Content>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack full="v" center vertical border boxed width={275} className="bg2">
+                                <Content xfull="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center full="h" vertical border boxed height={115} className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center vertical border boxed width={233} height={115} className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center full="v" vertical border boxed width="75%" className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center full="h" vertical border boxed height="75%" className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center vertical border boxed width="75%" className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center vertical border boxed height="75%" className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
+                        <Content width="90%" height="90%" center centerItems>
+                            <Stack center vertical border boxed width="75%" height="75%" className="bg2">
+                                <Content full="h">
+                                    Feuer und Wasser
+                                </Content>
+
+                                <Content flex>
+                                    Children?
+                                </Content>
+                            </Stack>
+                        </Content>
+                    
+    );
+    examples.push(
                         <Content width="90%" height="90%" center centerItems="h" wrap className="bg1">
                             Feuer und Wasser
                         </Content>

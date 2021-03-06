@@ -31,9 +31,23 @@ html, body, #app {
     display: inline-flex;
 }
 
+.stack-h.center-h {
+    display: flex !important;
+}
+
+.stack-h:not(.flow-padding) {
+    align-items: start
+}
+
+.stack-h > .full-v:not(.bounds) {
+    align-self: stretch;
+    height: auto;
+}
+
 .stack-v {
     display: flex;
     flex-direction: column;
+    justify-content: start;
 }
 
 .stack-h > div:not(.flex):not(.full-h),
@@ -42,9 +56,10 @@ html, body, #app {
 }
 
 .stack-v > .min-content-h {
-    width: inherit !important;
+/*    width: inherit !important; */
 }
 
+.stack-v > .full-v,
 .flex {
     flex: 1
 }
@@ -70,7 +85,7 @@ html, body, #app {
     margin-bottom: auto;
 }
 
-.stack-v > .min-content-h,
+/* .stack-v > .min-content-h, */
 .grid:not(.grid-cells-centered) > .min-content-h
 {
     width: 100% !important;
@@ -179,10 +194,19 @@ html, body, #app {
     margin-left: var(--default-padding)
 }
 
+.inner-border-v > div:not(:first-child)::before {
+    display: block;
+    content: '';
+    background-color: var(--box-border-color);
+    width: 100%;
+    height: var(--box-border-width);
+}
+/*
 .inner-border-v > div:not(:first-child) {
     border-top: var(--box-border-width) solid var(--box-border-color);
     box-sizing: border-box;
 }
+*/
 
 .inner-border-h > div:not(:first-child) {
     border-left: var(--box-border-width) solid var(--box-border-color);
@@ -201,6 +225,14 @@ div.boxed, div.thin-boxed {
     box-sizing: border-box;
 }
 
+.border-bg {
+    background-color: var(--box-border-color)
+}
+
+.stretch {
+    align-self: stretch
+}
+
 .absolute {
     position: absolute;
 }
@@ -211,5 +243,9 @@ div.boxed, div.thin-boxed {
 
 .fixed {
     position: fixed
+}
+
+.hidden {
+    display: none
 }
 

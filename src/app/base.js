@@ -151,7 +151,7 @@ function GridCanvas({size, width, height, ...props}) {
                     <Content padded boxed={1}>DAXX!</Content>
                 </Stack>
             </Stack>
-            <TestModal.content name="Arasaka is down" closeable>
+            <TestModal.content name="Arasaka is down" width="75%" closeable>
                 <Content full padded className="bg2">And what now, why dont I like it as it is???</Content>
             </TestModal.content>
         </>
@@ -166,13 +166,13 @@ function BaseApp({}) {
                     <Stack vertical gap full padded>
                         <Section full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section</Section>
 
-                        <Stack gap full flex>
-                            <Section width="100" collapse="h" full="v" className="bg1" name="First Section">
+                        <Stack gap full>
+                            <Section width={125} collapse="h" full className="bg1" name="First Section">
                                 <Stack vertical full="h" scroll padded gap>
                                     <Content padded center>
                                         <Canvas width={75} height={75} boxed={1} />
                                     </Content>
-                                    <Content wrap>Property Grid Here And so many more cool things :-)</Content>
+                                    <Content full="h" wrap>Property Grid Here And so many more cool things :-)</Content>
                                     <PropertyGrid propWidth="-">
                                         <ValueProp name="Just a test">Working or not?</ValueProp>
                                         <ValueProp name="DAng">
@@ -184,12 +184,12 @@ function BaseApp({}) {
                             <Section full flex name="Second Section">
                                 <GridCanvas size={10} width={50} height={10} />
                             </Section>
-                            <Section width={100} collapse="h" rev full="v" shorten className="bg1" padded name="Last Section">
+                            <Section width={100} collapse="h" rev full shorten className="bg1" padded name="Last Section">
                                 Here I am you fucker!
                             </Section>
                         </Stack>
 
-                        <Section full="h" shorten collapsed collapse name="Bottom Section" className="bg2">
+                        <Section full="h" collapsed collapse name="Bottom Section" className="bg2">
                             <SideTabs>
                                 <SideTab name="First one!" active>
                                     Hey man nice shot

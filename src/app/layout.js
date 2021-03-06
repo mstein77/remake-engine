@@ -290,7 +290,7 @@ function LayoutApp() {
 
     return (
         <div className="full-h full-v content">
-            <div className="stack-h full-h boxed inner-border-h max-h max-v">
+            <div className="stack-h full-v full-h boxed inner-border-h max-h max-v">
                 <div className="content scroll max-h max-v padded flex">
                     {getMarkUp()}
                 </div>
