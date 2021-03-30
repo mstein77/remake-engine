@@ -1,11 +1,18 @@
-import React, {Fragment, useState, useRef, useEffect, useContext, useMemo} from "react";
+import React, {Fragment, useState, useRef, useEffect} from "react";
 import {d} from '../helper/helper';
+
+const DIR = {
+    TOP: 1,
+    BOTTOM: 2,
+    LEFT: 4,
+    RIGHT: 8
+};
 
 /**
  * @module LayoutComponents
  */
 
-function useGetLayoutProps({className, padded, boxed, click, mouseDown, wheel, zIndex, ...props}) {
+function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...props}) {
     const dimCls = [];
     if (className) {
         dimCls.push(className);
@@ -17,21 +24,26 @@ function useGetLayoutProps({className, padded, boxed, click, mouseDown, wheel, z
             dimCls.push('padded' + (padded === 'v' ? '-v' : ''));
         }
     }
-    if (boxed) {
-        dimCls.push((boxed !== true ? 'thin-' : '') + 'boxed');
+    if (border) {
+        dimCls.push((border !== true ? 'thin-' : '') + 'boxed');
+        if (typeof border === 'number') {
+            let i = 1;
+            while (i < 16) {
+                if (!(border & i)) {
+                    dimCls.push('no-border-' + i);
+                }
+                i = i << 1;
+            }
+        }
     }
 
     const dimAttr = {};
-    if (click) {
-        dimAttr['onClick'] = click;
+    for(let prop of ['onClick', 'onKeyDown', 'onMouseDown', 'onWheel', 'onFocus']) {
+        const handler = props[prop];
+        if (handler) {
+            dimAttr[prop] = handler;
+        }
     }
-    if (mouseDown) {
-        dimAttr['onMouseDown'] = mouseDown;
-    }
-    if (wheel) {
-        dimAttr['onWheel'] = wheel;
-    }
-
     const dimStyle = {};
     for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
         let value = props[prop];
@@ -44,6 +56,15 @@ function useGetLayoutProps({className, padded, boxed, click, mouseDown, wheel, z
     }
     if (zIndex !== undefined) {
         dimStyle.zIndex = zIndex;
+    }
+    if (cursor) {
+        dimStyle.cursor = cursor;
+    }
+    if (tab) {
+        dimAttr.tabIndex = 0;
+        dimCls.push('tabbed');
+    } else if (tab === false) {
+        dimAttr.tabIndex = -1;
     }
 
     return {
@@ -127,7 +148,7 @@ function Tooltip({ children }) {
  *    ancestor with an assigned space
  *
  *  [parent:320]  => fix available size of 320
- *    [width:200] => gap of 120
+ *    [width:200] => gaps of 120
  *
  *  [parent:320]
  *    [full] => width: 320
@@ -149,7 +170,7 @@ function Tooltip({ children }) {
  *   - A relative size in the children should (???) refer to the required size of the stack or the max of
  *     the assigned and the required size?
  *   - What does a explicit or relative size on a stack component mean? Normally it should overwrite the
- *     assigned space, which would mean a gap if the size is smaller than the old assigned space or an
+ *     assigned space, which would mean a gaps if the size is smaller than the old assigned space or an
  *     overflow if the new assigned space is greater than the old
  *   - A full prop on a stack will set the required size of the stack to the assigned size???
  *
@@ -165,16 +186,15 @@ function Tooltip({ children }) {
  * @param {object} [props={}]
  * @param {Object|Array} [props.children] - Child components
  * @param {string} [props.className] - Additional CSS classes for this container
- * @param {boolean} [props.flex] - Makes the component flexible if it's parent is a stack component (=flex box container)
  * @param {boolean|string} [props.full] - Extend component to all available space in horizontal ('h'), vertical ('v') or both dimensions (true)
  * @param {boolean|string} [props.center] - Center container of this component horizontally ('h'), vertically ('v') or in both directions (true)
  * @param {boolean|string} [props.centerItems] - Center children of this component horizontally ('h'), vertically ('v') or in both directions (true)
- * @param {boolean|number} [props.boxed] - Draws a full (true) or a 1 pixel (1) border around this component
+ * @param {boolean|number} [props.border] - Draws a full (true) or a 1 pixel (1) border around this component
  * @param {boolean} [props.scroll] - Show vertical and/or horizontal scrollbar when content overflows
  * @param {boolean} [props.padded] - Use default padding for the content
  * @param {boolean} [props.wrap] - Enables word wrapping for the content
  * @param {boolean} [props.shorten] - Enables the shortening of text and shows a tooltip on mouse-over (only works when props.wrap is not set)
- * @param {function} [props.click] - ClickHandler which is invoked when the left mouse button is clicked on this component
+ * @param {function} [props.click] - ClickHandler which is invoked when the left mouse button is onClicked on this component
  * @param {string|number} [props.width] - A CSS width for this component
  * @param {string|number} [props.minWidth] - A CSS min-width for this component
  * @param {string|number} [props.maxWidth] - A CSS max-width for this component
@@ -184,7 +204,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Content = React.forwardRef(({children, flex, center, centerItems, full, shorten, scroll, wrap, zIndex, ...props}, ref) => {
+const Block = React.forwardRef(({children, center, centerItems, full, shorten, scroll, wrap, zIndex, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -200,7 +220,7 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
     const childCls = [];
 
     const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
-    dimCls.push('content');
+    dimCls.push('block');
     if (ref) {
         dimAttr['ref'] = ref;
     } else {
@@ -216,11 +236,12 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
         dimCls.push('full-v');
     }
     if (center) {
-        if (center !== 'v' && !fullH) {
+        if (center !== 'v' /* && !fullH */) {
             dimCls.push('center-h');
         }
-        if (center !== 'h' && !fullV) {
-            parentCls.push('full-v center-v');
+        if (center !== 'h' /* && !fullV */) {
+//            parentCls.push('full-v center-v');
+            parentCls.push('center-v');
             if (dimStyle.height) {
                 dimStyle.minHeight = dimStyle.height;
             }
@@ -266,7 +287,8 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
                 dimStyle.minHeight = dimStyle.height
             }
             if ((childFull && childFull !== 'h') || (childRel && childRel !== 'h')) {
-                childCls.push('full-v center-v');
+//                childCls.push('full-v center-v');
+                childCls.push('center-v');
                 if (childFull !== 'v' || childRel !== 'v') {
                     childCls.push('full-h center-' + (centerItems !== 'v' ? 'child-' : '') + 'h');
                 }
@@ -316,24 +338,23 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
     if (showTooltip) {
         dimCls.push('tooltip-parent');
     }
+    const parentStyle = {};
     if (scroll) {
         parentCls.push('scroll max-v max-h');
-        if (!isMinH) {
+        if (!isMinH && !dimStyle.width) {
             parentCls.push('full-h');
         }
         if (!isMinV) {
-            parentCls.push('full-v');
+            if (dimStyle.maxHeight) {
+                parentStyle.maxHeight = dimStyle.maxHeight;
+                dimStyle.maxHeight = null;
+            } else {
+                parentCls.push('full-v');
+            }
         }
     }
     if (shorten) {
         dimCls.push('max-h');
-    }
-    if (flex) {
-        if (parentCls.length > 0) {
-            parentCls.push('flex');
-        } else {
-            dimCls.push('flex');
-        }
     }
     if (childCls.length) {
         children = <div className={childCls.join(' ')}>{children}</div>
@@ -344,20 +365,39 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
             {showTooltip && <Tooltip>{childText}</Tooltip>}
         </div>
     );
+
     if (!parentCls.length) {
         return dimDiv;
     }
-    parentCls.push('parent');
-    if (!isMinH) {
+    parentCls.push('parent block');
+    if (doShorten || (!isMinH && !dimStyle.width)) {
         // TODO: this class could already be available
         parentCls.push('full-h');
+        if (doShorten) {
+            parentCls.push('block');
+        }
     }
     return (
-        <div className={parentCls.join(' ')}>
+        <div className={parentCls.join(' ')} style={parentStyle}>
             {dimDiv}
         </div>
     );
 });
+
+function getFlatChildren(children, result = []) {
+    if (children) {
+        for(let child of children) {
+            if (child === '') continue;
+
+            if (typeof child.type === 'symbol' && child.type.description === 'react.fragment') {
+                getFlatChildren(child.props.children, result);
+            } else {
+                result.push(child);
+            }
+        }
+    }
+    return result;
+}
 
 /**
  * @function
@@ -367,12 +407,12 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
  * @param {boolean} [props.flex] - Makes the component flexible if it's parent is a stack component (=flex box container)
  * @param {boolean|string} [props.full] - Extend component to all available space in horizontal ('h'), vertical ('v') or both dimensions (true)
  * @param {boolean|string} [props.center] - Center children of this component horizontally ('h'), vertically ('v') or in both directions (true)
- * @param {boolean|number} [props.boxed] - Draws a full (true) or a 1 pixel (1) border around this component
- * @param {boolean} [props.padded] - Use default padding for the content
+ * @param {boolean|number} [props.border] - Draws a full (true) or a 1 pixel (1) border around this component
+ * @param {boolean} [props.padded] - Use default padding for the block
  * @param {boolean} [props.vertical]
- * @param {boolean} [props.gap]
- * @param {boolean} [props.centerAll]
- * @param {boolean} [props.wrap] - Enables word wrapping for the content
+ * @param {boolean} [props.gaps]
+ * @param {boolean} [props.centerItems]
+ * @param {boolean} [props.wrap] - Enables word wrapping for the block
  * @param {string|number} [props.width] - A CSS width for this component
  * @param {string|number} [props.minWidth] - A CSS min-width for this component
  * @param {string|number} [props.maxWidth] - A CSS max-width for this component
@@ -380,62 +420,71 @@ const Content = React.forwardRef(({children, flex, center, centerItems, full, sh
  * @param {string|number} [props.minHeight] - A CSS min-height for this component
  * @param {string|number} [props.maxHeight] - A CSS max-height for this component
  */
-function Stack({children, vertical, flex, wrap, gap, border, scroll, full, center, centerAll, ...props}) {
-    const bCls = ['bounds'];
+function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full, center, centerItems, ...props}) {
+    const parentCls = ['bounds'];
     const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
-
     const axis = vertical ? 'v' : 'h';
     let hasFullV = axis === 'h';
-    dimCls.push('content stack-' + axis);
-    if (flex) {
-        bCls.push('flex');
+    let hasFullH = false;
+    dimCls.push('block stack-' + axis);
+    if (typeof dimStyle.width === 'number') {
+        parentCls.push('fix-h');
+    }
+    if (typeof dimStyle.height === 'number') {
+        parentCls.push('fix-v');
     }
     const style = {};
-    const bStyle = {};
+    const parentStyle = {};
     for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
         const value = dimStyle[prop];
         if (value) {
-            bStyle[prop] = value;
-            if (typeof value === 'string' && value.endsWith('%') && value !== '100%') {
+            if (!['minWidth', 'maxWidth', 'minHeight', 'maxHeight'].includes(prop)) {
+                parentStyle[prop] = value;
+            }
+            if (typeof value === 'string' && value.indexOf('%') !== -1 && value !== '100%') {
+                parentStyle[prop] = value;
                 style[prop] = '100%';
-            } else if (['width', 'height'].includes(prop) && (typeof value !== 'string' || value.match(/^\d+$/))) {
+            }
+            if (['width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight'].includes(prop) && (typeof value !== 'string' || value.match(/^\d+$/))) {
                 style[prop] = value;
             }
         }
     }
-
-    if (gap) {
+    if (gaps) {
         if (wrap) {
             dimCls.push('flow-padding');
-            if (centerAll) {
+            if (centerItems) {
                 dimCls.push('center-items');
             }
         } else {
             dimCls.push('inner-space-' + axis);
         }
     }
-    if (border && children && children.length > 1) {
-        const items = [];
-        const bAttr = {[axis === 'v' ? 'height' : 'width']: 5};
-        const sCls = ['border-bg'];
-        if (axis === 'h') {
-            sCls.push('stretch');
-        } else {
-            sCls.push('full-h');
-        }
-        for (let item of children) {
-            if (item !== '') {
-                items.push(
-                    items.length ?
-                        <Fragment key={'_' + items.length}>
-                            <div className={sCls.join(' ')} style={bAttr}></div>
-                            {item}
-                        </Fragment> :
-                        item
-                );
+    if (borders && children) {
+        children = getFlatChildren(children);
+        if (children.length > 1) {
+            const items = [];
+            const bAttr = {[axis === 'v' ? 'height' : 'width']: 5};
+            const sCls = ['border-bg'];
+            if (axis === 'h') {
+                sCls.push('stretch');
+            } else {
+                sCls.push('full-h');
             }
+            for (let item of children) {
+                if (item !== '') {
+                    items.push(
+                        items.length ?
+                            <Fragment key={'_' + items.length}>
+                                <div className={sCls.join(' ')} style={bAttr}></div>
+                                {item}
+                            </Fragment> :
+                            item
+                    );
+                }
+            }
+            children = items;
         }
-        children = items;
     }
     if (full) {
         if (full !== 'h') {
@@ -444,13 +493,14 @@ function Stack({children, vertical, flex, wrap, gap, border, scroll, full, cente
         }
         if (full !== 'v') {
             dimCls.push('full-h');
-            bCls.push('full-h');
+            parentCls.push('full-h');
+            hasFullH = true;
         }
     }
     if (hasFullV && !wrap) {
         // TODO: modal title cell bigger than flex cell
         if (full !== 'h') {
-            bCls.push('full-v');
+            parentCls.push('full-v');
         }
     }
     if (wrap) {
@@ -459,25 +509,44 @@ function Stack({children, vertical, flex, wrap, gap, border, scroll, full, cente
     if (center) {
         if (center !== 'v') {
             dimCls.push('center-h');
+            parentCls.push('center-h');
         }
         if (center !== 'h') {
-            bCls.push('full-v center-v');
+//            parentCls.push('full-v center-v');
+            parentCls.push('center-v');
             if (style.height) {
                 style.minHeight = style.height;
             }
         }
     }
     if (scroll) {
-        bCls.push('scroll');
+        parentCls.push('scroll');
     }
-    dimCls.push('max-h');
     dimCls.push('max-v');
+
+    if (indented) {
+        parentCls.push(indented === '1' ? 'padded-1' : 'indented');
+    }
 
     if (!style.width) {
         dimCls.push('min-content-h')
     }
+    if (hasFullH) {
+        dimCls.push('max-h');
+    }
+    if (center) {
+        if (parentStyle.width && center !== 'v') {
+            parentStyle.width = false;
+        }
+        if (parentStyle.height && center !== 'h') {
+            parentStyle.height = false;
+        }
+    } else if (axis === 'h') {
+        dimCls.push('no-inline');
+    }
+
     return (
-        <div className={bCls.join(' ')} style={bStyle}>
+        <div className={parentCls.join(' ')} style={parentStyle}>
             <div style={style} className={dimCls.join(' ')} {...dimAttr}>{children}</div>
         </div>
     )
@@ -502,9 +571,9 @@ function getGridTemplateString(value) {
     return newParts.join(' ');
 }
 
-function Grid({children, columns, rows, gap, flex, full, centerAll, className, ...props}) {
+function Grid({children, columns, rows, gaps, full, centerItems, className, ...props}) {
     const cls = ['grid'];
-    const bCls = ['max-h max-v content'];
+    const bCls = ['max-h max-v block'];
     if (className) {
         cls.push(className);
     }
@@ -515,10 +584,10 @@ function Grid({children, columns, rows, gap, flex, full, centerAll, className, .
             style[prop] = value;
         }
     }
-    if (gap) {
+    if (gaps) {
         cls.push('grid-gap');
     }
-    if (centerAll) {
+    if (centerItems) {
         cls.push('grid-cells-centered');
     }
     if (full) {
@@ -538,9 +607,6 @@ function Grid({children, columns, rows, gap, flex, full, centerAll, className, .
     if (rows) {
         style.gridTemplateRows = getGridTemplateString(rows);
     }
-    if (flex) {
-        bCls.push('flex');
-    }
     return (
         <div className={bCls.join(' ')}>
             <div className={cls.join(' ')} style={style}>
@@ -553,7 +619,7 @@ function Grid({children, columns, rows, gap, flex, full, centerAll, className, .
 const OverlayContext = React.createContext();
 
 function Overlays({ width, maxWidth, height, originX = 0, originY = 0, scroll, className, children }) {
-    const cls = ['relative content'];
+    const cls = ['relative block'];
     if (className) {
         cls.push(className);
     }
@@ -601,12 +667,112 @@ function Overlay({ width, height, top = 0, left = 0, className, children }) {
         <div style={style} className={cls.join(' ')}>{children}</div>
     )
 }
+/*
+function Block({maxHeight, minHeight, full, height, className, onclick, children}) {
+    const divRef = useRef(null);
+    const [bound, setBound] = useState(null);
+    const [content, setContent] = useState([]);
+
+    const cls = ['block'];
+    if (className) {
+        cls.push(className);
+    }
+
+    const observerRef = useRef(null);
+
+    useLayoutEffect(() => {
+        if (onclick) return;
+
+        const checkSize = () => {
+            d('checkSize', divRef.current);
+            d(divRef.current.clientHeight, divRef.current.offsetHeight, divRef.current.scrollHeight);
+            if (!divRef.current) return;
+            if (maxHeight && !height) {
+                if (divRef.current.clientHeight < divRef.current.scrollHeight) {
+                    setBound(d(divRef.current.clientHeight + 'px', 'setBound'));
+                } else if (minHeight && bound !== null && divRef.current.clientHeight === divRef.current.scrollHeight) {
+                    setBound(d(null, 'setBound'));
+                } else d('BOUND', bound);
+            }
+        };
+        const observer = new ResizeObserver(checkSize);
+        observerRef.current = observer;
+        observer.observe(divRef.current);
+        checkSize();
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        }
+    }, []);
+
+    const style = {
+        height,
+        maxHeight,
+        minHeight
+    };
+
+    if (maxHeight && !height && bound !== null) {
+        style.height = bound;
+    }
+
+    let click = null;
+    let rclick = null;
+    if (onclick) {
+        click = e => {
+            setContent([...content, 'Hey!']);
+            d('CLICK!');
+        };
+        rclick = e => {
+            e.preventDefault();
+            if (content.length === 0) return;
+            const [foo, ...newContent] = content;
+            setContent(newContent);
+            d('DCLICK!');
+        };
+        children =
+            content.length ?
+            content.map((item, i) => <Fragment key={i}>{item}<br /></Fragment>) :
+            'Please click me!';
+    }
+
+    return (
+        <div onClick={click} onContextMenu={rclick} ref={divRef} className={cls.join(' ')} style={style}>{children}</div>
+    );
+}
+
+function AutoBlock({children, full, minHeight, maxHeight, borders, padding, scroll}) {
+    const cls = ['block'];
+    const style = {
+        minHeight,
+        maxHeight
+    };
+    if (border) {
+        cls.push('border');
+    }
+    if (padding) {
+        cls.push('padded');
+    }
+    if (!full) {
+        cls.push('min-content-h');
+    }
+    if (scroll) {
+        cls.push('scroll');
+    }
+    return (
+        <div className={cls.join(' ')} style={style}>
+            {children}
+        </div>
+    )
+}
+*/
 
 export {
-    Content,
+    Block,
     Stack,
     Grid,
     Overlays,
     Overlay,
-    OverlayContext
+    OverlayContext,
+    DIR
 }

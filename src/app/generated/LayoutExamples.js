@@ -1,1599 +1,1764 @@
 import React from "react";
-import {Content, Stack, Grid, Overlays, Overlay} from "../components/LayoutComponents";
+import {Block, Stack, Grid, Overlays, Overlay} from "../components/LayoutComponents";
 function Canvas() { return <div></div> };
 
 function getExamples() {
     const examples = [];
     examples.push(
-                        <Stack vertical className="bg1" center boxed border full>
-                            <Content center="h" boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content full boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content center="h" boxed="1" width="275" className="bg2">
-                                Children
-                            </Content>
+                        <Block full padded className="bg1">
+                            <Block maxHeight="75%" center="v" border padded className="bg2">
+                                <Block full scroll className="bg3">
+                                    Half of the cake
+                                </Block>
+                            </Block>
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Block full padded className="bg1">
+                            <Block maxHeight="75%" center="v" border padded className="bg2">
+                                <Block full scroll className="bg3">
+                                    Half of the cake
+                                </Block>
+                            </Block>
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Block full padded className="bg1">
+                            <Block maxHeight="75%" center="v" border padded className="bg2">
+                                <Block full scroll className="bg3">
+                                    Half of the cake
+                                </Block>
+                            </Block>
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Block full padded className="bg1">
+                            <Block maxHeight="75%" center="v" border padded className="bg2">
+                                <Block full scroll className="bg3">
+                                    Half of the cake
+                                </Block>
+                            </Block>
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Stack vertical center="v" border gaps className="bg1">
+                            Nothing here to see
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" center boxed border full>
-                            <Content center="v" wrap boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content full boxed="1" className="bg2">
-                                Children
-                            </Content>
-
-                            <Content full="v" boxed="1" className="bg2" height={350}>
-                                Children
-                            </Content>
+                        <Stack vertical center="v" border gaps className="bg1">
+                            <Block height={50} width={50} center scroll className="bg2">XYZ</Block>
+                            <Block full="v" className="bg3">
+                                Hier gehts ab...
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" center="v" boxed border full="h">
-                            <Content center="h" boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content center="h" width="50%" boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content center="h" boxed="1" width="275" className="bg2">
-                                Children
-                            </Content>
+                        <Stack vertical center="v" border gaps className="bg1" scroll>
+                            <Block height={50} className="bg2">XYZ</Block>
+                            <Block minHeight={40} maxHeight={80} className="bg3">
+                                <Block scroll>
+                                 Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                </Block>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" center="h" boxed border full="v">
-                            <Content wrap boxed="1" className="bg2">
-                                Feuer und Wasser
-                            </Content>
-
-                            <Content center="v" boxed="1" className="bg2">
-                                Children
-                            </Content>
-
-                            <Content full="v" boxed="1" className="bg2" height={350}>
-                                Children
-                            </Content>
+                        <Stack vertical border gaps full="v" className="bg1">
+                            <Block height={50} className="bg2">XYZ</Block>
+                            <Block center="v" scroll full="v" minHeight={40} maxHeight={80} className="bg3">
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                                Remaining<br />
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" center border boxed="1">
-                            <Content wrap boxed="1" className="bg2">
+                        <Block scroll minWidth={140} maxWidth={266} border className="bg3">
+                            Remaining xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Block scroll minHeight={140} maxHeight={166} border className="bg3">
+                            Remain<br />
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Stack center="h" border gaps className="bg1">
+                            <Block width={50} className="bg2">XYZ</Block>
+                            <Block scroll minWidth={140} maxWidth={266} className="bg3">
+                                Remaining xxxxxxxxxxxxxxxxxxxxxxxxxxxxyyy
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack center="h" border gaps className="bg1" scroll>
+                            <Block width={50} className="bg2">XYZ</Block>
+                            <Block minWidth={140} maxWidth={266} className="bg3">
+                                <Block scroll>
+                                Remaining xxxxxxxxxxxxxxxxxxxxxxxxxxxxyyy
+                                </Block>
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack border gaps full="h" className="bg1">
+                            <Block width={50} className="bg2">XYZ</Block>
+                            <Block center="h" scroll full="h" minWidth={100} maxWidth={266} className="bg3">Remaining Space</Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical border gaps full="v" className="bg1">
+                            <Block height={50} className="bg2">XYZ</Block>
+                            <Block minHeight={80} maxHeight={180} scroll center="v" full="v" className="bg3">Remaining Space</Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack scroll center="h" border gaps full="h" minWidth={100} maxWidth={266} className="bg1">
+                            <Block width={50} className="bg2">XYZ</Block>
+                            <Block full="h" className="bg3">Remaining Space</Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical scroll center="v" border gaps full="v" minHeight={80} maxHeight={180} className="bg1">
+                            <Block height={50} className="bg2">XYZ</Block>
+                            <Block full="v" className="bg3">Remaining Space</Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Block full centerItems="v">
+                                <Block onclick className="bg2">
+                                        Click me!
+                                </Block>
+                        </Block>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" center border borders full>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" center border borders full>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" center border borders full>
+                            <Block center="h" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block full border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block center="h" border="1" width="275" className="bg2">
+                                Children
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center border borders full>
+                            <Block center="v" wrap border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block full border="1" className="bg2">
+                                Children
+                            </Block>
+
+                            <Block full="v" border="1" className="bg2" height={350}>
+                                Children
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack vertical className="bg1" center="v" border borders full="h">
+                            <Block center="h" border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block center="h" width="50%" border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block center="h" border="1" width="275" className="bg2">
+                                Children
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center="h" border borders full="v">
+                            <Block wrap border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block center="v" border="1" className="bg2">
+                                Children
+                            </Block>
+
+                            <Block full="v" border="1" className="bg2" height={350}>
+                                Children
+                            </Block>
+                        </Stack>
+                    
+    );
+    examples.push(
+                        <Stack className="bg1" center borders border="1">
+                            <Block wrap border="1" className="bg2">
+                                Feuer und Wasser
+                            </Block>
+
+                            <Block border="1" className="bg2">
                                 ChildrenX
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2" height={150}>
+                            <Block border="1" className="bg2" height={150}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" center="v" border boxed="1">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" center="v" borders border="1">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 ChildrenX
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2" height={150}>
+                            <Block border="1" className="bg2" height={150}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack center vertical className="bg1" boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack center vertical className="bg1" border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content width="50%" boxed="1" className="bg2">
+                            <Block width="50%" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="250" className="bg2">
+                            <Block border="1" width="250" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack center="h" vertical className="bg1" boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack center="h" vertical className="bg1" border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content width="50%" boxed="1" className="bg2">
+                            <Block width="50%" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="250" className="bg2">
+                            <Block border="1" width="250" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" boxed border gap full>
-                            <Content center="h" boxed="1" className="bg2">
+                        <Stack vertical className="bg1" border borders gaps full>
+                            <Block center="h" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" center="h" width="50%" boxed="1" className="bg2">
+                            <Block full="v" center="h" width="50%" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="h" boxed="1" width="450" className="bg2">
+                            <Block center="h" border="1" width="450" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" boxed border full="h">
-                            <Content center="h" boxed="1" className="bg2">
+                        <Stack vertical className="bg1" border borders full="h">
+                            <Block center="h" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="h" width="50%" boxed="1" className="bg2">
+                            <Block center="h" width="50%" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="h" boxed="1" width="275" className="bg2">
+                            <Block center="h" border="1" width="275" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" boxed border width="60%">
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" border borders width="60%">
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="h" boxed="1" className="bg2">
+                            <Block center="h" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="275" className="bg2">
+                            <Block border="1" width="275" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" boxed border gap full>
-                            <Content center="v" wrap boxed="1" className="bg2">
+                        <Stack className="bg1" border borders gaps full>
+                            <Block center="v" wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" full="h" height="75%" boxed="1" className="bg2">
+                            <Block center="v" full="h" height="75%" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content center="v" full="v" boxed="1" className="bg2" height={350}>
+                            <Block center="v" full="v" border="1" className="bg2" height={350}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" boxed border full="v">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" border borders full="v">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={350}>
+                            <Block full="v" border="1" className="bg2" height={350}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" boxed border>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" border borders>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width="60%">
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="h" boxed="1" className="bg2">
+                            <Block center="h" border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="275" className="bg2">
+                            <Block border="1" width="275" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width="60%">
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="75%" className="bg2">
+                            <Block border="1" width="75%" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width="60%">
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" full="h" className="bg2">
+                            <Block border="1" full="h" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width="60%">
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width="60%">
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" center="h" className="bg2">
+                            <Block border="1" center="h" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width={200}>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" center="h" className="bg2">
+                            <Block border="1" center="h" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="275" className="bg2">
+                            <Block border="1" width="275" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width={200}>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="75%" className="bg2">
+                            <Block border="1" width="75%" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width={200}>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" full="h" className="bg2">
+                            <Block border="1" full="h" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap width={200}>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps width={200}>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width={75} className="bg2">
+                            <Block border="1" width={75} className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" width="75%" className="bg2">
+                            <Block border="1" width="75%" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" full="h" className="bg2">
+                            <Block border="1" full="h" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack vertical className="bg1" padded boxed="1" gap>
-                            <Content boxed="1" className="bg2">
+                        <Stack vertical className="bg1" padded border="1" gaps>
+                            <Block border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" center="h" className="bg2">
+                            <Block border="1" center="h" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap full="v">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps full="v">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={350}>
+                            <Block full="v" border="1" className="bg2" height={350}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap full="v">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps full="v">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height="75%">
+                            <Block full="v" border="1" className="bg2" height="75%">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap full="v">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps full="v">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2">
+                            <Block full="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap full="v">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps full="v">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height="75%">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height="75%">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={350}>
+                            <Block full="v" border="1" className="bg2" height={350}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height="75%">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height="75%">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height="75%">
+                            <Block full="v" border="1" className="bg2" height="75%">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height="75%">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height="75%">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2">
+                            <Block full="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height="75%">
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height="75%">
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height={150}>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height={150}>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={350}>
+                            <Block full="v" border="1" className="bg2" height={350}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height={150}>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height={150}>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={50}>
+                            <Block full="v" border="1" className="bg2" height={50}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height={150}>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height={150}>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height="75%">
+                            <Block full="v" border="1" className="bg2" height="75%">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height={150}>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height={150}>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2">
+                            <Block full="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap height={150}>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps height={150}>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height={50}>
+                            <Block full="v" border="1" className="bg2" height={50}>
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2" height="75%">
+                            <Block full="v" border="1" className="bg2" height="75%">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content full="v" boxed="1" className="bg2">
+                            <Block full="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Stack className="bg1" padded boxed="1" gap>
-                            <Content wrap boxed="1" className="bg2">
+                        <Stack className="bg1" padded border="1" gaps>
+                            <Block wrap border="1" className="bg2">
                                 Feuer und Wasser
-                            </Content>
+                            </Block>
 
-                            <Content center="v" boxed="1" className="bg2">
+                            <Block center="v" border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
 
-                            <Content boxed="1" className="bg2">
+                            <Block border="1" className="bg2">
                                 Children
-                            </Content>
+                            </Block>
                         </Stack>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack full="v" center vertical border boxed width={275} className="bg2">
-                                <Content xfull="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack full="v" center vertical borders border width={275} className="bg2">
+                                <Block xfull="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center full="h" vertical border boxed height={115} className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center full="h" vertical borders border height={115} className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center vertical border boxed width={233} height={115} className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center vertical borders border width={233} height={115} className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center full="v" vertical border boxed width="75%" className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center full="v" vertical borders border width="75%" className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center full="h" vertical border boxed height="75%" className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center full="h" vertical borders border height="75%" className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center vertical border boxed width="75%" className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center vertical borders border width="75%" className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center vertical border boxed height="75%" className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center vertical borders border height="75%" className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems>
-                            <Stack center vertical border boxed width="75%" height="75%" className="bg2">
-                                <Content full="h">
+                        <Block width="90%" height="90%" center centerItems>
+                            <Stack center vertical borders border width="75%" height="75%" className="bg2">
+                                <Block full="h">
                                     Feuer und Wasser
-                                </Content>
+                                </Block>
 
-                                <Content flex>
+                                <Block full="v">
                                     Children?
-                                </Content>
+                                </Block>
                             </Stack>
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" wrap className="bg1">
+                        <Block width="90%" height="90%" center centerItems="h" wrap className="bg1">
                             Feuer und Wasser
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content width="233" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block width="233" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content width="233" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block width="233" center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content width="50%" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block width="50%" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content width="50%" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block width="50%" center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content full="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block full="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content full="h" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block full="h" center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                        <Block width="90%" height="90%" center centerItems="v" wrap className="bg1">
                             Feuer und Wasser
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center wrap className="bg1">
-                            <Content center="v" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center wrap className="bg1">
+                            <Block center="v" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
-                            <Content height="175" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Block height="175" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center wrap className="bg1">
-                            <Content center="v" height="175" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center wrap className="bg1">
+                            <Block center="v" height="175" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
-                            <Content height="33%" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Block height="33%" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center wrap className="bg1">
-                            <Content center="v" height="33%" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center wrap className="bg1">
+                            <Block center="v" height="33%" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" wrap className="bg1">
-                            <Content full="v" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" wrap className="bg1">
+                            <Block full="v" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center wrap className="bg1">
-                            <Content center="v" full="v" boxed>Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center wrap className="bg1">
+                            <Block center="v" full="v" border>Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems wrap className="bg1">
+                        <Block width="90%" height="90%" center centerItems wrap className="bg1">
                             Feuer und Wasser
-                        </Content>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content center boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block center border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block center="v" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
-                            <Content center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Block center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems className="bg1">
-                            <Content width="233" height="175" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems className="bg1">
+                            <Block width="233" height="175" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content width="233" height="175" center boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block width="233" height="175" center border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content width="233" height="175" center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block width="233" height="175" center="v" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
-                            <Content width="233" height="175" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Block width="233" height="175" center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems className="bg1">
-                            <Content width="50%" height="33%" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems className="bg1">
+                            <Block width="50%" height="33%" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content width="50%" height="33%" center boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block width="50%" height="33%" center border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
-                            <Content width="50%" height="33%" center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Block width="50%" height="33%" center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content width="50%" height="33%" center="v" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block width="50%" height="33%" center="v" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems className="bg1">
-                            <Content full boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems className="bg1">
+                            <Block full border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center className="bg1">
-                            <Content full center boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center className="bg1">
+                            <Block full center border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="h" className="bg1">
-                            <Content center="v" full boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="h" className="bg1">
+                            <Block center="v" full border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-                        <Content width="90%" height="90%" center centerItems="v" className="bg1">
-                            <Content full center="h" boxed wrap className="bg2">Feuer und Wasser</Content>
-                        </Content>
+                        <Block width="90%" height="90%" center centerItems="v" className="bg1">
+                            <Block full center="h" border wrap className="bg2">Feuer und Wasser</Block>
+                        </Block>
                     
     );
     examples.push(
-    <Content boxed="1" padded wrap className="bg1">
+    <Block border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content full="v" boxed="1" padded wrap className="bg1">
+    <Block full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content height="50%" boxed="1" padded wrap className="bg1">
+    <Block height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content height="350" boxed="1" padded wrap className="bg1">
+    <Block height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content full="h" boxed="1" padded wrap className="bg1">
+    <Block full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content full boxed="1" padded wrap className="bg1">
+    <Block full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content full="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block full="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="50%" boxed="1" padded wrap className="bg1">
+    <Block width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="50%" height="50%" boxed="1" padded wrap className="bg1">
+    <Block width="50%" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="500" boxed="1" padded wrap className="bg1">
+    <Block width="500" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="500" full="v" boxed="1" padded wrap className="bg1">
+    <Block width="500" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="500" height="50%" boxed="1" padded wrap className="bg1">
+    <Block width="500" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content width="500" height="350" boxed="1" padded wrap className="bg1">
+    <Block width="500" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" boxed="1" padded wrap className="bg1">
+    <Block center="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="h" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" full="h" boxed="1" padded wrap className="bg1">
+    <Block center="h" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" full boxed="1" padded wrap className="bg1">
+    <Block center="h" full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" full="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center="h" full="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="h" full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="50%" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="50%" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="500" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="500" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="500" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="500" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="500" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="500" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="h" width="500" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="h" width="500" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" boxed="1" padded wrap className="bg1">
+    <Block center="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" full="h" boxed="1" padded wrap className="bg1">
+    <Block center="v" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center="v" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" width="450" boxed="1" padded wrap className="bg1">
+    <Block center="v" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="v" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" full boxed="1" padded wrap className="bg1">
+    <Block center="v" full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="v" width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" width="450" full="v" boxed="1" padded wrap className="bg1">
+    <Block center="v" width="450" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="50%" full="h" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="50%" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="50%" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="50%" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="50%" width="450" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="50%" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block center="v" full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="350" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="350" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center="v" height="350" width="450" boxed="1" padded wrap className="bg1">
+    <Block center="v" height="350" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center boxed="1" padded wrap className="bg1">
+    <Block center border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="h" boxed="1" padded wrap className="bg1">
+    <Block center full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center width="50%" boxed="1" padded wrap className="bg1">
+    <Block center width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center width="450" boxed="1" padded wrap className="bg1">
+    <Block center width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="v" boxed="1" padded wrap className="bg1">
+    <Block center full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full boxed="1" padded wrap className="bg1">
+    <Block center full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="v" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center full="v" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="v" width="450" boxed="1" padded wrap className="bg1">
+    <Block center full="v" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center height="50%" boxed="1" padded wrap className="bg1">
+    <Block center height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block center full="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center height="50%" width="50%" boxed="1" padded wrap className="bg1">
+    <Block center height="50%" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center height="50%" width="450" boxed="1" padded wrap className="bg1">
+    <Block center height="50%" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center height="350" boxed="1" padded wrap className="bg1">
+    <Block center height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block center full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block center width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content center height="350" width="450" boxed="1" padded wrap className="bg1">
+    <Block center height="350" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" full boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" full="h" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" full="h" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="50%" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="50%" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="500" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="500" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="500" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="500" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="500" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="500" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="h" width="500" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="h" width="500" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="450" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" full boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="450" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="450" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" height="50%" full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" height="50%" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" height="50%" width="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" height="50%" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" height="50%" width="450" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" height="50%" width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" full="h" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" full="h" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems="v" width="450" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems="v" width="450" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems boxed="1" padded wrap className="bg1">
+    <Block centerItems border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="450" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="450" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems full boxed="1" padded wrap className="bg1">
+    <Block centerItems full border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="50%" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="50%" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="450" full="v" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="450" full="v" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems height="50%" full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems height="50%" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems height="50%" width="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems height="50%" width="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="450" height="50%" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="450" height="50%" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems height="350" full="h" boxed="1" padded wrap className="bg1">
+    <Block centerItems height="350" full="h" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="50%" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="50%" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content centerItems width="450" height="350" boxed="1" padded wrap className="bg1">
+    <Block centerItems width="450" height="350" border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content boxed="1" padded wrap className="bg1">
+    <Block border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
-    <Content boxed="1" padded wrap className="bg1">
+    <Block border="1" padded wrap className="bg1">
         Feuer und Wasser
-    </Content>
+    </Block>
 
     );
     examples.push(
@@ -1614,167 +1779,167 @@ function getExamples() {
     );
     examples.push(
         <Stack>
-            <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content wrap className="bg3" flex>Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block wrap className="bg3" full="h">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack minHeight={150}>
-            <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="h" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack full="v">
-            <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="h" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical full="v">
-            <Content height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="v" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical maxWidth={200} full="v">
-            <Content height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="v" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical full>
-            <Content height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="v" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical full>
             <Stack full="h" wrap className="bg1">
-                <Content>Sub 1 verr u wuewueuwew uweu weuwe e</Content>
-                <Content>Sub 2 hhwehw hwehwe hwehw whewh e</Content>
-                <Content>Sub 3</Content>
+                <Block>Sub 1 verr u wuewueuwew uweu weuwe e</Block>
+                <Block>Sub 2 hhwehw hwehwe hwehw whewh e</Block>
+                <Block>Sub 3</Block>
             </Stack>
-            <Content flex wrap className="bg2">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block full="v" wrap className="bg2">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
             <Stack full="h" wrap className="bg3">
-                <Content>Sub 1 verr u wuewueuwew uweu weuwe e</Content>
-                <Content>Sub 2 hhwehw hwehwe hwehw whewh e</Content>
-                <Content>Sub 3</Content>
+                <Block>Sub 1 verr u wuewueuwew uweu weuwe e</Block>
+                <Block>Sub 2 hhwehw hwehwe hwehw whewh e</Block>
+                <Block>Sub 3</Block>
             </Stack>
         </Stack>
     
     );
     examples.push(
         <Stack full>
-            <Content maxWidth={100} className="bg1">
+            <Block maxWidth={100} className="bg1">
                 <Stack wrap>
-                    <Content>Master on Sub 1</Content>
-                    <Content>Sub 2</Content>
-                    <Content>Sub 3</Content>
+                    <Block>Master on Sub 1</Block>
+                    <Block>Sub 2</Block>
+                    <Block>Sub 3</Block>
                 </Stack>
-            </Content>
-            <Content flex wrap className="bg2">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
-            <Content className="bg3">
+            </Block>
+            <Block full="h" wrap className="bg2">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
+            <Block className="bg3">
                 <Stack wrap>
-                    <Content>Sub 1</Content>
-                    <Content>Sub 2</Content>
-                    <Content>Sub 3</Content>
+                    <Block>Sub 1</Block>
+                    <Block>Sub 2</Block>
+                    <Block>Sub 3</Block>
                 </Stack>
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
-        <Content shorten width={80} className="bg1">
+        <Block shorten width={80} className="bg1">
             Test1<br />
             Thisisalittlebitlongerthanexpected
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content shorten maxWidth={80} className="bg1">
+        <Block shorten maxWidth={80} className="bg1">
             Test1<br />
             Thisisalittlebitlongerthanexpected
-        </Content>
+        </Block>
     
     );
     examples.push(
         <Stack vertical maxWidth={80}>
-            <Content shorten className="bg1">
+            <Block shorten className="bg1">
                 Test1<br />
                 Thisisalittlebitlongerthanexpected
-            </Content>
-            <Content shorten className="bg2">
+            </Block>
+            <Block shorten className="bg2">
                 Test1
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
-            <Content shorten className="bg1">
+            <Block shorten className="bg1">
                 HSH HASHSAHS HS HASH SHS AHSSHASHSAHSSHH SHASHAHS HSHHS S
-            </Content>
+            </Block>
     
     );
     examples.push(
-        <Content scroll full="v" className="bg1">
+        <Block scroll full="v" className="bg1">
             HSHAHASHSAHSAHSAHASHASHSAAHSSHASHSAHSSHHASHASHAHSAHSHHSAS
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content scroll full="h" className="bg1">
+        <Block scroll full="h" className="bg1">
             H<br />SHA<br />HASH<br />SAHSAH<br />SAHASH<br />ASHSAA<br />HSSHA<br />SHSAH<br />SSHHA<br />SHASH<br />AHSAH<br />SHHSAS
             H<br />SHA<br />HASH<br />SAHSAH<br />SAHASH<br />ASHSAA<br />HSSHA<br />SHSAH<br />SSHHA<br />SHASH<br />AHSAH<br />SHHSAS
-        </Content>
+        </Block>
     
     );
     examples.push(
         <Stack>
-            <Content width={100} scroll wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex scroll wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+            <Block width={100} scroll wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="h" scroll wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
         <Stack maxHeight={50}>
-            <Content width={100} scroll wrap className="bg1">
+            <Block width={100} scroll wrap className="bg1">
                 Fix size
                 <br />ooooooooooooooooooooover
                 <br />aaa
                 <br />bbb
-            </Content>
-            <Content scroll wrap className="bg2">
+            </Block>
+            <Block scroll wrap className="bg2">
                 Min contenteeeeeee
                 <br />ooooooooooooooooooooover
                 <br />aaa
                 <br />bbb
-            </Content>
-            <Content flex scroll wrap className="bg3">
-                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            </Block>
+            <Block full="h" scroll wrap className="bg3">
+                Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
                 <br />ooooooooooooooooooooover
                 <br />aaa
                 <br />bbb
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
         <Stack full="h">
-            <Content scroll width={100} wrap className="bg1">
+            <Block scroll width={100} wrap className="bg1">
                 Fix size
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1784,8 +1949,8 @@ function getExamples() {
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
-            </Content>
-            <Content scroll wrap className="bg2">
+            </Block>
+            <Block scroll wrap className="bg2">
                 Min contenteeeeeee
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1795,9 +1960,9 @@ function getExamples() {
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
-            </Content>
-            <Content flex scroll wrap className="bg3">
-                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            </Block>
+            <Block full="h" scroll wrap className="bg3">
+                Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1806,13 +1971,13 @@ function getExamples() {
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical full="v">
-            <Content scroll height={100} className="bg1">
+            <Block scroll height={100} className="bg1">
                 Fix size ooooooooooooooooooooover
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1822,13 +1987,13 @@ function getExamples() {
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
-            </Content>
-            <Content scroll className="bg2">
+            </Block>
+            <Block scroll className="bg2">
                 Min contenteeeeeee<br />
                 row 2
-            </Content>
-            <Content scroll flex className="bg3">
-                Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            </Block>
+            <Block scroll full="v" className="bg3">
+                Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1837,36 +2002,36 @@ function getExamples() {
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
                 <br />ooooooooooooooooooooover<br />aaa<br />bbb
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
-        <Content center="v" full="h" className="bg1">
+        <Block center="v" full="h" className="bg1">
             Abcde
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content center="h" className="bg1">
+        <Block center="h" className="bg1">
             Abcde
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content center className="bg1">
+        <Block center className="bg1">
             Abcde
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content center scroll className="bg1">
+        <Block center scroll className="bg1">
             Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content center scroll className="bg1">
+        <Block center scroll className="bg1">
             Abcdeiwqeqwjiew<br />
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1875,11 +2040,11 @@ function getExamples() {
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content center scroll className="bg1">
+        <Block center scroll className="bg1">
             Abcdeiwqeqwjiewqijewiqejiwqejwqeijwqejwqjeiwqijewqjiejwqiejiwqeijqwjieqwewqeqwe<br />
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -1888,48 +2053,48 @@ function getExamples() {
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Grid gap columns="minmax(80px, 120px) auto" rows="min-content min-content">
-            <Content shorten className="bg1">Cellwewewewwew wew wew wewe</Content>
-            <Content scroll wrap className="bg2">Cell 2 wew we wew ewew we ewe   wewe wewe we we
-                weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq</Content>
-            <Content wrap className="bg2">Cell 3</Content>
-            <Content wrap className="bg1">Cell 4</Content>
+        <Grid gaps columns="minmax(80px, 120px) auto" rows="min-content min-content">
+            <Block shorten className="bg1">Cellwewewewwew wew wew wewe</Block>
+            <Block scroll wrap className="bg2">Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq</Block>
+            <Block wrap className="bg2">Cell 3</Block>
+            <Block wrap className="bg1">Cell 4</Block>
         </Grid>
     
     );
     examples.push(
-        <Content scroll full>
-            <Grid full="h" gap columns="minmax(80px, 120px) auto">
-                <Content shorten className="bg1">Cellwewewewwew wew wew wewe</Content>
-                <Content wrap scroll className="bg2">Cell 2 wew we wew ewew we ewe   wewe wewe we we
-                    weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
-                <Content wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Content>
-                <Content wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Content>
+        <Block scroll full>
+            <Grid full="h" gaps columns="minmax(80px, 120px) auto">
+                <Block shorten className="bg1">Cellwewewewwew wew wew wewe</Block>
+                <Block wrap scroll className="bg2">Cell 2 wew we wew ewew we ewe   wewe wewe we we
+                    weweqweweweweweweqqrwerqtqrwqrwqrwqewqewqewqewqeqwrwqewqeq</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
+                <Block wrap className="bg2">Cell 3weqweqqwewqewqeqwewqeq</Block>
+                <Block wrap className="bg1">Cell 4 wqew ewqe wqewqe wqewqe wqewqewqewqewqewqewq ewqe qweqwewqewqe wqewq wqe eqweqweqw</Block>
             </Grid>
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Grid gap full centerAll columns="20px auto 20px" rows="20px auto 20px">
-            <Content className="bg1">1</Content>
-            <Content className="bg2">2</Content>
-            <Content className="bg1">3</Content>
-            <Content className="bg2">4</Content>
-            <Content wrap scroll full className="bg1">
+        <Grid gaps full centerItems columns="20px auto 20px" rows="20px auto 20px">
+            <Block className="bg1">1</Block>
+            <Block className="bg2">2</Block>
+            <Block className="bg1">3</Block>
+            <Block className="bg2">4</Block>
+            <Block wrap scroll full className="bg1">
                 wwew ewqe wqewq ewqe wqewqe wqe wqewqe wqewqe qwewqe wqe wqe ewqe
                 wqewe wqe qwe wqewq ewqe qwe qweqwe wqe qwe qwewqe wqe wqe qwewqe wqeqw e
                 wqewqe wqe wqeqw e ewe qw ewqewq e qwewqe wqewqewqewq ewqe eqw ewqe qwe
@@ -1947,24 +2112,24 @@ function getExamples() {
                 qe qwe wqeqwe
                 qwe qwe qwewq eqwe wqe qweqw
                 e qweqwe w
-            </Content>
-            <Content className="bg2">6</Content>
-            <Content className="bg1">7</Content>
-            <Content className="bg2">8</Content>
-            <Content className="bg1">9</Content>
+            </Block>
+            <Block className="bg2">6</Block>
+            <Block className="bg1">7</Block>
+            <Block className="bg2">8</Block>
+            <Block className="bg1">9</Block>
         </Grid>
     
     );
     examples.push(
-            <Content>Unsupported</Content>
+            <Block>Unsupported</Block>
     
     );
     examples.push(
         <Stack vertical full>
-            <Content height={40}>
+            <Block height={40}>
                 Top...
-            </Content>
-            <Content flex>
+            </Block>
+            <Block full="v">
                 <Overlays width={200} height={150}>
                     <Overlay width={200} height={150}>
                         base
@@ -1976,19 +2141,19 @@ function getExamples() {
                         Overlay 2
                     </Overlay>
                 </Overlays>
-            </Content>
-            <Content height={40}>
+            </Block>
+            <Block height={40}>
                 Bottom...
-            </Content>
+            </Block>
         </Stack>
     
     );
     examples.push(
         <Stack vertical full>
-            <Content height={40}>
+            <Block height={40}>
                 Top...
-            </Content>
-            <Content flex center>
+            </Block>
+            <Block full="v" center>
                 <Overlays scroll maxWidth={400} width={500} height={150}>
                     <Overlay width={500} height={150}>
                         base
@@ -2000,34 +2165,34 @@ function getExamples() {
                         Overlay 2
                     </Overlay>
                 </Overlays>
-            </Content>
-            <Content height={40}>
+            </Block>
+            <Block height={40}>
                 Bottom...
-            </Content>
+            </Block>
         </Stack>
 
     
     );
     examples.push(
-        <Content padded full="h" className="bg1">
+        <Block padded full="h" className="bg1">
             Children go here...
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded scroll className="bg1">
+        <Block padded scroll className="bg1">
             jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded shorten className="bg1">
+        <Block padded shorten className="bg1">
             jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded scroll className="bg1">
+        <Block padded scroll className="bg1">
             jwejwjejwejwqejwqejwqjewqjewqjewjqejwqejwqjeqwjejwqejwqjeqwjejqwejwqjewqjeqjwej
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
@@ -2036,402 +2201,402 @@ function getExamples() {
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
             <br />ooooooooooooooooooooover<br />aaa<br />bbb
-        </Content>
+        </Block>
 
     
     );
     examples.push(
-        <Content padded="h" full="h" className="bg1">
+        <Block padded="h" full="h" className="bg1">
             Children go here...
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded="v" full="h" className="bg1">
+        <Block padded="v" full="h" className="bg1">
             Children go here...
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Stack gap>
-            <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+        <Stack gaps>
+            <Block width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="h" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
-        <Stack vertical gap full>
-            <Content height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+        <Stack vertical gaps full>
+            <Block height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="v" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
-        <Stack border full="v">
-            <Content width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+        <Stack borders full="v">
+            <Block width={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block full="h" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
-        <Stack vertical border full>
-            <Content wrap className="bg2">Min contenteeeeeee</Content>
-            <Content height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Content>
-            <Content flex wrap className="bg3">Max content aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Content>
+        <Stack vertical borders full>
+            <Block wrap className="bg2">Min contenteeeeeee</Block>
+            <Block height={100} wrap className="bg1">Fix size ooooooooooooooooooooover</Block>
+            <Block full="v" wrap className="bg3">Max block aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</Block>
         </Stack>
     
     );
     examples.push(
-        <Stack full="h" wrap gap className="bg1">
-            <Content thin boxed>Elem one</Content>
-            <Content thin boxed>Elem HWHEhwehwehwe</Content>
-            <Content thin boxed>Elem wjwjewje</Content>
-            <Content thin boxed>Elem</Content>
-            <Content thin boxed>Elem geee haw</Content>
-            <Content thin boxed>Elem geee haw</Content>
-            <Content thin boxed>Elem geee haw</Content>
-            <Content thin boxed>Elem Bababsabs</Content>
+        <Stack full="h" wrap gaps className="bg1">
+            <Block border>Elem one</Block>
+            <Block border>Elem HWHEhwehwehwe</Block>
+            <Block border>Elem wjwjewje</Block>
+            <Block border>Elem</Block>
+            <Block border>Elem geee haw</Block>
+            <Block border>Elem geee haw</Block>
+            <Block border>Elem geee haw</Block>
+            <Block border>Elem Bababsabs</Block>
         </Stack>
     
     );
     examples.push(
-        <Stack full="h" wrap gap centerAll className="bg1">
-            <Content thin boxed>Elem one</Content>
-            <Content wrap thin boxed>Elem HWHEhwehwehwe</Content>
-            <Content wrap thin boxed>Elem wjwjewje</Content>
-            <Content boxed>Elem</Content>
-            <Content boxed>Elem geee haw</Content>
-            <Content wrap thin boxed>Elem geee haw</Content>
-            <Content thin boxed>Elem geee haw</Content>
-            <Content thin boxed>Elem Bababsabs</Content>
+        <Stack full="h" wrap gaps centerItems className="bg1">
+            <Block border>Elem one</Block>
+            <Block wrap border="1">Elem HWHEhwehwehwe</Block>
+            <Block wrap border="1">Elem wjwjewje</Block>
+            <Block border>Elem</Block>
+            <Block border>Elem geee haw</Block>
+            <Block wrap border="1">Elem geee haw</Block>
+            <Block border>Elem geee haw</Block>
+            <Block border>Elem Bababsabs</Block>
         </Stack>
     
     );
     examples.push(
-        <Content padded full="h" className="bg1">
-            <Stack gap>
-                <Content boxed width={100} height={100} className="bg2"></Content>
-                <Content thin boxed width={100} height={100} className="bg3"></Content>
+        <Block padded full="h" className="bg1">
+            <Stack gaps>
+                <Block border width={100} height={100} className="bg2"></Block>
+                <Block border width={100} height={100} className="bg3"></Block>
             </Stack>
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded full="h">
-            <Stack gap>
-                <Canvas boxed width={100} height={100}></Canvas>
-                <Canvas thin boxed width={100} height={100}></Canvas>
+        <Block padded full="h">
+            <Stack gaps>
+                <Canvas border width={100} height={100}></Canvas>
+                <Canvas border="1" width={100} height={100}></Canvas>
             </Stack>
-        </Content>
+        </Block>
     
     );
     examples.push(
-        <Content padded full="h" className="bg1">
-            <Stack border boxed>
-                <Content width={100} height={100} className="bg2"></Content>
-                <Content width={100} height={100} className="bg3"></Content>
+        <Block padded full="h" className="bg1">
+            <Stack borders border>
+                <Block width={100} height={100} className="bg2"></Block>
+                <Block width={100} height={100} className="bg3"></Block>
             </Stack>
-        </Content>
+        </Block>
 
     
     );
     examples.push(
-        <Stack vertical gap padded className="bg2">
-            <Content className="bg1">
+        <Stack vertical gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical gap padded full="h" className="bg2">
-            <Content className="bg1">
+        <Stack vertical gaps padded full="h" className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical gap padded className="bg2">
-            <Content className="bg1" full="h">
+        <Stack vertical gaps padded className="bg2">
+            <Block className="bg1" full="h">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical full="v" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack vertical full="v" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical gap padded className="bg2">
-            <Content full="v" className="bg1">
+        <Stack vertical gaps padded className="bg2">
+            <Block full="v" className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical full="v" gap padded className="bg2">
-            <Content full="v" className="bg1">
+        <Stack vertical full="v" gaps padded className="bg2">
+            <Block full="v" className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical gap padded full className="bg2">
-            <Content className="bg1">
+        <Stack vertical gaps padded full className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical gap padded full className="bg2">
-            <Content className="bg1">
+        <Stack vertical gaps padded full className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="v" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical full="h" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack vertical full="h" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="v" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack vertical full="v" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack vertical full="v" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="v" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded className="bg2">
-            <Content className="bg1">
+        <Stack gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded full="h" className="bg2">
-            <Content className="bg1">
+        <Stack gaps padded full="h" className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded className="bg2">
-            <Content className="bg1" full="h">
+        <Stack gaps padded className="bg2">
+            <Block className="bg1" full="h">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full="v" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack full="v" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded className="bg2">
-            <Content full="v" className="bg1">
+        <Stack gaps padded className="bg2">
+            <Block full="v" className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full="v" gap padded className="bg2">
-            <Content full="v" className="bg1">
+        <Stack full="v" gaps padded className="bg2">
+            <Block full="v" className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded full className="bg2">
-            <Content className="bg1">
+        <Stack gaps padded full className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content className="bg3">
+            </Block>
+            <Block className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack gap padded full className="bg2">
-            <Content className="bg1">
+        <Stack gaps padded full className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="h" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full="h" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack full="h" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="h" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full="v" gap padded className="bg2">
-            <Content className="bg1">
+        <Stack full="v" gaps padded className="bg2">
+            <Block className="bg1">
                     e1<br />balalaa
-            </Content>
-            <Content flex className="bg3">
+            </Block>
+            <Block full="h" className="bg3">
                     e2<br />balalaaaaaaaaaaaa<br />heey
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full gap padded className="bg2">
-            <Content padded width={100} className="bg1">
+        <Stack full gaps padded className="bg2">
+            <Block padded width={100} className="bg1">
                     fix
-            </Content>
-            <Content flex>
-                <Stack full="v" padded gap flex className="bg1">
-                    <Content padded className="bg3">
+            </Block>
+            <Block full="h">
+                <Stack full="v" padded gaps className="bg1">
+                    <Block padded className="bg3">
                         First
-                    </Content>
-                    <Content padded wrap className="bg3">
+                    </Block>
+                    <Block padded wrap className="bg3">
                         Second Box
-                    </Content>
+                    </Block>
                 </Stack>
-            </Content>
-            <Content padded width={100} className="bg3">
+            </Block>
+            <Block padded width={100} className="bg3">
                     last
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full gap padded className="bg2">
-            <Content padded width={100} className="bg1">
+        <Stack full gaps padded className="bg2">
+            <Block padded width={100} className="bg1">
                     fix
-            </Content>
-            <Stack full="v" padded gap flex className="bg1">
-                <Content padded className="bg3">
+            </Block>
+            <Stack full="v" padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>
-            <Content padded width={100} className="bg3">
+            <Block padded width={100} className="bg3">
                     last
-            </Content>
+            </Block>
         </Stack>
                     
     );
     examples.push(
-        <Stack full gap padded scroll className="bg2">
-            <Content padded width={100} className="bg1">
+        <Stack full gaps padded scroll className="bg2">
+            <Block padded width={100} className="bg1">
                     fix
-            </Content>
-            <Stack padded gap flex className="bg1">
-                <Content padded className="bg3">
+            </Block>
+            <Stack padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
-                <Content padded className="bg3">
+                </Block>
+                <Block padded className="bg3">
                     Veryveryveryveryveryveryveryveryveryverylong Box
-                </Content>
+                </Block>
             </Stack>
         </Stack>
                     
     );
     examples.push(
-        <Stack full gap padded scroll className="bg2">
-            <Content padded width={100} className="bg1">
+        <Stack full gaps padded scroll className="bg2">
+            <Block padded width={100} className="bg1">
                     fix
-            </Content>
-            <Stack padded gap flex className="bg1">
-                <Content padded className="bg3">
+            </Block>
+            <Stack padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
-                <Content padded className="bg3">
+                </Block>
+                <Block padded className="bg3">
                     Veryveryveryveryveryveryveryveryveryverylong Box
-                </Content>
+                </Block>
             </Stack>
         </Stack>
                     
@@ -2443,7 +2608,7 @@ export {getExamples};/*
 RESCUE CODE:
 
 import React from "react";
-import {Content, Stack, Grid, Overlays, Overlay} from "../components/LayoutComponents";
+import {Block, Stack, Grid, Overlays, Overlay} from "../components/LayoutComponents";
 
 function getExamples() {
     return [];

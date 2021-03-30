@@ -1,7 +1,8 @@
 import React, {useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect} from "react";
 import {d} from "../helper/helper"
-import {Content, Stack, Grid, Overlays, Overlay} from "./LayoutComponents";
+import {DIR, Block, Stack, Grid, Overlays, Overlay} from "./LayoutComponents";
 import ReactDOM from "react-dom";
+import {useMounted} from "./BaseComponents";
 
 const BackgroundContext = React.createContext();
 
@@ -45,7 +46,7 @@ function BackgroundControl() {
     )
 }
 
-function Canvas({ width, height, smoothing, render, plain, boxed, className }) {
+function Canvas({ width, height, smoothing, render, plain, border, className }) {
     const canvasRef = useRef(null);
     useEffect(() => {
         if (!canvasRef.current || !render) {
@@ -62,8 +63,8 @@ function Canvas({ width, height, smoothing, render, plain, boxed, className }) {
     if (className) {
         cls.push(className);
     }
-    if (boxed) {
-        cls.push((boxed !== true ? 'thin-' : '') + 'boxed');
+    if (border) {
+        cls.push((border !== true ? 'thin-' : '') + 'boxed');
     }
 
     return (
@@ -74,111 +75,274 @@ function Canvas({ width, height, smoothing, render, plain, boxed, className }) {
     )
 }
 
-function Section({ name, children, rev, full, flex, collapse, ...props }) {
-    const [ collapsed, setCollapsed ] = useState(props.collapsed === true);
-    const contentRef = useRef(null);
-    const { width, maxWidth, minWidth, ...contProps } = props;
-    let dimProps = { width, maxWidth, minWidth };
+function Section({ name, children, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
+    const wContext = useContext(WindowContext);
+    const update = useComponentUpdate();
 
+    const [ collapsed, setCollapsed ] = useState(props.collapsed === true);
+    const collapseH = collapse === 'h';
+    const minDefault = collapseH ? 100 : 25;
+    if (!minSize || minSize < minDefault) {
+        minSize = minDefault;
+    }
+    const [ size, setSize ] = useState(props.size && Math.max(props.size, minSize));
+
+    const contentRef = useRef(null);
+    const offsetRef = useRef(null);
+
+    const collapsedByH = collapsed && collapseH;
+    const { width, minWidth, maxWidth, height, minHeight, maxHeight, ...contProps } = props;
+    let dimProps = { width, maxWidth, minWidth, height, minHeight, maxHeight };
+
+    let fullDir = false;
+    let fullXDir = false;
+    if (full) {
+        if (collapseH) {
+            fullDir = full !== 'h';
+            fullXDir = full !== 'v';
+        } else {
+            fullDir = full !== 'v';
+            fullXDir = full !== 'h';
+        }
+    }
+    let parentFull;
+    if (collapsed) {
+        if (collapsedByH) {
+            parentFull = 'v';
+        } else if (fullDir) {
+            parentFull = 'h';
+        }
+    } else {
+        if (fullDir && fullXDir) {
+            parentFull = true;
+        } else if (collapseH) {
+            parentFull = fullDir;
+            if (!parentFull && props.size) {
+                parentFull = 'h';
+            }
+            if (dimProps.height && parentFull !== false) {
+                parentFull = true;
+            }
+        }
+        if (!parentFull) {
+            if (fullDir) {
+                parentFull = collapseH ? 'v' : 'h';
+            }
+            if (fullXDir) {
+                parentFull = collapseH ? 'h' : 'v';
+            }
+        }
+    }
+
+    const parentAttr = {
+        full: parentFull,
+        center,
+        scroll,
+        indented,
+        className: 'stack',
+        ...dimProps
+    };
+    if (collapsedByH) {
+        parentAttr.width = 'min-content';
+    } else if (collapsed) {
+        parentAttr.minHeight = false;
+        parentAttr.height = 'min-content';
+    }
+    const headerAttr = {
+        full: collapsedByH ? false : 'h',
+        vertical: collapsedByH
+    };
+    const contentAttr = {centerItems, ...contProps};
+
+    const sizeProp = collapseH ? 'width' : 'height';
+    const offProp = 'offset' + sizeProp[0].toUpperCase() + sizeProp.substring(1);
+
+    useEffect(() => {
+        if (contentRef.current) {
+            let elem = contentRef.current;
+            if (!collapseH) {
+                elem = elem.parentNode;
+            }
+            let stackElem = elem.parentNode;
+            while(!stackElem.classList.contains('stack')) {
+                stackElem = stackElem.parentNode;
+            }
+            offsetRef.current = stackElem[offProp] - elem[offProp];
+            update();
+        }
+    }, [collapsed]);
+
+    let items;
     let contentElem = '';
     if (!collapsed) {
-        contentElem = (
-            <Content ref={contentRef} flex full={full} { ...contProps }>
-                {children}
-            </Content>
-        );
-    } else {
-        if (collapse === 'h') {
-            full = 'v';
-            dimProps = {width: 'min-content'};
+        const cursor = (collapseH ? 'col' : 'row') +'-resize';
+        const attr = {};
+        if (size) {
+            if (collapseH) {
+                parentAttr.width = size + offsetRef.current;
+            } else if (offsetRef.current) {
+                parentAttr.height = size + offsetRef.current;
+                if (parentAttr.maxHeight) {
+                    parentAttr.maxHeight = 'max(' + (minSize + offsetRef.current) + 'px, ' + parentAttr.maxHeight +  ')';
+                }
+            }
+            attr.ref = contentRef;
         }
-        contentRef.current = null;
-    }
+        contentElem = (
+            <Block key="a" {...attr} full={collapseH ? parentAttr.full : true} { ...contentAttr }>
+                {children}
+            </Block>
+        );
+        if (size) {
+            const dimProp = 'client' + (collapseH ? 'X' : 'Y');
+            const handleAttr = {};
+            handleAttr[sizeProp] = 3;
 
-    const toggleCollapse = () => {
-        setCollapsed(!collapsed);
-    };
+            const onMouseDown = e => {
+                const anchorPos =  e[dimProp];
+                const factor = rev ? -1 : 1;
 
-    const hCollapsed = (collapse === 'h' && collapsed);
-    const attr = {};
-    let titleCls = '';
-    if (!hCollapsed) {
-        attr.height = 'min-content';
-        attr.full = 'h';
-    } else {
-        attr.vertical = true;
-        titleCls = 'text-vertical';
+                const currSize =
+                    collapseH ? contentRef.current[offProp] :
+                        contentRef.current.parentNode.clientHeight;
+                wContext.startExclusiveMode('resize-section', cursor);
+                wContext.addEventListener('mousemove', e => {
+                    let newSize = currSize - factor * (anchorPos - e[dimProp]);
+                    if (maxSize && newSize > maxSize) {
+                        newSize = maxSize;
+                    }
+                    if (minSize && newSize < minSize) {
+                        newSize = minSize;
+                    }
+                    if (newSize !== size && newSize > 0) {
+                        setSize(newSize)
+                    }
+                });
+                wContext.addEventListener('mouseup', () => {
+                    wContext.endExclusiveMode('resize-section');
+
+                    setSize(
+                        collapseH ? contentRef.current[offProp] :
+                        contentRef.current.parentNode.clientHeight
+                    );
+                }, {once: true});
+
+                setSize(currSize);
+
+                e.preventDefault();
+            };
+
+            const handleElem = <Block key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} xcenterItems {...handleAttr} cursor={cursor}></Block>;
+            if (!collapseH) {
+                contentElem = <Block key="x" className="flex" full="h" height={size}>{contentElem}</Block>;
+                items = [contentElem, handleElem];
+                if (rev) {
+                    items.reverse();
+                }
+                contentElem = (
+                    <Fragment key="f">
+                        {items}
+                    </Fragment>
+                );
+            } else {
+                items = [contentElem];
+                items.push(handleElem);
+                if (rev) {
+                    items.reverse();
+                }
+
+                let contentFull = parentAttr.full;
+                if (contentFull !== true) {
+                    if (collapseH) {
+                        contentFull = contentFull !== 'h' ? true : 'h';
+                    } else {
+                        contentFull = contentFull !== 'v' ? true : 'v';
+                    }
+                }
+                contentElem = (
+                    <Stack key="a" vertical={!collapseH} full={contentFull} borders>
+                        {items}
+                    </Stack>
+                );
+            }
+        }
     }
-    const items = [
-        <Content key="c" shorten padded className={titleCls}>
+    let titleCls = collapsedByH ? 'text-vertical' : '';
+    items = [
+        <Block key="c" full={!collapsed && collapseH && rev ? 'h' : false}  center="v"  shorten padded={collapsedByH ? 'v' : 'h'} className={titleCls}>
             {name}
-        </Content>
+        </Block>
     ];
     if (collapse) {
-        let dir = 'next';
-        if (collapse === 'h') {
+        let dir;
+        if (collapseH) {
             dir = 'navigate_' + ((!rev && !collapsed) || (rev && collapsed) ? 'before' : 'next');
         } else {
             dir = 'expand_' + ((!rev && !collapsed) || (rev && collapsed) ? 'less' : 'more');
         }
-        const button = <Content key="b" center><Button icon name={dir} click={toggleCollapse} /></Content>;
+        const toggleCollapse = () => {
+            setCollapsed(!collapsed);
+        };
+        const button = <Block key="b" center><Button icon={dir} onClick={toggleCollapse} /></Block>;
 
-        if (!hCollapsed && rev) {
+        if (collapseH && rev && !collapsed) {
             items.push(button);
         } else {
             items.unshift(button);
         }
     }
 
-    const topElem = (
-        <Stack padded {...attr}>
+    const headerElem = (
+        <Stack key="e" padded {...headerAttr}>
             {items}
         </Stack>
     );
-
-    if (collapsed && full) {
-        if (full !== 'h') {
-            full = 'h';
-        }
-    }
-    if (collapse === 'h') {
-        full = 'v'
-    }
-
+    items = !collapseH && rev ? [contentElem, headerElem] : [headerElem, contentElem];
     return (
-        <Stack vertical {...dimProps} flex={flex} border boxed full={full}>
-            {topElem}
-            {contentElem}
+        <Stack vertical {...parentAttr} borders border={inner ? (collapseH ? DIR.RIGHT : false) : true}>
+            {items}
         </Stack>
     )
 }
 
-function Button({ name, icon, disabled, click }) {
-    const cls = [];
-    const bCls = [];
-    if (disabled) {
-        cls.push('less');
-    } else {
-        cls.push('hover-inverse');
-    }
-    let text = icon ? <i className="material-icons md-18">{name}</i> : name;
-
-    if (!icon) {
-        bCls.push('padded');
-    }
-
+function EntityStack() {
     return (
-        <Content className={cls.join(' ')} boxed={1}>
-            <Content center click={click} className={bCls.join(' ')}>
-                {text}
-            </Content>
-        </Content>
+        <Stack vertical borders full>
+            <Block padded full="h">
+                <Stack full gaps>
+                    <Button icon="add" />
+                    <Button icon="delete" />
+                    <Block full="h" />
+                </Stack>
+            </Block>
+            <Block full>
+                <Stack vertical full="h" scroll>
+                    <Stack gaps full="h">
+                        <Block width={30} padded>#1</Block>
+                        <Block shorten padded>My first font</Block>
+                    </Stack>
+                    <Stack gaps full="h">
+                        <Block width={30} padded>#2</Block>
+                        <Block shorten padded>My second font</Block>
+                    </Stack>
+                    <Stack gaps full="h">
+                        <Block width={30} padded>#3</Block>
+                        <Block shorten padded>My first font</Block>
+                    </Stack>
+                    <Stack gaps full="h">
+                        <Block width={30} padded>#4</Block>
+                        <Block shorten padded>My first font</Block>
+                    </Stack>
+                </Stack>
+            </Block>
+        </Stack>
     )
 }
 
+
 function PropertyGrid({ propWidth = '-', valueWidth = '*', ...props }) {
     return (
-        <Grid gap={5} columns={propWidth + " " + valueWidth} {...props} />
+        <Grid gaps={5} columns={propWidth + " " + valueWidth} {...props} />
     );
 }
 
@@ -193,38 +357,25 @@ function ValueProp({ name, children }) {
 function PropLabel({ name, children }) {
     return (
         <>
-            <Content shorten className="small-font">
+            <Block shorten className="small-font">
                 {name}
-            </Content>
-            <Content full="h">
+            </Block>
+            <Block full="h">
                 {children}
-            </Content>
+            </Block>
         </>
     )
 }
 
 function Color({ value, set }) {
     return (
-        <Content>
+        <Block>
             <input
                 type="color"
                 value={value}
                 onChange={e => {set(e.target.value)}}
             />
-        </Content>
-    );
-}
-
-function Checkbox({ name, value, set, disabled }) {
-    name = name ? <div className="small-font">{name}</div> : '';
-    return (
-        <Stack gap>
-            <Content>{name}</Content>
-            <Content>
-                <input disabled={disabled} onChange={(e) => {
-                set(e.target.checked);
-            }} type="checkbox" checked={!!value} /></Content>
-        </Stack>
+        </Block>
     );
 }
 
@@ -285,7 +436,7 @@ function IntField({ readOnly, name, size = 3, step = 1, value = 0, min, set, but
     return (
         <>
             {name ? <div className="small-font">{name}</div> : ''}
-            <Stack centerAll fit full="v">
+            <Stack centerItems fit full="v">
                 {buttonPrev}
                 <input {...attr} />
                 {buttonNext}
@@ -296,7 +447,7 @@ function IntField({ readOnly, name, size = 3, step = 1, value = 0, min, set, but
 
 function Int(props) {
     return (
-        <Stack gap centerAll>
+        <Stack gaps centerItems>
             <IntField {...props} />
         </Stack>
     );
@@ -334,8 +485,8 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
     };
 
     return (
-        <Grid full gap={cssContext.defaultPadding} columns={columns.join(' ')} rows={rows.join(' ')}>
-            <Content full flex wheel={onWheel}>{children}</Content>
+        <Grid full gaps={cssContext.defaultPadding} columns={columns.join(' ')} rows={rows.join(' ')}>
+            <Block full onWheel={onWheel}>{children}</Block>
             {scrollbarY && <Scrollbar vertical pos={y} max={maxY} page={pageY} set={setY} />}
             {scrollbarX && <Scrollbar pos={x} max={maxX} page={pageX} set={setX} />}
         </Grid>
@@ -372,7 +523,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         [oppAxisKey]: space
     };
 
-    const mouseDown = e => {
+    const onMouseDown = e => {
         const rect = divRef.current.getBoundingClientRect();
         const anchorPos =  e[client];
         const pixelSteps = rect[axisKey] / max;
@@ -431,14 +582,15 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         handleCls.push('active');
     }
 
+
     return (
-        <Content full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
+        <Block full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
             <Stack full={dirKey} vertical={vertical}>
-                <Content mouseDown={prevPage} {...dimMin} />
-                <Content full={vertical ? false : 'v'} width={vertical ? 11 : false} flex mouseDown={mouseDown} className={handleCls.join(' ')}/>
-                <Content mouseDown={nextPage} {...dimMax} />
+                <Block onMouseDown={prevPage} {...dimMin} />
+                <Block width={vertical ? 11 : false} full={vertical ? 'v' : true} onMouseDown={onMouseDown} className={handleCls.join(' ')}/>
+                <Block onMouseDown={nextPage} {...dimMax} />
             </Stack>
-        </Content>
+        </Block>
     );
 }
 
@@ -448,6 +600,7 @@ function WindowCtx({ children }) {
     const [ fixCursor, setFixCursor ] = useState(null);
     const modeRef = useRef(null);
     const modalStack = useMemo(() => [],[]);
+    const focusStack = useMemo(() => { return {elem: {}, zIndex: null}}, []);
 
     const listeners = useMemo(() => { return {} }, []);
 
@@ -462,6 +615,8 @@ function WindowCtx({ children }) {
             zIndex = modalStack[len - 1] + 10;
         }
         modalStack.push(zIndex);
+        focusStack.zIndex = zIndex;
+        focusStack.elem[zIndex] = {top: null, start: null};
         return zIndex;
     };
     const closeModal = zIndex => {
@@ -470,6 +625,8 @@ function WindowCtx({ children }) {
             return;
         }
         modalStack.splice(index, 1);
+        delete focusStack.elem[zIndex];
+        focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
     };
 
     const startExclusiveMode = (id, cursor = 'auto') => {
@@ -536,7 +693,8 @@ function WindowCtx({ children }) {
         removeEventListener,
         getModalLevel,
         openModal,
-        closeModal
+        closeModal,
+        focusStack
     };
     const cls = ['fixed pos-0 transparent full-h full-v'];
 
@@ -610,9 +768,9 @@ function ToolGroup({ children }) {
     return (
         <>
             {children}
-            <Content>
-                <Content width={1} height={25} className="separator-h less"></Content>
-            </Content>
+            <Block>
+                <Block width={1} height={25} className="separator-h less"></Block>
+            </Block>
         </>
     );
 }
@@ -632,29 +790,30 @@ function SideTabs({ children, ...props }) {
             }
         }
     };
-
     const tabs = [];
     for(let item of items.current) {
         tabs.push(
-            <Stack key={item} gap className={item === active ? 'switch-button-enabled' : ''} boxed="1" click={() => setActive(item)} padded full="h">
-                <Content>{' '}</Content>
-                <Content full="h">{item}</Content>
-                <Content>{' '}</Content>
-                <Content><kbd>{' > '}</kbd></Content>
+            <Button key={item} full current={active} value={item} onClick={setActive} name={item} rev icon="keyboard_arrow_right" />
+            /*
+            <Stack indented key={item} gaps className={item === active ? 'switch-button-enabled' : ''} border="1" onClick={() => setActive(item)} padded full="h">
+                <Block padded="h" full="h">{item}</Block>
+                <Block><kbd>{'>'}</kbd></Block>
             </Stack>
+            */
         );
     }
 
     return (
-        <Stack full="v" border>
-            <Content padded full="v">
-                <Stack vertical gap full="v">{tabs}</Stack>
-            </Content>
-            <Content flex>
+        <Stack scroll full borders>
+            <Block scroll padded="h">
+                <Stack indented vertical gaps>{tabs}</Stack>
+            </Block>
+
+            <Block full="h">
                 <TabContext.Provider value={value}>
                     {children}
                 </TabContext.Provider>
-            </Content>
+            </Block>
         </Stack>
     )
 }
@@ -668,7 +827,7 @@ function SideTab({ name, active, children }) {
         }
     }, []);
     if (tabContext.active !== name) {
-        return '';
+        return null;
     }
     return (
         children
@@ -756,11 +915,40 @@ function Portal({ id, children }) {
     );
 }
 
+function ActionBarContent({ children, scroll, ...props }) {
+    const {maxHeight, ...childProps} = props;
+
+    const InnerModal = useModal();
+
+
+    return (
+        <Stack vertical full borders className="max-v">
+            <Block full scroll={scroll} maxHeight={maxHeight} className="max-v scroll">
+                <>
+                    <Block {...childProps}>
+                    {children}
+                    </Block>
+                    <InnerModal.content full="v" name="Inner Sanctum">
+                        <Block padded full centerItems>Welcome my friend!</Block>
+                    </InnerModal.content>
+                </>
+            </Block>
+            <Block full="h">
+                <Stack wrap centerItems gaps full="h">
+                    <Button name="Store" onClick={e => InnerModal.open()} />
+                    <Button name="Cancel" />
+                    <Button name="Whatever" />
+                </Stack>
+            </Block>
+        </Stack>
+    )
+}
+
 /**
  * <Modal full>  => Volle Max-Breit + Höhe (100%-20px)
  *
- * <Content center full fixed> -- Overlay (ganzer Bildschirm clickhandler
- *   <Content overlay-bounds [center=x]>
+ * <Block center full fixed> -- Overlay (ganzer Bildschirm clickhandler
+ *   <Block overlay-bounds [center=x]>
  *      <Stack [full=x]>
  *
  * Falls full dann kein "center" in overlay-bounds
@@ -778,12 +966,33 @@ function Portal({ id, children }) {
  *
  *
  */
-const Modal = function ({ name, close, closeable, zIndex = 0, full, width, height, children, ...props }) {
+const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width, maxWidth, height, maxHeight, children }) {
+    const wContext = useContext(WindowContext);
     useKeyListener(27, () => {close(); return true}, () => closeable);
 
-    const styleProps = {zIndex, width, height}; // useStyleProps(props);
-    const click = closeable ?
+    const trapRef = useRef(null);
+
+    useEffect(() => {
+        const focusElem = wContext.focusStack.elem[zIndex];
+        if (!focusElem) {
+            return;
+        }
+        focusElem.top = trapRef.current;
+        const elems = trapRef.current.querySelectorAll('.tabbed');
+        focusElem.start = elems ? elems[0] : null;
+    });
+
+    useEffect(() => {
+        const focusElem = wContext.focusStack.elem[zIndex];
+        if (!focusElem || !focusElem.start) {
+            return;
+        }
+        focusElem.start.focus();
+    }, []);
+
+    const onClick = closeable ?
         e => {
+
             let target = e.target;
             while(target.classList !== undefined) {
                 if (target.classList.contains('modal-centered')) {
@@ -796,25 +1005,67 @@ const Modal = function ({ name, close, closeable, zIndex = 0, full, width, heigh
             e.preventDefault();
         } : null;
 
+    const onKeyDown = null;
+    const hDivCls = ['center-v center-h block'];
+    if (!full || (full === 'v')) {
+        hDivCls.push('min-content-h');
+    }
+    if (!maxWidth) {
+        maxWidth = '100%';
+    } else {
+        if (typeof maxWidth === 'number') {
+            maxWidth = maxWidth + 'px';
+        }
+        maxWidth = 'min(' + maxWidth + ', 100%)';
+    }
+    const hDivStyle = {
+        maxWidth,
+        width
+    };
+    if (!maxHeight) {
+        maxHeight = '100%';
+    } else {
+        if (typeof maxHeight === 'number') {
+            maxHeight = maxHeight + 'px';
+        }
+        maxHeight = 'min(' + maxHeight + ', 100%)';
+    }
+    const vDivStyle = {
+        maxHeight,
+        height,
+        zIndex
+    };
+    const parentDivStyle = {
+        width: 'calc(100% - 50px)',
+        height: 'calc(100% - 50px)'
+    };
+
+    const vDivCls = ['stack-v full-h boxed modal-centered bg2'];
+    if (full && full !== 'h') {
+        vDivCls.push('full-v');
+    }
+
     return (
         <Portal id="modals-container">
-            <Content full centerItems className="modal-overlay fixed pos-0" click={click} zIndex={styleProps.zIndex - 1}>
-                <Content width="90%" height="90%" centerItems className="modal-bounds">
-                    <Stack full={full} vertical border boxed {...styleProps} className="modal-centered bg2">
-                        <Stack gap full="h" centerAll padded>
-                            <Content shorten flex>{name}</Content>
-                            <Button name="close" icon click={e => {
-                                close();
-                                e.stopPropagation();
-                            }} />
-                        </Stack>
-
-                        <Content flex>
-                            {children}
-                        </Content>
-                    </Stack>
-                </Content>
-            </Content>
+            <Block ref={trapRef} onKeyDown={onKeyDown} full className="modal-overlay fixed pos-0" onClick={onClick} zIndex={zIndex - 1}>
+                <div className="center-v center-h full-h editor-bounds">
+                    <div className="center-h block" style={parentDivStyle}>
+                        <div className={hDivCls.join(' ')} style={hDivStyle}>
+                            <div className={vDivCls.join(' ')} style={vDivStyle}>
+                                <Stack gaps full="h" padded>
+                                    <Block center="v" shorten full="h">{name}</Block>
+                                    <Button icon="close" onClick={e => {
+                                        close();
+                                        e.stopPropagation();
+                                    }} />
+                                </Stack>
+                                <div className="border-div-v"></div>
+                                {children}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Block>
         </Portal>
     );
 };
@@ -835,6 +1086,185 @@ function CssCtx({ children }) {
         </CssContext.Provider>
     )
 }
+function useComponentUpdate() {
+    const mounted = useMounted();
+    const [updates, setUpdates] = useState(false);
+    const updateRef = useRef(null);
+    updateRef.current = updates;
+    return () => {
+        if (mounted.current) {
+            setUpdates(!updateRef.current);
+        }
+    }
+}
+
+// ---------------------------- I N P U T   C O M P O N E N T S -------------------------
+
+/**
+ *
+ */
+function Checkbox({ name, value, set, disabled, rev, icon = true }) {
+
+    const items = [];
+    if (icon) {
+        items.push(
+            <Button
+                key={1}
+                border={false}
+                icon={value ? 'check_box' : 'check_box_outline_blank'}
+                padded={false}
+                disabled={disabled}
+                onClick={() => {
+                    set(!value)
+                }}
+            />
+        )
+    } else {
+        const inputProps = {};
+        if (disabled) {
+            inputProps.tabIndex = -1
+        } else {
+            inputProps.className = "tabbed"
+        }
+        items.push(
+            <input
+                key={1}
+                type="checkbox"
+                checked={!!value}
+                disabled={disabled}
+                onChange={e => {
+                    set(e.target.checked)
+                }}
+                {...inputProps}
+            />
+        )
+    }
+    if (name) {
+        items.push(
+            <Block key={2} shorten center="v">{name}</Block>
+        )
+    }
+    if (rev) {
+        items.reverse()
+    }
+    if (items.length === 1) {
+        return items[0]
+    }
+    return (
+        <Stack gaps>{items}</Stack>
+    )
+}
+
+/**
+ *
+ */
+function Button({ name, icon, current, value, disabled, padded = (name ? true : false), rev, onClick, tab = true, border = "1", className, ...props }) {
+
+    const wContext = useContext(WindowContext);
+
+    const mounted = useMounted();
+    const [clicked, setClicked] = useState(false);
+
+    let attr = { ...props };
+    const cls = [];
+    if (className) {
+        cls.push(className);
+    }
+
+    let active = false;
+    if (value) {
+        if (value == current) {
+            cls.push('active');
+            active = true;
+        } else {
+            tab = false;
+        }
+    }
+    if (disabled) {
+        cls.push('disabled');
+        if (tab) {
+            tab = false;
+        }
+    } else {
+        cls.push('hover-highlight');
+    }
+    attr = { ...attr, tab, border, padded, cursor: "default", indented: (padded ? false : '1'), center: 'v' };
+
+    const items = [];
+    if (icon) {
+        items.push(
+            <Block height={18} key={1}><i className="material-icons md-18">{icon}</i></Block>
+        );
+    }
+    if (name) {
+        items.push(
+            <Block shorten full="h" key={2}>{name}</Block>
+        );
+    }
+    if (rev) {
+        items.reverse()
+    }
+    if (clicked) {
+        cls.push('clicked');
+    }
+    if ((name || border)) {
+        cls.push(active ? 'active-bg' : 'control-bg');
+    }
+    const text = items.length === 1 ? items[0] : <Stack gaps full="h">{items}</Stack>;
+
+    if (disabled) {
+        attr.onFocus = e => { e.target.blur() }
+    } else if (onClick && !clicked) {
+        const handleClick = endEvent => {
+            wContext.startExclusiveMode('button-click');
+            wContext.addEventListener(endEvent, () => {
+                onClick(value);
+                if (mounted.current) {
+                    setClicked(false);
+                }
+                wContext.endExclusiveMode('button-click');
+
+            }, {once: true});
+            setClicked(true);
+        };
+
+        if (tab) {
+            attr.onKeyDown = e => {
+                if (e.keyCode !== 32) {
+                    return;
+                }
+                e.preventDefault();
+                handleClick('keyup');
+            }
+
+        }
+        attr.onMouseDown = e => {
+            handleClick('mouseup');
+        }
+    }
+    return (
+        <Block className={cls.join(' ')} {...attr}>{text}</Block>
+    )
+}
+
+/**
+ *
+ */
+function Radio({ name, options, set, disabled, padded, ...props }) {
+
+    const items = [];
+    for (let [value, name] of Object.entries(options)) {
+        items.push(
+            <Button key={value} padded={padded} disabled={disabled} name={name} value={value} current={props.value} onClick={set} />
+        );
+    }
+    return (
+        <Stack gaps>
+            <Block center="v">{name}</Block>
+            {items}
+        </Stack>
+    )
+}
 
 export {
     AvailContext,
@@ -842,6 +1272,7 @@ export {
     Canvas,
     Section,
     ToolGroup,
+    WindowContext,
     WindowCtx,
     ScrollArea,
     BackgroundCtx,
@@ -851,9 +1282,13 @@ export {
     useModal,
     CssCtx,
 
+    EntityStack,
+    ActionBarContent,
+
     Button,
     Int,
     Checkbox,
+    Radio,
     Scrollbar,
 
     PropertyGrid,

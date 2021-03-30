@@ -1,7 +1,7 @@
 import React, {useMemo, useEffect, useState, Fragment} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {Content, Stack, Grid, Overlays, Overlay} from "./components/LayoutComponents";
+import {Block, Stack, Grid, Overlays, Overlay} from "./components/LayoutComponents";
 import {getExamples} from "./generated/LayoutExamples";
 
 function explode(input, separator, limit = null) {
@@ -142,89 +142,88 @@ function LayoutApp() {
 
         let n = 0;
         const vsItems = [
-            <Stack full="v" padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack full="v" padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack full="h" padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack full="h" padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack full padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack full padded gaps full="h" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack full padded gap flex className="bg1">
-                <Content flex padded className="bg3">
+            <Stack full padded gaps full="h" className="bg1">
+                <Block full="h" padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
 
-            <Stack vertical full="v" padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack vertical full="v" padded gaps full="v" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack vertical full="h" padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack vertical full="h" padded gaps full="v" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack vertical padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack vertical padded gaps full="v" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack vertical full padded gap flex className="bg1">
-                <Content padded className="bg3">
+            <Stack vertical full padded gaps full="v" className="bg1">
+                <Block padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>,
-            <Stack vertical full padded gap flex className="bg1">
-                <Content flex padded className="bg3">
+            <Stack vertical full padded gaps full="v" className="bg1">
+                <Block flex padded className="bg3">
                     First
-                </Content>
-                <Content padded wrap className="bg3">
+                </Block>
+                <Block padded wrap className="bg3">
                     Second Box
-                </Content>
+                </Block>
             </Stack>
         ];
-
 
         result.push(
             <Fragment key="add">
@@ -235,16 +234,16 @@ function LayoutApp() {
                         vsItems.map((item, no) =>
                             <div key={no} className="stack-h inner-space-h">
                                 <div className="fix-screen">
-                                    <Stack full gap>
-                                        <Content width={100}>Eins</Content>
+                                    <Stack full gaps>
+                                        <Block width={100}>Eins</Block>
                                         {item}
                                     </Stack>
                                 </div>
 
                                 <div className="fix-screen">
-                                    <Stack full gap>
-                                        <Content width={100}>Eins</Content>
-                                        <Content full="h">{item}</Content>
+                                    <Stack full gaps>
+                                        <Block width={100}>Eins</Block>
+                                        <Block full="h">{item}</Block>
                                     </Stack>
                                 </div>
                             </div>
@@ -257,7 +256,7 @@ function LayoutApp() {
 
     const regenerate = () => {
         let code = "import React from \"react\";\n" +
-            "import {Content, Stack, Grid, Overlays, Overlay} from \"../components/LayoutComponents\";\n" +
+            "import {Block, Stack, Grid, Overlays, Overlay} from \"../components/LayoutComponents\";\n" +
             "function Canvas() { return <div></div> };\n" +
             "\n" +
             "function getExamples() {\n" +
@@ -275,7 +274,7 @@ function LayoutApp() {
             "RESCUE CODE:\n" +
             "\n" +
             "import React from \"react\";\n" +
-            "import {Content, Stack, Grid, Overlays, Overlay} from \"../components/LayoutComponents\";\n" +
+            "import {Block, Stack, Grid, Overlays, Overlay} from \"../components/LayoutComponents\";\n" +
             "\n" +
             "function getExamples() {\n" +
             "    return [];\n" +
@@ -289,9 +288,9 @@ function LayoutApp() {
     };
 
     return (
-        <div className="full-h full-v content">
+        <div className="full-h full-v block">
             <div className="stack-h full-v full-h boxed inner-border-h max-h max-v">
-                <div className="content scroll max-h max-v padded flex">
+                <div className="block scroll max-h max-v padded flex">
                     {getMarkUp()}
                 </div>
                 <div className="padded">

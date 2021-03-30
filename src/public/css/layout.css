@@ -4,6 +4,7 @@
     --default-padding: 5px;
     --box-border-width: 5px;
     --box-border-color: #000000;
+    --editor-max-width: 1200px;
 }
 
 html, body, #app {
@@ -13,7 +14,16 @@ html, body, #app {
     padding: 0;
 }
 
-.content {
+.editor-bounds {
+    max-width: var(--editor-max-width);
+}
+
+.wrap-normal.full-h {
+    width: max-content !important;
+    max-width: 100%
+}
+
+.block {
     overflow: hidden
 }
 
@@ -31,6 +41,7 @@ html, body, #app {
     display: inline-flex;
 }
 
+.no-inline,
 .stack-h.center-h {
     display: flex !important;
 }
@@ -39,6 +50,7 @@ html, body, #app {
     align-items: start
 }
 
+.stack-h > .center-v,
 .stack-h > .full-v:not(.bounds) {
     align-self: stretch;
     height: auto;
@@ -50,6 +62,8 @@ html, body, #app {
     justify-content: start;
 }
 
+.stack-h > .fix-h,
+.stack-v > .fix-v,
 .stack-h > div:not(.flex):not(.full-h),
 .stack-v > div:not(.flex):not(.full-v) {
     flex-shrink: 0
@@ -59,7 +73,8 @@ html, body, #app {
 /*    width: inherit !important; */
 }
 
-.stack-v > .full-v,
+.stack-v > .full-v:not(.fix-v),
+.stack-h > .full-h:not(.fix-h),
 .flex {
     flex: 1
 }
@@ -78,6 +93,7 @@ html, body, #app {
 .center-v {
     display: flex;
     flex-direction: column;
+    height: 100%
 }
 
 .center-v > div {
@@ -123,6 +139,7 @@ html, body, #app {
     max-height: 100%
 }
 
+.child-max-h > div,
 .max-h {
     max-width: 100%
 }
@@ -163,6 +180,11 @@ html, body, #app {
 .grid-cells-centered {
     justify-items: center;
     align-items: center
+}
+
+.indented {
+    padding: var(--default-padding);
+    box-sizing: border-box
 }
 
 .padded {
@@ -208,6 +230,12 @@ html, body, #app {
 }
 */
 
+.border-div-v {
+    background-color: var(--box-border-color);
+    height: var(--box-border-width);
+    align-self: stretch;
+}
+
 .inner-border-h > div:not(:first-child) {
     border-left: var(--box-border-width) solid var(--box-border-color);
     box-sizing: border-box;
@@ -215,6 +243,19 @@ html, body, #app {
 
 .boxed {
     border: var(--box-border-width) solid var(--box-border-color);
+}
+
+.no-border-1 {
+    border-top: none !important
+}
+.no-border-2 {
+    border-bottom: none !important
+}
+.no-border-4 {
+    border-left: none !important
+}
+.no-border-8 {
+    border-right: none !important
 }
 
 .thin-boxed {
@@ -249,3 +290,7 @@ div.boxed, div.thin-boxed {
     display: none
 }
 
+*:focus {
+    outline-offset: -1px;
+    outline-style: dot-dash;
+}

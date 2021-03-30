@@ -1,8 +1,8 @@
-import React, {useMemo, useEffect, useState, Fragment, useContext} from "react";
+import React, {useState, useContext} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {useModal, Section, Button, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Int, Checkbox, SideTabs, SideTab} from "./components/BasicComponents"
-import {Content, Stack, Grid, Overlays, Overlay, OverlayContext} from "./components/LayoutComponents";
+import {useModal, WindowContext, ActionBarContent, Section, EntityStack, Button, Radio, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Int, Checkbox, SideTabs, SideTab} from "./components/BasicComponents"
+import {DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext} from "./components/LayoutComponents";
 
 function OverlayCanvas({ render }) {
     const oContext = useContext(OverlayContext);
@@ -45,18 +45,28 @@ function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, s
                 {rulers && <Overlay className="bg1" top={-originY} height={originY - 5} width={dim.width} />}
             </Overlays>
     } else {
-        elem = <Content shorten center className="small-font">No space to render!</Content>;
+        elem = <Block shorten center className="small-font">No space to render!</Block>;
     }
 
     return (
-        <Content full centerItems>
+        <Block full centerItems>
             {elem}
-        </Content>
+        </Block>
     )
 }
 
+function TestContent(props) {
+    const [text, setText] = useState(props.text);
+    return (
+        <Block full="h" wrap onClick={() => {setText(text + props.text)}}>{text}</Block>
+    );
+}
+
 function GridCanvas({size, width, height, ...props}) {
-    const TestModal = useModal();
+    const TestModal1 = useModal();
+    const TestModal2 = useModal();
+    const TestModal3 = useModal();
+    const TestModal4 = useModal();
 
     const [ posX, setPosX ] = useState(0);
     const [ posY, setPosY ] = useState(0);
@@ -109,16 +119,15 @@ function GridCanvas({size, width, height, ...props}) {
             </AvailContextProvider>
         </ScrollArea>;
 
-    const showModal = () => {
-        TestModal.open({
-
-        });
-    };
+    const showModal1 = () => {TestModal1.open({});};
+    const showModal2 = () => {TestModal2.open({});};
+    const showModal3 = () => {TestModal3.open({});};
+    const showModal4 = () => {TestModal4.open({});};
 
     return (
         <>
-            <Stack vertical border full>
-                <Stack className="bg3" wrap gap centerAll full="h">
+            <Stack vertical borders full>
+                <Stack className="bg3" wrap gaps centerItems full="h">
                     <ToolGroup>
                         <Int name="PosX" value={posX} set={setPosX} min={0} max={maxPosX} buttons />
                         <Int name="PosY" value={posY} set={setPosY} min={0} max={maxPosY} buttons />
@@ -126,95 +135,230 @@ function GridCanvas({size, width, height, ...props}) {
                         <Int name="Border" value={border} set={setBorder} min={0} max={9} buttons />
                     </ToolGroup>
                     <ToolGroup>
-                        <Checkbox name="Rulers" value={rulers} set={setRulers} />
+                        <Checkbox name="Rulers" rev={true} icon value={rulers} set={setRulers} />
                     </ToolGroup>
                     <ToolGroup>
-                        <Content click={showModal} padded boxed="1">White</Content>
-                        <Content padded boxed={1}>Black & White</Content>
-                        <Content padded thin boxed={1}>DAXX!</Content>
+                        <Block padded border={1}>Black & White</Block>
+                        <Block padded thin border={1}>DAXX!</Block>
                     </ToolGroup>
                     <BackgroundControl />
                 </Stack>
-                <Grid centerAll full flex columns="- * -" rows="- * -">
-                    <Content padded><Button disabled name="+" /></Content>
-                    <Content padded><Stack gap><Button name="+" /><Button name="-" /></Stack></Content>
-                    <Content padded><Button disabled name="+" /></Content>
-                    <Content padded>4</Content>
+                <Grid centerItems full columns="- * -" rows="- * -">
+                    <Block padded><Button disabled icon="add" /></Block>
+                    <Block padded><Stack gaps><Button icon="add" /><Button icon="remove" /></Stack></Block>
+                    <Block padded><Button disabled icon="remove" /></Block>
+                    <Block padded>4</Block>
                     {scrollGrid}
-                    <Content padded>6</Content>
-                    <Content padded>7</Content>
-                    <Content padded>8</Content>
-                    <Content padded>9</Content>
+                    <Block padded>6</Block>
+                    <Block padded>7</Block>
+                    <Block padded>8</Block>
+                    <Block padded>9</Block>
                 </Grid>
-                <Stack className="bg3" wrap gap full="h">
-                    <Content padded boxed={1}>Black & White</Content>
-                    <Content padded boxed={1}>DAXX!</Content>
+                <Stack className="bg3" wrap gaps full="h">
+                    <Block onClick={showModal1} padded border="1">Modal1</Block>
+                    <Block onClick={showModal2} padded border="1">Modal2</Block>
+                    <Block onClick={showModal3} padded border="1">Modal3</Block>
+                    <Block onClick={showModal4} padded border="1">Modal4</Block>
                 </Stack>
             </Stack>
-            <TestModal.content name="Arasaka is down" width="75%" closeable>
-                <Content full padded className="bg2">And what now, why dont I like it as it is???</Content>
-            </TestModal.content>
+
+            <TestModal1.content name="Arasaka is down">
+                <ActionBarContent full="h" padded wrap scroll>
+                    <TestContent text={"Auto Width/Height :\n" +
+                    "                    And what now, why dont I like it as it is???\n" +
+                    "                    And what now, why dont I like it as it is???"} />
+                </ActionBarContent>
+            </TestModal1.content>
+
+            <TestModal2.content name="Arasaka is down" height="50%" width="50%">
+                <ActionBarContent full="h" padded wrap scroll>
+                    <TestContent text={"Width 50% / Height 50% :\n" +
+                    "                    And what now, why dont I like it as it is???\n" +
+                    "                    And what now, why dont I like it as it is???"} />
+                </ActionBarContent>
+            </TestModal2.content>
+
+            <TestModal3.content name="Arasaka is down" maxWidth="50%" maxHeight="50%">
+                <ActionBarContent full="h" padded wrap scroll>
+                    <TestContent text={"MaxWidth 50% / MaxHeight 50%"} />
+                </ActionBarContent>
+            </TestModal3.content>
+
+            <TestModal4.content name="Arasaka is down" maxWidth={650} maxHeight={150}>
+                <ActionBarContent full="h" padded wrap scroll>
+                    <TestContent text={"MaxWidth 250 / MaxHeight 150"} />
+                </ActionBarContent>
+            </TestModal4.content>
+
         </>
     )
 }
 
+function TestApp() {
+    const wContext = useContext(WindowContext);
+    const onFocus = e => {
+        const zIndex = wContext.focusStack.zIndex;
+        if (!zIndex) {
+            return;
+        }
+        const focusElem = wContext.focusStack.elem[zIndex];
+        if (!focusElem || !focusElem.top) {
+            return;
+        }
+        if (focusElem.top.contains(document.activeElement)) {
+            return;
+        }
+        focusElem.start.focus();
+    };
+
+    const [mode, setMode] = useState('0');
+
+    return (
+        <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
+            <Stack vertical full>
+
+                <Block full="h">
+                    <Stack full="h" padded="v">
+                        <Button icon="keyboard_backspace" padded="h" name="Back" />
+                        <Block padded="h" center="v" full="h" shorten>And a very very long very very long very very long very very long title goes here and here and here</Block>
+                        <Stack gaps center="v">
+                            <Block center="v">Space for Buttons</Block>
+                            <Button xborder={DIR.RIGHT|DIR.LEFT} padded="h" icon="pause_circle_outline" name="Replay" />
+                            <Button icon="play_circle_outline" disabled padded="h" name="Play" onClick={() => console.log(666)} />
+                            <Button border={false} padded={false} icon="build" />
+                        </Stack>
+                    </Stack>
+                </Block>
+
+                <Stack full vertical gaps>
+                    <Section full="h" centerItems size={300} maxSize={400} name="TextPane">
+                        <Stack vertical borders full>
+                            <Section name="Properties" className="scroll max-v" maxHeight={80} inner collapse scroll full="h">
+                                <Stack vertical full>
+                                    <Grid gaps columns="70px *" full="h">
+                                        <Block shorten>Name</Block>
+                                        <Block>Value</Block>
+                                        <Block shorten>More Name</Block>
+                                        <Block>Even MoreValue</Block>
+                                        <Block shorten>Name</Block>
+                                        <Block>Value</Block>
+                                        <Block shorten>More Name</Block>
+                                        <Block>
+                                        </Block>
+                                    </Grid>
+                                </Stack>
+                            </Section>
+                            <Stack full>
+                                <Section inner name="Fonts" size={250} maxWidth="33%" collapse="h" full="v">
+                                    <EntityStack />
+                                </Section>
+                                <Section inner name="Font Props" size={250} maxWidth="33%" collapse="h" collapsed full="v">
+                                    <Block padded>PropGrid</Block>
+                                </Section>
+                                <Section inner full padded name="Characters">
+                                    <Stack>
+                                        <Stack vertical gaps>
+                                            <Checkbox value={true} set={() => {}} />
+                                            <Checkbox icon value={true} set={() => {}} />
+                                            <Checkbox name="Rulers" value={true} set={() => {}} />
+                                            <Checkbox icon name="Rulers" value={true} set={() => {}} />
+                                            <Checkbox name="Rulers" rev value={true} set={() => {}} />
+                                            <Checkbox icon name="Rulers" rev value={true} set={() => {}} />
+                                            <Checkbox name="Rulers" disabled value={true} set={() => {}} />
+                                            <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
+                                        </Stack>
+
+                                        <Radio name="Mode" padded="h" options={{'0': 'Normal', '1': 'Hyper', '2': 'Godlike'}} value={mode} set={setMode} />
+                                    </Stack>
+                                </Section>
+                            </Stack>
+                        </Stack>
+                    </Section>
+
+                    <Section full name="Preview">
+                        <Stack full>
+                            <Section name="Text Blocks" inner collapse="h" size={300} full="v">
+                                <EntityStack />
+                            </Section>
+                            <Section name="Screen" full inner>
+                                <GridCanvas size={10} width={50} height={10} />
+                            </Section>
+                        </Stack>
+                    </Section>
+                    <Block />
+                </Stack>
+
+            </Stack>
+        </Block>
+    )
+}
+
+
+function RealApp() {
+    return (
+        <Stack vertical gaps full padded>
+            <Section size={100} maxHeight="50%" full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section hweh whew hwhe wehw hwe hwehw whe whe hw ehweh wehw hew ehweh weh hewe hwehw ehw</Section>
+
+            <Stack gaps full>
+                <Section width={300} minSize={50} maxWidth="25%" maxSize={400} size={155} collapse="h" full className="bg1" name="First Section">
+                    <Stack vertical full="h" scroll padded gaps>
+                        <Block padded center>
+                            <Canvas width={75} height={75} border={1} />
+                        </Block>
+                        <Block full="h" wrap>Property Grid Here And so many more cool things :-)</Block>
+                        <PropertyGrid propWidth="-">
+                            <ValueProp name="Just a test">Working or not?</ValueProp>
+                            <ValueProp name="DAng">
+                                <Block wrap>Herer  wewo woe oweo woew eo ow ewe</Block>
+                            </ValueProp>
+                        </PropertyGrid>
+                    </Stack>
+                </Section>
+                <Section full name="Second Section">
+                    <GridCanvas size={10} width={50} height={10} />
+                </Section>
+                <Section size={100} collapse="h" rev full="v" shorten className="bg1" padded name="Last Section">
+                    Here I am you fucker!
+                </Section>
+            </Stack>
+
+            <Section full="h" rev size={100} minSize={25} maxHeight="50%" collapsed collapse name="Bottom Section" className="bg2">
+                <SideTabs>
+                    <SideTab name="First one!" active>
+                        Hey man nice shot
+                    </SideTab>
+
+                    <SideTab name="A second one?">
+                        <Block padded shorten full="h">
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                            XXX Bottom Section
+                        </Block>
+                    </SideTab>
+                </SideTabs>
+            </Section>
+        </Stack>
+    )
+}
+
+
 function BaseApp({}) {
+    const test = 1;
+
     return (
         <CssCtx>
             <WindowCtx>
                 <BackgroundCtx>
-                    <Stack vertical gap full padded>
-                        <Section full="h" name="Top Section" collapse padded className="bg2">Here is the Top Section</Section>
-
-                        <Stack gap full>
-                            <Section width={125} collapse="h" full className="bg1" name="First Section">
-                                <Stack vertical full="h" scroll padded gap>
-                                    <Content padded center>
-                                        <Canvas width={75} height={75} boxed={1} />
-                                    </Content>
-                                    <Content full="h" wrap>Property Grid Here And so many more cool things :-)</Content>
-                                    <PropertyGrid propWidth="-">
-                                        <ValueProp name="Just a test">Working or not?</ValueProp>
-                                        <ValueProp name="DAng">
-                                            <Content wrap>Herer  wewo woe oweo woew eo ow ewe</Content>
-                                        </ValueProp>
-                                    </PropertyGrid>
-                                </Stack>
-                            </Section>
-                            <Section full flex name="Second Section">
-                                <GridCanvas size={10} width={50} height={10} />
-                            </Section>
-                            <Section width={100} collapse="h" rev full shorten className="bg1" padded name="Last Section">
-                                Here I am you fucker!
-                            </Section>
-                        </Stack>
-
-                        <Section full="h" collapsed collapse name="Bottom Section" className="bg2">
-                            <SideTabs>
-                                <SideTab name="First one!" active>
-                                    Hey man nice shot
-                                </SideTab>
-
-                                <SideTab name="A second one?">
-                                    <Content padded shorten>
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                        XXX Bottom Section
-                                    </Content>
-                                </SideTab>
-                            </SideTabs>
-
-                        </Section>
-                    </Stack>
+                    {test ? <TestApp /> : <RealApp />}
                 </BackgroundCtx>
             </WindowCtx>
         </CssCtx>

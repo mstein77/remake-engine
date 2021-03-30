@@ -57,6 +57,10 @@ html, body {
     left: 0
 }
 
+.padded-1 {
+    padding: 1px
+}
+
 /* TODO */
 .tooltip {
     background-color: #b3bbb1;
@@ -116,4 +120,31 @@ html, body {
 
 .font-small {
     font-size: 14px;
+}
+
+/* Theme-Styling */
+
+.hover-highlight {
+    filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
+}
+
+.hover-highlight:hover:not(.clicked) {
+    filter: brightness(1) !important;
+}
+
+.hover-highlight.clicked {
+    filter: brightness(calc(1 + var(--brightness-factor) * 0.25)) !important;
+}
+
+.control-bg {
+    background-color: var(--scrollbar-color);
+}
+
+.active-bg {
+    background-color: rgba(91, 170, 43, 0.93);
+    color: white;
+}
+
+.disabled {
+    opacity: 0.35
 }
