@@ -24,7 +24,8 @@ html, body, #app {
 }
 
 .block {
-    overflow: hidden
+    overflow: hidden;
+    user-select: none
 }
 
 .bounds {

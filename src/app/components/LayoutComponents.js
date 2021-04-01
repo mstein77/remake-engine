@@ -38,7 +38,7 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...p
     }
 
     const dimAttr = {};
-    for(let prop of ['onClick', 'onKeyDown', 'onMouseDown', 'onWheel', 'onFocus']) {
+    for(let prop of ['onClick', 'onKeyDown', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress']) {
         const handler = props[prop];
         if (handler) {
             dimAttr[prop] = handler;
@@ -204,7 +204,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Block = React.forwardRef(({children, center, centerItems, full, shorten, scroll, wrap, zIndex, ...props}, ref) => {
+const Block = React.forwardRef(({children, center, centerItems, tab, full, shorten, scroll, wrap, zIndex, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -246,6 +246,9 @@ const Block = React.forwardRef(({children, center, centerItems, full, shorten, s
                 dimStyle.minHeight = dimStyle.height;
             }
         }
+    }
+    if (tab) {
+        dimAttr.tabIndex = 0;
     }
 
     if (centerItems) {
@@ -423,6 +426,7 @@ function getFlatChildren(children, result = []) {
 function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full, center, centerItems, ...props}) {
     const parentCls = ['bounds'];
     const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
+
     const axis = vertical ? 'v' : 'h';
     let hasFullV = axis === 'h';
     let hasFullH = false;

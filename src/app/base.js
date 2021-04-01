@@ -1,7 +1,7 @@
 import React, {useState, useContext} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {useModal, WindowContext, ActionBarContent, Section, EntityStack, Button, Radio, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Int, Checkbox, SideTabs, SideTab} from "./components/BasicComponents"
+import {useModal, Select, WindowContext, ActionBarContent, Section, Tuple, Input, EntityStack, Button, Radio, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Number, TextArea, Checkbox, SideTabs, SideTab} from "./components/BasicComponents"
 import {DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext} from "./components/LayoutComponents";
 
 function OverlayCanvas({ render }) {
@@ -57,8 +57,12 @@ function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, s
 
 function TestContent(props) {
     const [text, setText] = useState(props.text);
+    const [value, setValue] = useState(10);
     return (
-        <Block full="h" wrap onClick={() => {setText(text + props.text)}}>{text}</Block>
+        <Stack vertical>
+            <Number max={30} min={0} value={value} set={setValue} />
+            <Block full="h" wrap onClick={() => {setText(text + props.text)}}>{text}</Block>
+        </Stack>
     );
 }
 
@@ -129,10 +133,9 @@ function GridCanvas({size, width, height, ...props}) {
             <Stack vertical borders full>
                 <Stack className="bg3" wrap gaps centerItems full="h">
                     <ToolGroup>
-                        <Int name="PosX" value={posX} set={setPosX} min={0} max={maxPosX} buttons />
-                        <Int name="PosY" value={posY} set={setPosY} min={0} max={maxPosY} buttons />
-                        <Int name="Zoom" value={zoom} set={setZoom} min={1} max={9} buttons />
-                        <Int name="Border" value={border} set={setBorder} min={0} max={9} buttons />
+                        <Tuple name="Pos" x={posX} setX={setPosX} min={0} maxX={maxPosX} y={posY} setY={setPosY} maxY={maxPosY} buttons />
+                        <Number name="Zoom" value={zoom} set={setZoom} min={1} max={9} buttons />
+                        <Number name="Border" value={border} set={setBorder} min={0} max={9} buttons />
                     </ToolGroup>
                     <ToolGroup>
                         <Checkbox name="Rulers" rev={true} icon value={rulers} set={setRulers} />
@@ -144,9 +147,9 @@ function GridCanvas({size, width, height, ...props}) {
                     <BackgroundControl />
                 </Stack>
                 <Grid centerItems full columns="- * -" rows="- * -">
-                    <Block padded><Button disabled icon="add" /></Block>
-                    <Block padded><Stack gaps><Button icon="add" /><Button icon="remove" /></Stack></Block>
-                    <Block padded><Button disabled icon="remove" /></Block>
+                    <Block padded><Button disabled size={14} icon="add" /></Block>
+                    <Block padded><Stack gaps><Button size={14} icon="add" /><Button size={14} icon="remove" /></Stack></Block>
+                    <Block padded><Button disabled size={14} icon="remove" /></Block>
                     <Block padded>4</Block>
                     {scrollGrid}
                     <Block padded>6</Block>
@@ -211,7 +214,26 @@ function TestApp() {
         focusElem.start.focus();
     };
 
-    const [mode, setMode] = useState('0');
+    const [mode, setMode] = useState(0);
+    const [test, setTest] = useState(6);
+    const [x, setX] = useState(0);
+    const [y, setY] = useState(0);
+    const [myText, setMyText] = useState('Schwätz nicht du Depp!');
+
+
+    const [repeat, setRepeat] = useState(1);
+    let text = '';
+    let i = repeat;
+    while (i > 0) {
+        text += 'So many many many words!';
+        i--;
+    }
+
+    const options = [
+        {id: 0, name: 'Here we go again'},
+        {id: 1, name: 'To Daxx or not to Daxx!'},
+        {id: 2, name: 'Space alert!'}
+    ];
 
     return (
         <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
@@ -255,9 +277,9 @@ function TestApp() {
                                 <Section inner name="Font Props" size={250} maxWidth="33%" collapse="h" collapsed full="v">
                                     <Block padded>PropGrid</Block>
                                 </Section>
-                                <Section inner full padded name="Characters">
-                                    <Stack>
-                                        <Stack vertical gaps>
+                                <Section inner full name="Characters">
+                                    <Stack borders full="v">
+                                        <Stack vertical gaps padded scroll>
                                             <Checkbox value={true} set={() => {}} />
                                             <Checkbox icon value={true} set={() => {}} />
                                             <Checkbox name="Rulers" value={true} set={() => {}} />
@@ -268,7 +290,24 @@ function TestApp() {
                                             <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
                                         </Stack>
 
-                                        <Radio name="Mode" padded="h" options={{'0': 'Normal', '1': 'Hyper', '2': 'Godlike'}} value={mode} set={setMode} />
+                                        <Block padded>
+                                            <Select name="Mode" padded="h" options={options} value={mode} set={setMode} />
+                                        </Block>
+
+                                        <Block padded>
+                                            <Stack vertical gaps>
+                                                <Number name="Slide:" slider="h" decimals={2} min={-5} max={10} value={test} set={setTest} />
+                                                <Tuple name="Position" readOnly x={x} setX={setX} minX={0} maxX={100} y={y} setY={setY} minY={0} maxY={100} />
+                                                <TextArea required value={myText} set={setMyText} rows={10} />
+                                            </Stack>
+                                        </Block>
+
+                                        <Block centerItems full padded>
+                                            <Stack vertical>
+                                                <Number slider buttons={false} name="Repeat" set={setRepeat} value={repeat} min={0} max={30} />
+                                                <Block wrap width={200}>{text}</Block>
+                                            </Stack>
+                                        </Block>
                                     </Stack>
                                 </Section>
                             </Stack>
