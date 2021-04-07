@@ -70,10 +70,6 @@ html, body, #app {
     flex-shrink: 0
 }
 
-.stack-v > .min-content-h {
-/*    width: inherit !important; */
-}
-
 .stack-v > .full-v:not(.fix-v),
 .stack-h > .full-h:not(.fix-h),
 .flex {
@@ -102,20 +98,11 @@ html, body, #app {
     margin-bottom: auto;
 }
 
-/* .stack-v > .min-content-h, */
 .grid:not(.grid-cells-centered) > .min-content-h
 {
     width: 100% !important;
 }
-/*
-.stack-h > div.full-v {
-    height: revert;
-}
 
-.stack-h > div:not(.flex):not(.modal-bounds) {
-    width: min-content;
-}
-*/
 .min-content-h {
     width: min-content
 }
@@ -217,17 +204,21 @@ html, body, #app {
     margin-left: var(--default-padding)
 }
 
+.inner-space-v-1 > div:not(:first-child) {
+    margin-top: 1px
+}
+
+.inner-space-h-1 > div:not(:first-child) {
+    margin-left: 1px
+}
+
+/*
 .inner-border-v > div:not(:first-child)::before {
     display: block;
     content: '';
     background-color: var(--box-border-color);
     width: 100%;
     height: var(--box-border-width);
-}
-/*
-.inner-border-v > div:not(:first-child) {
-    border-top: var(--box-border-width) solid var(--box-border-color);
-    box-sizing: border-box;
 }
 */
 
@@ -284,11 +275,15 @@ div.boxed, div.thin-boxed {
 }
 
 .fixed {
-    position: fixed
+    position: fixed;
 }
 
 .hidden {
     display: none
+}
+
+.invisible {
+    opacity: 0
 }
 
 *:focus {

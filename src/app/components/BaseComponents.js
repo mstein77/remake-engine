@@ -20,9 +20,9 @@ import {
     BitmapEditor,
     useEditorContextPart, CursorArea, EditorCtx, BitmapSelector
 } from "./Raster";
-import {WrappingIndexGrid, CellValue} from "../classes/Grid";
+import {WrappingIndexGrid,} from "../classes/Grid";
 import {CellSelection, BitmapCellProvider} from "../classes/CellProvider";
-import {AnimationIndex, ColorIndex, FrameIndex} from "../classes/EntityIndex";
+import {AnimationIndex, FrameIndex} from "../classes/EntityIndex";
 
 const GlobalContext = React.createContext();
 const BackgroundContext = React.createContext();

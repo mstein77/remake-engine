@@ -1,5 +1,6 @@
 import React, {Fragment, useState, useRef, useEffect} from "react";
 import {d} from '../helper/helper';
+import { Portal } from "./BasicComponents"
 
 const DIR = {
     TOP: 1,
@@ -86,6 +87,7 @@ function Tooltip({ children }) {
     const divRef = useRef(null);
     const [ absLeft, setAbsLeft ] = useState(null);
     const [ absTop, setAbsTop ] = useState(null);
+    const [ rect, setRect ] = useState(null);
 
     useEffect(() => {
         if (!divRef.current) return;
@@ -114,6 +116,7 @@ function Tooltip({ children }) {
         } else if (out.top) {
             setAbsTop(-rect.top);
         }
+        setRect(rect);
     }, []);
 
     const style = {
@@ -125,8 +128,22 @@ function Tooltip({ children }) {
     if (absTop) {
         style.marginTop = absTop;
     }
+    const portalStyle = {};
+    if (rect) {
+        portalStyle.top = rect.top;
+        portalStyle.left = rect.left;
+    }
+
+    // TODO: find a better solution without 2 divs
     return (
-        <div ref={divRef} style={style} className="tooltip hidden font-small fixed padded thin-boxed wrap-normal">{children}</div>
+        <>
+            <div ref={divRef} style={style} className="tooltip invisible font-small fixed padded thin-boxed wrap-normal">
+                {children}
+            </div>
+            <Portal id="modals-container">
+                <div style={portalStyle} className="fixed tooltip font-small padded thin-boxed wrap-normal">{children}</div>
+            </Portal>
+        </>
     );
 }
 
@@ -204,7 +221,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Block = React.forwardRef(({children, center, centerItems, tab, full, shorten, scroll, wrap, zIndex, ...props}, ref) => {
+const Block = React.forwardRef(({children, center, centerItems, tab, full, shorten, scroll, wrap, zIndex, verticalText, ...props}, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -247,8 +264,12 @@ const Block = React.forwardRef(({children, center, centerItems, tab, full, short
             }
         }
     }
+    if (verticalText) {
+        dimCls.push('text-vertical');
+    }
     if (tab) {
         dimAttr.tabIndex = 0;
+        dimCls.push('tabbed');
     }
 
     if (centerItems) {
@@ -313,11 +334,12 @@ const Block = React.forwardRef(({children, center, centerItems, tab, full, short
     }
     let childText = '';
     if (doShorten) {
+        const dimProp = verticalText ? 'Height' : 'Width';
         const mouseOver = () => {
             if (!ref) return;
 
             const elem = ref.current;
-            if (elem.offsetWidth >= elem.scrollWidth) {
+            if (elem['offset' + dimProp] >= elem['scroll' + dimProp]) {
                 return;
             }
             const time = Date.now();
@@ -461,7 +483,7 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
                 dimCls.push('center-items');
             }
         } else {
-            dimCls.push('inner-space-' + axis);
+            dimCls.push('inner-space-' + axis + (gaps === '1' ? '-1' : ''));
         }
     }
     if (borders && children) {
@@ -671,105 +693,6 @@ function Overlay({ width, height, top = 0, left = 0, className, children }) {
         <div style={style} className={cls.join(' ')}>{children}</div>
     )
 }
-/*
-function Block({maxHeight, minHeight, full, height, className, onclick, children}) {
-    const divRef = useRef(null);
-    const [bound, setBound] = useState(null);
-    const [content, setContent] = useState([]);
-
-    const cls = ['block'];
-    if (className) {
-        cls.push(className);
-    }
-
-    const observerRef = useRef(null);
-
-    useLayoutEffect(() => {
-        if (onclick) return;
-
-        const checkSize = () => {
-            d('checkSize', divRef.current);
-            d(divRef.current.clientHeight, divRef.current.offsetHeight, divRef.current.scrollHeight);
-            if (!divRef.current) return;
-            if (maxHeight && !height) {
-                if (divRef.current.clientHeight < divRef.current.scrollHeight) {
-                    setBound(d(divRef.current.clientHeight + 'px', 'setBound'));
-                } else if (minHeight && bound !== null && divRef.current.clientHeight === divRef.current.scrollHeight) {
-                    setBound(d(null, 'setBound'));
-                } else d('BOUND', bound);
-            }
-        };
-        const observer = new ResizeObserver(checkSize);
-        observerRef.current = observer;
-        observer.observe(divRef.current);
-        checkSize();
-        return () => {
-            if (observerRef.current) {
-                observerRef.current.disconnect();
-            }
-        }
-    }, []);
-
-    const style = {
-        height,
-        maxHeight,
-        minHeight
-    };
-
-    if (maxHeight && !height && bound !== null) {
-        style.height = bound;
-    }
-
-    let click = null;
-    let rclick = null;
-    if (onclick) {
-        click = e => {
-            setContent([...content, 'Hey!']);
-            d('CLICK!');
-        };
-        rclick = e => {
-            e.preventDefault();
-            if (content.length === 0) return;
-            const [foo, ...newContent] = content;
-            setContent(newContent);
-            d('DCLICK!');
-        };
-        children =
-            content.length ?
-            content.map((item, i) => <Fragment key={i}>{item}<br /></Fragment>) :
-            'Please click me!';
-    }
-
-    return (
-        <div onClick={click} onContextMenu={rclick} ref={divRef} className={cls.join(' ')} style={style}>{children}</div>
-    );
-}
-
-function AutoBlock({children, full, minHeight, maxHeight, borders, padding, scroll}) {
-    const cls = ['block'];
-    const style = {
-        minHeight,
-        maxHeight
-    };
-    if (border) {
-        cls.push('border');
-    }
-    if (padding) {
-        cls.push('padded');
-    }
-    if (!full) {
-        cls.push('min-content-h');
-    }
-    if (scroll) {
-        cls.push('scroll');
-    }
-    return (
-        <div className={cls.join(' ')} style={style}>
-            {children}
-        </div>
-    )
-}
-*/
 
 export {
     Block,

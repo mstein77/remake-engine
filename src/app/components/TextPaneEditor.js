@@ -1163,8 +1163,6 @@ function ResizeFontForm(props) {
     const previewWidth = Math.max(width, props.font.width);
     const previewHeight = Math.max(height, props.font.height);
 
-
-
     const size = 4;
     const zoom = 4;
     const border = 1;

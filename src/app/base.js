@@ -1,8 +1,9 @@
-import React, {useState, useContext} from "react";
+import React, { useState, useContext } from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import {useModal, Select, WindowContext, ActionBarContent, Section, Tuple, Input, EntityStack, Button, Radio, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, Number, TextArea, Checkbox, SideTabs, SideTab} from "./components/BasicComponents"
-import {DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext} from "./components/LayoutComponents";
+import { useModal, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
+import { Form, Submit, Input, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
+import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";
 
 function OverlayCanvas({ render }) {
     const oContext = useContext(OverlayContext);
@@ -57,10 +58,16 @@ function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, s
 
 function TestContent(props) {
     const [text, setText] = useState(props.text);
+    const [x, setX] = useState(18);
+    const [y, setY] = useState(33);
     const [value, setValue] = useState(10);
+    const [bool, setBool] = useState(true);
     return (
         <Stack vertical>
+            <Checkbox readOnly xicon={false} value={bool} set={setBool} />
             <Number max={30} min={0} value={value} set={setValue} />
+            <TupleProp autoFocus name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
+            <TextArea value={text} set={setText} />
             <Block full="h" wrap onClick={() => {setText(text + props.text)}}>{text}</Block>
         </Stack>
     );
@@ -138,7 +145,7 @@ function GridCanvas({size, width, height, ...props}) {
                         <Number name="Border" value={border} set={setBorder} min={0} max={9} buttons />
                     </ToolGroup>
                     <ToolGroup>
-                        <Checkbox name="Rulers" rev={true} icon value={rulers} set={setRulers} />
+                        <Checkbox name="Rulers" rev={true} icon={true} value={rulers} set={setRulers} />
                     </ToolGroup>
                     <ToolGroup>
                         <Block padded border={1}>Black & White</Block>
@@ -198,6 +205,7 @@ function GridCanvas({size, width, height, ...props}) {
 }
 
 function TestApp() {
+    // TODO: move this to new App Parent Component
     const wContext = useContext(WindowContext);
     const onFocus = e => {
         const zIndex = wContext.focusStack.zIndex;
@@ -219,7 +227,8 @@ function TestApp() {
     const [x, setX] = useState(0);
     const [y, setY] = useState(0);
     const [myText, setMyText] = useState('Schwätz nicht du Depp!');
-
+    const [align, setAlign] = useState('left');
+    const [activeAlign, setActiveAlign] = useState(1);
 
     const [repeat, setRepeat] = useState(1);
     let text = '';
@@ -228,13 +237,16 @@ function TestApp() {
         text += 'So many many many words!';
         i--;
     }
-
     const options = [
-        {id: 0, name: 'Here we go again'},
-        {id: 1, name: 'To Daxx or not to Daxx!'},
+        {id: 0, name: 'Here again'},
+        {id: 1, name: 'To Daxx'},
         {id: 2, name: 'Space alert!'}
     ];
-
+    const alignOptions = [
+        {id: 'left', name: 'format_align_left'},
+        {id: 'center', name: 'format_align_center'},
+        {id: 'right', name: 'format_align_right'}
+    ];
     return (
         <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
             <Stack vertical full>
@@ -255,28 +267,30 @@ function TestApp() {
                 <Stack full vertical gaps>
                     <Section full="h" centerItems size={300} maxSize={400} name="TextPane">
                         <Stack vertical borders full>
-                            <Section name="Properties" className="scroll max-v" maxHeight={80} inner collapse scroll full="h">
-                                <Stack vertical full>
-                                    <Grid gaps columns="70px *" full="h">
-                                        <Block shorten>Name</Block>
-                                        <Block>Value</Block>
-                                        <Block shorten>More Name</Block>
-                                        <Block>Even MoreValue</Block>
-                                        <Block shorten>Name</Block>
-                                        <Block>Value</Block>
-                                        <Block shorten>More Name</Block>
-                                        <Block>
-                                        </Block>
-                                    </Grid>
+                            <Section name="Properties" inner collapse scroll full="h">
+                                <Stack vertical full="h" collapsed padded>
+                                    Somewhere in time...
                                 </Stack>
                             </Section>
                             <Stack full>
-                                <Section inner name="Fonts" size={250} maxWidth="33%" collapse="h" full="v">
-                                    <EntityStack />
-                                </Section>
-                                <Section inner name="Font Props" size={250} maxWidth="33%" collapse="h" collapsed full="v">
-                                    <Block padded>PropGrid</Block>
-                                </Section>
+                                <EntityStackSections
+                                    entities={alignOptions} deselect emptyText="Add new font" active={activeAlign} setActive={setActiveAlign}
+                                    sectionProps={{inner: true, name: 'Fonts', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                                    detailProps={{inner: true, name: 'Font Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                                    >
+                                    {activeAlign === null ?
+                                        <Block center className="less">No font selected</Block> :
+                                        <Block padded full="h">
+                                            <Grid gaps columns="70px *" full="h">
+                                                <InputProp name="Id:" value={alignOptions[activeAlign].id} readOnly />
+                                                <TupleProp name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
+                                                <SelectProp tab name="Whatever:" options={options} value={mode} set={setMode} />
+                                                <RadioProp name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
+                                            </Grid>
+                                        </Block>
+                                    }
+                                </EntityStackSections>
+
                                 <Section inner full name="Characters">
                                     <Stack borders full="v">
                                         <Stack vertical gaps padded scroll>
@@ -290,15 +304,12 @@ function TestApp() {
                                             <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
                                         </Stack>
 
-                                        <Block padded>
-                                            <Select name="Mode" padded="h" options={options} value={mode} set={setMode} />
-                                        </Block>
 
                                         <Block padded>
                                             <Stack vertical gaps>
-                                                <Number name="Slide:" slider="h" decimals={2} min={-5} max={10} value={test} set={setTest} />
-                                                <Tuple name="Position" readOnly x={x} setX={setX} minX={0} maxX={100} y={y} setY={setY} minY={0} maxY={100} />
-                                                <TextArea required value={myText} set={setMyText} rows={10} />
+                                                <Number name="Slide:" slider="h" tab decimals={2} min={-5} max={10} value={test} set={setTest} />
+                                                <TextArea tab xname="terror" required value={myText} set={setMyText} rows={10} />
+                                                <Submit name="Speichern" />
                                             </Stack>
                                         </Block>
 
@@ -317,7 +328,7 @@ function TestApp() {
                     <Section full name="Preview">
                         <Stack full>
                             <Section name="Text Blocks" inner collapse="h" size={300} full="v">
-                                <EntityStack />
+                                <EntityStack entities={options} active={0} />
                             </Section>
                             <Section name="Screen" full inner>
                                 <GridCanvas size={10} width={50} height={10} />
