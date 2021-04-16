@@ -1,6 +1,6 @@
-import React, {Fragment, useState, useRef, useEffect} from "react";
+import React, {Fragment, useState, useRef, useEffect, useContext} from "react";
 import {d} from '../helper/helper';
-import { Portal } from "./BasicComponents"
+import {Portal, WindowContext} from "./BasicComponents"
 
 const DIR = {
     TOP: 1,
@@ -12,6 +12,22 @@ const DIR = {
 /**
  * @module LayoutComponents
  */
+
+function useHotKeys(elemRef, hotKeys, area = null, link = null) {
+    const wContext = useContext(WindowContext);
+    const isHot = !!(area || (hotKeys && Object.keys(hotKeys).length > 0));
+    useEffect(
+    () => {
+        if (!isHot) {
+            return;
+        }
+        wContext.addElemKeyBinding(elemRef.current, hotKeys, area, link);
+        return () => {
+            wContext.deleteElemKeyBindings(elemRef.current)
+        }
+    });
+    return isHot
+}
 
 function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...props}) {
     const dimCls = [];
@@ -221,7 +237,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Block = React.forwardRef(({children, center, centerItems, tab, full, shorten, scroll, wrap, zIndex, verticalText, ...props}, ref) => {
+const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, tab, full, shorten, scroll, wrap, zIndex, verticalText, ...props }, ref) => {
     const divRef = useRef(null);
     const [start, setStart] = useState(null);
     const [showTooltip, setShowTooltip] = useState(false);
@@ -244,6 +260,8 @@ const Block = React.forwardRef(({children, center, centerItems, tab, full, short
         dimAttr['ref'] = divRef;
         ref = divRef;
     }
+    useHotKeys(ref, hotKeys, area);
+
     if (isMinH) {
         dimCls.push('min-content-h');
     } else if (fullH) {
@@ -445,8 +463,14 @@ function getFlatChildren(children, result = []) {
  * @param {string|number} [props.minHeight] - A CSS min-height for this component
  * @param {string|number} [props.maxHeight] - A CSS max-height for this component
  */
-function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full, center, centerItems, ...props}) {
+function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full, hotKeys, area, link, center, centerItems, ...props}) {
     const parentCls = ['bounds'];
+    const parentAttr = {};
+    const parentRef = useRef(null);
+
+    if (useHotKeys(parentRef, hotKeys, area, link)) {
+        parentAttr.ref = parentRef;
+    }
     const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
 
     const axis = vertical ? 'v' : 'h';
@@ -572,7 +596,7 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
     }
 
     return (
-        <div className={parentCls.join(' ')} style={parentStyle}>
+        <div { ...parentAttr } className={parentCls.join(' ')} style={parentStyle}>
             <div style={style} className={dimCls.join(' ')} {...dimAttr}>{children}</div>
         </div>
     )

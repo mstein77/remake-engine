@@ -1,8 +1,8 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import { useModal, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
-import { Form, Submit, Input, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
+import { useModal, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
+import { Form, Submit, Input, Select, Radio, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
 import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";
 
 function OverlayCanvas({ render }) {
@@ -57,18 +57,32 @@ function FlexScrollGrid({ render, size, viewX, viewY, width, setViewX, height, s
 }
 
 function TestContent(props) {
+    const eContext = useContext(EditorContext);
+
     const [text, setText] = useState(props.text);
     const [x, setX] = useState(18);
     const [y, setY] = useState(33);
     const [value, setValue] = useState(10);
     const [bool, setBool] = useState(true);
+    const onClick = () => {
+        eContext.doAction(
+            () => d('MODAL DO'),
+            () => d('MODAL UNDO')
+        );
+    };
+    const hotKeys = {
+        undo: () => eContext.undoAction(),
+        redo: () => eContext.redoAction()
+    };
     return (
-        <Stack vertical>
+        <Stack vertical hotKeys={hotKeys}>
+            <UndoRedoButtons />
             <Checkbox readOnly xicon={false} value={bool} set={setBool} />
             <Number max={30} min={0} value={value} set={setValue} />
             <TupleProp autoFocus name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
             <TextArea value={text} set={setText} />
             <Block full="h" wrap onClick={() => {setText(text + props.text)}}>{text}</Block>
+            <Button onClick={onClick} name="Hit me!" />
         </Stack>
     );
 }
@@ -173,11 +187,13 @@ function GridCanvas({size, width, height, ...props}) {
             </Stack>
 
             <TestModal1.content name="Arasaka is down">
-                <ActionBarContent full="h" padded wrap scroll>
-                    <TestContent text={"Auto Width/Height :\n" +
-                    "                    And what now, why dont I like it as it is???\n" +
-                    "                    And what now, why dont I like it as it is???"} />
-                </ActionBarContent>
+                <EditorCtx id="modal">
+                    <ActionBarContent full="h" padded wrap scroll>
+                        <TestContent text={"Auto Width/Height :\n" +
+                        "                    And what now, why dont I like it as it is???\n" +
+                        "                    And what now, why dont I like it as it is???"} />
+                    </ActionBarContent>
+                </EditorCtx>
             </TestModal1.content>
 
             <TestModal2.content name="Arasaka is down" height="50%" width="50%">
@@ -204,23 +220,22 @@ function GridCanvas({size, width, height, ...props}) {
     )
 }
 
+function MyActionButton() {
+    const eContext = useContext(EditorContext);
+
+    const onClick = () => {
+        eContext.doAction(
+            () => {d('PLEASE DO!')},
+            () => {d('PLEASE UNDO!')}
+        );
+    };
+    return (
+        <Button name="Launch" onClick={onClick} />
+    )
+}
+
 function TestApp() {
     // TODO: move this to new App Parent Component
-    const wContext = useContext(WindowContext);
-    const onFocus = e => {
-        const zIndex = wContext.focusStack.zIndex;
-        if (!zIndex) {
-            return;
-        }
-        const focusElem = wContext.focusStack.elem[zIndex];
-        if (!focusElem || !focusElem.top) {
-            return;
-        }
-        if (focusElem.top.contains(document.activeElement)) {
-            return;
-        }
-        focusElem.start.focus();
-    };
 
     const [mode, setMode] = useState(0);
     const [test, setTest] = useState(6);
@@ -238,6 +253,7 @@ function TestApp() {
         i--;
     }
     const options = [
+        {id: -1, name: 'xxx'},
         {id: 0, name: 'Here again'},
         {id: 1, name: 'To Daxx'},
         {id: 2, name: 'Space alert!'}
@@ -248,98 +264,114 @@ function TestApp() {
         {id: 'right', name: 'format_align_right'}
     ];
     return (
-        <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
-            <Stack vertical full>
+        <Stack vertical full>
 
-                <Block full="h">
-                    <Stack full="h" padded="v">
-                        <Button icon="keyboard_backspace" padded="h" name="Back" />
-                        <Block padded="h" center="v" full="h" shorten>And a very very long very very long very very long very very long title goes here and here and here</Block>
-                        <Stack gaps center="v">
-                            <Block center="v">Space for Buttons</Block>
-                            <Button xborder={DIR.RIGHT|DIR.LEFT} padded="h" icon="pause_circle_outline" name="Replay" />
-                            <Button icon="play_circle_outline" disabled padded="h" name="Play" onClick={() => console.log(666)} />
-                            <Button border={false} padded={false} icon="build" />
-                        </Stack>
+            <Block full="h">
+                <Stack full="h" padded="v">
+                    <Button icon="keyboard_backspace" padded="h" name="Back" />
+                    <Block padded="h" center="v" full="h" shorten>And a very very long very very long very very long very very long title goes here and here and here</Block>
+                    <Stack gaps center="v">
+                        <Block center="v">Space for Buttons</Block>
+                        <Button xborder={DIR.RIGHT|DIR.LEFT} padded="h" icon="pause_circle_outline" name="Replay" />
+                        <Button icon="play_circle_outline" disabled padded="h" name="Play" onClick={() => console.log(666)} />
+                        <Button border={false} padded={false} icon="build" />
                     </Stack>
-                </Block>
+                </Stack>
+            </Block>
 
-                <Stack full vertical gaps>
-                    <Section full="h" centerItems size={300} maxSize={400} name="TextPane">
-                        <Stack vertical borders full>
-                            <Section name="Properties" inner collapse scroll full="h">
-                                <Stack vertical full="h" collapsed padded>
-                                    Somewhere in time...
+            <Stack full vertical gaps>
+                <EditorSection id="pane" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
+                   actions={
+                       [
+                           {name: 'Revert', onClick: () => d('REVERT!')},
+                           {name: 'Save',
+                               disabled: eContext => eContext.hasStorePos(),
+                               onClick: eContext => {
+                                   d('SAVE!!');
+                                   eContext.updateRestorePos()
+                               }
+                           },
+                           {name: 'Deploy', onClick: () => {d('DEPLOY!'); wContext.clearEditor('preview')}},
+                           {name: 'Export', onClick: () => d('EXPORT!')},
+                       ]
+                   }>
+                    <Stack vertical borders full>
+                        <Section name="Properties" inner collapse scroll full="h">
+                            <Stack vertical full="h" collapsed padded>
+                                <MyActionButton />
+                            </Stack>
+                        </Section>
+                        <Stack full>
+                            <Section name="Fonts" inner collapse="h" size={300} full="v">
+                                <EntityStack area={3} entities={options} active={0} />
+                            </Section>
+
+                            <Section inner full name="Characters">
+                                <Stack borders full>
+                                    <Stack vertical gaps padded scroll>
+                                        <Checkbox value={true} set={() => {}} />
+                                        <Checkbox icon value={true} set={() => {}} />
+                                        <Checkbox name="Rulers" value={true} set={() => {}} />
+                                        <Checkbox icon name="Rulers" value={true} set={() => {}} />
+                                        <Checkbox name="Rulers" rev value={true} set={() => {}} />
+                                        <Checkbox icon name="Rulers" rev value={true} set={() => {}} />
+                                        <Checkbox name="Rulers" disabled value={true} set={() => {}} />
+                                        <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
+                                    </Stack>
+
+
+                                    <Block padded full>
+                                        <Stack full="h" vertical gaps>
+                                            <Select name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
+                                            <Number name="Slide:" xslider="h" tab decimals={2} min={-5} max={10} value={test} set={setTest} />
+                                            <TextArea inputDim={{width: '100%'}} tab name="terror squad" cols={10} required value={myText} set={setMyText} rows={5} />
+                                            <Submit name="Speichern" />
+                                        </Stack>
+                                    </Block>
+
+                                    <Block centerItems full="v" padded>
+                                        <Stack vertical>
+                                            <Number slider buttons={false} name="Repeat" set={setRepeat} value={repeat} min={0} max={30} />
+                                            <Block wrap width={200}>{text}</Block>
+                                        </Stack>
+                                    </Block>
                                 </Stack>
                             </Section>
-                            <Stack full>
-                                <EntityStackSections
-                                    entities={alignOptions} deselect emptyText="Add new font" active={activeAlign} setActive={setActiveAlign}
-                                    sectionProps={{inner: true, name: 'Fonts', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-                                    detailProps={{inner: true, name: 'Font Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-                                    >
-                                    {activeAlign === null ?
-                                        <Block center className="less">No font selected</Block> :
-                                        <Block padded full="h">
-                                            <Grid gaps columns="70px *" full="h">
-                                                <InputProp name="Id:" value={alignOptions[activeAlign].id} readOnly />
-                                                <TupleProp name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
-                                                <SelectProp tab name="Whatever:" options={options} value={mode} set={setMode} />
-                                                <RadioProp name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
-                                            </Grid>
-                                        </Block>
-                                    }
-                                </EntityStackSections>
-
-                                <Section inner full name="Characters">
-                                    <Stack borders full="v">
-                                        <Stack vertical gaps padded scroll>
-                                            <Checkbox value={true} set={() => {}} />
-                                            <Checkbox icon value={true} set={() => {}} />
-                                            <Checkbox name="Rulers" value={true} set={() => {}} />
-                                            <Checkbox icon name="Rulers" value={true} set={() => {}} />
-                                            <Checkbox name="Rulers" rev value={true} set={() => {}} />
-                                            <Checkbox icon name="Rulers" rev value={true} set={() => {}} />
-                                            <Checkbox name="Rulers" disabled value={true} set={() => {}} />
-                                            <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
-                                        </Stack>
-
-
-                                        <Block padded>
-                                            <Stack vertical gaps>
-                                                <Number name="Slide:" slider="h" tab decimals={2} min={-5} max={10} value={test} set={setTest} />
-                                                <TextArea tab xname="terror" required value={myText} set={setMyText} rows={10} />
-                                                <Submit name="Speichern" />
-                                            </Stack>
-                                        </Block>
-
-                                        <Block centerItems full padded>
-                                            <Stack vertical>
-                                                <Number slider buttons={false} name="Repeat" set={setRepeat} value={repeat} min={0} max={30} />
-                                                <Block wrap width={200}>{text}</Block>
-                                            </Stack>
-                                        </Block>
-                                    </Stack>
-                                </Section>
-                            </Stack>
                         </Stack>
-                    </Section>
+                    </Stack>
+                </EditorSection>
 
-                    <Section full name="Preview">
-                        <Stack full>
-                            <Section name="Text Blocks" inner collapse="h" size={300} full="v">
-                                <EntityStack entities={options} active={0} />
-                            </Section>
-                            <Section name="Screen" full inner>
-                                <GridCanvas size={10} width={50} height={10} />
-                            </Section>
-                        </Stack>
-                    </Section>
-                    <Block />
-                </Stack>
-
+                <EditorSection id="preview" area={2} full name="Preview" actions={
+                    [
+                        {name: 'Export', onClick: () => d('EXPORT!')}
+                    ]
+                }>
+                    <Stack full>
+                        <EntityStackSections
+                            sectionProps={{inner: true, name: 'Text Blocks', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                            detailProps={{inner: true, name: 'Text Block Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                            entities={alignOptions} deselect emptyText="Add new block" active={activeAlign} setActive={setActiveAlign}
+                        >
+                            {activeAlign === null ?
+                                <Block center className="less">No font selected</Block> :
+                                <Block padded full="h">
+                                    <Grid gaps columns="70px *" full="h">
+                                        <InputProp name="Id:" value={alignOptions[activeAlign].id} readOnly />
+                                        <TupleProp undo="size" name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
+                                        <SelectProp undo={'whatever-' + alignOptions[activeAlign].id} tab={true} required name="Whatever:" options={options} value={mode} set={setMode} />
+                                        <RadioProp undo="textalign" name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
+                                    </Grid>
+                                </Block>
+                            }
+                        </EntityStackSections>
+                        <Section name="Screen" full inner>
+                            <GridCanvas size={10} width={50} height={10} />
+                        </Section>
+                    </Stack>
+                </EditorSection>
+                <Block />
             </Stack>
-        </Block>
+        </Stack>
     )
 }
 
@@ -400,6 +432,80 @@ function RealApp() {
     )
 }
 
+function BaseAppInner({ children }) {
+    const wContext = useContext(WindowContext);
+
+    const onFocus = e => {
+        wContext.lastTarget.current = e.target;
+        const zIndex = wContext.focusStack.zIndex;
+        if (!zIndex) {
+            return;
+        }
+        const focusElem = wContext.focusStack.elem[zIndex];
+        if (!focusElem || !focusElem.top) {
+            return;
+        }
+        if (focusElem.top.contains(document.activeElement)) {
+            return;
+        }
+        focusElem.start.focus();
+    };
+
+    useEffect(() => {
+        const hotkeyListener = e => {
+            if (wContext.isInExclusiveMode()) {
+                // TODO allow certain hotkeys?
+                return;
+            }
+            let hotKey = '';
+            let actionKey = '';
+            if (e.metaKey) {
+                hotKey += 'm';
+            } else if (e.ctrlKey) {
+                hotKey += 'c';
+            } else if (e.key === 'Escape') {
+                actionKey = e.key;
+            } else if (e.key >= '0' && e.key <= '9' &&
+                !(document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))) {
+                if (wContext.focusHotKeyArea(e.key)) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
+            }
+            if (hotKey !== '') {
+                actionKey = hotKey + ' ' + e.key;
+            }
+            if (!actionKey) {
+                return;
+            }
+            const elem = document.activeElement === document.body ? wContext.lastTarget.current : document.activeElement;
+            const handler = wContext.getHandlerForActionKey(actionKey, elem);
+            if (handler) {
+                if (!e.repeat) {
+                    handler();
+                }
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        };
+        const clickListener = e => {
+            wContext.lastTarget.current = e.target;
+        };
+        window.addEventListener('mousedown', clickListener, {});
+        window.addEventListener('keydown', hotkeyListener, {});
+        return () => {
+            window.removeEventListener('mousedown', clickListener, {});
+            window.removeEventListener('keydown', hotkeyListener, {})
+        }
+    });
+    return (
+        <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
+            {children}
+        </Block>
+    )
+}
+
 
 function BaseApp({}) {
     const test = 1;
@@ -408,7 +514,9 @@ function BaseApp({}) {
         <CssCtx>
             <WindowCtx>
                 <BackgroundCtx>
-                    {test ? <TestApp /> : <RealApp />}
+                    <BaseAppInner>
+                        {test ? <TestApp /> : <RealApp />}
+                    </BaseAppInner>
                 </BackgroundCtx>
             </WindowCtx>
         </CssCtx>

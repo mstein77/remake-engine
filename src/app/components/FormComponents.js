@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { d } from "../helper/helper"
 import { Block, Stack } from "./LayoutComponents";
-import { WindowContext, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { WindowContext, EditorContext, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 
 function isValidNumber(value) {
     return typeof value === 'number' && !isNaN(value);
@@ -94,16 +94,56 @@ function useAutoFocus(inputRef, props) {
     )
 }
 
-function ComponentWithName({ name, children }) {
+function useSet(value, { undo, set }) {
+    const eContext = useContext(EditorContext);
+    const eRef = useRef(null);
+    eRef.current = eContext;
+
+    return newValue => {
+        if (undo) {
+            const oldValue = value;
+            eRef.current.doAction(
+                () => set(newValue),
+                () => set(oldValue),
+                undo
+            );
+        } else {
+            set(newValue)
+        }
+    }
+}
+
+function ComponentWithName({ name, children, ...props }) {
     if (name) {
+        const attr = getDimHAttr(props);
         children = (
-            <Stack gaps>
-                <Block center="v">{name}</Block>
+            <Stack gaps {...attr}>
+                <Block center="v" full={attr.full} shorten>{name}</Block>
                 {children}
             </Stack>
         )
     }
     return children
+}
+
+function getDimHAttr({ full, width, minWidth, maxWidth }) {
+    return {
+        full: full && full !== 'v' ? 'h' : false,
+        width,
+        minWidth,
+        maxWidth
+    }
+}
+
+function getDimStyle({ width, minWidth, maxWidth, height, minHeight, maxHeight }) {
+    return {
+        width,
+        minWidth,
+        maxWidth,
+        height,
+        minHeight,
+        maxHeight
+    }
 }
 
 const FormContext = React.createContext();
@@ -165,7 +205,9 @@ function Form({ children, ...props }) {
  * disabled
  * tabbed
  */
-function Checkbox({ name, value, set, tab = true, disabled, readOnly, rev, icon = true }) {
+function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = true, ...props }) {
+
+    const set = useSet(value, props);
 
     const items = [];
     if (icon) {
@@ -217,7 +259,7 @@ function Checkbox({ name, value, set, tab = true, disabled, readOnly, rev, icon 
     }
     if (name) {
         items.push(
-            <Block key={2} shorten center="v">{name}</Block>
+            <Block full="h" key={2} shorten center="v">{name}</Block>
         )
     }
     if (rev) {
@@ -227,7 +269,7 @@ function Checkbox({ name, value, set, tab = true, disabled, readOnly, rev, icon 
         return items[0]
     }
     return (
-        <Stack gaps>{items}</Stack>
+        <Stack gaps {...getDimHAttr(props)}>{items}</Stack>
     )
 }
 
@@ -345,7 +387,10 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
 /**
  *
  */
-function Radio({ name, icon, options, gaps, value, set, readOnly, disabled, padded, tab = true }) {
+function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, tab = true, ...props }) {
+    const fContext = useContext(FormContext);
+
+    const set = useSet(value, props);
 
     const radioRef = useRef(null);
     const refocus = useRefocus(radioRef);
@@ -385,20 +430,32 @@ function Radio({ name, icon, options, gaps, value, set, readOnly, disabled, padd
     }
 
     const items = [];
+    let found = false;
     for (let {id, name} of options) {
         items.push(
             <Button key={id} tab={tab} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={value} onClick={readOnly ? null : setAndRefocus} />
         );
+        if (id === value) {
+            found = true;
+        }
+    }
+    if (!found) {
+        attr.className = 'invalid';
+        if (fContext) {
+            fContext.markInvalid()
+        }
     }
     return (
-        <ComponentWithName name={name}>
+        <ComponentWithName name={name} {...props}>
             <Block ref={radioRef}><Stack {...attr}>{items}</Stack></Block>
         </ComponentWithName>
     )
 }
 
-function Number({name, disabled, set, value, min, max, step, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true}) {
+function Number({name, disabled, value, min, max, step, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, ...props }) {
     const wContext = useContext(WindowContext);
+
+    const set = useSet(value, props);
 
     const divRef = useRef(null);
     const slideRef = useRef(null);
@@ -436,7 +493,7 @@ function Number({name, disabled, set, value, min, max, step, autoFocus, slider =
                 const relPos = anchor - e.clientY;
                 if (relPos !== lastPos) {
                     lastPos = relPos;
-                    let newOffset = Math.round(range ? relPos / Math.max(1, 200 / range) : relPos);
+                    let newOffset = stepHandler.round(range ? relPos / Math.max(1, 200 / range) : relPos);
                     if (maxOffset !== null) {
                         newOffset = Math.min(maxOffset, newOffset);
                     }
@@ -445,7 +502,7 @@ function Number({name, disabled, set, value, min, max, step, autoFocus, slider =
                     }
                     if (newOffset !== lastOffset) {
                         lastOffset = newOffset;
-                        set(anchorValue + newOffset);
+                        set(stepHandler.round(anchorValue + newOffset));
                     }
                 }
             }, {
@@ -523,21 +580,20 @@ function Number({name, disabled, set, value, min, max, step, autoFocus, slider =
         );
     }
     return (
-        <ComponentWithName name={name}>
+        <ComponentWithName name={name} {...props}>
             {elem}
         </ComponentWithName>
     )
 }
 
-/*
- */
-function Input({ name, value, set, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, className }) {
+function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, className, ...props }) {
 
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
 
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
+    const set = useSet(value, props);
     const [curr, setCurr] = useState(value);
     const [edit, setEdit] = useState(false);
 
@@ -729,19 +785,22 @@ function Input({ name, value, set, size, min, max, autoFocus, required, disabled
         input = <Block>{input}</Block>
     }
     return (
-        <ComponentWithName name={name}>
+        <ComponentWithName name={name} {...props}>
             {input}
         </ComponentWithName>
     )
 }
 
-function Tuple({ name, x, setX, y, setY, min, max, buttons, slider, tab = true, size, step, readOnly, disabled, autoFocus, ...props }) {
+function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = true, size, step, readOnly, disabled, autoFocus, full, ...props }) {
 
+    const attr = getDimHAttr(props);
     const xAttr = {
         name,
+        full: 'h',
         value: x,
         min:  min !== undefined ? min : props.minX,
         max: max !== undefined ? max : props.maxX,
+        undo: (undo ? undo + '_x' : false),
         size: size !== undefined ? size : props.sizeX,
         set: setX,
         step: step !== undefined ? step : props.stepX,
@@ -755,6 +814,7 @@ function Tuple({ name, x, setX, y, setY, min, max, buttons, slider, tab = true, 
         value: y,
         min:  min !== undefined ? min : props.minY,
         max: max !== undefined ? max : props.maxY,
+        undo: (undo ? undo + '_y' : false),
         size: size !== undefined ? size : props.sizeY,
         set: setY,
         step: step !== undefined ? step : props.stepY,
@@ -765,7 +825,7 @@ function Tuple({ name, x, setX, y, setY, min, max, buttons, slider, tab = true, 
         slider
     };
     return (
-        <Stack gaps>
+        <Stack {...attr} gaps>
             <Number {...xAttr} />
             <Button tab={false} className="less" size={12} icon="clear" border={false} />
             <Number {...yAttr} />
@@ -773,12 +833,21 @@ function Tuple({ name, x, setX, y, setY, min, max, buttons, slider, tab = true, 
     );
 }
 
-function Select({ name, value, set, disabled, options, readOnly, buttons = true, tab = true }) {
+function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, ...props }) {
+    const fContext = useContext(FormContext);
 
+    const cls = [];
     const optionHandler = getOptionHandler(options, value);
     if (readOnly) {
         buttons = false;
     }
+    if (optionHandler.id === null) {
+        cls.push('invalid');
+        if (fContext) {
+            fContext.markInvalid()
+        }
+    }
+    const set = useSet(value, props);
 
     const items = [];
     if (buttons) {
@@ -818,13 +887,15 @@ function Select({ name, value, set, disabled, options, readOnly, buttons = true,
         direct: true,
         disabled
     });
+    delete attr.tab;
     if (disabled || readOnly) {
         tab = false
     }
     attr.tabIndex = tab ? 0 : -1;
     if (tab) {
-        attr.className = 'tabbed'
+        cls.push('tabbed');
     }
+    attr.className = cls.join(' ');
     items.push(
         readOnly ?
             <Block><input key={1} onFocus={e => e.target.blur()} tabIndex={-1} value={optionHandler.name} readOnly={true} /></Block> :
@@ -833,9 +904,7 @@ function Select({ name, value, set, disabled, options, readOnly, buttons = true,
                 value={value}
                 disabled={disabled}
                 onChange={
-                    e => {
-                        set(optionHandler.intIds ? parseInt(e.target.value, 10) : e.target.value)
-                    }
+                    e => {set(optionHandler.intIds ? parseInt(e.target.value, 10) : e.target.value)}
                 }
                 {...attr}
             >
@@ -865,18 +934,20 @@ function Select({ name, value, set, disabled, options, readOnly, buttons = true,
         );
     }
     return (
-        <ComponentWithName name={name}>
+        <ComponentWithName name={name} {...props}>
             {items.length === 1 ? items[0] : <Stack>{items}</Stack>}
         </ComponentWithName>
     )
 }
 
-function TextArea({ name, value, set, autoFocus, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className }) {
+function TextArea({ name, value, autoFocus, inputDim, resize, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
+    const set = useSet(value, props);
 
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
+    const style = getDimStyle(inputDim || {});
     const attr = {
         wrap,
         rows,
@@ -884,9 +955,13 @@ function TextArea({ name, value, set, autoFocus, readOnly, disabled, rows, cols,
         readOnly,
         disabled,
         value,
+        style,
         ref: inputRef,
         onChange: e => set(e.target.value)
     };
+    if (!resize) {
+        attr.style.resize = 'none'
+    }
     const cls = [];
     if (className) {
         cls.push(className);
@@ -896,7 +971,6 @@ function TextArea({ name, value, set, autoFocus, readOnly, disabled, rows, cols,
         if (fContext) {
             fContext.markInvalid()
         }
-
     }
     if (readOnly || disabled) {
         tab = false;
@@ -909,16 +983,18 @@ function TextArea({ name, value, set, autoFocus, readOnly, disabled, rows, cols,
         cls.push('tabbed');
     }
     return (
-        <ComponentWithName name={name}>
-            <textarea
+        <ComponentWithName name={name} {...props}>
+            <Block><textarea
                 className={cls.join(' ')}
                 {...attr}
-            ></textarea>
+            ></textarea></Block>
         </ComponentWithName>
     )
 }
 
-function Color({ name, value, set, readOnly, disabled, tab = true }) {
+function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) {
+    const set = useSet(value, props);
+
     const cls = [];
     if (!tab || (readOnly || disabled)) {
         tab = false;
@@ -926,7 +1002,7 @@ function Color({ name, value, set, readOnly, disabled, tab = true }) {
         cls.push('tabbed');
     }
     return (
-        <ComponentWithName name={name}>
+        <ComponentWithName name={name} {...props}>
             <Block>
                 <input
                     type="color"
