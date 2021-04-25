@@ -1,6 +1,7 @@
 /* Base CSS */
 
 :root {
+    --font-url: 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i';
     --brightness-factor: -1;
     --modal-overlay-bg-color: #000000a3;
 
@@ -157,6 +158,10 @@ html, body {
 .top {
     z-index: 2000000;
     outline: 1px solid red;
+}
+
+.shadow {
+    box-shadow: 5px 5px 5px #00000088;
 }
 
 .rev-cols {

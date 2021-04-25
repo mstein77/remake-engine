@@ -55,7 +55,7 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...p
     }
 
     const dimAttr = {};
-    for(let prop of ['onClick', 'onKeyDown', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress']) {
+    for(let prop of ['onClick', 'onKeyDown', 'onKeyUp', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress']) {
         const handler = props[prop];
         if (handler) {
             dimAttr[prop] = handler;
@@ -514,19 +514,12 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
         children = getFlatChildren(children);
         if (children.length > 1) {
             const items = [];
-            const bAttr = {[axis === 'v' ? 'height' : 'width']: 5};
-            const sCls = ['border-bg'];
-            if (axis === 'h') {
-                sCls.push('stretch');
-            } else {
-                sCls.push('full-h');
-            }
             for (let item of children) {
                 if (item !== '') {
                     items.push(
                         items.length ?
                             <Fragment key={'_' + items.length}>
-                                <div className={sCls.join(' ')} style={bAttr}></div>
+                                <div className={'borders-' + axis}></div>
                                 {item}
                             </Fragment> :
                             item

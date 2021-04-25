@@ -4,18 +4,23 @@
     --default-padding: 5px;
     --box-border-width: 5px;
     --box-border-color: #000000;
-    --editor-max-width: 1200px;
+    --max-width: 1200px;
+    --font-import: 'https://fonts.googleapis.com/css?family=Markazi+Text|Roboto:400,400i,700,700i';
 }
+
+
 
 html, body, #app {
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
+    font-family: "Roboto";
+    font-size: 12px;
 }
 
 .editor-bounds {
-    max-width: var(--editor-max-width);
+    max-width: var(--max-width);
 }
 
 .wrap-normal.full-h {
@@ -284,6 +289,18 @@ div.boxed, div.thin-boxed {
 
 .invisible {
     opacity: 0
+}
+
+.borders-h {
+    align-self: stretch;
+    width: var(--box-border-width);
+    background-color: var(--box-border-color)
+}
+
+.borders-v {
+    width: 100%;
+    height: var(--box-border-width);
+    background-color: var(--box-border-color)
 }
 
 *:focus {

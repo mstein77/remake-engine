@@ -1,10 +1,19 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import {d} from "../helper/helper"
+import {d, Storage} from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import { Button, Number, Color } from "./FormComponents";
+import { Button, Number, Color, Form, Submit } from "./FormComponents";
 
 const BackgroundContext = React.createContext();
+
+function Ruler({ }) {
+    return (
+        <Stack full="h" className="less">
+            <Block height={3}></Block>
+            <Block height={3} full="h" border={DIR.TOP}></Block>
+        </Stack>
+    )
+}
 
 function BackgroundCtx({ children }) {
     const [ color, setColor ] = useState('#A0A0A0');
@@ -77,7 +86,7 @@ function Canvas({ width, height, smoothing, render, plain, border, className }) 
 
 const EditorContext = React.createContext();
 
-function  EditorCtx({ id, children }) {
+function EditorCtx({ id, children }) {
 
     const wContext = useContext(WindowContext);
 
@@ -162,29 +171,26 @@ function  EditorCtx({ id, children }) {
     )
 }
 
-function UndoRedoButtons() {
+
+function UndoRedoButtons({ hotKeys }) {
     const eContext = useContext(EditorContext);
 
-    const undoAttr = {
-        onClick: () => {
-            eContext.undoAction()
+    if (!hotKeys) {
+        hotKeys = {
+            undo: {
+                exec: () => eContext.undoAction(),
+                can: () => eContext.hasPast()
+            },
+            redo: {
+                exec: () => eContext.redoAction(),
+                can: () => eContext.hasFuture()
+            }
         }
-    };
-    if (!eContext.hasPast()) {
-        undoAttr.disabled = true
-    }
-    const redoAttr = {
-        onClick: () => {
-            eContext.redoAction();
-        }
-    };
-    if (!eContext.hasFuture()) {
-        redoAttr.disabled = true
     }
     return (
         <Stack gaps="1">
-            <Button icon="undo" {...undoAttr}>Undo</Button>
-            <Button icon="redo" {...redoAttr}>Redo</Button>
+            <Button icon="undo" onClick={hotKeys.undo}>Undo</Button>
+            <Button icon="redo" onClick={hotKeys.redo}>Redo</Button>
         </Stack>
 
     )
@@ -200,6 +206,17 @@ function EditorSection({ id, ...props }) {
 
 function EditorSectionInner({ name, actions = [], area, link, children, ...props }) {
     const eContext = useContext(EditorContext);
+
+    const hotKeys = {
+        undo: {
+            exec: () => eContext.undoAction(),
+            can: () => eContext.hasPast()
+        },
+        redo: {
+            exec: () => eContext.redoAction(),
+            can: () => eContext.hasFuture()
+        }
+    };
     const header = (
         <Stack full="h" key="eh">
             <Stack full="h" gaps>
@@ -208,7 +225,7 @@ function EditorSectionInner({ name, actions = [], area, link, children, ...props
                 <Block center="v" padded className="less">5</Block>
                 <Block full="h"> </Block>
             </Stack>
-            <Block center="v"><UndoRedoButtons /></Block>
+            <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <Stack center="v" padded="h" gaps="1">
                 {
                     actions.map(
@@ -226,10 +243,6 @@ function EditorSectionInner({ name, actions = [], area, link, children, ...props
             </Stack>
         </Stack>
     );
-    const hotKeys = {
-        undo: () => eContext.undoAction(),
-        redo: () => eContext.redoAction(),
-    };
     return (
         <SectionFrame
             header={header}
@@ -505,7 +518,8 @@ function EntityStackSections({ sectionProps, detailProps, active, children, ...p
     )
 }
 
-function EntityStack({ entities, getName = item => item.name, getInfo, area, emptyText, deselect, children, ...props }) {
+function EntityStack({ entities, set, getName = item => item.name, getInfo, area, emptyText, deselect, children, ...props }) {
+    const eContext = useContext(EditorContext);
 
     let [active, setActiveRaw] = useState(props.active === undefined ? null : props.active);
     if (props.setActive) {
@@ -609,17 +623,38 @@ function EntityStack({ entities, getName = item => item.name, getInfo, area, emp
     }
     const isEmpty = items.length === 0;
 
-    const add = () => d('ADD...');
+    const execAdd = () => {
+        eContext.doAction(
+            () => set([...entities, {id: items.length, name: 'New Item #' + items.length}]),
+            () => set([...entities])
+        )
+    };
+    const execDelete = () => {
+        const newEntities = [ ...entities];
+        newEntities.splice(active, 1);
+        eContext.doAction(
+            () => set(newEntities),
+            () => set(entities)
+        )
+    };
+
     const hotKeys = {
-        'new': add
+        'new': {
+            exec: () => set && execAdd(),
+            can: () => set && items.length < 10
+        },
+        'delete': {
+            exec: () => set && execDelete(),
+            can: () => active !== null && items.length > 0
+        }
     };
 
     let elem = (
         <Stack vertical borders full area={area} hotKeys={hotKeys}>
             <Block padded full="h">
                 <Stack full gaps>
-                    <Button icon="add" onClick={add} />
-                    <Button disabled={active === null} icon="delete" />
+                    <Button icon="add" onClick={hotKeys.new} />
+                    <Button icon="delete" onClick={hotKeys.delete} />
                     <Block full="h" />
                 </Stack>
             </Block>
@@ -702,7 +737,7 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
     };
 
     return (
-        <Grid full gaps={cssContext.defaultPadding} columns={columns.join(' ')} rows={rows.join(' ')}>
+        <Grid full gaps={cssContext.values.defaultPadding} columns={columns.join(' ')} rows={rows.join(' ')}>
             <Block full onWheel={onWheel}>{children}</Block>
             {scrollbarY && <Scrollbar vertical pos={y} max={maxY} page={pageY} set={setY} />}
             {scrollbarX && <Scrollbar pos={x} max={maxX} page={pageX} set={setX} />}
@@ -814,33 +849,113 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 const WindowContext = React.createContext();
 
 function WindowCtx({ children }) {
+    const cssContext = useContext(CssContext);
+    const cssRef = useRef(null);
+    cssRef.current = cssContext;
+
     const [ fixCursor, setFixCursor ] = useState(null);
     const lastTarget = useRef(null);
     const modeRef = useRef(null);
+
+    const settingsRef = useRef(null);
     const modalStack = useMemo(() => [],[]);
     const focusStack = useMemo(() => { return {elem: {}, zIndex: null}}, []);
+    const storage = useMemo(() => {
+        return new Storage(localStorage, 'remake-engine.editor.');
+    }, []);
 
     const listeners = useMemo(() => { return {} }, []);
     const editors = useMemo(() => { return {} }, []);
+    const styleLock = useMemo(() => {
+        return {
+            state: 'unlocked',
+            style: null
+        }
+    }, []);
+
+    const defaults = useMemo(() => {
+        return {
+            config: [
+                {
+                    name: 'Defaults',
+                    values: {
+                        maxWidth: 1200,
+                        maxHeight: 1200,
+                        uiAnimations: true,
+                        maxHistory: 10
+                    }
+                }
+            ],
+            theme: [
+                {
+                    name: 'Defaults',
+                    values: cssContext.values
+                }
+            ],
+            mapping: [
+                {
+                    name: 'Defaults',
+                    values: {
+                        undo: 'm z',
+                        redo: 'm y',
+                        save: 'm s',
+                        export: 'm x',
+                        new: 'c n',
+                        select: null,
+                        delete: 'c d',
+                        quit: 'c q',
+                        edit: 'm e',
+                        all: 'c a',
+                        pick: 'c p',
+                        play: 'm p',
+                        close: 'Escape'
+                    }
+                }
+            ]
+        }
+    }, []);
+    const defaultEditorConfig = defaults.config[0].values;
+    const defaultTheme = defaults.theme[0].values;
+    const defaultMapping = defaults.mapping[0].values;
+
+    const editorConfig = useMemo(() => {
+        return storage.getDefaultedJson('config', defaultEditorConfig);
+    }, []);
+
+    const theme = useMemo(() => {
+        return storage.getDefaultedJson('theme', defaultTheme);
+    }, []);
 
     const hotKeyActions = useMemo(() => {
-        const action2hotKey = {
-            undo: 'm z',
-            redo: 'm y',
-            save: 'm s',
-            export: 'm e',
-            new: 'c n',
-            quit: 'c q',
-            close: 'Escape'
-        };
+        const action2hotKey = storage.getDefaultedJson('hotkeys', defaultMapping);
         const hotKey2action = {};
         for (let [action, key] of Object.entries(action2hotKey)) {
-            hotKey2action[key] = action;
+            if (key !== null) {
+                hotKey2action[key] = action;
+            }
         }
         return {
             action2hotKey,
             hotKey2action
         }
+    }, []);
+
+    useEffect(() => {
+        cssContext.setStyleToValues(document.body.style, theme);
+        cssContext.update();
+        document.body.style.setProperty('--' + 'max-width', editorConfig.maxWidth + 'px');
+        const linkElems = document.querySelectorAll('link');
+        let parent = null;
+        if (linkElems.length > 0) {
+            parent = linkElems[0].parentNode;
+        }
+        const linkNode = document.createElement('link');
+        linkNode.href = 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i';
+        linkNode.rel = 'stylesheet';
+        linkNode.type ='text/css';
+        parent.appendChild(
+            linkNode
+        );
     }, []);
 
     const elemKeyBindings = useMemo(() => [], []);
@@ -1045,9 +1160,87 @@ function WindowCtx({ children }) {
         }
     };
 
+    const isStyleLocked = () => styleLock.state !== 'unlocked';
+
+    const setStyleLock = (state, cssStyle = null) => {
+        if (state === 'locked') {
+            styleLock.state = 'locked';
+            styleLock.style = cssStyle;
+        } else if (state === 'saved') {
+            styleLock.state = 'saved';
+        } else if (state === 'unlocked') {
+            if (styleLock.state !== 'saved' && styleLock.style !== null) {
+                for (let [key, value] of Object.entries(styleLock.style)) {
+                    cssContext.cssPropUpdate.current(document.body.style, key, value);
+                }
+            } else {
+                cssContext.update();
+            }
+            styleLock.style = null;
+            styleLock.state = 'unlocked';
+        }
+    };
+
+    const clearAllSettings = () => {
+        const keys = storage.getKeys();
+        for(let key of keys) {
+            if (!key.startsWith('presets.')) {
+                storage.deleteJson(key);
+            }
+        }
+    };
+
+    const openSettings = () => {
+        setStyleLock('locked', cssRef.current.values);
+        settingsRef.current.open({
+            defaults: {
+                mapping: defaultMapping,
+                theme: defaultTheme,
+                config: defaultEditorConfig
+            },
+            cleanUp: () => {
+                setStyleLock('unlocked');
+            },
+            save: newSettings => {
+                const diff = [];
+                for (let [action, hotKey] of Object.entries(newSettings.mapping)) {
+                    const oldHotKey = hotKeyActions.action2hotKey[action];
+                    if (hotKey !== oldHotKey) {
+                        diff.push([action, hotKey, oldHotKey]);
+                    }
+                }
+                for(let [action, hotKey, oldHotKey] of diff) {
+                    hotKeyActions.action2hotKey[action] = hotKey;
+                    if (oldHotKey !== null) {
+                        delete hotKeyActions.hotKey2action[oldHotKey];
+                    }
+                    if (hotKey !== null) {
+                        hotKeyActions.hotKey2action[hotKey] = action;
+                    }
+                }
+                storage.storeJson('hotkeys', hotKeyActions.action2hotKey);
+
+                for (let [key, value] of Object.entries(newSettings.config)) {
+                    editorConfig[key] = value;
+                }
+                storage.storeJson('config', newSettings.config);
+
+                for (let [key, value] of Object.entries(newSettings.theme)) {
+                    theme[key] = value;
+                }
+                storage.storeJson('theme', newSettings.theme);
+
+                setStyleLock('saved');
+                settingsRef.current.close()
+            }
+        });
+    };
+
     const value = useMemo(() => {
         return {
             lastTarget,
+            editorConfig,
+            theme,
             startExclusiveMode,
             endExclusiveMode,
             isInExclusiveMode,
@@ -1064,6 +1257,15 @@ function WindowCtx({ children }) {
             getHotKeyArea,
             focusHotKeyArea,
             getHandlerForActionKey,
+            hotKeyActions,
+            settingsRef,
+            openSettings,
+            clearAllSettings,
+            setStyleLock,
+            isStyleLocked,
+            cssPropUpdate: cssContext.cssPropUpdate,
+            defaults,
+            storage,
             focusStack
         }
     }, [focusStack]);
@@ -1156,7 +1358,7 @@ function SideTabs({ children, ...props }) {
     const setActive = value => {
         refocus();
         setActiveRaw(value)
-    }
+    };
 
     const items = useRef([]);
 
@@ -1216,7 +1418,7 @@ function SideTabs({ children, ...props }) {
                 <Stack indented vertical gaps {...attr}>{tabs}</Stack>
             </Block>
 
-            <Block full="h">
+            <Block full>
                 <TabContext.Provider value={value}>
                     {children}
                 </TabContext.Provider>
@@ -1249,6 +1451,9 @@ function useModal() {
     currRef.current = isOpen;
 
     const close = () => {
+        if (propsRef.current && propsRef.current.cleanUp) {
+            propsRef.current.cleanUp();
+        }
         propsRef.current = null;
         context.closeModal(currRef.current);
         setIsOpen(false);
@@ -1257,13 +1462,13 @@ function useModal() {
         propsRef.current = props;
         setIsOpen(context.openModal());
     };
-    const content = function ({full, width, maxWidth, minWidth, height, maxHeight, minHeight, ...props}) {
+    const content = function ({full, fixStyle, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
         const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
         dimProps.zIndex = isOpen;
         return (
             <>
-                {isOpen && <Modal close={close} name={title} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} fixStyle={fixStyle} {...dimProps}>{props.children}</Modal>}
             </>
         );
     };
@@ -1278,38 +1483,6 @@ function useModal() {
     };
 }
 
-function useKeyListener(keyCode, action, doRegister = () => true) {
-    useEffect(
-        () => {
-            if (!doRegister()) {
-                return;
-            }
-            const keyHandler = (e) => {
-                if (e.keyCode === keyCode) {
-                    if (!action()) {
-                        return;
-                    }
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-            };
-            window.addEventListener(
-                'keydown',
-                keyHandler,
-                {capture: false}
-            );
-            return () => {
-                window.removeEventListener(
-                    'keydown',
-                    keyHandler,
-                    {capture: false}
-                )
-            }
-        },
-        []
-    );
-}
-
 function Portal({ id, children }) {
     const domElem = document.getElementById(id);
     if (!domElem) {
@@ -1320,6 +1493,30 @@ function Portal({ id, children }) {
         children,
         domElem
     );
+}
+
+function OkCancelForm({ full, save, cancel, submit, buttons = [], children }) {
+    let elem = (
+        <Stack vertical borders full={full}>
+            <Block full={full} scroll>
+                {children}
+            </Block>
+            <Stack full="h" gaps padded>
+                {submit ? <Submit name="OK" onClick={save} /> : <Button onClick={save} name="OK" />}
+                <Button onClick={cancel} name="Cancel" />
+                {buttons.length > 0 ? <Block full="h" /> : ''}
+                {buttons}
+            </Stack>
+        </Stack>
+    );
+    if (submit) {
+        elem = (
+            <Form full={full}>
+                {elem}
+            </Form>
+        )
+    }
+    return  elem
 }
 
 function ActionBarContent({ children, scroll, ...props }) {
@@ -1350,6 +1547,21 @@ function ActionBarContent({ children, scroll, ...props }) {
     )
 }
 
+function ThemeFreeze({ blockRef, children }) {
+    const cContext = useContext(CssContext);
+    const [fixValue, setFixValue] = useState({ ...cContext.values, setStyles: cContext.setStyles });
+
+    useEffect(() => {
+        fixValue.setStyles(blockRef.current.style);
+    }, []);
+
+    return (
+        <CssContext.Provider value={fixValue}>
+            {children}
+        </CssContext.Provider>
+    )
+}
+
 /**
  * <Modal full>  => Volle Max-Breit + Höhe (100%-20px)
  *
@@ -1372,10 +1584,14 @@ function ActionBarContent({ children, scroll, ...props }) {
  *
  *
  */
-const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width, maxWidth, height, maxHeight, children }) {
+const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, full, width, transparent, maxWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
     const trapRef = useRef(null);
+    const dimRef = useRef(null);
+    const [left, setLeft] = useState(null);
+    const [top, setTop] = useState(null);
+    const [dim, setDim] = useState(null);
 
     useEffect(() => {
         const focusElem = wContext.focusStack.elem[zIndex];
@@ -1392,12 +1608,25 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
         if (!focusElem || !focusElem.start) {
             return;
         }
-        focusElem.start.focus();
+        const elem = trapRef.current.querySelector('.tabbed.autofocus');
+        if (elem) {
+            elem.focus();
+        } else {
+            focusElem.start.focus();
+        }
+    }, []);
+
+    useEffect(() => {
+        if (drag) {
+            const rect = dimRef.current.getBoundingClientRect();
+            setDim(rect);
+            setLeft(rect.left);
+            setTop(rect.top);
+        }
     }, []);
 
     const onClick = closeable ?
         e => {
-
             let target = e.target;
             while(target.classList !== undefined) {
                 if (target.classList.contains('modal-centered')) {
@@ -1410,10 +1639,12 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
             e.preventDefault();
         } : null;
 
-    const onKeyDown = null;
-    const hDivCls = ['center-v center-h block'];
+    const hDivCls = ['center-v center-h'];
     if (!full || (full === 'v')) {
         hDivCls.push('min-content-h');
+    }
+    if (!transparent) {
+        hDivCls.push('block');
     }
     if (!maxWidth) {
         maxWidth = '100%';
@@ -1449,42 +1680,179 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
     if (full && full !== 'h') {
         vDivCls.push('full-v');
     }
+    if (transparent) {
+        vDivCls.push('shadow');
+    }
 
     const hotKeys = {};
     if (closeable) {
         hotKeys.close = close
     }
-    return (
-        <Portal id="modals-container">
-            <Block ref={trapRef} area={1} hotKeys={hotKeys} full className="modal-overlay fixed pos-0" onClick={onClick} zIndex={zIndex - 1}>
-                <div className="center-v center-h full-h editor-bounds">
-                    <div className="center-h block" style={parentDivStyle}>
-                        <div className={hDivCls.join(' ')} style={hDivStyle}>
-                            <div className={vDivCls.join(' ')} style={vDivStyle}>
-                                <Stack gaps full="h" padded>
-                                    <Block center="v" shorten full="h">{name}</Block>
-                                    <Button icon="close" onClick={e => close()} />
-                                </Stack>
-                                <div className="border-div-v"></div>
-                                {children}
-                            </div>
-                        </div>
+
+    const overlayCls = ['fixed pos-0'];
+    if (!transparent) {
+        overlayCls.push('modal-overlay');
+    }
+
+    const nameAttr = {};
+    if (drag) {
+        nameAttr.cursor = 'grab';
+        nameAttr.onMouseDown = e => {
+            const rect = dimRef.current.getBoundingClientRect();
+
+            const anchorPos = {x: e.clientX, y: e.clientY};
+            let lastPosX = anchorPos.x;
+            let lastPosY = anchorPos.y;
+            const offX = lastPosX - rect.x;
+            const offY = lastPosY - rect.y;
+            wContext.startExclusiveMode('modal-drag', 'grab');
+            wContext.addEventListener('mousemove', e => {
+                const relPos = {x: e.clientX - anchorPos.x, y: e.clientY - anchorPos.y};
+                if (relPos.x !== lastPosX || relPos.y !== lastPosY) {
+                    lastPosX = relPos.x;
+                    setLeft(e.clientX - offX);
+                    lastPosY = relPos.y;
+                    setTop(e.clientY - offY);
+                }
+            });
+            wContext.addEventListener('mouseup', () => {
+                wContext.endExclusiveMode('modal-drag')
+            }, {once: true});
+            e.stopPropagation();
+            e.preventDefault();
+        };
+    }
+
+    if (dim !== null) {
+        vDivStyle.left = left;
+        vDivStyle.top = top;
+        vDivStyle.position = 'fixed';
+        vDivStyle.width = dim.width;
+        vDivStyle.maxWidth = null;
+        vDivStyle.minWidth = null;
+        vDivStyle.height = dim.height;
+        vDivStyle.maxHeight = null;
+        vDivStyle.minHeight = null;
+    }
+
+    let elem = <Block ref={trapRef} area={1} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
+        <div className="center-v center-h full-h editor-bounds">
+            <div className="center-h block" style={parentDivStyle}>
+                <div className={hDivCls.join(' ')} style={hDivStyle}>
+                    <div ref={dimRef} className={vDivCls.join(' ')} style={vDivStyle}>
+                        <Stack gaps full="h" padded>
+                            <Block center="v" { ...nameAttr } shorten full="h">{name}</Block>
+                            {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
+                        </Stack>
+                        <div className="border-div-v"></div>
+                        {children}
                     </div>
                 </div>
-            </Block>
+            </div>
+        </div>
+    </Block>;
+
+    if (wContext.isStyleLocked()) {
+        elem = <ThemeFreeze blockRef={trapRef}>{elem}</ThemeFreeze>
+    }
+
+    return (
+        <Portal id="modals-container">
+            {elem}
         </Portal>
     );
 };
 
+function getCssConstProp(prop) {
+    let i = 0;
+    const iMax = prop.length;
+    let result = '--';
+    while (i < iMax) {
+        const char = prop[i];
+        const lc = char.toLowerCase();
+        if (lc !== char) {
+            result += '-';
+        }
+        result +=  lc;
+        i++;
+    }
+    return result;
+}
+
 const CssContext = React.createContext();
 
 function CssCtx({ children }) {
+    const [updates, setUpdates] = useState(0);
+    const updatesRef = useRef(null);
+    updatesRef.current = updates;
+    const cssPropUpdate = useRef(null);
+
+    const type2props = useMemo(() => {
+        return {
+            px: ['defaultPadding', 'boxBorderWidth', 'maxWidth'],
+            color: ['boxBorderColor'],
+            url: ['fontUrl']
+        }
+    }, []);
+
     const value = useMemo(() => {
         const style = getComputedStyle(document.body);
         const values = {};
-        values.defaultPadding = parseInt(style.getPropertyValue('--default-padding'), 10);
-        return values
-    }, []);
+
+        for(let prop of type2props.px) {
+            const constProp = getCssConstProp(prop);
+            const value = parseInt(style.getPropertyValue(constProp), 10);
+            values[prop] = value;
+        }
+        for(let prop of type2props.color) {
+            const constProp = getCssConstProp(prop);
+            const value = style.getPropertyValue(constProp).trim();
+            values[prop] = value;
+        }
+        for(let prop of type2props.url) {
+            const constProp = getCssConstProp(prop);
+            const value = style.getPropertyValue(constProp).trim();
+            values[prop] = value.substr(1, value.length - 2);
+        }
+
+        cssPropUpdate.current = (css, prop, value) => {
+            const constProp = getCssConstProp(prop);
+            if (type2props.px.includes(prop)) {
+                value = value + 'px';
+            }
+            css.setProperty(constProp, value);
+        };
+        const setStyles = (style, props = null) => {
+            let pxProps = type2props.px;
+            let colProps = type2props.color;
+            if (props) {
+                pxProps = pxProps.filter(prop => props.includes(prop));
+                colProps = colProps.filter(prop => props.includes(prop));
+            }
+
+            for(let prop of pxProps) {
+                const constProp = getCssConstProp(prop);
+                style.setProperty(constProp, values[prop] + 'px');
+            }
+            for(let prop of colProps) {
+                const constProp = getCssConstProp(prop);
+                style.setProperty(constProp, values[prop])
+            }
+        };
+
+        const setStyleToValues = (style, values) => {
+            for (let [key, value] of Object.entries(values)) {
+                cssPropUpdate.current(style, key, value);
+            }
+        };
+        return {
+            values,
+            update: () => setUpdates(updatesRef.current + 1),
+            cssPropUpdate,
+            setStyles,
+            setStyleToValues
+        };
+    }, [updates]);
 
     return (
         <CssContext.Provider value={value}>
@@ -1576,11 +1944,14 @@ export {
     SideTabs,
     SideTab,
     CssCtx,
+    CssContext,
     Scrollbar,
     Portal,
     EditorContext,
     EditorCtx,
     UndoRedoButtons,
+    OkCancelForm,
+    Ruler,
 
     EntityStack,
     EntityStackSections,

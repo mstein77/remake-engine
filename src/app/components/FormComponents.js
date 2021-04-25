@@ -284,6 +284,15 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
 
     const [clicked, setClicked] = useState(false);
 
+    if (onClick && typeof onClick === 'object') {
+        if (onClick.can && !onClick.can()) {
+            disabled = true
+        } else {
+            const exec = onClick.exec;
+            onClick = () => exec();
+        }
+    }
+
     const readOnly = !onClick;
     let attr = { ...props };
     const cls = [];
@@ -324,7 +333,7 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
     }
     if (name) {
         items.push(
-            <Block shorten full="h" key={2}>{name}</Block>
+            <Block center="v" shorten full="h" key={2}>{name}</Block>
         );
     }
     if (rev) {

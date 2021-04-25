@@ -1,8 +1,8 @@
-import React, { useState, useContext, useRef, useEffect } from "react";
+import React, {useState, useContext, useMemo, useRef, useEffect, Fragment} from "react";
 import ReactDOM from "react-dom";
 import {d} from "../app/helper/helper";
-import { useModal, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
-import { Form, Submit, Input, Select, Radio, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
+import { useModal, useComponentUpdate, useRefocus, Ruler, OkCancelForm, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
+import { Form, Submit, Input, Select, CheckboxProp, Radio, LabelProp, NumberProp, ColorProp, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
 import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";
 
 function OverlayCanvas({ render }) {
@@ -235,7 +235,7 @@ function MyActionButton() {
 }
 
 function TestApp() {
-    // TODO: move this to new App Parent Component
+    const wContext = useContext(WindowContext);
 
     const [mode, setMode] = useState(0);
     const [test, setTest] = useState(6);
@@ -244,6 +244,12 @@ function TestApp() {
     const [myText, setMyText] = useState('Schwätz nicht du Depp!');
     const [align, setAlign] = useState('left');
     const [activeAlign, setActiveAlign] = useState(1);
+    const [entities, setEntities] = useState([
+        {id: -1, name: 'xxx'},
+        {id: 0, name: 'Here again'},
+        {id: 1, name: 'To Daxx'},
+        {id: 2, name: 'Space alert!'}
+    ]);
 
     const [repeat, setRepeat] = useState(1);
     let text = '';
@@ -274,7 +280,7 @@ function TestApp() {
                         <Block center="v">Space for Buttons</Block>
                         <Button xborder={DIR.RIGHT|DIR.LEFT} padded="h" icon="pause_circle_outline" name="Replay" />
                         <Button icon="play_circle_outline" disabled padded="h" name="Play" onClick={() => console.log(666)} />
-                        <Button border={false} padded={false} icon="build" />
+                        <Button border={false} padded={false} onClick={() => wContext.openSettings()} icon="build" />
                     </Stack>
                 </Stack>
             </Block>
@@ -287,7 +293,6 @@ function TestApp() {
                            {name: 'Save',
                                disabled: eContext => eContext.hasStorePos(),
                                onClick: eContext => {
-                                   d('SAVE!!');
                                    eContext.updateRestorePos()
                                }
                            },
@@ -303,7 +308,7 @@ function TestApp() {
                         </Section>
                         <Stack full>
                             <Section name="Fonts" inner collapse="h" size={300} full="v">
-                                <EntityStack area={3} entities={options} active={0} />
+                                <EntityStack area={3} entities={entities} set={setEntities} active={0} />
                             </Section>
 
                             <Section inner full name="Characters">
@@ -432,8 +437,413 @@ function RealApp() {
     )
 }
 
+function NameDialog({ close, save, max, reserved = [], ...props }) {
+    const [name, setName] = useState(props.name || '');
+    const match = value => !reserved.includes(value);
+    return (
+        <OkCancelForm full="h" submit padded cancel={close} save={() => save(name)}>
+            <Block full="h" padded>
+                <PropertyGrid full="h">
+                    <InputProp full="h" autoFocus name="Name:" value={name} set={setName} match={match} max={max} required />
+                </PropertyGrid>
+            </Block>
+        </OkCancelForm>
+    )
+}
+
+function PresetsManager({ id, set, config, ...props }) {
+    const wContext = useContext(WindowContext);
+
+    const NameModal = useModal();
+    const update = useComponentUpdate();
+
+    const defaultItems = [];
+    const customItems = [];
+
+    const presetKey = 'presets.' + id;
+    const presets = wContext.storage.getDefaultedArray(presetKey, []);
+
+    const setDefaultedValues = values => {
+        set((presets.length > 0) ? { ...presets[0].values, ...values } : { ...values });
+    };
+
+    const defaults = wContext.defaults[id];
+    if (defaults) {
+        for (let item of defaults) {
+            defaultItems.push(
+                <Block key={item.name} padded="h" full="h">
+                    <Button full="h" name={'< ' + item.name} onClick={() => setDefaultedValues({ ...item.values })} />
+                </Block>
+            )
+        }
+    }
+
+    const reserved = [];
+    for (let item of presets) {
+        reserved.push(item.name);
+        customItems.push(
+            <Stack vertical key={item.name} padded="h" full="h" gaps="1">
+                <Button full="h" name={'< ' + item.name} onClick={() => setDefaultedValues(item.values)} />
+                <Stack full="h" gaps="1">
+                    <Block full="h"></Block>
+                    <Button icon="edit" onClick={() => editPresets(item.name)} />
+                    <Button icon="delete" onClick={() => deletePresets(item.name)} />
+                </Stack>
+            </Stack>
+        )
+    }
+
+    const deletePresets = name => {
+        wContext.storage.storeJson(presetKey, presets.filter(item => item.name !== name));
+        update();
+    };
+
+    const editPresets = name => {
+        NameModal.open({
+            reserved: reserved.filter(item => item !== name),
+            name,
+            max: 20,
+            save: newName => {
+                const newPresets = [];
+                for (let item of presets) {
+                    newPresets.push(
+                        item.name === name ?
+                            { ...item, name: newName } : item
+                    );
+                }
+                wContext.storage.storeJson(presetKey, newPresets);
+                NameModal.close()
+            }
+        })
+    };
+
+    const addPresets = () => {
+        NameModal.open({
+            reserved,
+            max: 20,
+            save: name => {
+                wContext.storage.storeJson(presetKey,  [ ...presets, {name, values: props.values} ] )
+                NameModal.close();
+            }
+        });
+    };
+
+    return (
+        <Block full="v" scroll>
+            <Stack full="h" gaps vertical padded>
+                {defaultItems}
+                <Ruler />
+                <Block center>
+                    <Button icon="add" onClick={addPresets} />
+                </Block>
+                <Ruler />
+                {customItems}
+            </Stack>
+
+            <NameModal.content name={'Store ' + id + ' as...'} width={200}>
+                <NameDialog { ...NameModal.props} />
+            </NameModal.content>
+        </Block>
+    )
+}
+
+function ConfigSettings({ config, setConfig }) {
+    const lastDim = useRef(null);
+
+    useEffect(() => {
+        if (lastDim.current === null) {
+            lastDim.current = config.maxWidth;
+        }
+        if (lastDim.current !== config.maxWidth) {
+            document.body.style.setProperty('--' + 'max-width', config.maxWidth + 'px')
+            lastDim.current = config.maxWidth
+        }
+    });
+
+    const propSetter = prop => value => setConfig({ ...config, [prop]: value});
+
+    return (
+        <Stack full borders>
+            <Block padded full="h">
+                <PropertyGrid padded>
+                    <NumberProp name="Max Width" slider="h" value={config.maxWidth} max={5000} set={propSetter('maxWidth')} min={400} />
+                    <NumberProp name="Max Height" slider="h" value={config.maxHeight} max={5000} set={propSetter('maxHeight')} min={400} />
+                    <CheckboxProp name="UI Animations" value={config.uiAnimations} set={propSetter('uiAnimations')} />
+                    <NumberProp name="History size" value={config.maxHistory} max={100} set={propSetter('maxHistory')} min={5} />
+                </PropertyGrid>
+            </Block>
+
+            <PresetsManager id="config" set={setConfig} values={config} />
+        </Stack>
+    )
+}
+
+function ThemeSettings({ theme, setTheme, cssPropUpdate }) {
+    const themeRef = useRef(null);
+
+    useEffect(() => {
+        if (!themeRef.current) {
+            themeRef.current = { ...theme };
+        }
+        for (let key of Object.keys(themeRef.current)) {
+            if (theme[key] !== themeRef.current[key]) {
+                themeRef.current[key] = theme[key];
+                cssPropUpdate(document.body.style, key, theme[key]);
+            }
+        }
+    });
+
+    const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
+
+    return (
+        <Stack full borders>
+            <Block full="h" padded>
+                <PropertyGrid>
+                    <NumberProp name="Padding" value={theme.defaultPadding} max={20} set={propSetter('defaultPadding')} min={0} />
+                    <NumberProp name="Border Width" value={theme.boxBorderWidth} max={10} set={propSetter('boxBorderWidth')} min={0} />
+                    <ColorProp name="Border Color" value={theme.boxBorderColor} set={propSetter('boxBorderColor')} />
+                    <InputProp name="Font-URL" value={theme.fontUrl} set={propSetter('fontUrl')} />
+                </PropertyGrid>
+            </Block>
+            <PresetsManager id="theme" set={setTheme} values={theme} />
+        </Stack>
+    )
+}
+
+function HotKeyRecorder({ action, save, close, mapping, ...props }) {
+    const [hotKey, setHotKey] = useState(null);
+    const recorderRef = useRef(null);
+
+    const onKeyDown = e => {
+        let newHotKey = '';
+        let actionKey = '';
+        if (e.metaKey) {
+            newHotKey += 'm';
+        } else if (e.ctrlKey) {
+            newHotKey += 'c';
+        } else if (e.altKey) {
+            newHotKey += 'a';
+        } else if (HotKeySingleKeys.includes(e.key)) {
+            actionKey = e.key;
+        }
+        if (newHotKey.length > 0 && e.shiftKey) {
+            newHotKey += 'i';
+        }
+        if (newHotKey !== '') {
+            actionKey = newHotKey;
+            if (!HotKeySkipValues.includes(e.key)) {
+                actionKey += ' ' + e.key;
+            }
+        }
+
+        if (e.key !== 'Tab') {
+            e.preventDefault();
+            e.stopPropagation();
+        } else return;
+
+        if (actionKey === hotKey) {
+            return
+        }
+        setHotKey(actionKey !== '' ? actionKey : null)
+    };
+
+    let delAction = null;
+    if (hotKey && hotKey !== props.hotKey) {
+        for (let [currAction, actionHotKey] of Object.entries(mapping)) {
+            if (hotKey === actionHotKey) {
+                delAction = currAction;
+            }
+        }
+    }
+
+    const isHotKeyOnly = value => value.match(/^[mca]i?$/);
+
+    const onKeyUp = e => {
+        if (hotKey !== null && isHotKeyOnly(hotKey)) {
+            setHotKey(null);
+        }
+    };
+
+    const okOp = {
+        can: () => hotKey !== null && !isHotKeyOnly(hotKey),
+        exec: () => save(hotKey, delAction)
+    };
+
+    return (
+        <Stack vertical borders width={300}>
+            <Stack padded center vertical gaps full="h">
+                <Block center="h">{'Press HotKey for action "' + action + '":'}</Block>
+                <Block padded center>
+                    <Block onKeyDown={onKeyDown} onKeyUp={onKeyUp} ref={recorderRef} tab border height={60} className="autofocus" padded>
+                        <HotKeyKeys hotKey={hotKey} empty="press hotkey" />
+                    </Block>
+                </Block>
+                {
+                    delAction &&
+                        <Block full="h" padded>
+                            <Stack padded border="1" full="h">
+                                <Block padded centerItems><Button border={false} icon="warning" /></Block>
+                                <Block padded wrap full="h">
+                                    {`This HotKey is currently assigned to "${delAction}", if you save this assignment gets deleted!`}
+                                </Block>
+                            </Stack>
+                        </Block>
+                }
+            </Stack>
+            <Stack padded gaps>
+                <Button name="OK" onClick={okOp} />
+                <Button name="Cancel" onClick={close} />
+            </Stack>
+        </Stack>
+    )
+}
+
+const HotKeySingleKeys = ['Escape'];
+const HotKeySkipValues = ['Meta', 'Control', 'Alt', 'Shift'];
+
+function HotKeyKeys({ hotKey, empty }) {
+
+    const keys = [];
+    let elems = [];
+    if (hotKey !== null) {
+        const [hotPart, keyPart] = hotKey.split(' ');
+        if (hotPart.startsWith('m')) {
+            keys.push('CMD ⌘')
+        } else if (hotPart.startsWith('c')) {
+            keys.push('CTRL')
+        } else if (hotPart.startsWith('a')) {
+            keys.push('ALT');
+        }
+        if (keys.length > 0) {
+            if (hotPart.indexOf('i') !== -1) {
+                keys.push('SHIFT');
+            }
+            if (keyPart) {
+                keys.push(keyPart);
+            }
+        } else if (HotKeySingleKeys.includes(hotPart)) {
+            keys.push(hotPart);
+        }
+    }
+    if (keys.length) {
+        for(let key of keys) {
+            if (elems.length) {
+                elems.push(<Button key={'_' + elems.length} border={false} icon="add" className="less" />);
+            }
+            elems.push(<Block key={key} padded border="1"><kbd>{key}</kbd></Block>);
+
+        }
+        return (
+            <Stack gaps center="v">{elems}</Stack>
+        )
+    }
+    return (
+        <Block centerItems full className="less">{empty}</Block>
+    )
+}
+
+function HotKeySettings({ mapping, setMapping }) {
+    const RecordModal = useModal();
+
+    const clearAction = action => {
+        const newMapping = { ...mapping };
+        newMapping[action] = null;
+        setMapping(newMapping)
+    };
+
+    const items = [];
+    for (let [action, hotKey] of Object.entries(mapping)) {
+        const deleteOp = {
+            exec: () => clearAction(action),
+            can: () => hotKey !== null
+        };
+        const assignOp = () => {
+            RecordModal.open({
+                action,
+                hotKey,
+                mapping,
+                save: (value, oldAction) => {
+                    const newMapping = { ...mapping };
+                    if (oldAction) {
+                        newMapping[oldAction] = null;
+                    }
+                    newMapping[action] = value;
+                    setMapping(newMapping);
+                    RecordModal.close()
+                }
+            });
+        };
+        items.push(
+            <Fragment key={items.length}>
+                <Block padded center="v">{action + ':'}</Block>
+                <HotKeyKeys hotKey={hotKey} empty="not assigned" />
+                <Stack padding="h" gaps center>
+                    <Button icon="delete" onClick={deleteOp} />
+                    <Button icon="keyboard" onClick={assignOp} />
+                </Stack>
+            </Fragment>
+        )
+    }
+    return (
+        <Stack full borders>
+            <Block padded scroll full="h">
+                <Grid columns="- + 80px" full="v" gaps>
+                    {items}
+                </Grid>
+                <RecordModal.content name="Assign HotKey">
+                    <HotKeyRecorder {...RecordModal.props} />
+                </RecordModal.content>
+            </Block>
+            <PresetsManager id="mapping" set={setMapping} values={mapping} />
+        </Stack>
+    )
+}
+
+function Settings({ save, close, defaults }) {
+    const wContext = useContext(WindowContext);
+
+    const [config, setConfig] = useState(wContext.editorConfig);
+    const [theme, setTheme] = useState(wContext.theme);
+    const [mapping, setMapping] = useState(wContext.hotKeyActions.action2hotKey);
+
+    const buttons = useMemo(() => {
+        return [
+            <Button key="clear" name="Clear all settings" onClick={() => {
+                wContext.clearAllSettings();
+                setConfig(defaults.config);
+                setTheme(defaults.theme);
+                for (let [key, value] of Object.entries(defaults.theme)) {
+                    wContext.cssPropUpdate.current(document.body.style, key, value);
+                }
+                setMapping(defaults.mapping);
+            }} />
+        ];
+    }, []);
+
+    return (
+        <OkCancelForm full save={() => save({ config, theme, mapping })} cancel={close} buttons={buttons}>
+            <SideTabs full>
+                <SideTab name="Editor" active full>
+                    <ConfigSettings config={config} setConfig={setConfig} />
+                </SideTab>
+
+                <SideTab name="Theme" full>
+                    <ThemeSettings theme={theme} setTheme={setTheme} cssPropUpdate={wContext.cssPropUpdate.current} />
+                </SideTab>
+
+                <SideTab name="HotKeys" full scroll>
+                    <HotKeySettings mapping={mapping} defaults={defaults.mapping} setMapping={setMapping} />
+                </SideTab>
+            </SideTabs>
+        </OkCancelForm>
+    )
+}
+
 function BaseAppInner({ children }) {
     const wContext = useContext(WindowContext);
+    const SettingsModal = useModal();
+
+    wContext.settingsRef.current = SettingsModal;
 
     const onFocus = e => {
         wContext.lastTarget.current = e.target;
@@ -463,7 +873,9 @@ function BaseAppInner({ children }) {
                 hotKey += 'm';
             } else if (e.ctrlKey) {
                 hotKey += 'c';
-            } else if (e.key === 'Escape') {
+            } else if (e.altKey) {
+                hotKey += 'a';
+            } else if (HotKeySingleKeys.includes(e.key)) {
                 actionKey = e.key;
             } else if (e.key >= '0' && e.key <= '9' &&
                 !(document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName))) {
@@ -473,8 +885,14 @@ function BaseAppInner({ children }) {
                     return;
                 }
             }
+            if (hotKey.length > 0 && e.shiftKey) {
+                hotKey += 'i';
+            }
             if (hotKey !== '') {
-                actionKey = hotKey + ' ' + e.key;
+                actionKey = hotKey;
+                if (!HotKeySkipValues.includes(e.key)) {
+                    actionKey += ' ' + e.key;
+                }
             }
             if (!actionKey) {
                 return;
@@ -483,7 +901,13 @@ function BaseAppInner({ children }) {
             const handler = wContext.getHandlerForActionKey(actionKey, elem);
             if (handler) {
                 if (!e.repeat) {
-                    handler();
+                    if (typeof handler === 'object') {
+                        if (!handler.can || handler.can()) {
+                            handler.exec();
+                        }
+                    } else {
+                        handler();
+                    }
                 }
                 e.stopPropagation();
                 e.preventDefault();
@@ -500,9 +924,14 @@ function BaseAppInner({ children }) {
         }
     });
     return (
-        <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
-            {children}
-        </Block>
+            <Block onFocus={onFocus} center="h" full padded="h" className="editor-bounds">
+                <>
+                    {children}
+                    <SettingsModal.content name="Settings" height="50%" width="50%" fixStyle transparent drag>
+                        <Settings { ...SettingsModal.props } />
+                    </SettingsModal.content>
+                </>
+            </Block>
     )
 }
 

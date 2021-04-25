@@ -115,6 +115,104 @@ const flattenResources = resources => {
     return result;
 };
 
+class Storage {
+    constructor(storage, prefix = '') {
+        this.storage = storage;
+        this.prefix = prefix;
+        this.active = this.isAvailable();
+    }
+
+    isQuotaExceededException(e) {
+        return e instanceof DOMException && (
+            e.name === 'QuotaExceededError' ||
+            e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+        );
+    }
+
+    isAvailable() {
+        if (!this.storage) {
+            return false;
+        }
+        try {
+            const x = '__storage_test__';
+            this.storage.setItem(x, '1');
+            this.storage.removeItem(x);
+            return true;
+        } catch(e) {
+            return e instanceof DOMException && !this.isQuotaExceededException(e) && (
+                e.code === 22 ||
+                e.code === 1014) &&
+                (localStorage && localStorage.length !== 0);
+        }
+    }
+
+    getKeys() {
+        if (!this.isAvailable()) {
+            return [];
+        }
+        const keys = [];
+        for(let i = 0; i < this.storage.length; i++) {
+            const key = this.storage.key(i);
+            if (key.startsWith(this.prefix)) {
+                keys.push(key.substring(this.prefix.length));
+            }
+        }
+        return keys;
+    }
+
+    storeJson(id, data) {
+        if (!this.isAvailable()) {
+            return false;
+        }
+        try {
+            this.storage.setItem(this.prefix + id, JSON.stringify(data));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    getJson(id) {
+        if (!this.isAvailable()) {
+            return null;
+        }
+        try {
+            const item = this.storage.getItem(this.prefix + id);
+            try {
+                return JSON.parse(item);
+            } catch (e) {
+                return null;
+            }
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
+    }
+
+    deleteJson(id) {
+        this.storage.removeItem(this.prefix + id);
+    }
+
+    getDefaultedArray(id, defaults = []) {
+        const json = this.getJson(id);
+        if (Array.isArray(json)) {
+            return json;
+        }
+        return Array.isArray(defaults) ? defaults : []
+    }
+
+    getDefaultedJson(id, defaults = null) {
+        const json = this.getJson(id);
+        if (json === null) {
+            return typeof defaults === 'object' ? { ...defaults } : defaults;
+        }
+        if (defaults === null) {
+            return json
+        }
+        return { ...defaults, ...json }
+    }
+}
+
 class ResourceDependencies {
 
     constructor(getDirect, storeDirect, getIndirect, storeIndirect, deleteResource) {
@@ -1122,6 +1220,7 @@ module.exports = {
     rgb2hex,
     isValidResourceId,
     getItemsCloneWithUpdatedItem,
+    Storage,
     ResourceDependencies,
     flattenResources,
     drawTextBlocks,
