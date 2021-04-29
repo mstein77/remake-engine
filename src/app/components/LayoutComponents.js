@@ -514,12 +514,13 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
         children = getFlatChildren(children);
         if (children.length > 1) {
             const items = [];
+            const borderWidth = borders === '1' ? '1-' : '';
             for (let item of children) {
                 if (item !== '') {
                     items.push(
                         items.length ?
                             <Fragment key={'_' + items.length}>
-                                <div className={'borders-' + axis}></div>
+                                <div className={'borders-' + borderWidth + axis}></div>
                                 {item}
                             </Fragment> :
                             item
@@ -586,6 +587,9 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
         }
     } else if (axis === 'h') {
         dimCls.push('no-inline');
+    }
+    if (dimStyle.cursor) {
+        parentStyle.cursor = dimStyle.cursor
     }
 
     return (

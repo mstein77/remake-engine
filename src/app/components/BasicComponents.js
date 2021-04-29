@@ -879,8 +879,10 @@ function WindowCtx({ children }) {
                 {
                     name: 'Defaults',
                     values: {
-                        maxWidth: 1200,
+                        maxWidth: 1600,
+                        noMaxWidth: false,
                         maxHeight: 1200,
+                        noMaxHeight: true,
                         uiAnimations: true,
                         maxHistory: 10
                     }
@@ -940,22 +942,54 @@ function WindowCtx({ children }) {
         }
     }, []);
 
+    const links = useMemo(() => {
+        return {defaults: [], backups: []}
+    }, []);
+
+    const syncLinks = currLinks => {
+        const elems = document.querySelectorAll('link');
+        const parts = currLinks.split(' ');
+        const found = [];
+        for (let elem of elems) {
+            const href = elem.href;
+            if (
+                links.defaults.includes(href) ||
+                links.backups.includes(href) ||
+                parts.includes(href)) {
+                found.push(elem);
+            } else {
+                const parent = elem.parentNode;
+                parent.removeChild(elem);
+            }
+        }
+        const head = document.querySelector('head');
+        for (let part of parts) {
+            if (!found.includes(part)) {
+                const linkNode = document.createElement('link');
+                linkNode.href = part;
+                linkNode.rel = 'stylesheet';
+                linkNode.type ='text/css';
+                head.appendChild(
+                    linkNode
+                );
+            }
+        }
+    };
+
     useEffect(() => {
+        // 1. get current link elements
+        const elems = document.querySelectorAll('link');
+        for (let elem of elems) {
+            links.defaults.push(elem.href);
+        }
+
         cssContext.setStyleToValues(document.body.style, theme);
         cssContext.update();
-        document.body.style.setProperty('--' + 'max-width', editorConfig.maxWidth + 'px');
-        const linkElems = document.querySelectorAll('link');
-        let parent = null;
-        if (linkElems.length > 0) {
-            parent = linkElems[0].parentNode;
-        }
-        const linkNode = document.createElement('link');
-        linkNode.href = 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i';
-        linkNode.rel = 'stylesheet';
-        linkNode.type ='text/css';
-        parent.appendChild(
-            linkNode
-        );
+
+        document.body.style.setProperty('--max-width', editorConfig.noMaxWidth ? 'none' :  editorConfig.maxWidth + 'px');
+        document.body.style.setProperty('--max-height', editorConfig.noMaxHeight ? 'none' :  editorConfig.maxHeight + 'px');
+        syncLinks(theme.linkResources);
+
     }, []);
 
     const elemKeyBindings = useMemo(() => [], []);
@@ -1166,6 +1200,7 @@ function WindowCtx({ children }) {
         if (state === 'locked') {
             styleLock.state = 'locked';
             styleLock.style = cssStyle;
+            links.backups = theme.linkResources.split(' ');
         } else if (state === 'saved') {
             styleLock.state = 'saved';
         } else if (state === 'unlocked') {
@@ -1177,6 +1212,7 @@ function WindowCtx({ children }) {
                 cssContext.update();
             }
             styleLock.style = null;
+            links.backups = [];
             styleLock.state = 'unlocked';
         }
     };
@@ -1200,8 +1236,9 @@ function WindowCtx({ children }) {
             },
             cleanUp: () => {
                 setStyleLock('unlocked');
+                syncLinks(theme.linkResources);
             },
-            save: newSettings => {
+            save: (newSettings, persist = true) => {
                 const diff = [];
                 for (let [action, hotKey] of Object.entries(newSettings.mapping)) {
                     const oldHotKey = hotKeyActions.action2hotKey[action];
@@ -1218,17 +1255,18 @@ function WindowCtx({ children }) {
                         hotKeyActions.hotKey2action[hotKey] = action;
                     }
                 }
-                storage.storeJson('hotkeys', hotKeyActions.action2hotKey);
-
                 for (let [key, value] of Object.entries(newSettings.config)) {
                     editorConfig[key] = value;
                 }
-                storage.storeJson('config', newSettings.config);
 
                 for (let [key, value] of Object.entries(newSettings.theme)) {
                     theme[key] = value;
                 }
-                storage.storeJson('theme', newSettings.theme);
+                if (persist) {
+                    storage.storeJson('hotkeys', hotKeyActions.action2hotKey);
+                    storage.storeJson('config', newSettings.config);
+                    storage.storeJson('theme', newSettings.theme);
+                }
 
                 setStyleLock('saved');
                 settingsRef.current.close()
@@ -1263,6 +1301,7 @@ function WindowCtx({ children }) {
             clearAllSettings,
             setStyleLock,
             isStyleLocked,
+            syncLinks,
             cssPropUpdate: cssContext.cssPropUpdate,
             defaults,
             storage,
@@ -1445,7 +1484,7 @@ function SideTab({ name, active, children }) {
 
 function useModal() {
     const context = useContext(WindowContext);
-    const [isOpen, setIsOpen] = useState(false);
+    const [ isOpen, setIsOpen ] = useState(false);
     const propsRef = useRef(null);
     const currRef = useRef(null);
     currRef.current = isOpen;
@@ -1584,7 +1623,7 @@ function ThemeFreeze({ blockRef, children }) {
  *
  *
  */
-const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, full, width, transparent, maxWidth, height, maxHeight, drag, children }) {
+const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
     const trapRef = useRef(null);
@@ -1618,10 +1657,43 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
 
     useEffect(() => {
         if (drag) {
+            const observer = new ResizeObserver(
+                entries => {
+                    const rect = dimRef.current.getBoundingClientRect();
+                    const dim = entries[0].contentRect;
+
+                    const spaceX = dim.width - rect.width;
+                    const spaceY = dim.height - rect.height;
+
+                    let newPosX = null;
+                    let newPosY = null;
+                    if (rect.x < 0 || dim.width < (rect.x + rect.width)) {
+                        newPosX = spaceX < 0 ?
+                            0 : Math.round((dim.width / 2) - (rect.width / 2));
+                    }
+                    if (rect.y < 0 || dim.height < (rect.y + rect.height)) {
+                        newPosY = spaceY < 0 ?
+                            0 : Math.round((dim.height / 2) - (rect.height / 2));
+                    }
+
+                    if (newPosX !== null) {
+                        setLeft(newPosX);
+                    }
+                    if (newPosY !== null) {
+                        setTop(newPosY);
+                    }
+                }
+            );
+            observer.observe(document.body);
+
             const rect = dimRef.current.getBoundingClientRect();
             setDim(rect);
             setLeft(rect.left);
             setTop(rect.top);
+
+            return () => {
+                observer.disconnect();
+            };
         }
     }, []);
 
@@ -1656,6 +1728,7 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
     }
     const hDivStyle = {
         maxWidth,
+        minWidth,
         width
     };
     if (!maxHeight) {
@@ -1699,10 +1772,15 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
         nameAttr.cursor = 'grab';
         nameAttr.onMouseDown = e => {
             const rect = dimRef.current.getBoundingClientRect();
+            const dim = document.body.getBoundingClientRect();
 
             const anchorPos = {x: e.clientX, y: e.clientY};
             let lastPosX = anchorPos.x;
             let lastPosY = anchorPos.y;
+            const minLeft = -rect.width / 2;
+            const maxLeft = Math.max(dim.width - (rect.width / 2), 0);
+            const minTop = 0;
+            const maxTop = Math.max(dim.height - (rect.height / 2), 0);
             const offX = lastPosX - rect.x;
             const offY = lastPosY - rect.y;
             wContext.startExclusiveMode('modal-drag', 'grab');
@@ -1710,9 +1788,9 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
                 const relPos = {x: e.clientX - anchorPos.x, y: e.clientY - anchorPos.y};
                 if (relPos.x !== lastPosX || relPos.y !== lastPosY) {
                     lastPosX = relPos.x;
-                    setLeft(e.clientX - offX);
+                    setLeft(Math.min(Math.max(e.clientX - offX, minLeft), maxLeft));
                     lastPosY = relPos.y;
-                    setTop(e.clientY - offY);
+                    setTop(Math.min(Math.max(e.clientY - offY, minTop), maxTop));
                 }
             });
             wContext.addEventListener('mouseup', () => {
@@ -1740,8 +1818,8 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
                     <div ref={dimRef} className={vDivCls.join(' ')} style={vDivStyle}>
-                        <Stack gaps full="h" padded>
-                            <Block center="v" { ...nameAttr } shorten full="h">{name}</Block>
+                        <Stack gaps full="h" { ...nameAttr } padded>
+                            <Block center="v" shorten full="h">{name}</Block>
                             {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
                         </Stack>
                         <div className="border-div-v"></div>
@@ -1789,9 +1867,9 @@ function CssCtx({ children }) {
 
     const type2props = useMemo(() => {
         return {
-            px: ['defaultPadding', 'boxBorderWidth', 'maxWidth'],
+            px: ['defaultPadding', 'boxBorderWidth', 'maxWidth', 'maxHeight'],
             color: ['boxBorderColor'],
-            url: ['fontUrl']
+            url: ['linkResources']
         }
     }, []);
 

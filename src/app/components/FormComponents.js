@@ -85,8 +85,10 @@ function useAutoFocus(inputRef, props) {
         () => {
             if (props.autoFocus && !(props.disabled || props.readOnly)) {
                 requestAnimationFrame(() => {
-                    inputRef.current.select();
-                    inputRef.current.focus()
+                    if (inputRef.current) {
+                        inputRef.current.select();
+                        inputRef.current.focus()
+                    }
                 })
             }
         },
@@ -615,9 +617,10 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     useEffect(() => {
         if (autoFocus) {
             requestAnimationFrame(() => {
-                inputRef.current.focus();
-                inputRef.current.select();
-
+                if (inputRef.current) {
+                    inputRef.current.focus();
+                    inputRef.current.select()
+                }
             });
         }
     }, []);
@@ -679,6 +682,10 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
         }
         return (!match || match(newValue))
     };
+
+    if (props.full && props.full !== 'v') {
+        cls.push('full-h');
+    }
 
     const attr = {
         value: edit ? curr : value,
@@ -791,7 +798,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     if (clear && !readOnly) {
         input = <Stack>{input}<Button icon="clear" disabled={disabled} tab={false} size={14} onClick={() => set('')} /></Stack>
     } else {
-        input = <Block>{input}</Block>
+        input = <Block full={props.full}>{input}</Block>
     }
     return (
         <ComponentWithName name={name} {...props}>
