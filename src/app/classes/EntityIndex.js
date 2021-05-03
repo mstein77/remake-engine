@@ -519,6 +519,102 @@ class AssignIndex extends EntityIndex {
     }
 }
 
+class FontIndex extends EntityIndex {
+
+    constructor(model) {
+        super();
+        this.model = model;
+        this.items = [];
+        this.chars = {};
+        for (let font of model.fonts) {
+            this.items.push(font.id);
+            this.chars[font.id] = new CharIndex(font);
+        }
+    }
+
+    setEntityValue(index, value) {
+        if (this.model.fonts.length <= index) {
+            this.model.fonts.push({id: value});
+        }
+        this.items[index] = value;
+    }
+
+    setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
+        if (['width', 'height'].includes(prop)) {
+            const obj = this.model.fonts[index];
+            if (obj) {
+                obj[prop] = value;
+            }
+        } else if (prop === 'chars') {
+            this.chars[this.getEntityValue(index)] = value;
+        }
+    }
+
+    getEntityPropValue(index, prop) {
+        if (prop === 'width') {
+            return this.model.fonts[index].width
+        } else if (prop === 'height') {
+            return this.model.fonts[index].height
+        } else if (prop === 'chars') {
+            return this.chars[this.getEntityValue(index)]
+        }
+        return super.getEntityPropValue(index, prop);
+    }
+
+    getEntityProps() {
+        return  [...super.getEntityProps(), 'chars', 'width', 'height'];
+    }
+
+    deleteEntityPropValues(index) {
+        delete this.chars[this.getEntityValue(index)]
+    }
+}
+
+class TextBlockIndex extends EntityIndex {
+
+    constructor(model) {
+        super();
+        this.model = model;
+        this.items = [];
+        for (let block of model.blocks) {
+            this.items.push(block.id);
+        }
+    }
+
+    setEntityValue(index, value) {
+        if (this.model.blocks.length <= index) {
+            this.model.blocks.push({id: value});
+        }
+        this.items[index] = value;
+    }
+
+    setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
+        if (['filters', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'filters', 'font', 'height', 'lineSpacing', 'text', 'textAlign', 'width', 'x', 'y'].includes(prop)) {
+            const obj = this.model.blocks[index];
+            if (obj) {
+                obj[prop] = value;
+            }
+        }
+    }
+
+    getEntityPropValue(index, prop) {
+        if (['filters', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'filters', 'font', 'height', 'lineSpacing', 'text', 'textAlign', 'width', 'x', 'y'].includes(prop)) {
+            return this.model.blocks[index][prop]
+        }
+        return super.getEntityPropValue(index, prop);
+    }
+
+    getEntityProps() {
+        return [ ...super.getEntityProps(), 'filters', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'filters', 'font', 'height', 'lineSpacing', 'text', 'textAlign', 'width', 'x', 'y' ];
+    }
+
+    deleteEntityPropValues(index) {
+        this.model.blocks.splice(index, 1);
+    }
+}
+
 class CharIndex extends EntityIndex {
 
     constructor(model) {
@@ -2742,5 +2838,7 @@ export {
     SpriteIndex,
     AnimationIndex,
     FrameIndex,
+    FontIndex,
+    TextBlockIndex,
     EventIndex
 };

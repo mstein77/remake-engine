@@ -1,23 +1,8 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BackgroundCtx, CssCtx, OkCancelForm, PropertyGrid, Ruler, SideTab, SideTabs, useComponentUpdate, useModal, WindowContext, WindowCtx } from "../components/BasicComponents";
+import { BackgroundCtx, CssCtx, NameDialog, OkCancelForm, Icon, PropertyGrid, Ruler, SideTab, SideTabs, useComponentUpdate, useModal, WindowContext, WindowCtx } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
 import { Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
 import { d } from "../helper/helper";
-
-function NameDialog({ close, save, max, reserved = [], ...props }) {
-    const [name, setName] = useState(props.name || '');
-    const matching = props.match ? props.match : () => true;
-    const match = value => !reserved.includes(value) && matching(value);
-    return (
-        <OkCancelForm full="h" submit padded cancel={close} save={() => save(name)}>
-            <Block full="h" padded>
-                <PropertyGrid full="h">
-                    <InputProp full="h" autoFocus name="Name:" value={name} set={setName} match={match} max={max} required />
-                </PropertyGrid>
-            </Block>
-        </OkCancelForm>
-    )
-}
 
 function PresetsManager({ id, set, config, ...props }) {
     const wContext = useContext(WindowContext);
@@ -254,9 +239,19 @@ function ThemeSettings({ theme, setTheme, cssPropUpdate }) {
         <Stack full borders>
             <Block full="h" padded>
                 <PropertyGrid>
+                    <ColorProp name="Background" value={theme.editorBgColor} set={propSetter('editorBgColor')} />
+                    <ColorProp name="Color" value={theme.editorColor} set={propSetter('editorColor')} />
                     <NumberProp name="Padding" value={theme.defaultPadding} max={20} set={propSetter('defaultPadding')} min={0} />
                     <NumberProp name="Border Width" value={theme.boxBorderWidth} max={10} set={propSetter('boxBorderWidth')} min={0} />
                     <ColorProp name="Border Color" value={theme.boxBorderColor} set={propSetter('boxBorderColor')} />
+
+                    <ColorProp name="Button Background" value={theme.buttonBgColor} set={propSetter('buttonBgColor')} />
+                    <ColorProp name="Button Color" value={theme.buttonColor} set={propSetter('buttonColor')} />
+                    <InputProp name="Button Font" value={theme.buttonFontFamily} set={propSetter('buttonFontFamily')} />
+                    <InputProp name="Button Border Style" value={theme.buttonBorderStyle} set={propSetter('buttonBorderStyle')} />
+                    <ColorProp name="Button Border Color" value={theme.buttonBorderColor} set={propSetter('buttonBorderColor')} />
+                    <NumberProp name="Button radius" value={theme.buttonBorderRadius} max={10} set={propSetter('buttonBorderRadius')} min={0} />
+
                     <LabelProp name="Link-Resources">
                         <ConcatList value={theme.linkResources} separator=" " set={propSetter('linkResources')} />
                     </LabelProp>
@@ -385,7 +380,7 @@ function HotKeyKeys({ hotKey, empty }) {
     if (keys.length) {
         for(let key of keys) {
             if (elems.length) {
-                elems.push(<Button key={'_' + elems.length} border={false} icon="add" className="less" />);
+                elems.push(<Block center="v" key={'_' + elems.length}><Icon name="add" className="less" /></Block>);
             }
             elems.push(<Block key={key} padded border="1"><kbd>{key}</kbd></Block>);
 
@@ -459,12 +454,38 @@ function HotKeySettings({ mapping, setMapping }) {
 function Settings({ save, close, defaults }) {
     const wContext = useContext(WindowContext);
 
+    const beforeRef = useRef(null);
+    const afterRef = useRef(null);
+
     const [config, setConfig] = useState(wContext.editorConfig);
     const [theme, setTheme] = useState(wContext.theme);
     const [mapping, setMapping] = useState(wContext.hotKeyActions.action2hotKey);
 
-    const buttons = useMemo(() => {
-        return [
+    useEffect(() => {
+        beforeRef.current = {
+            config,
+            theme,
+            mapping
+        };
+    }, []);
+
+    const showBefore = () => {
+        afterRef.current = {config, theme, mapping};
+        setConfig(beforeRef.current.config);
+        setTheme(beforeRef.current.theme);
+        setMapping(beforeRef.current.mapping);
+    };
+    const restoreAfter  = () => {
+        setConfig(afterRef.current.config);
+        setTheme(afterRef.current.theme);
+        setMapping(afterRef.current.mapping);
+        afterRef.current = null;
+    };
+
+    const buttons = // useMemo(() => {
+//        return
+        [
+            <Button key="before" icon="visibility" name="before" direct onClick={showBefore} onClickEnd={restoreAfter} />,
             <Button key="clear" name="Clear all settings" onClick={() => {
                 wContext.clearAllSettings();
                 // TODO: find a better solution to update css live props
@@ -480,7 +501,7 @@ function Settings({ save, close, defaults }) {
                 }, false);
             }} />
         ];
-    }, []);
+//    }, []);
 
     return (
         <OkCancelForm full save={() => save({ config, theme, mapping })} cancel={close} buttons={buttons}>

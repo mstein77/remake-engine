@@ -37,7 +37,7 @@ import {
     FiltersSelector,
     GlobalContext,
     useComponentUpdate,
-    EntityManager
+    EntityManager, useExportModal
 } from "./BaseComponents";
 
 import {
@@ -1400,12 +1400,16 @@ function NewIdForm(props) {
 }
 
 function TextPaneEditor(props) {
+    d('props', props.resource);
+
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
 
     const ResizeFontModal = useModal();
     const NewFontModal = useModal();
     const NewFontIdModal = useModal();
+
+    const ExportModal = useExportModal(props.resource);
 
     const [model, setModel] = useState(props.model);
     const [blocks, setBlocks] = useState(props.resource.blocks);
@@ -1520,7 +1524,8 @@ function TextPaneEditor(props) {
     };
 
     const exportTextPane = () => {
-        props.export(model);
+        ExportModal.open(model, {});
+//        props.export(model);
     };
 
     const deployTextPane = () => {
@@ -1645,6 +1650,8 @@ function TextPaneEditor(props) {
             <NewFontIdModal.content name="New Font Id" fit closeable>
                 <NewIdForm {...NewFontIdModal.props} />
             </NewFontIdModal.content>
+
+            {ExportModal.render}
         </Page>
     );
 }

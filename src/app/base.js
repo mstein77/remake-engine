@@ -4,6 +4,7 @@ import {d} from "../app/helper/helper";
 import { useModal, useComponentUpdate, useRefocus, Ruler, OkCancelForm, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
 import { Form, Submit, Input, Select, CheckboxProp, Radio, LabelProp, NumberProp, ColorProp, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
 import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";
+import { TextPaneEditor } from "./editors/TextPaneEditor";
 import { MainEditor } from "./editors/MainEditor";
 
 function OverlayCanvas({ render }) {
@@ -235,136 +236,6 @@ function MyActionButton() {
     )
 }
 
-function TestApp() {
-    const wContext = useContext(WindowContext);
-
-    const [mode, setMode] = useState(0);
-    const [test, setTest] = useState(6);
-    const [x, setX] = useState(0);
-    const [y, setY] = useState(0);
-    const [myText, setMyText] = useState('Schwätz nicht du Depp!');
-    const [align, setAlign] = useState('left');
-    const [activeAlign, setActiveAlign] = useState(1);
-    const [entities, setEntities] = useState([
-        {id: -1, name: 'xxx'},
-        {id: 0, name: 'Here again'},
-        {id: 1, name: 'To Daxx'},
-        {id: 2, name: 'Space alert!'}
-    ]);
-
-    const [repeat, setRepeat] = useState(1);
-    let text = '';
-    let i = repeat;
-    while (i > 0) {
-        text += 'So many many many words!';
-        i--;
-    }
-    const options = [
-        {id: -1, name: 'xxx'},
-        {id: 0, name: 'Here again'},
-        {id: 1, name: 'To Daxx'},
-        {id: 2, name: 'Space alert!'}
-    ];
-    const alignOptions = [
-        {id: 'left', name: 'format_align_left'},
-        {id: 'center', name: 'format_align_center'},
-        {id: 'right', name: 'format_align_right'}
-    ];
-    return (
-        <Stack full vertical gaps>
-            <EditorSection id="pane" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
-               actions={
-                   [
-                       {name: 'Revert', onClick: () => d('REVERT!')},
-                       {name: 'Save',
-                           disabled: eContext => eContext.hasStorePos(),
-                           onClick: eContext => {
-                               eContext.updateRestorePos()
-                           }
-                       },
-                       {name: 'Deploy', onClick: () => {d('DEPLOY!'); wContext.clearEditor('preview')}},
-                       {name: 'Export', onClick: () => d('EXPORT!')},
-                   ]
-               }>
-                <Stack vertical borders full>
-                    <Section name="Properties" inner collapse scroll full="h">
-                        <Stack vertical full="h" collapsed padded>
-                            <MyActionButton />
-                        </Stack>
-                    </Section>
-                    <Stack full>
-                        <Section name="Fonts" inner collapse="h" size={300} full="v">
-                            <EntityStack area={3} entities={entities} set={setEntities} active={0} />
-                        </Section>
-
-                        <Section inner full name="Characters">
-                            <Stack borders full>
-                                <Stack vertical gaps padded scroll>
-                                    <Checkbox value={true} set={() => {}} />
-                                    <Checkbox icon value={true} set={() => {}} />
-                                    <Checkbox name="Rulers" value={true} set={() => {}} />
-                                    <Checkbox icon name="Rulers" value={true} set={() => {}} />
-                                    <Checkbox name="Rulers" rev value={true} set={() => {}} />
-                                    <Checkbox icon name="Rulers" rev value={true} set={() => {}} />
-                                    <Checkbox name="Rulers" disabled value={true} set={() => {}} />
-                                    <Checkbox icon name="x Rulers" disabled value={true} set={() => {}} />
-                                </Stack>
-
-
-                                <Block padded full>
-                                    <Stack full="h" vertical gaps>
-                                        <Select name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
-                                        <Number name="Slide:" xslider="h" tab decimals={2} min={-5} max={10} value={test} set={setTest} />
-                                        <TextArea inputDim={{width: '100%'}} tab name="terror squad" cols={10} required value={myText} set={setMyText} rows={5} />
-                                        <Submit name="Speichern" />
-                                    </Stack>
-                                </Block>
-
-                                <Block centerItems full="v" padded>
-                                    <Stack vertical>
-                                        <Number slider buttons={false} name="Repeat" set={setRepeat} value={repeat} min={0} max={30} />
-                                        <Block wrap width={200}>{text}</Block>
-                                    </Stack>
-                                </Block>
-                            </Stack>
-                        </Section>
-                    </Stack>
-                </Stack>
-            </EditorSection>
-
-            <EditorSection id="preview" area={2} full name="Preview" actions={
-                [
-                    {name: 'Export', onClick: () => d('EXPORT!')}
-                ]
-            }>
-                <Stack full>
-                    <EntityStackSections
-                        sectionProps={{inner: true, name: 'Text Blocks', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-                        detailProps={{inner: true, name: 'Text Block Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-                        entities={alignOptions} deselect emptyText="Add new block" active={activeAlign} setActive={setActiveAlign}
-                    >
-                        {activeAlign === null ?
-                            <Block center className="less">No font selected</Block> :
-                            <Block padded full="h">
-                                <Grid gaps columns="70px *" full="h">
-                                    <InputProp name="Id:" value={alignOptions[activeAlign].id} readOnly />
-                                    <TupleProp undo="size" name="Size:" x={x} setX={setX} y={y} setY={setY} min={1} max={999} />
-                                    <SelectProp undo={'whatever-' + alignOptions[activeAlign].id} tab={true} required name="Whatever:" options={options} value={mode} set={setMode} />
-                                    <RadioProp undo="textalign" name="Text Align:" options={alignOptions} gaps="1" icon value={align} set={setAlign} />
-                                </Grid>
-                            </Block>
-                        }
-                    </EntityStackSections>
-                    <Section name="Screen" full inner>
-                        <GridCanvas size={10} width={50} height={10} />
-                    </Section>
-                </Stack>
-            </EditorSection>
-            <Block />
-        </Stack>
-    )
-}
-
 
 function RealApp() {
     return (
@@ -427,8 +298,179 @@ function RealApp() {
 }
 
 const test = 1;
+const model = {
+    type: 'TextPane',
+    id: 'statusPane',
+    fonts: [
+        {id: 'marioFontMap', width: 8, height: 8,
+            map: {
+                "0": {
+                    "x": 24,
+                    "y": 0
+                },
+                "1": {
+                    "x": 32,
+                    "y": 0
+                },
+                "2": {
+                    "x": 40,
+                    "y": 0
+                },
+                "3": {
+                    "x": 48,
+                    "y": 0
+                },
+                "4": {
+                    "x": 56,
+                    "y": 0
+                },
+                "5": {
+                    "x": 64,
+                    "y": 0
+                },
+                "6": {
+                    "x": 72,
+                    "y": 0
+                },
+                "7": {
+                    "x": 80,
+                    "y": 0
+                },
+                "8": {
+                    "x": 88,
+                    "y": 0
+                },
+                "9": {
+                    "x": 96,
+                    "y": 0
+                },
+                "!": {
+                    "x": 0,
+                    "y": 0
+                },
+                "*": {
+                    "x": 8,
+                    "y": 0
+                },
+                "-": {
+                    "x": 16,
+                    "y": 0
+                },
+                "A": {
+                    "x": 104,
+                    "y": 0
+                },
+                "B": {
+                    "x": 112,
+                    "y": 0
+                },
+                "C": {
+                    "x": 120,
+                    "y": 0
+                },
+                "D": {
+                    "x": 128,
+                    "y": 0
+                },
+                "E": {
+                    "x": 136,
+                    "y": 0
+                },
+                "F": {
+                    "x": 144,
+                    "y": 0
+                },
+                "G": {
+                    "x": 152,
+                    "y": 0
+                },
+                "H": {
+                    "x": 160,
+                    "y": 0
+                },
+                "I": {
+                    "x": 168,
+                    "y": 0
+                },
+                "J": {
+                    "x": 176,
+                    "y": 0
+                },
+                "K": {
+                    "x": 184,
+                    "y": 0
+                },
+                "L": {
+                    "x": 192,
+                    "y": 0
+                },
+                "M": {
+                    "x": 200,
+                    "y": 0
+                },
+                "N": {
+                    "x": 208,
+                    "y": 0
+                },
+                "O": {
+                    "x": 216,
+                    "y": 0
+                },
+                "P": {
+                    "x": 224,
+                    "y": 0
+                },
+                "Q": {
+                    "x": 232,
+                    "y": 0
+                },
+                "R": {
+                    "x": 240,
+                    "y": 0
+                },
+                "S": {
+                    "x": 248,
+                    "y": 0
+                },
+                "T": {
+                    "x": 256,
+                    "y": 0
+                },
+                "U": {
+                    "x": 264,
+                    "y": 0
+                },
+                "V": {
+                    "x": 272,
+                    "y": 0
+                },
+                "W": {
+                    "x": 280,
+                    "y": 0
+                },
+                "X": {
+                    "x": 288,
+                    "y": 0
+                },
+                "Y": {
+                    "x": 296,
+                    "y": 0
+                },
+                "Z": {
+                    "x": 304,
+                    "y": 0
+                },
+
+            image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATgAAAAICAYAAABtcuNzAAACxElEQVRoQ+1ZW27DMAxbgZ6iN9qJd6OeosCGDNCgCaRIOc0eQPrV1rYs0RSlOJeX9Hk8Hu/bz+v1esn/P+N72O7sv91un/u/3u/f9s9rw5fsIxpH+yAfVtZm22y9mqP8r2fA8DvCf+VbPgMn/m0+O0PEufrfnhgn9hHv1Xo13sXOxip3O/472NQ5Hbdyrm/zVHxHj2eMwu+8p+Lfl5AoEPaI3GYbOZdthrhVgVMAVr+YSLP4HFHv5ij/9o7XA2bJj0SJYY4I4sxFHDgav5UCPIkPJRDaM0SnFhpUeLr91XkePb6Hy4HLEfExfJXAsfwPe5bAZYGKDd0uTyU4ErnawXWEcxLAIXwFSgkyE/ypACl8jhhXmCkCq/V7x1WRUtxj/q/YVR0CKpwKv98ed7nLxH/V/9ARliO1e0SC2hUkVGwsgcuiVsUub4hEQiWoK3CISEz4Qr2n6t9VKCaATjKjJHEeAyePCKsCrc6HJXgtAO7+XQekMHa6xXrmijddwnTcDo65Asg6bBd/dz1KcsU/JiQTgUN4ZP4iUWU50F0VhB33CgfedbEKicTtJwTOISkTGkVABPykQnXkcAji7s8IspIgSpRV/Gq9Glf2J52WG3/2iSWHuoNDHQiKJSfhin+sQHfdYhdf5c4z8WX5rwogilHFoPzONsOWLXD5cNUjggKUCSV6yYAq0iSBHF8qMCsJqMDv7si6eNwE+U93cCv4TooFs8+41HWGU/zrHtP1U74yge2uWPZytYuJ5ZLT4dWOzylESh+st6VVkJhAoS6jdjhIZfMLhmxju4tzOjA0p+tCu0PI1Rf5jsZZ8rnrUWWua9UjSsVevSnrKqzz+FwJq4oeOyMlAKxDcDuAah8lBOPY5IrAKTCoQ+nElfEn/EL+ufGpbhUVXafDmoiSg6/bzCDt2ezbHVwnXufYicCJwInAX0TgA2h85FTA4y6VAAAAAElFTkSuQmCC"
+        }},
+        {id: 'whatever', map: {}, width: 16, height: 16, image: "ohoh"}
+    ],
+    blocks: JSON.parse("[{\"id\":\"status\",\"x\":24,\"y\":8,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"MARIO         WORLD  TIME\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":25,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"score\",\"x\":24,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"undefined\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":9,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"coins\",\"x\":96,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"*undefined\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":10,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"world\",\"x\":144,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"1-1\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":3,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"time\",\"x\":200,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"398\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":3,\"height\":1,\"__type\":\"TextBlockConfig\"}]"),
+    dim: {x: 256, y: 224},
+
+};
 
 ReactDOM.render(
-    <MainEditor>{test ? <TestApp /> : <RealApp />}</MainEditor>,
+    <MainEditor>{test ? <TextPaneEditor model={model} /> : <RealApp />}</MainEditor>,
     document.getElementById('app')
 );

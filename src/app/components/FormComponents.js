@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { d } from "../helper/helper"
 import { Block, Stack } from "./LayoutComponents";
-import { WindowContext, EditorContext, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { WindowContext, EditorContext, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 
 function isValidNumber(value) {
     return typeof value === 'number' && !isNaN(value);
@@ -218,6 +218,7 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
                 key={1}
                 border={false}
                 tab={tab}
+                className="transparent"
                 icon={value ? 'check_box' : 'check_box_outline_blank'}
                 padded={false}
                 disabled={disabled}
@@ -278,7 +279,7 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
 /**
  *
  */
-function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, onClick, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
+function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
     const wContext = useContext(WindowContext);
 
     const mounted = useMounted();
@@ -297,7 +298,10 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
 
     const readOnly = !onClick;
     let attr = { ...props };
-    const cls = [];
+    const cls = ['button'];
+    if (border) {
+        cls.push('button-border');
+    }
     if (className) {
         cls.push(className);
     }
@@ -366,6 +370,9 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
                 }
                 if (mounted.current) {
                     setClicked(false);
+                }
+                if (onClickEnd) {
+                    onClickEnd();
                 }
                 wContext.endExclusiveMode('button-click', cursor);
             }, {once: true});
@@ -798,7 +805,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     if (clear && !readOnly) {
         input = <Stack>{input}<Button icon="clear" disabled={disabled} tab={false} size={14} onClick={() => set('')} /></Stack>
     } else {
-        input = <Block full={props.full}>{input}</Block>
+        input = <Block center="v" full={props.full}>{input}</Block>
     }
     return (
         <ComponentWithName name={name} {...props}>
@@ -841,9 +848,9 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
         slider
     };
     return (
-        <Stack {...attr} gaps>
+        <Stack {...attr} gaps="1">
             <Number {...xAttr} />
-            <Button tab={false} className="less" size={12} icon="clear" border={false} />
+            <Block center="v"><Icon name="clear" className="less" size={12} /></Block>
             <Number {...yAttr} />
         </Stack>
     );
@@ -1098,6 +1105,17 @@ function CheckboxProp({ name, ...props }) {
     )
 }
 
+function FullProp({ name, children}) {
+    return (
+        <>
+            {name && <Block full="h" className="small-font col-span-2">{name}</Block>}
+            <Block full="h" className="col-span-2">
+                {children}
+            </Block>
+        </>
+    )
+}
+
 function TextAreaProp({ name, ...props }) {
     return (
         <LabelProp name={name}>
@@ -1143,5 +1161,6 @@ export {
     TextAreaProp,
     Color,
     ColorProp,
-    LabelProp
+    LabelProp,
+    FullProp
 }

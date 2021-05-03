@@ -7,11 +7,24 @@
 
     --scrollbar-color: #B0B0B0;
     --scrollbar-bg-color: #EFEFEF;
+
+
+    --editor-bg-color: #404040;
+    --editor-color: #B0B0B0;
+
+    --button-bg-color: #A0A0A0;
+    --button-color: #303020;
+    --button-border-color: #606060;
+    --button-border-style: inset;
+    --button-border-radius: 0px;
+    --button-font-family: Arial;
 }
 
 html, body {
     cursor: auto;
     overscroll-behavior-x: contain;
+    background-color: var(--editor-bg-color);
+    color: var(--editor-color);
 }
 
 .hidden {
@@ -50,7 +63,7 @@ html, body {
 }
 
 .transparent {
-    background-color: transparent
+    background-color: transparent !important;
 }
 
 .pos-0 {
@@ -152,7 +165,7 @@ html, body {
 }
 
 .disabled {
-    opacity: 0.35
+    opacity: 0.45
 }
 
 .top {
@@ -182,4 +195,38 @@ input:invalid {
     -webkit-animation-timing-function: ease-in-out;
     -webkit-animation-direction: alternate;
     color: black;
+}
+
+.col-span-2 {
+    grid-column: span 2
+}
+
+/*
+    Theme-Css
+*/
+
+.button {
+    color: var(--button-color);
+    font-family: var(--button-font-family);
+    border-radius: var(--button-border-radius);
+    padding: calc(var(--button-border-radius) / 3)
+}
+
+.button:not(.active-bg) {
+    background-color: var(--button-bg-color);
+}
+
+.button-border {
+    border-style: var(--button-border-style);
+    border-color: var(--button-border-color);
+}
+
+.button.padded-h {
+    padding-left: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
+    padding-right: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
+}
+
+.button.padded-v {
+    padding-top: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
+    padding-bottom: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
 }

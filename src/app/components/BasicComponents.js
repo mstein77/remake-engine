@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useL
 import ReactDOM from "react-dom";
 import {d, Storage} from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import { Button, Number, Color, Form, Submit } from "./FormComponents";
+import {Button, Number, Color, Form, Submit, InputProp} from "./FormComponents";
 
 const BackgroundContext = React.createContext();
 
@@ -518,11 +518,14 @@ function EntityStackSections({ sectionProps, detailProps, active, children, ...p
     )
 }
 
-function EntityStack({ entities, set, getName = item => item.name, getInfo, area, emptyText, deselect, children, ...props }) {
+function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, clone, area, add, order, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
 
+    useUpdateOnEntityIndexChanges(entityIndex);
+
     let [active, setActiveRaw] = useState(props.active === undefined ? null : props.active);
-    if (props.setActive) {
+    const entities = entityIndex.getEntityObjects();
+    if (props.setActive !== undefined) {
         setActiveRaw = props.setActive;
         active = props.active;
     }
@@ -592,10 +595,18 @@ function EntityStack({ entities, set, getName = item => item.name, getInfo, area
         ]
     });
 
+    const indexSize = entityIndex.getLength();
+
+    if (indexSize > 0 && active >= indexSize) {
+        // TODO check why setActive does not work here
+        setActiveRaw(indexSize - 1);
+        return ''
+    }
+
     const items = [];
     let index = 0;
     // TODO use reasonable font width
-    const numLen = (('' + entities.length).length + 2) * 8;
+    const numLen = (('' + indexSize).length + 2) * 8;
     for(let entity of entities) {
         const curr = index;
         const isActive = index === active;
@@ -616,37 +627,106 @@ function EntityStack({ entities, set, getName = item => item.name, getInfo, area
         items.push(
             <Stack key={index} border={DIR.BOTTOM} gaps className={'hover-highlight' + (isActive ? ' active-bg' : ' control-bg')} full="h" {...attr}>
                 <Block width={numLen} className="less" padded>#{index}</Block>
-                <Block shorten padded>{getName(entity)}</Block>
+                <Stack vertical padded gaps>
+                    <Block shorten>{getName(entity)}</Block>
+                    {getInfo && <Block className="less" shorten>{getInfo(entity)}</Block>}
+                </Stack>
             </Stack>
         );
         index++
     }
     const isEmpty = items.length === 0;
 
-    const execAdd = () => {
-        eContext.doAction(
-            () => set([...entities, {id: items.length, name: 'New Item #' + items.length}]),
-            () => set([...entities])
-        )
-    };
+    const execAdd = add;
+
     const execDelete = () => {
-        const newEntities = [ ...entities];
-        newEntities.splice(active, 1);
+        const oldEntity = entityIndex.getEntityObject(active);
         eContext.doAction(
-            () => set(newEntities),
-            () => set(entities)
+            () => entityIndex.deleteEntity(oldEntity.index),
+            () => entityIndex.setEntityObject(oldEntity)
         )
     };
 
-    const hotKeys = {
-        'new': {
-            exec: () => set && execAdd(),
-            can: () => set && items.length < 10
-        },
-        'delete': {
-            exec: () => set && execDelete(),
-            can: () => active !== null && items.length > 0
+    const execClone = !clone ? null : () => {
+        const index = active;
+        const cloneEntity = { ...entityIndex.getEntityObject(index) };
+
+        let no = 2;
+        let name = cloneEntity.value;
+        const matches = name.match(/ #(\d)+$/);
+        if (matches) {
+            name = name.substr(0, matches.index + 2);
+            no = parseInt(matches[1])
+        } else {
+            name += ' #';
         }
+        while (entityIndex.hasPropValue('value', name + no)) {
+            no++;
+        }
+        cloneEntity.value = name + no;
+        cloneEntity.index++;
+        eContext.doAction(
+            () => entityIndex.setEntityObject(cloneEntity),
+            () => entityIndex.deleteEntity(index + 1)
+        );
+        setActive(cloneEntity.index);
+    };
+
+    const execUp = !order ? null : () => {
+        const index = active;
+        eContext.doAction(
+            () => {
+                const old = entityIndex.getEntityObject(index - 1);
+                entityIndex.deleteEntity(index - 1);
+                entityIndex.setEntityObject({ ...old, index});
+            },
+            () => {
+                const old = entityIndex.getEntityObject(index);
+                entityIndex.deleteEntity(index);
+                entityIndex.setEntityObject({ ...old, index: index - 1});
+            }
+        );
+        setActive(index - 1)
+    };
+
+    const execDown = !order ? null : () => {
+        const index = active;
+        eContext.doAction(
+            () => {
+                const old = entityIndex.getEntityObject(index + 1);
+                entityIndex.deleteEntity(index + 1);
+                entityIndex.setEntityObject({ ...old, index});
+            },
+            () => {
+                const old = entityIndex.getEntityObject(index);
+                entityIndex.deleteEntity(index);
+                entityIndex.setEntityObject({ ...old, index: index + 1});
+            }
+        );
+        setActive(index + 1)
+    };
+
+    const hotKeys = {
+        new: {
+            exec: () => execAdd(),
+            can: () => true
+        },
+        delete: {
+            exec: () => execDelete(),
+            can: () => active !== null && items.length > 0
+        },
+        clone: {
+            exec: () => execClone(),
+            can: () => clone && active !== null
+        },
+        up: {
+            exec: () => execUp(),
+            can: () => active !== null && active > 0
+        },
+        down: {
+            exec: () => execDown(),
+            can: () => active !== null && active < (entityIndex.getLength() - 1)
+        },
     };
 
     let elem = (
@@ -654,7 +734,10 @@ function EntityStack({ entities, set, getName = item => item.name, getInfo, area
             <Block padded full="h">
                 <Stack full gaps>
                     <Button icon="add" onClick={hotKeys.new} />
+                    {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
                     <Button icon="delete" onClick={hotKeys.delete} />
+                    {order && <Button icon="keyboard_arrow_up" onClick={hotKeys.up} />}
+                    {order && <Button icon="keyboard_arrow_down" onClick={hotKeys.down} />}
                     <Block full="h" />
                 </Stack>
             </Block>
@@ -1841,6 +1924,35 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
     );
 };
 
+function NameDialog({ close, save, max, reserved = [], ...props }) {
+    const [name, setName] = useState(props.name || '');
+    const matching = props.match ? props.match : () => true;
+    const match = value => !reserved.includes(value) && matching(value);
+    return (
+        <OkCancelForm full="h" submit padded cancel={close} save={() => save(name)}>
+            <Block full="h" padded>
+                <PropertyGrid full="h">
+                    <InputProp full="h" autoFocus name="Name:" value={name} set={setName} match={match} max={max} required />
+                </PropertyGrid>
+            </Block>
+        </OkCancelForm>
+    )
+}
+
+function Icon({ name, width, height, className, size = 18 }) {
+    const style = {
+        width: width || size,
+        height: height || size
+    };
+    const cls = ['min-content-h center-h'];
+    if (className) {
+        cls.push(className);
+    }
+    return (
+        <div style={style} className={cls.join(' ')} key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + name + '</i>' }} />
+    );
+}
+
 function getCssConstProp(prop) {
     let i = 0;
     const iMax = prop.length;
@@ -1867,8 +1979,27 @@ function CssCtx({ children }) {
 
     const type2props = useMemo(() => {
         return {
-            px: ['defaultPadding', 'boxBorderWidth', 'maxWidth', 'maxHeight'],
-            color: ['boxBorderColor'],
+            px: [
+                'defaultPadding',
+                'boxBorderWidth',
+                'maxWidth',
+                'maxHeight',
+
+                'buttonBorderRadius'
+            ],
+            color: [
+                'boxBorderColor',
+
+                'editorBgColor',
+                'editorColor',
+                'buttonBgColor',
+                'buttonColor',
+                'buttonBorderColor'
+            ],
+            string: [
+                'buttonFontFamily',
+                'buttonBorderStyle'
+            ],
             url: ['linkResources']
         }
     }, []);
@@ -1891,6 +2022,11 @@ function CssCtx({ children }) {
             const constProp = getCssConstProp(prop);
             const value = style.getPropertyValue(constProp).trim();
             values[prop] = value.substr(1, value.length - 2);
+        }
+        for (let prop of type2props.string) {
+            const constProp = getCssConstProp(prop);
+            const value = style.getPropertyValue(constProp).trim();
+            values[prop] = value;
         }
 
         cssPropUpdate.current = (css, prop, value) => {
@@ -2007,6 +2143,21 @@ function useRefocus(parentRef, direct = false) {
     }
 }
 
+function useUpdateOnEntityIndexChanges(entityIndex) {
+    const update = useComponentUpdate();
+
+    useEffect(
+        () => {
+            entityIndex.addListener(update);
+            return () => {
+                entityIndex.removeListener(update);
+            }
+        },
+        [entityIndex]
+    );
+    return update;
+}
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -2030,16 +2181,20 @@ export {
     UndoRedoButtons,
     OkCancelForm,
     Ruler,
+    Icon,
 
     EntityStack,
     EntityStackSections,
     ActionBarContent,
+
+    NameDialog,
 
     PropertyGrid,
     ValueProp,
 
     useModal,
     useComponentUpdate,
+    useUpdateOnEntityIndexChanges,
     useMounted,
     useFocusKeyBindings,
     useRefocus
