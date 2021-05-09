@@ -137,6 +137,18 @@ function getDimHAttr({ full, width, minWidth, maxWidth }) {
     }
 }
 
+function getDimAttr({ full, width, minWidth, maxWidth, height, minHeight, maxHeight }) {
+    return {
+        full,
+        width,
+        minWidth,
+        maxWidth,
+        height,
+        minHeight,
+        maxHeight
+    }
+}
+
 function getDimStyle({ width, minWidth, maxWidth, height, minHeight, maxHeight }) {
     return {
         width,
@@ -150,7 +162,7 @@ function getDimStyle({ width, minWidth, maxWidth, height, minHeight, maxHeight }
 
 const FormContext = React.createContext();
 
-function Form({ children, ...props }) {
+function Form({ children, submit, ...props }) {
     const [invalid, setInvalid] = useState(false);
     const mounted = useMounted();
 
@@ -192,9 +204,17 @@ function Form({ children, ...props }) {
         checkForInvalid()
     }, []);
 
+    const submitOnReturn = !submit ? null : e => {
+        if (e.key === 'Enter' && !invalidRef.current) {
+            submit();
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
     return (
         <FormContext.Provider value={value}>
-            <Block ref={formRef} {...props}>
+            <Block onKeyDown={submitOnReturn} ref={formRef} {...props}>
                 {children}
             </Block>
         </FormContext.Provider>
@@ -219,6 +239,7 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
                 border={false}
                 tab={tab}
                 className="transparent"
+                iconCls="checkbox"
                 icon={value ? 'check_box' : 'check_box_outline_blank'}
                 padded={false}
                 disabled={disabled}
@@ -279,7 +300,7 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
 /**
  *
  */
-function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
+function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
     const wContext = useContext(WindowContext);
 
     const mounted = useMounted();
@@ -333,8 +354,13 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, o
             width: iconWidth || size,
             height: iconHeight || size
         };
+        const iCls = ['min-content-h center-h'];
+        if (iconCls) {
+            iCls.push(iconCls);
+        }
+
         items.push(
-            <div style={style} className="min-content-h center-h" key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + icon + '</i>' }} />
+            <div style={style} className={iCls.join(' ')} key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + icon + '</i>' }} />
         );
     }
     if (name) {
@@ -616,7 +642,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     const [edit, setEdit] = useState(false);
 
     const isFloat = number && (decimals && decimals > 0);
-    const cls = [];
+    const cls = ['input'];
     if (className) {
         cls.push(className);
     }
@@ -803,7 +829,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     let input = <input ref={inputRef} type="text" {...attr} className={cls.join(' ')} />;
 
     if (clear && !readOnly) {
-        input = <Stack>{input}<Button icon="clear" disabled={disabled} tab={false} size={14} onClick={() => set('')} /></Stack>
+        input = <Stack full={props.full}>{input}<Button icon="clear" center="v" disabled={disabled} tab={false} size={14} onClick={() => set('')} /></Stack>
     } else {
         input = <Block center="v" full={props.full}>{input}</Block>
     }
@@ -815,7 +841,6 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
 }
 
 function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = true, size, step, readOnly, disabled, autoFocus, full, ...props }) {
-
     const attr = getDimHAttr(props);
     const xAttr = {
         name,
@@ -826,6 +851,7 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
         undo: (undo ? undo + '_x' : false),
         size: size !== undefined ? size : props.sizeX,
         set: setX,
+        disabled: disabled !== undefined ? disabled : props.disabledX,
         step: step !== undefined ? step : props.stepX,
         autoFocus,
         readOnly: readOnly !== undefined ? readOnly : props.readOnlyX,
@@ -841,6 +867,7 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
         size: size !== undefined ? size : props.sizeY,
         set: setY,
         step: step !== undefined ? step : props.stepY,
+        disabled: disabled !== undefined ? disabled : props.disabledY,
         autoFocus,
         readOnly: readOnly !== undefined ? readOnly : props.readOnlyY,
         tab,
@@ -859,7 +886,7 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
 function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, ...props }) {
     const fContext = useContext(FormContext);
 
-    const cls = [];
+    const cls = ['input'];
     const optionHandler = getOptionHandler(options, value);
     if (readOnly) {
         buttons = false;
@@ -918,6 +945,10 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (tab) {
         cls.push('tabbed');
     }
+    const dimAttr = getDimHAttr(props);
+    if (dimAttr.full || dimAttr.full !== 'v') {
+        cls.push('full-h');
+    }
     attr.className = cls.join(' ');
     items.push(
         readOnly ?
@@ -958,19 +989,21 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     }
     return (
         <ComponentWithName name={name} {...props}>
-            {items.length === 1 ? items[0] : <Stack>{items}</Stack>}
+            {items.length === 1 ? items[0] : <Stack full={dimAttr.full}>{items}</Stack>}
         </ComponentWithName>
     )
 }
 
-function TextArea({ name, value, autoFocus, inputDim, resize, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
+function TextArea({ name, value, autoFocus, resize, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
     const set = useSet(value, props);
 
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
-    const style = getDimStyle(inputDim || {});
+    const style = getDimStyle(props || {});
+    const dimAttr = getDimAttr(props);
+
     const attr = {
         wrap,
         rows,
@@ -985,9 +1018,15 @@ function TextArea({ name, value, autoFocus, inputDim, resize, readOnly, disabled
     if (!resize) {
         attr.style.resize = 'none'
     }
-    const cls = [];
+    const cls = ['input'];
     if (className) {
         cls.push(className);
+    }
+    if (dimAttr.full && dimAttr.full !== 'v') {
+        cls.push('full-h');
+    }
+    if (dimAttr.full && dimAttr.full !== 'h') {
+        cls.push('full-v');
     }
     if ((required && value === '') || match && !match(value)) {
         cls.push('invalid');
@@ -1007,7 +1046,7 @@ function TextArea({ name, value, autoFocus, inputDim, resize, readOnly, disabled
     }
     return (
         <ComponentWithName name={name} {...props}>
-            <Block><textarea
+            <Block {...dimAttr}><textarea
                 className={cls.join(' ')}
                 {...attr}
             ></textarea></Block>
@@ -1018,7 +1057,7 @@ function TextArea({ name, value, autoFocus, inputDim, resize, readOnly, disabled
 function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) {
     const set = useSet(value, props);
 
-    const cls = [];
+    const cls = ['input'];
     if (!tab || (readOnly || disabled)) {
         tab = false;
     } else {
@@ -1105,6 +1144,7 @@ function CheckboxProp({ name, ...props }) {
     )
 }
 
+// TODO: braucht full eine Dim?
 function FullProp({ name, children}) {
     return (
         <>

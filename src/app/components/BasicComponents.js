@@ -84,6 +84,15 @@ function Canvas({ width, height, smoothing, render, plain, border, className }) 
     )
 }
 
+function Toolbar({ children }) {
+    return (
+        <Stack full="h" wrap gaps centerItems className="toolbar-bg">
+            {children}
+        </Stack>
+    )
+}
+
+
 const EditorContext = React.createContext();
 
 function EditorCtx({ id, children }) {
@@ -380,7 +389,9 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
         if (size) {
             const dimProp = 'client' + (collapseH ? 'X' : 'Y');
             const handleAttr = {};
-            handleAttr[sizeProp] = 3;
+            handleAttr[sizeProp] = 4;
+
+            const handleCls = 'resize-handle-' + (collapseH ? 'v' : 'h');
 
             const onMouseDown = e => {
                 const anchorPos =  e[dimProp];
@@ -412,11 +423,47 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
                 }, {once: true});
 
                 setSize(currSize);
-
                 e.preventDefault();
+
+                let elem = e.target.querySelector('.tabbed');
+                if (elem === null) {
+                    elem = e.target;
+                    do {
+                        elem = elem.parentNode;
+                        if (!elem) break;
+
+                    } while (
+                        !elem.classList && elem.classList.contains('.tabbed')
+                    )
+                }
+                if (elem) {
+                    elem.focus();
+                }
             };
 
-            const handleElem = <Block key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} {...handleAttr} cursor={cursor}></Block>;
+            const incKey = collapseH ? 'Right' : 'Down';
+            const decKey = collapseH ? 'Left' : 'Up';
+
+            const handleKey = e => {
+                if (e.key === 'Arrow' + decKey) {
+                    if (size > 0 && !(minSize && size <= minSize)) {
+                        setSize(size - 1);
+                    }
+                } else if (e.key === 'Arrow' + incKey) {
+                    if (!(maxSize && size >= maxSize)) {
+                        setSize(size + 1);
+                    }
+                }
+            };
+
+            const handleElem = (
+                <Block onKeyDown={handleKey} className="padded-1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} {...handleAttr} cursor={cursor}>
+                    <Stack center vertical={collapseH} tab gaps="1" className="hover-highlight">
+                        <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
+                        <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
+                    </Stack>
+                </Block>
+            );
             if (!collapseH) {
                 contentElem = <Block key="x" className="flex" full="h" height={size}>{contentElem}</Block>;
                 items = [contentElem, handleElem];
@@ -491,6 +538,16 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
     )
 }
 
+function makeOp(customOp, defaultOp, defaultCan = true) {
+    const isObj = typeof customOp === 'object';
+    const hasCustomExec = isObj && customOp.exec;
+    const canByDefault = typeof defaultCan === 'function' ? defaultCan() : defaultCan;
+    return {
+        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp() : (hasCustomExec ? customOp.exec() : customOp()),
+        can: () => canByDefault && (!customOp || !isObj || !customOp.can || customOp.can())
+    }
+}
+
 function Section({ ...props }) {
     return (
         <SectionFrame {...props} />
@@ -518,8 +575,12 @@ function EntityStackSections({ sectionProps, detailProps, active, children, ...p
     )
 }
 
-function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, clone, area, add, order, emptyText, deselect, children, ...props }) {
+function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
+
+    const add = props.add !== undefined ? props.add : !!addOp;
+    const clone = props.clone !== undefined ? props.clone : !!cloneOp;
+    const del = props.del !== undefined ? props.del : !!deleteOp;
 
     useUpdateOnEntityIndexChanges(entityIndex);
 
@@ -627,7 +688,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         items.push(
             <Stack key={index} border={DIR.BOTTOM} gaps className={'hover-highlight' + (isActive ? ' active-bg' : ' control-bg')} full="h" {...attr}>
                 <Block width={numLen} className="less" padded>#{index}</Block>
-                <Stack vertical padded gaps>
+                <Stack vertical full="h" padded gaps>
                     <Block shorten>{getName(entity)}</Block>
                     {getInfo && <Block className="less" shorten>{getInfo(entity)}</Block>}
                 </Stack>
@@ -637,7 +698,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     }
     const isEmpty = items.length === 0;
 
-    const execAdd = add;
+    const execAdd = () => d('ADD');
 
     const execDelete = () => {
         const oldEntity = entityIndex.getEntityObject(active);
@@ -647,7 +708,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         )
     };
 
-    const execClone = !clone ? null : () => {
+    const execClone = () => {
         const index = active;
         const cloneEntity = { ...entityIndex.getEntityObject(index) };
 
@@ -707,18 +768,9 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     };
 
     const hotKeys = {
-        new: {
-            exec: () => execAdd(),
-            can: () => true
-        },
-        delete: {
-            exec: () => execDelete(),
-            can: () => active !== null && items.length > 0
-        },
-        clone: {
-            exec: () => execClone(),
-            can: () => clone && active !== null
-        },
+        new: makeOp(addOp, execAdd),
+        delete: makeOp(deleteOp, execDelete, active !== null && items.length > 0),
+        clone: makeOp(cloneOp, execClone, clone && active !== null),
         up: {
             exec: () => execUp(),
             can: () => active !== null && active > 0
@@ -731,14 +783,13 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     let elem = (
         <Stack vertical borders full area={area} hotKeys={hotKeys}>
-            <Block padded full="h">
-                <Stack full gaps>
-                    <Button icon="add" onClick={hotKeys.new} />
+            <Block full="h">
+                <Stack full wrap gaps className="toolbar-bg">
+                    {add && <Button icon="add" onClick={hotKeys.new} />}
                     {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
-                    <Button icon="delete" onClick={hotKeys.delete} />
+                    {del && <Button icon="delete" onClick={hotKeys.delete} />}
                     {order && <Button icon="keyboard_arrow_up" onClick={hotKeys.up} />}
                     {order && <Button icon="keyboard_arrow_down" onClick={hotKeys.down} />}
-                    <Block full="h" />
                 </Stack>
             </Block>
             <Block full ref={stackRef}>
@@ -1623,9 +1674,9 @@ function OkCancelForm({ full, save, cancel, submit, buttons = [], children }) {
             <Block full={full} scroll>
                 {children}
             </Block>
-            <Stack full="h" gaps padded>
-                {submit ? <Submit name="OK" onClick={save} /> : <Button onClick={save} name="OK" />}
-                <Button onClick={cancel} name="Cancel" />
+            <Stack className="toolbar-bg" full="h" gaps padded>
+                {submit ? <Submit padded="h" name="OK" onClick={save} /> : <Button padded="h" onClick={save} name="OK" />}
+                <Button padded="h" onClick={cancel} name="Cancel" />
                 {buttons.length > 0 ? <Block full="h" /> : ''}
                 {buttons}
             </Stack>
@@ -1633,7 +1684,7 @@ function OkCancelForm({ full, save, cancel, submit, buttons = [], children }) {
     );
     if (submit) {
         elem = (
-            <Form full={full}>
+            <Form full={full} submit={save}>
                 {elem}
             </Form>
         )
@@ -1685,26 +1736,6 @@ function ThemeFreeze({ blockRef, children }) {
 }
 
 /**
- * <Modal full>  => Volle Max-Breit + Höhe (100%-20px)
- *
- * <Block center full fixed> -- Overlay (ganzer Bildschirm clickhandler
- *   <Block overlay-bounds [center=x]>
- *      <Stack [full=x]>
- *
- * Falls full dann kein "center" in overlay-bounds
- * ansonsten
- *
- *
- *
- * <Modal full="h" => Volle Breite + Mindest-Höhe bzw. MaxHöhe
- *
- * <Modal full="v" => Volle Höhe + Mindest-Breite bzw. MaxBreite
- *
- * <Modal width=320 => Breite 320 oder max-Breite, Mindest-Höhe
- *
- * <Modal maxWidth=500>
- *
- *
  */
 const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
@@ -1832,7 +1863,7 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
         height: 'calc(100% - 50px)'
     };
 
-    const vDivCls = ['stack-v full-h boxed modal-centered bg2'];
+    const vDivCls = ['stack-v full-h boxed modal-centered'];
     if (full && full !== 'h') {
         vDivCls.push('full-v');
     }
@@ -1953,6 +1984,183 @@ function Icon({ name, width, height, className, size = 18 }) {
     );
 }
 
+function CellMarker({ dir = DIR.ALL, type, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, zoom = 1, border = 0, width = 1, height = 1, moveCursor, ...props }) {
+    if (posX === null || posY === null) {
+        return '';
+    }
+    sizeX = sizeX * zoom;
+    sizeY = sizeY * zoom;
+
+    const hasResize = onResize && !onClick;
+    const hasMove = !!onMove;
+
+    const overhang = 8;
+
+    const offset = {
+        top: border + (sizeY + border) * posY  - overhang,
+        left: border + (sizeX + border) * posX - overhang,
+        width: 'min-content',
+        height: 'min-content'
+    };
+    if (type === 'row-gap') {
+        const baseline = Math.round(border / 2) + posY * (sizeY + border) - overhang;
+        offset.top =  baseline - overhang - border;
+        offset.left = -overhang;
+    } else if (type === 'column-gap') {
+        const baseline = Math.round(border / 2) + posX * (sizeX + border) - overhang;
+        offset.left =  baseline - overhang - border;
+        offset.top = -overhang;
+    }
+    const centerStyle = {
+        width: (type === 'column-gap' ? 2 * overhang  : sizeX * width + (width - 1) * border),
+        height: (type === 'row-gap' ? 2 * overhang : sizeY * height + (height - 1) * border)
+    };
+
+    const markerCls = 'marker-cell' + (highlight ? '-highlight' : '');
+    const cls = ['marker-grid'];
+
+    const clsCenter = [];
+    if (['rows', 'columns', 'row-gap', 'column-gap'].indexOf(type) !== -1) {
+        clsCenter.push(markerCls);
+    }
+    let centerClickHandler = null;
+/*
+    if (pointer) {
+        clsCenter.push('cursor-' + pointer);
+    }
+
+ */
+    if (hasMove) {
+        centerStyle.cursor = moveCursor ? moveCursor : 'move';
+        centerClickHandler = e => {
+            onMove(e);
+        }
+    }
+
+    const clsRight = [];
+    let rightClickHandler = null;
+    if (DIR.RIGHT & dir) {
+        clsRight.push(markerCls);
+        if (hasResize) {
+            clsRight.push('cursor-hresize');
+            rightClickHandler  = e => {
+                onResize(e, 'x', false);
+            };
+        }
+    }
+    const clsTopLeft = [];
+    let topLeftClickHandler = null;
+    if ((DIR.LEFT & dir) && (DIR.TOP & dir)) {
+        clsTopLeft.push(markerCls);
+        if (hasResize) {
+            clsTopLeft.push('cursor-nwseresize');
+            topLeftClickHandler  = e => {
+                onResize(e, 'xy', true, true);
+            };
+        }
+    }
+    const clsTopRight = [];
+    let topRightClickHandler = null;
+    if ((DIR.RIGHT & dir) && (DIR.TOP & dir)) {
+        clsTopRight.push(markerCls);
+        if (hasResize) {
+            clsTopRight.push('cursor-neswresize');
+            topRightClickHandler  = e => {
+                onResize(e, 'xy', false, true);
+            };
+        }
+    }
+    const clsLeft = [];
+    let leftClickHandler = null;
+    if (DIR.LEFT & dir) {
+        clsLeft.push(markerCls);
+        if (hasResize) {
+            clsLeft.push('cursor-hresize');
+            leftClickHandler  = e => {
+                onResize(e, 'x', true);
+            };
+        }
+    }
+    const clsTop = [];
+    let topClickHandler = null;
+    if (DIR.TOP & dir) {
+        clsTop.push(markerCls);
+        if (hasResize) {
+            clsTop.push('cursor-vresize');
+            topClickHandler  = e => {
+                onResize(e, 'y', null, true);
+            };
+        }
+    }
+    const clsBottom = [];
+    let bottomClickHandler = null;
+    if (DIR.BOTTOM & dir) {
+        clsBottom.push(markerCls);
+        if (hasResize) {
+            clsBottom.push('cursor-vresize');
+            bottomClickHandler  = e => {
+                onResize(e, 'y', null, false);
+            };
+        }
+    }
+    const clsBottomLeft = [];
+    let bottomLeftClickHandler = null;
+    if ((DIR.LEFT & dir) && (DIR.BOTTOM & dir)) {
+        clsBottomLeft.push(markerCls);
+        if (hasResize) {
+            clsBottomLeft.push('cursor-neswresize');
+            bottomLeftClickHandler  = e => {
+                onResize(e, 'xy', true, false);
+            };
+        }
+    }
+    const clsBottomRight = [];
+    let bottomRightClickHandler = null;
+    if ((DIR.RIGHT & dir) && (DIR.BOTTOM & dir)) {
+        clsBottomRight.push(markerCls);
+        if (hasResize) {
+            clsBottomRight.push('cursor-nwseresize');
+            bottomRightClickHandler  = e => {
+                onResize(e, 'xy', false, false);
+            };
+        }
+    }
+
+    if (props.blink) {
+        cls.push('blink');
+    }
+    cls.push('all-events');
+    const divAttr = {
+        style: offset,
+        className: cls.join(' ')
+    };
+    if (props.dblClick) {
+        divAttr.onDoubleClick = props.dblClick;
+    } else if (onClick) {
+        divAttr.onClick = onClick;
+    } else if (onMouseDown) {
+        divAttr.onMouseDown = onMouseDown;
+    }
+    let matrix = '';
+
+    return (
+        <div {...divAttr}>
+            <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>
+            <div className={clsTop.join(' ')} onMouseDown={topClickHandler}></div>
+            <div className={clsTopRight.join(' ')} onMouseDown={topRightClickHandler}></div>
+
+            <div className={clsLeft.join(' ')} onMouseDown={leftClickHandler}></div>
+            <div className={clsCenter.join(' ')} onMouseDown={centerClickHandler} style={centerStyle}>{matrix}</div>
+            <div className={clsRight.join(' ')} onMouseDown={rightClickHandler}></div>
+
+            <div className={clsBottomLeft.join(' ')} onMouseDown={bottomLeftClickHandler}></div>
+            <div className={clsBottom.join(' ')} onMouseDown={bottomClickHandler}></div>
+            <div className={clsBottomRight.join(' ')} onMouseDown={bottomRightClickHandler}></div>
+        </div>
+    )
+}
+
+
 function getCssConstProp(prop) {
     let i = 0;
     const iMax = prop.length;
@@ -1989,6 +2197,11 @@ function CssCtx({ children }) {
             ],
             color: [
                 'boxBorderColor',
+                'toolbarBgColor',
+
+                'inputBgColor',
+                'inputColor',
+                'inputBorderColor',
 
                 'editorBgColor',
                 'editorColor',
@@ -2164,6 +2377,7 @@ export {
     Canvas,
     EditorSection,
     Section,
+    Toolbar,
     ToolGroup,
     WindowContext,
     WindowCtx,
@@ -2182,6 +2396,7 @@ export {
     OkCancelForm,
     Ruler,
     Icon,
+    CellMarker,
 
     EntityStack,
     EntityStackSections,

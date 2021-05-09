@@ -242,8 +242,16 @@ function ThemeSettings({ theme, setTheme, cssPropUpdate }) {
                     <ColorProp name="Background" value={theme.editorBgColor} set={propSetter('editorBgColor')} />
                     <ColorProp name="Color" value={theme.editorColor} set={propSetter('editorColor')} />
                     <NumberProp name="Padding" value={theme.defaultPadding} max={20} set={propSetter('defaultPadding')} min={0} />
+
                     <NumberProp name="Border Width" value={theme.boxBorderWidth} max={10} set={propSetter('boxBorderWidth')} min={0} />
                     <ColorProp name="Border Color" value={theme.boxBorderColor} set={propSetter('boxBorderColor')} />
+
+                    <ColorProp name="Toolbar Background" value={theme.toolbarBgColor} set={propSetter('toolbarBgColor')} />
+
+                    <ColorProp name="Input Color" value={theme.inputColor} set={propSetter('inputColor')} />
+                    <ColorProp name="Input Background" value={theme.inputBgColor} set={propSetter('inputBgColor')} />
+                    <ColorProp name="Input Border Color" value={theme.inputBorderColor} set={propSetter('inputBorderColor')} />
+
 
                     <ColorProp name="Button Background" value={theme.buttonBgColor} set={propSetter('buttonBgColor')} />
                     <ColorProp name="Button Color" value={theme.buttonColor} set={propSetter('buttonColor')} />

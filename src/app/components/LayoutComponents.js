@@ -6,7 +6,8 @@ const DIR = {
     TOP: 1,
     BOTTOM: 2,
     LEFT: 4,
-    RIGHT: 8
+    RIGHT: 8,
+    ALL: 15
 };
 
 /**
@@ -502,7 +503,7 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
     }
     if (gaps) {
         if (wrap) {
-            dimCls.push('flow-padding');
+            dimCls.push('flow-padding' + (gaps === '1' ? '-1' : ''));
             if (centerItems) {
                 dimCls.push('center-items');
             }

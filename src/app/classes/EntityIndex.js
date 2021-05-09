@@ -519,6 +519,15 @@ class AssignIndex extends EntityIndex {
     }
 }
 
+class FilterIndex extends EntityIndex {
+    constructor(model) {
+        super();
+        this.model = model;
+        this.items = [];
+        this.chars = {};
+    }
+}
+
 class FontIndex extends EntityIndex {
 
     constructor(model) {
@@ -567,7 +576,20 @@ class FontIndex extends EntityIndex {
     }
 
     deleteEntityPropValues(index) {
-        delete this.chars[this.getEntityValue(index)]
+        const oldValue = this.getEntityValue(index);
+        delete this.chars[this.getEntityValue(index)];
+        const len = this.getLength();
+        let replaceValue = null;
+        if (len > 1) {
+            replaceValue = this.getEntityValue(
+                index === len - 1 ? index - 1 : index + 1
+            )
+        }
+        for (let block of this.model.blocks) {
+            if (block.font === oldValue) {
+                block.font = replaceValue
+            }
+        }
     }
 }
 
@@ -2839,6 +2861,7 @@ export {
     AnimationIndex,
     FrameIndex,
     FontIndex,
+    FilterIndex,
     TextBlockIndex,
     EventIndex
 };
