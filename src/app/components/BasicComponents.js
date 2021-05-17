@@ -2,9 +2,19 @@ import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useL
 import ReactDOM from "react-dom";
 import {d, Storage} from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import {Button, Number, Color, Form, Submit, InputProp} from "./FormComponents";
+import { Button, Number, Color, Form, Submit, InputProp, OkCancelForm } from "./FormComponents";
+import { CellValue } from "../classes/Grid";
+import { CellSelection } from "../classes/CellProvider";
 
 const BackgroundContext = React.createContext();
+
+function CenterInfo({ children }) {
+    return (
+        <Block padded center="v" full="h" wrap className="less text-center ">
+            {children}
+        </Block>
+    )
+}
 
 function Ruler({ }) {
     return (
@@ -16,8 +26,8 @@ function Ruler({ }) {
 }
 
 function BackgroundCtx({ children }) {
-    const [ color, setColor ] = useState('#A0A0A0');
-    const [ opacity, setOpacity ] = useState(12);
+    const [ color, setColor ] = useState('#202222');
+    const [ opacity, setOpacity ] = useState(18);
 
     const value = {
         color,
@@ -73,7 +83,7 @@ function Canvas({ width, height, smoothing, render, plain, border, className }) 
         cls.push(className);
     }
     if (border) {
-        cls.push((border !== true ? 'thin-' : '') + 'boxed');
+        cls.push('outline' + (border !== true ? '-1' : ''));
     }
 
     return (
@@ -92,7 +102,6 @@ function Toolbar({ children }) {
     )
 }
 
-
 const EditorContext = React.createContext();
 
 function EditorCtx({ id, children }) {
@@ -103,9 +112,24 @@ function EditorCtx({ id, children }) {
     const [future, setFuture] = useState([]);
     const [storePos, setStorePos] = useState(0);
     const [historyPos, setHistoryPos] = useState(0);
+    const [targetCellValue, setTargetCellValue] = useState(CellValue.raw);
+    const [selection, setSelectionRaw] = useState(new CellSelection());
+    const setSelection = selection => {
+        setTargetCellValue(selection.getCellValue());
+        setSelectionRaw(selection);
+    };
     const lastId = useRef(null);
 
     const value = {
+        // selection
+        selection,
+        setSelection,
+        targetCellValue,
+        setTargetCellValue: targetCellValue => {
+            setTargetCellValue(CellValue[targetCellValue])
+        },
+
+
         doAction: (doAction, undoAction, uid = null) => {
             let action;
             if (uid !== null && uid === lastId.current) {
@@ -445,14 +469,17 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
             const decKey = collapseH ? 'Left' : 'Up';
 
             const handleKey = e => {
+                let newSize = size;
                 if (e.key === 'Arrow' + decKey) {
-                    if (size > 0 && !(minSize && size <= minSize)) {
-                        setSize(size - 1);
-                    }
+                    newSize = Math.max(minSize, size - (e.shiftKey ? 10 : 1));
                 } else if (e.key === 'Arrow' + incKey) {
-                    if (!(maxSize && size >= maxSize)) {
-                        setSize(size + 1);
+                    newSize = size + (e.shiftKey ? 10 : 1);
+                    if (maxSize) {
+                        newSize = Math.min(maxSize, newSize);
                     }
+                }
+                if (size !== newSize) {
+                    setSize(newSize);
                 }
             };
 
@@ -538,278 +565,11 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
     )
 }
 
-function makeOp(customOp, defaultOp, defaultCan = true) {
-    const isObj = typeof customOp === 'object';
-    const hasCustomExec = isObj && customOp.exec;
-    const canByDefault = typeof defaultCan === 'function' ? defaultCan() : defaultCan;
-    return {
-        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp() : (hasCustomExec ? customOp.exec() : customOp()),
-        can: () => canByDefault && (!customOp || !isObj || !customOp.can || customOp.can())
-    }
-}
-
 function Section({ ...props }) {
     return (
         <SectionFrame {...props} />
     )
 }
-
-function EntityStackSections({ sectionProps, detailProps, active, children, ...props}) {
-
-    const items = [];
-
-    items.push(
-        <Section key={0} { ...sectionProps }>
-            <EntityStack active={active} { ...props } />
-        </Section>
-    );
-    if (children) {
-        items.push(
-            <Section key={1} { ...detailProps }>{children}</Section>
-        );
-    }
-    return (
-        <>
-            {items}
-        </>
-    )
-}
-
-function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
-    const eContext = useContext(EditorContext);
-
-    const add = props.add !== undefined ? props.add : !!addOp;
-    const clone = props.clone !== undefined ? props.clone : !!cloneOp;
-    const del = props.del !== undefined ? props.del : !!deleteOp;
-
-    useUpdateOnEntityIndexChanges(entityIndex);
-
-    let [active, setActiveRaw] = useState(props.active === undefined ? null : props.active);
-    const entities = entityIndex.getEntityObjects();
-    if (props.setActive !== undefined) {
-        setActiveRaw = props.setActive;
-        active = props.active;
-    }
-    let [shadow, setShadow] = useState(active);
-
-    const stackRef = useRef(null);
-    const refocus = useRefocus(stackRef);
-    const setActive = value => {
-        refocus();
-        if (value !== null) {
-            setShadow(value);
-        }
-        setActiveRaw(value)
-    };
-
-    const stackAttr = useFocusKeyBindings({
-        keyHandlers: [
-            {
-                keys: ['ArrowDown', 'ArrowRight'],
-                handler:
-                    () => {
-                        let newIndex = (active === null ? shadow : active) + 1;
-                        if (newIndex >= entities.length) {
-                            newIndex = 0;
-                        }
-                        if (active === null) {
-                            setShadow(newIndex);
-                            refocus();
-                        } else {
-                            setActive(newIndex);
-                        }
-                    }
-            },
-            {
-                keys: ['ArrowUp', 'ArrowLeft'],
-                handler:
-                    () => {
-                        let newIndex = (active === null ? shadow : active) - 1;
-                        if (newIndex < 0) {
-                            newIndex = entities.length - 1;
-                        }
-                        if (active === null) {
-                            setShadow(newIndex);
-                            refocus()
-                        } else {
-                            setActive(newIndex);
-                        }
-                    }
-            },
-            {
-                keys: [' '],
-                handler:
-                    () => {
-                        if (entities.length === 0) {
-                            return
-                        }
-                        if (!deselect && active !== null) {
-                            return;
-                        }
-                        if (active === null) {
-                            setActive(shadow !== null ? shadow : 0);
-                        } else {
-                            setActive(null);
-                        }
-                    }
-            }
-        ]
-    });
-
-    const indexSize = entityIndex.getLength();
-
-    if (indexSize > 0 && active >= indexSize) {
-        // TODO check why setActive does not work here
-        setActiveRaw(indexSize - 1);
-        return ''
-    }
-
-    const items = [];
-    let index = 0;
-    // TODO use reasonable font width
-    const numLen = (('' + indexSize).length + 2) * 8;
-    for(let entity of entities) {
-        const curr = index;
-        const isActive = index === active;
-        const attr = {
-            onClick: () => {
-                if (curr === active) {
-                    if (deselect) {
-                        setActive(null);
-                    }
-                } else {
-                    setActive(curr);
-                }
-            }
-        };
-        if (isActive || (index === shadow && active === null)) {
-            attr.tab = true;
-        }
-        items.push(
-            <Stack key={index} border={DIR.BOTTOM} gaps className={'hover-highlight' + (isActive ? ' active-bg' : ' control-bg')} full="h" {...attr}>
-                <Block width={numLen} className="less" padded>#{index}</Block>
-                <Stack vertical full="h" padded gaps>
-                    <Block shorten>{getName(entity)}</Block>
-                    {getInfo && <Block className="less" shorten>{getInfo(entity)}</Block>}
-                </Stack>
-            </Stack>
-        );
-        index++
-    }
-    const isEmpty = items.length === 0;
-
-    const execAdd = () => d('ADD');
-
-    const execDelete = () => {
-        const oldEntity = entityIndex.getEntityObject(active);
-        eContext.doAction(
-            () => entityIndex.deleteEntity(oldEntity.index),
-            () => entityIndex.setEntityObject(oldEntity)
-        )
-    };
-
-    const execClone = () => {
-        const index = active;
-        const cloneEntity = { ...entityIndex.getEntityObject(index) };
-
-        let no = 2;
-        let name = cloneEntity.value;
-        const matches = name.match(/ #(\d)+$/);
-        if (matches) {
-            name = name.substr(0, matches.index + 2);
-            no = parseInt(matches[1])
-        } else {
-            name += ' #';
-        }
-        while (entityIndex.hasPropValue('value', name + no)) {
-            no++;
-        }
-        cloneEntity.value = name + no;
-        cloneEntity.index++;
-        eContext.doAction(
-            () => entityIndex.setEntityObject(cloneEntity),
-            () => entityIndex.deleteEntity(index + 1)
-        );
-        setActive(cloneEntity.index);
-    };
-
-    const execUp = !order ? null : () => {
-        const index = active;
-        eContext.doAction(
-            () => {
-                const old = entityIndex.getEntityObject(index - 1);
-                entityIndex.deleteEntity(index - 1);
-                entityIndex.setEntityObject({ ...old, index});
-            },
-            () => {
-                const old = entityIndex.getEntityObject(index);
-                entityIndex.deleteEntity(index);
-                entityIndex.setEntityObject({ ...old, index: index - 1});
-            }
-        );
-        setActive(index - 1)
-    };
-
-    const execDown = !order ? null : () => {
-        const index = active;
-        eContext.doAction(
-            () => {
-                const old = entityIndex.getEntityObject(index + 1);
-                entityIndex.deleteEntity(index + 1);
-                entityIndex.setEntityObject({ ...old, index});
-            },
-            () => {
-                const old = entityIndex.getEntityObject(index);
-                entityIndex.deleteEntity(index);
-                entityIndex.setEntityObject({ ...old, index: index + 1});
-            }
-        );
-        setActive(index + 1)
-    };
-
-    const hotKeys = {
-        new: makeOp(addOp, execAdd),
-        delete: makeOp(deleteOp, execDelete, active !== null && items.length > 0),
-        clone: makeOp(cloneOp, execClone, clone && active !== null),
-        up: {
-            exec: () => execUp(),
-            can: () => active !== null && active > 0
-        },
-        down: {
-            exec: () => execDown(),
-            can: () => active !== null && active < (entityIndex.getLength() - 1)
-        },
-    };
-
-    let elem = (
-        <Stack vertical borders full area={area} hotKeys={hotKeys}>
-            <Block full="h">
-                <Stack full wrap gaps className="toolbar-bg">
-                    {add && <Button icon="add" onClick={hotKeys.new} />}
-                    {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
-                    {del && <Button icon="delete" onClick={hotKeys.delete} />}
-                    {order && <Button icon="keyboard_arrow_up" onClick={hotKeys.up} />}
-                    {order && <Button icon="keyboard_arrow_down" onClick={hotKeys.down} />}
-                </Stack>
-            </Block>
-            <Block full ref={stackRef}>
-                <Stack vertical full={isEmpty ? true : "h"} scroll {...stackAttr}>
-                    {isEmpty ? <Block center className="less">{emptyText}</Block> : items}
-                </Stack>
-            </Block>
-        </Stack>
-    );
-
-    if (children) {
-        elem = <Stack>
-            {elem}
-            <Block>{children}</Block>
-        </Stack>
-    }
-
-    return elem
-}
-
 
 function PropertyGrid({ propWidth = '-', valueWidth = '*', ...props }) {
     // TODO use CSS value
@@ -839,11 +599,15 @@ function PropLabel({ name, children }) {
     )
 }
 
-function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto }) {
+function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto, gaps }) {
     const cssContext = useContext(CssContext);
 
     const scrollbarX = x !== undefined && (!auto || (x > 0 || maxX > pageX));
     const scrollbarY = y !== undefined && (!auto || (y > 0 || maxY > pageY));
+
+    if (!(scrollbarX || scrollbarY)) {
+        return children;
+    }
 
     const columns = ['*'];
     const rows = ['*'];
@@ -871,7 +635,7 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
     };
 
     return (
-        <Grid full gaps={cssContext.values.defaultPadding} columns={columns.join(' ')} rows={rows.join(' ')}>
+        <Grid full gaps={gaps ? cssContext.values.defaultPadding : null} columns={columns.join(' ')} rows={rows.join(' ')}>
             <Block full onWheel={onWheel}>{children}</Block>
             {scrollbarY && <Scrollbar vertical pos={y} max={maxY} page={pageY} set={setY} />}
             {scrollbarX && <Scrollbar pos={x} max={maxX} page={pageX} set={setX} />}
@@ -1468,9 +1232,6 @@ function AvailContextProvider({ children }) {
         const checkSize = () => {
             if (!divRef.current) return;
             const rect = divRef.current.getBoundingClientRect();
-// TODO: why?
-            rect.width -= 10;
-            rect.height -= 10;
             if (rect.width !== propsRef.current.width) {
                 setWidth(rect.width);
             }
@@ -1521,6 +1282,21 @@ function ToolGroup({ children }) {
 }
 
 const TabContext = React.createContext();
+
+function ButtonStack({ items, onClick }) {
+    const tabs = [];
+    for(let item of items) {
+        tabs.push(
+            <Button key={item} full onClick={() => onClick(item)} name={item} rev icon="keyboard_arrow_right" />
+        );
+    }
+    return (
+        <Block scroll padded="h" full="h">
+            <Stack indented vertical gaps full="h">{tabs}</Stack>
+        </Block>
+    )
+}
+
 
 function SideTabs({ children, ...props }) {
 
@@ -1582,7 +1358,7 @@ function SideTabs({ children, ...props }) {
     const tabs = [];
     for(let item of items.current) {
         tabs.push(
-            <Button key={item} full current={active} value={item} onClick={setActive} name={item} rev icon="keyboard_arrow_right" />
+            <Button key={item} full padded="h" current={active} value={item} onClick={setActive} name={item} rev icon="keyboard_arrow_right" />
         );
     }
     return (
@@ -1666,30 +1442,6 @@ function Portal({ id, children }) {
         children,
         domElem
     );
-}
-
-function OkCancelForm({ full, save, cancel, submit, buttons = [], children }) {
-    let elem = (
-        <Stack vertical borders full={full}>
-            <Block full={full} scroll>
-                {children}
-            </Block>
-            <Stack className="toolbar-bg" full="h" gaps padded>
-                {submit ? <Submit padded="h" name="OK" onClick={save} /> : <Button padded="h" onClick={save} name="OK" />}
-                <Button padded="h" onClick={cancel} name="Cancel" />
-                {buttons.length > 0 ? <Block full="h" /> : ''}
-                {buttons}
-            </Stack>
-        </Stack>
-    );
-    if (submit) {
-        elem = (
-            <Form full={full} submit={save}>
-                {elem}
-            </Form>
-        )
-    }
-    return  elem
 }
 
 function ActionBarContent({ children, scroll, ...props }) {
@@ -1897,7 +1649,7 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
             const maxTop = Math.max(dim.height - (rect.height / 2), 0);
             const offX = lastPosX - rect.x;
             const offY = lastPosY - rect.y;
-            wContext.startExclusiveMode('modal-drag', 'grab');
+            wContext.startExclusiveMode('modal-drag', 'grabbing');
             wContext.addEventListener('mousemove', e => {
                 const relPos = {x: e.clientX - anchorPos.x, y: e.clientY - anchorPos.y};
                 if (relPos.x !== lastPosX || relPos.y !== lastPosY) {
@@ -1955,21 +1707,6 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
     );
 };
 
-function NameDialog({ close, save, max, reserved = [], ...props }) {
-    const [name, setName] = useState(props.name || '');
-    const matching = props.match ? props.match : () => true;
-    const match = value => !reserved.includes(value) && matching(value);
-    return (
-        <OkCancelForm full="h" submit padded cancel={close} save={() => save(name)}>
-            <Block full="h" padded>
-                <PropertyGrid full="h">
-                    <InputProp full="h" autoFocus name="Name:" value={name} set={setName} match={match} max={max} required />
-                </PropertyGrid>
-            </Block>
-        </OkCancelForm>
-    )
-}
-
 function Icon({ name, width, height, className, size = 18 }) {
     const style = {
         width: width || size,
@@ -1980,8 +1717,23 @@ function Icon({ name, width, height, className, size = 18 }) {
         cls.push(className);
     }
     return (
-        <div style={style} className={cls.join(' ')} key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + name + '</i>' }} />
+        <div style={style} className={cls.join(' ')} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + name + '</i>' }} />
     );
+}
+
+function Kbd({ value = '', length = null, className }) {
+    const cls = [];
+    if (className) {
+        cls.push(className);
+    }
+    value = '' + value;
+    if (length !== null) {
+        value = value.padStart(length, ' ')
+    }
+    value = value.replaceAll(' ', '&nbsp;');
+    return (
+        <kbd className={cls.join(' ')} dangerouslySetInnerHTML={{ __html: value}}></kbd>
+    )
 }
 
 function CellMarker({ dir = DIR.ALL, type, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, zoom = 1, border = 0, width = 1, height = 1, moveCursor, ...props }) {
@@ -2356,14 +2108,18 @@ function useRefocus(parentRef, direct = false) {
     }
 }
 
-function useUpdateOnEntityIndexChanges(entityIndex) {
+function useUpdateOnEntityIndexChanges(entityIndex, callback) {
     const update = useComponentUpdate();
 
     useEffect(
         () => {
-            entityIndex.addListener(update);
+            const callbackAndUpdate = !callback ? update : () => {
+                callback();
+                update()
+            };
+            entityIndex.addListener(callbackAndUpdate);
             return () => {
-                entityIndex.removeListener(update);
+                entityIndex.removeListener(callbackAndUpdate);
             }
         },
         [entityIndex]
@@ -2397,12 +2153,10 @@ export {
     Ruler,
     Icon,
     CellMarker,
-
-    EntityStack,
-    EntityStackSections,
+    ButtonStack,
+    CenterInfo,
     ActionBarContent,
-
-    NameDialog,
+    Kbd,
 
     PropertyGrid,
     ValueProp,

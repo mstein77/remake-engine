@@ -47,6 +47,10 @@ html, body {
     opacity: 0.5
 }
 
+.outline-1 {
+    outline: 1px solid var(--box-border-color)
+}
+
 .content-box {
     box-sizing: content-box !important;
 }
@@ -130,12 +134,18 @@ html, body {
     background-color: var(--modal-overlay-bg-color);
 }
 
-.modal-centered {}
+.modal-centered {
+    background-color: var(--editor-bg-color);
+}
 
 .modal-bounds {
     width: calc(100% - 40px);
     height: calc(100% - 40px);
     overflow: hidden;
+}
+
+.overflow {
+    overflow: visible;
 }
 
 .hover-inverse:hover {
@@ -171,8 +181,12 @@ html, body {
     color: white;
 }
 
+.active-bg-text {
+    color: rgba(91, 170, 43, 0.93)
+}
+
 .active-border {
-    border: solid red 2px !important;
+    border: solid rgba(91, 170, 43, 0.93) 2px !important;
 
 }
 

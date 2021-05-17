@@ -23,8 +23,12 @@ html, body, #app {
 }
 
 .wrap-normal.full-h {
-    width: max-content !important;
+/*    width: max-content !important; */
     max-width: 100%
+}
+
+.text-center {
+    text-align: center
 }
 
 .block {
@@ -269,6 +273,7 @@ textarea.full-v {
     border-right: none !important
 }
 
+.boxed-1,
 .thin-boxed {
     border: 1px solid var(--box-border-color);
 }

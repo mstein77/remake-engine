@@ -1,4 +1,4 @@
-const {d, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail} = require('../helper/helper');
+const {d, cloneDeep, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail} = require('../helper/helper');
 const {CellValue} = require('../classes/Grid');
 
 class EntityIndex {
@@ -40,6 +40,10 @@ class EntityIndex {
 
     hasIndex(index) {
         return (index >= 0 && index < this.getLength());
+    }
+
+    hasUniqueValues() {
+        return true
     }
 
     hasPropValueMatch(prop, matchFunction) {
@@ -263,7 +267,6 @@ class EntityIndex {
             }
             objIndex++;
         }
-
         const newIndex = [];
         const updates = [];
         i = 0;
@@ -310,7 +313,6 @@ class EntityIndex {
                 }
             }
         }
-
         this.setItems(newIndex);
         this.doUpdates(updates, overwrite);
 
@@ -354,7 +356,6 @@ class EntityIndex {
         if (updates.length) {
             this.doUpdates(updates, true);
         }
-
         this.suspendNotifications = false;
         this.notify();
     }
@@ -520,11 +521,45 @@ class AssignIndex extends EntityIndex {
 }
 
 class FilterIndex extends EntityIndex {
+
     constructor(model) {
         super();
         this.model = model;
+        this.params = [];
         this.items = [];
-        this.chars = {};
+    }
+
+    hasUniqueValues() {
+        return false
+    }
+
+    setEntityValue(index, value) {
+        if (index >= this.params.length) {
+            this.params.push(null);
+        }
+        this.items[index] = value;
+    }
+
+    setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
+        if (prop === 'params') {
+            this.params[index] = cloneDeep(value);
+        }
+    }
+
+    getEntityPropValue(index, prop) {
+        if (prop === 'params') {
+            return cloneDeep(this.params[index])
+        }
+        return super.getEntityPropValue(index, prop);
+    }
+
+    getEntityProps() {
+        return  [...super.getEntityProps(), 'params'];
+    }
+
+    deleteEntityPropValues(index) {
+        this.params.splice(index, 1);
     }
 }
 
@@ -537,7 +572,9 @@ class FontIndex extends EntityIndex {
         this.chars = {};
         for (let font of model.fonts) {
             this.items.push(font.id);
-            this.chars[font.id] = new CharIndex(font);
+            const charIndex = new CharIndex(font);
+            this.chars[font.id] = charIndex;
+            charIndex.addListener(() => this.notify());
         }
     }
 
@@ -709,6 +746,10 @@ class CharIndex extends EntityIndex {
         this.model.image = canvas;
         this.img = canvas;
         return ['image'];
+    }
+
+    deleteEntityPropValues(index) {
+        delete this.model.map[this.items[index]];
     }
 
     resize(sizeX, sizeY, offsetX = 0, offsetY = 0) {

@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { d } from "../helper/helper"
+import {d, drawCanvasToAvail, getCanvasForBitmap} from "../helper/helper"
 import { Block, Stack } from "./LayoutComponents";
-import { WindowContext, EditorContext, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { WindowContext, EditorContext, useModal, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { EntityPicker } from "./EntityComponents";
 
 function isValidNumber(value) {
     return typeof value === 'number' && !isNaN(value);
@@ -221,6 +222,30 @@ function Form({ children, submit, ...props }) {
     )
 }
 
+function OkCancelForm({ full, save, cancel, submit, left = [], right = [], children }) {
+    let elem = (
+        <Stack vertical borders full={full}>
+            <Block full={full} scroll>
+                {children}
+            </Block>
+            <Stack className="toolbar-bg" full="h" gaps padded>
+                {submit ? <Submit padded="h" name="OK" onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
+                <Button padded="h" onClick={cancel} name="Cancel" icon="close" />
+                {left}
+                {right.length > 0 ? <Block full="h" /> : ''}
+                {right}
+            </Stack>
+        </Stack>
+    );
+    if (submit) {
+        elem = (
+            <Form full={full} submit={save}>
+                {elem}
+            </Form>
+        )
+    }
+    return  elem
+}
 
 /**
  * readOnly
@@ -414,7 +439,7 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, i
                     return;
                 }
                 e.preventDefault();
-                handleClick('keyup');
+                handleClick('keyup', direct ? e : null);
             }
 
         }
@@ -829,7 +854,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     let input = <input ref={inputRef} type="text" {...attr} className={cls.join(' ')} />;
 
     if (clear && !readOnly) {
-        input = <Stack full={props.full}>{input}<Button icon="clear" center="v" disabled={disabled} tab={false} size={14} onClick={() => set('')} /></Stack>
+        input = <Stack full={props.full}>{input}<Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={() => set('')} /></Stack>
     } else {
         input = <Block center="v" full={props.full}>{input}</Block>
     }
@@ -1083,6 +1108,50 @@ function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) 
     )
 }
 
+function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
+    const CopyBitmapModal = useModal();
+
+    const copy = () => {
+        CopyBitmapModal.open({
+            entityIndex,
+            controls: true,
+            select: index => {
+                set(entityIndex.getEntityPropValue(index, 'image'));
+                CopyBitmapModal.close();
+            }
+        });
+    };
+
+    const width = value ? (typeof zoomOrAvail === 'object' ? zoomOrAvail.width : zoomOrAvail * value.width) : 0;
+    const height = value ? (typeof zoomOrAvail === 'object' ? zoomOrAvail.height : zoomOrAvail * value.height) : 0;
+
+    const render = ctx => {
+        ctx.clearRect(0, 0, width, height);
+        drawCanvasToAvail(getCanvasForBitmap(value), ctx, 0, 0, {width, height});
+    };
+    return (
+        <>
+            <Stack vertical>
+                <Stack gaps="1">
+                    <Button name="edit" padded="h" />
+                    <Button name="import" padded="h" />
+                    {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
+                    {empty && <Button icon="clear" onClick={() => set(null)} />}
+                </Stack>
+                <Block padded>
+                    <Canvas width={width} height={height} render={render} border="1" />
+                </Block>
+            </Stack>
+
+            {entityIndex &&
+                <CopyBitmapModal.content name="Copy image from..."  width={500} height={500}>
+                    <EntityPicker {...CopyBitmapModal.props} />
+                </CopyBitmapModal.content>
+            }
+        </>
+    )
+}
+
 function LabelProp({name, children}) {
     return (
         <>
@@ -1172,16 +1241,26 @@ function ColorProp({ name, ...props }) {
     )
 }
 
+
+function BitmapProp({ name, ...props }) {
+    return (
+        <LabelProp name={name}>
+            <Bitmap { ...props } />
+        </LabelProp>
+    )
+}
+
 function Submit({ disabled, ...props }) {
     const fContext = useContext(FormContext);
 
     return (
-        <Button disabled={disabled || (fContext && fContext.invalid)} { ...props } />
+        <Button icon="done" disabled={disabled || (fContext && fContext.invalid)} { ...props } />
     )
 }
 
 export {
     Form,
+    OkCancelForm,
     FormContext,
     Button,
     Submit,
@@ -1201,6 +1280,8 @@ export {
     TextAreaProp,
     Color,
     ColorProp,
+    Bitmap,
+    BitmapProp,
     LabelProp,
     FullProp
 }

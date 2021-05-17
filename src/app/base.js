@@ -1,6 +1,6 @@
 import React, {useState, useContext, useMemo, useRef, useEffect, Fragment} from "react";
 import ReactDOM from "react-dom";
-import {d} from "../app/helper/helper";
+import { d, getCanvasForDim } from "../app/helper/helper";
 import { useModal, useComponentUpdate, useRefocus, Ruler, OkCancelForm, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
 import { Form, Submit, Input, Select, CheckboxProp, Radio, LabelProp, NumberProp, ColorProp, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
 import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";
@@ -459,18 +459,29 @@ const model = {
                 "Z": {
                     "x": 304,
                     "y": 0
-                },
-
-            image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATgAAAAICAYAAABtcuNzAAACxElEQVRoQ+1ZW27DMAxbgZ6iN9qJd6OeosCGDNCgCaRIOc0eQPrV1rYs0RSlOJeX9Hk8Hu/bz+v1esn/P+N72O7sv91un/u/3u/f9s9rw5fsIxpH+yAfVtZm22y9mqP8r2fA8DvCf+VbPgMn/m0+O0PEufrfnhgn9hHv1Xo13sXOxip3O/472NQ5Hbdyrm/zVHxHj2eMwu+8p+Lfl5AoEPaI3GYbOZdthrhVgVMAVr+YSLP4HFHv5ij/9o7XA2bJj0SJYY4I4sxFHDgav5UCPIkPJRDaM0SnFhpUeLr91XkePb6Hy4HLEfExfJXAsfwPe5bAZYGKDd0uTyU4ErnawXWEcxLAIXwFSgkyE/ypACl8jhhXmCkCq/V7x1WRUtxj/q/YVR0CKpwKv98ed7nLxH/V/9ARliO1e0SC2hUkVGwsgcuiVsUub4hEQiWoK3CISEz4Qr2n6t9VKCaATjKjJHEeAyePCKsCrc6HJXgtAO7+XQekMHa6xXrmijddwnTcDo65Asg6bBd/dz1KcsU/JiQTgUN4ZP4iUWU50F0VhB33CgfedbEKicTtJwTOISkTGkVABPykQnXkcAji7s8IspIgSpRV/Gq9Glf2J52WG3/2iSWHuoNDHQiKJSfhin+sQHfdYhdf5c4z8WX5rwogilHFoPzONsOWLXD5cNUjggKUCSV6yYAq0iSBHF8qMCsJqMDv7si6eNwE+U93cCv4TooFs8+41HWGU/zrHtP1U74yge2uWPZytYuJ5ZLT4dWOzylESh+st6VVkJhAoS6jdjhIZfMLhmxju4tzOjA0p+tCu0PI1Rf5jsZZ8rnrUWWua9UjSsVevSnrKqzz+FwJq4oeOyMlAKxDcDuAah8lBOPY5IrAKTCoQ+nElfEn/EL+ufGpbhUVXafDmoiSg6/bzCDt2ezbHVwnXufYicCJwInAX0TgA2h85FTA4y6VAAAAAElFTkSuQmCC"
-        }},
+                }
+            }},
         {id: 'whatever', map: {}, width: 16, height: 16, image: "ohoh"}
     ],
     blocks: JSON.parse("[{\"id\":\"status\",\"x\":24,\"y\":8,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"MARIO         WORLD  TIME\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":25,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"score\",\"x\":24,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"undefined\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":9,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"coins\",\"x\":96,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"*undefined\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":10,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"world\",\"x\":144,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"1-1\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":3,\"height\":1,\"__type\":\"TextBlockConfig\"},{\"id\":\"time\",\"x\":200,\"y\":16,\"alignToGrid\":false,\"autoCenteringX\":false,\"autoCenteringY\":false,\"text\":\"398\",\"font\":\"marioFontMap\",\"textAlign\":\"left\",\"lineSpacing\":0,\"filters\":\"\",\"width\":3,\"height\":1,\"__type\":\"TextBlockConfig\"}]"),
     dim: {x: 256, y: 224},
 
 };
+const image = new Image(320, 8);
+image.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATgAAAAICAYAAABtcuNzAAACxElEQVRoQ+1ZW27DMAxbgZ6iN9qJd6OeosCGDNCgCaRIOc0eQPrV1rYs0RSlOJeX9Hk8Hu/bz+v1esn/P+N72O7sv91un/u/3u/f9s9rw5fsIxpH+yAfVtZm22y9mqP8r2fA8DvCf+VbPgMn/m0+O0PEufrfnhgn9hHv1Xo13sXOxip3O/472NQ5Hbdyrm/zVHxHj2eMwu+8p+Lfl5AoEPaI3GYbOZdthrhVgVMAVr+YSLP4HFHv5ij/9o7XA2bJj0SJYY4I4sxFHDgav5UCPIkPJRDaM0SnFhpUeLr91XkePb6Hy4HLEfExfJXAsfwPe5bAZYGKDd0uTyU4ErnawXWEcxLAIXwFSgkyE/ypACl8jhhXmCkCq/V7x1WRUtxj/q/YVR0CKpwKv98ed7nLxH/V/9ARliO1e0SC2hUkVGwsgcuiVsUub4hEQiWoK3CISEz4Qr2n6t9VKCaATjKjJHEeAyePCKsCrc6HJXgtAO7+XQekMHa6xXrmijddwnTcDo65Asg6bBd/dz1KcsU/JiQTgUN4ZP4iUWU50F0VhB33CgfedbEKicTtJwTOISkTGkVABPykQnXkcAji7s8IspIgSpRV/Gq9Glf2J52WG3/2iSWHuoNDHQiKJSfhin+sQHfdYhdf5c4z8WX5rwogilHFoPzONsOWLXD5cNUjggKUCSV6yYAq0iSBHF8qMCsJqMDv7si6eNwE+U93cCv4TooFs8+41HWGU/zrHtP1U74yge2uWPZytYuJ5ZLT4dWOzylESh+st6VVkJhAoS6jdjhIZfMLhmxju4tzOjA0p+tCu0PI1Rf5jsZZ8rnrUWWua9UjSsVevSnrKqzz+FwJq4oeOyMlAKxDcDuAah8lBOPY5IrAKTCoQ+nElfEn/EL+ufGpbhUVXafDmoiSg6/bzCDt2ezbHVwnXufYicCJwInAX0TgA2h85FTA4y6VAAAAAElFTkSuQmCC";
+image.decode().then(
+    () => {
+        const canvas = getCanvasForDim(320, 8);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, 0, 0);
+        model.fonts[0].image = canvas;
 
-ReactDOM.render(
-    <MainEditor>{test ? <TextPaneEditor model={model} /> : <RealApp />}</MainEditor>,
-    document.getElementById('app')
+        ReactDOM.render(
+            <MainEditor>{test ? <TextPaneEditor model={model} /> : <RealApp />}</MainEditor>,
+            document.getElementById('app')
+        )
+    }
 );
+
+

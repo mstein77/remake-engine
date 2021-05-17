@@ -1,7 +1,8 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BackgroundCtx, CssCtx, NameDialog, OkCancelForm, Icon, PropertyGrid, Ruler, SideTab, SideTabs, useComponentUpdate, useModal, WindowContext, WindowCtx } from "../components/BasicComponents";
+import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, useComponentUpdate, useModal, WindowContext, WindowCtx } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import { OkCancelForm, Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import { NameDialog } from "../components/EditorComponents";
 import { d } from "../helper/helper";
 
 function PresetsManager({ id, set, config, ...props }) {
@@ -23,7 +24,7 @@ function PresetsManager({ id, set, config, ...props }) {
         for (let item of defaults) {
             defaultItems.push(
                 <Block key={item.name} padded="h" full="h">
-                    <Button full="h" name={'< ' + item.name} onClick={() => setDefaultedValues({ ...item.values })} />
+                    <Button full="h" name={'< ' + item.name} padded="h" onClick={() => setDefaultedValues({ ...item.values })} />
                 </Block>
             )
         }
@@ -35,7 +36,7 @@ function PresetsManager({ id, set, config, ...props }) {
         reserved.push(item.name);
         customItems.push(
             <Stack vertical key={item.name} padded="h" full="h" gaps="1">
-                <Button full="h" name={'< ' + item.name} onClick={() => setDefaultedValues(item.values)} />
+                <Button full="h" name={'< ' + item.name} padded="h" onClick={() => setDefaultedValues(item.values)} />
                 <Stack full="h" gaps="1">
                     <Block full="h"></Block>
                     <Button icon="edit" onClick={() => editPresets(item.name)} />
@@ -237,7 +238,7 @@ function ThemeSettings({ theme, setTheme, cssPropUpdate }) {
 
     return (
         <Stack full borders>
-            <Block full="h" padded>
+            <Block full="h" padded scroll>
                 <PropertyGrid>
                     <ColorProp name="Background" value={theme.editorBgColor} set={propSetter('editorBgColor')} />
                     <ColorProp name="Color" value={theme.editorColor} set={propSetter('editorColor')} />
@@ -388,13 +389,13 @@ function HotKeyKeys({ hotKey, empty }) {
     if (keys.length) {
         for(let key of keys) {
             if (elems.length) {
-                elems.push(<Block center="v" key={'_' + elems.length}><Icon name="add" className="less" /></Block>);
+                elems.push(<Block center="v" key={'_' + elems.length}><Icon name="add" size={12} className="less" /></Block>);
             }
             elems.push(<Block key={key} padded border="1"><kbd>{key}</kbd></Block>);
 
         }
         return (
-            <Stack gaps center="v">{elems}</Stack>
+            <Stack center="v" gaps="1">{elems}</Stack>
         )
     }
     return (
@@ -489,30 +490,27 @@ function Settings({ save, close, defaults }) {
         setMapping(afterRef.current.mapping);
         afterRef.current = null;
     };
-
-    const buttons = // useMemo(() => {
-//        return
-        [
-            <Button key="before" icon="visibility" name="before" direct onClick={showBefore} onClickEnd={restoreAfter} />,
-            <Button key="clear" name="Clear all settings" onClick={() => {
-                wContext.clearAllSettings();
-                // TODO: find a better solution to update css live props
-                for (let [key, value] of Object.entries(defaults.theme)) {
-                    wContext.cssPropUpdate.current(document.body.style, key, value);
-                }
-                wContext.cssPropUpdate.current(document.body.style, 'maxWidth', defaults.config.maxWidth);
-                wContext.cssPropUpdate.current(document.body.style, 'maxHeight', defaults.config.maxHeight);
-                save({
-                    config: defaults.config,
-                    theme: defaults.theme,
-                    mapping: defaults.mapping
-                }, false);
-            }} />
-        ];
-//    }, []);
-
+    const leftButtons = [
+        <Button key="before" icon="visibility" name="before" padded="h" direct onClick={showBefore} onClickEnd={restoreAfter} />
+    ];
+    const rightButtons = [
+        <Button key="clear" name="Clear all settings" padded="h" onClick={() => {
+            wContext.clearAllSettings();
+            // TODO: find a better solution to update css live props
+            for (let [key, value] of Object.entries(defaults.theme)) {
+                wContext.cssPropUpdate.current(document.body.style, key, value);
+            }
+            wContext.cssPropUpdate.current(document.body.style, 'maxWidth', defaults.config.maxWidth);
+            wContext.cssPropUpdate.current(document.body.style, 'maxHeight', defaults.config.maxHeight);
+            save({
+                config: defaults.config,
+                theme: defaults.theme,
+                mapping: defaults.mapping
+            }, false);
+        }} />
+    ];
     return (
-        <OkCancelForm full save={() => save({ config, theme, mapping })} cancel={close} buttons={buttons}>
+        <OkCancelForm full save={() => save({ config, theme, mapping })} cancel={close} left={leftButtons} right={rightButtons}>
             <SideTabs full>
                 <SideTab name="Editor" active full>
                     <ConfigSettings config={config} setConfig={setConfig} />
@@ -622,9 +620,9 @@ function BaseAppInner({ children }) {
                         <Button icon="keyboard_backspace" padded="h" name="Back" />
                         <Block padded="h" center="v" full="h" shorten></Block>
                         <Stack gaps center="v">
-                            <Button padded="h" icon="pause_circle_outline" name="Replay" />
-                            <Button icon="play_circle_outline" disabled padded="h" name="Play" onClick={() => console.log(666)} />
-                            <Button border={false} padded={false} onClick={() => wContext.openSettings()} icon="build" />
+                            <Button icon="build" onClick={() => wContext.openSettings()} />
+                            <Button name="Play" icon="play_circle_outline" padded="h" />
+                            <Button name="Exit" icon="logout" padded="h" onClick={() => console.log(666)} />
                         </Stack>
                     </Stack>
                 </Block>
