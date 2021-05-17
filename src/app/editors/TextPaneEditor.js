@@ -46,6 +46,37 @@ function FontProperties({ font, reserved, save, close }) {
     )
 }
 
+function CharAssignments({ close, save, assignIndex }) {
+    const values = assignIndex.getPropValues('value');
+
+    const setValueAtIndex = (index, value) => {
+        if (value !== '') {
+            const oldIndex = assignIndex.getEntityByPropValue('value', value);
+            if (oldIndex !== null) {
+                assignIndex.setEntityPropValue(oldIndex, 'value', '');
+            }
+        }
+        assignIndex.setEntityPropValue(index, 'value', value);
+        values[index] = value;
+        return value;
+    };
+
+    return (
+        <OkCancelForm full cancel={close} save={() => save(values)}>
+            <EntityManager
+                readOnly
+                auto
+                entityIndex={assignIndex}
+                renderTitle={index =>
+                    <Block full="h"><Input value={assignIndex.getEntityValue(index)} required set={
+                        value => setValueAtIndex(index, value)
+                    } /></Block>
+                }
+            />
+        </OkCancelForm>
+    )
+}
+
 function CharProperties({ charIndex, char, save, close }) {
     const [value, setValue] = useState(char.value);
     const [image, setImage] = useState(char.image);
@@ -65,6 +96,7 @@ function CharProperties({ charIndex, char, save, close }) {
                             {value && <Block center="v"><Kbd value={value.charCodeAt(0)} /></Block>}
                         </Stack>
                     </LabelProp>
+                    <InputProp name="Code:" required value={value ? value.charCodeAt(0) : ''} min={1} max={4} set={code => setValue(code ? String.fromCharCode(code) : '')} className="padded-h" />
                     <BitmapProp name="Image:" zoomOrAvail={10} value={image} set={setImage} entityIndex={charIndex} />
                 </PropertyGrid>
             </Block>
@@ -76,6 +108,7 @@ function CharManager({ charIndex }) {
     const eContext = useContext(EditorContext);
 
     const CharPropsModal = useModal();
+    const AssignCharsModal = useModal();
 
     const editChar = index => {
         const char = charIndex.getEntityObject(index);
@@ -84,13 +117,12 @@ function CharManager({ charIndex }) {
             char,
             save: editChar => {
                 saveAssignments([
-                    {oldChar: char.value, value: editChar.value, image: editChar.image}
+                    {oldChar: '', value: editChar.value, image: editChar.image}
                 ]);
                 CharPropsModal.close()
             }
         });
     };
-
     const addChar = () => {
         CharPropsModal.open({
             charIndex,
@@ -99,17 +131,40 @@ function CharManager({ charIndex }) {
                 image: getEmptyImageData(charIndex.getSizeX(), charIndex.getSizeY())
             },
             save: newChar => {
-
                 saveAssignments([
-                    d({
+                    {
                         value: newChar.value,
                         oldChar: '',
                         image: newChar.image
-                    })
+                    }
                 ]);
                 CharPropsModal.close()
             }
         });
+    };
+    const importChars = () => {
+        const assignIndex = new AssignIndex(charIndex.getSizeX(), charIndex.getSizeY());
+//        assignIndex.setEntityObjects(chars);
+        AssignCharsModal.open({
+            assignIndex,
+            save: assignments => {
+                AssignCharsModal.close()
+            }
+        });
+    };
+
+    const reassignOp = indices => {
+        indices.sort();
+        const items = [];
+        for (let index of indices) {
+            const char = charIndex.getEntityValue(index);
+            items.push({
+                image: charIndex.getEntityPropValue(index, 'image'),
+                oldChar: char,
+                value: char
+            });
+        }
+        assignImagesToChars(items)
     };
 
     const saveAssignments = items => {
@@ -178,15 +233,13 @@ function CharManager({ charIndex }) {
     const assignImagesToChars = chars => {
         const assignIndex = new AssignIndex(charIndex.getSizeX(), charIndex.getSizeY());
         assignIndex.setEntityObjects(chars);
-        /*
         AssignCharsModal.open({
             assignIndex,
             save: items => {
                 saveAssignments(items);
                 AssignCharsModal.close();
             }
-        });
-         */
+        })
     };
 
     return (
@@ -197,6 +250,8 @@ function CharManager({ charIndex }) {
                 entityIndex={charIndex}
                 addOp={addChar}
                 editOp={editChar}
+                importOp={importChars}
+                reassignOp={reassignOp}
                 minWidth={90}
                 renderTitle={
                     index => {
@@ -214,9 +269,14 @@ function CharManager({ charIndex }) {
                     }
                 }
             />
+
             <CharPropsModal.content name="New Char" width={250}>
                 <CharProperties { ...CharPropsModal.props } />
             </CharPropsModal.content>
+
+            <AssignCharsModal.content name="Assign Images to Chars" width="75%" height="40%">
+                <CharAssignments { ...AssignCharsModal.props } />
+            </AssignCharsModal.content>
         </>
     )
 }
@@ -685,7 +745,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                            minY={fieldProps.y.min} maxY={fieldProps.y.max}
                                            x={actual.x} y={actual.y}
                                     />
-                                    <Button name="Apply" center="v" padded="h" onClick={applyActual} />
+                                    <Button name="Apply" disabled={actual.x === currBlock.x && actual.y === currBlock.y} center="v" padded="h" onClick={applyActual} />
                                 </Stack>
                             </LabelProp>
                             <NumberProp name="Line Spacing:" undo={'spacing' + currBlock.id} value={currBlock.lineSpacing} set={setEntityProp('lineSpacing')} />

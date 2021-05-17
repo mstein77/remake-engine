@@ -1115,6 +1115,7 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
         CopyBitmapModal.open({
             entityIndex,
             controls: true,
+            filter: true,
             select: index => {
                 set(entityIndex.getEntityPropValue(index, 'image'));
                 CopyBitmapModal.close();
@@ -1144,7 +1145,7 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
             </Stack>
 
             {entityIndex &&
-                <CopyBitmapModal.content name="Copy image from..."  width={500} height={500}>
+                <CopyBitmapModal.content name="Copy image from..."  width="75%" height={500}>
                     <EntityPicker {...CopyBitmapModal.props} />
                 </CopyBitmapModal.content>
             }

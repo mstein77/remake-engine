@@ -1,9 +1,10 @@
-import React, {useContext, useRef, useState} from "react";
-import {Block, DIR, Stack} from "./LayoutComponents";
-import {d, getEmptyImageData} from "../helper/helper";
-import { Button, Input, Number } from "./FormComponents";
+import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
+import { Block, DIR, Stack, Overlays, Overlay } from "./LayoutComponents";
+import { d, getEmptyImageData } from "../helper/helper";
+import { Button, Input, Number, Checkbox } from "./FormComponents";
 import {
     useModal,
+    useMounted,
     CenterInfo,
     EditorContext,
     Section,
@@ -17,10 +18,13 @@ import {
     ToolGroup,
     ScrollArea,
     BackgroundControl,
-    useUpdateOnEntityIndexChanges, AvailContext, CssContext
+    useUpdateOnEntityIndexChanges, AvailContext, CssContext, WindowContext
 } from "./BasicComponents";
 import { FiltersModal } from "./EditorComponents";
-import {CellSelection} from "../classes/CellProvider";
+import { CellSelection } from "../classes/CellProvider";
+import { WrappingIndexGrid } from "../classes/Grid";
+import { PictureCell } from "./BaseComponents";
+import { CellMarker } from "./Raster";
 
 function makeOp(customOp, defaultOp, defaultCan = true) {
     const isObj = typeof customOp === 'object';
@@ -389,7 +393,7 @@ function FlexStack({ auto, scaling,
     )
 }
 
-function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, minWidth, titleHeight, maxedZoom, renderTitle, ...props }) {
+function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIndex, emptyText, auto, scaling, minWidth, titleHeight, maxedZoom, renderTitle, ...props }) {
     const eContext = useContext(EditorContext);
     const cssContext = useContext(CssContext);
 
@@ -450,7 +454,7 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
                 full
                 border="1"
                 className={cls.join(' ')}
-                onMouseDown={() => toggleMarker(index)}>
+                onMouseDown={readOnly ? null : () => toggleMarker(index)}>
                 {renderTitle(index)}
                 <Block className="overflow" full centerItems padded="h">
                     <Canvas render={itemRender} width={zoom * sizeX} height={zoom * sizeY} border="1" />
@@ -658,6 +662,7 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
                     <Button name="delete" padded="h" onClick={deleteOp} />
                     <Button name="clear" padded="h" onClick={clearOp} />
                     <Button name="apply..." padded="h" onClick={applyOp} />
+                    <Button name="reassign" padded="h" onClick={() => reassignOp(marked)} />
                     <Button name="swap" padded="h" onClick={swapOp} />
                     <Button name="copy" padded="h" onClick={copyOp} />
                     <Button name="paste" padded="h" onClick={pasteOp} />
@@ -675,13 +680,14 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
 
     return (
         <Stack full borders>
-            <Block full="v" className="toolbar-bg">
-                <Stack vertical gaps padded scroll>
-                    <Button icon="add" onClick={addOp} />
-                    <Button icon="playlist_add" />
-                </Stack>
-            </Block>
-
+            {!readOnly &&
+                <Block full="v" className="toolbar-bg">
+                    <Stack vertical gaps padded scroll>
+                        <Button icon="add" onClick={addOp} />
+                        <Button icon="playlist_add" onClick={importOp} />
+                    </Stack>
+                </Block>
+            }
             {
                 entityIndex.getLength() === 0 ?
                     <Block full>
@@ -702,7 +708,6 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
                             </ToolGroup>
                             <BackgroundControl />
                         </Toolbar>
-
                         <Block full>
                             {
                                 view.count === 0 ?
@@ -722,10 +727,11 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
                                     </ScrollArea>
                             }
                         </Block>
-
-                        <Toolbar>
-                            {bottomItems}
-                        </Toolbar>
+                        {!readOnly &&
+                            <Toolbar>
+                                {bottomItems}
+                            </Toolbar>
+                        }
                     </Stack>
             }
 
@@ -736,10 +742,9 @@ function EntityManager({ addOp, editOp, entityIndex, emptyText, auto, scaling, m
     )
 }
 
-function EntityPicker({ controls }) {
-
+function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, ...props }) {
     const [pos, setPos] = useState(0);
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(8);
     const [maxZoom, setMaxZoom] = useState(10);
     const [rulers, setRulers] = useState(false);
     const [border, setBorder] = useState(1);
@@ -747,20 +752,428 @@ function EntityPicker({ controls }) {
     const [height, setHeight] = useState(1);
     const [filter, setFilterRaw] = useState('');
 
-    const content = <CenterInfo>No result...</CenterInfo>;
+    if (zoom > maxZoom) {
+        setZoom(maxZoom);
+    }
+
+    const players = null; // useAnimationPlayers(entityIndex, animationIndex);
+
+    const gridProvider = useMemo(() => {
+        return new WrappingIndexGrid(entityIndex, base, players);
+    }, [entityIndex]);
+
+    const sizeX = gridProvider.getCellSizeX();
+    const sizeY = gridProvider.getCellSizeY();
+    const cellType = useMemo(() => {
+        return new PictureCell(sizeX, sizeY)
+    }, [sizeX, sizeY]);
+
+    const setFilter = value => {
+        gridProvider.setMatch(value === '' ? null : value);
+        setFilterRaw(value);
+        setPos(0);
+    };
 
     return (
         <Stack vertical full>
-            {!controls && <Toolbar>
-
+            {controls &&
+                <Toolbar>
+                    {props.filter &&
+                        <Input name="Filter:" clear active={filter !== ''} value={filter} set={setFilter} />
+                    }
+                    <Number name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
+                    <Number name="Zoom:" buttons min={1} value={zoom} set={setZoom} max={maxZoom} />
+                    <Number name="Border:" buttons min={0} value={border} set={setBorder} />
+                    <Checkbox name="Rulers:" value={rulers} set={setRulers} />
                 </Toolbar>
             }
             <Block full>
-                {content}
+                {gridProvider.getWidth() === 0 ?
+                    <CenterInfo>No items available!</CenterInfo> :
+                    <CellGrid
+                        match={filter}
+                        cellType={cellType}
+                        posX={0}
+                        setPosX={() => {}}
+                        posY={pos}
+                        setPosY={setPos}
+                        zoom={zoom}
+                        maxZoom={maxZoom}
+                        setZoom={setZoom}
+                        setMaxZoom={setMaxZoom}
+                        border={border}
+                        setBorder={setBorder}
+                        rulers={rulers}
+                        setRulers={setRulers}
+                        width={width}
+                        setWidth={setWidth}
+                        height={height}
+                        setHeight={setHeight}
+                        gridProvider={gridProvider}
+                    >
+                        <GridCellSelector
+                            gridProvider={gridProvider}
+                            cellType={cellType}
+                            pos={pos}
+                            width={width}
+                            height={height}
+                            zoom={zoom}
+                            border={border}
+                            select={select}
+                            doubleClick={doubleClick}
+                        />
+                    </CellGrid>
+                }
             </Block>
         </Stack>
     )
 }
+
+function CellGrid({ children, ...props }) {
+    return (
+        <AvailContextProvider>
+            <CellGridInner { ...props }>{ children }</CellGridInner>
+        </AvailContextProvider>
+    )
+}
+
+function CellGridInner({ gridProvider, cellType, width, setWidth, height, setHeight, posX, setPosX, posY, setPosY,
+           children, rulers, border, zoom, maxZoom, setMaxZoom, match, ...props }) {
+    const cssContext = useContext(CssContext);
+    const aContext = useContext(AvailContext);
+
+    const gridWidth = gridProvider.getWidth();
+    const gridHeight = gridProvider.getHeight();
+
+    // TODO calc
+    const rulerPaddingX = rulers ? 20 : 0;
+    const rulerPaddingY = rulers ? 12 : 0;
+    const rulerSpaceX = rulers ? 38 : 0;
+    const rulerSpaceY = rulers ? 22 : 0;
+    const hasScrollingY = height < gridHeight;
+    const hasScrollingX = width < gridWidth;
+    const propsRef = useRef(null);
+
+    const render = useMemo(
+        () => {
+            return (
+                cellType.hasText() ?
+                    (x, y) => {
+                        return props.render(posX + x, posY + y);
+                    } :
+                    ctx => {
+                        const {posX, posY, width, height, border, zoom, dim, maxPosX, maxPosY} = propsRef.current;
+                        ctx.clearRect(0, 0, dim.width, dim.height);
+                        gridProvider.drawGrid(ctx, Math.min(posX, maxPosX), Math.min(posY, maxPosY), width, height, border, zoom, null /* players*/);
+                    }
+            )
+        },
+        [gridProvider, props.render]
+    );
+
+    if (!(aContext.width && aContext.height)) return '';
+
+    const spaceX = aContext.width - 2 * cssContext.values.defaultPadding - (rulers ? rulerSpaceX * 2 : 0) - border;
+    const spaceY = aContext.height - 2 * cssContext.values.defaultPadding - (rulers ? rulerSpaceY * 2 : 0) - border;
+    const cellSize = cellType.getCellSize(spaceX, spaceY, zoom, border);
+    if (cellSize.maxZoom < zoom) {
+        setMaxZoom(cellSize.maxZoom);
+        return '';
+    }
+    if (gridProvider.setWrapWidth) {
+        gridProvider.setWrapWidth(cellSize.wrapWidth);
+    }
+    const newWidth = Math.min(cellSize.wrapWidth, gridProvider.getWidth());
+    const newHeight = Math.min(Math.floor(spaceY / cellSize.yPlusBorder), gridProvider.getHeight());
+
+    if (width !== newWidth) setWidth(newWidth);
+    if (height !== newHeight) setHeight(newHeight);
+    if (cellSize.maxZoom > 0 && maxZoom !== cellSize.maxZoom) setMaxZoom(cellSize.maxZoom);
+
+    const maxPosX = Math.max(0, gridProvider.getWidth() - width);
+    const maxPosY = Math.max(0, gridProvider.getHeight() - height);
+
+    const dim = {width: Math.min(width, gridWidth) * cellSize.xPlusBorder + border, height: Math.min(height, gridHeight) * cellSize.yPlusBorder + border};
+
+    propsRef.current = { posX, maxPosX, posY, maxPosY, width, height, maxZoom, border, zoom, dim, rulers };
+
+    if (posX > maxPosX) {
+        setPosX(maxPosX);
+    }
+    if (posY > maxPosY) {
+        setPosY(maxPosY);
+    }
+
+    return (
+        <ScrollArea
+            x={posX} setX={setPosX} pageX={width} maxX={gridProvider.getWidth()}
+            y={posY} setY={setPosY} pageY={height} maxY={gridProvider.getHeight()}
+            auto>
+            <Block full centerItems="h" padded>
+                <Overlays width={dim.width} height={dim.height}>
+                    <Overlay>
+                        <Canvas width={dim.width} height={dim.height} render={render} />
+                    </Overlay>
+
+                    {children}
+                </Overlays>
+            </Block>
+        </ScrollArea>
+    )
+}
+
+function GridCellSelector({ gridProvider, cellType, zoom, border, doubleClick, width, height, pos, select }) {
+    const wContext = useContext(WindowContext);
+
+    const [highlight, setHighlight] = useState(false);
+
+    const cellSize = cellType.getCellSize(0, 0, zoom, border);
+
+    const mounted = useMounted();
+
+    const onMouseDown = (e, x, y) => {
+        wContext.startExclusiveMode('cell-select');
+        const index = gridProvider.getCellValue(x, y);
+        if (index !== null) {
+            setHighlight(true);
+            select(index);
+            wContext.addEventListener('mouseup', mouseUp, {once: true});
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const mouseUp = e => {
+        if (mounted.current) {
+            setHighlight(false);
+        }
+        wContext.endExclusiveMode('cell-select');
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    return (
+        <CursorOverlay
+            cellProvider={gridProvider}
+            onMouseDown={onMouseDown}
+            doubleClick={doubleClick}
+            mouseTrack={null}
+            highlight={highlight}
+            cursorWidth={1}
+            cursorHeight={1}
+            fixed={highlight}
+            cursorType="rect"
+            matrix={null}
+            inclusion={false}
+            width={width}
+            height={height}
+            zoom={1}
+            border={border}
+            valid={(x, y) => gridProvider.getCellValue(x, y) !== null}
+            sizeX={cellSize.x}
+            sizeY={cellSize.y}
+            posX={0}
+            posY={pos}
+        />
+    )
+}
+
+function useRasterDimXY({ cellProvider, sizeX, sizeY, width, height, zoom, border}) {
+    const cellSizeX = (sizeX ? sizeX : cellProvider.getCellSizeX()) * zoom;
+    const cellPlusBorderSizeX = cellSizeX + border;
+    const cellSizeY = (sizeY ? sizeY : cellProvider.getCellSizeY()) * zoom;
+    const cellPlusBorderSizeY = cellSizeY + border;
+    const rasterWidth = cellPlusBorderSizeX * width + border;
+    const rasterHeight = cellPlusBorderSizeY * height + border;
+
+    return [cellSizeX, cellPlusBorderSizeX, cellSizeY, cellPlusBorderSizeY, rasterWidth, rasterHeight];
+}
+
+function CursorOverlay({
+            cellProvider, cursorType, cursorWidth, cursorHeight, cursorPointer,
+            posX, posY, sizeX, sizeY, zoom, border, width, height,
+            fixed, valid, matrix, inclusion, highlight,
+            onMouseDown, onDoubleClick
+        }) {
+
+    const divRef = useRef(null);
+    const [offX, setOffX] = useState(null);
+    const [offY, setOffY] = useState(null);
+
+    const [cellSizeX, cellPlusBorderSizeX, cellSizeY, cellPlusBorderSizeY, rasterWidth, rasterHeight] =
+        useRasterDimXY({ cellProvider, sizeX, sizeY, width, height, zoom, border });
+    let marker;
+    const markerType = cursorType;
+
+    const isGap = markerType.endsWith('gap');
+
+    if (offX !== null) {
+
+        let hasTop = true;
+        let hasBottom = true;
+        let hasLeft = true;
+        let hasRight = true;
+
+        let markerWidth = markerType.startsWith('row') ? width : Math.min(cursorWidth, width - offX);
+        let markerHeight = markerType.startsWith('column') ? height : Math.min(cursorHeight, height - offY);
+
+        if (markerType === 'row-gap') {
+            markerHeight = 1;
+        } else if (markerType === 'column-gap') {
+            markerWidth = 1;
+        }
+
+        switch (markerType) {
+            case 'rect':
+                hasBottom = (offY + cursorHeight <= height);
+                hasRight = (offX + cursorWidth <= width);
+                break;
+
+            case 'columns':
+                hasTop = false;
+                hasBottom = false;
+                break;
+
+            case 'rows':
+                hasLeft = false;
+                hasRight = false;
+                break;
+
+            case 'row-gap':
+            case 'column-gap':
+                hasTop = false;
+                hasBottom = false;
+                hasLeft = false;
+                hasRight = false;
+                break;
+        }
+
+        const onClick = (e) => {
+            if (!onMouseDown) {
+                return;
+            }
+            const offset = getOffsetPos(e);
+            e.stopPropagation();
+            e.preventDefault();
+            return onMouseDown(e, posX + offset.x, posY + offset.y, 1, 1);
+        };
+
+        if (!(inclusion &&
+            (posY + offY > cellProvider.getHeight() - cursorHeight ||
+                posX + offX > cellProvider.getWidth() - cursorWidth
+            ))
+        )  {
+            marker = <CellMarker
+                blink
+                mouseDown={onClick}
+                matrix={matrix}
+                sizeX={sizeX}
+                sizeY={sizeY}
+                border={border}
+                zoom={zoom}
+                type={markerType}
+                highlight={highlight}
+                posX={offX}
+                posY={offY}
+                pointer={cursorPointer}
+                width={markerWidth}
+                height={markerHeight}
+                dir={DIR.ALL}
+                top={hasTop}
+                bottom={hasBottom}
+                left={hasLeft}
+                right={hasRight}
+            />;
+        }
+    }
+
+    const adjustPosX = isGap ? cellSizeX >> 1 : 0;
+    let maxPosX = width;
+    const adjustPosY = isGap ? cellSizeY >> 1 : 0;
+    let maxPosY = height;
+    if (isGap) {
+        maxPosX++;
+        maxPosY++;
+    }
+
+    const getOffsetPos = (e) => {
+        const rect = divRef.current.getBoundingClientRect();
+        let posX = Math.floor((e.clientX - rect.x + adjustPosX)/cellPlusBorderSizeX);
+        let reset = (posX < 0 || posX >= maxPosX);
+        let posY = Math.floor((e.clientY - rect.y + adjustPosY)/cellPlusBorderSizeY);
+        reset = reset || (posY < 0 || posY >= maxPosY);
+
+        if (reset) {
+            return false;
+        }
+        if (markerType.startsWith('column')) {
+            posY = 0;
+        } else if (markerType.startsWith('row')) {
+            posX = 0;
+        }
+        return {
+            x: posX,
+            y: posY
+        };
+    };
+
+    const onMouseMove = (e) => {
+        if (!fixed) {
+            const offset = getOffsetPos(e);
+            if (offset === false || valid && !valid(posX + offset.x, posY + offset.y)) {
+                /*
+                if (props.mouseTrack) {
+                    props.mouseTrack(null, null);
+                }
+                 */
+                setOffX(null);
+                setOffY(null);
+            } else if (offX !== offset.x || offY !== offset.y) {
+                /*
+                if (props.mouseTrack) {
+                    props.mouseTrack(props.posX + offset.x, props.posY + offset.y);
+                }
+                 */
+                setOffX(offset.x);
+                setOffY(offset.y);
+            }
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const onMouseLeave = (e) => {
+        /*
+        if (props.mouseTrack) {
+            props.mouseTrack(null, null);
+        }
+         */
+        setOffX(null);
+        setOffY(null);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    onDoubleClick = onDoubleClick ? e => {
+        const offset = getOffsetPos(e);
+        onDoubleClick(e, offset.x, offset.y);
+        e.stopPropagation();
+        e.preventDefault();
+    } : null;
+
+    return (
+
+        <Overlay width={rasterWidth} height={rasterHeight}
+            ref={divRef}
+            onMouseMove={onMouseMove}
+            onMouseLeave={onMouseLeave}
+            onDoubleClick={onDoubleClick}
+        >
+            {marker}
+        </Overlay>
+    );
+}
+
 
 export {
     EntityStack,

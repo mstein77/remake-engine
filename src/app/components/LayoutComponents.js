@@ -700,7 +700,9 @@ function Overlays({ width, maxWidth, height, originX = 0, originY = 0, scroll, c
     )
 }
 
-function Overlay({ width, height, top = 0, left = 0, className, children }) {
+
+
+const Overlay = React.forwardRef(({ width, height, top = 0, left = 0, className, children, ...props }, forwardRef) => {
     const cls = ['absolute'];
     if (className) {
         cls.push(className);
@@ -712,9 +714,9 @@ function Overlay({ width, height, top = 0, left = 0, className, children }) {
         left
     };
     return (
-        <div style={style} className={cls.join(' ')}>{children}</div>
+        <div ref={forwardRef} style={style} className={cls.join(' ')} { ...props }>{children}</div>
     )
-}
+});
 
 export {
     Block,
