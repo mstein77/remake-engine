@@ -215,7 +215,7 @@ function Form({ children, submit, ...props }) {
 
     return (
         <FormContext.Provider value={value}>
-            <Block onKeyDown={submitOnReturn} ref={formRef} {...props}>
+            <Block className="form" onKeyDown={submitOnReturn} ref={formRef} {...props}>
                 {children}
             </Block>
         </FormContext.Provider>
@@ -655,7 +655,7 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
     )
 }
 
-function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, className, ...props }) {
+function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, onMax, className, ...props }) {
 
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
@@ -786,6 +786,9 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
                 const parsed = getParsed(newValue);
                 if (!force || valid(parsed, false)) {
                     set(parsed === false ? '' : parsed);
+                    if (onMax && max && !number && newValue.length === max) {
+                        onMax();
+                    }
                 }
                 setCurr(newValue);
             } :
@@ -1251,11 +1254,15 @@ function BitmapProp({ name, ...props }) {
     )
 }
 
-function Submit({ disabled, ...props }) {
+function Submit({ disabled, className, ...props }) {
     const fContext = useContext(FormContext);
+    const cls = ['submit'];
+    if (className) {
+        cls.push(className);
+    }
 
     return (
-        <Button icon="done" disabled={disabled || (fContext && fContext.invalid)} { ...props } />
+        <Button icon="done" className={cls.join(' ')} disabled={disabled || (fContext && fContext.invalid)} { ...props } />
     )
 }
 

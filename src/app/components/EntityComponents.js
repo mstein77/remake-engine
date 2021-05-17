@@ -720,7 +720,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                                                 render={render} items={view.matches}
                                                 zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
                                                 varWidth={sizeX} fixWidth={2 * padding} minWidth={minWidth}
-                                                fixHeight={41} varHeight={sizeY}
+                                                fixHeight={titleHeight} varHeight={sizeY}
                                                 page={page} maxPage={view.count} setPage={setPage}
                                             />
                                         </AvailContextProvider>

@@ -47,6 +47,8 @@ function FontProperties({ font, reserved, save, close }) {
 }
 
 function CharAssignments({ close, save, assignIndex }) {
+    const managerRef = useRef(null);
+
     const values = assignIndex.getPropValues('value');
 
     const setValueAtIndex = (index, value) => {
@@ -61,18 +63,92 @@ function CharAssignments({ close, save, assignIndex }) {
         return value;
     };
 
-    return (
-        <OkCancelForm full cancel={close} save={() => save(values)}>
-            <EntityManager
-                readOnly
-                auto
-                entityIndex={assignIndex}
-                renderTitle={index =>
-                    <Block full="h"><Input value={assignIndex.getEntityValue(index)} required set={
-                        value => setValueAtIndex(index, value)
-                    } /></Block>
+    const autoFill = index => {
+        const leftValues = index === 0 ? [] : values.slice(0, index);
+        for(let i = 0; i < leftValues.length; i++) {
+            leftValues[i] = leftValues[i].charCodeAt(0);
+        }
+        let currCode = values[index].charCodeAt(0);
+        for (let i = index + 1; i < values.length; i++) {
+            currCode++;
+            setValueAtIndex(i, String.fromCharCode(currCode));
+        }
+        focusNextFrom(values.length - 1);
+    };
+
+    const setFocusIndex = index => {
+        let focusElem = null;
+        if (index === -1) {
+            let elem = managerRef.current;
+            while (elem && !elem.classList.contains('form')) {
+                elem = elem.parentNode;
+            }
+            if (elem) {
+                focusElem = elem.querySelector('.submit');
+            }
+        } else {
+            const inputs = managerRef.current.querySelectorAll('.assign');
+            if (inputs.length > index) {
+                focusElem = inputs[index]
+            }
+        }
+        if (focusElem) {
+            requestAnimationFrame(
+                () => {
+                    focusElem.focus()
                 }
-            />
+            )
+        }
+    };
+
+    const focusNextFrom = from => {
+        if (values[from] === '') {
+            setFocusIndex(from);
+        } else {
+            let next = from + 1;
+            if (values.length === next) {
+                next = values.indexOf('');
+            }
+            setFocusIndex(next);
+        }
+    };
+
+    const doSave = () => {
+        save(assignIndex.getEntityObjects())
+    };
+
+    return (
+        <OkCancelForm submit full cancel={close} save={doSave}>
+            <Block full ref={managerRef}>
+                <EntityManager
+                    readOnly
+                    auto
+                    entityIndex={assignIndex}
+                    titleHeight={50}
+                    renderTitle={index => {
+                        const char = assignIndex.getEntityValue(index);
+                        return (
+                            <Stack full="h" padded gaps>
+                                <Block center="v">
+                                    <Input
+                                        value={char}
+                                        min={1}
+                                        max={1}
+                                        onMax={() => focusNextFrom(index)}
+                                        set={value => setValueAtIndex(index, value)}
+                                        className="padded-h assign"
+                                    />
+                                </Block>
+                                <Button
+                                    icon="more_horiz"
+                                    disabled={char === ''}
+                                    onClick={() => autoFill(index)}
+                                />
+                            </Stack>
+                        )}
+                    }
+                />
+            </Block>
         </OkCancelForm>
     )
 }
@@ -253,6 +329,7 @@ function CharManager({ charIndex }) {
                 importOp={importChars}
                 reassignOp={reassignOp}
                 minWidth={90}
+                titleHeight={41}
                 renderTitle={
                     index => {
                         const code = charIndex.getEntityValue(index).charCodeAt(0);
@@ -274,7 +351,7 @@ function CharManager({ charIndex }) {
                 <CharProperties { ...CharPropsModal.props } />
             </CharPropsModal.content>
 
-            <AssignCharsModal.content name="Assign Images to Chars" width="75%" height="40%">
+            <AssignCharsModal.content name="Assign Images to Chars" width="75%" height={280}>
                 <CharAssignments { ...AssignCharsModal.props } />
             </AssignCharsModal.content>
         </>
