@@ -217,6 +217,7 @@ html, body {
     to {background-color: var(--warning-color)}
 }
 
+div.invalid,
 textarea.invalid,
 input.invalid,
 input:invalid {

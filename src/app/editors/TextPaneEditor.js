@@ -7,6 +7,7 @@ import {
     Checkbox,
     Input,
     InputProp,
+    KeyInput,
     NumberProp,
     Number,
     RadioProp,
@@ -22,6 +23,7 @@ import {
     Tuple,
     TupleProp,
     BitmapProp,
+    Hidden,
     OkCancelForm
 } from "../components/FormComponents";
 import {AssignIndex, FontIndex, TextBlockIndex} from "../classes/EntityIndex";
@@ -47,6 +49,12 @@ function FontProperties({ font, reserved, save, close }) {
 }
 
 function CharAssignments({ close, save, assignIndex }) {
+
+    useUpdateOnEntityIndexChanges(assignIndex);
+
+    const [pos, setPos] = useState(0);
+    const [page, setPage] = useState(1);
+
     const managerRef = useRef(null);
 
     const values = assignIndex.getPropValues('value');
@@ -73,31 +81,53 @@ function CharAssignments({ close, save, assignIndex }) {
             currCode++;
             setValueAtIndex(i, String.fromCharCode(currCode));
         }
+        assignIndex.notify();
         focusNextFrom(values.length - 1);
     };
 
+    const focusRelIndex = index => {
+        const inputs = managerRef.current.querySelectorAll('.assign');
+        if (inputs.length > index) {
+            const focusElem = inputs[index];
+            if (focusElem) {
+                requestAnimationFrame(
+                    () => {
+                        focusElem.focus()
+                    }
+                )
+            }
+        }
+    };
+
     const setFocusIndex = index => {
-        let focusElem = null;
         if (index === -1) {
             let elem = managerRef.current;
             while (elem && !elem.classList.contains('form')) {
                 elem = elem.parentNode;
             }
             if (elem) {
-                focusElem = elem.querySelector('.submit');
+                const focusElem = elem.querySelector('.submit');
+                if (focusElem) {
+                    requestAnimationFrame(
+                        () => {
+                            focusElem.focus()
+                        }
+                    )
+                }
             }
         } else {
-            const inputs = managerRef.current.querySelectorAll('.assign');
-            if (inputs.length > index) {
-                focusElem = inputs[index]
-            }
-        }
-        if (focusElem) {
-            requestAnimationFrame(
-                () => {
-                    focusElem.focus()
+            const relIndex = index - pos;
+            if (relIndex < 0 || relIndex > (page - 1)) {
+                const newPos = Math.min(values.length - page, index);
+                if (pos !== newPos) {
+                    setPos(newPos);
+                    requestAnimationFrame(() => {
+                        focusRelIndex(index - newPos);
+                    });
                 }
-            )
+            } else {
+                focusRelIndex(relIndex);
+            }
         }
     };
 
@@ -121,27 +151,31 @@ function CharAssignments({ close, save, assignIndex }) {
         <OkCancelForm submit full cancel={close} save={doSave}>
             <Block full ref={managerRef}>
                 <EntityManager
+                    pos={pos}
+                    page={page}
+                    setPos={setPos}
+                    setPage={setPage}
+                    minWidth={82}
                     readOnly
                     auto
                     entityIndex={assignIndex}
-                    titleHeight={50}
+                    titleHeight={60}
                     renderTitle={index => {
                         const char = assignIndex.getEntityValue(index);
                         return (
                             <Stack full="h" padded gaps>
                                 <Block center="v">
-                                    <Input
+                                    <KeyInput
+                                        key={index}
                                         value={char}
-                                        min={1}
-                                        max={1}
-                                        onMax={() => focusNextFrom(index)}
+                                        onInput={() => focusNextFrom(index)}
                                         set={value => setValueAtIndex(index, value)}
-                                        className="padded-h assign"
+                                        className={"assign" + (index === pos ? ' autofocus' : '')}
                                     />
                                 </Block>
                                 <Button
                                     icon="more_horiz"
-                                    disabled={char === ''}
+                                    disabled={char === '' || index === values.length - 1}
                                     onClick={() => autoFill(index)}
                                 />
                             </Stack>
@@ -149,6 +183,7 @@ function CharAssignments({ close, save, assignIndex }) {
                     }
                 />
             </Block>
+            <Hidden invalid={assignIndex.hasPropValue('value', '')} />
         </OkCancelForm>
     )
 }
@@ -172,7 +207,12 @@ function CharProperties({ charIndex, char, save, close }) {
                             {value && <Block center="v"><Kbd value={value.charCodeAt(0)} /></Block>}
                         </Stack>
                     </LabelProp>
-                    <InputProp name="Code:" required value={value ? value.charCodeAt(0) : ''} min={1} max={4} set={code => setValue(code ? String.fromCharCode(code) : '')} className="padded-h" />
+                    <InputProp name="Code:"
+                       value={value ? '' + value.charCodeAt(0) : ''}
+                       min={1} max={4}
+                       set={code => setValue(code ? String.fromCharCode(code) : '')}
+                       className="padded-h"
+                    />
                     <BitmapProp name="Image:" zoomOrAvail={10} value={image} set={setImage} entityIndex={charIndex} />
                 </PropertyGrid>
             </Block>
@@ -189,11 +229,12 @@ function CharManager({ charIndex }) {
     const editChar = index => {
         const char = charIndex.getEntityObject(index);
         CharPropsModal.open({
+            name: 'Edit char',
             charIndex,
             char,
             save: editChar => {
                 saveAssignments([
-                    {oldChar: '', value: editChar.value, image: editChar.image}
+                    {oldChar: char.value, value: editChar.value, image: editChar.image}
                 ]);
                 CharPropsModal.close()
             }
@@ -201,6 +242,7 @@ function CharManager({ charIndex }) {
     };
     const addChar = () => {
         CharPropsModal.open({
+            name: 'Add new char',
             charIndex,
             char: {
                 value: '',
@@ -230,14 +272,14 @@ function CharManager({ charIndex }) {
     };
 
     const reassignOp = indices => {
-        indices.sort();
+        indices = indices.sort((a, b) => a === b ? 0 : (a < b) ? -1 : 1);
         const items = [];
         for (let index of indices) {
             const char = charIndex.getEntityValue(index);
             items.push({
                 image: charIndex.getEntityPropValue(index, 'image'),
                 oldChar: char,
-                value: char
+                value: '' // char
             });
         }
         assignImagesToChars(items)
@@ -321,7 +363,7 @@ function CharManager({ charIndex }) {
     return (
         <>
             <EntityManager
-                filter auto
+                filter auto undo
                 emptyText="No chars yet, please add or import chars by clicking on the icons on the left side"
                 entityIndex={charIndex}
                 addOp={addChar}
@@ -330,6 +372,7 @@ function CharManager({ charIndex }) {
                 reassignOp={reassignOp}
                 minWidth={90}
                 titleHeight={41}
+                onDoubleClick={editChar}
                 renderTitle={
                     index => {
                         const code = charIndex.getEntityValue(index).charCodeAt(0);
@@ -347,11 +390,11 @@ function CharManager({ charIndex }) {
                 }
             />
 
-            <CharPropsModal.content name="New Char" width={250}>
+            <CharPropsModal.content name={CharPropsModal.props.name} width={250}>
                 <CharProperties { ...CharPropsModal.props } />
             </CharPropsModal.content>
 
-            <AssignCharsModal.content name="Assign Images to Chars" width="75%" height={280}>
+            <AssignCharsModal.content name="Assign Images to Chars" width="75%" height={290}>
                 <CharAssignments { ...AssignCharsModal.props } />
             </AssignCharsModal.content>
         </>
@@ -410,7 +453,8 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
                 <Section inner
                          name="Fonts" size={250} maxWidth="33%" collapse="h" full="v">
                     <EntityStack
-                        area={3} entityIndex={fontIndex} getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
+                        area={3} entityIndex={fontIndex}
+                        getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
                         active={activeFont} setActive={setActiveFont}
                         addOp={newFont} deleteOp={deleteFont} undo
                         emptyText="Add new Font"

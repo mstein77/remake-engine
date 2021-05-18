@@ -39,6 +39,8 @@ function makeOp(customOp, defaultOp, defaultCan = true) {
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
 
+    const doAction = undo && eContext ? eContext.doAction : action => action();
+
     const add = props.add !== undefined ? props.add : !!addOp;
     const clone = props.clone !== undefined ? props.clone : !!cloneOp;
     const del = props.del !== undefined ? props.del : !!deleteOp;
@@ -164,14 +166,10 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const execDelete = () => {
         const oldEntity = entityIndex.getEntityObject(active);
-        if (undo) {
-            eContext.doAction(
-                () => entityIndex.deleteEntity(oldEntity.index),
-                () => entityIndex.setEntityObject(oldEntity)
-            )
-        } else {
-            entityIndex.deleteEntity(active)
-        }
+        doAction(
+            () => entityIndex.deleteEntity(oldEntity.index),
+            () => entityIndex.setEntityObject(oldEntity)
+        )
     };
 
     const execClone = () => {
@@ -194,60 +192,44 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             cloneEntity.value = name + no;
         }
         cloneEntity.index++;
-        if (undo) {
-            eContext.doAction(
-                () => entityIndex.setEntityObject(cloneEntity),
-                () => entityIndex.deleteEntity(index + 1)
-            );
-        } else {
-            entityIndex.setEntityObject(cloneEntity)
-        }
+        doAction(
+            () => entityIndex.setEntityObject(cloneEntity),
+            () => entityIndex.deleteEntity(index + 1)
+        );
         setActive(cloneEntity.index);
     };
 
     const execUp = !order ? null : () => {
-        if (undo) {
-            const index = active;
-            eContext.doAction(
-                () => {
-                    const old = entityIndex.getEntityObject(index - 1);
-                    entityIndex.deleteEntity(index - 1);
-                    entityIndex.setEntityObject({ ...old, index});
-                },
-                () => {
-                    const old = entityIndex.getEntityObject(index);
-                    entityIndex.deleteEntity(index);
-                    entityIndex.setEntityObject({ ...old, index: index - 1});
-                }
-            );
-        } else {
-            const old = entityIndex.getEntityObject(active - 1);
-            entityIndex.deleteEntity(active - 1);
-            entityIndex.setEntityObject({ ...old, index: active});
-        }
+        const index = active;
+        doAction(
+            () => {
+                const old = entityIndex.getEntityObject(index - 1);
+                entityIndex.deleteEntity(index - 1);
+                entityIndex.setEntityObject({ ...old, index});
+            },
+            () => {
+                const old = entityIndex.getEntityObject(index);
+                entityIndex.deleteEntity(index);
+                entityIndex.setEntityObject({ ...old, index: index - 1});
+            }
+        );
         setActive(active - 1)
     };
 
     const execDown = !order ? null : () => {
-        if (undo) {
-            const index = active;
-            eContext.doAction(
-                () => {
-                    const old = entityIndex.getEntityObject(index + 1);
-                    entityIndex.deleteEntity(index + 1);
-                    entityIndex.setEntityObject({ ...old, index});
-                },
-                () => {
-                    const old = entityIndex.getEntityObject(index);
-                    entityIndex.deleteEntity(index);
-                    entityIndex.setEntityObject({ ...old, index: index + 1});
-                }
-            );
-        } else {
-            const old = entityIndex.getEntityObject(active + 1);
-            entityIndex.deleteEntity(active + 1);
-            entityIndex.setEntityObject({ ...old, index: active});
-        }
+        const index = active;
+        doAction(
+            () => {
+                const old = entityIndex.getEntityObject(index + 1);
+                entityIndex.deleteEntity(index + 1);
+                entityIndex.setEntityObject({ ...old, index});
+            },
+            () => {
+                const old = entityIndex.getEntityObject(index);
+                entityIndex.deleteEntity(index);
+                entityIndex.setEntityObject({ ...old, index: index + 1});
+            }
+        );
         setActive(active + 1)
     };
 
@@ -393,16 +375,30 @@ function FlexStack({ auto, scaling,
     )
 }
 
-function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIndex, emptyText, auto, scaling, minWidth, titleHeight, maxedZoom, renderTitle, ...props }) {
+function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick,
+                           entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
     const eContext = useContext(EditorContext);
     const cssContext = useContext(CssContext);
 
     const ApplyModal = useModal();
 
-    const [pos, setPos] = useState(0);
+    const doAction = eContext && undo ? eContext.doAction : action => action();
+
+    let [posRaw, setPos] = useState(props.pos !== undefined ? props.pos : 0);
+    let pos = posRaw;
+    if (props.setPos) {
+        setPos = props.setPos;
+        pos = props.pos
+    }
     const [zoom, setZoom] = useState(props.zoom ? props.zoom : 1);
     const [maxZoom, setMaxZoom] = useState(props.maxZoom ? props.maxZoom : null);
-    const [page, setPage] = useState(10);
+
+    let [pageRaw, setPage] = useState(props.page !== undefined ? props.page : 1);
+    let page = pageRaw;
+    if (props.setPage) {
+        setPage = props.setPage;
+        page = props.page
+    }
     const [marked, setMarked] = useState([]);
     const [filter, setFilterRaw] = useState('');
     const setFilter = value => {
@@ -413,7 +409,12 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
     useUpdateOnEntityIndexChanges(entityIndex);
 
     const matcher = props.filter && filter ? filter : null;
-    const view = entityIndex.getView(pos, page, matcher);
+    const view = entityIndex.getView(pos, filter ? null : page, matcher);
+    view.all = [ ...view.matches];
+    if (filter) {
+        view.matches = view.matches.slice(0, page);
+    }
+
     const viewEnd = Math.max(view.count - page, 0);
     if (pos > viewEnd) {
         setPos(viewEnd);
@@ -425,7 +426,6 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
     const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
     const padding = cssContext.values.defaultPadding;
-
 
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
@@ -454,6 +454,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                 full
                 border="1"
                 className={cls.join(' ')}
+                onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                 onMouseDown={readOnly ? null : () => toggleMarker(index)}>
                 {renderTitle(index)}
                 <Block className="overflow" full centerItems padded="h">
@@ -504,7 +505,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
         let hidden = 0;
         const notHidden = [];
         for (let index of marked) {
-            if (!view.matches.includes(index)) {
+            if (!view.all.includes(index)) {
                 hidden++;
             } else {
                 notHidden.push(index);
@@ -525,13 +526,13 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
 
     if (marked.length) {
         const execEdit = {
-            exec: () => editOp(marked),
+            exec: () => editOp([ ...marked]),
             can: () => marked.length === 1
         };
         const deleteOp = () => {
             const undoEntities = entityIndex.getEntityObjects(marked);
             const doMarked = [ ...marked ];
-            eContext.doAction(
+            doAction(
                 () => entityIndex.deleteEntities(doMarked),
                 () => entityIndex.setEntityObjects(undoEntities)
             );
@@ -545,7 +546,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
             for (let index of indices) {
                 undoImages[index] = entityIndex.getEntityPropValue(index, 'image');
             }
-            eContext.doAction(
+            doAction(
                 () => {
                     for (let index of indices) {
                         entityIndex.setEntityPropValue(index, 'image', emptyBitmap);
@@ -576,7 +577,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                             // TODO: apply filters here
                             doImages.push(image);
                         }
-                        eContext.doAction(
+                        doAction(
                             () => {
                                 let i = 0;
                                 while (i < doImages.length) {
@@ -605,7 +606,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                 const second = marked[1];
                 const firstBitmap = entityIndex.getEntityPropValue(first, 'image');
                 const secondBitmap = entityIndex.getEntityPropValue(second, 'image');
-                eContext.doAction(
+                doAction(
                     () => {
                         entityIndex.setEntityPropValue(first, 'image', secondBitmap);
                         entityIndex.setEntityPropValue(second, 'image', firstBitmap);
@@ -632,7 +633,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                 const indices = [ ...marked ];
                 const undoObjects = entityIndex.getEntityObjects(indices);
                 const pasteBitmap = eContext.selection.getCell();
-                eContext.doAction(
+                doAction(
                     () => {
                         for (let index of indices) {
                             entityIndex.setEntityPropValue(index, 'image', pasteBitmap);
@@ -662,7 +663,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                     <Button name="delete" padded="h" onClick={deleteOp} />
                     <Button name="clear" padded="h" onClick={clearOp} />
                     <Button name="apply..." padded="h" onClick={applyOp} />
-                    <Button name="reassign" padded="h" onClick={() => reassignOp(marked)} />
+                    <Button name="reassign" padded="h" onClick={() => reassignOp([ ...marked ])} />
                     <Button name="swap" padded="h" onClick={swapOp} />
                     <Button name="copy" padded="h" onClick={copyOp} />
                     <Button name="paste" padded="h" onClick={pasteOp} />
@@ -722,6 +723,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, entityIn
                                                 varWidth={sizeX} fixWidth={2 * padding} minWidth={minWidth}
                                                 fixHeight={titleHeight} varHeight={sizeY}
                                                 page={page} maxPage={view.count} setPage={setPage}
+                                                onDoubleClick={onDoubleClick}
                                             />
                                         </AvailContextProvider>
                                     </ScrollArea>

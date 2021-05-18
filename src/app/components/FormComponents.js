@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {d, drawCanvasToAvail, getCanvasForBitmap} from "../helper/helper"
 import { Block, Stack } from "./LayoutComponents";
-import { WindowContext, EditorContext, useModal, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { WindowContext, EditorContext, useModal, Kbd, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 
 function isValidNumber(value) {
@@ -1266,6 +1266,72 @@ function Submit({ disabled, className, ...props }) {
     )
 }
 
+function Hidden({ invalid }) {
+    const fContext = useContext(FormContext);
+
+    const cls = [];
+    if (invalid) {
+        cls.push('invalid');
+        if (fContext) {
+            fContext.markInvalid()
+        }
+    }
+    return (
+        <input type="hidden" className={cls.join(' ')} />
+    )
+}
+
+function KeyInput({ value, set, onInput, className }) {
+    const fContext = useContext(FormContext);
+    const [record, setRecord] = useState(false);
+
+    const cls = ['input'];
+    if (className) {
+        cls.push(className);
+    }
+    if (value === '') {
+        cls.push('invalid');
+        if (fContext) {
+            fContext.markInvalid()
+        }
+    }
+    const getInputFromTarget = e => {
+        let elem = e.target;
+        while (elem && !elem.classList.contains('input')) {
+            elem = elem.parentNode
+        }
+        return elem
+    };
+
+    const selfFocus = e => {
+        const elem = getInputFromTarget(e);
+        if (elem) {
+            elem.focus();
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    };
+    const setKeyInput = e => {
+        const code = e.key.length === 1 ? e.key.charCodeAt(0) : 0;
+        if (code >= 32) {
+            const elem = getInputFromTarget(e);
+            set(String.fromCharCode(code));
+            elem.blur();
+            e.stopPropagation();
+            e.preventDefault()
+            if (onInput) onInput();
+        }
+    };
+    return (
+        <Stack vertical tab className={cls.join(' ')} onFocus={() => setRecord(true)} onBlur={() => setRecord(false)} onMouseDown={selfFocus} onKeyDown={setKeyInput}>
+            <Block border="1" full="h" className={record ? 'blink' : ''} padded="h" center="h">
+                {value === '' && record ? <Icon name="keyboard" size={13} /> : <Kbd value={value !== '' ? value : ' '} />}
+            </Block>
+            <Block full="h"><Kbd value={value !== '' ? value.charCodeAt(0) : ''} length={4} /></Block>
+        </Stack>
+    )
+}
+
 export {
     Form,
     OkCancelForm,
@@ -1280,6 +1346,7 @@ export {
     RadioProp,
     Input,
     InputProp,
+    KeyInput,
     Tuple,
     TupleProp,
     Select,
@@ -1291,5 +1358,6 @@ export {
     Bitmap,
     BitmapProp,
     LabelProp,
+    Hidden,
     FullProp
 }

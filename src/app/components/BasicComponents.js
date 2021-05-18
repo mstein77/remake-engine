@@ -1513,12 +1513,15 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
         if (!focusElem || !focusElem.start) {
             return;
         }
-        const elem = trapRef.current.querySelector('.tabbed.autofocus');
-        if (elem) {
-            elem.focus();
-        } else {
-            focusElem.start.focus();
-        }
+        requestAnimationFrame(() => {
+            const elem = trapRef.current ? trapRef.current.querySelector('.tabbed.autofocus') : null;
+            if (elem) {
+                elem.focus();
+            } else {
+                focusElem.start.focus();
+            }
+
+        });
     }, []);
 
     useEffect(() => {

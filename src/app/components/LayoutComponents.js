@@ -56,7 +56,7 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...p
     }
 
     const dimAttr = {};
-    for(let prop of ['onClick', 'onKeyDown', 'onKeyUp', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress']) {
+    for(let prop of ['onClick', 'onKeyDown', 'onKeyUp', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress', 'onDoubleClick']) {
         const handler = props[prop];
         if (handler) {
             dimAttr[prop] = handler;
