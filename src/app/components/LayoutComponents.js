@@ -666,7 +666,7 @@ function Grid({children, columns, rows, gaps, full, centerItems, className, ...p
 
 const OverlayContext = React.createContext();
 
-function Overlays({ width, maxWidth, height, originX = 0, originY = 0, scroll, className, children }) {
+function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, scroll, className, children }) {
     const cls = ['relative block'];
     if (className) {
         cls.push(className);
@@ -676,6 +676,9 @@ function Overlays({ width, maxWidth, height, originX = 0, originY = 0, scroll, c
         maxWidth,
         height
     };
+    if (cursor) {
+        style.cursor = cursor
+    }
     if (scroll) {
         cls.push('scroll');
         cls.push('max-v');

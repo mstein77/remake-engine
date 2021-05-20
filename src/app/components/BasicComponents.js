@@ -5,6 +5,7 @@ import { DIR, Block, Stack, Grid } from "./LayoutComponents";
 import { Button, Number, Color, Form, Submit, InputProp, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
+import { ImageIndex } from "../classes/EntityIndex";
 
 const BackgroundContext = React.createContext();
 
@@ -1172,6 +1173,10 @@ function WindowCtx({ children }) {
         });
     };
 
+    const imageIndex = useMemo(() => {
+        return new ImageIndex({})
+    });
+
     const value = useMemo(() => {
         return {
             lastTarget,
@@ -1203,7 +1208,8 @@ function WindowCtx({ children }) {
             cssPropUpdate: cssContext.cssPropUpdate,
             defaults,
             storage,
-            focusStack
+            focusStack,
+            imageIndex
         }
     }, [focusStack]);
 
@@ -1739,183 +1745,6 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
-function CellMarker({ dir = DIR.ALL, type, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, zoom = 1, border = 0, width = 1, height = 1, moveCursor, ...props }) {
-    if (posX === null || posY === null) {
-        return '';
-    }
-    sizeX = sizeX * zoom;
-    sizeY = sizeY * zoom;
-
-    const hasResize = onResize && !onClick;
-    const hasMove = !!onMove;
-
-    const overhang = 8;
-
-    const offset = {
-        top: border + (sizeY + border) * posY  - overhang,
-        left: border + (sizeX + border) * posX - overhang,
-        width: 'min-content',
-        height: 'min-content'
-    };
-    if (type === 'row-gap') {
-        const baseline = Math.round(border / 2) + posY * (sizeY + border) - overhang;
-        offset.top =  baseline - overhang - border;
-        offset.left = -overhang;
-    } else if (type === 'column-gap') {
-        const baseline = Math.round(border / 2) + posX * (sizeX + border) - overhang;
-        offset.left =  baseline - overhang - border;
-        offset.top = -overhang;
-    }
-    const centerStyle = {
-        width: (type === 'column-gap' ? 2 * overhang  : sizeX * width + (width - 1) * border),
-        height: (type === 'row-gap' ? 2 * overhang : sizeY * height + (height - 1) * border)
-    };
-
-    const markerCls = 'marker-cell' + (highlight ? '-highlight' : '');
-    const cls = ['marker-grid'];
-
-    const clsCenter = [];
-    if (['rows', 'columns', 'row-gap', 'column-gap'].indexOf(type) !== -1) {
-        clsCenter.push(markerCls);
-    }
-    let centerClickHandler = null;
-/*
-    if (pointer) {
-        clsCenter.push('cursor-' + pointer);
-    }
-
- */
-    if (hasMove) {
-        centerStyle.cursor = moveCursor ? moveCursor : 'move';
-        centerClickHandler = e => {
-            onMove(e);
-        }
-    }
-
-    const clsRight = [];
-    let rightClickHandler = null;
-    if (DIR.RIGHT & dir) {
-        clsRight.push(markerCls);
-        if (hasResize) {
-            clsRight.push('cursor-hresize');
-            rightClickHandler  = e => {
-                onResize(e, 'x', false);
-            };
-        }
-    }
-    const clsTopLeft = [];
-    let topLeftClickHandler = null;
-    if ((DIR.LEFT & dir) && (DIR.TOP & dir)) {
-        clsTopLeft.push(markerCls);
-        if (hasResize) {
-            clsTopLeft.push('cursor-nwseresize');
-            topLeftClickHandler  = e => {
-                onResize(e, 'xy', true, true);
-            };
-        }
-    }
-    const clsTopRight = [];
-    let topRightClickHandler = null;
-    if ((DIR.RIGHT & dir) && (DIR.TOP & dir)) {
-        clsTopRight.push(markerCls);
-        if (hasResize) {
-            clsTopRight.push('cursor-neswresize');
-            topRightClickHandler  = e => {
-                onResize(e, 'xy', false, true);
-            };
-        }
-    }
-    const clsLeft = [];
-    let leftClickHandler = null;
-    if (DIR.LEFT & dir) {
-        clsLeft.push(markerCls);
-        if (hasResize) {
-            clsLeft.push('cursor-hresize');
-            leftClickHandler  = e => {
-                onResize(e, 'x', true);
-            };
-        }
-    }
-    const clsTop = [];
-    let topClickHandler = null;
-    if (DIR.TOP & dir) {
-        clsTop.push(markerCls);
-        if (hasResize) {
-            clsTop.push('cursor-vresize');
-            topClickHandler  = e => {
-                onResize(e, 'y', null, true);
-            };
-        }
-    }
-    const clsBottom = [];
-    let bottomClickHandler = null;
-    if (DIR.BOTTOM & dir) {
-        clsBottom.push(markerCls);
-        if (hasResize) {
-            clsBottom.push('cursor-vresize');
-            bottomClickHandler  = e => {
-                onResize(e, 'y', null, false);
-            };
-        }
-    }
-    const clsBottomLeft = [];
-    let bottomLeftClickHandler = null;
-    if ((DIR.LEFT & dir) && (DIR.BOTTOM & dir)) {
-        clsBottomLeft.push(markerCls);
-        if (hasResize) {
-            clsBottomLeft.push('cursor-neswresize');
-            bottomLeftClickHandler  = e => {
-                onResize(e, 'xy', true, false);
-            };
-        }
-    }
-    const clsBottomRight = [];
-    let bottomRightClickHandler = null;
-    if ((DIR.RIGHT & dir) && (DIR.BOTTOM & dir)) {
-        clsBottomRight.push(markerCls);
-        if (hasResize) {
-            clsBottomRight.push('cursor-nwseresize');
-            bottomRightClickHandler  = e => {
-                onResize(e, 'xy', false, false);
-            };
-        }
-    }
-
-    if (props.blink) {
-        cls.push('blink');
-    }
-    cls.push('all-events');
-    const divAttr = {
-        style: offset,
-        className: cls.join(' ')
-    };
-    if (props.dblClick) {
-        divAttr.onDoubleClick = props.dblClick;
-    } else if (onClick) {
-        divAttr.onClick = onClick;
-    } else if (onMouseDown) {
-        divAttr.onMouseDown = onMouseDown;
-    }
-    let matrix = '';
-
-    return (
-        <div {...divAttr}>
-            <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>
-            <div className={clsTop.join(' ')} onMouseDown={topClickHandler}></div>
-            <div className={clsTopRight.join(' ')} onMouseDown={topRightClickHandler}></div>
-
-            <div className={clsLeft.join(' ')} onMouseDown={leftClickHandler}></div>
-            <div className={clsCenter.join(' ')} onMouseDown={centerClickHandler} style={centerStyle}>{matrix}</div>
-            <div className={clsRight.join(' ')} onMouseDown={rightClickHandler}></div>
-
-            <div className={clsBottomLeft.join(' ')} onMouseDown={bottomLeftClickHandler}></div>
-            <div className={clsBottom.join(' ')} onMouseDown={bottomClickHandler}></div>
-            <div className={clsBottomRight.join(' ')} onMouseDown={bottomRightClickHandler}></div>
-        </div>
-    )
-}
-
-
 function getCssConstProp(prop) {
     let i = 0;
     const iMax = prop.length;
@@ -2155,7 +1984,6 @@ export {
     OkCancelForm,
     Ruler,
     Icon,
-    CellMarker,
     ButtonStack,
     CenterInfo,
     ActionBarContent,

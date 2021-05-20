@@ -510,6 +510,13 @@ const getCanvasForBitmap = bitmap => {
     return canvas;
 };
 
+const getImageDataForImage = image => {
+    const canvas = getCanvasForDim(image.width, image.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0);
+    return ctx.getImageData(0, 0, image.width, image.height);
+}
+
 const toHex = value => {
     return  ('0' + (value & 0xFF).toString(16)).slice(-2);
 };
@@ -1232,6 +1239,7 @@ module.exports = {
     getNextUid,
     getCanvasForDim,
     getCanvasForBitmap,
+    getImageDataForImage,
     getColorsFromCanvas,
     getColorsFromImageData,
     getEmptyImageData,

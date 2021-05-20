@@ -1,8 +1,22 @@
 import React, { useContext, useEffect, useMemo, useState, useRef } from "react";
-import { EditorSection, EditorCtx, Kbd, CenterInfo, EditorContext, CellMarker, ButtonStack, Toolbar, ToolGroup, Canvas, useModal, useUpdateOnEntityIndexChanges, PropertyGrid, Section, WindowContext} from "../components/BasicComponents";
+import {
+    EditorSection,
+    Kbd,
+    CenterInfo,
+    EditorContext,
+    ButtonStack,
+    Toolbar,
+    ToolGroup,
+    Canvas,
+    useModal,
+    useUpdateOnEntityIndexChanges,
+    PropertyGrid,
+    Section,
+    WindowContext,
+} from "../components/BasicComponents";
 import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import {d, getBlockPos, getCanvasForDim, getEmptyImageData, rgb2hex} from "../helper/helper";
-import { NameDialog, FiltersModal } from "../components/EditorComponents";
+import { d, getCanvasForDim, getEmptyImageData } from "../helper/helper";
+import { NameDialog, FiltersModal, BitmapSelector } from "../components/EditorComponents";
 import {
     Checkbox,
     Input,
@@ -11,12 +25,10 @@ import {
     NumberProp,
     Number,
     RadioProp,
-    Select,
     SelectProp,
     LabelProp,
     CheckboxProp,
     FullProp,
-    Submit,
     Color,
     Button,
     TextArea,
@@ -26,8 +38,11 @@ import {
     Hidden,
     OkCancelForm
 } from "../components/FormComponents";
-import {AssignIndex, FontIndex, TextBlockIndex} from "../classes/EntityIndex";
+import { AssignIndex, FontIndex, TextBlockIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
+import { GridCellMarker } from "../components/GridComponents";
+import {BitmapCellProvider} from "../classes/CellProvider";
+
 
 function FontProperties({ font, reserved, save, close }) {
     const [value, setValue] = useState(font.value);
@@ -213,7 +228,7 @@ function CharProperties({ charIndex, char, save, close }) {
                        set={code => setValue(code ? String.fromCharCode(code) : '')}
                        className="padded-h"
                     />
-                    <BitmapProp name="Image:" zoomOrAvail={10} value={image} set={setImage} entityIndex={charIndex} />
+                    <BitmapProp name="Image:" zoomOrAvail={10} value={image} set={setImage} width={charIndex.getSizeX()} height={charIndex.getSizeY()} entityIndex={charIndex} />
                 </PropertyGrid>
             </Block>
         </OkCancelForm>
@@ -225,6 +240,7 @@ function CharManager({ charIndex }) {
 
     const CharPropsModal = useModal();
     const AssignCharsModal = useModal();
+    const BitmapSelectorModal = useModal();
 
     const editChar = index => {
         const char = charIndex.getEntityObject(index);
@@ -233,6 +249,7 @@ function CharManager({ charIndex }) {
             charIndex,
             char,
             save: editChar => {
+                d('EDIT', editChar);
                 saveAssignments([
                     {oldChar: char.value, value: editChar.value, image: editChar.image}
                 ]);
@@ -261,13 +278,34 @@ function CharManager({ charIndex }) {
         });
     };
     const importChars = () => {
-        const assignIndex = new AssignIndex(charIndex.getSizeX(), charIndex.getSizeY());
-//        assignIndex.setEntityObjects(chars);
-        AssignCharsModal.open({
-            assignIndex,
-            save: assignments => {
-                AssignCharsModal.close()
+        const selected = selection => {
+            const baseCells = selection.getBaseCells();
+            const chars = [];
+            let index = 0;
+            for(let cells of baseCells) {
+                const provider = new BitmapCellProvider(1);
+                provider.setMap(cells);
+                chars.push({
+                    index,
+                    value: '',
+                    oldChar: '',
+                    image: provider.getImageData()
+                });
+                index++;
             }
+            assignImagesToChars(chars);
+            BitmapSelectorModal.close();
+        };
+        BitmapSelectorModal.open({
+            selection: {
+                type: 'rect',
+                width: charIndex.getSizeX(),
+                height: charIndex.getSizeY(),
+                fixed: true,
+                multi: true,
+                doubleClick: selected
+            },
+            save: selected
         });
     };
 
@@ -397,6 +435,10 @@ function CharManager({ charIndex }) {
             <AssignCharsModal.content name="Assign Images to Chars" width="75%" height={290}>
                 <CharAssignments { ...AssignCharsModal.props } />
             </AssignCharsModal.content>
+
+            <BitmapSelectorModal.content name="Select Image" full>
+                <BitmapSelector { ...BitmapSelectorModal.props } />
+            </BitmapSelectorModal.content>
         </>
     )
 }
@@ -912,7 +954,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                             <Overlay width={width * zoom} height={width * zoom}>
                                 <Block ref={screenRef} full onMouseDown={activateByClick}>
                                     {marker && actual &&
-                                        <CellMarker
+                                        <GridCellMarker
                                             blink
                                             posX={actual.x}
                                             posY={actual.y}
@@ -986,7 +1028,6 @@ function TextPaneEditor({ model }) {
                 ]
             }>
                 <TextBlockEditor full blockIndex={blockIndex} fontIndex={fontIndex} activeFont={activeFont} />
-
             </EditorSection>
         </Stack>
     )

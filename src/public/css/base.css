@@ -311,3 +311,12 @@ input:invalid {
     padding-top: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
     padding-bottom: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
 }
+
+.no-events {
+    pointer-events: none;
+}
+
+.all-events {
+    pointer-events: all;
+}
+

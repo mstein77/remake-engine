@@ -1,18 +1,13 @@
-import React, {useMemo, useState} from "react";
-import {FilterIndex} from "../classes/EntityIndex";
-import {
-    ButtonStack, Canvas,
-    CenterInfo,
-    OkCancelForm,
-    PropertyGrid,
-    Section, Toolbar,
-    useUpdateOnEntityIndexChanges
-} from "./BasicComponents";
-import { d, rgb2hex, getCanvasForBitmap } from "../helper/helper";
-import {ColorProp} from "./BaseComponents";
-import {Color, InputProp, Number, NumberProp} from "./FormComponents";
-import {Block, Stack} from "./LayoutComponents";
-import {EntityStackSections} from "./EntityComponents";
+import React, {useContext, useMemo, useState} from "react";
+import { FilterIndex } from "../classes/EntityIndex";
+import { EditorContext, CssContext, EditorCtx, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
+import { d, rgb2hex, getCanvasForBitmap, getImageDataForImage } from "../helper/helper";
+import { PictureCell} from "./BaseComponents";
+import { Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden } from "./FormComponents";
+import { Block, Stack } from "./LayoutComponents";
+import { EntityStack, EntityStackSections } from "./EntityComponents";
+import { AvailGrid, CellCursorOverlay, CellMarkerOverlay, GridRulerH, GridRulerV } from "./GridComponents";
+import { BitmapGrid } from "../classes/Grid";
 
 function NameDialog({ close, save, max, reserved = [], ...props }) {
     const [name, setName] = useState(props.name || '');
@@ -343,7 +338,187 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
     )
 }
 
+function ImageProperties({ values, save, close }) {
+    const [ value, setValue ] = useState(values.value);
+    const [ image, setImage ] = useState(values.image);
+
+    const saveImage = () => {
+        save({value, image, width: (image.width || 0), height: (image.height || 0)});
+    };
+
+    return (
+        <OkCancelForm submit save={saveImage} cancel={close} full>
+            <Block padded full>
+                <PropertyGrid full="h">
+                    <InputProp name="ID" value={value} set={setValue} full="h" required />
+                    <ImageProp
+                        name="Image"
+                        value={image}
+                        set={setImage}
+                        full="h" />
+                </PropertyGrid>
+            </Block>
+        </OkCancelForm>
+    )
+}
+
+function BitmapSelectorInner({ save, close, selection }) {
+    const wContext = useContext(WindowContext);
+    const eContext = useContext(EditorContext);
+
+    const NewImageModal = useModal();
+    const [activeImage, setActiveImage] = useState(null);
+
+    const imageIndex = wContext.imageIndex;
+
+    useUpdateOnEntityIndexChanges(imageIndex);
+
+    const addImage = () => {
+        NewImageModal.open({
+            values: {
+                value: '',
+                width: 0,
+                height: 0,
+                image: null
+            },
+            save: newImage => {
+                const index = imageIndex.setEntityObject(newImage);
+                setActiveImage(index);
+                NewImageModal.close()
+            }
+        });
+    };
+
+    const doSave = () => save(eContext.selection);
+
+    return (
+        <OkCancelForm submit full save={doSave} cancel={close}>
+            <Stack full>
+                <Section collapse="h" inner full="v" size={200} name="Images">
+                    <EntityStack
+                        entityIndex={imageIndex}
+                        active={activeImage}
+                        setActive={setActiveImage}
+                        del
+                        deselect
+                        addOp={addImage}
+                        getInfo={item => <Kbd value={item.width + ' x ' + item.height} />}
+                        emptyText="No images available yet"
+                    />
+                </Section>
+                <Block full>
+                    {activeImage === null ?
+                        <CenterInfo>Please select an image...</CenterInfo> :
+                        <BitmapSelectionGrid
+                            selection={selection}
+                            image={imageIndex.getEntityPropValue(activeImage, 'image')}
+                            onDoubleClick={doSave}
+                        />
+                    }
+                </Block>
+                <Hidden invalid={!(eContext.selection.getType() === 'rect')} />
+            </Stack>
+
+            <NewImageModal.content name="Add new Image" width={400}>
+                <ImageProperties { ...NewImageModal.props } />
+            </NewImageModal.content>
+        </OkCancelForm>
+    )
+}
+
+function BitmapSelector(props) {
+    return (
+        <EditorCtx>
+            <BitmapSelectorInner { ...props } />
+        </EditorCtx>
+    )
+}
+
+function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
+    const eContext = useContext(EditorContext);
+
+    const [posX, setPosX] = useState(0);
+    const [posY, setPosY] = useState(0);
+    const [width, setWidth] = useState(100);
+    const [height, setHeight] = useState(80);
+    const [zoom, setZoom] = useState(1);
+    const [border, setBorder] = useState(1);
+    const [rulers, setRulers] = useState(false);
+    const [markerX, setMarkerX] = useState(null);
+    const [markerY, setMarkerY] = useState(null);
+    const [markerWidth, setMarkerWidth] = useState(null);
+    const [markerHeight, setMarkerHeight] = useState(null);
+
+    const bitmapGrid = useMemo(() => {
+        return new BitmapGrid({image: getImageDataForImage(image)});
+    }, [ image ]);
+
+    const sizeX = bitmapGrid.getCellSizeX();
+    const sizeY = bitmapGrid.getCellSizeY();
+    const cellType = useMemo(() => {
+        return new PictureCell(sizeX, sizeY);
+    }, [sizeX, sizeY]);
+
+    const gridWidth = bitmapGrid.getWidth();
+    const gridHeight = bitmapGrid.getHeight();
+
+    const setMarker = (e, x, y) => {
+        eContext.setSelection(bitmapGrid.getSelection(x, y, selection.width, selection.height));
+        setMarkerX(x);
+        setMarkerY(y);
+        setMarkerWidth(selection.width);
+        setMarkerHeight(selection.height)
+    };
+
+    return (
+        <Stack vertical borders full>
+            <Toolbar full="h">
+                <Tuple name="Position:" x={posX} setX={setPosX} min={0} y={posY} setY={setPosY} />
+                <Number name="Zoom:" value={zoom} min={1} max={10} set={setZoom} />
+                <Number name="Border:" value={border} min={0} max={10} set={setBorder} />
+                <Checkbox name="Rulers" value={rulers} set={setRulers} />
+            </Toolbar>
+            <Block full>
+                <AvailGrid
+                    gridProvider={bitmapGrid} cellType={cellType}
+                    zoom={zoom} border={border} rulers={rulers}
+                    posX={posX} setPosX={setPosX} posY={posY} setPosY={setPosY}
+                    width={width} setWidth={setWidth} height={height} setHeight={setHeight}
+                    gridWidth={gridWidth} gridHeight={gridHeight}
+                >
+                    {rulers && <GridRulerH posX={posX} width={width} />}
+                    {rulers && <GridRulerV posY={posY} height={height} />}
+                    <CellCursorOverlay
+                        posX={posX} posY={posY}
+                        width={width} height={height}
+                        cursorWidth={selection.width} cursorHeight={selection.height}
+                        onMouseDown={setMarker}
+                        cursorType="rect"
+                    />
+                    {markerX !== null &&
+                        <CellMarkerOverlay
+                            posX={posX} posY={posY}
+                            width={width} height={height}
+                            onDoubleClick={onDoubleClick}
+                            markerX={markerX} markerY={markerY}
+                            markerWidth={markerWidth} markerHeight={markerHeight}
+                            markerType="rect"
+                        />
+                    }
+                </AvailGrid>
+            </Block>
+            <Toolbar full="h">
+                {markerX !== null &&
+                    <Tuple name="Marker:" x={markerX} setX={setMarkerX} min={0} maxX={image.width - 1} maxY={image.height - 1} y={markerY} setY={setMarkerY} />
+                }
+            </Toolbar>
+        </Stack>
+    )
+}
+
 export {
+    BitmapSelector,
+    BitmapSelectionGrid,
     FiltersModal,
     NameDialog
 }

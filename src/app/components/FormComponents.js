@@ -3,6 +3,8 @@ import {d, drawCanvasToAvail, getCanvasForBitmap} from "../helper/helper"
 import { Block, Stack } from "./LayoutComponents";
 import { WindowContext, EditorContext, useModal, Kbd, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
+import { BitmapCellProvider } from "../classes/CellProvider";
+import { BitmapSelector } from "./EditorComponents";
 
 function isValidNumber(value) {
     return typeof value === 'number' && !isNaN(value);
@@ -1113,6 +1115,30 @@ function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) 
 
 function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
     const CopyBitmapModal = useModal();
+    const ImportBitmapModal = useModal();
+
+    const importBitmap = () => {
+        const selected = selection => {
+            const provider = new BitmapCellProvider(1);
+            provider.setMap(selection.getCells());
+            set(provider.getImageData());
+            ImportBitmapModal.close();
+        };
+        ImportBitmapModal.open({
+            zoom: 1,
+            border: 0,
+            save: selected,
+            selection: {
+                type: 'rect',
+                width: entityIndex.hasEntityDim() ? 1 : entityIndex.getSizeX(),
+                height: entityIndex.hasEntityDim() ? 1 : entityIndex.getSizeY(),
+                fixed: !entityIndex.hasEntityDim(),
+                multi: false,
+                doubleClick: selected
+            }
+//            , bitmaps: context.imageResources
+        });
+    };
 
     const copy = () => {
         CopyBitmapModal.open({
@@ -1138,7 +1164,7 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
             <Stack vertical>
                 <Stack gaps="1">
                     <Button name="edit" padded="h" />
-                    <Button name="import" padded="h" />
+                    <Button name="import" onClick={importBitmap} padded="h" />
                     {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
                     {empty && <Button icon="clear" onClick={() => set(null)} />}
                 </Stack>
@@ -1147,12 +1173,150 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
                 </Block>
             </Stack>
 
+            <ImportBitmapModal.content name="Select image..." full>
+                <BitmapSelector {...ImportBitmapModal.props} />
+            </ImportBitmapModal.content>
             {entityIndex &&
-                <CopyBitmapModal.content name="Copy image from..."  width="75%" height={500}>
+                <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
                     <EntityPicker {...CopyBitmapModal.props} />
                 </CopyBitmapModal.content>
             }
         </>
+    )
+}
+
+function FileDropZone({ type, full, save }) {
+    const [error, setError] = useState('');
+    const dragEnterRef = useRef(null);
+    const dropzoneRef = useRef(null);
+
+    useEffect(() => {
+        const handlePaste = (event) => {
+            let items = (event.clipboardData  || event.originalEvent.clipboardData).items;
+            handleImages(items);
+            event.stopPropagation();
+            event.preventDefault();
+        };
+        window.addEventListener('paste', handlePaste, {capture: false});
+        return () => {
+            window.removeEventListener('paste', handlePaste, {capture: false});
+        }
+    }, []);
+
+    const handleImages = (items) => {
+        const matches = [];
+        const invTypes = new Map();
+        for(let item of items) {
+            if (type && item.type.startsWith(type + '/')) {
+                matches.push(item);
+            } else {
+                invTypes.set('"' + item.type + '"', null);
+            }
+        }
+        if (matches.length === 0) {
+            if (invTypes.size > 0) {
+                setError('The given types ' + [...invTypes.keys()].join(', ') + ' are not supported!');
+            } else {
+                setError('No content found!');
+            }
+            return;
+        } else if (matches.length > 1) {
+            setError('Multiple files not allowed!');
+            return;
+        }
+        const file = matches[0];
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            save(reader.result, file.name);
+            setError('');
+        };
+        reader.readAsDataURL(file.getAsFile ? file.getAsFile() : file);
+    };
+
+    const handleDrop = (e) => {
+        handleImages(e.dataTransfer.files);
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragOver = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragEnter = (e) => {
+        if (dropzoneRef.current) {
+            dropzoneRef.current.classList.toggle('blink', true);
+            dragEnterRef.current = e.target;
+        }
+        e.stopPropagation();
+        e.preventDefault();
+    };
+    const handleDragLeave = (e) => {
+        if (dropzoneRef.current && dragEnterRef.current === e.target) {
+            dropzoneRef.current.classList.toggle('blink', false);
+        }
+        e.preventDefault();
+    };
+    const handleFileSelection = (e) => {
+        e.preventDefault();
+        handleImages(e.target.files);
+    };
+
+    const accept = type ? type + '/*' : '*';
+
+    return (
+        <Block
+            ref={dropzoneRef}
+            full={full}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}>
+            <Stack vertical centerItems="center" full="h">
+                <Block padded full="h">
+                    No image given. Please insert image by one of the following options:
+                    <ul>
+                        <li>Drag'n Drop an image from your desktop here<br /><br /></li>
+                        <li>Copy image to clipboard and paste it here<br /><br /></li>
+                        <li><input onChange={handleFileSelection} type="file" accept={accept} /></li>
+                    </ul>
+                    {error && <Block boxed padded>Reading content failed: {error}</Block>}
+                </Block>
+            </Stack>
+        </Block>
+    );
+}
+
+function ImageProp({ name, value, set, ...props }) {
+    return (
+        <LabelProp name={name}>
+            {value ?
+                <Stack vertical gaps>
+                    <Stack>
+                        <Block padded>Size: <Kbd value={value.width + 'x' + value.height} /></Block>
+                        <Button icon="clear" onClick={() => {
+                            set(null);
+                        }} />
+                    </Stack>
+                    <Block border="1">
+                        <img src={value.src} />
+                    </Block>
+                </Stack> :
+                <FileDropZone
+                    type="image"
+                    save={
+                        (bitmap, name = null) => {
+                            const img = new Image();
+                            img.src = bitmap;
+                            img.decode().then(() => {
+                                set(img);
+                            })
+                        }
+                    }
+                    { ...props }
+                />
+            }
+        </LabelProp>
     )
 }
 
@@ -1244,7 +1408,6 @@ function ColorProp({ name, ...props }) {
         </LabelProp>
     )
 }
-
 
 function BitmapProp({ name, ...props }) {
     return (
@@ -1357,6 +1520,8 @@ export {
     ColorProp,
     Bitmap,
     BitmapProp,
+    FileDropZone,
+    ImageProp,
     LabelProp,
     Hidden,
     FullProp

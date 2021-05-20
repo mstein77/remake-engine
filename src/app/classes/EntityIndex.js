@@ -2890,6 +2890,37 @@ class EventIndex extends EntityIndex {
     }
 }
 
+class ImageIndex extends EntityIndex {
+
+    constructor(model) {
+        super();
+        this.model = model;
+        this.items = []
+    }
+
+    getEntityProps() {
+        return [ ...super.getEntityProps(), 'width', 'height', 'image' ];
+    }
+
+    getEntityPropValue(index, prop) {
+        if (['width', 'height'].includes(prop)) {
+            const img = this.model[this.getEntityValue(index)];
+            return img ? img[prop] : 0
+        }
+        if (prop === 'image') {
+            return this.model[this.getEntityValue(index)]
+        }
+        return super.getEntityPropValue(index, prop)
+    }
+
+    setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
+        if (prop === 'image') {
+            this.model[this.getEntityValue(index)] = value;
+        }
+    }
+}
+
 export {
     SimpleIndex,
     ColorIndex,
@@ -2904,5 +2935,6 @@ export {
     FontIndex,
     FilterIndex,
     TextBlockIndex,
-    EventIndex
+    EventIndex,
+    ImageIndex
 };
