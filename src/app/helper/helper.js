@@ -1220,8 +1220,13 @@ function cloneDeep(value) {
     return value;
 }
 
+function clamp(min, curr, max) {
+    return Math.min(Math.max(min, curr), max)
+}
+
 module.exports = {
     d,
+    clamp,
     cloneDeep,
     hex2rgb,
     rgb2hex,

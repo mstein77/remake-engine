@@ -1,12 +1,12 @@
-import React, {useContext, useMemo, useState} from "react";
+import React, { useRef, useContext, useMemo, useState } from "react";
 import { FilterIndex } from "../classes/EntityIndex";
 import { EditorContext, CssContext, EditorCtx, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
-import { d, rgb2hex, getCanvasForBitmap, getImageDataForImage } from "../helper/helper";
-import { PictureCell} from "./BaseComponents";
-import { Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden } from "./FormComponents";
+import { d, rgb2hex, getCanvasForBitmap, getImageDataForImage, clamp } from "../helper/helper";
+import { PictureCell } from "./BaseComponents";
+import { Button, Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden } from "./FormComponents";
 import { Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections } from "./EntityComponents";
-import { AvailGrid, CellCursorOverlay, CellMarkerOverlay, GridRulerH, GridRulerV } from "./GridComponents";
+import { FlexGrid } from "./GridComponents";
 import { BitmapGrid } from "../classes/Grid";
 
 function NameDialog({ close, save, max, reserved = [], ...props }) {
@@ -402,7 +402,7 @@ function BitmapSelectorInner({ save, close, selection }) {
                         del
                         deselect
                         addOp={addImage}
-                        getInfo={item => <Kbd value={item.width + ' x ' + item.height} />}
+                        getInfo={item => <Kbd className="less" value={item.width + ' x ' + item.height} />}
                         emptyText="No images available yet"
                     />
                 </Section>
@@ -435,8 +435,6 @@ function BitmapSelector(props) {
 }
 
 function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
-    const eContext = useContext(EditorContext);
-
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
     const [width, setWidth] = useState(100);
@@ -448,10 +446,13 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     const [markerY, setMarkerY] = useState(null);
     const [markerWidth, setMarkerWidth] = useState(null);
     const [markerHeight, setMarkerHeight] = useState(null);
+    const [markerGapX, setMarkerGapX] = useState(0);
+    const [markerGapY, setMarkerGapY] = useState(0);
 
     const bitmapGrid = useMemo(() => {
         return new BitmapGrid({image: getImageDataForImage(image)});
     }, [ image ]);
+
 
     const sizeX = bitmapGrid.getCellSizeX();
     const sizeY = bitmapGrid.getCellSizeY();
@@ -462,54 +463,57 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     const gridWidth = bitmapGrid.getWidth();
     const gridHeight = bitmapGrid.getHeight();
 
-    const setMarker = (e, x, y) => {
-        eContext.setSelection(bitmapGrid.getSelection(x, y, selection.width, selection.height));
-        setMarkerX(x);
-        setMarkerY(y);
-        setMarkerWidth(selection.width);
-        setMarkerHeight(selection.height)
-    };
-
     return (
         <Stack vertical borders full>
             <Toolbar full="h">
-                <Tuple name="Position:" x={posX} setX={setPosX} min={0} y={posY} setY={setPosY} />
+                <Tuple name="Position:" x={posX} setX={setPosX} maxX={gridWidth - width} min={0}
+                       y={posY} setY={setPosY} maxY={gridHeight - height} />
                 <Number name="Zoom:" value={zoom} min={1} max={10} set={setZoom} />
                 <Number name="Border:" value={border} min={0} max={10} set={setBorder} />
                 <Checkbox name="Rulers" value={rulers} set={setRulers} />
             </Toolbar>
             <Block full>
-                <AvailGrid
+                <FlexGrid
                     gridProvider={bitmapGrid} cellType={cellType}
                     zoom={zoom} border={border} rulers={rulers}
                     posX={posX} setPosX={setPosX} posY={posY} setPosY={setPosY}
                     width={width} setWidth={setWidth} height={height} setHeight={setHeight}
                     gridWidth={gridWidth} gridHeight={gridHeight}
-                >
-                    {rulers && <GridRulerH posX={posX} width={width} />}
-                    {rulers && <GridRulerV posY={posY} height={height} />}
-                    <CellCursorOverlay
-                        posX={posX} posY={posY}
-                        width={width} height={height}
-                        cursorWidth={selection.width} cursorHeight={selection.height}
-                        onMouseDown={setMarker}
-                        cursorType="rect"
-                    />
-                    {markerX !== null &&
-                        <CellMarkerOverlay
-                            posX={posX} posY={posY}
-                            width={width} height={height}
-                            onDoubleClick={onDoubleClick}
-                            markerX={markerX} markerY={markerY}
-                            markerWidth={markerWidth} markerHeight={markerHeight}
-                            markerType="rect"
-                        />
-                    }
-                </AvailGrid>
+                    selection={selection}
+                    markerX={markerX} markerY={markerY} setMarkerX={setMarkerX} setMarkerY={setMarkerY}
+                    markerWidth={markerWidth} markerHeight={markerHeight}
+                    markerGapX={markerGapX} markerGapY={markerGapY}
+                    setMarkerWidth={setMarkerWidth} setMarkerHeight={setMarkerHeight}
+                    onDoubleClick={onDoubleClick}
+                />
             </Block>
             <Toolbar full="h">
                 {markerX !== null &&
-                    <Tuple name="Marker:" x={markerX} setX={setMarkerX} min={0} maxX={image.width - 1} maxY={image.height - 1} y={markerY} setY={setMarkerY} />
+                    <Tuple name="Position:"
+                           x={markerX} setX={setMarkerX} min={0} maxX={gridWidth - markerWidth}
+                           maxY={gridHeight - markerHeight} y={markerY} setY={setMarkerY} />
+                }
+                {markerX !== null &&
+                    <Tuple name="Size:"
+                           x={markerWidth} setX={setMarkerWidth} maxX={selection.width} minX={selection.width}
+                           y={markerHeight} setY={setMarkerHeight} maxY={selection.height} minY={selection.height}
+                           readOnly={selection.fixed} />
+                }
+                {selection.multi && markerX !== null &&
+                    <Tuple name="Gap:"
+                           x={markerGapX} setX={setMarkerGapX} min={0}
+                           y={markerGapY} setY={setMarkerGapY}
+                    />
+                }
+                {markerX !== null &&
+                    <Button icon="clear" onClick={
+                        () => {
+                            setMarkerX(null);
+                            setMarkerY(null);
+                            setMarkerWidth(null);
+                            setMarkerHeight(null)
+                        }
+                    } />
                 }
             </Toolbar>
         </Stack>

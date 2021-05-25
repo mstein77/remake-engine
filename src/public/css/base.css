@@ -253,7 +253,7 @@ input:invalid {
 }
 
 .marker-cell {
-    background-color: var(--marker-color);
+    background-color: var(--marker-color)
 }
 
 .marker-cell-highlight {
@@ -320,3 +320,18 @@ input:invalid {
     pointer-events: all;
 }
 
+.cursor-neswresize {
+    cursor: nesw-resize;
+}
+
+.cursor-nwseresize {
+    cursor: nwse-resize;
+}
+
+.cursor-vresize {
+    cursor: ns-resize;
+}
+
+.cursor-hresize {
+    cursor: ew-resize;
+}
