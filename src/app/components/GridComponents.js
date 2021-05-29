@@ -1,5 +1,5 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
-import {Block, DIR, Overlay, Overlays, Stack} from "./LayoutComponents";
+import {Block, DIR, Overlay, Overlays} from "./LayoutComponents";
 import {
     AvailContext,
     AvailContextProvider,
@@ -11,7 +11,7 @@ import {
 } from "./BasicComponents";
 import { d, clamp } from "../helper/helper";
 
-function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onMove, onResize }) {
+function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onMove, onResize, autoMatrix }) {
     const gContext = useContext(GridContext);
 
     let offX;
@@ -72,6 +72,7 @@ function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWid
                 onMove={onMove}
                 onResize={onResize}
                 onDoubleClick={onDoubleClick}
+                autoMatrix={autoMatrix}
                 dir={
                     (hasRight ? DIR.RIGHT : 0) |
                     (hasLeft ? DIR.LEFT : 0) |
@@ -481,6 +482,22 @@ function FlexGridInner({
             trackX = false;
         }
     }
+    let autoMatrix = null;
+    if (selection.fixed) {
+        autoMatrix = {
+            gapX: markerGapX,
+            gapY: markerGapY,
+            markerWidth,
+            markerHeight,
+            width: selection.width,
+            height: selection.height,
+            offStartX: Math.max(posX - markerX, 0),
+            offEndX: Math.max(markerX + markerWidth - (posX + width), 0),
+            offStartY: Math.max(posY - markerY, 0),
+            offEndY: Math.max(markerY + markerHeight - (posY + height), 0)
+        };
+    }
+
     const propsRef = useRef(null);
     propsRef.current = {
         gridWidth, gridHeight, width, height, posX, setPosX, posY, setPosY,
@@ -924,6 +941,7 @@ function FlexGridInner({
                                 onDoubleClick={onDoubleClick}
                                 onMove={moveMarker}
                                 onResize={resizeMarker}
+                                autoMatrix={autoMatrix}
                                 markerX={markerX} markerY={markerY}
                                 markerWidth={markerWidth} markerHeight={markerHeight}
                                 markerType="rect"
@@ -944,7 +962,7 @@ function FlexGrid(props) {
     );
 }
 
-function GridCellMarker({ dir = DIR.ALL, type, cursor, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, onDoubleClick, zoom = 1, border = 0, width = 1, height = 1, moveCursor, ...props }) {
+function GridCellMarker({ dir = DIR.ALL, type, cursor, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, onDoubleClick, zoom = 1, border = 0, width = 1, height = 1, moveCursor, autoMatrix, ...props }) {
     if (posX === null || posY === null) {
         return '';
     }
@@ -1105,6 +1123,128 @@ function GridCellMarker({ dir = DIR.ALL, type, cursor, posX, posY, sizeX = 1, si
         divAttr.onMouseDown = onMouseDown;
     }
     let matrix = '';
+    if (autoMatrix) {
+
+        const offStartX = autoMatrix.offStartX;
+        const offEndX = autoMatrix.offEndX;
+
+        const sizeAndGapX = autoMatrix.width + autoMatrix.gapX;
+        const modOffStartX = offStartX % sizeAndGapX;
+        const modOffEndX = offEndX % sizeAndGapX;
+        const segStartX = Math.floor((offStartX + autoMatrix.gapX) / sizeAndGapX);
+
+        const margStartX = modOffStartX < autoMatrix.width ? 0 : sizeAndGapX - (offStartX % sizeAndGapX);
+
+        const segmentsX = (autoMatrix.markerWidth + autoMatrix.gapX) / sizeAndGapX;
+        const segEndX = (segmentsX - 1) - Math.max(0, Math.floor((offEndX + autoMatrix.gapX) / sizeAndGapX));
+
+        const hiddenEndX = modOffEndX >= autoMatrix.width ? 0 : modOffEndX;
+
+        const offStartY = autoMatrix.offStartY;
+        const offEndY = autoMatrix.offEndY;
+
+        const sizeAndGapY = autoMatrix.height + autoMatrix.gapY;
+        const modOffStartY = offStartY % sizeAndGapY;
+        const modOffEndY = offEndY % sizeAndGapY;
+        const segStartY = Math.floor((offStartY + autoMatrix.gapY) / sizeAndGapY);
+
+        const margStartY = modOffStartY < autoMatrix.height ? 0 : sizeAndGapY - (offStartY % sizeAndGapY);
+
+        const segmentsY = (autoMatrix.markerHeight + autoMatrix.gapY) / sizeAndGapY;
+        const segEndY = (segmentsY - 1) - Math.max(0, Math.floor((offEndY + autoMatrix.gapY) / sizeAndGapY));
+
+        const hiddenEndY = modOffEndY >= autoMatrix.height ? 0 : modOffEndY;
+
+        const gapX = border + (sizeX + border) * autoMatrix.gapX;
+        const gapY = border + (sizeY + border) * autoMatrix.gapY;
+
+        const style = {
+            display: 'grid',
+            gridColumnGap: gapX + 'px',
+            gridRowGap: gapY + 'px'
+        };
+
+        const cells = [];
+        const xSizes = [];
+        const ySizes = [];
+        for (let y = segStartY; y <= segEndY; y++) {
+            let cellsY = autoMatrix.height;
+            let rowStyle = null;
+            if (y === segStartY) {
+                if (margStartY) {
+                    rowStyle = {marginTop: margStartY * sizeY};
+                    cellsY += margStartY;
+                } else if (modOffStartY < autoMatrix.height) {
+                    cellsY -= modOffStartY
+                }
+            }
+            if (y === segEndY) {
+                cellsY -= hiddenEndY
+            }
+            ySizes.push(
+                (sizeY + (sizeY + border) * (cellsY - 1)) + 'px'
+            );
+
+            for (let x = segStartX; x <= segEndX; x++) {
+                let cellsX = autoMatrix.width;
+                let style = rowStyle ? { ...rowStyle } : null;
+                if (x === segStartX) {
+                    if (margStartX) {
+                        if (style === null) {
+                            style = {};
+                        }
+                        style.marginLeft = margStartX * sizeX;
+                        cellsX += margStartX
+
+                    } else if (modOffStartX < autoMatrix.width) {
+                        cellsX -= modOffStartX;
+                    }
+                }
+                if (x === segEndX) {
+                    cellsX -= hiddenEndX;
+                }
+                if (y === segStartY) {
+                    xSizes.push((sizeX + (sizeX + border) * (cellsX - 1)) + 'px');
+                }
+                cells.push(<div key={y + ' ' + x} style={style} className={markerCls + ((x + y) % 2 === 1 ? ' alt-cell' : '')}></div>);
+            }
+        }
+        style.gridTemplateColumns = xSizes.join(' ');
+        style.gridTemplateRows = ySizes.join(' ');
+        matrix =
+            <div style={style}>
+                {cells}
+            </div>;
+    } else if (props.matrix) {
+       /*
+        const style = {
+            display: 'grid',
+            gridColumnGap: props.border + 'px',
+            gridRowGap: props.border + 'px'
+        };
+        const xMax = Math.min(props.matrix[0].length, props.width);
+        const yMax = Math.min(props.matrix.length, props.height);
+        const cells = [];
+        const xSizes = [];
+        const ySizes = [];
+        for (let y = 0; y < yMax; y++) {
+            ySizes.push(sizeY + 'px');
+            for (let x = 0; x < xMax; x++) {
+                if (y === 0) {
+                    xSizes.push(sizeX + 'px');
+                }
+                cells.push(<div key={y + ' ' + x} className={props.matrix[y][x] ? '' : markerCls}></div>);
+            }
+        }
+        style.gridTemplateColumns = xSizes.join(' ');
+        style.gridTemplateRows = ySizes.join(' ');
+        matrix =
+            <div style={style}>
+                {cells}
+            </div>;
+
+        */
+    }
 
     return (
         <div {...divAttr}>

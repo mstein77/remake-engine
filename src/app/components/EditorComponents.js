@@ -2,7 +2,7 @@ import React, { useRef, useContext, useMemo, useState } from "react";
 import { FilterIndex } from "../classes/EntityIndex";
 import { EditorContext, CssContext, EditorCtx, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
 import { d, rgb2hex, getCanvasForBitmap, getImageDataForImage, clamp } from "../helper/helper";
-import { PictureCell } from "./BaseComponents";
+import {Dim, PictureCell} from "./BaseComponents";
 import { Button, Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden } from "./FormComponents";
 import { Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections } from "./EntityComponents";
@@ -501,8 +501,44 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
                 }
                 {selection.multi && markerX !== null &&
                     <Tuple name="Gap:"
-                           x={markerGapX} setX={setMarkerGapX} min={0}
-                           y={markerGapY} setY={setMarkerGapY}
+                           x={markerGapX}
+                           setX={
+                                value => {
+                                    const oversize = markerWidth - selection.width;
+                                    const sectors = (oversize / (selection.width + markerGapX));
+                                    const newWidth = selection.width + sectors * (selection.width + value);
+                                    setMarkerGapX(value);
+                                    setMarkerWidth(newWidth);
+                                }
+                           }
+                           maxX={
+                               markerGapX + Math.floor(
+                                   (gridWidth - (markerX + markerWidth)) / (
+                                       markerWidth <= (selection.width * 2 + markerGapX) ?
+                                           1 :
+                                           ((markerWidth - selection.width)/(selection.width + markerGapX))
+                                   )
+                               )
+                           }
+                           y={markerGapY}
+                           setY={
+                               (value) => {
+                                   const oversize = markerHeight - selection.height;
+                                   const sectors = (oversize / (selection.height + markerGapY));
+                                   const newHeight = selection.height + sectors * (selection.height + value);
+                                   setMarkerGapY(value);
+                                   setMarkerHeight(newHeight);
+                               }}
+                           maxY={
+                               markerGapY + Math.floor(
+                                   (gridHeight - (markerY + markerHeight)) / (
+                                       markerHeight <= (selection.height * 2 + markerGapY) ?
+                                           1 :
+                                           ((markerHeight - selection.height) / (selection.height + markerGapY))
+                                   )
+                               )
+                           }
+                           min={0}
                     />
                 }
                 {markerX !== null &&

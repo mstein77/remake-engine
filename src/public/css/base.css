@@ -207,10 +207,33 @@ html, body {
     flex-direction: column-reverse !important
 }
 
-@-webkit-keyframes blinker {
+@-webkit-keyframes old-blinker {
     from {opacity: 1.0;}
     to {opacity: 0.4;}
 }
+
+@-webkit-keyframes blinker {
+    from {
+        filter: invert(0%);
+        opacity: 1.0;
+    }
+    to {
+        filter: invert(50%);
+        opacity: 0.7;
+    }
+}
+
+@-webkit-keyframes blinker-alt {
+    from {
+        filter: invert(50%);
+        opacity: 0.7;
+    }
+    to {
+        filter: invert(0%);
+        opacity: 1.0;
+    }
+}
+
 
 @-webkit-keyframes input-warning {
     from {background-color: var(--input-bg-color)}
@@ -237,9 +260,10 @@ input:invalid {
     Theme-Css
 */
 
+
 .blink {
     -webkit-animation-name: blinker;
-    -webkit-animation-duration: 0.6s;
+    -webkit-animation-duration: 0.8s;
     -webkit-animation-iteration-count:infinite;
     -webkit-animation-timing-function:ease-in-out;
     -webkit-animation-direction: alternate;
@@ -253,7 +277,12 @@ input:invalid {
 }
 
 .marker-cell {
-    background-color: var(--marker-color)
+    background-color: var(--marker-color);
+}
+
+.alt-cell {
+/*    -webkit-animation-name: blinker-alt !important */
+    background-color: #000000A0 !important;
 }
 
 .marker-cell-highlight {
