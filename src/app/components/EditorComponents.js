@@ -389,7 +389,9 @@ function BitmapSelectorInner({ save, close, selection }) {
         });
     };
 
-    const doSave = () => save(eContext.selection);
+    const doSave = () => save(eContext.getSelection());
+
+    selection.doubleClick = doSave;
 
     return (
         <OkCancelForm submit full save={doSave} cancel={close}>
@@ -416,7 +418,7 @@ function BitmapSelectorInner({ save, close, selection }) {
                         />
                     }
                 </Block>
-                <Hidden invalid={!(eContext.selection.getType() === 'rect')} />
+                <Hidden invalid={!eContext.hasSelection} />
             </Stack>
 
             <NewImageModal.content name="Add new Image" width={400}>
@@ -435,6 +437,8 @@ function BitmapSelector(props) {
 }
 
 function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
+    const eContext = useContext(EditorContext);
+
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
     const [width, setWidth] = useState(100);
@@ -448,6 +452,7 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     const [markerHeight, setMarkerHeight] = useState(null);
     const [markerGapX, setMarkerGapX] = useState(0);
     const [markerGapY, setMarkerGapY] = useState(0);
+    const [markerType, setMarkerType] = useState('rect');
 
     const bitmapGrid = useMemo(() => {
         return new BitmapGrid({image: getImageDataForImage(image)});
@@ -463,6 +468,12 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     const gridWidth = bitmapGrid.getWidth();
     const gridHeight = bitmapGrid.getHeight();
 
+    const showPin = selection.unfix && eContext.mode === 'select' && markerX !== null;
+    const isPinned = (showPin && eContext.modeParams.fixed);
+
+    const sectorWidth = eContext.modeParams.width;
+    const sectorHeight = eContext.modeParams.height;
+
     return (
         <Stack vertical borders full>
             <Toolbar full="h">
@@ -474,16 +485,18 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
             </Toolbar>
             <Block full>
                 <FlexGrid
+                    modes={['select', 'markerMove']} mode="select" modeParams={selection}
                     gridProvider={bitmapGrid} cellType={cellType}
                     zoom={zoom} border={border} rulers={rulers}
                     posX={posX} setPosX={setPosX} posY={posY} setPosY={setPosY}
                     width={width} setWidth={setWidth} height={height} setHeight={setHeight}
                     gridWidth={gridWidth} gridHeight={gridHeight}
-                    selection={selection}
                     markerX={markerX} markerY={markerY} setMarkerX={setMarkerX} setMarkerY={setMarkerY}
                     markerWidth={markerWidth} markerHeight={markerHeight}
                     markerGapX={markerGapX} markerGapY={markerGapY}
+                    setMarkerType={setMarkerType} markerType={markerType}
                     setMarkerWidth={setMarkerWidth} setMarkerHeight={setMarkerHeight}
+                    pinned={isPinned}
                     onDoubleClick={onDoubleClick}
                 />
             </Block>
@@ -495,18 +508,18 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
                 }
                 {markerX !== null &&
                     <Tuple name="Size:"
-                           x={markerWidth} setX={setMarkerWidth} maxX={selection.width} minX={selection.width}
-                           y={markerHeight} setY={setMarkerHeight} maxY={selection.height} minY={selection.height}
-                           readOnly={selection.fixed} />
+                           x={isPinned ? sectorWidth : markerWidth} setX={setMarkerWidth} maxX={isPinned ? markerWidth : gridWidth - (markerX + markerWidth)} minX={isPinned ? markerWidth : 1}
+                           y={isPinned ? sectorHeight : markerHeight} setY={setMarkerHeight} xmaxY={isPinned ? markerHeight : gridHeight - (markerY + markerHeight)} minY={isPinned ? markerHeight : 1}
+                           readOnly={selection.fixed || isPinned} />
                 }
                 {selection.multi && markerX !== null &&
                     <Tuple name="Gap:"
                            x={markerGapX}
                            setX={
                                 value => {
-                                    const oversize = markerWidth - selection.width;
-                                    const sectors = (oversize / (selection.width + markerGapX));
-                                    const newWidth = selection.width + sectors * (selection.width + value);
+                                    const oversize = markerWidth - sectorWidth;
+                                    const sectors = (oversize / (sectorWidth + markerGapX));
+                                    const newWidth = sectorWidth + sectors * (sectorWidth + value);
                                     setMarkerGapX(value);
                                     setMarkerWidth(newWidth);
                                 }
@@ -514,27 +527,27 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
                            maxX={
                                markerGapX + Math.floor(
                                    (gridWidth - (markerX + markerWidth)) / (
-                                       markerWidth <= (selection.width * 2 + markerGapX) ?
+                                       markerWidth <= (sectorWidth * 2 + markerGapX) ?
                                            1 :
-                                           ((markerWidth - selection.width)/(selection.width + markerGapX))
+                                           ((markerWidth - sectorWidth)/(sectorWidth + markerGapX))
                                    )
                                )
                            }
                            y={markerGapY}
                            setY={
                                (value) => {
-                                   const oversize = markerHeight - selection.height;
-                                   const sectors = (oversize / (selection.height + markerGapY));
-                                   const newHeight = selection.height + sectors * (selection.height + value);
+                                   const oversize = markerHeight - sectorHeight;
+                                   const sectors = (oversize / (sectorHeight + markerGapY));
+                                   const newHeight = sectorHeight + sectors * (sectorHeight + value);
                                    setMarkerGapY(value);
                                    setMarkerHeight(newHeight);
                                }}
                            maxY={
                                markerGapY + Math.floor(
                                    (gridHeight - (markerY + markerHeight)) / (
-                                       markerHeight <= (selection.height * 2 + markerGapY) ?
+                                       markerHeight <= (sectorHeight * 2 + markerGapY) ?
                                            1 :
-                                           ((markerHeight - selection.height) / (selection.height + markerGapY))
+                                           ((markerHeight - sectorHeight) / (sectorHeight + markerGapY))
                                    )
                                )
                            }
@@ -550,6 +563,24 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
                             setMarkerHeight(null)
                         }
                     } />
+                }
+                {showPin &&
+                    <Button
+                        icon="push_pin"
+                        value={true}
+                        current={isPinned}
+                        onClick={() => {
+                            const newParams = { ...eContext.modeParams, fixed: !isPinned };
+                            newParams.width = newParams.fixed ? markerWidth : sectorWidth;
+                            newParams.height = newParams.fixed ? markerHeight : sectorHeight;
+
+                            if (!newParams.fixed) {
+                                setMarkerWidth(sectorWidth);
+                                setMarkerHeight(sectorHeight);
+                            }
+                            eContext.setMode('select', newParams);
+                        }}
+                    />
                 }
             </Toolbar>
         </Stack>

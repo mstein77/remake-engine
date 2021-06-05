@@ -176,7 +176,7 @@ function Form({ children, submit, ...props }) {
     const value = {
         invalid,
         markInvalid: () => {
-            if (!invalid) {
+            if (!invalidRef.current) {
                 setInvalid(true)
             }
         }

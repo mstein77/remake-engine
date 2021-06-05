@@ -9,7 +9,8 @@ import {
     WindowContext,
     EditorContext
 } from "./BasicComponents";
-import { d, clamp } from "../helper/helper";
+import { d, clamp, areDisjoint } from "../helper/helper";
+import {CellSelection} from "../classes/CellProvider";
 
 function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onMove, onResize, autoMatrix }) {
     const gContext = useContext(GridContext);
@@ -318,10 +319,7 @@ function CellGrid({ gridProvider, cellType, posX, posY, width, height, border, z
     );
 
     useEffect(() => {
-        gContext.boundingRectRef.current = gridRef.current.getBoundingClientRect();
-        return () => {
-            gContext.boundingRectRef.current = null;
-        }
+        gContext.boundingRectRef.current = gridRef.current.getBoundingClientRect()
     });
 
     return (
@@ -333,9 +331,10 @@ function CellGrid({ gridProvider, cellType, posX, posY, width, height, border, z
 
 class AutoScroll {
 
-    constructor(propsRef, callback) {
+    constructor(setter, propsRef, callback) {
         this.id = null;
         this.propsRef = propsRef;
+        this.setter = setter;
         this.x = null;
         this.y = null;
         this.callback = callback;
@@ -371,37 +370,37 @@ class AutoScroll {
             this.id = null;
             return
         }
-        const props = this.propsRef.current;
+        const { posX, posY, width, height } = this.propsRef.current;
+        const { setPosX, setPosY } = this.setter;
         let deltaX = 0;
         if (this.x) {
-            const newPosX = clamp(0, props.posX + this.x, this.maxX - props.width);
-            if (newPosX !== props.posX) {
-                deltaX = newPosX - props.posX;
-                props.setPosX(newPosX);
-
+            const newPosX = clamp(0, posX + this.x, this.maxX - width);
+            if (newPosX !== posX) {
+                deltaX = newPosX - posX;
+                setPosX(newPosX);
             }
         }
         let deltaY = 0;
         if (this.y) {
-            const newPosY = clamp(0, props.posY + this.y, this.maxY - props.height);
-            if (newPosY !== props.posY) {
-                deltaY = newPosY - props.posY;
-                props.setPosY(newPosY);
+            const newPosY = clamp(0, posY + this.y, this.maxY - height);
+            if (newPosY !== posY) {
+                deltaY = newPosY - posY;
+                setPosY(newPosY);
             }
         }
         if (this.callback) {
-            this.callback(props, deltaX, deltaY);
+            this.callback(this.propsRef.current, deltaX, deltaY);
         }
         this.init();
     }
 
     check(pos) {
-        const props = this.propsRef.current;
-        this.x = (pos.rawX < 0 || pos.rawX >= props.width) ?
-            (pos.rawX < 0 ? pos.rawX : pos.rawX - props.width + 1) : null;
+        const { width, height } = this.propsRef.current;
+        this.x = (pos.rawX < 0 || pos.rawX >= width) ?
+            (pos.rawX < 0 ? pos.rawX : pos.rawX - width + 1) : null;
         //const scrollY = autoScrollMarker === null || autoScrollMarker.resizeY;
-        this.y = (/*scrollY &&*/ pos.rawY < 0 || pos.rawY >= props.height) ?
-            (pos.rawY < 0 ? pos.rawY : pos.rawY - props.height + 1) : null;
+        this.y = (/*scrollY &&*/ pos.rawY < 0 || pos.rawY >= height) ?
+            (pos.rawY < 0 ? pos.rawY : pos.rawY - height + 1) : null;
 
         if (this.x || this.y) {
             if (!this.id) {
@@ -454,512 +453,91 @@ function setMarkerResizeChanges(axis, change, dist, attr) {
 
 const GridContext = React.createContext();
 
-function FlexGridInner({
-            gridProvider, cellType, gridWidth, gridHeight,
-            width, setWidth, height, setHeight,
-            border, zoom, rulers, selection,
-            posX, setPosX, posY, setPosY,
-            markerX, markerY, markerType = 'rect', markerWidth, markerHeight,
-            setMarkerX, setMarkerY, setMarkerType, setMarkerWidth, setMarkerHeight,
-            markerGapX, markerGapY,
-            onDoubleClick
-        }) {
+function MarkerAutoSubGrid({ width, height, gapX, gapY, markerWidth, markerHeight, offStartX, offEndX, offStartY, offEndY, border, sizeX, sizeY }) {
+    const sizeAndGapX = width + gapX;
+    const modOffStartX = offStartX % sizeAndGapX;
+    const modOffEndX = offEndX % sizeAndGapX;
+    const segStartX = Math.floor((offStartX + gapX) / sizeAndGapX);
 
-    const aContext = useContext(AvailContext);
-    const cssContext = useContext(CssContext);
-    const wContext = useContext(WindowContext);
-    const eContext = useContext(EditorContext);
+    const margStartX = modOffStartX < width ? 0 : sizeAndGapX - (offStartX % sizeAndGapX);
 
-    const cursorType = markerType;
-    const cursorWidth = 1;
-    const cursorHeight = 1;
-    let trackX = true;
-    let trackY = true;
-    if (cursorType !== 'rect') {
-        if (cursorType.startsWith('column')) {
-            trackY = false;
-        } else if (cursorType.startsWith('row')) {
-            trackX = false;
-        }
-    }
-    let autoMatrix = null;
-    if (selection.fixed) {
-        autoMatrix = {
-            gapX: markerGapX,
-            gapY: markerGapY,
-            markerWidth,
-            markerHeight,
-            width: selection.width,
-            height: selection.height,
-            offStartX: Math.max(posX - markerX, 0),
-            offEndX: Math.max(markerX + markerWidth - (posX + width), 0),
-            offStartY: Math.max(posY - markerY, 0),
-            offEndY: Math.max(markerY + markerHeight - (posY + height), 0)
-        };
-    }
+    const segmentsX = (markerWidth + gapX) / sizeAndGapX;
+    const segEndX = (segmentsX - 1) - Math.max(0, Math.floor((offEndX + gapX) / sizeAndGapX));
 
-    const propsRef = useRef(null);
-    propsRef.current = {
-        gridWidth, gridHeight, width, height, posX, setPosX, posY, setPosY,
-        markerX, setMarkerX, markerY, setMarkerY, markerWidth, markerHeight,
-        markerGapX, markerGapY
+    const hiddenEndX = modOffEndX >= width ? 0 : modOffEndX;
+
+    const sizeAndGapY = height + gapY;
+    const modOffStartY = offStartY % sizeAndGapY;
+    const modOffEndY = offEndY % sizeAndGapY;
+    const segStartY = Math.floor((offStartY + gapY) / sizeAndGapY);
+
+    const margStartY = modOffStartY < height ? 0 : sizeAndGapY - (offStartY % sizeAndGapY);
+
+    const segmentsY = (markerHeight + gapY) / sizeAndGapY;
+    const segEndY = (segmentsY - 1) - Math.max(0, Math.floor((offEndY + gapY) / sizeAndGapY));
+
+    const hiddenEndY = modOffEndY >= height ? 0 : modOffEndY;
+
+    const style = {
+        display: 'grid',
+        gridColumnGap: (border + (sizeX + border) * gapX) + 'px',
+        gridRowGap: (border + (sizeY + border) * gapY) + 'px'
     };
 
-    const setState = useMemo(
-        () =>
-            change => {
-                d(change);
-                const props = propsRef.current;
-                if (change.markerType !== undefined && change.markerType !== props.markerType) {
-                    d('-> markerType', change.markerType, props.markerType);
-                    setMarkerType(change.markerType);
-                } else {
-                    change.markerType = props.markerType;
-                }
-                if (change.markerHeight !== undefined && change.markerHeight !== props.markerHeight) {
-                    d('-> markerHeight', change.markerHeight, props.markerHeight);
-                    setMarkerHeight(change.markerHeight);
-                } else {
-                    change.markerHeight = props.markerHeight;
-                }
-                if (change.markerWidth !== undefined && change.markerWidth !== props.markerWidth) {
-                    d('-> markerWidth', change.markerWidth, props.markerWidth);
-                    setMarkerWidth(change.markerWidth);
-                } else {
-                    change.markerWidth = props.markerWidth;
-                }
-                if (change.markerX !== undefined && change.markerX !== props.markerX) {
-                    d('-> markerX', change.markerX, props.markerX);
-                    setMarkerX(change.markerX);
-                } else {
-                    change.markerX = props.markerX;
-                }
-                if (change.markerY !== undefined && change.markerY !== props.markerY) {
-                    d('-> markerY', change.markerY, props.markerY);
-                    setMarkerY(change.markerY);
-                } else {
-                    change.markerY = props.markerY;
-                }
-                if (change.posX !== undefined && change.posX !== props.posX) {
-                    d('-> posX', change.posX, props.posX);
-                    props.setPosX(change.posX);
-                } else {
-                    change.posX = props.posX;
-                }
-                if (change.posY !== undefined && change.posY !== props.posY) {
-                    d('-> posY', change.posY, props.posY);
-                    setPosY(change.posY);
-                } else {
-                    change.posY = props.posY;
-                }
+    const markerCls = 'marker-cell-highlight';
 
-                if (!change.added || change.markerX === null) {
-                    return;
-                }
+    const cells = [];
+    const xSizes = [];
+    const ySizes = [];
+    for (let y = segStartY; y <= segEndY; y++) {
+        let cellsY = height;
+        let rowStyle = null;
+        if (y === segStartY) {
+            if (margStartY) {
+                rowStyle = {marginTop: margStartY * sizeY};
+                cellsY += margStartY;
+            } else if (modOffStartY < height) {
+                cellsY -= modOffStartY
+            }
+        }
+        if (y === segEndY) {
+            cellsY -= hiddenEndY
+        }
+        ySizes.push(
+            (sizeY + (sizeY + border) * (cellsY - 1)) + 'px'
+        );
 
-                const isGap = change.markerType.endsWith('gap');
-                const checkX = change.axis === 'x' && !change.markerType.startsWith('row');
-                const checkY = change.axis === 'y' && !change.markerType.startsWith('column');
-                let reset = false;
-
-                if (checkX) {
-                    if (change.start) {
-                        setMarkerX(Math.max(change.markerX + change.added, 0));
-                        if (isGap) {
-                            if (change.markerX + change.added < 0) {
-                                reset = true;
-                            }
-                        } else {
-                            const markerWidth = change.markerWidth + Math.min(change.markerX + change.added, 0);
-                            if (markerWidth <= 0) {
-                                reset = true;
-                            } else {
-                                setMarkerWidth(markerWidth);
-                            }
-                        }
-                    } else if (change.added < 0) {
-                        const newWidth = props.gridWidth;
-                        if (isGap) {
-                            if (newWidth < change.markerX) {
-                                reset = true;
-                            }
-                        } else {
-                            if ((change.markerX + change.markerWidth) > newWidth) {
-                                if (newWidth <= change.markerX) {
-                                    reset = true;
-                                } else {
-                                    setMarkerWidth(newWidth - change.markerX);
-                                }
-                            }
-                        }
+        for (let x = segStartX; x <= segEndX; x++) {
+            let cellsX = width;
+            let style = rowStyle ? { ...rowStyle } : null;
+            if (x === segStartX) {
+                if (margStartX) {
+                    if (style === null) {
+                        style = {};
                     }
+                    style.marginLeft = margStartX * sizeX;
+                    cellsX += margStartX
+
+                } else if (modOffStartX < width) {
+                    cellsX -= modOffStartX
                 }
-
-                if (checkY) {
-                    if (change.start) {
-                        setMarkerY(Math.max(change.markerY + change.added, 0));
-                        if (isGap) {
-                            if (change.markerY + change.added < 0) {
-                                reset = true;
-                            }
-                        } else {
-                            const markerHeight = change.markerHeight + Math.min(change.markerY + change.added, 0);
-                            if (markerHeight <= 0) {
-                                reset = true;
-                            } else {
-                                setMarkerHeight(markerHeight);
-                            }
-                        }
-                    } else if (change.added < 0) {
-                        const newHeight = props.gridHeight;
-                        if (isGap) {
-                            if (newHeight < change.markerY) {
-                                reset = true;
-                            }
-                        } else {
-                            if ((change.markerY + change.markerHeight) > newHeight) {
-                                if (newHeight <= change.markerY) {
-                                    reset = true;
-                                } else {
-                                    setMarkerHeight(newHeight - change.markerY);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (reset) {
-                    setMarkerX(null);
-                    setMarkerY(null);
-                }
-        },
-        []
-    );
-
-    const value = useMemo(() => {
-        const sizeX = gridProvider.getCellSizeX();
-        const sizeY = gridProvider.getCellSizeY();
-        const cellSizeX = zoom * sizeX;
-        const cellSizeY = zoom * sizeY;
-
-        const cellPlusBorderSizeX = cellSizeX + border;
-        const cellPlusBorderSizeY = cellSizeY + border;
-
-        let spaceX = aContext.width - border - 2 * cssContext.values.defaultPadding -
-            (rulers ? 38 : 0);
-        let spaceY = aContext.height - border - 2 * cssContext.values.defaultPadding -
-            (rulers ? 22 : 0);
-
-        let maxPageX = Math.min(gridWidth, Math.floor(spaceX / cellPlusBorderSizeX));
-        let maxPageY = Math.min(gridHeight, Math.floor(spaceY / cellPlusBorderSizeY));
-
-        if (maxPageX < gridWidth) {
-            spaceY -= 21 // scrollbarHeight;
+            }
+            if (x === segEndX) {
+                cellsX -= hiddenEndX;
+            }
+            if (y === segStartY) {
+                xSizes.push((sizeX + (sizeX + border) * (cellsX - 1)) + 'px');
+            }
+            cells.push(<div key={y + ' ' + x} style={style} className={markerCls + ((x + y) % 2 === 1 ? ' alt-cell' : '')}></div>)
         }
-        if (maxPageY < gridHeight) {
-            spaceX -= 21 // scrollbarWidth;
-        }
-
-        maxPageX = Math.floor(spaceX / cellPlusBorderSizeX);
-        maxPageY = Math.floor(spaceY / cellPlusBorderSizeY);
-
-        return {
-            border,
-            zoom,
-            sizeX,
-            sizeY,
-            cellSizeX,
-            cellSizeY,
-            cellPlusBorderSizeX,
-            cellPlusBorderSizeY,
-            spaceX,
-            spaceY,
-            maxPageX,
-            maxPageY,
-            boundingRectRef: {current: null}
-        }
-    }, [zoom, border, gridWidth, gridHeight, rulers, aContext.width, aContext.height]);
-    if (aContext.width === 0 || aContext.height === 0) return '';
-
-    const maxPosX = gridWidth - value.maxPageX;
-    const maxPosY = gridHeight - value.maxPageY;
-
-    if (posX > maxPosX) setPosX(maxPosX);
-    if (posY > maxPosY) setPosY(maxPosY);
-
-
-    if (value.maxPageX !== width) {
-        setWidth(value.maxPageX);
-        width = value.maxPageX
     }
-    if (value.maxPageY != height) {
-        setHeight(value.maxPageY);
-        height = value.maxPageY
-    }
-    value.dimX = width * value.cellPlusBorderSizeX + border;
-    value.dimY = height * value.cellPlusBorderSizeY + border;
-
-    const setMarker = (e, x, y) => {
-        wContext.startExclusiveMode('set-marker');
-        wContext.addEventListener('mouseup', () => {
-            wContext.endExclusiveMode('set-marker')
-        }, {once: true});
-        eContext.setSelection(gridProvider.getSelection(x, y, selection.width, selection.height));
-        setMarkerX(x);
-        setMarkerY(y);
-        setMarkerWidth(selection.width);
-        setMarkerHeight(selection.height)
-    };
-
-    const getGridPosFromEvent = (e, outside = false, isGap = false) => {
-        return getGridPosFromClient({x: e.clientX, y: e.clientY}, outside, isGap);
-    };
-
-    const getGridPosFromClient = (client, outside = false, isGap = false) => {
-        const rect = value.boundingRectRef.current;
-        if (!rect) return null;
-
-        const adjustPosX = isGap ? value.cellPlusBorderSizeX >> 1 : 0;
-        const adjustPosY = isGap ? value.cellPlusBorderSizeY >> 1 : 0;
-        const rasterPos = {
-            x: Math.floor(Math.round(client.x - rect.left + adjustPosX)/value.cellPlusBorderSizeX),
-            y: Math.floor(Math.round(client.y - rect.top + adjustPosY)/value.cellPlusBorderSizeY),
-        };
-        let maxX = propsRef.current.width;
-        let maxY = propsRef.current.height;
-        if (!isGap) {
-            maxX++;
-            maxY++;
-        }
-        rasterPos.rawX = rasterPos.x;
-        rasterPos.rawY = rasterPos.y;
-        if (!outside) {
-            if (rasterPos.x < 0) {
-                rasterPos.x = 0;
-            } else if (rasterPos.x > maxX) {
-                rasterPos.x = maxX;
-            }
-            if (rasterPos.y < 0) {
-                rasterPos.y = 0;
-            } else if (rasterPos.y > maxY) {
-                rasterPos.y = maxY;
-            }
-        }
-        return rasterPos;
-    };
-
-    const moveMarker = e => {
-        const pos = getGridPosFromEvent(e);
-        let lastX = pos.x;
-        let lastY = pos.y;
-        const grabX = pos.x - (markerX - posX);
-        const grabY = pos.y - (markerY - posY);
-
-        const autoScroll = new AutoScroll(propsRef, (props, x, y) => {
-            let newMarkerX = clamp(0, props.markerX + x, gridWidth - markerWidth);
-            if (props.markerX !== newMarkerX) {
-                setMarkerX(newMarkerX);
-            }
-            const newMarkerY = clamp(0, props.markerY + y, gridHeight - markerHeight);
-            if (props.markerY !== newMarkerY) {
-                setMarkerY(newMarkerY);
-            }
-        });
-
-        wContext.startExclusiveMode('marker-move', 'grabbing');
-        wContext.addEventListener('mousemove', e => {
-            const pos = getGridPosFromEvent(e);
-            const props = propsRef.current;
-
-            const checkX = pos.x !== lastX;
-            if (checkX) {
-                const newMarkerX = clamp(0, props.posX + pos.x - grabX, gridWidth - markerWidth);
-                if (propsRef.markerX !== newMarkerX) {
-                    setMarkerX(newMarkerX);
-                }
-                lastX = pos.x;
-            }
-            const checkY = pos.y !== lastY;
-            if (checkY) {
-                const newMarkerY = clamp(0, props.posY + pos.y - grabY, gridHeight - markerHeight);
-                if (propsRef.markerY !== newMarkerY) {
-                    setMarkerY(newMarkerY);
-                }
-                lastY = pos.y;
-            }
-            autoScroll.check(pos);
-        });
-        wContext.addEventListener('mouseup', e => {
-            wContext.endExclusiveMode('marker-move');
-            const props = propsRef.current;
-            eContext.setSelection(gridProvider.getSelection(props.markerX, props.markerY, props.markerWidth, props.markerHeight));
-            autoScroll.reset()
-        }, {once: true})
-    };
-
-    const resizeMarker = (e, resize) => {
-        const {startX, startY, cursor, axis} = resize;
-
-        const baseWidth = selection.width;
-        const baseHeight = selection.height;
-
-        const anchorPos = {
-            x: markerX + (!startX ? 0 : markerWidth - baseWidth),
-            y: markerY + (!startY ? 0 : markerHeight - baseHeight)
-        };
-        const resizeX = trackX && axis.indexOf('x') !== -1;
-        const resizeY = trackY && axis.indexOf('y') !== -1;
-
-        let lastRasterPos = getGridPosFromEvent(e, true);
-
-        const attr = {
-            x: {
-                markerSize: 'markerWidth',
-                markerPos: 'markerX',
-                gap: markerGapX,
-                base: baseWidth,
-                size: gridWidth
-            },
-            y: {
-                markerSize: 'markerHeight',
-                markerPos: 'markerY',
-                gap: markerGapY,
-                base: baseHeight,
-                size: gridHeight
-            },
-            anchorPos,
-            resizeX,
-            resizeY
-        };
-
-        const autoScroll = new AutoScroll(propsRef, (props, x, y) => {
-            const change = {};
-            if (resizeX && x !== 0) {
-                const posX =
-                    clamp(0,props.posX + x, props.gridWidth - props.width);
-                const anchorX = anchorPos.x;
-                const anchorDistX = posX - anchorX + (x > 0 ? props.width : 0);
-                setMarkerResizeChanges('x', change, anchorDistX, attr);
-            }
-            if (resizeY && y !== 0) {
-                const posY =
-                    clamp(0,props.posY + y, props.gridHeight - props.height);
-                const anchorY = anchorPos.y;
-                const anchorDistY = posY - anchorY + (y > 0 ? props.height : 0);
-                setMarkerResizeChanges('y', change, anchorDistY, attr);
-            }
-            setState(change);
-        });
-
-        const checkWithLastRasterPos = e => {
-            const props = propsRef.current;
-            const newRasterPos = getGridPosFromEvent(e, true);
-            autoScroll.check(newRasterPos);
-
-            if (newRasterPos === null) {
-                return;
-            }
-
-            // distFromAnchor (+ => right from anchor, - = left from anchor)
-            const anchorDistX = newRasterPos.x + props.posX - anchorPos.x;
-            const anchorDistY = newRasterPos.y + props.posY - anchorPos.y;
-
-            const validX =
-                (resizeX  // resizing in X dir allowed
-                    && newRasterPos.x + 1 >= 0 // new rasterPos in Range [-1, ..., width]
-                    && newRasterPos.x <= props.width
-                );
-
-            const validY = (resizeY && anchorDistY !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= props.height);
-
-            // rasterPos valid and has changed since last check?
-            const hasChanged =
-                (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
-                (validX || validY);
-
-            if (hasChanged) {
-                lastRasterPos = newRasterPos;
-                const change = {};
-
-                if (validX) {
-                    setMarkerResizeChanges('x', change, anchorDistX, attr);
-                }
-                if (validY) {
-                    setMarkerResizeChanges('y', change, anchorDistY, attr);
-                }
-                setState(change)
-            }
-        };
-
-        wContext.startExclusiveMode('marker-resize', cursor);
-        wContext.addEventListener('mousemove', e => {
-            checkWithLastRasterPos(e);
-            e.stopPropagation();
-            e.preventDefault();
-        });
-
-        wContext.addEventListener('mouseup', e => {
-            wContext.endExclusiveMode('marker-resize');
-            autoScroll.reset();
-            e.stopPropagation();
-            e.preventDefault()
-        }, {once: true});
-    };
+    style.gridTemplateColumns = xSizes.join(' ');
+    style.gridTemplateRows = ySizes.join(' ');
     return (
-        <GridContext.Provider value={value}>
-            <ScrollArea
-                full
-                x={posX} setX={setPosX} maxX={gridWidth} pageX={width}
-                y={posY} setY={setPosY} maxY={gridHeight} pageY={height}
-            >
-                <Block full centerItems>
-                    <Overlays originX={rulers ? 38 : 0} originY={rulers ? 22 : 0} width={value.dimX} height={value.dimY} className="overflow">
-                        <CellGrid
-                            posX={posX} posY={posY} width={width} height={height}
-                            border={border} zoom={zoom} cellType={cellType}
-                            gridProvider={gridProvider}
-                        />
-                        {rulers &&
-                            <GridRulerH posX={posX} width={width} />
-                        }
-                        {rulers &&
-                            <GridRulerV posY={posY} height={height} />
-                        }
-                        <GridCursorOverlay
-                            posX={posX} posY={posY}
-                            width={width} height={height}
-                            cursorWidth={selection.width} cursorHeight={selection.height}
-                            gridWidth={gridWidth} gridHeight={gridHeight}
-                            onMouseDown={setMarker}
-                            inclusion={true}
-                            cursorType="rect"
-                        />
-                        {markerX !== null &&
-                            <GridMarkerOverlay
-                                posX={posX} posY={posY}
-                                width={width} height={height}
-                                onDoubleClick={onDoubleClick}
-                                onMove={moveMarker}
-                                onResize={resizeMarker}
-                                autoMatrix={autoMatrix}
-                                markerX={markerX} markerY={markerY}
-                                markerWidth={markerWidth} markerHeight={markerHeight}
-                                markerType="rect"
-                            />
-                        }
-                    </Overlays>
-                </Block>
-            </ScrollArea>
-        </GridContext.Provider>
+        <div style={style}>
+            {cells}
+        </div>
     )
-}
-
-function FlexGrid(props) {
-    return (
-        <AvailContextProvider>
-            <FlexGridInner {...props} />
-        </AvailContextProvider>
-    );
 }
 
 function GridCellMarker({ dir = DIR.ALL, type, cursor, posX, posY, sizeX = 1, sizeY = 1, highlight, onClick, onResize, onMove, onMouseDown, onDoubleClick, zoom = 1, border = 0, width = 1, height = 1, moveCursor, autoMatrix, ...props }) {
@@ -1124,97 +702,7 @@ function GridCellMarker({ dir = DIR.ALL, type, cursor, posX, posY, sizeX = 1, si
     }
     let matrix = '';
     if (autoMatrix) {
-
-        const offStartX = autoMatrix.offStartX;
-        const offEndX = autoMatrix.offEndX;
-
-        const sizeAndGapX = autoMatrix.width + autoMatrix.gapX;
-        const modOffStartX = offStartX % sizeAndGapX;
-        const modOffEndX = offEndX % sizeAndGapX;
-        const segStartX = Math.floor((offStartX + autoMatrix.gapX) / sizeAndGapX);
-
-        const margStartX = modOffStartX < autoMatrix.width ? 0 : sizeAndGapX - (offStartX % sizeAndGapX);
-
-        const segmentsX = (autoMatrix.markerWidth + autoMatrix.gapX) / sizeAndGapX;
-        const segEndX = (segmentsX - 1) - Math.max(0, Math.floor((offEndX + autoMatrix.gapX) / sizeAndGapX));
-
-        const hiddenEndX = modOffEndX >= autoMatrix.width ? 0 : modOffEndX;
-
-        const offStartY = autoMatrix.offStartY;
-        const offEndY = autoMatrix.offEndY;
-
-        const sizeAndGapY = autoMatrix.height + autoMatrix.gapY;
-        const modOffStartY = offStartY % sizeAndGapY;
-        const modOffEndY = offEndY % sizeAndGapY;
-        const segStartY = Math.floor((offStartY + autoMatrix.gapY) / sizeAndGapY);
-
-        const margStartY = modOffStartY < autoMatrix.height ? 0 : sizeAndGapY - (offStartY % sizeAndGapY);
-
-        const segmentsY = (autoMatrix.markerHeight + autoMatrix.gapY) / sizeAndGapY;
-        const segEndY = (segmentsY - 1) - Math.max(0, Math.floor((offEndY + autoMatrix.gapY) / sizeAndGapY));
-
-        const hiddenEndY = modOffEndY >= autoMatrix.height ? 0 : modOffEndY;
-
-        const gapX = border + (sizeX + border) * autoMatrix.gapX;
-        const gapY = border + (sizeY + border) * autoMatrix.gapY;
-
-        const style = {
-            display: 'grid',
-            gridColumnGap: gapX + 'px',
-            gridRowGap: gapY + 'px'
-        };
-
-        const cells = [];
-        const xSizes = [];
-        const ySizes = [];
-        for (let y = segStartY; y <= segEndY; y++) {
-            let cellsY = autoMatrix.height;
-            let rowStyle = null;
-            if (y === segStartY) {
-                if (margStartY) {
-                    rowStyle = {marginTop: margStartY * sizeY};
-                    cellsY += margStartY;
-                } else if (modOffStartY < autoMatrix.height) {
-                    cellsY -= modOffStartY
-                }
-            }
-            if (y === segEndY) {
-                cellsY -= hiddenEndY
-            }
-            ySizes.push(
-                (sizeY + (sizeY + border) * (cellsY - 1)) + 'px'
-            );
-
-            for (let x = segStartX; x <= segEndX; x++) {
-                let cellsX = autoMatrix.width;
-                let style = rowStyle ? { ...rowStyle } : null;
-                if (x === segStartX) {
-                    if (margStartX) {
-                        if (style === null) {
-                            style = {};
-                        }
-                        style.marginLeft = margStartX * sizeX;
-                        cellsX += margStartX
-
-                    } else if (modOffStartX < autoMatrix.width) {
-                        cellsX -= modOffStartX;
-                    }
-                }
-                if (x === segEndX) {
-                    cellsX -= hiddenEndX;
-                }
-                if (y === segStartY) {
-                    xSizes.push((sizeX + (sizeX + border) * (cellsX - 1)) + 'px');
-                }
-                cells.push(<div key={y + ' ' + x} style={style} className={markerCls + ((x + y) % 2 === 1 ? ' alt-cell' : '')}></div>);
-            }
-        }
-        style.gridTemplateColumns = xSizes.join(' ');
-        style.gridTemplateRows = ySizes.join(' ');
-        matrix =
-            <div style={style}>
-                {cells}
-            </div>;
+        matrix = <MarkerAutoSubGrid border={border} sizeX={sizeX} sizeY={sizeY} { ...autoMatrix } />;
     } else if (props.matrix) {
        /*
         const style = {
@@ -1358,6 +846,745 @@ function GridRulerV({ posY, height, cellsPerLine }) {
         </Overlay>
     )
 }
+
+function useGridModes({modes, propsRef, cursor, marker, setter}) {
+    const wContext = useContext(WindowContext);
+    const eContext = useContext(EditorContext);
+    const gContext = useContext(GridContext);
+
+    const lastRef = useRef(null);
+
+    const lastClickRef = useRef(null);
+
+    return useMemo(() => {
+
+        const { gridProvider } = propsRef.current;
+        const {
+            setMarkerX, setMarkerY, setPosX, setPosY,
+            setCursorWidth, setCursorHeight, setCursorType,
+            setMarkerWidth, setMarkerHeight, setMarkerType
+        } = setter;
+        const setMode = eContext.setMode;
+
+        const setLastClick = (action, e, doubleClick) => {
+            if (!doubleClick) return;
+
+            const time = Date.now();
+
+            let newLastClick = {
+                action,
+                time,
+                x: e.clientX,
+                y: e.clientY
+            };
+            const lastClick = lastClickRef.current;
+            if (lastClick && lastClick.action === action) {
+                if (time - lastClick.time < 250 &&
+                    Math.abs(lastClick.x - newLastClick.x) < 10 &&
+                    Math.abs(lastClick.y - newLastClick.y) < 10)
+                {
+                    newLastClick = null;
+                    requestAnimationFrame(() => doubleClick());
+                }
+            }
+            lastClickRef.current = newLastClick;
+        };
+
+        const checkLastClick = e => {
+            const lastClick = lastClickRef.current;
+
+            if (lastClick) {
+                if (Date.now() - lastClick.time >= 250) {
+                    lastClick.current = null;
+                }
+            }
+        };
+
+        const setState =
+            change => {
+                const { markerType, markerHeight, markerWidth, markerX, markerY,
+                        posX, posY, gridWidth, gridHeight } = propsRef.current;
+                if (change.markerType !== undefined && change.markerType !== markerType) {
+                    d('-> markerType', change.markerType, markerType);
+                    setMarkerType(change.markerType);
+                } else {
+                    change.markerType = markerType;
+                }
+                if (change.markerHeight !== undefined && change.markerHeight !== markerHeight) {
+                    d('-> markerHeight', change.markerHeight, markerHeight);
+                    setMarkerHeight(change.markerHeight);
+                } else {
+                    change.markerHeight = markerHeight;
+                }
+                if (change.markerWidth !== undefined && change.markerWidth !== markerWidth) {
+                    d('-> markerWidth', change.markerWidth, markerWidth);
+                    setMarkerWidth(change.markerWidth);
+                } else {
+                    change.markerWidth = markerWidth;
+                }
+                if (change.markerX !== undefined && change.markerX !== markerX) {
+                    d('-> markerX', change.markerX, markerX);
+                    setMarkerX(change.markerX);
+                } else {
+                    change.markerX = markerX;
+                }
+                if (change.markerY !== undefined && change.markerY !== markerY) {
+                    d('-> markerY', change.markerY, markerY);
+                    setMarkerY(change.markerY);
+                } else {
+                    change.markerY = markerY;
+                }
+                if (change.posX !== undefined && change.posX !== posX) {
+                    d('-> posX', change.posX, posX);
+                    setPosX(change.posX);
+                } else {
+                    change.posX = posX;
+                }
+                if (change.posY !== undefined && change.posY !== posY) {
+                    d('-> posY', change.posY, posY);
+                    setPosY(change.posY);
+                } else {
+                    change.posY = posY;
+                }
+
+                if (!change.added || change.markerX === null) {
+                    return;
+                }
+
+                const isGap = change.markerType.endsWith('gap');
+                const checkX = change.axis === 'x' && !change.markerType.startsWith('row');
+                const checkY = change.axis === 'y' && !change.markerType.startsWith('column');
+                let reset = false;
+
+                if (checkX) {
+                    if (change.start) {
+                        setMarkerX(Math.max(change.markerX + change.added, 0));
+                        if (isGap) {
+                            if (change.markerX + change.added < 0) {
+                                reset = true;
+                            }
+                        } else {
+                            const markerWidth = change.markerWidth + Math.min(change.markerX + change.added, 0);
+                            if (markerWidth <= 0) {
+                                reset = true;
+                            } else {
+                                setMarkerWidth(markerWidth);
+                            }
+                        }
+                    } else if (change.added < 0) {
+                        const newWidth = gridWidth;
+                        if (isGap) {
+                            if (newWidth < change.markerX) {
+                                reset = true;
+                            }
+                        } else {
+                            if ((change.markerX + change.markerWidth) > newWidth) {
+                                if (newWidth <= change.markerX) {
+                                    reset = true;
+                                } else {
+                                    setMarkerWidth(newWidth - change.markerX);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (checkY) {
+                    if (change.start) {
+                        setMarkerY(Math.max(change.markerY + change.added, 0));
+                        if (isGap) {
+                            if (change.markerY + change.added < 0) {
+                                reset = true;
+                            }
+                        } else {
+                            const markerHeight = change.markerHeight + Math.min(change.markerY + change.added, 0);
+                            if (markerHeight <= 0) {
+                                reset = true;
+                            } else {
+                                setMarkerHeight(markerHeight);
+                            }
+                        }
+                    } else if (change.added < 0) {
+                        const newHeight = gridHeight;
+                        if (isGap) {
+                            if (newHeight < change.markerY) {
+                                reset = true;
+                            }
+                        } else {
+                            if ((change.markerY + change.markerHeight) > newHeight) {
+                                if (newHeight <= change.markerY) {
+                                    reset = true;
+                                } else {
+                                    setMarkerHeight(newHeight - change.markerY);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (reset) {
+                    setMarkerX(null);
+                    setMarkerY(null);
+                }
+            };
+
+        const getGridPosFromEvent = (e, outside = false, isGap = false) => {
+            return getGridPosFromClient({x: e.clientX, y: e.clientY}, outside, isGap);
+        };
+
+        const getGridPosFromClient = (client, outside = false, isGap = false) => {
+            const rect = gContext.boundingRectRef.current;
+            if (!rect) return null;
+
+            const adjustPosX = isGap ? gContext.cellPlusBorderSizeX >> 1 : 0;
+            const adjustPosY = isGap ? gContext.cellPlusBorderSizeY >> 1 : 0;
+            const rasterPos = {
+                x: Math.floor(Math.round(client.x - rect.left + adjustPosX) / gContext.cellPlusBorderSizeX),
+                y: Math.floor(Math.round(client.y - rect.top + adjustPosY) / gContext.cellPlusBorderSizeY),
+            };
+            let maxX = propsRef.current.width;
+            let maxY = propsRef.current.height;
+            if (!isGap) {
+                maxX++;
+                maxY++;
+            }
+            rasterPos.rawX = rasterPos.x;
+            rasterPos.rawY = rasterPos.y;
+            if (!outside) {
+                if (rasterPos.x < 0) {
+                    rasterPos.x = 0;
+                } else if (rasterPos.x > maxX) {
+                    rasterPos.x = maxX;
+                }
+                if (rasterPos.y < 0) {
+                    rasterPos.y = 0;
+                } else if (rasterPos.y > maxY) {
+                    rasterPos.y = maxY;
+                }
+            }
+            return rasterPos;
+        };
+
+        const moveMarker = e => {
+            const { modeParams, posX, posY, markerX, markerY, gridWidth, gridHeight, markerWidth, markerHeight } = propsRef.current;
+
+            setLastClick('move', e, modeParams.doubleClick);
+
+            const pos = getGridPosFromEvent(e);
+            let lastX = pos.x;
+            let lastY = pos.y;
+            const grabX = pos.x - (markerX - posX);
+            const grabY = pos.y - (markerY - posY);
+
+            const autoScroll = new AutoScroll(setter, propsRef, (props, x, y) => {
+                const { markerX, markerY } = props;
+                let newMarkerX = clamp(0, markerX + x, gridWidth - markerWidth);
+                if (markerX !== newMarkerX) {
+                    setMarkerX(newMarkerX);
+                }
+                const newMarkerY = clamp(0, markerY + y, gridHeight - markerHeight);
+                if (markerY !== newMarkerY) {
+                    setMarkerY(newMarkerY);
+                }
+            });
+
+            wContext.startExclusiveMode('marker-move', 'grabbing');
+            wContext.addEventListener('mousemove', e => {
+                const pos = getGridPosFromEvent(e);
+                const { posX, posY, markerX, markerY } = propsRef.current;
+
+                const checkX = pos.x !== lastX;
+                if (checkX) {
+                    const newMarkerX = clamp(0, posX + pos.x - grabX, gridWidth - markerWidth);
+                    if (markerX !== newMarkerX) {
+                        setMarkerX(newMarkerX);
+                    }
+                    lastX = pos.x;
+                }
+                const checkY = pos.y !== lastY;
+                if (checkY) {
+                    const newMarkerY = clamp(0, posY + pos.y - grabY, gridHeight - markerHeight);
+                    if (markerY !== newMarkerY) {
+                        setMarkerY(newMarkerY);
+                    }
+                    lastY = pos.y;
+                }
+                autoScroll.check(pos);
+            });
+            wContext.addEventListener('mouseup', e => {
+                wContext.endExclusiveMode('marker-move');
+                autoScroll.reset();
+                checkLastClick(e);
+            }, {once: true})
+        };
+
+        const resizeMarker = (e, resize) => {
+            const { markerX, markerY, markerWidth, markerHeight, cursorWidth, cursorHeight,
+                trackX, trackY, gridWidth, gridHeight, markerGapX, markerGapY } = propsRef.current;
+            const {startX, startY, cursor, axis} = resize;
+
+            const baseWidth = cursorWidth;
+            const baseHeight = cursorHeight;
+
+            const anchorPos = {
+                x: markerX + (!startX ? 0 : markerWidth - baseWidth),
+                y: markerY + (!startY ? 0 : markerHeight - baseHeight)
+            };
+            const resizeX = trackX && axis.indexOf('x') !== -1;
+            const resizeY = trackY && axis.indexOf('y') !== -1;
+
+            let lastRasterPos = getGridPosFromEvent(e, true);
+
+            const attr = {
+                x: {
+                    markerSize: 'markerWidth',
+                    markerPos: 'markerX',
+                    gap: markerGapX,
+                    base: baseWidth,
+                    size: gridWidth
+                },
+                y: {
+                    markerSize: 'markerHeight',
+                    markerPos: 'markerY',
+                    gap: markerGapY,
+                    base: baseHeight,
+                    size: gridHeight
+                },
+                anchorPos,
+                resizeX,
+                resizeY
+            };
+
+            const autoScroll = new AutoScroll(setter, propsRef, (props, x, y) => {
+                const { posX, posY, gridWidth, gridHeight, width, height } = props;
+                const change = {};
+                if (resizeX && x !== 0) {
+                    const clampedPosX =
+                        clamp(0,posX + x, gridWidth - width);
+                    const anchorX = anchorPos.x;
+                    const anchorDistX = clampedPosX - anchorX + (x > 0 ? width : 0);
+                    setMarkerResizeChanges('x', change, anchorDistX, attr);
+                }
+                if (resizeY && y !== 0) {
+                    const clampedPosY =
+                        clamp(0,posY + y, gridHeight - height);
+                    const anchorY = anchorPos.y;
+                    const anchorDistY = clampedPosY - anchorY + (y > 0 ? height : 0);
+                    setMarkerResizeChanges('y', change, anchorDistY, attr);
+                }
+                setState(change);
+            });
+
+            const checkWithLastRasterPos = e => {
+                const { posX, posY, width, height } = propsRef.current;
+                const newRasterPos = getGridPosFromEvent(e, true);
+                autoScroll.check(newRasterPos);
+
+                if (newRasterPos === null) {
+                    return;
+                }
+
+                // distFromAnchor (+ => right from anchor, - = left from anchor)
+                const anchorDistX = newRasterPos.x + posX - anchorPos.x;
+                const anchorDistY = newRasterPos.y + posY - anchorPos.y;
+
+                const validX =
+                    (resizeX  // resizing in X dir allowed
+                        && newRasterPos.x + 1 >= 0 // new rasterPos in Range [-1, ..., width]
+                        && newRasterPos.x <= width
+                    );
+
+                const validY = (resizeY && anchorDistY !== 0 && newRasterPos.y + 1  >= 0 && newRasterPos.y <= height);
+
+                // rasterPos valid and has changed since last check?
+                const hasChanged =
+                    (newRasterPos.x !== lastRasterPos.x || newRasterPos.y !== lastRasterPos.y) &&
+                    (validX || validY);
+
+                if (hasChanged) {
+                    lastRasterPos = newRasterPos;
+                    const change = {};
+
+                    if (validX) {
+                        setMarkerResizeChanges('x', change, anchorDistX, attr);
+                    }
+                    if (validY) {
+                        setMarkerResizeChanges('y', change, anchorDistY, attr);
+                    }
+                    setState(change)
+                }
+            };
+
+            wContext.startExclusiveMode('marker-resize', cursor);
+            wContext.addEventListener('mousemove', e => {
+                checkWithLastRasterPos(e);
+                e.stopPropagation();
+                e.preventDefault();
+            });
+
+            wContext.addEventListener('mouseup', e => {
+                wContext.endExclusiveMode('marker-resize');
+                autoScroll.reset();
+                e.stopPropagation();
+                e.preventDefault()
+            }, {once: true});
+        };
+
+        const getMarkerSelection = () => {
+            const { markerX, markerY, markerType, markerWidth, markerHeight, markerGapX, markerGapY,
+                    gridWidth, gridHeight, gridProvider, modeParams } = propsRef.current;
+            const cellValue = eContext.targetCellValue;
+            const rect = gridProvider.getRect(
+                markerX,
+                markerY,
+                markerType === 'rows' ? gridWidth : markerWidth,
+                markerType === 'columns' ? gridHeight : markerHeight,
+                cellValue
+            );
+            if (modeParams.multi) {
+                return (
+                    new CellSelection(
+                        'multi',
+                        {
+                            gapX: markerGapX,
+                            gapY: markerGapY,
+                            baseX: modeParams.width,
+                            baseY: modeParams.height,
+                            rect
+                        },
+                        cellValue
+                    )
+                );
+            }
+            return (
+                gridProvider.getSelection(
+                    markerX, markerY, markerWidth, markerHeight
+                )
+            )
+        };
+
+        cursor.use = !areDisjoint(modes, ['select']);
+        marker.use = !areDisjoint(modes, ['markerMove', 'markerResize']);
+
+        const controller = {};
+        for (let mode of modes) {
+            let obj = null;
+            switch(mode) {
+                case 'select':
+                    obj = {
+                        defaults: {
+                            unfix: false,
+                            fixed: false,
+                            multi: false,
+                            type: 'rect',
+                            width: 1,
+                            height: 1,
+                            resetMarker: false,
+                            doubleClick: null
+                        },
+                        init: data => {
+                            cursor.propsRef.current = {
+                                cursorType: data.type,
+                                onMouseDown: (e, x, y) => {
+                                    setMarkerX(x);
+                                    setMarkerY(y);
+                                    setMarkerType(data.type);
+                                    setMarkerWidth(data.width);
+                                    setMarkerHeight(data.height);
+                                    const startEvent = {clientX: e.clientX, clientY: e.clientY};
+                                    lastRef.current = true;
+                                    wContext.startExclusiveMode('set-marker');
+                                    wContext.addEventListener('mouseup', () => lastRef.current = false, {once: true});
+                                    requestAnimationFrame(() => {
+                                        wContext.endExclusiveMode('set-marker');
+                                        if (!lastRef.current) return;
+                                        data.fixed && !data.multi ?
+                                            moveMarker(startEvent) :
+                                            resizeMarker(
+                                                startEvent,
+                                                {axis: "xy", cursor: "nwse-resize", startX: false, startY: false}
+                                            )
+                                    });
+                                },
+                                inclusion: true
+                            };
+
+                            marker.propsRef.current = {
+                                onMove: moveMarker,
+                                onResize: data.fixed && !data.multi ? null : resizeMarker,
+                                autoMatrix: data.fixed && data.multi ? {width: data.width, height: data.height} : null
+                            };
+                            setCursorType(data.type);
+                            setCursorWidth(data.fixed ? data.width : 1);
+                            setCursorHeight(data.fixed ? data.height : 1);
+                            eContext.select.get = getMarkerSelection
+                        },
+                        cleanUp: () => {
+                            eContext.select.get = null;
+                        }
+                    };
+                    break;
+            }
+            if (obj) {
+                controller[mode] = obj;
+            }
+        }
+        return controller
+    }, []);
+}
+
+function ManagedGrid({
+         gridProvider, cellType, modes, markerType, setMarkerType,
+         posX, posY, setPosX, setPosY,
+         width, height, zoom, border, rulers,
+         markerX, markerY, setMarkerX, setMarkerY,
+         markerWidth, markerHeight, setMarkerWidth, setMarkerHeight,
+         markerGapX, markerGapY,
+         ...props
+    }) {
+    const gContext = useContext(GridContext);
+    const eContext = useContext(EditorContext);
+
+    const lastControllerRef = useRef(null);
+
+    const [cursorWidth, setCursorWidth] = useState(1);
+    const [cursorHeight, setCursorHeight] = useState(1);
+    const [cursorType, setCursorType] = useState('rect');
+
+    const gridWidth = gridProvider.getWidth();
+    const gridHeight = gridProvider.getHeight();
+
+    let trackX = true;
+    let trackY = true;
+    if (cursorType !== 'rect') {
+        if (cursorType.startsWith('column')) {
+            trackY = false;
+        } else if (cursorType.startsWith('row')) {
+            trackX = false;
+        }
+    }
+
+    const cursorPropsRef = useRef(null);
+    const cursor = useMemo(() => {
+        return {
+            use: false,
+            propsRef: cursorPropsRef
+        }
+    }, []);
+    const markerPropsRef = useRef(null);
+    const marker = useMemo(() => {
+        return {
+            use: false,
+            propsRef: markerPropsRef
+        }
+    }, []);
+
+    if (markerPropsRef.current && markerPropsRef.current.autoMatrix) {
+        const autoMatrix = markerPropsRef.current.autoMatrix;
+        autoMatrix.gapX = markerGapX;
+        autoMatrix.gapY = markerGapY;
+        autoMatrix.markerWidth = markerWidth;
+        autoMatrix.markerHeight = markerHeight;
+        autoMatrix.offStartX = Math.max(posX - markerX, 0);
+        autoMatrix.offEndX = Math.max(markerX + markerWidth - (posX + width), 0);
+        autoMatrix.offStartY = Math.max(posY - markerY, 0);
+        autoMatrix.offEndY = Math.max(markerY + markerHeight - (posY + height), 0)
+    }
+    const hasSelection = marker.use && markerX !== null;
+    if (eContext.hasSelection !== hasSelection) {
+        eContext.setHasSelection(hasSelection)
+    }
+
+    const mode = eContext.mode;
+    const modeParams = eContext.modeParams;
+
+    const setter = useMemo(() => {
+        return {
+            setPosX, setPosY, setMarkerX, setMarkerY,
+            setMarkerWidth, setMarkerHeight, setMarkerType,
+            setCursorWidth, setCursorHeight, setCursorType
+        }
+    }, []);
+
+    const propsRef = useRef(null);
+    propsRef.current = {
+        gridProvider, trackX, trackY,
+        cursorWidth, cursorHeight, cursorType,
+        mode, modeParams,
+        gridWidth, gridHeight, width, height, posX, posY,
+        markerX, markerY, markerWidth, markerHeight,
+        markerType, markerGapX, markerGapY, ...props
+    };
+
+    const controller = useGridModes({modes, propsRef, cursor, marker, setter});
+
+    useMemo(() => {
+            const lastController = lastControllerRef.current;
+            if (lastController && lastController.cleanUp) {
+                lastController.cleanUp()
+            }
+            if (mode === null) {
+                return;
+            }
+            const modeController = controller[mode];
+            if (modeController) {
+                modeController.init(
+                    modeController.defaults ?
+                        { ...modeController.defaults, ...modeParams  } : modeParams
+                );
+            }
+            lastControllerRef.current = modeController
+        },
+    [mode, modeParams]
+    );
+    useEffect(() => {
+        if (props.mode) {
+            eContext.setMode(props.mode, props.modeParams);
+        }
+    }, []);
+
+    return (
+        <Overlays originX={rulers ? 38 : 0} originY={rulers ? 22 : 0} width={gContext.dimX} height={gContext.dimY} className="overflow">
+            <CellGrid
+                posX={posX} posY={posY} width={width} height={height}
+                border={border} zoom={zoom} cellType={cellType}
+                gridProvider={gridProvider}
+            />
+            {rulers &&
+                <GridRulerH posX={posX} width={width} />
+            }
+            {rulers &&
+                <GridRulerV posY={posY} height={height} />
+            }
+            {cursor.use &&
+                <GridCursorOverlay
+                    posX={posX} posY={posY}
+                    width={width} height={height}
+                    cursorType={cursorType}
+                    cursorWidth={cursorWidth} cursorHeight={cursorHeight}
+                    gridWidth={gridWidth} gridHeight={gridHeight}
+                    { ...cursor.propsRef.current }
+                />
+            }
+            {marker.use && markerX !== null &&
+                <GridMarkerOverlay
+                    posX={posX} posY={posY}
+                    width={width} height={height}
+                    markerX={markerX} markerY={markerY}
+                    markerGapX={markerGapX} markerGapY={markerGapY}
+                    markerWidth={markerWidth} markerHeight={markerHeight}
+                    markerType={markerType}
+                    { ...marker.propsRef.current }
+                />
+            }
+        </Overlays>
+    )
+}
+
+function FlexGridInner({ gridProvider, cellType, border, zoom, rulers,
+    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, ...props }) {
+    const aContext = useContext(AvailContext);
+    const cssContext = useContext(CssContext);
+
+    const gridWidth = gridProvider.getWidth();
+    const gridHeight = gridProvider.getHeight();
+
+    const value = useMemo(() => {
+        const sizeX = gridProvider.getCellSizeX();
+        const sizeY = gridProvider.getCellSizeY();
+        const cellSizeX = zoom * sizeX;
+        const cellSizeY = zoom * sizeY;
+
+        const cellPlusBorderSizeX = cellSizeX + border;
+        const cellPlusBorderSizeY = cellSizeY + border;
+
+        let spaceX = aContext.width - border - 2 * cssContext.values.defaultPadding -
+            (rulers ? 38 : 0);
+        let spaceY = aContext.height - border - 2 * cssContext.values.defaultPadding -
+            (rulers ? 22 : 0);
+
+        let maxPageX = Math.min(gridWidth, Math.floor(spaceX / cellPlusBorderSizeX));
+        let maxPageY = Math.min(gridHeight, Math.floor(spaceY / cellPlusBorderSizeY));
+
+        if (maxPageX < gridWidth) {
+            spaceY -= 21 // scrollbarHeight;
+        }
+        if (maxPageY < gridHeight) {
+            spaceX -= 21 // scrollbarWidth;
+        }
+
+        maxPageX = Math.floor(spaceX / cellPlusBorderSizeX);
+        maxPageY = Math.floor(spaceY / cellPlusBorderSizeY);
+
+        return {
+            border,
+            zoom,
+            sizeX,
+            sizeY,
+            cellSizeX,
+            cellSizeY,
+            cellPlusBorderSizeX,
+            cellPlusBorderSizeY,
+            spaceX,
+            spaceY,
+            maxPageX,
+            maxPageY,
+            boundingRectRef: {current: null}
+        }
+    }, [zoom, border, gridWidth, gridHeight, rulers, aContext.width, aContext.height]);
+    if (aContext.width === 0 || aContext.height === 0) return '';
+
+    const maxPosX = gridWidth - value.maxPageX;
+    const maxPosY = gridHeight - value.maxPageY;
+
+    if (posX > maxPosX) setPosX(maxPosX);
+    if (posY > maxPosY) setPosY(maxPosY);
+
+    let pageX = width;
+    let pageY = height;
+    if (value.maxPageX !== pageX) {
+        setWidth(value.maxPageX);
+        pageX = value.maxPageX
+    }
+    if (value.maxPageY != pageY) {
+        setHeight(value.maxPageY);
+        pageY = value.maxPageY
+    }
+    value.dimX = pageX * value.cellPlusBorderSizeX + border;
+    value.dimY = pageY * value.cellPlusBorderSizeY + border;
+
+    return (
+        <GridContext.Provider value={value}>
+            <ScrollArea
+                full
+                x={posX} setX={setPosX} maxX={gridWidth} pageX={pageX}
+                y={posY} setY={setPosY} maxY={gridHeight} pageY={pageY}
+            >
+                <Block full centerItems>
+                    <ManagedGrid
+                        gridProvider={gridProvider} cellType={cellType}
+                        border={border} zoom={zoom} rulers={rulers}
+                        posX={posX} setPosX={setPosX}
+                        posY={posY} setPosY={setPosY}
+                        width={pageX} height={pageY}
+                        gridWidth={gridWidth} gridHeight={gridHeight}
+                        { ...props }
+                    />
+                </Block>
+            </ScrollArea>
+        </GridContext.Provider>
+    )
+}
+
+function FlexGrid(props) {
+    return (
+        <AvailContextProvider>
+            <FlexGridInner { ...props } />
+        </AvailContextProvider>
+    );
+}
+
+
 
 export {
     CellGrid,

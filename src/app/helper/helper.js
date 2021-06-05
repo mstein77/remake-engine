@@ -1224,9 +1224,14 @@ function clamp(min, curr, max) {
     return Math.min(Math.max(min, curr), max)
 }
 
+function areDisjoint(a, b) {
+    return a.filter(item => b.includes(item)).length === 0;
+}
+
 module.exports = {
     d,
     clamp,
+    areDisjoint,
     cloneDeep,
     hex2rgb,
     rgb2hex,

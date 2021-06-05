@@ -109,20 +109,43 @@ function EditorCtx({ id, children }) {
 
     const wContext = useContext(WindowContext);
 
+    const [lastMode, setLastMode] = useState(null);
+    const [lastModeParams, setLastModeParams] = useState({});
+
     const [past, setPast] = useState([]);
     const [future, setFuture] = useState([]);
     const [storePos, setStorePos] = useState(0);
     const [historyPos, setHistoryPos] = useState(0);
     const [targetCellValue, setTargetCellValue] = useState(CellValue.raw);
+    const [hasSelection, setHasSelection] = useState(false);
     const [selection, setSelectionRaw] = useState(new CellSelection());
     const setSelection = selection => {
         setTargetCellValue(selection.getCellValue());
         setSelectionRaw(selection);
     };
     const lastId = useRef(null);
+    const select = useMemo(() => {return {has: false, get: null}}, []);
 
     const value = {
+        // mode
+        mode: lastMode,
+        modeParams: lastModeParams,
+        setMode: (mode, params = {}) => {
+            d('SETTING MODE', mode, params);
+            setLastMode(mode);
+            setLastModeParams(params);
+        },
+
         // selection
+        select,
+        hasSelection,
+        setHasSelection,
+        getSelection: () => {
+            if (select.get) {
+                return select.get();
+            }
+            return null;
+        },
         selection,
         setSelection,
         targetCellValue,

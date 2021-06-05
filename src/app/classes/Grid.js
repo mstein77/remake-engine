@@ -768,11 +768,11 @@ class BitmapGrid extends Grid {
     }
 
     getCellSizeX() {
-        return 10;
+        return 5;
     }
 
     getCellSizeY() {
-        return 10;
+        return 5;
     }
 
     drawCellValue(ctx, value, x, y, zoom) {

@@ -38,27 +38,66 @@ import {
     Hidden,
     OkCancelForm
 } from "../components/FormComponents";
-import { AssignIndex, FontIndex, TextBlockIndex } from "../classes/EntityIndex";
+import { AssignIndex, FontIndex, CharIndex, TextBlockIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 import {BitmapCellProvider} from "../classes/CellProvider";
 
 
 function FontProperties({ font, reserved, save, close }) {
+    const ImportFontModal = useModal();
+
     const [value, setValue] = useState(font.value);
     const [width, setWidth] = useState(font.width);
     const [height, setHeight] = useState(font.height);
 
-    const saveFont = () => save({ ...font, value, width, height});
+    const saveFont = () => save({ ...font, value, width, height, chars: new CharIndex({map: {}, img: null, width, height})});
+
+    const importFont = () => {
+        ImportFontModal.open({
+            selection: {
+                multi: true,
+                unfix: true
+            },
+            save: bitmaps => {
+                d('bitmaps', bitmaps);
+                ImportFontModal.close()
+            }
+        });
+    };
+
+    const selectSize = () => {
+        ImportFontModal.open({
+            selection: {},
+            save: bitmap => {
+                setWidth(bitmap.getWidth());
+                setHeight(bitmap.getHeight());
+                ImportFontModal.close()
+            }
+        })
+    };
 
     return (
         <OkCancelForm submit save={saveFont} cancel={close} full>
             <Block full="h" padded>
                 <PropertyGrid full="h" padded>
                     <InputProp name="ID:" full="h" required match={value => !reserved.includes(value)} value={value} set={setValue} />
-                    <TupleProp name="Size:" x={width} setX={setWidth} min={1} max={128} y={height} setY={setHeight} />
+                    <LabelProp name="Size:">
+                        <Stack gaps vertical>
+                            <Tuple x={width} setX={setWidth} min={1} max={128} y={height} setY={setHeight} />
+                            <Stack gaps="1">
+                                <Button name="Select" padded="h" onClick={selectSize} />
+                                <Button name="Import" padded="h" onClick={importFont} />
+                            </Stack>
+                        </Stack>
+
+                    </LabelProp>
                 </PropertyGrid>
             </Block>
+
+            <ImportFontModal.content name="Select Size" full>
+                <BitmapSelector { ...ImportFontModal.props } />
+            </ImportFontModal.content>
         </OkCancelForm>
     )
 }
@@ -249,7 +288,6 @@ function CharManager({ charIndex }) {
             charIndex,
             char,
             save: editChar => {
-                d('EDIT', editChar);
                 saveAssignments([
                     {oldChar: char.value, value: editChar.value, image: editChar.image}
                 ]);
@@ -279,6 +317,7 @@ function CharManager({ charIndex }) {
     };
     const importChars = () => {
         const selected = selection => {
+            d('===>', selection);
             const baseCells = selection.getBaseCells();
             const chars = [];
             let index = 0;
@@ -293,7 +332,7 @@ function CharManager({ charIndex }) {
                 });
                 index++;
             }
-            assignImagesToChars(chars);
+            assignImagesToChars(d(chars, 66));
             BitmapSelectorModal.close();
         };
         BitmapSelectorModal.open({
@@ -511,7 +550,6 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
                     <FontProperties { ...NewFontModal.props } />
                 </NewFontModal.content>
             </Stack>
-
         </Stack>
     )
 }
