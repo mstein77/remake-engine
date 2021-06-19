@@ -15,8 +15,8 @@ import {
     WindowContext,
 } from "../components/BasicComponents";
 import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import { d, getCanvasForDim, getEmptyImageData } from "../helper/helper";
-import { NameDialog, FiltersModal, BitmapSelector } from "../components/EditorComponents";
+import { d, getCanvasForDim, getEmptyImageData, getColorsFromImageData } from "../helper/helper";
+import { NameDialog, FiltersModal, BitmapSelector, ResizeProps, BitmapEditor } from "../components/EditorComponents";
 import {
     Checkbox,
     Input,
@@ -41,8 +41,6 @@ import {
 import { AssignIndex, FontIndex, CharIndex, TextBlockIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
-import {BitmapCellProvider} from "../classes/CellProvider";
-
 
 function FontProperties({ font, reserved, save, close }) {
     const ImportFontModal = useModal();
@@ -50,8 +48,18 @@ function FontProperties({ font, reserved, save, close }) {
     const [value, setValue] = useState(font.value);
     const [width, setWidth] = useState(font.width);
     const [height, setHeight] = useState(font.height);
+    const [newWidth, setNewWidth] = useState(font.width);
+    const [newHeight, setNewHeight] = useState(font.height);
+    const [offsetX, setOffsetX] = useState(0);
+    const [offsetY, setOffsetY] = useState(0);
+    const [images, setImages] = useState(null);
 
-    const saveFont = () => save({ ...font, value, width, height, chars: new CharIndex({map: {}, img: null, width, height})});
+    const saveFont = () => save(
+        { ...font,
+            newWidth, newHeight, offsetX, offsetY,
+            value, images, width, height
+        }
+    );
 
     const importFont = () => {
         ImportFontModal.open({
@@ -60,18 +68,19 @@ function FontProperties({ font, reserved, save, close }) {
                 unfix: true
             },
             save: bitmaps => {
-                d('bitmaps', bitmaps);
+                setWidth(bitmaps[0].width);
+                setHeight(bitmaps[0].height);
+                setImages(bitmaps);
                 ImportFontModal.close()
             }
         });
     };
-
     const selectSize = () => {
         ImportFontModal.open({
             selection: {},
             save: bitmap => {
-                setWidth(bitmap.getWidth());
-                setHeight(bitmap.getHeight());
+                setWidth(bitmap.width);
+                setHeight(bitmap.height);
                 ImportFontModal.close()
             }
         })
@@ -82,16 +91,33 @@ function FontProperties({ font, reserved, save, close }) {
             <Block full="h" padded>
                 <PropertyGrid full="h" padded>
                     <InputProp name="ID:" full="h" required match={value => !reserved.includes(value)} value={value} set={setValue} />
-                    <LabelProp name="Size:">
-                        <Stack gaps vertical>
-                            <Tuple x={width} setX={setWidth} min={1} max={128} y={height} setY={setHeight} />
-                            <Stack gaps="1">
-                                <Button name="Select" padded="h" onClick={selectSize} />
-                                <Button name="Import" padded="h" onClick={importFont} />
+                    {font.index === undefined &&
+                        <LabelProp name="Size:">
+                            <Stack gaps vertical>
+                                <Tuple x={width} setX={setWidth} min={1} max={128} y={height} setY={setHeight} disabled={images !== null} />
+                                {images ?
+                                    <Stack gaps>
+                                        <Block center="v" border="1" padded>{images.length} imported chars</Block>
+                                        <Button icon="clear" onClick={() => setImages(null)} />
+                                    </Stack> :
+                                    <Stack gaps="1">
+                                        <Button name="Select" padded="h" onClick={selectSize} />
+                                        <Button name="Import" padded="h" onClick={importFont} />
+                                    </Stack>
+                                }
                             </Stack>
-                        </Stack>
-
-                    </LabelProp>
+                        </LabelProp>
+                    }
+                    {font.index !== undefined &&
+                        <ResizeProps
+                            width={width} height={height}
+                            maxWidth={128} maxHeight={128}
+                            newWidth={newWidth} newHeight={newHeight}
+                            setNewWidth={setNewWidth} setNewHeight={setNewHeight}
+                            offsetX={offsetX} offsetY={offsetY}
+                            setOffsetX={setOffsetX} setOffsetY={setOffsetY}
+                        />
+                    }
                 </PropertyGrid>
             </Block>
 
@@ -280,6 +306,7 @@ function CharManager({ charIndex }) {
     const CharPropsModal = useModal();
     const AssignCharsModal = useModal();
     const BitmapSelectorModal = useModal();
+    const EditBitmapModal = useModal();
 
     const editChar = index => {
         const char = charIndex.getEntityObject(index);
@@ -295,6 +322,29 @@ function CharManager({ charIndex }) {
             }
         });
     };
+
+    const editBitmap = index => {
+        const image = charIndex.getEntityPropValue(index, 'image');
+        EditBitmapModal.open({
+            image,
+            save: newImage => {
+                const undoImage = charIndex.getEntityPropValue(index, 'image');
+                eContext.doAction(
+                    () => {
+                        charIndex.setEntityPropValue(index, 'image', newImage);
+                        charIndex.notify();
+                    },
+                    () => {
+                        charIndex.setEntityPropValue(index, 'image', undoImage);
+                        charIndex.notify();
+                    }
+                );
+
+                EditBitmapModal.close()
+            }
+        });
+    };
+
     const addChar = () => {
         CharPropsModal.open({
             name: 'Add new char',
@@ -316,23 +366,19 @@ function CharManager({ charIndex }) {
         });
     };
     const importChars = () => {
-        const selected = selection => {
-            d('===>', selection);
-            const baseCells = selection.getBaseCells();
+        const selected = images => {
             const chars = [];
             let index = 0;
-            for(let cells of baseCells) {
-                const provider = new BitmapCellProvider(1);
-                provider.setMap(cells);
+            for(let image of images) {
                 chars.push({
                     index,
                     value: '',
                     oldChar: '',
-                    image: provider.getImageData()
+                    image
                 });
                 index++;
             }
-            assignImagesToChars(d(chars, 66));
+            assignImagesToChars(chars);
             BitmapSelectorModal.close();
         };
         BitmapSelectorModal.open({
@@ -369,14 +415,22 @@ function CharManager({ charIndex }) {
         const deleteChars = [];
         const backup = {};
         const newChars = [];
+
         for (let item of items) {
             newChars.push(item.value);
         }
-
         for (let item of items) {
-            if (item.oldChar === item.value) continue;
+            if (item.oldChar === item.value) {
+                const index = charIndex.getEntityByPropValue('value', item.oldChar);
+                backup[item.value] = charIndex.getEntityPropValue(index, 'image');
+                changeItems.push(
+                    {index, value: item.value, image: item.image}
+                );
+                continue;
+            }
 
             const newIndex = charIndex.getEntityByPropValue('value', item.value);
+
             if (newIndex !== null) {
                 backup[item.value] = charIndex.getEntityPropValue(newIndex, 'image');
                 changeItems.push(
@@ -430,8 +484,8 @@ function CharManager({ charIndex }) {
         assignIndex.setEntityObjects(chars);
         AssignCharsModal.open({
             assignIndex,
-            save: items => {
-                saveAssignments(items);
+            save: images => {
+                saveAssignments(images);
                 AssignCharsModal.close();
             }
         })
@@ -450,6 +504,7 @@ function CharManager({ charIndex }) {
                 minWidth={90}
                 titleHeight={41}
                 onDoubleClick={editChar}
+                onRightClick={editBitmap}
                 renderTitle={
                     index => {
                         const code = charIndex.getEntityValue(index).charCodeAt(0);
@@ -478,6 +533,10 @@ function CharManager({ charIndex }) {
             <BitmapSelectorModal.content name="Select Image" full>
                 <BitmapSelector { ...BitmapSelectorModal.props } />
             </BitmapSelectorModal.content>
+
+            <EditBitmapModal.content name="Edit Char" full>
+                <BitmapEditor { ...EditBitmapModal.props } />
+            </EditBitmapModal.content>
         </>
     )
 }
@@ -486,6 +545,7 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
 
+    const AssignCharsModal = useModal();
     const NewFontModal = useModal();
 
     useUpdateOnEntityIndexChanges(fontIndex);
@@ -494,21 +554,54 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
     const currChars = currFont && currFont.chars;
 
     const newFont = () => {
-        const font = {value: 'MyNewId', map: [], width: 8, height: 8, image: null};
+        const font = {value: 'MyNewId', width: 8, height: 8, image: null};
         NewFontModal.open({
+            name: 'New Font',
             font,
             reserved: fontIndex.getPropValues('value'),
             save: newFont => {
                 let index = null;
-                eContext.doAction(
-                    () => {
-                        index = fontIndex.setEntityObject(newFont);
-                    },
-                    () => {
-                        fontIndex.deleteEntity(index);
+
+                const chars = new CharIndex({map: {}, img: null, width: newFont.width, height: newFont.height})
+                newFont.chars = chars;
+
+                if (newFont.images) {
+                    const assignIndex = new AssignIndex(newFont.width, newFont.height);
+                    const chars = [];
+                    for(let image of newFont.images) {
+                       chars.push({value: '', oldChar: null, image});
                     }
-                );
-                setActiveFont(fontIndex.getLength() - 1);
+                    assignIndex.setEntityObjects(chars);
+                    AssignCharsModal.open({
+                        assignIndex,
+                        save: assigns => {
+                            for(let assign of assigns) {
+                                newFont.chars.setEntityObject({value: assign.value, image: assign.image});
+                            }
+                            eContext.doAction(
+                                () => {
+                                    index = fontIndex.setEntityObject(newFont);
+                                },
+                                () => {
+                                    fontIndex.deleteEntity(index);
+                                }
+                            );
+                            setActiveFont(fontIndex.getLength() - 1);
+                            AssignCharsModal.close();
+                        }
+                    });
+                } else {
+
+                    eContext.doAction(
+                        () => {
+                            index = fontIndex.setEntityObject(newFont);
+                        },
+                        () => {
+                            fontIndex.deleteEntity(index);
+                        }
+                    );
+                    setActiveFont(fontIndex.getLength() - 1);
+                }
                 NewFontModal.close()
             }
         });
@@ -528,6 +621,38 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
         wContext.clearEditor('preview');
     };
 
+    const editFont = () => {
+        const font = currFont;
+        const reserved = [ ...fontIndex.getPropValues('value') ];
+        reserved.splice(reserved.indexOf(font.value), 1);
+        NewFontModal.open({
+            name: 'Edit Font',
+            font,
+            reserved,
+            save: editFont => {
+                if (
+                    editFont.width !== editFont.newWidth ||
+                    editFont.height !== editFont.newHeight
+                ) {
+                    const undoObjects = editFont.chars.getEntityObjects();
+                    const undoSizeX = editFont.width;
+                    const undoSizeY = editFont.height;
+                    eContext.doAction(
+                        () => {
+                            editFont.chars.resize(editFont.newWidth, editFont.newHeight, editFont.offsetX, editFont.offsetY);
+                            fontIndex.setEntityObject(d({ ...editFont, width: editFont.newWidth, height: editFont.newHeight }), true);
+                        },
+                        () => {
+                            editFont.chars.resize(undoSizeX, undoSizeY);
+                            editFont.chars.setEntityObjects(undoObjects, true);
+                        }
+                    );
+                }
+                NewFontModal.close()
+            }
+        });
+    };
+
     return (
         <Stack vertical full>
             <Stack full>
@@ -537,6 +662,7 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
                         area={3} entityIndex={fontIndex}
                         getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
                         active={activeFont} setActive={setActiveFont}
+                        editOp={editFont}
                         addOp={newFont} deleteOp={deleteFont} undo
                         emptyText="Add new Font"
                     />
@@ -546,9 +672,13 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
                     {currChars && <CharManager charIndex={currChars} />}
                 </Section>
 
-                <NewFontModal.content name="New Font" width={250}>
+                <NewFontModal.content name={NewFontModal.props.name} width={500}>
                     <FontProperties { ...NewFontModal.props } />
                 </NewFontModal.content>
+
+                <AssignCharsModal.content name="Assign Images to Chars" width="75%" height={290}>
+                    <CharAssignments { ...AssignCharsModal.props } />
+                </AssignCharsModal.content>
             </Stack>
         </Stack>
     )
@@ -706,8 +836,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 for (let y = 0; y < lines.length; y++) {
                     let line = lines[y];
                     // do text align on current line
-                    if (block.textAlign !== 'left' && line.length < block.width) {
-                        const pad = block.textAlign === 'right' ? block.width : (line.length + ((block.width - line.length) >> 1));
+                    if (block.textAlign !== 'left' && line.length < dim.maxLen) {
+                        const pad = block.textAlign === 'right' ? dim.maxLen : (line.length + ((dim.maxLen - line.length) >> 1));
                         line = line.padStart(pad, ' ');
                     }
                     // draw each char in current line
@@ -725,8 +855,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                 font.width,
                                 font.height
                             );
-                        } else {
-                         // ??  trigger = true;
                         }
                     }
                     posY += block.lineSpacing + font.height;
@@ -883,7 +1011,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
             moveCursor = 'not-allowed'
         }
     }
-
     const renderScreen = ctx => {
         ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = background;
@@ -909,13 +1036,11 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
             );
         }
     };
-
     if (fontIndex.getLength() === 0) {
         return (
             <CenterInfo>Preview will be available once you add a font</CenterInfo>
         )
     }
-
     const dim = getBlockDim(currBlock);
     const actual = getActualBlockPos(currBlock, dim);
     const font = currBlock && fonts[currBlock.font];

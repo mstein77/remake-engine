@@ -1,10 +1,10 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {d, drawCanvasToAvail, getCanvasForBitmap} from "../helper/helper"
-import { Block, Stack } from "./LayoutComponents";
+import { Block, Stack, Tooltip } from "./LayoutComponents";
 import { WindowContext, EditorContext, useModal, Kbd, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapCellProvider } from "../classes/CellProvider";
-import { BitmapSelector } from "./EditorComponents";
+import { BitmapSelector, BitmapEditor } from "./EditorComponents";
 
 function isValidNumber(value) {
     return typeof value === 'number' && !isNaN(value);
@@ -327,7 +327,7 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
 /**
  *
  */
-function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
+function Button({ name, icon, rotate, current, vertical, value, disabled, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
     const wContext = useContext(WindowContext);
 
     const mounted = useMounted();
@@ -387,12 +387,12 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, i
         }
 
         items.push(
-            <div style={style} className={iCls.join(' ')} key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + icon + '</i>' }} />
+            <div style={style} className={iCls.join(' ')} key={1} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block; ' + (rotate ? 'transform: rotate(' + rotate + 'deg)' : '')  + ' ">' + icon + '</i>' }} />
         );
     }
     if (name) {
         items.push(
-            <Block center="v" shorten full="h" key={2}>{name}</Block>
+            <Block center={vertical ? 'h' : 'v'} shorten full={vertical ? 'v' : 'h'} key={2}>{name}</Block>
         );
     }
     if (rev) {
@@ -404,7 +404,7 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, i
     if ((name || border)) {
         cls.push(active ? 'active-bg' : 'control-bg');
     }
-    const text = items.length === 1 ? items[0] : <Stack gaps full="h">{items}</Stack>;
+    const text = items.length === 1 ? items[0] : <Stack vertical={vertical} gaps full="h">{items}</Stack>;
 
     attr.onFocus = e => {
         if (tab && !(disabled || readOnly)) {
@@ -445,7 +445,7 @@ function Button({ name, icon, current, value, disabled, iconWidth, iconHeight, i
             }
 
         }
-        attr.onMouseDown = e => {
+        attr.onLeftClick = e => {
             handleClick('mouseup', direct ? e : null);
 // TODO: check selection problem: e.preventDefault();
         }
@@ -1114,14 +1114,24 @@ function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) 
 }
 
 function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
+    const EditBitmapModal = useModal();
     const CopyBitmapModal = useModal();
     const ImportBitmapModal = useModal();
 
+    const editBitmap = () => {
+        EditBitmapModal.open({
+            image: value,
+            colors,
+            save: newImage => {
+                set(newImage);
+                EditBitmapModal.close()
+            }
+        });
+    };
+
     const importBitmap = () => {
-        const selected = selection => {
-            const provider = new BitmapCellProvider(1);
-            provider.setMap(selection.getCells());
-            set(provider.getImageData());
+        const selected = image => {
+            set(image);
             ImportBitmapModal.close();
         };
         ImportBitmapModal.open({
@@ -1136,7 +1146,6 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
                 multi: false,
                 doubleClick: selected
             }
-//            , bitmaps: context.imageResources
         });
     };
 
@@ -1163,19 +1172,24 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
         <>
             <Stack vertical>
                 <Stack gaps="1">
-                    <Button name="edit" padded="h" />
+                    <Button name="edit" padded="h" onClick={editBitmap} />
                     <Button name="import" onClick={importBitmap} padded="h" />
                     {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
                     {empty && <Button icon="clear" onClick={() => set(null)} />}
                 </Stack>
-                <Block padded>
+                <Block padded onLeftClick={editBitmap}>
                     <Canvas width={width} height={height} render={render} border="1" />
                 </Block>
             </Stack>
 
+            <EditBitmapModal.content name="Edit Bitmap" full>
+                <BitmapEditor { ...EditBitmapModal.props } />
+            </EditBitmapModal.content>
+
             <ImportBitmapModal.content name="Select image..." full>
                 <BitmapSelector {...ImportBitmapModal.props} />
             </ImportBitmapModal.content>
+
             {entityIndex &&
                 <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
                     <EntityPicker {...CopyBitmapModal.props} />
@@ -1185,13 +1199,23 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
     )
 }
 
-function FileDropZone({ type, full, save }) {
+function FileDropZone({ type, full, save, required }) {
+    const fContext = useContext(FormContext);
+    const wContext = useContext(WindowContext);
+
     const [error, setError] = useState('');
+    const [showTooltip, setShowTooltip] = useState(false);
+
     const dragEnterRef = useRef(null);
     const dropzoneRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
+        const currLevel = wContext.getModalLevel();
+
         const handlePaste = (event) => {
+            if (currLevel !== wContext.getModalLevel()) return;
+
             let items = (event.clipboardData  || event.originalEvent.clipboardData).items;
             handleImages(items);
             event.stopPropagation();
@@ -1203,7 +1227,8 @@ function FileDropZone({ type, full, save }) {
         }
     }, []);
 
-    const handleImages = (items) => {
+    const handleImages = items => {
+        dropzoneRef.current.classList.toggle('blink', false);
         const matches = [];
         const invTypes = new Map();
         for(let item of items) {
@@ -1234,16 +1259,16 @@ function FileDropZone({ type, full, save }) {
         reader.readAsDataURL(file.getAsFile ? file.getAsFile() : file);
     };
 
-    const handleDrop = (e) => {
+    const handleDrop = e => {
         handleImages(e.dataTransfer.files);
         e.stopPropagation();
         e.preventDefault();
     };
-    const handleDragOver = (e) => {
+    const handleDragOver = e => {
         e.stopPropagation();
         e.preventDefault();
     };
-    const handleDragEnter = (e) => {
+    const handleDragEnter = e => {
         if (dropzoneRef.current) {
             dropzoneRef.current.classList.toggle('blink', true);
             dragEnterRef.current = e.target;
@@ -1251,19 +1276,38 @@ function FileDropZone({ type, full, save }) {
         e.stopPropagation();
         e.preventDefault();
     };
-    const handleDragLeave = (e) => {
+    const handleDragLeave = e => {
         if (dropzoneRef.current && dragEnterRef.current === e.target) {
             dropzoneRef.current.classList.toggle('blink', false);
         }
         e.preventDefault();
     };
-    const handleFileSelection = (e) => {
+    const handleFileSelection = e => {
         e.preventDefault();
         handleImages(e.target.files);
     };
 
     const accept = type ? type + '/*' : '*';
 
+    const attr = {};
+    if (error) {
+        attr.tab = true;
+        attr.onMouseEnter = () => {
+            setShowTooltip(true)
+        };
+        attr.onMouseLeave = () => {
+            setShowTooltip(false)
+        };
+        attr.onFocus = () => {
+            setShowTooltip(true)
+        };
+        attr.onBlur = () => {
+            setShowTooltip(false)
+        }
+    }
+    if (required) {
+        fContext.markInvalid()
+    }
     return (
         <Block
             ref={dropzoneRef}
@@ -1271,23 +1315,28 @@ function FileDropZone({ type, full, save }) {
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}>
-            <Stack vertical centerItems="center" full="h">
-                <Block padded full="h">
-                    No image given. Please insert image by one of the following options:
-                    <ul>
-                        <li>Drag'n Drop an image from your desktop here<br /><br /></li>
-                        <li>Copy image to clipboard and paste it here<br /><br /></li>
-                        <li><input onChange={handleFileSelection} type="file" accept={accept} /></li>
-                    </ul>
-                    {error && <Block boxed padded>Reading content failed: {error}</Block>}
+            onDragLeave={handleDragLeave}
+        >
+            <Stack center border className={required ? 'invalid' : ''}>
+                <Block padded center="v" { ...attr }>
+                    <Stack vertical className={error ? 'blink color-warning' : ''}>
+                        <Icon name={error ? 'report_problem' : 'file_upload'} />
+                        {showTooltip && <Block><Tooltip>{error}</Tooltip></Block>}
+                    </Stack>
                 </Block>
+                <Stack vertical padded vertical gaps>
+                    <Block center="h">Drop/paste image here or</Block>
+                    <Block center="h">
+                        <Button name="Select image" padded="h" onClick={() => fileInputRef.current.click()} />
+                        <input ref={fileInputRef} className="hidden" onChange={handleFileSelection} type="file" accept={accept} />
+                    </Block>
+                </Stack>
             </Stack>
         </Block>
-    );
+    )
 }
 
-function ImageProp({ name, value, set, ...props }) {
+function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props }) {
     return (
         <LabelProp name={name}>
             {value ?
@@ -1299,17 +1348,31 @@ function ImageProp({ name, value, set, ...props }) {
                         }} />
                     </Stack>
                     <Block border="1">
-                        <img src={value.src} />
+                        <Canvas
+                            width={zoomOrAvail ? zoomOrAvail.width : value.width}
+                            height={zoomOrAvail ? zoomOrAvail.height : value.height}
+                            render={ctx => {
+                                if (zoomOrAvail) {
+                                    drawCanvasToAvail(value, ctx, 0, 0, zoomOrAvail)
+                                } else {
+                                    ctx.drawImage(value, 0, 0)
+                                }
+                            }}
+                        />
                     </Block>
                 </Stack> :
                 <FileDropZone
                     type="image"
+                    required={required}
                     save={
                         (bitmap, name = null) => {
                             const img = new Image();
                             img.src = bitmap;
                             img.decode().then(() => {
                                 set(img);
+                                if (setName && name) {
+                                    setName(name)
+                                }
                             })
                         }
                     }

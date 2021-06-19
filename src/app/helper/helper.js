@@ -1228,6 +1228,38 @@ function areDisjoint(a, b) {
     return a.filter(item => b.includes(item)).length === 0;
 }
 
+const handleLeft = handler => {
+    return e => {
+        if (e.button !== 0) {
+            return;
+        }
+        handler(e);
+    }
+};
+
+const handleRight = handler => {
+    return e => {
+        if (e.button !== 2) {
+            return;
+        }
+        handler(e);
+        e.preventDefault();
+        e.stopPropagation();
+    }
+};
+
+const handleLeftRight = (leftHandler, rightHandler) => {
+    return e => {
+        if (e.button === 0) {
+            leftHandler(e);
+        } else if (e.button === 2) {
+            rightHandler(e);
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+};
+
 module.exports = {
     d,
     clamp,

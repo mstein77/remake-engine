@@ -616,7 +616,7 @@ function BaseAppInner({ children }) {
         <Block onFocus={onFocus} center full padded className="editor-bounds">
             <Stack vertical gaps full>
                 <Block full="h">
-                    <Stack full="h" xpadded="v">
+                    <Stack full="h">
                         <Button icon="keyboard_backspace" padded="h" name="Back" />
                         <Block padded="h" center="v" full="h" shorten></Block>
                         <Stack gaps center="v">

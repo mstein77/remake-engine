@@ -522,6 +522,10 @@ class EmptyGrid extends Grid {
         return this.cellSizeY;
     }
 
+    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1, players = null) {
+        super.drawGrid(ctx, Math.max(posX, 0), Math.max(posY, 0), width, height, grid, zoom, players);
+    }
+
     drawCellValue(ctx, value, x, y, zoom) {
         if (this.opacity === '00') {
             return;

@@ -28,8 +28,12 @@
     --button-font-family: Arial;
 
     --marker-width: 8px;
-    --marker-color-highlight: #FF474799;
+    --marker-color-highlight: #FF4747;
     --marker-color: #FFFFFF77;
+
+    --min-opacity: 0.2;
+    --max-opacity: 0.7;
+    --max-invert: 50%;
 }
 
 html, body {
@@ -207,33 +211,41 @@ html, body {
     flex-direction: column-reverse !important
 }
 
-@-webkit-keyframes old-blinker {
-    from {opacity: 1.0;}
-    to {opacity: 0.4;}
-}
-
 @-webkit-keyframes blinker {
     from {
-        filter: invert(0%);
-        opacity: 1.0;
+        backdrop-filter: invert(0%);
+        opacity: var(--max-opacity);
     }
     to {
-        filter: invert(50%);
-        opacity: 0.7;
+        backdrop-filter: invert(var(--max-invert));
+        opacity: var(--min-opacity);
     }
 }
 
-@-webkit-keyframes blinker-alt {
-    from {
-        filter: invert(50%);
-        opacity: 0.7;
-    }
-    to {
-        filter: invert(0%);
-        opacity: 1.0;
-    }
+.blink {
+    opacity: 0.5;
+    -webkit-animation-name: blinker;
+    -webkit-animation-duration: 0.8s;
+    -webkit-animation-iteration-count:infinite;
+    -webkit-animation-timing-function:ease-in-out;
+    -webkit-animation-direction: alternate;
 }
 
+.even-cell {
+    background-color: #00000044;
+}
+
+.odd-cell {
+    background-color: #FFFFFF44;
+}
+
+.blink {
+    -webkit-animation-name: blinker;
+    -webkit-animation-duration: 0.8s;
+    -webkit-animation-iteration-count:infinite;
+    -webkit-animation-timing-function:ease-in-out;
+    -webkit-animation-direction: alternate;
+}
 
 @-webkit-keyframes input-warning {
     from {background-color: var(--input-bg-color)}
@@ -260,6 +272,10 @@ input:invalid {
     Theme-Css
 */
 
+.color-warning {
+    color: var(--warning-color)
+}
+
 
 .blink {
     -webkit-animation-name: blinker;
@@ -282,15 +298,19 @@ input:invalid {
 
 .alt-cell {
 /*    -webkit-animation-name: blinker-alt !important */
-    background-color: #000000A0 !important;
+/*    background-color: #000000A0 !important;*/
 }
 
 .marker-cell-highlight {
-    background-color: var(--marker-color-highlight);
+    background-color: var(--marker-color-highlight)
 }
 
 .toolbar-bg {
-    background-color: var(--toolbar-bg-color);
+    background-color: var(--toolbar-bg-color)
+}
+
+.cursor-bg-hover:hover {
+    background-color: var(--marker-color)
 }
 
 .checkbox {

@@ -1400,7 +1400,6 @@ function NewIdForm(props) {
 }
 
 function TextPaneEditor(props) {
-    d('props', props.resource);
 
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);

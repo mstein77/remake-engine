@@ -42,6 +42,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     const doAction = undo && eContext ? eContext.doAction : action => action();
 
     const add = props.add !== undefined ? props.add : !!addOp;
+    const edit = props.edit !== undefined ? props.edit : !!editOp;
     const clone = props.clone !== undefined ? props.clone : !!cloneOp;
     const del = props.del !== undefined ? props.del : !!deleteOp;
 
@@ -164,6 +165,8 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const execAdd = () => {throw Error('Missing implementation of addOp!')};
 
+    const execEdit = () => {throw Error('Missing implementation of editOp!')};
+
     const execDelete = () => {
         const oldEntity = entityIndex.getEntityObject(active);
         doAction(
@@ -235,6 +238,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const hotKeys = {
         new: makeOp(addOp, execAdd),
+        edit: makeOp(editOp, execEdit, active !== null),
         delete: makeOp(deleteOp, execDelete, active !== null && items.length > 0),
         clone: makeOp(cloneOp, execClone, active !== null),
         up: {
@@ -252,6 +256,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             <Block full="h">
                 <Stack full wrap gaps className="toolbar-bg">
                     {add && <Button icon="add" onClick={hotKeys.new} />}
+                    {edit && <Button icon="edit" onClick={hotKeys.edit} />}
                     {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
                     {del && <Button icon="delete" onClick={hotKeys.delete} />}
                     {order && <Button icon="keyboard_arrow_up" onClick={hotKeys.up} />}
@@ -375,7 +380,7 @@ function FlexStack({ auto, scaling,
     )
 }
 
-function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick,
+function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick,
                            entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
     const eContext = useContext(EditorContext);
     const cssContext = useContext(CssContext);
@@ -455,7 +460,8 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                 border="1"
                 className={cls.join(' ')}
                 onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
-                onMouseDown={readOnly ? null : () => toggleMarker(index)}>
+                onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
+                onLeftClick={readOnly ? null : () => toggleMarker(index)}>
                 {renderTitle(index)}
                 <Block className="overflow" full centerItems padded="h">
                     <Canvas render={itemRender} width={zoom * sizeX} height={zoom * sizeY} border="1" />
@@ -746,7 +752,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
 
 function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, ...props }) {
     const [pos, setPos] = useState(0);
-    const [zoom, setZoom] = useState(8);
+    const [zoom, setZoom] = useState(props.zoom ? props.zoom : 1);
     const [maxZoom, setMaxZoom] = useState(10);
     const [rulers, setRulers] = useState(false);
     const [border, setBorder] = useState(1);

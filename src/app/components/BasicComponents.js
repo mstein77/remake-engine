@@ -66,8 +66,10 @@ function BackgroundControl() {
     )
 }
 
-function Canvas({ width, height, smoothing, render, plain, border, className }) {
+function Canvas({ id, width, height, smoothing, render, plain, border, className }) {
+    const eContext = useContext(EditorContext);
     const canvasRef = useRef(null);
+
     useEffect(() => {
         if (!canvasRef.current || !render) {
             return;
@@ -152,7 +154,6 @@ function EditorCtx({ id, children }) {
         setTargetCellValue: targetCellValue => {
             setTargetCellValue(CellValue[targetCellValue])
         },
-
 
         doAction: (doAction, undoAction, uid = null) => {
             let action;
@@ -1235,6 +1236,17 @@ function WindowCtx({ children }) {
             imageIndex
         }
     }, [focusStack]);
+
+    useEffect(() => {
+        const contextMenuHandler = e => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        window.addEventListener('contextmenu', contextMenuHandler, {capture: false});
+        return () => {
+            window.removeEventListener('contextmenu', contextMenuHandler, {catpure: false})
+        }
+    });
 
     return (
         <WindowContext.Provider value={value}>

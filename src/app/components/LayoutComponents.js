@@ -30,7 +30,19 @@ function useHotKeys(elemRef, hotKeys, area = null, link = null) {
     return isHot
 }
 
-function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...props}) {
+const handleLeftRightClick = (leftHandler, rightHandler) => {
+    return e => {
+        if (leftHandler && e.button === 0) {
+            leftHandler(e);
+        } else if (rightHandler && e.button === 2) {
+            rightHandler(e);
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+};
+
+function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, onLeftClick, onRightClick,  ...props}) {
     const dimCls = [];
     if (className) {
         dimCls.push(className);
@@ -56,7 +68,15 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, ...p
     }
 
     const dimAttr = {};
-    for(let prop of ['onClick', 'onKeyDown', 'onKeyUp', 'onMouseDown', 'onWheel', 'onFocus', 'onBlur', 'onMouseEnter', 'onMouseLeave', 'onKeyPress', 'onDoubleClick']) {
+    if (onLeftClick || onRightClick) {
+        if (props.onMouseDown) {
+            throw Error('onMouseDown cannot be used with onLeftClick/onRightCLick at the same time!');
+        }
+        dimAttr.onMouseDown = handleLeftRightClick(onLeftClick, onRightClick);
+    }
+
+    for(let prop of Object.keys(props)) {
+        if (!prop.startsWith('on')) continue;
         const handler = props[prop];
         if (handler) {
             dimAttr[prop] = handler;
@@ -431,7 +451,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
 function getFlatChildren(children, result = []) {
     if (children) {
         for(let child of children) {
-            if (child === '') continue;
+            if (child === '' || child === null) continue;
 
             if (typeof child.type === 'symbol' && child.type.description === 'react.fragment') {
                 getFlatChildren(child.props.children, result);
@@ -728,5 +748,7 @@ export {
     Overlays,
     Overlay,
     OverlayContext,
-    DIR
+    Tooltip,
+    DIR,
+    handleLeftRightClick
 }
