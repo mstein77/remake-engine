@@ -208,8 +208,12 @@ class Grid {
     drawCellValue(ctx, value, x, y, zoom) {};
 
     drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1, players = null) {
-        const viewX = Math.min(width, this.getWidth());
-        const viewY = Math.min(height, this.getHeight());
+        const cellsX = this.getWidth();
+        const cellsY = this.getHeight();
+        if (posX + width > cellsX || posY + height > cellsY) return;
+
+        const viewX = width;
+        const viewY = height;
         const tileX = this.getCellSizeX() * zoom;
         const tileXPlusBorder = tileX + grid;
         const tileY = this.getCellSizeY() * zoom;

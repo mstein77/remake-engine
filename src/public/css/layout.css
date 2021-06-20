@@ -227,10 +227,10 @@ textarea.full-v {
     padding-bottom: var(--default-padding)
 }
 .padded-4 {
-    padding-bottom: var(--default-padding)
+    padding-left: var(--default-padding)
 }
 .padded-8 {
-    padding-bottom: var(--default-padding)
+    padding-right: var(--default-padding)
 }
 .border-box {
     box-sizing: border-box;

@@ -780,7 +780,7 @@ function GridRulerH({ posX, width }) {
         ctx.fillStyle = '#FFFFFF'; // cssContext.values.boxBorderColor;
         ctx.text = fontSize + 'px Monospace';
 
-        ctx.fillRect(0, height - gContext.border, gContext.dimX, gContext.border);
+        ctx.fillRect(0, height - 1, gContext.dimX, 1);
         const dist = Math.ceil((digits * charWidth + 2 * padding) / cellPlusBorderSize);
 
         for (let i = 0; i < width; i++) {
@@ -1716,11 +1716,9 @@ function ManagedGrid({
 }
 
 function FlexGridInner({ gridProvider, border, zoom, rulers,
-    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY,
-   resize, shift, navi, ...props }) {
+    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, ...props }) {
     const aContext = useContext(AvailContext);
     const cssContext = useContext(CssContext);
-    const eContext = useContext(EditorContext);
 
     const update = useComponentUpdate();
     const gridWidth = gridProvider.getWidth();
@@ -1791,6 +1789,37 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
     value.dimX = pageX * value.cellPlusBorderSizeX + border;
     value.dimY = pageY * value.cellPlusBorderSizeY + border;
 
+    return (
+        <GridContext.Provider value={value}>
+            <ScrollArea
+                full auto
+                x={posX} setX={setPosX} maxX={gridWidth} pageX={pageX}
+                y={posY} setY={setPosY} maxY={gridHeight} pageY={pageY}
+            >
+                <Block full centerItems>
+                    <ManagedGrid
+                        undo
+                        gridProvider={gridProvider}
+                        border={border} zoom={zoom} rulers={rulers}
+                        posX={posX} setPosX={setPosX}
+                        posY={posY} setPosY={setPosY}
+                        width={pageX} height={pageY}
+                        gridWidth={gridWidth} gridHeight={gridHeight}
+                        { ...props }
+                    />
+                </Block>
+            </ScrollArea>
+        </GridContext.Provider>
+    )
+}
+
+function FlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, height, resize, shift, navi, ...props}) {
+
+    const eContext = useContext(EditorContext);
+
+    const gridWidth = gridProvider.getWidth();
+    const gridHeight = gridProvider.getHeight();
+
     const shiftRow = start => {
         const doWidth = gridWidth;
         const doHeight = gridHeight;
@@ -1843,11 +1872,19 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
         return () => eContext.doGridAction('addColumns', {no, start});
     };
 
+    const maxPosX = Math.max(gridWidth - width, 0);
+    const maxPosY = Math.max(gridHeight - height, 0);
+
+    const innerProps = {
+        gridProvider, posX, posY, setPosX, setPosY,
+        width, height, resize, shift, navi, ...props
+    };
+
     return (
         <Grid className="padded-p" full columns="- * -" rows="- * -">
             <Block padded={DIR.BOTTOM|DIR.RIGHT}>
                 {navi && <Button icon="north_west" disabled={posX === 0 && posY === 0} onClick={() => {setPosX(0); setPosY(0)}} />}</Block>
-            <Block padded={DIR.BOTTOM|DIR.RIGHT|DIR.LEFT}>
+                <Block padded={DIR.BOTTOM|DIR.RIGHT|DIR.LEFT}>
                 <Stack center="h" gaps="1">
                     {resize &&
                         <>
@@ -1857,16 +1894,17 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
                     }
                     {navi &&
                         <Button icon="north" disabled={posY === 0} onClick={() => setPosY(0)} />}
-                    {shift &&
-                        <Button icon="system_update_alt" rotate={180} onClick={() => shiftRow(true)} />}
-                    {resize &&
-                        <>
-                            <Button icon="add" name="10" onClick={addRows(10, true)} />
-                            <Button icon="add" onClick={addRows(1, true)} />
-                        </>
-                    }
+                        {shift &&
+                            <Button icon="system_update_alt" rotate={180} onClick={() => shiftRow(true)} />}
+                        {resize &&
+                            <>
+                                <Button icon="add" name="10" onClick={addRows(10, true)} />
+                                <Button icon="add" onClick={addRows(1, true)} />
+                            </>
+                        }
                 </Stack>
             </Block>
+
             <Block padded={DIR.BOTTOM|DIR.LEFT}>
                 {navi && <Button icon="north_east" disabled={posX === maxPosX && posY === 0} onClick={() => {setPosX(maxPosX); setPosY(0)}} />}
             </Block>
@@ -1882,35 +1920,18 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
                     {navi && <Button icon="west" disabled={posX === 0} onClick={() => setPosX(0)} />}
                     {shift &&
                         <Button icon="system_update_alt" rotate={90} onClick={() => shiftColumn(true)} />}
-                    {resize &&
-                        <>
-                            <Button vertical icon="add" name="10" onClick={addColumns(10, true)} />
-                            <Button icon="add" onClick={addColumns(1, true)} />
-                        </>
-                    }
+                        {resize &&
+                            <>
+                                <Button vertical icon="add" name="10" onClick={addColumns(10, true)} />
+                                <Button icon="add" onClick={addColumns(1, true)} />
+                            </>
+                        }
                 </Stack>
             </Block>
             <Block full>
-                <GridContext.Provider value={value}>
-                    <ScrollArea
-                        full auto
-                        x={posX} setX={setPosX} maxX={gridWidth} pageX={pageX}
-                        y={posY} setY={setPosY} maxY={gridHeight} pageY={pageY}
-                    >
-                        <Block full centerItems>
-                            <ManagedGrid
-                                undo
-                                gridProvider={gridProvider}
-                                border={border} zoom={zoom} rulers={rulers}
-                                posX={posX} setPosX={setPosX}
-                                posY={posY} setPosY={setPosY}
-                                width={pageX} height={pageY}
-                                gridWidth={gridWidth} gridHeight={gridHeight}
-                                { ...props }
-                            />
-                        </Block>
-                    </ScrollArea>
-                </GridContext.Provider>
+                <AvailContextProvider>
+                    <FlexGridInner { ...innerProps } />
+                </AvailContextProvider>
             </Block>
             <Block padded={DIR.TOP|DIR.LEFT|DIR.BOTTOM} centerItems full="v">
                 <Stack gaps="1" vertical>
@@ -1921,8 +1942,7 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
                         </>
                     }
                     {navi && <Button icon="east" disabled={posX === maxPosX} onClick={() => setPosX(maxPosX)} />}
-                    {shift &&
-                        <Button icon="system_update_alt" rotate={-90} onClick={() => shiftColumn(false)} />}
+                    {shift && <Button icon="system_update_alt" rotate={-90} onClick={() => shiftColumn(false)} />}
                     {resize &&
                         <>
                             <Button vertical icon="add" name="10" onClick={addColumns(10, false)} />
@@ -1944,8 +1964,7 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
                         </>
                     }
                     {navi && <Button icon="south" disabled={posY === maxPosY} onClick={() => setPosY(maxPosY)} />}
-                    {shift &&
-                        <Button icon="system_update_alt" onClick={() => shiftRow(false)} />}
+                    {shift && <Button icon="system_update_alt" onClick={() => shiftRow(false)} />}
                     {resize &&
                         <>
                             <Button icon="add" name="10" onClick={addRows(10, false)} />
@@ -1958,14 +1977,6 @@ function FlexGridInner({ gridProvider, border, zoom, rulers,
                 {navi && <Button icon="south_east" disabled={posY === maxPosY && posX === maxPosX} onClick={() => {setPosX(maxPosX); setPosY(maxPosY)}} />}
             </Block>
         </Grid>
-    )
-}
-
-function FlexGrid(props) {
-    return (
-        <AvailContextProvider>
-            <FlexGridInner { ...props } />
-        </AvailContextProvider>
     );
 }
 

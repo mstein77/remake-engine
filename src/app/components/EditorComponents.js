@@ -1100,7 +1100,7 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
                     markerGapX={markerGapX} markerGapY={markerGapY}
                     setMarkerType={setMarkerType} markerType={markerType}
                     setMarkerWidth={setMarkerWidth} setMarkerHeight={setMarkerHeight}
-                    pinned={isPinned}
+                    pinned={isPinned} navi
                     onDoubleClick={onDoubleClick}
                 />
             </Block>
