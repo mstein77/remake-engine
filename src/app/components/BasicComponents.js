@@ -68,16 +68,35 @@ function BackgroundControl() {
 
 function Canvas({ id, width, height, smoothing, render, plain, border, className }) {
     const eContext = useContext(EditorContext);
+    const isMounted = useMounted();
     const canvasRef = useRef(null);
 
     useEffect(() => {
-        if (!canvasRef.current || !render) {
-            return;
+        const doRender = () => {
+            if (!canvasRef.current || !render) {
+                return;
+            }
+            const ctx = canvasRef.current.getContext('2d');
+            ctx.imageSmoothingEnabled = smoothing ? true : false;
+            render(ctx);
+        };
+        if (eContext && id) {
+            eContext.setRenderGrid(id, () => {
+                if (isMounted.current) {
+                    doRender();
+                }
+            });
         }
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.imageSmoothingEnabled = smoothing ? true : false;
-        render(ctx);
+        doRender();
     });
+
+    useEffect(() => {
+        if (id && eContext) {
+            return () => {
+                eContext.unsetRenderGrid(id)
+            };
+        }
+    }, []);
 
     if (height === 0 || width === 0) return '';
 
@@ -128,6 +147,10 @@ function EditorCtx({ id, children }) {
     const lastId = useRef(null);
     const select = useMemo(() => {return {has: false, get: null}}, []);
 
+    const gridActionsRef = useRef(null);
+
+    const renderGrids = useMemo(() => { return {}}, []);
+
     const value = {
         // mode
         mode: lastMode,
@@ -136,6 +159,32 @@ function EditorCtx({ id, children }) {
             d('SETTING MODE', mode, params);
             setLastMode(mode);
             setLastModeParams(params);
+        },
+
+        setGridActions: actions => gridActionsRef.current = actions,
+        getGridAction: name => {
+            const action = gridActionsRef.current[name];
+            return action
+        },
+        doGridAction: (name, data) => {
+            const action = gridActionsRef.current[name];
+            if (!action || (action.can && !action.can())) return;
+            return action.exec(data)
+        },
+
+        setRenderGrid: (id, update) => {
+            renderGrids[id] = update;
+        },
+        unsetRenderGrid: id => {
+            delete renderGrids[id]
+        },
+        renderGrid: id => {
+            const doRender = renderGrids[id];
+            if (doRender) {
+                requestAnimationFrame(() => {
+                    doRender()
+                })
+            }
         },
 
         // selection

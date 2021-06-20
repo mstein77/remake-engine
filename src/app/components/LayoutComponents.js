@@ -49,9 +49,20 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, onLe
     }
     if (padded) {
         if (padded === 'h') {
-            dimCls.push('padded-h');
+            dimCls.push('padded-h')
+        } else if (typeof padded === 'number') {
+            dimCls.push('border-box');
+            let i = 1;
+            while (i < 16) {
+                if ((padded & i)) {
+                    dimCls.push('padded-' + i);
+                }
+                i = i << 1
+            }
+        } else if (padded === '1') {
+            dimCls.push('padded-p')
         } else {
-            dimCls.push('padded' + (padded === 'v' ? '-v' : ''));
+            dimCls.push('padded' + (padded === 'v' ? '-v' : ''))
         }
     }
     if (border) {

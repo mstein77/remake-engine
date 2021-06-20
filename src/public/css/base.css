@@ -276,7 +276,6 @@ input:invalid {
     color: var(--warning-color)
 }
 
-
 .blink {
     -webkit-animation-name: blinker;
     -webkit-animation-duration: 0.8s;
@@ -294,11 +293,6 @@ input:invalid {
 
 .marker-cell {
     background-color: var(--marker-color);
-}
-
-.alt-cell {
-/*    -webkit-animation-name: blinker-alt !important */
-/*    background-color: #000000A0 !important;*/
 }
 
 .marker-cell-highlight {

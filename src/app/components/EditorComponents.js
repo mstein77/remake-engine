@@ -726,6 +726,8 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
         return new PictureCell(sizeX, sizeY);
     }, [sizeX, sizeY]);
 
+    const mode = eContext.mode;
+
     useEffect(() => {
         const cellValue = gridProvider.baseCellValue;
         if (cellValue) {
@@ -737,7 +739,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
     const gridWidth = gridProvider.getWidth();
     const gridHeight = gridProvider.getHeight();
 
-    const showPin = selection.unfix && eContext.mode === 'select' && markerX !== null;
+    const showPin = selection.unfix && mode === 'select' && markerX !== null;
     const isPinned = (showPin && eContext.modeParams.fixed);
 
     const sectorWidth = selection.fixed || isPinned ? eContext.modeParams.width : markerWidth;
@@ -771,15 +773,22 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
         return options
     }, [targetValues]);
 
+    const modes = ['select', 'pick', 'write'];
+    const hasMode = value => modes.includes(value);
+
     return (
         <Stack vertical borders full>
             <Toolbar full="h">
                 <UndoRedoButtons />
-                <Stack gaps="1">
-                    <Button icon="highlight_alt" current={eContext.mode} value={'select'} onClick={() => eContext.setMode('select', selection)} />
-                    <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />
-                    <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />
-                </Stack>
+                {modes.length > 1 &&
+                    <Stack gaps="1">
+                        {hasMode('select') && <Button icon="highlight_alt" current={eContext.mode} value={'select'} onClick={() => eContext.setMode('select', selection)} />}
+                        {hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
+                        {hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
+                        {hasMode('drag') && <Button icon="pan_tool" current={eContext.mode} value={'drag'} onClick={() => eContext.setMode('drag')} />}
+                        {hasMode('add') && <Button icon="exposure" rotate={180} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
+                    </Stack>
+                }
                 <Tuple name="Position:" x={posX} setX={setPosX} maxX={gridWidth - width} min={0}
                        y={posY} setY={setPosY} maxY={gridHeight - height} />
                 <Number name="Zoom:" value={zoom} min={1} max={10} set={setZoom} />
@@ -788,7 +797,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
             </Toolbar>
             <Block full>
                 <FlexGrid
-                    modes={['select', 'pick', 'write']} mode="select" modeParams={selection}
+                    modes={modes} mode="select" modeParams={selection}
                     gridProvider={gridProvider} cellType={cellType}
                     zoom={zoom} border={border} rulers={rulers}
                     posX={posX} setPosX={setPosX} posY={posY} setPosY={setPosY}
@@ -807,128 +816,132 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
             </Block>
             <Toolbar full="h">
                 <ToolGroup>
-                    <Block>Mode: {eContext.mode}</Block>
-                    {eContext.mode === 'write' && targetValues.length > 1 &&
-                    <Block width={100}>
-                        <Select
-                            value={eContext.targetCellValue.getId()}
-                            buttons
-                            full="h"
-                            options={targetValueOptions}
-                            set={id => eContext.setTargetCellValue(id)}
-                        />
-                    </Block>
+                    <Block>Mode: {mode}</Block>
+                    {mode === 'write' && targetValues.length > 1 &&
+                        <Block width={100}>
+                            <Select
+                                value={eContext.targetCellValue.getId()}
+                                buttons
+                                full="h"
+                                options={targetValueOptions}
+                                set={id => eContext.setTargetCellValue(id)}
+                            />
+                        </Block>
                     }
-                    {eContext.mode === 'write' && !eContext.selection.isCell() &&
-                    <Checkbox name="Opaque" value={writeTransparent} set={setWriteTransparent} />
+                    {mode === 'write' && !eContext.selection.isCell() &&
+                        <Checkbox name="Opaque" value={writeTransparent} set={setWriteTransparent} />
                     }
                 </ToolGroup>
 
-                {markerX !== null &&
-                <Tuple name="Position:"
-                       x={markerX} setX={setMarkerX} min={0} maxX={gridWidth - markerWidth}
-                       maxY={gridHeight - markerHeight} y={markerY} setY={setMarkerY} />
-                }
-                {!selection.multi && markerX !== null &&
-                <Tuple name="Size:"
-                       x={markerWidth} setX={setMarkerWidth} maxX={gridWidth - (markerX + markerWidth)} min={1}
-                       y={markerHeight} setY={setMarkerHeight} maxY={gridHeight - (markerY + markerHeight)}
-                       readOnly={selection.fixed} />
-                }
-                {hasSegments &&
-                <Tuple
-                    name="Size:"
-                    x={sectorWidth} setX={value => {
-                    setMarkerWidth(value + (value + markerGapX) * (segsX - 1));
-                    const params = { ...eContext.modeParams };
-                    params.width = value;
-                    eContext.setMode('select', params);
-                }} maxX={maxSectorWidth} min={1}
-                    y={sectorHeight} setY={value => {
-                    setMarkerHeight(value + (value + markerGapY) * (segsY - 1));
-                    const params = { ...eContext.modeParams };
-                    params.height = value;
-                    eContext.setMode('select', params);
-                }} maxY={maxSectorHeight}
-                    disabled={selection.fixed}
-                />
-                }
-                {hasSegments &&
-                <Tuple
-                    name="Segments:"
-                    x={segsX} setX={value => {setMarkerWidth(sectorWidth + (sectorWidth + markerGapX) * (value - 1))}} maxX={maxSegsX} min={1}
-                    y={segsY} setY={value => {setMarkerHeight(sectorHeight + (sectorHeight + markerGapY) * (value - 1))}} maxY={maxSegsY}
-                />
-                }
-                {hasSegments &&
-                <Tuple name="Gap:"
-                       x={markerGapX}
-                       setX={
-                           value => {
-                               const oversize = markerWidth - sectorWidth;
-                               const sectors = (oversize / (sectorWidth + markerGapX));
-                               const newWidth = sectorWidth + sectors * (sectorWidth + value);
-                               setMarkerGapX(value);
-                               setMarkerWidth(newWidth);
-                           }
-                       }
-                       maxX={
-                           markerGapX + Math.floor(
-                               (gridWidth - (markerX + markerWidth)) / (
-                                   markerWidth <= (sectorWidth * 2 + markerGapX) ?
-                                       1 :
-                                       ((markerWidth - sectorWidth)/(sectorWidth + markerGapX))
-                               )
-                           )
-                       }
-                       y={markerGapY}
-                       setY={
-                           (value) => {
-                               const oversize = markerHeight - sectorHeight;
-                               const sectors = (oversize / (sectorHeight + markerGapY));
-                               const newHeight = sectorHeight + sectors * (sectorHeight + value);
-                               setMarkerGapY(value);
-                               setMarkerHeight(newHeight);
-                           }}
-                       maxY={
-                           markerGapY + Math.floor(
-                               (gridHeight - (markerY + markerHeight)) / (
-                                   markerHeight <= (sectorHeight * 2 + markerGapY) ?
-                                       1 :
-                                       ((markerHeight - sectorHeight) / (sectorHeight + markerGapY))
-                               )
-                           )
-                       }
-                       min={0}
-                />
-                }
-                {markerX !== null &&
-                <Button icon="clear" onClick={
-                    () => {
-                        setMarkerX(null);
-                        setMarkerY(null);
-                        setMarkerWidth(null);
-                        setMarkerHeight(null)
-                    }
-                } />
-                }
-                {showPin &&
-                <Button
-                    icon="push_pin"
-                    value={true}
-                    current={isPinned}
-                    onClick={() => {
-                        const newParams = { ...eContext.modeParams, fixed: !isPinned };
-                        newParams.width = newParams.fixed ? markerWidth : sectorWidth;
-                        newParams.height = newParams.fixed ? markerHeight : sectorHeight;
-
-                        if (!newParams.fixed) {
-                            setMarkerWidth(sectorWidth);
-                            setMarkerHeight(sectorHeight);
+                {mode === 'select' &&
+                    <ToolGroup>
+                        {markerX !== null &&
+                        <Tuple name="Position:"
+                               x={markerX} setX={setMarkerX} min={0} maxX={gridWidth - markerWidth}
+                               maxY={gridHeight - markerHeight} y={markerY} setY={setMarkerY} />
                         }
-                        eContext.setMode('select', newParams);
-                    }}
-                />
+                        {!selection.multi && markerX !== null &&
+                        <Tuple name="Size:"
+                               x={markerWidth} setX={setMarkerWidth} maxX={gridWidth - (markerX + markerWidth)} min={1}
+                               y={markerHeight} setY={setMarkerHeight} maxY={gridHeight - (markerY + markerHeight)}
+                               readOnly={selection.fixed} />
+                        }
+                        {hasSegments &&
+                        <Tuple
+                            name="Size:"
+                            x={sectorWidth} setX={value => {
+                            setMarkerWidth(value + (value + markerGapX) * (segsX - 1));
+                            const params = { ...eContext.modeParams };
+                            params.width = value;
+                            eContext.setMode('select', params);
+                        }} maxX={maxSectorWidth} min={1}
+                            y={sectorHeight} setY={value => {
+                            setMarkerHeight(value + (value + markerGapY) * (segsY - 1));
+                            const params = { ...eContext.modeParams };
+                            params.height = value;
+                            eContext.setMode('select', params);
+                        }} maxY={maxSectorHeight}
+                            disabled={selection.fixed}
+                        />
+                        }
+                        {hasSegments &&
+                        <Tuple
+                            name="Segments:"
+                            x={segsX} setX={value => {setMarkerWidth(sectorWidth + (sectorWidth + markerGapX) * (value - 1))}} maxX={maxSegsX} min={1}
+                            y={segsY} setY={value => {setMarkerHeight(sectorHeight + (sectorHeight + markerGapY) * (value - 1))}} maxY={maxSegsY}
+                        />
+                        }
+                        {hasSegments &&
+                        <Tuple name="Gap:"
+                               x={markerGapX}
+                               setX={
+                                   value => {
+                                       const oversize = markerWidth - sectorWidth;
+                                       const sectors = (oversize / (sectorWidth + markerGapX));
+                                       const newWidth = sectorWidth + sectors * (sectorWidth + value);
+                                       setMarkerGapX(value);
+                                       setMarkerWidth(newWidth);
+                                   }
+                               }
+                               maxX={
+                                   markerGapX + Math.floor(
+                                       (gridWidth - (markerX + markerWidth)) / (
+                                           markerWidth <= (sectorWidth * 2 + markerGapX) ?
+                                               1 :
+                                               ((markerWidth - sectorWidth)/(sectorWidth + markerGapX))
+                                       )
+                                   )
+                               }
+                               y={markerGapY}
+                               setY={
+                                   (value) => {
+                                       const oversize = markerHeight - sectorHeight;
+                                       const sectors = (oversize / (sectorHeight + markerGapY));
+                                       const newHeight = sectorHeight + sectors * (sectorHeight + value);
+                                       setMarkerGapY(value);
+                                       setMarkerHeight(newHeight);
+                                   }}
+                               maxY={
+                                   markerGapY + Math.floor(
+                                       (gridHeight - (markerY + markerHeight)) / (
+                                           markerHeight <= (sectorHeight * 2 + markerGapY) ?
+                                               1 :
+                                               ((markerHeight - sectorHeight) / (sectorHeight + markerGapY))
+                                       )
+                                   )
+                               }
+                               min={0}
+                        />
+                        }
+                        {markerX !== null &&
+                        <Button icon="clear" onClick={
+                            () => {
+                                setMarkerX(null);
+                                setMarkerY(null);
+                                setMarkerWidth(null);
+                                setMarkerHeight(null)
+                            }
+                        } />
+                        }
+                        {showPin &&
+                        <Button
+                            icon="push_pin"
+                            value={true}
+                            current={isPinned}
+                            onClick={() => {
+                                const newParams = { ...eContext.modeParams, fixed: !isPinned };
+                                newParams.width = newParams.fixed ? markerWidth : sectorWidth;
+                                newParams.height = newParams.fixed ? markerHeight : sectorHeight;
+
+                                if (!newParams.fixed) {
+                                    setMarkerWidth(sectorWidth);
+                                    setMarkerHeight(sectorHeight);
+                                }
+                                eContext.setMode('select', newParams);
+                            }}
+                        />
+                        }
+                    </ToolGroup>
                 }
             </Toolbar>
         </Stack>
@@ -955,6 +968,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
     }, []);
 
     const activeColor = eContext.selection.getType() === 'rect' ? eContext.selection.getCell() : '#00000000';
+    const previewSize = 25;
 
     return (
         <OkCancelForm cancel={close} save={doSave} full>
@@ -963,11 +977,11 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
                     <Stack vertical full>
                         <Block padded>Selected:</Block>
                         <Block padded centerItems full="h">
-                            <Canvas key={activeColor} border="1" width={25} height={25}
+                            <Canvas key={activeColor} border="1" width={previewSize} height={previewSize}
                                 render={
                                     ctx => {
                                         ctx.fillStyle = activeColor;
-                                        ctx.fillRect(0, 0, 25, 25)
+                                        ctx.fillRect(0, 0, previewSize, previewSize)
                                     }
                                 }
                             />
@@ -981,6 +995,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
                                     eContext.setSelection(
                                         new CellSelection('rect', [[colorIndex.getEntityValue(index)]], CellValue.color)
                                     );
+                                    eContext.setMode('write');
                                 }}
                             />
                         </Block>
@@ -988,8 +1003,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
                 </Section>
                 <Block full>
                     <BaseGrid
-                        targetValues={[CellValue.color]}
-                        undo shift resize={resize} navi zoom={4}
+                        undo shift resize={true || resize} navi zoom={4}
                         gridProvider={gridProvider} selection={selection}
                     />
                 </Block>
