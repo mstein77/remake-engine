@@ -703,9 +703,9 @@ function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, s
         cls.push(className);
     }
     const style = {
-        width,
+        width: width + originX,
         maxWidth,
-        height
+        height: height + originY
     };
     if (cursor) {
         style.cursor = cursor

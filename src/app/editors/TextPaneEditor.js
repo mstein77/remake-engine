@@ -1153,6 +1153,44 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     )
 }
 
+// TODO: remove
+function FastCanvas() {
+    const sizeX = 2;
+    const sizeY = 2;
+    const cells = 100;
+    const width = sizeX * cells;
+    const height = sizeY * cells;
+    const buffer = new ArrayBuffer((cells * cells) << 2);
+    const colors32 = new Uint32Array(buffer);
+    for (let y = 0; y < cells; y++ ) {
+        for (let x = 0; x < cells; x++) {
+            colors32[y * cells + x] = parseInt((x + y) % 2 === 0 ? 'F04040FF' : 'D0D0D0FF', 16);
+        }
+    }
+
+    const render = ctx => {
+
+        let pos = 0;
+        let posY = 0;
+        for (let y = 0; y < cells; y++) {
+            let posX = 0;
+            for (let x = 0; x < cells; x++) {
+                ctx.fillStyle = '#' + colors32[pos].toString(16);
+                ctx.fillRect(posX, posY, sizeX, sizeY);
+                pos++;
+                posX += sizeX;
+            }
+            posY += sizeY;
+        }
+    };
+
+
+    return (
+        <Block><Canvas border width={width} height={height} render={render} /></Block>
+    );
+}
+
+
 function TextPaneEditor({ model }) {
     const wContext = useContext(WindowContext);
     const [activeFont, setActiveFont] = useState(0);

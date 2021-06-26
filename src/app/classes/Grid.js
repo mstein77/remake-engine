@@ -172,6 +172,24 @@ class Grid {
 
     constructor() {
         this.baseCellValue = CellValue.raw;
+        this.dimListeners = [];
+    }
+
+    addDimListener(listener) {
+        this.dimListeners.push(listener);
+    }
+
+    removeDimListener(listener) {
+        const index = this.dimListeners.indexOf(listener);
+        if (index !== -1) {
+            this.dimListeners.splice(index, 1)
+        }
+    }
+
+    notifyDimChange() {
+        for (let listener of this.dimListeners) {
+            listener();
+        }
     }
 
     hasEvents() {
@@ -295,6 +313,7 @@ class Grid {
                 }
                 no--;
             }
+            this.notifyDimChange();
             return added;
         } else {
             if (this.map.length + no < 1) {
@@ -305,6 +324,7 @@ class Grid {
             }
             const pos = start ? 0 : this.map.length + no;
             this.map.splice(pos, -no);
+            this.notifyDimChange();
             return -no;
         }
     }
@@ -316,10 +336,12 @@ class Grid {
             no--;
         }
         this.map.splice.call(this.map, index, 0, ...rows);
+        this.notifyDimChange()
     }
 
     deleteRows(index, no) {
         this.map.splice(index, no);
+        this.notifyDimChange()
     }
 
     getClonedRow(row, cellValue= this.baseCellValue) {
@@ -347,6 +369,7 @@ class Grid {
                 }
                 no--;
             }
+            this.notifyDimChange();
             return added;
         } else {
             if (this.map[0].length + no < 1) {
@@ -359,6 +382,7 @@ class Grid {
             for (let i = 0, iMax = this.map.length; i < iMax; i++) {
                 this.map[i].splice(pos, -no);
             }
+            this.notifyDimChange();
             return -no;
         }
     }
@@ -372,12 +396,14 @@ class Grid {
         for (let column of this.map) {
             column.splice.call(column, index, 0, ...columns);
         }
+        this.notifyDimChange()
     }
 
     deleteColumns(index, no) {
         for (let row of this.map) {
             row.splice(index, no);
         }
+        this.notifyDimChange()
     }
 
     // rect methods
@@ -402,6 +428,7 @@ class Grid {
     reduceToRect(posX, posY, width, height) {
         // TODO also set in model.key
         this.map = this.getRect(posX, posY, width, height);
+        this.notifyDimChange()
     }
 
     // path methods
@@ -490,6 +517,7 @@ class Grid {
             this.map.push(this.getClonedRow(selection.getRow(i), cellValue));
             i++;
         }
+        this.notifyDimChange();
     }
 
     importRawSelection(selection) {

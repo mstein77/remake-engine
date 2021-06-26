@@ -130,149 +130,167 @@ function EditorCtx({ id, children }) {
 
     const wContext = useContext(WindowContext);
 
-    const [lastMode, setLastMode] = useState(null);
-    const [lastModeParams, setLastModeParams] = useState({});
+    const [ lastMode, setLastMode ] = useState(null);
+    const [ lastModeParams, setLastModeParams ] = useState({});
 
-    const [past, setPast] = useState([]);
-    const [future, setFuture] = useState([]);
-    const [storePos, setStorePos] = useState(0);
-    const [historyPos, setHistoryPos] = useState(0);
-    const [targetCellValue, setTargetCellValue] = useState(CellValue.raw);
-    const [hasSelection, setHasSelection] = useState(false);
-    const [selection, setSelectionRaw] = useState(new CellSelection());
+    const [ past, setPast ] = useState([]);
+    const [ future, setFuture ] = useState([]);
+    const [ storePos, setStorePos ] = useState(0);
+    const [ historyPos, setHistoryPos ] = useState(0);
+    const [ targetCellValue, setTargetCellValue ] = useState(CellValue.raw);
+    const [ hasSelection, setHasSelection ] = useState(false);
+    const [ selection, setSelectionRaw ] = useState(new CellSelection());
+
     const setSelection = selection => {
         setTargetCellValue(selection.getCellValue());
         setSelectionRaw(selection);
     };
-    const lastId = useRef(null);
-    const select = useMemo(() => {return {has: false, get: null}}, []);
 
-    const gridActionsRef = useRef(null);
-
-    const renderGrids = useMemo(() => { return {}}, []);
-
-    const value = {
-        // mode
+    const propsRef = useRef(null);
+    propsRef.current = {
         mode: lastMode,
         modeParams: lastModeParams,
-        setMode: (mode, params = {}) => {
-            d('SETTING MODE', mode, params);
-            setLastMode(mode);
-            setLastModeParams(params);
-        },
-
-        setGridActions: actions => gridActionsRef.current = actions,
-        getGridAction: name => {
-            const action = gridActionsRef.current[name];
-            return action
-        },
-        doGridAction: (name, data) => {
-            const action = gridActionsRef.current[name];
-            if (!action || (action.can && !action.can())) return;
-            return action.exec(data)
-        },
-
-        setRenderGrid: (id, update) => {
-            renderGrids[id] = update;
-        },
-        unsetRenderGrid: id => {
-            delete renderGrids[id]
-        },
-        renderGrid: id => {
-            const doRender = renderGrids[id];
-            if (doRender) {
-                requestAnimationFrame(() => {
-                    doRender()
-                })
-            }
-        },
-
-        // selection
-        select,
-        hasSelection,
-        setHasSelection,
-        getSelection: () => {
-            if (select.get) {
-                return select.get();
-            }
-            return null;
-        },
-        selection,
-        setSelection,
+        past,
+        future,
+        storePos,
+        historyPos,
         targetCellValue,
-        setTargetCellValue: targetCellValue => {
-            setTargetCellValue(CellValue[targetCellValue])
-        },
-
-        doAction: (doAction, undoAction, uid = null) => {
-            let action;
-            if (uid !== null && uid === lastId.current) {
-                action = past[past.length - 1];
-                action.doAction = doAction;
-            } else {
-                lastId.current = uid;
-                action = {doAction, undoAction};
-                const newPast = [ ...past ];
-                if (newPast.length > 10) {
-                    newPast.shift();
-                }
-                newPast.push(action);
-                setPast(newPast);
-                setFuture([]);
-                setHistoryPos(historyPos + 1);
-            }
-            action.doAction();
-        },
-        undoAction: () => {
-            lastId.current = null;
-            if (past.length === 0) {
-                return;
-            }
-            const newPast = [ ...past ];
-            const newFuture = [ ...future ];
-            const action = newPast.pop();
-            newFuture.push(action);
-            setPast(newPast);
-            setFuture(newFuture);
-            setHistoryPos(historyPos - 1);
-            action.undoAction();
-        },
-        redoAction: () => {
-            lastId.current = null;
-            if (future.length === 0) {
-                return;
-            }
-            const newPast = [ ...past ];
-            const newFuture = [ ...future ];
-            const action = newFuture.pop();
-            newPast.push(action);
-            setPast(newPast);
-            setFuture(newFuture);
-            setHistoryPos(historyPos + 1);
-            action.doAction();
-        },
-        hasFuture: () => future.length > 0,
-        hasPast: () => past.length > 0,
-        hasStorePos: () => historyPos === storePos,
-        updateRestorePos: () => setStorePos(historyPos),
-        clear: () => {
-            lastId.current = null;
-            setPast([]);
-            setFuture([]);
-            setHistoryPos(0);
-            setStorePos(-1)
-        }
+        hasSelection,
+        selection
     };
+    const setter = useMemo(
+    () => {
+            const renderGrids = {};
+            let gridActions = {};
+            let select = {
+                has: false,
+                get: null
+            };
+            let lastId = null;
+
+            return {
+                setMode: (mode, params = {}) => {
+                    d('SETTING MODE', mode, params);
+                    setLastMode(mode);
+                    setLastModeParams(params);
+                },
+                setGridActions: actions => gridActions = actions,
+                getGridAction: name => {
+                    return gridActions[name];
+                },
+                getGridActions: () => gridActions,
+                doGridAction: (name, data) => {
+                    d('DO ACTION', name);
+                    const action = gridActions[name];
+                    if (!action || (action.can && !action.can())) return;
+                    return action.exec(data)
+                },
+
+                setRenderGrid: (id, update) => {
+                    renderGrids[id] = update;
+                },
+                unsetRenderGrid: id => {
+                    delete renderGrids[id]
+                },
+                renderGrid: id => {
+                    const doRender = renderGrids[id];
+                    if (doRender) {
+                        requestAnimationFrame(() => {
+                            doRender()
+                        })
+                    }
+                },
+
+                // selection
+                select,
+                setHasSelection,
+                getSelection: () => {
+                    if (select.get) {
+                        return select.get();
+                    }
+                    return null;
+                },
+                setSelection,
+                setTargetCellValue: targetCellValue => {
+                    setTargetCellValue(CellValue[targetCellValue])
+                },
+
+                doAction: (doAction, undoAction, uid = null) => {
+                    let action;
+                    const { past, historyPos } = propsRef.current;
+
+                    if (uid !== null && uid === lastId) {
+                        action = past[past.length - 1];
+                        action.doAction = doAction;
+                    } else {
+                        lastId = uid;
+                        action = {doAction, undoAction};
+                        const newPast = [ ...past ];
+                        if (newPast.length > 10) {
+                            newPast.shift();
+                        }
+                        newPast.push(action);
+                        setPast(newPast);
+                        setFuture([]);
+                        setHistoryPos(historyPos + 1);
+                    }
+                    action.doAction();
+                },
+                undoAction: () => {
+                    const { past, future, historyPos } = propsRef.current;
+                    lastId = null;
+                    if (past.length === 0) {
+                        return;
+                    }
+                    const newPast = [ ...past ];
+                    const newFuture = [ ...future ];
+                    const action = newPast.pop();
+                    newFuture.push(action);
+                    setPast(newPast);
+                    setFuture(newFuture);
+                    setHistoryPos(historyPos - 1);
+                    action.undoAction();
+                },
+                redoAction: () => {
+                    const { past, future, historyPos } = propsRef.current;
+                    lastId = null;
+                    if (future.length === 0) {
+                        return;
+                    }
+                    const newPast = [ ...past ];
+                    const newFuture = [ ...future ];
+                    const action = newFuture.pop();
+                    newPast.push(action);
+                    setPast(newPast);
+                    setFuture(newFuture);
+                    setHistoryPos(historyPos + 1);
+                    action.doAction();
+                },
+                hasFuture: () => propsRef.current.future.length > 0,
+                hasPast: () => propsRef.current.past.length > 0,
+                hasStorePos: () => propsRef.current.historyPos === propsRef.current.storePos,
+                updateRestorePos: () => setStorePos(propsRef.current.historyPos),
+                clear: () => {
+                    lastId = null;
+                    setPast([]);
+                    setFuture([]);
+                    setHistoryPos(0);
+                    setStorePos(-1)
+                }
+            }
+
+        }, []
+    );
 
     // TODO: this might not work correctly
     useEffect(() => {
-        wContext.registerEditor(id, value.clear);
+        wContext.registerEditor(id, setter.clear);
         return () => {
             wContext.unregisterEditor(id)
         }
-    }, []);
+    },[]);
     return (
-        <EditorContext.Provider value={value}>
+        <EditorContext.Provider value={{ ...setter, ...propsRef.current }}>
             {children}
         </EditorContext.Provider>
     )
@@ -558,7 +576,7 @@ function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev,
             };
 
             const handleElem = (
-                <Block onKeyDown={handleKey} className="padded-1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} {...handleAttr} cursor={cursor}>
+                <Block onKeyDown={handleKey} padded="1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} {...handleAttr} cursor={cursor}>
                     <Stack center vertical={collapseH} tab gaps="1" className="hover-highlight">
                         <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
                         <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
@@ -679,40 +697,39 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
     const scrollbarX = x !== undefined && (!auto || (x > 0 || maxX > pageX));
     const scrollbarY = y !== undefined && (!auto || (y > 0 || maxY > pageY));
 
-    if (!(scrollbarX || scrollbarY)) {
-        return children;
-    }
-
     const columns = ['*'];
     const rows = ['*'];
-    if (scrollbarX) {
-        rows.push('-');
-    }
-    if (scrollbarY) {
-        columns.push('-');
+    let onWheel = null;
+    if (scrollbarX || scrollbarY) {
+        if (scrollbarX) {
+            rows.push('-');
+        }
+        if (scrollbarY) {
+            columns.push('-');
+        }
+        const sensitivity = 0.25;
+        onWheel = e => {
+            let deltaX = Math.round(e.deltaX * sensitivity);
+            let deltaY = Math.round(e.deltaY * sensitivity);
+
+            const newX = Math.min(Math.max(x + deltaX, 0), maxX);
+            const newY = Math.min(Math.max(y + deltaY, 0), maxY);
+            if (x !== undefined && newX !== x) {
+                setX(newX);
+            }
+            if (y !== undefined && newY !== y) {
+                setY(newY);
+            }
+            e.stopPropagation();
+        };
     }
 
-    const sensitivity = 0.25;
-    const onWheel = e => {
-        let deltaX = Math.round(e.deltaX * sensitivity);
-        let deltaY = Math.round(e.deltaY * sensitivity);
-
-        const newX = Math.min(Math.max(x + deltaX, 0), maxX);
-        const newY = Math.min(Math.max(y + deltaY, 0), maxY);
-        if (x !== undefined && newX !== x) {
-            setX(newX);
-        }
-        if (y !== undefined && newY !== y) {
-            setY(newY);
-        }
-        e.stopPropagation();
-    };
 
     return (
         <Grid full gaps={gaps ? cssContext.values.defaultPadding : null} columns={columns.join(' ')} rows={rows.join(' ')}>
-            <Block full onWheel={onWheel}>{children}</Block>
-            {scrollbarY && <Scrollbar vertical pos={y} max={maxY} page={pageY} set={setY} />}
-            {scrollbarX && <Scrollbar pos={x} max={maxX} page={pageX} set={setX} />}
+            <Block key="a" full onWheel={onWheel}>{children}</Block>
+            {scrollbarY && <Scrollbar key="b" vertical pos={y} max={maxY} page={pageY} set={setY} />}
+            {scrollbarX && <Scrollbar key="c" pos={x} max={maxX} page={pageX} set={setX} />}
         </Grid>
     )
 }

@@ -700,7 +700,7 @@ function SimpleMarkerGrid({ gridProvider, markerWidth, markerHeight, markerX, ma
     )
 }
 
-function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], resize, navi, shift, undo, ...props }) {
+function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], resize, edit, navi, shift, undo, ...props }) {
     const eContext = useContext(EditorContext);
 
     const [posX, setPosX] = useState(0);
@@ -775,6 +775,15 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
 
     const modes = ['select', 'pick', 'write'];
     const hasMode = value => modes.includes(value);
+
+    const actions = eContext.getGridActions();
+    const buttons = [];
+    for (let [name, action] of Object.entries(actions)) {
+        if (action.has && !action.has()) continue;
+
+        buttons.push(<Button key={name} name={name} padded="h" onClick={action} />);
+    }
+    const markerActions = <Stack>{buttons}</Stack>
 
     return (
         <Stack vertical borders full>
@@ -914,14 +923,29 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
                         />
                         }
                         {markerX !== null &&
-                        <Button icon="clear" onClick={
-                            () => {
-                                setMarkerX(null);
-                                setMarkerY(null);
-                                setMarkerWidth(null);
-                                setMarkerHeight(null)
-                            }
-                        } />
+                            <Stack gaps="1">
+                                <Button icon="north_west" onClick={
+                                    () => {
+                                        eContext.doGridAction('goto');
+                                    }
+                                } />
+                                {<Button icon="select_all" onClick={
+                                    () => {
+                                        setMarkerX(0);
+                                        setMarkerY(0);
+                                        setMarkerWidth(gridProvider.getWidth());
+                                        setMarkerHeight(gridProvider.getHeight());
+                                    }
+                                } />}
+                                {edit && <Button icon="clear" onClick={
+                                    () => {
+                                        setMarkerX(null);
+                                        setMarkerY(null);
+                                        setMarkerWidth(null);
+                                        setMarkerHeight(null)
+                                    }
+                                } />}
+                            </Stack>
                         }
                         {showPin &&
                         <Button
@@ -941,12 +965,14 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], r
                             }}
                         />
                         }
+                        {markerActions}
                     </ToolGroup>
                 }
             </Toolbar>
         </Stack>
     )
 }
+
 
 function BitmapEditorInner({ image, colors, resize, save, close }) {
     const eContext = useContext(EditorContext);
@@ -1003,7 +1029,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
                 </Section>
                 <Block full>
                     <BaseGrid
-                        undo shift resize={true || resize} navi zoom={4}
+                        undo shift edit resize={resize} navi zoom={4}
                         gridProvider={gridProvider} selection={selection}
                     />
                 </Block>
