@@ -894,6 +894,7 @@ class TilesCellProvider extends CellProvider {
 }
 
 class FontIndexCellProvider extends CellProvider {
+
     constructor(provider, index) {
         super(provider.size);
         this.provider = provider;

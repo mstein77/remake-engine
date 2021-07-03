@@ -700,6 +700,10 @@ class WrappingIndexGrid extends IndexGrid {
         this.hasAnimationProp = players && tilesIndex.hasEntityProp('animation');
     }
 
+    getLength() {
+        return this.index.getLength()
+    }
+
     setMatch(match) {
         this.mapping = this.index.getView(0, this.index.getLength(), [match, this.base]);
     }

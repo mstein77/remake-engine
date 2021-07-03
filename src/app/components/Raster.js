@@ -62,7 +62,6 @@ function CellMarker(props) {
         width: (props.type === 'column-gap' ? 16  : sizeX * width + (width - 1) * props.border),
         height: (props.type === 'row-gap' ? 16 : sizeY * height + (height - 1) * props.border)
     };
-
     const markerCls = 'marker-cell' + (props.highlight ? '-highlight' : '');
     const cls = ['marker-grid'];
 
@@ -214,7 +213,6 @@ function CellMarker(props) {
                 {cells}
             </div>;
     }
-
     return (
         <div {...divAttr}>
             <div className={clsTopLeft.join(' ')} onMouseDown={topLeftClickHandler}></div>

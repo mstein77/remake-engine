@@ -1,5 +1,5 @@
-const {d, cloneDeep, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail} = require('../helper/helper');
-const {CellValue} = require('../classes/Grid');
+const { d, cloneDeep, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail } = require('../helper/helper');
+const { CellValue } = require('../classes/Grid');
 
 class EntityIndex {
 

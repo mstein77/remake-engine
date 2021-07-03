@@ -462,7 +462,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
 function getFlatChildren(children, result = []) {
     if (children) {
         for(let child of children) {
-            if (child === '' || child === null) continue;
+            if (!child) continue; // TODO check === '' || child === null || child === undefined) continue;
 
             if (typeof child.type === 'symbol' && child.type.description === 'react.fragment') {
                 getFlatChildren(child.props.children, result);
@@ -733,8 +733,6 @@ function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, s
         </OverlayContext.Provider>
     )
 }
-
-
 
 const Overlay = React.forwardRef(({ width, height, top = 0, left = 0, className, children, ...props }, forwardRef) => {
     const cls = ['absolute'];

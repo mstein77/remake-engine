@@ -127,7 +127,6 @@ function Toolbar({ children }) {
 const EditorContext = React.createContext();
 
 function EditorCtx({ id, children }) {
-
     const wContext = useContext(WindowContext);
 
     const [ lastMode, setLastMode ] = useState(null);
@@ -723,8 +722,6 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
             e.stopPropagation();
         };
     }
-
-
     return (
         <Grid full gaps={gaps ? cssContext.values.defaultPadding : null} columns={columns.join(' ')} rows={rows.join(' ')}>
             <Block key="a" full onWheel={onWheel}>{children}</Block>

@@ -15,7 +15,7 @@ import {
     WindowContext,
 } from "../components/BasicComponents";
 import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import { d, getCanvasForDim, getEmptyImageData, getColorsFromImageData } from "../helper/helper";
+import {d, getCanvasForDim, getEmptyImageData, getColorsFromImageData, getColorsFromCanvas} from "../helper/helper";
 import { NameDialog, FiltersModal, BitmapSelector, ResizeProps, BitmapEditor } from "../components/EditorComponents";
 import {
     Checkbox,
@@ -38,7 +38,7 @@ import {
     Hidden,
     OkCancelForm
 } from "../components/FormComponents";
-import { AssignIndex, FontIndex, CharIndex, TextBlockIndex } from "../classes/EntityIndex";
+import {AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex} from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 
@@ -276,7 +276,7 @@ function CharProperties({ charIndex, char, save, close }) {
         value,
         image
     });
-
+    const colors = new ColorIndex({colors: getColorsFromCanvas(charIndex.img)});
     return (
         <OkCancelForm submit save={saveChar} cancel={close} full>
             <Block full="h" padded>
@@ -293,7 +293,7 @@ function CharProperties({ charIndex, char, save, close }) {
                        set={code => setValue(code ? String.fromCharCode(code) : '')}
                        className="padded-h"
                     />
-                    <BitmapProp name="Image:" zoomOrAvail={10} value={image} set={setImage} width={charIndex.getSizeX()} height={charIndex.getSizeY()} entityIndex={charIndex} />
+                    <BitmapProp name="Image:" zoomOrAvail={10} value={image} colors={colors} set={setImage} width={charIndex.getSizeX()} height={charIndex.getSizeY()} entityIndex={charIndex} />
                 </PropertyGrid>
             </Block>
         </OkCancelForm>
@@ -327,6 +327,7 @@ function CharManager({ charIndex }) {
         const image = charIndex.getEntityPropValue(index, 'image');
         EditBitmapModal.open({
             image,
+            colors: new ColorIndex({colors: getColorsFromCanvas(charIndex.img)}),
             save: newImage => {
                 const undoImage = charIndex.getEntityPropValue(index, 'image');
                 eContext.doAction(
@@ -1167,9 +1168,7 @@ function FastCanvas() {
             colors32[y * cells + x] = parseInt((x + y) % 2 === 0 ? 'F04040FF' : 'D0D0D0FF', 16);
         }
     }
-
     const render = ctx => {
-
         let pos = 0;
         let posY = 0;
         for (let y = 0; y < cells; y++) {
@@ -1183,8 +1182,6 @@ function FastCanvas() {
             posY += sizeY;
         }
     };
-
-
     return (
         <Block><Canvas border width={width} height={height} render={render} /></Block>
     );
