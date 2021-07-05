@@ -722,11 +722,15 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         y: {min: -1000, max: 1000}
     };
 
+    const invalidateBlockImage = index => {
+        delete imagesRef.current[blockIndex.getEntityValue(index)];
+    };
+
     const setEntityProp = prop => {
         return value => {
             blockIndex.setEntityPropValue(activeBlock, prop, value);
             if (['font', 'text', 'textAlign', 'lineSpacing', 'filters'].includes(prop)) {
-                delete imagesRef.current[blockIndex.getEntityValue(activeBlock)];
+                invalidateBlockImage(activeBlock)
             }
             blockIndex.notify();
         };
@@ -741,13 +745,26 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const currBlock = blockRef.current;
 
     const changeFilter = () => {
+        const undoFilters = currBlock.filters;
+        const index = currBlock.index;
+
         FilterModal.open({
-            images: [getBlockImage(currBlock)],
+            images: [getBaseBlockImage(currBlock)],
             background,
-            filters: currBlock.filters,
+            filters: undoFilters,
             save: newFilters => {
-                blockIndex.setEntityPropValue(activeBlock, 'filters', newFilters);
-                blockIndex.notify();
+                eContext.doAction(
+                    () => {
+                        blockIndex.setEntityPropValue(index, 'filters', newFilters);
+                        invalidateBlockImage(index);
+                        blockIndex.notify()
+                    },
+                    () => {
+                        blockIndex.setEntityPropValue(index, 'filters', undoFilters);
+                        invalidateBlockImage(index);
+                        blockIndex.notify()
+                    }
+                );
                 FilterModal.close()
             }
         });
@@ -759,10 +776,12 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         eContext.doAction(
             () => {
                 blockIndex.setEntityPropValue(index, 'filters', '');
+                invalidateBlockImage(index);
                 blockIndex.notify()
             },
             () => {
                 blockIndex.setEntityPropValue(index, 'filters', redoValue);
+                invalidateBlockImage(index);
                 blockIndex.notify()
             }
         )
@@ -821,47 +840,55 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         };
     };
 
+    const getBaseBlockImage = block => {
+        const dim = getBlockDim(block);
+        let canvas = null;
+        if (dim.maxLen > 0 && dim.lines.length > 0) {
+            canvas = getCanvasForDim(dim.width, dim.height);
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+
+            const font = fonts[block.font].chars.model;
+            const lines = block.text.split('\n');
+            // process lines
+            let posY = 0;
+            for (let y = 0; y < lines.length; y++) {
+                let line = lines[y];
+                // do text align on current line
+                if (block.textAlign !== 'left' && line.length < dim.maxLen) {
+                    const pad = block.textAlign === 'right' ? dim.maxLen : (line.length + ((dim.maxLen - line.length) >> 1));
+                    line = line.padStart(pad, ' ');
+                }
+                // draw each char in current line
+                for (let x = 0; x < line.length; x++) {
+                    const char = font.map[line[x]];
+                    if (char) {
+                        ctx.drawImage(
+                            font.image,
+                            char.x,
+                            char.y,
+                            font.width,
+                            font.height,
+                            x * font.width,
+                            posY,
+                            font.width,
+                            font.height
+                        );
+                    }
+                }
+                posY += block.lineSpacing + font.height;
+            }
+        }
+        return canvas;
+    };
+
     const getBlockImage = block => {
         if (!imagesRef.current[block.value]) {
-            const dim = getBlockDim(block);
-            let canvas = null;
-            if (dim.maxLen > 0 && dim.lines.length > 0) {
-                canvas = getCanvasForDim(dim.width, dim.height);
-                const ctx = canvas.getContext('2d');
-                ctx.imageSmoothingEnabled = false;
-
-                const font = fonts[block.font].chars.model;
-                const lines = block.text.split('\n');
-                // process lines
-                let posY = 0;
-                for (let y = 0; y < lines.length; y++) {
-                    let line = lines[y];
-                    // do text align on current line
-                    if (block.textAlign !== 'left' && line.length < dim.maxLen) {
-                        const pad = block.textAlign === 'right' ? dim.maxLen : (line.length + ((dim.maxLen - line.length) >> 1));
-                        line = line.padStart(pad, ' ');
-                    }
-                    // draw each char in current line
-                    for (let x = 0; x < line.length; x++) {
-                        const char = font.map[line[x]];
-                        if (char) {
-                            ctx.drawImage(
-                                font.image,
-                                char.x,
-                                char.y,
-                                font.width,
-                                font.height,
-                                x * font.width,
-                                posY,
-                                font.width,
-                                font.height
-                            );
-                        }
-                    }
-                    posY += block.lineSpacing + font.height;
-                }
-                imagesRef.current[block.value] = canvas
+            let canvas = getBaseBlockImage(block);
+            if (block.filters) {
+                canvas = wContext.getFilteredCanvasData(block.filters, canvas)
             }
+            imagesRef.current[block.value] = canvas
         }
         return imagesRef.current[block.value]
     };
@@ -1123,7 +1150,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                             posX={actual.x}
                                             posY={actual.y}
                                             zoom={zoom}
-                                            moveCursor={moveCursor}
+                                            cursor={moveCursor}
                                             xdir={
                                                 (DIR.BOTTOM & (currBlock.y + dim.height < height)) |
                                                 DIR.TOP |

@@ -1,6 +1,6 @@
 import React, {useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, getEmptyImageData } from "../helper/helper";
+import { d, noop, getEmptyImageData, getCanvasForBitmap } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
 import {
     EditorCtx,
@@ -17,7 +17,7 @@ import {
     ToolGroup,
     ScrollArea,
     BackgroundControl,
-    useUpdateOnEntityIndexChanges, AvailContext, CssContext
+    useUpdateOnEntityIndexChanges, AvailContext, CssContext, WindowContext
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { FiltersModal } from "./EditorComponents";
@@ -382,6 +382,7 @@ function FlexStack({ auto, scaling,
 function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick,
                            entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
     const eContext = useContext(EditorContext);
+    const wContext = useContext(WindowContext);
     const cssContext = useContext(CssContext);
 
     const ApplyModal = useModal();
@@ -579,8 +580,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                     if (filters) {
                         const doImages = [];
                         for (let image of undoImages) {
-                            // TODO: apply filters here
-                            doImages.push(image);
+                            doImages.push(wContext.getFilteredImageData(filters, image));
                         }
                         doAction(
                             () => {
@@ -782,7 +782,6 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
         setFilterRaw(value);
         setPos(0);
     };
-
     const modeProps = useMemo(() => {
         return {
             modes: ['pick'],
@@ -797,15 +796,15 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
         <EditorCtx>
             <Stack vertical full borders>
                 {controls &&
-                <Toolbar>
-                    {props.filter &&
-                    <Input name="Filter:" clear active={filter !== ''} value={filter} set={setFilter} />
-                    }
-                    <Number name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
-                    <Number name="Zoom:" buttons min={1} value={zoom} set={setZoom} max={maxZoom} />
-                    <Number name="Border:" buttons min={0} value={border} set={setBorder} />
-                    <Checkbox name="Rulers:" value={rulers} set={setRulers} />
-                </Toolbar>
+                    <Toolbar>
+                        {props.filter &&
+                            <Input name="Filter:" clear active={filter !== ''} value={filter} set={setFilter} />
+                        }
+                        <Number name="Pos:" buttons min={0} max={gridProvider.getHeight() - height} value={pos} set={setPos} />
+                        <Number name="Zoom:" buttons min={cellType.getMinZoom()} value={zoom} set={setZoom} max={maxZoom} />
+                        <Number name="Border:" buttons min={0} value={border} set={setBorder} />
+                        <Checkbox name="Rulers:" value={rulers} set={setRulers} />
+                    </Toolbar>
                 }
                 <Block full>
                     {gridProvider.getWidth() === 0 ?
@@ -815,26 +814,19 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                                 { ...modeProps }
 
                                 gridProvider={gridProvider} cellType={cellType}
-                                zoom={zoom} border={border} rulers={rulers}
-                                posX={0} setPosX={() => {}} posY={pos} setPosY={setPos}
-
+                                zoom={zoom} setZoom={setZoom} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
+                                setBorder={setBorder} setRulers={setRulers}
+                                border={border} rulers={rulers}
+                                posX={0} setPosX={noop} posY={pos} setPosY={setPos}
                                 width={width} setWidth={setWidth} height={height} setHeight={setHeight}
-                                gridWidth={gridProvider.getWidth()} gridHeight={gridProvider.getHeight()}
-                                markerType="rect" setMarkerType={() => {}}
-                                markerWidth={1} setMarkerWidth={() => {}}
-                                markerHeight={1} setMarkerHeight={() => {}}
+
+                                markerType="rect" setMarkerType={noop}
+                                markerWidth={1} setMarkerWidth={noop}
+                                markerHeight={1} setMarkerHeight={noop}
                                 markerX={markerX} setMarkerX={setMarkerX}
                                 markerY={markerY} setMarkerY={setMarkerY}
 
                                 valid={(x, y) => gridProvider.getCellValue(x, y) !== null}
-
-                                match={filter}
-                                zoom={zoom}
-                                setZoom={setZoom}
-                                border={border}
-                                setBorder={setBorder}
-                                rulers={rulers}
-                                setRulers={setRulers}
                             />
                         </Block>
                     }

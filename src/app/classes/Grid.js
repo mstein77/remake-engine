@@ -196,6 +196,10 @@ class Grid {
         return false;
     }
 
+    getLength() {
+        return null
+    }
+
     getWidth() {
         return this.map.length === 0 ? 0 : this.map[0].length;
     }

@@ -4,6 +4,7 @@ import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
 import { OkCancelForm, Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
 import { NameDialog } from "../components/EditorComponents";
 import { d } from "../helper/helper";
+import ReactDOM from "react-dom";
 
 function PresetsManager({ id, set, config, ...props }) {
     const wContext = useContext(WindowContext);
@@ -528,11 +529,20 @@ function Settings({ save, close, defaults }) {
     )
 }
 
-function BaseAppInner({ children }) {
+function BaseAppInner({ game, children }) {
     const wContext = useContext(WindowContext);
     const SettingsModal = useModal();
 
     wContext.settingsRef.current = SettingsModal;
+
+    const play = () => {
+        ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+        if (false && context.dirty) {
+            game.reloadScreen();
+        } else {
+            game.restart();
+        }
+    };
 
     const onFocus = e => {
         wContext.lastTarget.current = e.target;
@@ -622,7 +632,7 @@ function BaseAppInner({ children }) {
                         <Stack gaps center="v">
                             <Button icon="build" onClick={() => wContext.openSettings()} />
                             <Button name="Play" icon="play_circle_outline" padded="h" />
-                            <Button name="Exit" icon="logout" padded="h" onClick={() => console.log(666)} />
+                            <Button name="Exit" icon="logout" padded="h" onClick={() => play()} />
                         </Stack>
                     </Stack>
                 </Block>
@@ -635,14 +645,12 @@ function BaseAppInner({ children }) {
     )
 }
 
-function MainEditor({ children }) {
+function MainEditor({ imageResources = [], filters = [], ...props }) {
     return (
         <CssCtx>
-            <WindowCtx>
+            <WindowCtx imageResources={imageResources} filters={d(filters)}>
                 <BackgroundCtx>
-                    <BaseAppInner>
-                        {children}
-                    </BaseAppInner>
+                    <BaseAppInner { ...props} />
                 </BackgroundCtx>
             </WindowCtx>
         </CssCtx>

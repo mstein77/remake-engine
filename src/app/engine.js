@@ -6123,7 +6123,7 @@ filterer.addFilter(
         return imageData;
     },
     [
-        {key: 'opacity', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 1}
+        {key: 'opacity', type: FILTER.PARAM.FLOAT, min: 0, max: 1, step: 0.01, decimals: 2, default: 1}
     ]
 );
 

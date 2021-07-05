@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import {d, Storage} from "../helper/helper"
+import { d, Storage, getCanvasForBitmap } from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import { Button, Number, Color, Form, Submit, InputProp, OkCancelForm } from "./FormComponents";
+import { Button, Number, Color, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex } from "../classes/EntityIndex";
@@ -754,11 +754,13 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 
     const dimMin = {
         [axisKey]: minPerc + '%',
-        [oppAxisKey]: space
+        [oppAxisKey]: space,
+        className: 'scrollbar-space'
     };
     const dimMax = {
         [axisKey]: maxPerc + '%',
-        [oppAxisKey]: space
+        [oppAxisKey]: space,
+        className: 'scrollbar-space'
     };
 
     const onMouseDown = e => {
@@ -820,12 +822,11 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         handleCls.push('active');
     }
 
-
     return (
         <Block full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
             <Stack full={dirKey} vertical={vertical}>
                 <Block onMouseDown={prevPage} {...dimMin} />
-                <Block width={vertical ? 11 : false} full={vertical ? 'v' : true} onMouseDown={onMouseDown} className={handleCls.join(' ')}/>
+                <Block width={vertical ? 13 : false} full={vertical ? 'v' : true} onMouseDown={onMouseDown} className={handleCls.join(' ')}/>
                 <Block onMouseDown={nextPage} {...dimMax} />
             </Stack>
         </Block>
@@ -834,7 +835,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 
 const WindowContext = React.createContext();
 
-function WindowCtx({ children }) {
+function WindowCtx({ imageResources, filters, children }) {
     const cssContext = useContext(CssContext);
     const cssRef = useRef(null);
     cssRef.current = cssContext;
@@ -1260,8 +1261,29 @@ function WindowCtx({ children }) {
         });
     };
 
+    const getFilteredCanvasData = (filter, canvas) => {
+        if (!filter) {
+            return getCanvasForBitmap(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height))
+        }
+        const result = filters.getCanvasWithFiltersApplied(filter, {elem: canvas, ctx: canvas.getContext('2d')}, 0, 0, canvas.width, canvas.height);
+        return result[0].elem;
+    };
+
+    const getFilteredImageData = (filter, imageData) => {
+        if (!filter) {
+            return getCanvasForBitmap(imageData).getContext('2d').getImageData(0, 0, imageData.width, imageData.height)
+        }
+        const result = getFilteredCanvasData(filter, getCanvasForBitmap(imageData));
+        const ctx = result.getContext('2d');
+        return ctx.getImageData(0, 0, result.width, result.height);
+    };
+
     const imageIndex = useMemo(() => {
-        return new ImageIndex({})
+        const index =  new ImageIndex({});
+        for (let resource of imageResources) {
+            index.setEntityObject({value: resource.name, image: resource.bitmap});
+        }
+        return index
     });
 
     const value = useMemo(() => {
@@ -1296,7 +1318,10 @@ function WindowCtx({ children }) {
             defaults,
             storage,
             focusStack,
-            imageIndex
+            imageIndex,
+            getFilteredCanvasData,
+            getFilteredImageData,
+            filters
         }
     }, [focusStack]);
 

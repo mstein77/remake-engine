@@ -27,6 +27,8 @@ function NameDialog({ close, save, max, reserved = [], ...props }) {
 }
 
 function FiltersModal({ save, close, model, images, filters = '', type = 'canvas', ...props }) {
+    const wContext = useContext(WindowContext);
+
     const [zoom, setZoom] = useState(1);
     const [background, setBackground] = useState(props.background ? props.background :'#000000');
 
@@ -46,113 +48,8 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
     const currImage = inputData[index];
 
     const filterDefinitions = useMemo(() => {
-        return {
-            "clear-y": {
-                "type": 0,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "type": 4,
-                        "key": "pixels",
-                        "default": 0
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            },
-            "flip-x": {
-                "type": 0,
-                "minParams": 0,
-                "paramDefs": [],
-                "params": []
-            },
-            "flip-y": {
-                "type": 0,
-                "minParams": 0,
-                "paramDefs": [],
-                "params": []
-            },
-            "flip-xy": {
-                "type": 0,
-                "minParams": 0,
-                "paramDefs": [],
-                "params": []
-            },
-            "shift-y": {
-                "type": 0,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "type": 4,
-                        "key": "pixels",
-                        "default": 0
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            },
-            "shift-x": {
-                "type": 0,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "type": 4,
-                        "key": "pixels",
-                        "default": 0
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            },
-            "monochrome": {
-                "type": 1,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "type": 2,
-                        "key": "color",
-                        "default": "#ffffff"
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            },
-            "opacity": {
-                "type": 1,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "key": "opacity",
-                        "type": 1,
-                        "min": 0,
-                        "max": 1,
-                        "default": 1
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            },
-            "color-replace": {
-                "type": 1,
-                "minParams": 1,
-                "paramDefs": [
-                    {
-                        "key": "replace",
-                        "type": 3
-                    }
-                ],
-                "params": [
-                    null
-                ]
-            }
-        }
+        return wContext.filters.getFilters();
     });
-
     const filterIndex = useMemo(() => {
         const index =  new FilterIndex(model);
         const filterExpressions = filters.split('|');
@@ -168,9 +65,8 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                 const values = parts[1].substr(0, parts[1].length - 1).split(',');
                 const params = filterDefinitions[name].params;
                 for (let i = 0; i < params.length; i++) {
-//                    params[i](values[i], item);
-                    // TODO: validation?
-                    item[name] = values[i];
+                    params[i](values[i], item);
+                    item[name] = params;
                 }
             }
             index.setEntityObject({value: name, params: { ...item }});
@@ -182,9 +78,32 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
 
     useUpdateOnEntityIndexChanges(filterIndex);
 
+    const getFilterString = () => {
+        const assigned = filterIndex.getEntityObjects();
+        const values = [];
+        for (let filter of assigned) {
+            let expr = filter.value;
+            const paramDefs = filterDefinitions[expr].paramDefs;
+            if (paramDefs.length > 0) {
+                expr += '(';
+                const params = [];
+                for (let def of paramDefs) {
+                    const rawValue = filter.params[def.key];
+                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
+                }
+                expr += params.join(',') + ')';
+            }
+            values.push(expr);
+        }
+        return values.join('|');
+    };
+
     const render = ctx => {
+        const filteredCanvas = wContext.getFilteredCanvasData(getFilterString(), currImage);
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, currImage.width * zoom, currImage.height * zoom);
         ctx.drawImage(
-            currImage,
+            filteredCanvas,
             0,
             0,
             currImage.width,
@@ -241,7 +160,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                             name={def.key + ':'}
                             min={def.min}
                             max={def.max}
-                            decimals={2}
+                            decimals={def.decimals}
                             step={def.step}
                             value={params[def.key]}
                             set={value => {
@@ -285,23 +204,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
     };
 
     const saveFilters = () => {
-        const assigned = filterIndex.getEntityObjects();
-        const values = [];
-        for (let filter of assigned) {
-            let expr = filter.value;
-            const paramDefs = filterDefinitions[expr].paramDefs;
-            if (paramDefs.length > 0) {
-                expr += '(';
-                const params = [];
-                for (let def of paramDefs) {
-                    const rawValue = filter.params[def.key];
-                    params.push(def.type === 2 ? rgb2hex(rawValue) : rawValue);
-                }
-                expr += params.join(',') + ')';
-            }
-            values.push(expr);
-        }
-        save(values.join('|'));
+        save(getFilterString());
     };
 
     return (
@@ -321,17 +224,20 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                     {getItemProperties()}
                 </EntityStackSections>
                 <Section inner full name="Preview">
-                    <Stack vertical full>
+                    <Stack vertical full borders>
                         <Toolbar>
                             <Number name="Zoom:" value={zoom} set={setZoom} min={1} max={9} />
                             <Color name="Background:" value={background} set={setBackground} />
                         </Toolbar>
-                        <Block full centerItems>
-                            <Canvas
-                                width={currImage.width * zoom}
-                                height={currImage.height * zoom}
-                                render={render}
-                            />
+                        <Block full padded>
+                            <Block full centerItems>
+                                <Canvas
+                                    border="1"
+                                    width={currImage.width * zoom}
+                                    height={currImage.height * zoom}
+                                    render={render}
+                                />
+                            </Block>
                         </Block>
                     </Stack>
                 </Section>

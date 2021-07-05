@@ -1260,8 +1260,11 @@ const handleLeftRight = (leftHandler, rightHandler) => {
     }
 };
 
+const noop = () => {};
+
 module.exports = {
     d,
+    noop,
     clamp,
     areDisjoint,
     cloneDeep,

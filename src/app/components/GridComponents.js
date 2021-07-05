@@ -7,12 +7,14 @@ import {
     Canvas,
     ScrollArea,
     WindowContext,
-    EditorContext, useComponentUpdate, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
+    EditorContext, useModal, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
 } from "./BasicComponents";
-import {Button, Checkbox, Number, Select, Tuple} from "./FormComponents";
-import { d, clamp, areDisjoint } from "../helper/helper";
-import { CellSelection } from "../classes/CellProvider";
-import {PictureCell} from "./BaseComponents";
+import { FiltersModal } from "./EditorComponents";
+import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
+import { d, clamp, areDisjoint, getCanvasForBitmap } from "../helper/helper";
+import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
+import { PictureCell } from "./BaseComponents";
+import { BitmapGrid, CellValue } from "../classes/Grid";
 
 function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onRightClick, initMove, initResize, autoMatrix }) {
     const gContext = useContext(GridContext);
@@ -889,7 +891,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
             setMarkerX, setMarkerY, setPosX, setPosY,
             setCursorWidth, setCursorHeight, setCursorType,
             setMarkerWidth, setMarkerHeight, setMarkerType,
-            update
+            update, doAction
         } = setter;
         const setMode = eContext.setMode;
 
@@ -1305,9 +1307,12 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
         marker.use = !areDisjoint(modes, ['select', 'pick', 'move-marker']);
 
         const resetMarker = () => {
-            setMarkerX(null);
-            setMarkerY(null);
-            setMarkerType(null)
+            const { mounted } = propsRef.current;
+            if (mounted.current) {
+                setMarkerX(null);
+                setMarkerY(null);
+                setMarkerType(null)
+            }
         };
 
         const setMarker = (type, x, y, width = 1, height = 1) => {
@@ -1344,7 +1349,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     const width = markerType === 'rows' ? gridProvider.getWidth() : markerWidth;
                     const height = markerType === 'columns' ? gridProvider.getHeight() : markerHeight;
                     const undoSelection = gridProvider.getSelection(markerX, markerY, width, height, cellValue);
-                    eContext.doAction(
+                    doAction(
                         () => {
                             gridProvider.fillRect(
                                 markerX,
@@ -1366,7 +1371,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                             );
                             eContext.renderGrid('main');
                         }
-                    );
+                    )
                 },
                 has: () => {
                     const { markerType, markerX } = propsRef.current;
@@ -1411,6 +1416,42 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     return markerX !== null && !markerType.endsWith('gap') && !modeParams.fixed
                 }
             },
+            apply: {
+                exec: () => {
+                    const { ApplyModal, markerX, markerY, markerWidth, markerHeight, markerType } = propsRef.current;
+                    const undoSelection = gridProvider.getSelection(
+                        markerX,
+                        markerY,
+                        markerType === 'rows' ? gridProvider.getWidth() : markerWidth,
+                        markerType === 'columns' ? gridProvider.getHeight() : markerHeight,
+                    );
+                    const provider = new BitmapCellProvider(1);
+                    provider.setMap(undoSelection.getCells());
+                    const image = provider.getImageData();
+                    ApplyModal.open({
+                        images: [ getCanvasForBitmap(image) ],
+                        background: '#000000',
+                        filters: '',
+                        save: newFilters => {
+                            const bitmapGrid = new BitmapGrid({image: wContext.getFilteredImageData(newFilters, image)})
+                            const doSelection = bitmapGrid.getSelection(0, 0, image.width, image.height);
+                            doAction(
+                                () => {
+                                    gridProvider.writeSelection(markerX, markerY, doSelection)
+                                },
+                                () => {
+                                    gridProvider.writeSelection(markerX, markerY, undoSelection)
+                                }
+                            );
+                            ApplyModal.close()
+                        }
+                    });
+                },
+                has: () => {
+                    const { markerType, markerX } = propsRef.current;
+                    return gridProvider.baseCellValue === CellValue.color && markerX !== null && ['rect', 'columns', 'rows'].includes(markerType)
+                }
+            },
             fill: {
                 exec: () => {
                     const { markerX, markerY, markerWidth, markerHeight, markerType } = propsRef.current;
@@ -1426,7 +1467,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                         height,
                         cellValue
                     );
-                    eContext.doAction(
+                    doAction(
                         () => {
                             gridProvider.fillRectWithSelection(
                                 markerX,
@@ -1461,7 +1502,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                 exec: () => {
                     const { posX, markerType, markerY, markerX, markerWidth, markerHeight, gridWidth, gridHeight } = propsRef.current;
                     const undoSelection = gridProvider.getRawSelection(0, 0, gridWidth, gridHeight);
-                    eContext.doAction(
+                    doAction(
                         () => {
                             if (markerType === 'rows' || (markerType === 'rect' && markerWidth === gridWidth)) {
                                 gridProvider.deleteRows(markerY, markerHeight);
@@ -1475,7 +1516,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                             gridProvider.importRawSelection(undoSelection);
                             setPosX(posX);
                         }
-                    );
+                    )
                 },
                 can: () => {
                     const { markerType, markerWidth, markerHeight } = propsRef.current;
@@ -1504,7 +1545,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     const undoSelection = gridProvider.getRawSelection(
                         0, 0, oldWidth, oldHeight
                     );
-                    eContext.doAction(
+                    doAction(
                         () => {
                             gridProvider.reduceToRect(
                                 markerX,
@@ -1534,34 +1575,33 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     let oldPosY = posY;
                     let undoSelection = null;
                     let min = Math.min(Math.abs(no), gridHeight - 1);
-
-                    const doAction = () => {
-                        if (no < 0) {
-                            undoSelection = gridProvider.getRawSelection(
-                                0, start ? 0 : gridHeight - min,
-                                gridWidth, min
-                            );
+                    doAction(
+                        () => {
+                            if (no < 0) {
+                                undoSelection = gridProvider.getRawSelection(
+                                    0, start ? 0 : gridHeight - min,
+                                    gridWidth, min
+                                );
+                            }
+                            added = gridProvider.addRows(start, no);
+                            if (no < 0) {
+                                added *= -1;
+                            }
+                            const _posY = start ? 0 : Math.max(0, oldPosY + added);
+                            setState({posY: _posY, start, added, axis: 'y'});
+                        },
+                        () => {
+                            gridProvider.addRows(start, -added);
+                            if (undoSelection) {
+                                gridProvider.fillRectWithSelection(
+                                    0, start ? 0 : gridHeight + added,
+                                    gridWidth, -added,
+                                    undoSelection
+                                );
+                            }
+                            setState({posY: oldPosY, start, added: -added, axis: 'y'});
                         }
-                        added = gridProvider.addRows(start, no);
-                        if (no < 0) {
-                            added *= -1;
-                        }
-                        const _posY = start ? 0 : Math.max(0, oldPosY + added);
-                        setState({posY: _posY, start, added, axis: 'y'});
-                    };
-
-                    const undoAction = () => {
-                        gridProvider.addRows(start, -added);
-                        if (undoSelection) {
-                            gridProvider.fillRectWithSelection(
-                                0, start ? 0 : gridHeight + added,
-                                gridWidth, -added,
-                                undoSelection
-                            );
-                        }
-                        setState({posY: oldPosY, start, added: -added, axis: 'y'});
-                    };
-                    eContext.doAction(doAction, undoAction);
+                    )
                 }
             };
             actions.addColumns = {
@@ -1575,33 +1615,33 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     let oldPosX = posX;
                     let undoSelection = null;
                     let min = Math.min(Math.abs(no), gridWidth - 1);
-
-                    const doAction = () => {
-                        if (no < 0) {
-                            undoSelection = gridProvider.getRawSelection(
-                                start ? 0 : gridWidth - min, 0,
-                                min, gridHeight
-                            );
+                    doAction(
+                        () => {
+                            if (no < 0) {
+                                undoSelection = gridProvider.getRawSelection(
+                                    start ? 0 : gridWidth - min, 0,
+                                    min, gridHeight
+                                );
+                            }
+                            added = gridProvider.addColumns(start, no);
+                            if (no < 0) {
+                                added *= -1;
+                            }
+                            const _posX = start ? 0 : Math.max(0, oldPosX + added);
+                            setState({posX: _posX, start, added, axis: 'x'});
+                        },
+                        () => {
+                            gridProvider.addColumns(start, -added);
+                            if (undoSelection) {
+                                gridProvider.fillRectWithSelection(
+                                    start ? 0 : gridWidth + added, 0,
+                                    -added, gridHeight,
+                                    undoSelection
+                                );
+                            }
+                            setState({posX: oldPosX, start, added: -added, axis: 'x'});
                         }
-                        added = gridProvider.addColumns(start, no);
-                        if (no < 0) {
-                            added *= -1;
-                        }
-                        const _posX = start ? 0 : Math.max(0, oldPosX + added);
-                        setState({posX: _posX, start, added, axis: 'x'});
-                    };
-                    const undoAction = () => {
-                        gridProvider.addColumns(start, -added);
-                        if (undoSelection) {
-                            gridProvider.fillRectWithSelection(
-                                start ? 0 : gridWidth + added, 0,
-                                -added, gridHeight,
-                                undoSelection
-                            );
-                        }
-                        setState({posX: oldPosX, start, added: -added, axis: 'x'});
-                    };
-                    eContext.doAction(doAction, undoAction);
+                    )
                 }
             };
             actions.insert = {
@@ -1618,7 +1658,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     }
                     if (markerType === 'row-gap') {
                         const oldMarkerY = markerY;
-                        eContext.doAction(
+                        doAction(
                             () => {
                                 gridProvider.insertRowsAt(oldMarkerY, no);
                                 setPosY(posY + 1);
@@ -1629,10 +1669,10 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                 setPosY(posY + 1);
                                 setPosY(posY);
                             }
-                        );
+                        )
                     } else {
                         const oldMarkerX = markerX;
-                        eContext.doAction(
+                        doAction(
                             () => {
                                 gridProvider.insertColumnsAt(oldMarkerX, no);
                                 setPosY(posY + 1);
@@ -1643,7 +1683,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                 setPosY(posY + 1);
                                 setPosY(posY);
                             }
-                        );
+                        )
                     }
                 }
             }
@@ -1759,13 +1799,14 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                     const undoPath = path.old;
                                     const { selection } = eContextRef.current;
                                     const cellValue = selection.getCellValue();
-                                    const doAction = () => {
-                                        gridProvider.writePath(doPath, cellValue);
-                                    };
-                                    const undoAction = () => {
-                                        gridProvider.writePath(undoPath, cellValue);
-                                    };
-                                    eContext.doAction(doAction, undoAction);
+                                    doAction(
+                                        () => {
+                                            gridProvider.writePath(doPath, cellValue);
+                                        },
+                                        () => {
+                                            gridProvider.writePath(undoPath, cellValue);
+                                        }
+                                    );
                                     cursor.propsRef.current.last = {clientX: e.clientX, clientY: e.clientY};
                                     resetMarker();
                                 }, {once: true})
@@ -1857,7 +1898,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                 controller[mode] = obj;
             }
         }
-        return {controller, actions}
+        return { controller, actions }
     }, []);
 }
 
@@ -1867,11 +1908,14 @@ function ManagedGrid({
          width, height, zoom, border, rulers,
          markerX, markerY, setMarkerX, setMarkerY, valid,
          markerWidth, markerHeight, setMarkerWidth, setMarkerHeight,
-         markerGapX, markerGapY,
+         markerGapX, markerGapY, undo,
          ...props
     }) {
     const gContext = useContext(GridContext);
     const eContext = useContext(EditorContext);
+    const mounted = useMounted();
+
+    const ApplyModal = useModal();
 
     const lastControllerRef = useRef(null);
     const update = useComponentUpdate();
@@ -1932,12 +1976,13 @@ function ManagedGrid({
             setPosX, setPosY, setMarkerX, setMarkerY,
             setMarkerWidth, setMarkerHeight, setMarkerType,
             setCursorWidth, setCursorHeight, setCursorType,
-            update
+            update, doAction: undo && eContext ? eContext.doAction : action => action()
         }
     }, []);
 
     const propsRef = useRef(null);
     propsRef.current = {
+        mounted, ApplyModal,
         gridProvider, trackX, trackY,
         cursorWidth, cursorHeight, cursorType,
         mode, modeParams, writeTransparent,
@@ -1946,7 +1991,7 @@ function ManagedGrid({
         markerType, markerGapX, markerGapY, ...props
     };
 
-    const {controller, actions} = useGridModes({modes, propsRef, cursor, marker, setter});
+    const { controller, actions } = useGridModes({modes, propsRef, cursor, marker, setter});
     useMemo(() => {
         eContext.setGridActions(actions)
     }, []);
@@ -2013,81 +2058,85 @@ function ManagedGrid({
                     { ...marker.propsRef.current }
                 />
             }
+            <ApplyModal.content name="Apply filters to selection..." full>
+                <FiltersModal { ...ApplyModal.props } />
+            </ApplyModal.content>
         </Overlays>
     )
 }
 
-function FlexGridInner({ gridProvider, cellType, border, zoom, rulers,
-    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, ...props }) {
+function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, setMaxZoom, setZoom,
+    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, undo, ...props }) {
     const aContext = useContext(AvailContext);
     const cssContext = useContext(CssContext);
 
-    const gridWidth = gridProvider.getWidth();
-    const gridHeight = gridProvider.getHeight();
+    let gridWidth = gridProvider.getWidth();
+    let gridHeight = gridProvider.getHeight();
+    const gridLength = gridProvider.getLength;
 
     const value = useMemo(() => {
-        const sizeX = gridProvider.getCellSizeX();
-        const sizeY = gridProvider.getCellSizeY();
-        /*
-        const cellSizeX = zoom * sizeX;
-        const cellSizeY = zoom * sizeY;
+        if (!aContext.width || !aContext.height) return d(null, '+++++++++++');
 
-        const cellPlusBorderSizeX = cellSizeX + border;
-        const cellPlusBorderSizeY = cellSizeY + border;
-         */
-        if (!(aContext.width || aContext.height)) return null;
-
+        // TODO: check & replace magic numbers
         let spaceX = Math.max(aContext.width - border - 2 * cssContext.values.defaultPadding -
             (rulers ? 38 : 0), 0);
         let spaceY = Math.max(aContext.height - border - 2 * cssContext.values.defaultPadding -
             (rulers ? 22 : 0), 0);
 
+        const wrap = !!gridProvider.setWrapWidth;
         const cellDim = cellType.getCellSize(spaceX, spaceY, zoom, border);
 
-        const maxWidth = gridProvider.setWrapWidth ? gridProvider.getLength() : gridProvider.getWidth();
-        const maxHeight = gridProvider.setWrapWidth ? gridProvider.getLength() : gridProvider.getHeight();
+        const maxWidth = wrap ? gridLength : gridWidth;
+        const maxHeight = wrap ? gridLength : gridHeight;
 
         let maxPageX = Math.min(maxWidth,  Math.floor(spaceX / cellDim.xPlusBorder));
         let maxPageY = Math.min(maxHeight, Math.floor(spaceY / cellDim.yPlusBorder));
 
-        const wrapWidth = gridProvider.setWrapWidth ? cellDim.wrapWidth : gridWidth;
-
-        if (gridProvider.setWrapWidth) {
+        if (wrap) {
             gridProvider.setWrapWidth(
-                wrapWidth //maxPageX
+                cellDim.wrapWidth
             );
+            gridWidth = gridProvider.getWidth();
+            gridHeight = gridProvider.getHeight()
         }
-        if (maxPageX < gridProvider.getWidth() && spaceX >= 21) {
+        if (maxPageX < gridWidth && spaceX >= 21) {
             spaceY -= 21 // scrollbarHeight;
         }
-        if (maxPageY < gridProvider.getHeight() && spaceY >= 21) {
+        if (maxPageY < gridHeight && spaceY >= 21) {
             spaceX -= 21 // scrollbarWidth;
         }
 
-        maxPageX = Math.max(Math.min(Math.floor(spaceX / cellDim.xPlusBorder), gridProvider.getWidth()), 1);
-        maxPageY = Math.max(Math.min(Math.floor(spaceY / cellDim.yPlusBorder), gridProvider.getHeight()), 1);
+        maxPageX = Math.max(Math.min(Math.floor(spaceX / cellDim.xPlusBorder), gridWidth), 1);
+        maxPageY = Math.max(Math.min(Math.floor(spaceY / cellDim.yPlusBorder), gridHeight), 1);
 
+        if (maxZoom !== undefined) {
+            const newMaxZoom = Math.max(cellType.getMinZoom(), cellDim.maxZoom);
+            if (maxZoom !== newMaxZoom) {
+                setMaxZoom(newMaxZoom);
+            }
+            if (zoom > newMaxZoom) {
+                setZoom(newMaxZoom);
+            }
+        }
         return {
             border,
             zoom,
-            sizeX,
-            sizeY,
+            sizeX: gridProvider.getCellSizeX(),
+            sizeY: gridProvider.getCellSizeY(),
             cellSizeX: cellDim.x,
             cellSizeY: cellDim.y,
             cellPlusBorderSizeX: cellDim.xPlusBorder,
             cellPlusBorderSizeY: cellDim.yPlusBorder,
-            spaceX,
-            spaceY,
             maxPageX,
             maxPageY,
             boundingRectRef: {current: null}
         }
-    }, [zoom, border, gridWidth, gridHeight, rulers, aContext.width, aContext.height]);
+    }, [zoom, border, gridWidth, gridHeight, gridLength, rulers, aContext.width, aContext.height]);
 
-    if(!aContext.width || !aContext.height) return <Block />;
+    if (!value) return '';
 
-    const maxPosX = Math.max(gridProvider.getWidth() - value.maxPageX, 0);
-    const maxPosY = Math.max(gridProvider.getHeight() - value.maxPageY, 0);
+    const maxPosX = Math.max(gridWidth - value.maxPageX, 0);
+    const maxPosY = Math.max(gridHeight - value.maxPageY, 0);
 
     if (posX > maxPosX) setPosX(maxPosX);
     if (posY > maxPosY) setPosY(maxPosY);
@@ -2109,18 +2158,17 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers,
         <GridContext.Provider value={value}>
             <ScrollArea
                 full auto
-                x={posX} setX={setPosX} maxX={gridProvider.getWidth()} pageX={pageX}
-                y={posY} setY={setPosY} maxY={gridProvider.getHeight()} pageY={pageY}
+                x={posX} setX={setPosX} maxX={gridWidth} pageX={pageX}
+                y={posY} setY={setPosY} maxY={gridHeight} pageY={pageY}
             >
                 <Block full centerItems>
                     <ManagedGrid
-                        undo
+                        undo={undo}
                         gridProvider={gridProvider} cellType={cellType}
                         border={border} zoom={zoom} rulers={rulers}
                         posX={posX} setPosX={setPosX}
                         posY={posY} setPosY={setPosY}
                         width={pageX} height={pageY}
-                        gridWidth={gridProvider.getWidth()} gridHeight={gridProvider.getHeight()}
                         { ...props }
                     />
                 </Block>
@@ -2137,11 +2185,13 @@ function FlexGrid({  ...props }) {
     )
 }
 
-function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, height, resize, edit, navi, ...props}) {
+function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, height, resize, edit, navi, undo, ...props}) {
 
     const eContext = useContext(EditorContext);
 
     useUpdateOnGridDimChanges(gridProvider);
+
+    const doAction = undo && eContext ? eContext.doAction : action => action();
 
     const gridWidth = gridProvider.getWidth();
     const gridHeight = gridProvider.getHeight();
@@ -2153,22 +2203,21 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
             gridProvider.getRawSelection(
                 0, start ? 0 : doHeight - 1, doWidth, 1
             );
-
-        const doAction = () => {
-            gridProvider.addRows(start, -1);
-            gridProvider.addRows(!start, 1);
-        };
-        const undoAction = () => {
-            gridProvider.addRows(!start, -1);
-            gridProvider.addRows(start, 1);
-            gridProvider.writeSelection(
-                0, start ? 0 : doHeight - 1,
-                undoSelection
-            );
-        };
-        eContext.doAction(doAction, undoAction);
+        doAction(
+            () => {
+                gridProvider.addRows(start, -1);
+                gridProvider.addRows(!start, 1);
+            },
+            () => {
+                gridProvider.addRows(!start, -1);
+                gridProvider.addRows(start, 1);
+                gridProvider.writeSelection(
+                    0, start ? 0 : doHeight - 1,
+                    undoSelection
+                )
+            }
+        )
     };
-
     const shiftColumn = start => {
         const doWidth = gridWidth;
         const doHeight = gridHeight;
@@ -2176,19 +2225,20 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
             gridProvider.getRawSelection(
                 start ? 0 : doWidth - 1, 0, 1, doHeight
             );
-        const doAction = () => {
-            gridProvider.addColumns(start, -1);
-            gridProvider.addColumns(!start, 1);
-        };
-        const undoAction = () => {
-            gridProvider.addColumns(!start, -1);
-            gridProvider.addColumns(start, 1);
-            gridProvider.writeSelection(
-                start ? 0 : doWidth - 1, 0,
-                undoSelection
-            );
-        };
-        eContext.doAction(doAction, undoAction);
+        doAction(
+            () => {
+                gridProvider.addColumns(start, -1);
+                gridProvider.addColumns(!start, 1);
+            },
+            () => {
+                gridProvider.addColumns(!start, -1);
+                gridProvider.addColumns(start, 1);
+                gridProvider.writeSelection(
+                    start ? 0 : doWidth - 1, 0,
+                    undoSelection
+                );
+            }
+        )
     };
     const addRows = (no, start) => {
         return () => eContext.doGridAction('addRows',{no, start})
@@ -2201,7 +2251,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
 
     const innerProps = {
         gridProvider, posX, posY, setPosX, setPosY,
-        width, height, resize, edit, navi, ...props
+        width, height, resize, edit, navi, undo, ...props
     };
     return (
         <Grid className="padded-p" full columns="- * -" rows="- * -">
@@ -2301,14 +2351,14 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
     );
 }
 
-function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], undo, resize, edit, navi, ...props }) {
+function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], undo, resize, edit, navi, minZoom = 1, maxZoom = 10, ...props }) {
     const eContext = useContext(EditorContext);
 
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
     const [width, setWidth] = useState(1);
     const [height, setHeight] = useState(1);
-    const [zoom, setZoom] = useState(props.zoom ? props.zoom : 1);
+    const [zoom, setZoom] = useState(props.zoom ? props.zoom : (minZoom !== undefined ? minZoom : 1));
     const [border, setBorder] = useState(1);
     const [rulers, setRulers] = useState(false);
     const [writeTransparent, setWriteTransparent] = useState(false);
@@ -2392,9 +2442,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
                 const { params, ...buttonProps } = button;
                 const key = '' + buttonProps.name + buttonProps.icon;
                 buttons.push(
-                    <Button { ...buttonProps } key={key}
-                            onClick={() => eContext.doGridAction(name, button.params)}
-                    />
+                    <Button { ...buttonProps } key={key} onClick={() => eContext.doGridAction(name, button.params)} />
                 );
             }
         } else {
@@ -2408,26 +2456,26 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
             <Toolbar full="h">
                 <ToolGroup>
                     {undo &&
-                    <UndoRedoButtons />
+                        <UndoRedoButtons />
                     }
                     {modes.length > 1 &&
-                    <Stack gaps="1">
-                        {edit && hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
-                        {edit && hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
-                        {edit && hasMode('drag') && <Button icon="pan_tool" current={eContext.mode} value={'drag'} onClick={() => eContext.setMode('drag')} />}
-                        {edit && hasMode('add') && <Button icon="exposure" rotate={180} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
-                        {hasMode('select') && <Button icon="highlight_alt" current={modeParams.type || (mode === 'select' && 'rect')} value={'rect'} onClick={() => eContext.setMode('select', selection)} />}
-                        {edit && hasMode('select')  && <Button icon="view_week" rotate={-90} current={modeParams.type} value={'rows'} onClick={() => eContext.setMode('select', {type: 'rows'})} />}
-                        {edit && hasMode('select') && <Button icon="view_week" current={modeParams.type} value={'columns'} onClick={() => eContext.setMode('select', {type: 'columns'})} />}
-                        {resize && hasMode('select')  && <Button icon="border_horizontal" current={modeParams.type} value={'row-gap'} onClick={() => eContext.setMode('select', {type: 'row-gap'})} />}
-                        {resize && hasMode('select') && <Button icon="border_vertical" current={modeParams.type} value={'column-gap'} onClick={() => eContext.setMode('select', {type: 'column-gap'})} />}
-                    </Stack>
+                        <Stack gaps="1">
+                            {edit && hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
+                            {edit && hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
+                            {edit && hasMode('drag') && <Button icon="pan_tool" current={eContext.mode} value={'drag'} onClick={() => eContext.setMode('drag')} />}
+                            {edit && hasMode('add') && <Button icon="exposure" rotate={180} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
+                            {hasMode('select') && <Button icon="highlight_alt" current={modeParams.type || (mode === 'select' && 'rect')} value={'rect'} onClick={() => eContext.setMode('select', selection)} />}
+                            {edit && hasMode('select')  && <Button icon="view_week" rotate={-90} current={modeParams.type} value={'rows'} onClick={() => eContext.setMode('select', {type: 'rows'})} />}
+                            {edit && hasMode('select') && <Button icon="view_week" current={modeParams.type} value={'columns'} onClick={() => eContext.setMode('select', {type: 'columns'})} />}
+                            {resize && hasMode('select')  && <Button icon="border_horizontal" current={modeParams.type} value={'row-gap'} onClick={() => eContext.setMode('select', {type: 'row-gap'})} />}
+                            {resize && hasMode('select') && <Button icon="border_vertical" current={modeParams.type} value={'column-gap'} onClick={() => eContext.setMode('select', {type: 'column-gap'})} />}
+                        </Stack>
                     }
                 </ToolGroup>
                 <ToolGroup>
                     <Tuple name="Position:" x={posX} setX={setPosX} maxX={gridWidth - width} min={0}
                            y={posY} setY={setPosY} maxY={gridHeight - height} />
-                    <Number name="Zoom:" value={zoom} min={1} max={10} set={setZoom} />
+                    <Number name="Zoom:" value={zoom} min={minZoom} max={maxZoom} set={setZoom} />
                     <Number name="Border:" value={border} min={0} max={10} set={setBorder} />
                     <Checkbox name="Rulers" value={rulers} set={setRulers} />
                 </ToolGroup>
@@ -2449,7 +2497,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
                     writeTransparent={writeTransparent}
                     pinned={isPinned} edit={edit}
                     resize={resize} navi={navi}
-                    onDoubleClick={onDoubleClick}
+                    onDoubleClick={onDoubleClick} undo={undo}
                 />
             </Block>
             <Toolbar full="h">
@@ -2485,15 +2533,15 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
                         /> :
                         <>
                             {markerX !== null &&
-                            <Tuple name="Position:"
-                                   x={markerX} setX={setMarkerX} min={0} maxX={gridWidth - markerWidth}
-                                   maxY={gridHeight - markerHeight} y={markerY} setY={setMarkerY} />
+                                <Tuple name="Position:"
+                                       x={markerX} setX={setMarkerX} min={0} maxX={gridWidth - markerWidth}
+                                       maxY={gridHeight - markerHeight} y={markerY} setY={setMarkerY} />
                             }
                             {!selection.multi && markerX !== null &&
-                            <Tuple name="Size:"
-                                   x={markerWidth} setX={setMarkerWidth} maxX={gridWidth - (markerX + markerWidth)} min={1}
-                                   y={markerHeight} setY={setMarkerHeight} maxY={gridHeight - (markerY + markerHeight)}
-                                   readOnly={selection.fixed} />
+                                <Tuple name="Size:"
+                                       x={markerWidth} setX={setMarkerWidth} maxX={gridWidth - markerX} min={1}
+                                       y={markerHeight} setY={setMarkerHeight} maxY={gridHeight - markerY}
+                                       readOnly={selection.fixed} />
                             }
                         </>
                     }

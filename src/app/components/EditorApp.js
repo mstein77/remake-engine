@@ -15,8 +15,8 @@ import {
 } from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
+import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
-import {SpriteIndex} from "../classes/EntityIndex"
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
 import {
@@ -26,6 +26,7 @@ import {
     getResourceTreeForJsonModel
 } from '../helper/helper';
 import ReactDOM from "react-dom";
+import { MainEditor } from "../editors/MainEditor";
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
@@ -481,6 +482,42 @@ function PageSelector(props) {
 }
 
 function EditorApp(props) {
+    const isNew = 1;
+    const [ ready, setReady ] = useState(false);
+
+    useEffect(() => {
+        const syncLinks = parts => {
+            const elems = document.querySelectorAll('link');
+            for (let elem of elems) {
+                const href = elem.href;
+                if (!parts.includes(href)) {
+                    const parent = elem.parentNode;
+                    parent.removeChild(elem);
+                }
+            }
+            const head = document.querySelector('head');
+            for (let part of parts) {
+                const linkNode = document.createElement('link');
+                linkNode.href = part;
+                linkNode.rel = 'stylesheet';
+                linkNode.type ='text/css';
+                head.appendChild(
+                    linkNode
+                );
+            }
+        };
+        syncLinks(isNew ? ['css/layout.css', 'css/base.css'] : ['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
+        setTimeout(() => {
+            setReady(true)
+        }, 100);
+
+        return () => {
+            syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
+        }
+    }, []);
+
+    if (!ready) return '';
+
     const resources = props.game.getEditableResources();
 
     let filters = null;
@@ -536,6 +573,31 @@ function EditorApp(props) {
     window.oncontextmenu = (e) => {
         e.preventDefault();
     };
+
+    if (isNew) {
+        let editor = '';
+        const resourceLoader = props.game.getResourceLoader();
+        for (let resource of resources) {
+            if (resource.type !== 'TextPane') continue;
+
+            if (resource.data === null) {
+                resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+            }
+            const model = getJsonModelOfInstance(resource.data);
+
+            model.blocks = resource.blocks;
+
+            const tree = getResourceTreeForJsonModel(resource.cls, model);
+            editor = <TextPaneEditorNew model={model} />;
+        }
+        return  (
+            <>
+                <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>{editor}</MainEditor>
+                <div id="modals-container"></div>
+            </>
+        )
+    }
+
     return (
         <GlobalCtx game={props.game} filters={filters} imageResources={imageResources}>
             <PageSelector {...props} resources={resources} />

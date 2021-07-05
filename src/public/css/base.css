@@ -5,8 +5,10 @@
     --brightness-factor: -1;
     --modal-overlay-bg-color: #000000a3;
 
+    /*
     --scrollbar-color: #B0B0B0;
     --scrollbar-bg-color: #EFEFEF;
+    */
 
 
     --editor-bg-color: #404040;
@@ -106,16 +108,21 @@ html, body {
 /* Scrollbar */
 
 .scrollbar-div {
-    border: 2px inset var(--scrollbar-color);
+    border: 1px inset var(--toolbar-bg-color);
     padding: 1px;
     margin: 0px;
-    background-color: var(--scrollbar-bg-color);
+    background-color: var(--toolbar-bg-color)
+}
+
+.scrollbar-space {
+    background-color: #000000;
+    opacity: 0.5
 }
 
 .scrollbar-handle {
     flex: 1;
-    border: 2px outset var(--scrollbar-color);
-    background-color: var(--scrollbar-color);
+    border: 1px outset var(--button-border-color);
+    background-color: var(--button-bg-color);
     filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
 }
 
