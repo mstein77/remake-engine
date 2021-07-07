@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import {d, drawCanvasToAvail, getCanvasForBitmap} from "../helper/helper"
+import { d, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard } from "../helper/helper"
 import { Block, Stack, Tooltip } from "./LayoutComponents";
 import { WindowContext, EditorContext, useModal, Kbd, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
@@ -327,13 +327,13 @@ function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = tru
 /**
  *
  */
-function Button({ name, icon, rotate, current, vertical, value, disabled, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
+function Button({ name, icon, rotate, current, vertical, value, disabled, warning, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
     const wContext = useContext(WindowContext);
 
     const mounted = useMounted();
     const focusRef = useRef(null);
 
-    const [clicked, setClicked] = useState(false);
+    const [ clicked, setClicked ] = useState(false);
 
     if (onClick && typeof onClick === 'object') {
         if (onClick.can && !onClick.can()) {
@@ -360,7 +360,7 @@ function Button({ name, icon, rotate, current, vertical, value, disabled, iconWi
             cls.push('active');
             active = true;
         } else {
-            tab = false;
+            tab = (value === true);
         }
     }
     if (disabled) {
@@ -401,7 +401,9 @@ function Button({ name, icon, rotate, current, vertical, value, disabled, iconWi
     if (clicked) {
         cls.push('clicked');
     }
-    if ((name || border)) {
+    if (warning) {
+        cls.push('invalid-highlight');
+    } else if ((name || border)) {
         cls.push(active ? 'active-bg' : 'control-bg');
     }
     const text = items.length === 1 ? items[0] : <Stack vertical={vertical} gaps full="h">{items}</Stack>;
@@ -1024,14 +1026,22 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     )
 }
 
-function TextArea({ name, value, autoFocus, resize, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
+function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
     const fContext = useContext(FormContext);
+    const wContext = useContext(WindowContext);
+
     const inputRef = useRef(null);
     const set = useSet(value, props);
+    const [copying, setCopying] = useState(false);
+    const propsRef = useRef(null);
+    propsRef.current = { copying };
 
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
     const style = getDimStyle(props || {});
+    if (copy) {
+        style.cursor = 'copy';
+    }
     const dimAttr = getDimAttr(props);
 
     const attr = {
@@ -1043,6 +1053,30 @@ function TextArea({ name, value, autoFocus, resize, readOnly, disabled, rows, co
         value,
         style,
         ref: inputRef,
+        onMouseDown: !copy ? null : e => {
+            if (e.button !== 0) {
+                return;
+            }
+            wContext.startExclusiveMode('copy-textarea', 'copy');
+            setCopying(1);
+            copy2clipboard(value).then(
+                () =>  {
+                    if (propsRef.current.copying === 1) {
+                        setCopying(2);
+                    }
+                },
+                err => {
+                    console.error('Async: Could not copy text: ', err);
+                    if (propsRef.current.copying === 1) {
+                        setCopying(3);
+                    }
+                }
+            );
+            wContext.addEventListener('mouseup', () => {
+                wContext.endExclusiveMode('copy-textarea');
+                setCopying(0)
+            }, {once: true});
+        },
         onChange: e => set(e.target.value)
     };
     if (!resize) {
@@ -1051,6 +1085,11 @@ function TextArea({ name, value, autoFocus, resize, readOnly, disabled, rows, co
     const cls = ['input'];
     if (className) {
         cls.push(className);
+    }
+    if (copying === 2) {
+        cls.push('active-highlight');
+    } else if (copying === 3) {
+        cls.push('invalid-highlight');
     }
     if (dimAttr.full && dimAttr.full !== 'v') {
         cls.push('full-h');
@@ -1074,6 +1113,7 @@ function TextArea({ name, value, autoFocus, resize, readOnly, disabled, rows, co
     } else {
         cls.push('tabbed');
     }
+
     return (
         <ComponentWithName name={name} {...props}>
             <Block {...dimAttr}><textarea

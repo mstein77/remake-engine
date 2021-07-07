@@ -454,7 +454,7 @@ function PageSelector(props) {
             editor =
                 <Restorable confirmRef={confirmRef}>
                     <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />
-                </Restorable>
+                </Restorable>;
             break;
     }
 
@@ -501,6 +501,7 @@ function EditorApp(props) {
                 linkNode.href = part;
                 linkNode.rel = 'stylesheet';
                 linkNode.type ='text/css';
+                linkNode.onload = function() { this.title = '1' };
                 head.appendChild(
                     linkNode
                 );
@@ -508,13 +509,22 @@ function EditorApp(props) {
         };
         syncLinks(isNew ? ['css/layout.css', 'css/base.css'] : ['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
         setTimeout(() => {
+            const elems = document.querySelectorAll('link');
+            let loaded = true;
+            for (let elem of elems) {
+                if (!(elem.title && elem.title === '1')) {
+                    loaded = false;
+                    break
+                }
+            }
             setReady(true)
-        }, 100);
+        }, 200);
 
         return () => {
             syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
         }
     }, []);
+
 
     if (!ready) return '';
 
@@ -588,7 +598,7 @@ function EditorApp(props) {
             model.blocks = resource.blocks;
 
             const tree = getResourceTreeForJsonModel(resource.cls, model);
-            editor = <TextPaneEditorNew model={model} />;
+            editor = <TextPaneEditorNew resource={resource} model={model} />;
         }
         return  (
             <>

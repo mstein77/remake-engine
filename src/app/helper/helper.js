@@ -1260,11 +1260,39 @@ const handleLeftRight = (leftHandler, rightHandler) => {
     }
 };
 
+const copy2clipboard = content => {
+    return navigator.clipboard.writeText(content)
+};
+
+const getUniqueName = (template, reserved = []) => {
+    const parts = template.split('$');
+    const name = parts.join('');
+    if (!reserved.includes(name)) return name;
+
+    let no = 2;
+    let currName = parts[0];
+    const matches = currName.match(/\_(\d)+$/);
+    if (matches) {
+        currName = currName.substr(0, matches.index + 1);
+        no = parseInt(matches[1])
+    } else {
+        currName += '_';
+    }
+    while (reserved.includes(currName + no)) {
+        no++;
+    }
+    if (parts.length > 1) {
+        no = '' + no + parts[1];
+    }
+    return currName + no;
+};
+
 const noop = () => {};
 
 module.exports = {
     d,
     noop,
+    copy2clipboard,
     clamp,
     areDisjoint,
     cloneDeep,
@@ -1276,6 +1304,7 @@ module.exports = {
     ResourceDependencies,
     flattenResources,
     drawTextBlocks,
+    getUniqueName,
     getFlatObjectResources,
     getDeflatedResources,
     getIdToItems,

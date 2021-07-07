@@ -188,6 +188,11 @@ html, body {
     color: white;
 }
 
+.active-highlight {
+    background-color: rgba(91, 170, 43, 0.93) !important;
+    color: white !important;
+}
+
 .active-bg-text {
     color: rgba(91, 170, 43, 0.93)
 }
@@ -203,7 +208,6 @@ html, body {
 
 .top {
     z-index: 2000000;
-    outline: 1px solid red;
 }
 
 .shadow {
@@ -277,6 +281,10 @@ input:invalid {
 
 .color-warning {
     color: var(--warning-color)
+}
+
+.invalid-highlight {
+    background-color: var(--warning-color) !important;
 }
 
 .blink {

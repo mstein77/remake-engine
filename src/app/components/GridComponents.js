@@ -2075,7 +2075,7 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
     const gridLength = gridProvider.getLength;
 
     const value = useMemo(() => {
-        if (!aContext.width || !aContext.height) return d(null, '+++++++++++');
+        if (!aContext.width || !aContext.height) return null;
 
         // TODO: check & replace magic numbers
         let spaceX = Math.max(aContext.width - border - 2 * cssContext.values.defaultPadding -

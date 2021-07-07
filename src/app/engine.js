@@ -1636,6 +1636,15 @@ class TextBlockConfig extends Config {
         this.filters = this.validateString(value);
     }
 
+    addRebuildProps(obj, deep, base) {
+        const defaults = this.getDefaults();
+        for (let prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
+            if (defaults[prop] !== undefined && defaults[prop] === base[prop]) continue;
+            obj[prop] = base[prop];
+        }
+        return obj;
+    }
+
     applyTo(obj) {
         super.applyTo(obj);
         obj.x = this.x;

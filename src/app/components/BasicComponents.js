@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import { d, Storage, getCanvasForBitmap } from "../helper/helper"
+import { d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName } from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
 import { Button, Number, Color, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
@@ -328,8 +328,11 @@ function EditorSection({ id, ...props }) {
     )
 }
 
-function EditorSectionInner({ name, actions = [], area, link, children, ...props }) {
+function EditorSectionInner({ name, actions = [], area, link, confirm, children, ...props }) {
+    const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
+    const eContextRef = useRef(null);
+    eContextRef.current = eContext;
 
     const hotKeys = {
         undo: {
@@ -341,6 +344,25 @@ function EditorSectionInner({ name, actions = [], area, link, children, ...props
             can: () => eContext.hasFuture()
         }
     };
+
+    const actionHotKeys = useMemo(() => {
+        return actions(eContextRef);
+    }, []);
+
+    useEffect(() => {
+        if (!confirm) return;
+
+        wContext.setConfirmExit(() => !eContextRef.current.hasStorePos());
+        return () => {
+            wContext.setConfirmExit(null);
+        }
+    }, []);
+
+    const buttons = [];
+    for (let [action, op] of Object.entries(actionHotKeys)) {
+        buttons.push(<Button key={action} padded="h" name={action} onClick={op} />);
+    }
+
     const header = (
         <Stack full="h" key="eh">
             <Stack full="h" gaps>
@@ -351,19 +373,7 @@ function EditorSectionInner({ name, actions = [], area, link, children, ...props
             </Stack>
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <Stack center="v" padded="h" gaps="1">
-                {
-                    actions.map(
-                        item => {
-                            const attr = {};
-                            if (item.disabled && item.disabled(eContext)) {
-                                attr.disabled = true;
-                            }
-                            return (
-                                <Button key={item.name} {...attr} padded="h" name={item.name} onClick={() => item.onClick(eContext)} />
-                            )
-                        }
-                    )
-                }
+                {buttons}
             </Stack>
         </Stack>
     );
@@ -835,7 +845,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 
 const WindowContext = React.createContext();
 
-function WindowCtx({ imageResources, filters, children }) {
+function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
     const cssRef = useRef(null);
     cssRef.current = cssContext;
@@ -843,6 +853,7 @@ function WindowCtx({ imageResources, filters, children }) {
     const [ fixCursor, setFixCursor ] = useState(null);
     const lastTarget = useRef(null);
     const modeRef = useRef(null);
+    const confirmRef = useRef(null);
 
     const settingsRef = useRef(null);
     const modalStack = useMemo(() => [],[]);
@@ -928,6 +939,20 @@ function WindowCtx({ imageResources, filters, children }) {
             hotKey2action
         }
     }, []);
+
+    useEffect(() => {
+        const leaveHandler = e => {
+            if (confirmRef.current) {
+                const confirmationMessage = 'You have unsaved changes, are you sure that you want to leave?';
+                e.returnValue = confirmationMessage;
+                return confirmationMessage;
+            }
+        };
+        window.addEventListener('beforeunload', leaveHandler);
+        return () => {
+            window.removeEventListener('beforeunload', leaveHandler);
+        }
+    });
 
     const links = useMemo(() => {
         return {defaults: [], backups: []}
@@ -1288,6 +1313,19 @@ function WindowCtx({ imageResources, filters, children }) {
 
     const value = useMemo(() => {
         return {
+            game,
+            getNewImageResource: (template, width, height) => {
+                const loader = game.getResourceLoader();
+                return (
+                    loader.makeImageResource(
+                        getCanvasForDim(width, height),
+                        getUniqueName(template, loader.getAllResourceIds('image'))
+                    )
+                )
+            },
+            storeScreenResource: (...params) => {
+                game.getResourceLoader().storeScreenResource(...params);
+            },
             lastTarget,
             editorConfig,
             theme,
@@ -1319,6 +1357,8 @@ function WindowCtx({ imageResources, filters, children }) {
             storage,
             focusStack,
             imageIndex,
+            setConfirmExit: confirm => confirmRef.current = confirm,
+            needsConfirmation: () => confirmRef.current && confirmRef.current(),
             getFilteredCanvasData,
             getFilteredImageData,
             filters
@@ -1645,9 +1685,9 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
         requestAnimationFrame(() => {
             const elem = trapRef.current ? trapRef.current.querySelector('.tabbed.autofocus') : null;
             if (elem) {
-                elem.focus();
+                elem.focus()
             } else {
-                focusElem.start.focus();
+                focusElem.start.focus()
             }
 
         });

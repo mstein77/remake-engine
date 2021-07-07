@@ -580,7 +580,7 @@ class FontIndex extends EntityIndex {
 
     setEntityValue(index, value) {
         if (this.model.fonts.length <= index) {
-            this.model.fonts.push({id: value});
+            this.model.fonts.push(null); // {id: value});
         }
         this.items[index] = value;
     }
@@ -593,6 +593,7 @@ class FontIndex extends EntityIndex {
                 obj[prop] = value;
             }
         } else if (prop === 'chars') {
+            this.model.fonts[index] = value.model;
             this.chars[this.getEntityValue(index)] = value;
         }
     }
@@ -615,6 +616,7 @@ class FontIndex extends EntityIndex {
     deleteEntityPropValues(index) {
         const oldValue = this.getEntityValue(index);
         delete this.chars[this.getEntityValue(index)];
+        this.model.fonts.splice(index, 1);
         const len = this.getLength();
         let replaceValue = null;
         if (len > 1) {

@@ -4,19 +4,26 @@ import {
     Kbd,
     CenterInfo,
     EditorContext,
-    ButtonStack,
     Toolbar,
     ToolGroup,
     Canvas,
     useModal,
+    useComponentUpdate,
     useUpdateOnEntityIndexChanges,
     PropertyGrid,
     Section,
     WindowContext,
 } from "../components/BasicComponents";
 import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import {d, getCanvasForDim, getEmptyImageData, getColorsFromImageData, getColorsFromCanvas} from "../helper/helper";
-import { NameDialog, FiltersModal, BitmapSelector, ResizeProps, BitmapEditor } from "../components/EditorComponents";
+import { d, getCanvasForDim, getEmptyImageData, getColorsFromImageData, getColorsFromCanvas } from "../helper/helper";
+import {
+    useExportModal,
+    NameDialog,
+    FiltersModal,
+    BitmapSelector,
+    ResizeProps,
+    BitmapEditor
+} from "../components/EditorComponents";
 import {
     Checkbox,
     Input,
@@ -38,7 +45,7 @@ import {
     Hidden,
     OkCancelForm
 } from "../components/FormComponents";
-import {AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex} from "../classes/EntityIndex";
+import { AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 
@@ -542,7 +549,7 @@ function CharManager({ charIndex }) {
     )
 }
 
-function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
+function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
 
@@ -562,8 +569,12 @@ function FontEditor({ fontIndex, blockIndex, activeFont, setActiveFont }) {
             reserved: fontIndex.getPropValues('value'),
             save: newFont => {
                 let index = null;
-
-                const chars = new CharIndex({map: {}, img: null, width: newFont.width, height: newFont.height})
+                const fontConfig = new resource.config.deps.font({id: newFont.value, map: {}, width: newFont.width, height: newFont.height});
+                fontConfig.setImage(
+                    wContext.getNewImageResource('font_' + newFont.value + '$.png', newFont.width, newFont.height)
+                );
+                const fontJson = fontConfig.getJson();
+                const chars = new CharIndex(fontJson);
                 newFont.chars = chars;
 
                 if (newFont.images) {
@@ -1214,9 +1225,12 @@ function FastCanvas() {
     );
 }
 
-
-function TextPaneEditor({ model }) {
+function TextPaneEditor({ model, resource }) {
     const wContext = useContext(WindowContext);
+    const update = useComponentUpdate();
+
+    const { getModelConfig, getModelResources, openExportModal, Modals } = useExportModal({ name: 'TextPane', model, resource });
+
     const [activeFont, setActiveFont] = useState(0);
 
     const fontIndex = useMemo(() => {
@@ -1231,29 +1245,50 @@ function TextPaneEditor({ model }) {
         <Stack full vertical gaps>
             <EditorSection
                 id="pane" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
+                confirm
                actions={
-                   [
-                       {name: 'Revert', onClick: () => d('REVERT!')},
-                       {name: 'Save',
-                           disabled: eContext => eContext.hasStorePos(),
-                           onClick: eContext => {
-                               eContext.updateRestorePos()
-                           }
-                       },
-                       {name: 'Deploy', onClick: () => {d('DEPLOY!'); wContext.clearEditor('preview')}},
-                       {name: 'Export', onClick: () => d('EXPORT!')},
-                   ]
+                   eContextRef => {
+                       return {
+                           revert: () => d('REVERT!'),
+                           save: {
+                               can: () => !eContextRef.current.hasStorePos(),
+                               exec: () => {
+                                   wContext.storeScreenResource(wContext.game.currentScreen, getModelConfig());
+                                   eContextRef.current.updateRestorePos();
+                                   update();
+                               }
+                           },
+                           deploy: {
+                               can: () => eContextRef.current.hasStorePos(),
+                               exec: () => {
+                                    wContext.clearEditor('preview')
+                               }
+                           },
+                           export: () => openExportModal()
+                       }
+                   }
                }>
-                <FontEditor full fontIndex={fontIndex} blockIndex={blockIndex} activeFont={activeFont} setActiveFont={setActiveFont} />
+                <FontEditor full resource={resource} fontIndex={fontIndex} blockIndex={blockIndex} activeFont={activeFont} setActiveFont={setActiveFont} />
             </EditorSection>
 
             <EditorSection id="preview" area={2} full name="Preview" actions={
-                [
-                    {name: 'Export', onClick: () => d('EXPORT!')}
-                ]
-            }>
+                eContextRef => {
+                    return {
+                        export: () => {
+                            const jsons = [];
+                            for (let block of model.blocks) {
+                                const obj = new resource.config.deps.block(block);
+                                jsons.push(obj.getRebuildJson());
+                            }
+                            openExportModal(JSON.stringify(jsons, null, 4));
+                        }
+                    }
+            }}>
                 <TextBlockEditor full blockIndex={blockIndex} fontIndex={fontIndex} activeFont={activeFont} />
             </EditorSection>
+
+            <Modals />
+
         </Stack>
     )
 }

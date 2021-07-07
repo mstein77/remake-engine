@@ -1,15 +1,63 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo, useState, useRef } from "react";
 import { ColorIndex, FilterIndex } from "../classes/EntityIndex";
 import { EditorContext, EditorCtx, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
-import { d, rgb2hex, drawCanvasToAvail, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
+import { d, rgb2hex, copy2clipboard, drawCanvasToAvail, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
 import { PictureCell } from "./BaseComponents";
-import { FileDropZone, Button, Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Select, Tuple, Hidden, TupleProp, LabelProp } from "./FormComponents";
+import {
+    FileDropZone,
+    Button,
+    Color,
+    ColorProp,
+    Checkbox,
+    ImageProp,
+    InputProp,
+    Number,
+    NumberProp,
+    Tuple,
+    Hidden,
+    TupleProp,
+    LabelProp,
+    TextArea
+} from "./FormComponents";
 import { Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker } from "./EntityComponents";
 import { FlexGrid, BaseGrid } from "./GridComponents";
 import { BitmapGrid, CellValue, EmptyGrid } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
-import { BackgroundControl } from "./BasicComponents";
+import { BackgroundControl, Icon } from "./BasicComponents";
+
+function ConfirmDialog({ close, save, msg }) {
+    return (
+        <OkCancelForm full="h" submit padded cancel={close} save={() => save()}>
+            <Block full padded>
+                <Stack full gaps>
+                    <Block full="v">
+                        <Block center="v">
+                            <Icon size={30} name="warning" />
+                        </Block>
+                    </Block>
+                    <CenterInfo>
+                        {msg}
+                    </CenterInfo>
+                </Stack>
+            </Block>
+        </OkCancelForm>
+    )
+}
+
+function useConfirmDialog() {
+    const ConfirmModal = useModal();
+    return {
+        openConfirmModal: ({save, ...props}) => ConfirmModal.open({ ...props, save: () => {
+            ConfirmModal.close();
+            save()
+            }}),
+        Modals: () =>
+            <ConfirmModal.content name="Please confirm" width={250}>
+                <ConfirmDialog { ...ConfirmModal.props } />
+            </ConfirmModal.content>
+    }
+}
 
 function NameDialog({ close, save, max, reserved = [], ...props }) {
     const [name, setName] = useState(props.name || '');
@@ -693,6 +741,142 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     )
 }
 
+function useExportModal({ model, resource, name }) {
+    const ExportModal = useModal();
+
+    const [ copying, setCopying ] = useState(false);
+    const [ copied, setCopied ] = useState(null);
+
+    const propsRef = useRef(null);
+    propsRef.current = { copying, copied };
+
+    const getResourceDef = (type, id, value, details) => {
+        if (type === 'image') {
+            value = '"' + value + '"';
+        } else if (type === 'json') {
+            const lines = JSON.stringify(value, null, 4).split('\n');
+            let jsonLines = [];
+            if (details.compact) {
+                let no = 0;
+                let trackLevel = -1;
+                let track;
+                let prefix;
+                for (let line of lines) {
+                    if (trackLevel < 0) {
+                        // TODO remove hardcoded key
+                        if (line.trim().startsWith('"map": [')) {
+                            trackLevel = 0;
+                            track = [];
+                        }
+                        jsonLines.push(line);
+                    } else {
+                        if (line.match(/\[$/)) {
+                            trackLevel++;
+                            if (trackLevel === 1) {
+                                prefix = line.substr(0, line.indexOf('['));
+                                track = [line.trim()];
+                            } else {
+                                track.push(line.trim());
+                            }
+                        } else if (line.match(/\],?$/)) {
+                            trackLevel--;
+                            if (trackLevel === 0) {
+                                track.push(line.trim());
+                                jsonLines.push(prefix + track.join(' '));
+                            } else if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        } else {
+                            if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        }
+                    }
+                    no++;
+                }
+            } else {
+                jsonLines = lines;
+            }
+            value = jsonLines.join('\n    ');
+        }
+        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
+    };
+
+    const copy = () => {
+        setCopying(true);
+        setCopied(null);
+        copy2clipboard(ExportModal.props.code).then(
+            () => {
+                setCopied(false);
+                if (propsRef.current.copying === false) {
+                    ExportModal.close()
+                } else {
+                    setCopied(true)
+                }
+            },
+            err => {
+                console.error('Failed copying to clipboard', err);
+                setCopied(false);
+            }
+        );
+    };
+    const copyCleanUp = () => {
+        setCopying(false);
+        if (propsRef.current.copied) {
+            ExportModal.close()
+        }
+    };
+    const getModelConfig = () => {
+        const rebuildJson = getRebuildJsonForModel(resource.cls, model, true);
+        return new resource.config(rebuildJson);
+    };
+    const getModelResources = () => {
+        return getModelConfig().getResources();
+    };
+
+    return {
+        getModelConfig,
+        getModelResources,
+        openExportModal: (code = null, details = {}) => {
+            if (code === null) {
+                const resources = getModelResources();
+                const lines = [];
+                for (let res of resources.resources.reverse()) {
+                    const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
+                    lines.push(getResourceDef(res.type, res.id, data, details));
+                }
+                code = lines.join('\n');
+            }
+            ExportModal.open({
+                code
+            })
+        },
+        Modals: () =>
+            <ExportModal.content name={'Export as Code: ' + name} width="80%" height="75%">
+                <Stack vertical borders full>
+                    <Block padded full>
+                        <TextArea full copy readOnly value={ExportModal.props.code} />
+                    </Block>
+                    <Block padded full="h">
+                        <Stack gaps>
+                            <Button
+                                name="Copy" warning={copying && copied === false}
+                                current={copying} value={true} direct
+                                onClick={copy} onClickEnd={copyCleanUp}
+                                icon="content_paste" padded="h" className="autofocus"
+                            />
+                            <Button name="Close" icon="close" padded="h" onClick={() => ExportModal.close()} />
+                        </Stack>
+                    </Block>
+                </Stack>
+            </ExportModal.content>
+    };
+}
+
 export {
     MarkerMoveGrid,
     ResizeProps,
@@ -700,5 +884,7 @@ export {
     BitmapSelector,
     BitmapSelectionGrid,
     FiltersModal,
-    NameDialog
+    NameDialog,
+    useExportModal,
+    useConfirmDialog
 }

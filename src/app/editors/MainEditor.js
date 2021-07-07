@@ -1,9 +1,22 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, useComponentUpdate, useModal, WindowContext, WindowCtx } from "../components/BasicComponents";
+import {
+    BackgroundCtx,
+    CenterInfo,
+    CssCtx,
+    Icon,
+    PropertyGrid,
+    Ruler,
+    SideTab,
+    SideTabs,
+    useComponentUpdate,
+    useModal,
+    WindowContext,
+    WindowCtx
+} from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
 import { OkCancelForm, Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
-import { NameDialog } from "../components/EditorComponents";
-import { d } from "../helper/helper";
+import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
+import {d, getRebuildJsonForModel} from "../helper/helper";
 import ReactDOM from "react-dom";
 
 function PresetsManager({ id, set, config, ...props }) {
@@ -529,18 +542,35 @@ function Settings({ save, close, defaults }) {
     )
 }
 
-function BaseAppInner({ game, children }) {
+function BaseAppInner({ children }) {
     const wContext = useContext(WindowContext);
     const SettingsModal = useModal();
+    const { openConfirmModal, Modals } = useConfirmDialog();
 
     wContext.settingsRef.current = SettingsModal;
 
+    const confirm = callback => {
+        if (wContext.needsConfirmation()) {
+            openConfirmModal({
+                msg: 'You have unsaved changes, are you sure that you want to leave?',
+                save: () => {
+                    callback()
+                }
+            });
+        } else {
+            callback()
+        }
+    };
+
+    const back = () => d('BACK!');
+
     const play = () => {
+        const gameRef = wContext.game;
         ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
         if (false && context.dirty) {
-            game.reloadScreen();
+            gameRef.reloadScreen();
         } else {
-            game.restart();
+            gameRef.restart();
         }
     };
 
@@ -627,28 +657,31 @@ function BaseAppInner({ game, children }) {
             <Stack vertical gaps full>
                 <Block full="h">
                     <Stack full="h">
-                        <Button icon="keyboard_backspace" padded="h" name="Back" />
+                        <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
                         <Block padded="h" center="v" full="h" shorten></Block>
                         <Stack gaps center="v">
                             <Button icon="build" onClick={() => wContext.openSettings()} />
                             <Button name="Play" icon="play_circle_outline" padded="h" />
-                            <Button name="Exit" icon="logout" padded="h" onClick={() => play()} />
+                            <Button name="Exit" icon="logout" padded="h" onClick={() => confirm(play)} />
                         </Stack>
                     </Stack>
                 </Block>
                 {children}
             </Stack>
+
             <SettingsModal.content name="Settings" height="50%" width="50%" minWidth={500} maxWidth={650} closeable={false} fixStyle transparent drag>
                 <Settings { ...SettingsModal.props } />
             </SettingsModal.content>
+
+            <Modals />
         </Block>
     )
 }
 
-function MainEditor({ imageResources = [], filters = [], ...props }) {
+function MainEditor({ imageResources = [], filters = [], game, ...props }) {
     return (
         <CssCtx>
-            <WindowCtx imageResources={imageResources} filters={d(filters)}>
+            <WindowCtx imageResources={imageResources} filters={filters} game={game}>
                 <BackgroundCtx>
                     <BaseAppInner { ...props} />
                 </BackgroundCtx>

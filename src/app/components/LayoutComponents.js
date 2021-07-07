@@ -652,7 +652,7 @@ function getGridTemplateString(value) {
 
 function Grid({children, columns, rows, gaps, full, centerItems, className, ...props}) {
     const cls = ['grid'];
-    const bCls = ['max-h max-v block'];
+    const bCls = ['max-h block'];
     if (className) {
         cls.push(className);
     }
@@ -672,7 +672,7 @@ function Grid({children, columns, rows, gaps, full, centerItems, className, ...p
     if (full) {
         if (full !== 'h') {
             cls.push('full-v');
-            bCls.push('full-v');
+            bCls.push('full-v max-v');
         }
         if (full !== 'v') {
             cls.push('full-h');

@@ -1518,7 +1518,7 @@ function TextPaneEditor(props) {
 
 
     const saveTextPane = () => {
-        props.save(model);
+        props.saveModel(model);
         eContext.updateRestorePos();
     };
 
