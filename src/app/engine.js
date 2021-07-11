@@ -877,7 +877,10 @@ class ResourceLoader {
             }).then(body => {
                 for (let resource of body.stored) {
                     const screen = this.getResourceScreen(resource.type + ':' + resource.id);
-                    this.storage.deleteScreenResource(screen, resource.type, resource.id);
+                    if (screen) {
+                        // TODO: check why global state resource fails here
+                        this.storage.deleteScreenResource(screen, resource.type, resource.id);
+                    }
                 }
                 return body;
             })

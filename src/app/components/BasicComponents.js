@@ -1,20 +1,41 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import { d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName } from "../helper/helper"
+import {d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex} from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import { Button, Number, Color, OkCancelForm } from "./FormComponents";
+import { Button, Number, Color, OkCancelForm, ColorPicker } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex } from "../classes/EntityIndex";
 
 const BackgroundContext = React.createContext();
 
-function CenterInfo({ children }) {
-    return (
+function CenterInfo({ icon, iconSize, children }) {
+    const elem = (
         <Block padded center="v" full="h" wrap className="less text-center ">
             {children}
         </Block>
+    );
+    if (!icon) return elem;
+
+    return (
+        <Stack full>
+            <Block padded center="v">
+                <Icon name={icon} size={iconSize} />
+            </Block>
+            {elem}
+        </Stack>
     )
+}
+
+function LoadingIndicator({msg = 'please wait...'}) {
+    return (
+        <Stack center>
+            <Block padded center="v">
+                <Icon name="refresh" className="icon-rotate" />
+            </Block>
+            <Block full centerItems className="less">{msg}</Block>
+        </Stack>
+    );
 }
 
 function Ruler({ }) {
@@ -27,15 +48,12 @@ function Ruler({ }) {
 }
 
 function BackgroundCtx({ children }) {
-    const [ color, setColor ] = useState('#202222');
-    const [ opacity, setOpacity ] = useState(18);
+    const [ color, setColor ] = useState('#20222288');
 
     const value = {
         color,
         setColor,
-        css: color + (Math.min(opacity * 10, 255)).toString(16).padStart(2, '0'),
-        opacity,
-        setOpacity
+        css: color
     };
 
     return (
@@ -59,10 +77,7 @@ function BackgroundControl() {
     const bContext = useContext(BackgroundContext);
 
     return (
-        <>
-            <Number name="Background:" min={0} max={26} set={bContext.setOpacity} value={bContext.opacity} buttons />
-            <Color value={bContext.color} set={bContext.setColor} />
-        </>
+        <Color name="Background:" value={bContext.color} alpha set={bContext.setColor} />
     )
 }
 
@@ -78,7 +93,7 @@ function Canvas({ id, width, height, smoothing, render, plain, border, className
             }
             const ctx = canvasRef.current.getContext('2d');
             ctx.imageSmoothingEnabled = smoothing ? true : false;
-            render(ctx);
+            render(ctx)
         };
         if (eContext && id) {
             eContext.setRenderGrid(id, () => {
@@ -328,7 +343,7 @@ function EditorSection({ id, ...props }) {
     )
 }
 
-function EditorSectionInner({ name, actions = [], area, link, confirm, children, ...props }) {
+function EditorSectionInner({ name, actions = [], area, tree, link, confirm, children, ...props }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
     const eContextRef = useRef(null);
@@ -351,8 +366,7 @@ function EditorSectionInner({ name, actions = [], area, link, confirm, children,
 
     useEffect(() => {
         if (!confirm) return;
-
-        wContext.setConfirmExit(() => !eContextRef.current.hasStorePos());
+        wContext.setConfirmExit(() => d(!eContextRef.current.hasStorePos(), 'HAS?'));
         return () => {
             wContext.setConfirmExit(null);
         }
@@ -367,9 +381,15 @@ function EditorSectionInner({ name, actions = [], area, link, confirm, children,
         <Stack full="h" key="eh">
             <Stack full="h" gaps>
                 <Block center="v" padded xshorten>{name}</Block>
-                <Block className="control-bg" center="v" padded>Resources:</Block>
-                <Block center="v" padded className="less">5</Block>
-                <Block full="h"> </Block>
+                {tree &&
+                    <>
+                        <Block className="control-bg" center="v" padded>From:</Block>
+                        <Block center="v" padded className="less">{tree[0].source}</Block>
+                        <Block className="control-bg" center="v" padded>Resources:</Block>
+                        <Block center="v" padded className="less">{tree.length}</Block>
+                        <Block full="h"> </Block>
+                    </>
+                }
             </Stack>
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <Stack center="v" padded="h" gaps="1">
@@ -845,15 +865,104 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 
 const WindowContext = React.createContext();
 
+function buildColorMaskCanvas() {
+    const size = 192;
+    const canvas = getCanvasForDim(size, size);
+    const ctx = canvas.getContext('2d');
+
+    const whiteCanvas = getCanvasForDim(size, size);
+    const whiteCtx = whiteCanvas.getContext('2d');
+    const grdWhite = ctx.createLinearGradient(0, 0, size - 1, 0);
+    grdWhite.addColorStop(0, "#FFFFFFFF");
+    grdWhite.addColorStop(1, "#FFFFFF00");
+    whiteCtx.fillStyle = grdWhite;
+    whiteCtx.fillRect(0, 0, size, size);
+    ctx.drawImage(whiteCanvas, 0, 0, size, size);
+
+    const blackCanvas = getCanvasForDim(size, size);
+    const blackCtx = blackCanvas.getContext('2d');
+    const grdBlack = ctx.createLinearGradient(0, 0, 0, size - 1);
+    grdBlack.addColorStop(0, "#00000000");
+    grdBlack.addColorStop(1, "#000000FF");
+    blackCtx.fillStyle = grdBlack;
+    blackCtx.fillRect(0, 0, size, size);
+    ctx.drawImage(blackCanvas, 0, 0, size, size);
+
+    return canvas
+}
+
+function buildBaseColorCanvas() {
+    const height = 192;
+    const canvas = getCanvasForDim(15, height);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 15, height);
+
+    const rgb = hex2rgb('#FF0000');
+    const parts = [
+        ['g', true],    // #0 ->   0: FF0000 ... 255: FFFF00
+        ['r', false],   // #1 -> 256: FEFF00 ...    : 00FF00
+        ['b', true],    // #2 ->    : 00FF01 ...    : 00FFFF
+        ['g', false],   // #3 ->    : 00FEFF ...    : 0000FF
+        ['r', true],    // #4 ->    : 0100FF ...    : FF00FF
+        ['b', false]    // #5 ->    : FF00FE ...    : FF0001
+    ];
+    const steps = 8;
+    let y = 0;
+    for (let [key, up] of parts) {
+        if (up) {
+            while (rgb[key] <= 255) {
+                ctx.fillStyle = rgb2hex(rgb);
+                ctx.fillRect(0, y, 15, 1);
+                rgb[key] += steps;
+                y++;
+            }
+            rgb[key] = 255;
+        } else {
+            while (rgb[key] >= 0) {
+                ctx.fillStyle = rgb2hex(rgb);
+                ctx.fillRect(0, y, 15, 1);
+                rgb[key] -= steps;
+                y++;
+            }
+            rgb[key] = 0;
+        }
+    }
+    return canvas;
+}
+
+function ModalColorPicker({}) {
+    const wContext = useContext(WindowContext);
+    const PickerModal = useModal();
+
+    useEffect(() =>{
+        wContext.register('openColorPickerModal', PickerModal.open)
+    }, []);
+
+    return (
+        <PickerModal.content name="Change color" drag transparent>
+            <BackgroundCtx>
+                <EditorCtx>
+                    <ColorPicker { ...PickerModal.props } />
+                </EditorCtx>
+            </BackgroundCtx>
+        </PickerModal.content>
+    )
+}
+
 function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
+
     const cssRef = useRef(null);
     cssRef.current = cssContext;
 
-    const [ fixCursor, setFixCursor ] = useState(null);
+    const registryRef = useRef({});
+
+    const registry = (key = null) => key ? registryRef.current[key] : registryRef.current;
+
     const lastTarget = useRef(null);
     const modeRef = useRef(null);
     const confirmRef = useRef(null);
+
 
     const settingsRef = useRef(null);
     const modalStack = useMemo(() => [],[]);
@@ -942,7 +1051,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
     useEffect(() => {
         const leaveHandler = e => {
-            if (confirmRef.current) {
+            if (confirmRef.current && confirmRef.current()) {
                 const confirmationMessage = 'You have unsaved changes, are you sure that you want to leave?';
                 e.returnValue = confirmationMessage;
                 return confirmationMessage;
@@ -1136,7 +1245,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             endExclusiveMode(modeRef.current);
         }
         modeRef.current = id;
-        setFixCursor(cursor);
+        registry().setFixCursor(cursor);
     };
 
     const isInExclusiveMode = () => modeRef.current !== null;
@@ -1151,7 +1260,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             }
         }
         modeRef.current = null;
-        setFixCursor(null);
+        registry().setFixCursor(null);
     };
 
     const addEventListener = (type, listener, options = false) => {
@@ -1311,8 +1420,30 @@ function WindowCtx({ imageResources, filters, children, game }) {
         return index
     });
 
+    const getBaseColorCanvas = () => {
+        let canvas = registry().baseColorCanvas;
+        if (!canvas) {
+            canvas = buildBaseColorCanvas();
+            registryRef.current.baseColorCanvas = canvas;
+        }
+        return canvas;
+    };
+
+    const getColorMaskCanvas = () => {
+        let canvas = registry().colorMaskCanvas;
+        if (!canvas) {
+            canvas = buildColorMaskCanvas();
+            registryRef.current.colorMaskCanvas = canvas;
+        }
+        return canvas;
+    };
+
     const value = useMemo(() => {
         return {
+            register: (key, value) => {
+                registryRef.current[key] = value
+            },
+
             game,
             getNewImageResource: (template, width, height) => {
                 const loader = game.getResourceLoader();
@@ -1359,8 +1490,11 @@ function WindowCtx({ imageResources, filters, children, game }) {
             imageIndex,
             setConfirmExit: confirm => confirmRef.current = confirm,
             needsConfirmation: () => confirmRef.current && confirmRef.current(),
+            openColorPickerModal: props => registry().openColorPickerModal(props),
             getFilteredCanvasData,
             getFilteredImageData,
+            getBaseColorCanvas,
+            getColorMaskCanvas,
             filters
         }
     }, [focusStack]);
@@ -1378,12 +1512,31 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
     return (
         <WindowContext.Provider value={value}>
+            <ModalColorPicker key="cp" />
+            <FixCursorArea key="em" />
             {children}
-            {fixCursor !== null &&
-                <div style={{cursor: (fixCursor ? fixCursor : 'auto'), zIndex: 999999}} className={'fixed pos-0 transparent full-h full-v'}></div>
-            }
         </WindowContext.Provider>
     )
+}
+
+function FixCursorArea() {
+    const wContext = useContext(WindowContext);
+    const [ fixCursor, setFixCursor ] = useState(null);
+
+    useEffect(() => {
+        wContext.register('setFixCursor', setFixCursor);
+    }, []);
+
+    const style = {
+        cursor: (fixCursor ? fixCursor : 'auto'),
+        zIndex: 999999
+    };
+    if (fixCursor === null) {
+        style.display = 'none'
+    }
+    return (
+        <div key="fc" style={style} className={'fixed pos-0 transparent full-h full-v'} />
+    );
 }
 
 const AvailContext = React.createContext();
@@ -2151,6 +2304,7 @@ export {
     CenterInfo,
     ActionBarContent,
     Kbd,
+    LoadingIndicator,
 
     PropertyGrid,
     ValueProp,

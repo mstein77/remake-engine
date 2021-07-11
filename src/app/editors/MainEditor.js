@@ -562,7 +562,7 @@ function BaseAppInner({ children }) {
         }
     };
 
-    const back = () => d('BACK!');
+    const back = () => d('TODO!');
 
     const play = () => {
         const gameRef = wContext.game;

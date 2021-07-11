@@ -1,7 +1,21 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { d, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard } from "../helper/helper"
-import { Block, Stack, Tooltip } from "./LayoutComponents";
-import { WindowContext, EditorContext, useModal, Kbd, Canvas, Icon, useFocusKeyBindings, useRefocus, useMounted } from "./BasicComponents";
+import { d, round, clamp, ucfirst, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
+import { Block, Stack, Tooltip, Overlays, Overlay } from "./LayoutComponents";
+import {
+    WindowContext,
+    EditorContext,
+    useModal,
+    EditorCtx,
+    PropertyGrid,
+    Kbd,
+    Canvas,
+    Icon,
+    AvailContextProvider,
+    useFocusKeyBindings,
+    useRefocus,
+    useMounted,
+    useComponentUpdate, AvailContext
+} from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapCellProvider } from "../classes/CellProvider";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -418,7 +432,7 @@ function Button({ name, icon, rotate, current, vertical, value, disabled, warnin
 
     if (!(disabled || readOnly) && onClick && !clicked) {
         const handleClick = (endEvent, directEvent = false) => {
-            wContext.startExclusiveMode('button-click', cursor);
+            wContext.startExclusiveMode('button-click', cursor === 'grab' ? 'grabbing' : cursor);
             wContext.addEventListener(endEvent, () => {
                 if (!directEvent) {
                     onClick(value);
@@ -429,7 +443,7 @@ function Button({ name, icon, rotate, current, vertical, value, disabled, warnin
                 if (onClickEnd) {
                     onClickEnd();
                 }
-                wContext.endExclusiveMode('button-click', cursor);
+                wContext.endExclusiveMode('button-click');
             }, {once: true});
             setClicked(true);
             if (directEvent) {
@@ -595,8 +609,10 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
         );
     } else if (hasRange && slider === 'h') {
         items.push(
-            <input key={1} disabled={disabled} readOnly={readOnly} tabIndex={-1} type="range" step={stepHandler.step} value={value} min={min} max={max} onChange={e => set(stepHandler.round(e.target.valueAsNumber))} />
-        );
+            <Block key={1} full="h" padded="h" center="v">
+                <Slider key={1} tab={false} end disabled={disabled} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set} />
+            </Block>
+        )
     }
     items.push(
         <Input key={2} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus} decimals={decimals} step={stepHandler.step} number max={max} min={min} value={value} set={set} />
@@ -609,7 +625,7 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
             </Stack>
         );
     }
-    let elem = items.length === 1 ? items[0] : <Stack>{items}</Stack>;
+    let elem = items.length === 1 ? items[0] : <Stack full={props.full}>{items}</Stack>;
 
     if ((buttons || slider) || !(readOnly || disabled)) {
         const onMouseEnter = e => {
@@ -641,11 +657,11 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
             attr.onMouseLeave = onMouseLeave;
             attr.className = 'fixed';
         } else {
-            attr.className = 'min-content-h';
+            attr.className = props.full && props.full !== 'v' ? null : 'min-content-h';
         }
 
         elem = (
-            <Block onMouseEnter={onMouseEnter} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
+            <Block full={props.full} onMouseEnter={onMouseEnter} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
                 <div { ...attr }>
                     {elem}
                 </div>
@@ -861,7 +877,11 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     let input = <input ref={inputRef} type="text" {...attr} className={cls.join(' ')} />;
 
     if (clear && !readOnly) {
-        input = <Stack full={props.full}>{input}<Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={() => set('')} /></Stack>
+        input =
+            <Stack full={props.full}>
+                {input}
+                <Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={() => set('')} />
+            </Stack>
     } else {
         input = <Block center="v" full={props.full}>{input}</Block>
     }
@@ -1124,30 +1144,192 @@ function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, ro
     )
 }
 
-function Color({ name, value, readOnly, disabled, full, tab = true, ...props }) {
-    const set = useSet(value, props);
-
-    const cls = ['input'];
-    if (!tab || (readOnly || disabled)) {
-        tab = false;
-    } else {
-        cls.push('tabbed');
+function ColorBox({color, width, height, className}) {
+    const boxStyle = {
+        width,
+        height
+    };
+    const bgStyle = {
+        backgroundColor: color
+    };
+    const cls = ['checkerboard-bg relative'];
+    if (className) {
+        cls.push(className);
     }
     return (
-        <ComponentWithName name={name} {...props}>
-            <Block>
-                <input
-                    type="color"
-                    tabIndex={tab ? 0 : -1}
-                    value={value}
-                    className={cls.join(' ')}
-                    disabled={disabled}
-                    onClick={readOnly ? e => {
-                        e.preventDefault();
-                        e.stopPropagation()
-                    } : null}
-                    onChange={e => {set(e.target.value)}}
-                />
+        <div className={cls.join(' ')} style={boxStyle}>
+            <div className="absolute full-h full-v" style={bgStyle} />
+        </div>
+    )
+}
+
+function ColorPicker({ value, set, alpha }) {
+    const wContext = useContext(WindowContext);
+    const PickerModal = useModal();
+
+    const rgb = hex2rgb(value.current);
+    const update = useComponentUpdate();
+
+    const baseColorCanvas = wContext.getBaseColorCanvas();
+    const colorMaskCanvas = wContext.getColorMaskCanvas();
+
+    const [ baseColorIndex, setBaseColorIndexRaw ] = useState(0);
+    const setBaseColorIndex = index => {
+        setBaseColorIndexRaw(index);
+        const ctx = baseColorCanvas.getContext('2d');
+        const data = ctx.getImageData(0, index, 1, 1).data;
+        setBaseColor(rgb2hex({r: data[0], g: data[1], b: data[2]}));
+    };
+    const [ baseColor, setBaseColor ] = useState('#FF0000');
+
+    const height = baseColorCanvas.height;
+
+    const setByte = index => {
+        return byteValue => {
+            let i = 0;
+            let newValue = '#';
+            const iMax = alpha ? 3 : 2;
+            while (i <= iMax) {
+                if (i === index) {
+                    newValue += byteValue.toString(16).padStart(2, '0');
+                } else {
+                    newValue += value.current.substr(1 + i * 2, 2)
+                }
+                i++;
+            }
+            set(newValue);
+
+            // TODO calc base color
+            /*
+            const rgb = hex2rgb(newValue);
+            const values = [rgb.r, rgb.g, rgb.b];
+            values.sort((a, b) => a < b ? -1 : (a === b ? 0 : 1));
+            const max = values[2];
+            const min = values[0];
+
+            let hexBaseColor = '#';
+            if (min === max) {
+                hexBaseColor = '#ff0000'
+            } else {
+                hexBaseColor += rgb.r === max ? 'ff' : (rgb.r === min ? '00' : (max - values[1]).toString(16).padStart(2, '0'));
+                hexBaseColor += rgb.g === max ? 'ff' : (rgb.g === min ? '00' : (max - values[1]).toString(16).padStart(2, '0'));
+                hexBaseColor += rgb.b === max ? 'ff' : (rgb.b === min ? '00' : (max - values[1]).toString(16).padStart(2, '0'));
+            }
+            setBaseColor(hexBaseColor);
+            d('->', newValue, hexBaseColor);
+             */
+            requestAnimationFrame(update);
+        }
+    };
+
+    const renderSquare = ctx => {
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, 192, 192);
+        ctx.drawImage(colorMaskCanvas, 0, 0, 192, 192);
+    };
+
+    const renderRainbow = ctx => {
+        ctx.drawImage(baseColorCanvas, 0, 0, baseColorCanvas.width, baseColorCanvas.height)
+    };
+
+    const len = alpha ? 8 : 6;
+    const isValid = hex => hex.length === len && hex.match(/^[a-fA-F0-9]+$/);
+
+    return (
+        <Stack borders>
+            <Stack vertical borders width={280}>
+                <Stack gaps padded>
+                    <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
+                    <Block center="v"><Input name="#" match={isValid} force value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
+                    <Button icon="colorize" onClick={() => PickerModal.open({})} />
+                </Stack>
+
+                <Block padded full="h">
+                    <PropertyGrid>
+                        <NumberProp name="R" full="h" value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
+                        <NumberProp name="G" full="h" value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
+                        <NumberProp name="B" full="h" value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
+                        {alpha &&
+                            <NumberProp name="A" full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
+                        }
+                    </PropertyGrid>
+                </Block>
+            </Stack>
+
+            <Block padded>
+                <Stack gaps>
+
+                    <CanvasHitRegion plain width={height} height={height} border render={renderSquare}
+                        onHit={(x, y) => {
+                            d('HIT', x, y);
+                        }}
+                    />
+
+                    <Overlays width={baseColorCanvas.width + 11} height={height + 16}>
+                        <Overlay top={5} width={baseColorCanvas.width} height={height + 16}>
+                            <CanvasHitRegion
+                                plain width={15} height={height}
+                                onHit={(x, y) => {
+                                    const posY = round(y - 2);
+                                    setBaseColorIndex(posY);
+                                }}
+                                render={renderRainbow}
+                            />
+                        </Overlay>
+                        <Overlay top={1 + baseColorIndex} left={7} width={10} height={10}><Block className="slider-arrow-left" /></Overlay>
+                        <Overlay left={12} width={15} height={204} className="no-events"><Slider vertical plain min={0} max={191} value={baseColorIndex} set={setBaseColorIndex} /></Overlay>
+
+                    </Overlays>
+                </Stack>
+            </Block>
+
+            <PickerModal.content name="Pick a color..." full>
+                <BitmapSelector save={() => d(666)} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
+            </PickerModal.content>
+        </Stack>
+    )
+}
+
+function CanvasHitRegion({width, height, render, plain, onHit }) {
+    const wContext = useContext(WindowContext);
+    const blockRef = useRef(null);
+
+    const onLeftClick = e => {
+        const rect = blockRef.current.getBoundingClientRect();
+        onHit(round(e.clientX - rect.x), round(e.clientY - rect.y));
+        wContext.startExclusiveMode('set-hit', 'pointer');
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('set-hit')
+        }, {once: true});
+    };
+
+    return (
+        <Block ref={blockRef} onLeftClick={onLeftClick} cursor="pointer">
+            <Canvas plain={plain} width={width} height={height} border="1" render={render} />
+        </Block>
+    )
+}
+
+
+function Color({ name, value, set, readOnly, disabled, full, alpha, tab = true, ...props }) {
+    const wContext = useContext(WindowContext);
+    const colorRef = useRef(null);
+    colorRef.current = value;
+
+    const openColorPicker = () => {
+        wContext.openColorPickerModal({
+            value: colorRef,
+            test: value,
+            alpha,
+            set
+        });
+    };
+    return (
+        <ComponentWithName name={name} { ...props }>
+            <Block className="button button-border" tab border="1" padded onLeftClick={openColorPicker}>
+                <Block padded="1">
+                    <ColorBox className="thin-boxed button-border" color={value} width={35} height={16} />
+                </Block>
             </Block>
         </ComponentWithName>
     )
@@ -1236,6 +1418,128 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
                 </CopyBitmapModal.content>
             }
         </>
+    )
+}
+
+const sliderHandleSize = 20;
+
+function Slider({ vertical, center, size, end, maxSize = 250, minSize = 100, ...props }) {
+    const axisKey = vertical ? 'height' : 'width';
+    const oppAxisKey = vertical ? 'width' : 'height';
+
+    const attr = {
+        [oppAxisKey]: sliderHandleSize,
+        ['min' + ucfirst(axisKey)]: minSize,
+        ['max' + ucfirst(axisKey)]: maxSize
+    };
+    if (size) {
+        attr[axisKey] = size
+    } else {
+        attr.full = vertical ? 'v' : 'h'
+    }
+    return (
+        <Block center={center} end={end} { ...attr }>
+            <AvailContextProvider>
+                <SliderInner vertical={vertical} { ...props } />
+            </AvailContextProvider>
+        </Block>
+    )
+}
+
+function SliderInner({ vertical, plain, min, max, decimals = 0, value, set, tab = true }) {
+    const aContext = useContext(AvailContext);
+    const wContext = useContext(WindowContext);
+
+    const divRef = useRef(null);
+    const propsRef = useRef(null);
+    propsRef.current = value;
+
+    const dirKey = vertical ? 'v' : 'h';
+
+    const axisKey = vertical ? 'height' : 'width';
+    const size = aContext[axisKey];
+
+    const space = 8;
+    const points = max - min;
+
+    // take handle size (with borders) into account
+    const pointDist = (size - 12) / points;
+
+    const startOffset = value - min;
+    const startDist = points === 0 ? size - 12 : startOffset * pointDist;
+
+    const axis = vertical ? 'y' : 'x';
+    const oppAxisKey = vertical ? 'width' : 'height';
+    const client = 'client' + axis.toUpperCase();
+
+    const dimMin = {
+        [axisKey]: startDist,
+        [oppAxisKey]: space
+    };
+    const dimMax = {
+        [oppAxisKey]: space
+    };
+
+    const cls = ['relative overflow'];
+    const dim = {
+        [oppAxisKey]: sliderHandleSize,
+        [axisKey]: size
+    };
+
+    const startSliding = points === 0 ? null : e => {
+        const anchorPos = e[client];
+        const anchorValue = value;
+        let oldDist = 0;
+
+        wContext.addEventListener('mousemove', e => {
+            const dist = Math.round((e[client] - anchorPos) / pointDist);
+
+            if (dist === oldDist) return;
+
+            oldDist = dist;
+
+            const newValue = round(clamp(min, anchorValue + dist, max), decimals);
+
+            if (propsRef.current !== newValue) {
+                set(newValue);
+            }
+        });
+        e.stopPropagation();
+        e.preventDefault();
+    };
+
+    const setPos = plain ? null : e => {
+        wContext.startExclusiveMode('set-slider', 'pointer');
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('set-slider')
+        }, {once: true});
+
+        const rect = divRef.current.getBoundingClientRect();
+        const dist = (e[client] - rect.x - 5);
+        const newValue = round(clamp(min, min + dist / pointDist, max), decimals);
+        if (propsRef.current !== newValue) {
+            set(newValue);
+        }
+    };
+    const handleStyle = {
+        [vertical ? 'left' : 'top']: 0,
+        [vertical ? 'top' : 'left']: startDist
+    };
+
+    const dir = vertical ? 'v' : 'h';
+    const oppDir = vertical ? 'h' : 'v';
+
+    return (
+        <Block full={dirKey} { ...dim } ref={divRef} className={cls.join(' ')}>
+            <Stack full vertical={vertical} className={"slider-padding-" + dir}>
+                <Block center={oppDir} cursor="pointer"  onMouseDown={setPos} {...dimMin} className={plain ? "transparent" : "slider-bg-less"} />
+                <Block center={oppDir} full={dirKey} cursor="pointer" onMouseDown={setPos} className={plain ? "transparent" :"slider-bg-more"} {...dimMax} />
+            </Stack>
+
+            <div className="absolute all-events" style={handleStyle}>
+                <Button name=" " cursor="grab" tab={tab} direct onClick={startSliding} className={"slider-handle-" + dir} />
+            </div>
+        </Block>
     )
 }
 
@@ -1621,6 +1925,8 @@ export {
     TextAreaProp,
     Color,
     ColorProp,
+    ColorPicker,
+    Slider,
     Bitmap,
     BitmapProp,
     FileDropZone,

@@ -48,6 +48,7 @@ import {
 import { AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
+import ReactDOM from "react-dom";
 
 function FontProperties({ font, reserved, save, close }) {
     const ImportFontModal = useModal();
@@ -97,7 +98,7 @@ function FontProperties({ font, reserved, save, close }) {
         <OkCancelForm submit save={saveFont} cancel={close} full>
             <Block full="h" padded>
                 <PropertyGrid full="h" padded>
-                    <InputProp name="ID:" full="h" required match={value => !reserved.includes(value)} value={value} set={setValue} />
+                    <InputProp name="ID:" full="h" maxWidth={250} required match={value => !reserved.includes(value)} value={value} set={setValue} />
                     {font.index === undefined &&
                         <LabelProp name="Size:">
                             <Stack gaps vertical>
@@ -117,6 +118,7 @@ function FontProperties({ font, reserved, save, close }) {
                     }
                     {font.index !== undefined &&
                         <ResizeProps
+                            entityIndex={font.chars}
                             width={width} height={height}
                             maxWidth={128} maxHeight={128}
                             newWidth={newWidth} newHeight={newHeight}
@@ -1226,10 +1228,9 @@ function FastCanvas() {
 }
 
 function TextPaneEditor({ model, resource }) {
-    const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
 
-    const { getModelConfig, getModelResources, openExportModal, Modals } = useExportModal({ name: 'TextPane', model, resource });
+    const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TextPane', model, resource, update });
 
     const [activeFont, setActiveFont] = useState(0);
 
@@ -1241,28 +1242,25 @@ function TextPaneEditor({ model, resource }) {
         return new TextBlockIndex(model)
     }, [model]);
 
+    const tree = getResourceTree();
+
     return (
         <Stack full vertical gaps>
             <EditorSection
                 id="pane" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
-                confirm
+                confirm tree={tree}
+
                actions={
                    eContextRef => {
                        return {
                            revert: () => d('REVERT!'),
                            save: {
                                can: () => !eContextRef.current.hasStorePos(),
-                               exec: () => {
-                                   wContext.storeScreenResource(wContext.game.currentScreen, getModelConfig());
-                                   eContextRef.current.updateRestorePos();
-                                   update();
-                               }
+                               exec: () => storeModel(eContextRef)
                            },
                            deploy: {
                                can: () => eContextRef.current.hasStorePos(),
-                               exec: () => {
-                                    wContext.clearEditor('preview')
-                               }
+                               exec: () => deployModel()
                            },
                            export: () => openExportModal()
                        }
@@ -1280,6 +1278,7 @@ function TextPaneEditor({ model, resource }) {
                                 const obj = new resource.config.deps.block(block);
                                 jsons.push(obj.getRebuildJson());
                             }
+                            // TODO use tab setting here
                             openExportModal(JSON.stringify(jsons, null, 4));
                         }
                     }

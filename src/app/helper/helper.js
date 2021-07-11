@@ -35,23 +35,22 @@ function getItemsCloneWithUpdatedItem(oldItems, index, props) {
 }
 
 function hex2rgb(hex) {
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null;
+
     const color = {};
-    if (hex[0] === '#') {
-        if (hex.length === 7) {
-            color.r = parseInt(hex.substr(1, 2), 16);
-            color.g = parseInt(hex.substr(3, 2), 16);
-            color.b = parseInt(hex.substr(5, 2), 16);
-            return color;
-        }
-    }
-    return null;
+    color.r = parseInt(hex.substr(1, 2), 16);
+    color.g = parseInt(hex.substr(3, 2), 16);
+    color.b = parseInt(hex.substr(5, 2), 16);
+    color.a = hex.length === 9 ? parseInt(hex.substr(7, 2), 16) : 255;
+
+    return color;
 }
 
 function rgb2hex(rgb) {
     if (typeof rgb === 'string') {
         return rgb;
     }
-    return '#' + (rgb.r).toString(16) + (rgb.g).toString(16) + (rgb.b).toString(16);
+    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0');
 }
 
 const isValidResourceId = (type, id) => {
@@ -1287,11 +1286,26 @@ const getUniqueName = (template, reserved = []) => {
     return currName + no;
 };
 
+const round = (value, decimals = 0) => {
+    let factor = 1;
+    while (decimals-- > 0) {
+        factor *= 10;
+    }
+    return Math.round(value * factor) / factor;
+};
+
+const ucfirst = (value) => {
+    if (value === '') return '';
+    return value[0].toUpperCase() + value.substring(1);
+};
+
 const noop = () => {};
 
 module.exports = {
     d,
     noop,
+    round,
+    ucfirst,
     copy2clipboard,
     clamp,
     areDisjoint,

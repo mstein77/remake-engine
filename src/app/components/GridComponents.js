@@ -1853,6 +1853,9 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                         },
                         init: data => {
                             setCursor(data.type, data.fixed ? data.width : 1, data.fixed ? data.height : 1);
+                            if (data.markerX !== undefined) {
+                                setMarker(data.type, data.markerX, data.markerY, data.width, data.height);
+                            }
                             cursor.propsRef.current = {
                                 onLeftClick: (e, x, y) => {
                                     setMarker(data.type, x, y, data.width, data.height);
@@ -2396,7 +2399,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
     const sectorWidth = selection.fixed || isPinned ? eContext.modeParams.width : markerWidth;
     const sectorHeight = selection.fixed || isPinned ? eContext.modeParams.height : markerHeight;
 
-    const hasSegments = selection.multi && markerX !== null;
+    const hasSegments = selection.multi && markerX !== null && isPinned;
 
     const maxSegsX = hasSegments ?
         Math.floor((gridWidth - markerX - sectorWidth) / (sectorWidth + markerGapX)) + 1 : 1;
@@ -2646,6 +2649,8 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
                                 const newParams = { ...eContext.modeParams, fixed: !isPinned };
                                 newParams.width = newParams.fixed ? markerWidth : sectorWidth;
                                 newParams.height = newParams.fixed ? markerHeight : sectorHeight;
+                                newParams.markerX = markerX;
+                                newParams.markerY = markerY;
 
                                 if (!newParams.fixed) {
                                     setMarkerWidth(sectorWidth);

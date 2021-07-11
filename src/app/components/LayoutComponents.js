@@ -42,7 +42,7 @@ const handleLeftRightClick = (leftHandler, rightHandler) => {
     }
 };
 
-function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, onLeftClick, onRightClick,  ...props}) {
+function useGetLayoutProps({className, padded, end, border, zIndex, cursor, tab, onLeftClick, onRightClick,  ...props}) {
     const dimCls = [];
     if (className) {
         dimCls.push(className);
@@ -114,6 +114,9 @@ function useGetLayoutProps({className, padded, border, zIndex, cursor, tab, onLe
         dimCls.push('tabbed');
     } else if (tab === false) {
         dimAttr.tabIndex = -1;
+    }
+    if (end) {
+        dimCls.push('align-end');
     }
 
     return {

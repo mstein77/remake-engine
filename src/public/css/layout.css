@@ -359,3 +359,7 @@ div.boxed, div.thin-boxed {
     outline-offset: -1px;
     outline-style: dot-dash;
 }
+
+.align-end {
+    margin-left: auto;
+}

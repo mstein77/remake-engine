@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
 import { ColorIndex, FilterIndex } from "../classes/EntityIndex";
-import { EditorContext, EditorCtx, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
-import { d, rgb2hex, copy2clipboard, drawCanvasToAvail, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
+import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
+import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
 import { PictureCell } from "./BaseComponents";
 import {
     FileDropZone,
@@ -25,6 +25,7 @@ import { FlexGrid, BaseGrid } from "./GridComponents";
 import { BitmapGrid, CellValue, EmptyGrid } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BackgroundControl, Icon } from "./BasicComponents";
+import ReactDOM from "react-dom";
 
 function ConfirmDialog({ close, save, msg }) {
     return (
@@ -294,8 +295,10 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
     )
 }
 
-function ResizeProps({ width, height, newWidth, newHeight, maxWidth, maxHeight, setNewWidth, setNewHeight, offsetX, offsetY, setOffsetX, setOffsetY }) {
+function ResizeProps({ entityIndex, width, height, newWidth, newHeight, maxWidth, maxHeight, setNewWidth, setNewHeight, offsetX, offsetY, setOffsetX, setOffsetY }) {
     const ImportFontModal = useModal();
+
+    const [ index, setIndex ] = useState(0);
 
     const selectNewSize = () => {
         ImportFontModal.open({
@@ -307,40 +310,46 @@ function ResizeProps({ width, height, newWidth, newHeight, maxWidth, maxHeight, 
             }
         })
     };
-    const maxOffsetX = Math.abs(newWidth - width);
-    const maxOffsetY = Math.abs(newHeight - height);
+    const moveOldX = newWidth > width;
+    const moveOldY = newHeight > height;
 
-    const setState = changes => {
-        changes.newWidth = changes.newWidth ? changes.newWidth : width;
-        changes.newHeight = changes.newHeight ? changes.newHeight : height;
-        changes.offsetX = changes.offsetX !== undefined ? changes.offsetX : offsetX;
-        changes.offsetY = changes.offsetY !== undefined ? changes.offsetY : offsetY;
-
-        if (changes.width !== width) {
-            changes.offsetX = Math.min(changes.offsetX, maxOffsetX);
-            setNewWidth(changes.newWidth);
-        }
-        if (changes.height !== height) {
-            changes.offsetY = Math.min(changes.offsetY, maxOffsetY);
-            setNewHeight(changes.newHeight);
-        }
-        if (changes.offsetX !== offsetX) {
-            setOffsetX(changes.offsetX);
-        }
-        if (changes.offsetY !== offsetY) {
-            setOffsetY(changes.offsetY);
-        }
-    };
+    const markerWidth = Math.min(newWidth, width);
+    const markerHeight = Math.min(newHeight, height);
 
     const previewWidth = Math.max(newWidth, width);
     const previewHeight = Math.max(newHeight, height);
 
-    const size = 4;
-    const zoom = 4;
-    const border = 1;
-    const provider = new EmptyGrid(previewWidth, previewHeight, size, '#000000');
-//    const dim = provider.getGridDim(previewWidth, previewHeight, border, zoom);
+    const maxOffsetX = Math.abs(previewWidth - markerWidth);
+    const maxOffsetY = Math.abs(previewHeight - markerHeight);
 
+    if (offsetX > maxOffsetX) {
+        setOffsetX(maxOffsetX)
+    }
+    if (offsetY > maxOffsetY) {
+        setOffsetY(maxOffsetY)
+    }
+
+    const provider = new BitmapGrid({image: getEmptyImageData(previewWidth, previewHeight)});
+
+    const hasIndex = !!(entityIndex && entityIndex.getLength());
+
+    if (hasIndex) {
+        const model = {
+            image: entityIndex.getEntityPropValue(index, 'image')
+        };
+        const oGrid = new BitmapGrid(model);
+
+        const selection = oGrid.getSelection(
+            0, 0,
+            moveOldX ? width : previewWidth,
+            moveOldY ? height : previewHeight
+        );
+        provider.writeSelection(
+            moveOldX ? offsetX : 0,
+            moveOldY ? offsetY : 0,
+            selection
+        )
+    }
     return (
         <>
             <TupleProp name="Current Size:" readOnly x={width} y={height} min={1} max={128} />
@@ -365,7 +374,8 @@ function ResizeProps({ width, height, newWidth, newHeight, maxWidth, maxHeight, 
                 <Block width={400} height={300} border={1}>
                     <MarkerMoveGrid
                         gridProvider={provider}
-                        markerWidth={newWidth} markerHeight={newHeight}
+                        index={index} setIndex={setIndex} maxIndex={hasIndex ? entityIndex.getLength() - 1 : null}
+                        markerWidth={markerWidth} markerHeight={markerHeight}
                         markerX={offsetX} markerY={offsetY}
                         setMarkerX={setOffsetX} setMarkerY={setOffsetY}
                     />
@@ -602,7 +612,7 @@ function BitmapSelector(props) {
     )
 }
 
-function MarkerMoveGrid({ gridProvider, markerWidth, markerHeight, markerX, markerY, setMarkerX, setMarkerY }) {
+function MarkerMoveGrid({ gridProvider, markerWidth, markerHeight, markerX, markerY, setMarkerX, setMarkerY, index, setIndex, maxIndex }) {
     const [posX, setPosX] = useState(0);
     const [posY, setPosY] = useState(0);
     const [width, setWidth] = useState(1);
@@ -632,6 +642,7 @@ function MarkerMoveGrid({ gridProvider, markerWidth, markerHeight, markerX, mark
         <EditorCtx>
             <Stack vertical borders full>
                 <Toolbar full="h">
+                    {maxIndex !== null && <Number name="Index:" min={0} value={index} set={setIndex} max={maxIndex} />}
                     <Tuple name="Position:" x={posX} setX={setPosX} maxX={gridWidth - width} min={0}
                            y={posY} setY={setPosY} maxY={gridHeight - height} />
                     <Number name="Zoom:" value={zoom} min={1} max={10} set={setZoom} />
@@ -741,8 +752,11 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     )
 }
 
-function useExportModal({ model, resource, name }) {
+function useExportModal({ model, resource, update, name }) {
+    const wContext = useContext(WindowContext);
     const ExportModal = useModal();
+    const LoadingModal = useModal();
+    const ErrorModal = useModal();
 
     const [ copying, setCopying ] = useState(false);
     const [ copied, setCopied ] = useState(null);
@@ -838,9 +852,45 @@ function useExportModal({ model, resource, name }) {
         return getModelConfig().getResources();
     };
 
+    const storeModel = eContextRef => {
+        wContext.storeScreenResource(wContext.game.currentScreen, getModelConfig());
+        eContextRef.current.updateRestorePos();
+        update();
+    };
+
+    const deployModel = () => {
+        const gameRef = wContext.game;
+        const resourcesInfo = getModelResources();
+
+        LoadingModal.open();
+        gameRef.getResourceLoader().deployResources(
+            gameRef.currentScreen,
+            resourcesInfo.resources,
+            {json: [resource.id]},
+            resourcesInfo.dependencies
+        ).then(
+            response => {
+                d('GOT', response);
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                gameRef.reloadScreen(1);
+            }
+        ).catch(err => {
+            console.error(err);
+            LoadingModal.close();
+            ErrorModal.open({msg: 'Error deploying ' + name})
+        })
+    };
+
+    const getResourceTree = () => {
+        return getResourceTreeForJsonModel(resource.cls, model)
+    };
+
     return {
         getModelConfig,
         getModelResources,
+        getResourceTree,
+        storeModel,
+        deployModel,
         openExportModal: (code = null, details = {}) => {
             if (code === null) {
                 const resources = getModelResources();
@@ -856,24 +906,36 @@ function useExportModal({ model, resource, name }) {
             })
         },
         Modals: () =>
-            <ExportModal.content name={'Export as Code: ' + name} width="80%" height="75%">
-                <Stack vertical borders full>
-                    <Block padded full>
-                        <TextArea full copy readOnly value={ExportModal.props.code} />
+            <>
+                <ExportModal.content name={'Export as Code: ' + name} width="80%" height="75%">
+                    <Stack vertical borders full>
+                        <Block padded full>
+                            <TextArea full copy readOnly value={ExportModal.props.code} />
+                        </Block>
+                        <Block padded full="h">
+                            <Stack gaps>
+                                <Button
+                                    name="Copy" warning={copying && copied === false}
+                                    current={copying} value={true} direct
+                                    onClick={copy} onClickEnd={copyCleanUp}
+                                    icon="content_paste" padded="h" className="autofocus"
+                                />
+                                <Button name="Close" icon="close" padded="h" onClick={() => ExportModal.close()} />
+                            </Stack>
+                        </Block>
+                    </Stack>
+                </ExportModal.content>
+
+                <LoadingModal.content name={"Deploying " + name} closeable={false} width={200}>
+                    <LoadingIndicator />
+                </LoadingModal.content>
+
+                <ErrorModal.content name="An error occured" width={250}>
+                    <Block full>
+                        <CenterInfo icon="warning" iconSize={30}>{ErrorModal.props.msg}</CenterInfo>
                     </Block>
-                    <Block padded full="h">
-                        <Stack gaps>
-                            <Button
-                                name="Copy" warning={copying && copied === false}
-                                current={copying} value={true} direct
-                                onClick={copy} onClickEnd={copyCleanUp}
-                                icon="content_paste" padded="h" className="autofocus"
-                            />
-                            <Button name="Close" icon="close" padded="h" onClick={() => ExportModal.close()} />
-                        </Stack>
-                    </Block>
-                </Stack>
-            </ExportModal.content>
+                </ErrorModal.content>
+            </>
     };
 }
 

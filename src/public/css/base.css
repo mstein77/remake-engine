@@ -126,6 +126,44 @@ html, body {
     filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
 }
 
+.slider-handle-h {
+    width: 11px;
+    height: 20px;
+}
+
+.slider-handle-v {
+    height: 11px;
+    width: 20px;
+}
+
+.slider-padding-h {
+    padding-left: 5px;
+    padding-right: 5px;
+    box-sizing: border-box;
+}
+
+.slider-padding-v {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    box-sizing: border-box;
+}
+
+.slider-arrow-left {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right:7px solid white;
+}
+
+.slider-bg-less {
+    background-color: var(--button-bg-color)
+}
+
+.slider-bg-more {
+    background-color: var(--input-bg-color)
+}
+
 .scrollbar-handle:hover {
     filter: brightness(1);
 }
@@ -388,4 +426,14 @@ input:invalid {
 
 .cursor-hresize {
     cursor: ew-resize;
+}
+
+.icon-rotate {
+    animation: rotate 1.2s linear infinite;
+}
+
+@keyframes rotate {
+    to {
+        transform: rotate(360deg);
+    }
 }
