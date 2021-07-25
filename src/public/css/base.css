@@ -1,49 +1,86 @@
 /* Base CSS */
 
 :root {
-    --link-resources: 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i https://fonts.googleapis.com/icon?family=Material+Icons';
-    --brightness-factor: -1;
-    --modal-overlay-bg-color: #000000a3;
+    --link-resources-urls: 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i https://fonts.googleapis.com/icon?family=Material+Icons';
+    --brightness-factor-float: -1;
+    --modal-overlay-bg-rgb: #000000a3;
 
-    /*
-    --scrollbar-color: #B0B0B0;
-    --scrollbar-bg-color: #EFEFEF;
-    */
+    --marker-width-px: 8px;
+    --marker-color-highlight-rgb: #FF4747;
+    --marker-color-rgb: #FFFFFF77;
 
-
-    --editor-bg-color: #404040;
-    --editor-color: #B0B0B0;
-
-    --warning-color: #D8B2A2;
-
-    --toolbar-bg-color: #606060;
-
-    --input-bg-color: #000000;
-    --input-color: #A0A0D0;
-    --input-border-color: #8080A0;
-
-    --button-bg-color: #A0A0A0;
-    --button-color: #303020;
-    --button-border-color: #606060;
-    --button-border-style: inset;
-    --button-border-radius: 0px;
-    --button-font-family: Arial;
-
-    --marker-width: 8px;
-    --marker-color-highlight: #FF4747;
-    --marker-color: #FFFFFF77;
-
-    --min-opacity: 0.2;
-    --max-opacity: 0.7;
-    --max-invert: 50%;
+    --min-opacity-float: 0.2;
+    --max-opacity-float: 0.7;
+    --max-invert-perc: 50%;
 }
 
 html, body {
     cursor: auto;
     overscroll-behavior-x: contain;
-    background-color: var(--editor-bg-color);
-    color: var(--editor-color);
+    background-color: var(--editor-bg-rgb);
+    color: var(--editor-rgb)
 }
+
+
+.focus-box:focus {
+    box-shadow: inset 0 0 1px 1px var(--focus-rgba);
+    outline: none
+}
+
+/*
+     button styles
+ */
+.button-bg {
+    background-color: var(--button-bg-rgb)
+}
+.button-color {
+    color: var(--button-rgb)
+}
+.button-padding {
+    padding: var(--button-padding-px);
+    box-sizing: border-box
+}
+.button-border-color {
+    border-color: var(--button-border-rgb)
+}
+.button-border-style {
+    border-style: var(--button-bstyle)
+}
+.button-border-width {
+    border-width: var(--button-border-width-px)
+}
+.button-border-radius {
+    border-radius: var(--button-border-radius-px)
+}
+
+.error-bg {
+    background-color: var(--error-bg-rgb)
+}
+
+.error-color {
+    color: var(--error-rgb)
+}
+
+.hover-change, .hover-fix {
+    filter: brightness(calc(1 - var(--brightness-factor-float) * 0.25));
+}
+
+.hover-change:hover:not(.clicked) {
+    filter: brightness(1) !important;
+}
+
+.hover-change.clicked {
+    filter: brightness(calc(1 + var(--brightness-factor-float) * 0.25)) !important;
+}
+
+/**
+
+ */
+.circle-handle {
+    border: 2px solid #ffffff;
+    border-radius: 100%
+}
+
 
 .hidden {
     display: none
@@ -54,7 +91,7 @@ html, body {
 }
 
 .outline-1 {
-    outline: 1px solid var(--box-border-color)
+    outline: 1px solid var(--box-border-rgb)
 }
 
 .content-box {
@@ -81,7 +118,7 @@ html, body {
 .separator-h {
     margin-left: 2px;
     margin-right: 2px;
-    background-color: var(--box-border-color)
+    background-color: var(--box-border-rgb)
 }
 
 .transparent {
@@ -108,10 +145,10 @@ html, body {
 /* Scrollbar */
 
 .scrollbar-div {
-    border: 1px inset var(--toolbar-bg-color);
+    border: 1px inset var(--toolbar-bg-rgb);
     padding: 1px;
     margin: 0px;
-    background-color: var(--toolbar-bg-color)
+    background-color: var(--toolbar-bg-rgb)
 }
 
 .scrollbar-space {
@@ -121,9 +158,9 @@ html, body {
 
 .scrollbar-handle {
     flex: 1;
-    border: 1px outset var(--button-border-color);
-    background-color: var(--button-bg-color);
-    filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
+    border: 1px outset var(--button-border-rgb);
+    background-color: var(--button-bg-rgb);
+    filter: brightness(calc(1 - var(--brightness-factor-float) * 0.25));
 }
 
 .slider-handle-h {
@@ -157,11 +194,11 @@ html, body {
 }
 
 .slider-bg-less {
-    background-color: var(--button-bg-color)
+    background-color: var(--button-bg-rgb)
 }
 
 .slider-bg-more {
-    background-color: var(--input-bg-color)
+    background-color: var(--input-bg-rgb)
 }
 
 .scrollbar-handle:hover {
@@ -169,18 +206,18 @@ html, body {
 }
 
 .scrollbar-handle.active {
-    filter: brightness(calc(1 + var(--brightness-factor) * 0.25));
+    filter: brightness(calc(1 + var(--brightness-factor-float) * 0.25));
 }
 
 
 /* ALL:   */
 
 .modal-overlay {
-    background-color: var(--modal-overlay-bg-color);
+    background-color: var(--modal-overlay-bg-rgb);
 }
 
 .modal-centered {
-    background-color: var(--editor-bg-color);
+    background-color: var(--editor-bg-rgb);
 }
 
 .modal-bounds {
@@ -206,7 +243,7 @@ html, body {
 /* Theme-Styling */
 
 .hover-highlight {
-    filter: brightness(calc(1 - var(--brightness-factor) * 0.25));
+    filter: brightness(calc(1 - var(--brightness-factor-float) * 0.25));
 }
 
 .hover-highlight:hover:not(.clicked) {
@@ -214,11 +251,11 @@ html, body {
 }
 
 .hover-highlight.clicked {
-    filter: brightness(calc(1 + var(--brightness-factor) * 0.25)) !important;
+    filter: brightness(calc(1 + var(--brightness-factor-float) * 0.25)) !important;
 }
 
 .control-bg {
-    background-color: var(--scrollbar-color);
+    background-color: var(--scrollbar-rgb);
 }
 
 .active-bg {
@@ -259,11 +296,11 @@ html, body {
 @-webkit-keyframes blinker {
     from {
         backdrop-filter: invert(0%);
-        opacity: var(--max-opacity);
+        opacity: var(--max-opacity-float);
     }
     to {
-        backdrop-filter: invert(var(--max-invert));
-        opacity: var(--min-opacity);
+        backdrop-filter: invert(var(--max-invert-perc));
+        opacity: var(--min-opacity-float);
     }
 }
 
@@ -293,8 +330,8 @@ html, body {
 }
 
 @-webkit-keyframes input-warning {
-    from {background-color: var(--input-bg-color)}
-    to {background-color: var(--warning-color)}
+    from {background-color: var(--input-bg-rgb)}
+    to {background-color: var(--warning-rgb)}
 }
 
 div.invalid,
@@ -318,11 +355,11 @@ input:invalid {
 */
 
 .color-warning {
-    color: var(--warning-color)
+    color: var(--warning-rgb)
 }
 
 .invalid-highlight {
-    background-color: var(--warning-color) !important;
+    background-color: var(--warning-rgb) !important;
 }
 
 .blink {
@@ -336,34 +373,34 @@ input:invalid {
 .marker-grid {
     position: relative;
     display: grid;
-    grid-template-columns: var(--marker-width) min-content var(--marker-width);
-    grid-template-rows: var(--marker-width) min-content var(--marker-width);
+    grid-template-columns: var(--marker-width-px) min-content var(--marker-width-px);
+    grid-template-rows: var(--marker-width-px) min-content var(--marker-width-px);
 }
 
 .marker-cell {
-    background-color: var(--marker-color);
+    background-color: var(--marker-rgb);
 }
 
 .marker-cell-highlight {
-    background-color: var(--marker-color-highlight)
+    background-color: var(--marker-color-highlight-rgb)
 }
 
 .toolbar-bg {
-    background-color: var(--toolbar-bg-color)
+    background-color: var(--toolbar-bg-rgb)
 }
 
 .cursor-bg-hover:hover {
-    background-color: var(--marker-color)
+    background-color: var(--marker-rgb)
 }
 
 .checkbox {
-    color: var(--input-bg-color);
+    color: var(--input-bg-rgb);
 }
 
 .input {
-    background-color: var(--input-bg-color);
-    color: var(--input-color);
-    border-color: var(--input-border-color);
+    background-color: var(--input-bg-rgb);
+    color: var(--input-rgb);
+    border-color: var(--input-border-rgb);
     border-style: solid;
     border-width: 1px
 }
@@ -379,29 +416,32 @@ input:invalid {
 }
 
 .button {
-    color: var(--button-color);
-    font-family: var(--button-font-family);
-    border-radius: var(--button-border-radius);
-    padding: calc(var(--button-border-radius) / 3)
+    color: var(--button-rgb);
+    font-family: var(--button-font);
+    border-radius: var(--button-border-radius-px);
+    padding: calc(var(--button-border-radius-px) / 3)
 }
 
 .button:not(.active-bg) {
-    background-color: var(--button-bg-color);
+    background-color: var(--button-bg-rgb);
 }
 
+/* obsolete */
 .button-border {
-    border-style: var(--button-border-style);
-    border-color: var(--button-border-color);
+    border-style: var(--button-bstyle);
+    border-color: var(--button-border-rgb);
 }
 
+/* obsolete */
 .button.padded-h {
-    padding-left: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
-    padding-right: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
+    padding-left: calc(var(--default-padding-px) + var(--button-border-radius-px) / 3) !important;
+    padding-right: calc(var(--default-padding-px) + var(--button-border-radius-px) / 3) !important;
 }
 
+/* obsolete */
 .button.padded-v {
-    padding-top: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
-    padding-bottom: calc(var(--default-padding) + var(--button-border-radius) / 3) !important;
+    padding-top: calc(var(--default-padding-px) + var(--button-border-radius-px) / 3) !important;
+    padding-bottom: calc(var(--default-padding-px) + var(--button-border-radius-px) / 3) !important;
 }
 
 .no-events {

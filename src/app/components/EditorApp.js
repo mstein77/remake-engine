@@ -27,6 +27,7 @@ import {
 } from '../helper/helper';
 import ReactDOM from "react-dom";
 import { MainEditor } from "../editors/MainEditor";
+import { DemoEditor } from "../editors/DemoEditor";
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
@@ -588,7 +589,10 @@ function EditorApp(props) {
         let editor = '';
         const resourceLoader = props.game.getResourceLoader();
         for (let resource of resources) {
+            // editor = <DemoEditor />; break;
+
             if (resource.type !== 'TextPane') continue;
+
 
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));

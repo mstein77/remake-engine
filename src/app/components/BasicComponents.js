@@ -1,11 +1,62 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import {d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex} from "../helper/helper"
+import { d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
 import { DIR, Block, Stack, Grid } from "./LayoutComponents";
 import { Button, Number, Color, OkCancelForm, ColorPicker } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex } from "../classes/EntityIndex";
+
+const defaultValues = {
+    config: {
+        maxWidthPx: 1600,
+        noMaxWidth: false,
+        maxHeightPx: 1200,
+        noMaxHeight: true,
+        uiAnimations: true,
+        maxHistory: 10
+    },
+    theme: {
+        defaultPaddingPx: 9,
+        boxBorderWidthPx: 1,
+        maxWidthPx: 1200,
+        maxHeightPx: 1200,
+        buttonBorderRadiusPx: 4,
+        boxBorderRgb: "#2b7797",
+        toolbarBgRgb: "#2f304b",
+        inputBgRgb: "#b0aec1",
+        inputRgb: "#29292e",
+        inputBorderRgb: "#a8a8a8",
+        editorBgRgb: "#080808",
+        editorRgb: "#9aa0a2",
+        buttonBgRgb: "#1e42ae",
+        buttonRgb: "#b0d5e8",
+        buttonBorderRgb: "#347f66",
+        buttonBorderWidthPx: 1,
+        buttonPaddingPx: 3,
+        errorBgRgb: '#AA0020',
+        errorRgb: '#E0E0A0',
+        linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
+        buttonFont: "Monospace",
+        buttonBstyle: "solid",
+        fontUrl: "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
+    },
+    mapping: {
+        undo: 'm z',
+        redo: 'm y',
+        save: 'm s',
+        export: 'm x',
+        new: 'c n',
+        select: null,
+        delete: 'c d',
+        quit: 'c q',
+        edit: 'm e',
+        all: 'c a',
+        pick: 'c p',
+        play: 'm p',
+        close: 'Escape'
+    }
+};
 
 const BackgroundContext = React.createContext();
 
@@ -366,7 +417,7 @@ function EditorSectionInner({ name, actions = [], area, tree, link, confirm, chi
 
     useEffect(() => {
         if (!confirm) return;
-        wContext.setConfirmExit(() => d(!eContextRef.current.hasStorePos(), 'HAS?'));
+        wContext.setConfirmExit(() => !eContextRef.current.hasStorePos());
         return () => {
             wContext.setConfirmExit(null);
         }
@@ -753,7 +804,7 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
         };
     }
     return (
-        <Grid full gaps={gaps ? cssContext.values.defaultPadding : null} columns={columns.join(' ')} rows={rows.join(' ')}>
+        <Grid full gaps={gaps ? cssContext.getValue('defaultPaddingPx') : null} columns={columns.join(' ')} rows={rows.join(' ')}>
             <Block key="a" full onWheel={onWheel}>{children}</Block>
             {scrollbarY && <Scrollbar key="b" vertical pos={y} max={maxY} page={pageY} set={setY} />}
             {scrollbarX && <Scrollbar key="c" pos={x} max={maxX} page={pageX} set={setX} />}
@@ -949,93 +1000,49 @@ function ModalColorPicker({}) {
     )
 }
 
+/**
+ * registry
+ *  - used to store values/methods from children
+ */
 function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
 
-    const cssRef = useRef(null);
-    cssRef.current = cssContext;
-
-    const registryRef = useRef({});
-
-    const registry = (key = null) => key ? registryRef.current[key] : registryRef.current;
-
-    const lastTarget = useRef(null);
-    const modeRef = useRef(null);
-    const confirmRef = useRef(null);
-
-
-    const settingsRef = useRef(null);
-    const modalStack = useMemo(() => [],[]);
-    const focusStack = useMemo(() => { return {elem: {}, zIndex: null}}, []);
-    const storage = useMemo(() => {
+    const [ storage ] = useState(() => {
         return new Storage(localStorage, 'remake-engine.editor.');
-    }, []);
+    });
 
-    const listeners = useMemo(() => { return {} }, []);
-    const editors = useMemo(() => { return {} }, []);
-    const styleLock = useMemo(() => {
-        return {
-            state: 'unlocked',
-            style: null
-        }
-    }, []);
+    const setterRef = useRef();
 
-    const defaults = useMemo(() => {
-        return {
+    const defaultEditorConfig = defaultValues.config;
+    const defaultTheme = defaultValues.theme;
+    const defaultMapping = defaultValues.mapping;
+
+    // the registry is used for storing values which are either expensive to calculate
+    // or come from child components
+    const registryRef = useRef();
+    const registry = (key = null) => key ? registryRef.current[key] : registryRef.current;
+    if (!registry()) {
+        const defaults = {
             config: [
                 {
                     name: 'Defaults',
-                    values: {
-                        maxWidth: 1600,
-                        noMaxWidth: false,
-                        maxHeight: 1200,
-                        noMaxHeight: true,
-                        uiAnimations: true,
-                        maxHistory: 10
-                    }
+                    values: defaultEditorConfig
                 }
             ],
             theme: [
                 {
                     name: 'Defaults',
-                    values: cssContext.values
+                    values: defaultTheme
                 }
             ],
             mapping: [
                 {
                     name: 'Defaults',
-                    values: {
-                        undo: 'm z',
-                        redo: 'm y',
-                        save: 'm s',
-                        export: 'm x',
-                        new: 'c n',
-                        select: null,
-                        delete: 'c d',
-                        quit: 'c q',
-                        edit: 'm e',
-                        all: 'c a',
-                        pick: 'c p',
-                        play: 'm p',
-                        close: 'Escape'
-                    }
+                    values: defaultMapping
                 }
             ]
-        }
-    }, []);
-    const defaultEditorConfig = defaults.config[0].values;
-    const defaultTheme = defaults.theme[0].values;
-    const defaultMapping = defaults.mapping[0].values;
+        };
 
-    const editorConfig = useMemo(() => {
-        return storage.getDefaultedJson('config', defaultEditorConfig);
-    }, []);
-
-    const theme = useMemo(() => {
-        return storage.getDefaultedJson('theme', defaultTheme);
-    }, []);
-
-    const hotKeyActions = useMemo(() => {
         const action2hotKey = storage.getDefaultedJson('hotkeys', defaultMapping);
         const hotKey2action = {};
         for (let [action, key] of Object.entries(action2hotKey)) {
@@ -1043,478 +1050,489 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 hotKey2action[key] = action;
             }
         }
-        return {
-            action2hotKey,
-            hotKey2action
-        }
-    }, []);
 
-    useEffect(() => {
-        const leaveHandler = e => {
-            if (confirmRef.current && confirmRef.current()) {
-                const confirmationMessage = 'You have unsaved changes, are you sure that you want to leave?';
-                e.returnValue = confirmationMessage;
-                return confirmationMessage;
+        const syncLinks = currLinks => {
+            const links = registry('links');
+            const elems = document.querySelectorAll('link');
+            const parts = currLinks.split(' ');
+            const found = [];
+            for (let elem of elems) {
+                const href = elem.href;
+                if (
+                    links.defaults.includes(href) ||
+                    links.backups.includes(href) ||
+                    parts.includes(href)) {
+                    found.push(elem);
+                } else {
+                    const parent = elem.parentNode;
+                    parent.removeChild(elem);
+                }
+            }
+            const head = document.querySelector('head');
+            for (let part of parts) {
+                if (!found.includes(part)) {
+                    const linkNode = document.createElement('link');
+                    linkNode.href = part;
+                    linkNode.rel = 'stylesheet';
+                    linkNode.type ='text/css';
+                    head.appendChild(
+                        linkNode
+                    );
+                }
             }
         };
-        window.addEventListener('beforeunload', leaveHandler);
-        return () => {
-            window.removeEventListener('beforeunload', leaveHandler);
-        }
-    });
 
-    const links = useMemo(() => {
-        return {defaults: [], backups: []}
-    }, []);
-
-    const syncLinks = currLinks => {
-        const elems = document.querySelectorAll('link');
-        const parts = currLinks.split(' ');
-        const found = [];
-        for (let elem of elems) {
-            const href = elem.href;
-            if (
-                links.defaults.includes(href) ||
-                links.backups.includes(href) ||
-                parts.includes(href)) {
-                found.push(elem);
-            } else {
-                const parent = elem.parentNode;
-                parent.removeChild(elem);
+        registryRef.current = {
+            lastTarget: null,
+            mode: null,
+            confirm: null,
+            settings: null,
+            modalStack: [],
+            focusStack: {
+                elem: {},
+                zIndex: null
+            },
+            listeners: {},
+            editors: {},
+            styleLock: {
+                state: 'unlocked',
+                style: null
+            },
+            defaults,
+            editorConfig: storage.getDefaultedJson('config', defaultEditorConfig),
+            theme: storage.getDefaultedJson('theme', defaultTheme),
+            hotKeyActions: {
+                action2hotKey,
+                hotKey2action
+            },
+            elemKeyBindings: [],
+            links: {
+                defaults: [],
+                backups: []
             }
-        }
-        const head = document.querySelector('head');
-        for (let part of parts) {
-            if (!found.includes(part)) {
-                const linkNode = document.createElement('link');
-                linkNode.href = part;
-                linkNode.rel = 'stylesheet';
-                linkNode.type ='text/css';
-                head.appendChild(
-                    linkNode
-                );
+        };
+
+        const resourceLoader = game.getResourceLoader();
+
+        const register = (key, value) => {
+            registryRef.current[key] = value
+        };
+
+        const endExclusiveMode = id => {
+            const { mode, listeners, setFixCursor } = registry();
+            if (!id || mode !== id) {
+                return;
             }
-        }
-    };
-
-    useEffect(() => {
-        // 1. get current link elements
-        const elems = document.querySelectorAll('link');
-        for (let elem of elems) {
-            links.defaults.push(elem.href);
-        }
-
-        cssContext.setStyleToValues(document.body.style, theme);
-        cssContext.update();
-
-        document.body.style.setProperty('--max-width', editorConfig.noMaxWidth ? 'none' :  editorConfig.maxWidth + 'px');
-        document.body.style.setProperty('--max-height', editorConfig.noMaxHeight ? 'none' :  editorConfig.maxHeight + 'px');
-        syncLinks(theme.linkResources);
-
-    }, []);
-
-    const elemKeyBindings = useMemo(() => [], []);
-
-    const addElemKeyBinding = (elem, action2handlers = {}, area = null, link = null) => {
-        if (elem === null) {
-            return;
-        }
-        if (!link) {
-            link = []
-        } else if (!Array.isArray(link)) {
-            link = [link];
-        }
-        elemKeyBindings.push([elem, action2handlers, area, getModalLevel(), link]);
-    };
-
-    const deleteElemKeyBindings = elem => {
-        let index = 0;
-        for (let item of elemKeyBindings) {
-            if (item[0] === elem) {
-                elemKeyBindings.splice(index, 1);
-                break;
-            }
-            index++;
-        }
-    };
-
-    const getHotKeyArea = area => {
-        const currLevel = getModalLevel();
-        for (let item of elemKeyBindings) {
-            if (currLevel === item[3] && item[2] == area) {
-                return item[0];
-            }
-        }
-        return null;
-    };
-
-    const focusHotKeyArea = area => {
-        let elem = getHotKeyArea(area);
-        if (elem) {
-            elem = elem.querySelector('.tabbed');
-            if (elem) {
-                elem.focus();
-                lastTarget.current = elem;
-                return true;
-            }
-        }
-        return false;
-    };
-
-    const getHandlerForAction = (action, elem, followLinks = true, passed = false) => {
-        const currLevel = getModalLevel();
-        for (let [node, bindings, area, level, links] of elemKeyBindings) {
-            if (elem === node && level === currLevel) {
-                passed = true;
-                const binding = bindings[action];
-                if (binding) {
-                    return binding
+            if (listeners) {
+                for (let type of Object.keys(listeners)) {
+                    removeEventListener(type)
                 }
-                if (followLinks) {
-                    for (let link of links) {
-                        const node = getHotKeyArea(link);
-                        if (node) {
-                            const binding = getHandlerForAction(action, node, false, passed);
-                            if (binding) {
-                                return binding
+            }
+            register('mode', null);
+            setFixCursor(null);
+        };
+
+        const removeEventListener = type => {
+            const { listeners } = registry();
+
+            const handlers = listeners[type];
+            if (!handlers || handlers.length === 0) {
+                return;
+            }
+            const last = handlers.pop();
+            window.removeEventListener(type, last.handler, last.options);
+            if (last.options.cleanUp) {
+                last.options.cleanUp()
+            }
+        };
+
+        const getModalLevel = () => registry('modalStack').length;
+
+        const getHotKeyArea = area => {
+            const { elemKeyBindings } = registry();
+
+            const currLevel = getModalLevel();
+            for (let item of elemKeyBindings) {
+                if (currLevel === item[3] && item[2] == area) {
+                    return item[0];
+                }
+            }
+            return null;
+        };
+
+        const getHandlerForAction = (action, elem, followLinks = true, passed = false) => {
+            const { elemKeyBindings } = registry();
+
+            const currLevel = getModalLevel();
+            for (let [node, bindings, area, level, links] of elemKeyBindings) {
+                if (elem === node && level === currLevel) {
+                    passed = true;
+                    const binding = bindings[action];
+                    if (binding) {
+                        return binding
+                    }
+                    if (followLinks) {
+                        for (let link of links) {
+                            const node = getHotKeyArea(link);
+                            if (node) {
+                                const binding = getHandlerForAction(action, node, false, passed);
+                                if (binding) {
+                                    return binding
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        if (!followLinks || !elem || elem.id === 'modals-container') {
-            return passed ? undefined : false;
-        }
-        elem = elem.parentNode;
-        if (elem) {
-            return getHandlerForAction(action, elem, true, passed)
-        }
-        return passed ? undefined : false
-    };
-
-    const getHandlerForActionKey = (actionKey, elem) => {
-        if (elemKeyBindings.length === 0) {
-            return null;
-        }
-        const action = hotKeyActions.hotKey2action[actionKey];
-        if (!action) {
-            return null;
-        }
-        let handler = getHandlerForAction(action, elem);
-
-        if (handler === false) {
-            // try hotkey region 1 when no area was found along the node path
-            const node = getHotKeyArea(1);
-            if (node) {
-                handler = getHandlerForAction(action, node);
+            if (!followLinks || !elem || elem.id === 'modals-container') {
+                return passed ? undefined : false;
             }
-        }
-
-        return handler ? handler : null;
-    };
-
-    const getModalLevel = () => {
-        return modalStack.length
-    };
-
-    const openModal = () => {
-        let zIndex = 10000;
-        const len = modalStack.length;
-        if (len > 0) {
-            zIndex = modalStack[len - 1] + 10;
-        }
-        modalStack.push(zIndex);
-        focusStack.zIndex = zIndex;
-        focusStack.elem[zIndex] = {top: null, start: null, lastTarget: lastTarget.current };
-        return zIndex;
-    };
-    const closeModal = zIndex => {
-        const index = modalStack.indexOf(zIndex);
-        if (index === -1) {
-            return;
-        }
-        modalStack.splice(index, 1);
-        lastTarget.current = focusStack.elem[zIndex].lastTarget;
-        delete focusStack.elem[zIndex];
-        focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
-    };
-
-    const startExclusiveMode = (id, cursor = 'auto') => {
-        if (modeRef.current !== null) {
-            endExclusiveMode(modeRef.current);
-        }
-        modeRef.current = id;
-        registry().setFixCursor(cursor);
-    };
-
-    const isInExclusiveMode = () => modeRef.current !== null;
-
-    const endExclusiveMode = id => {
-        if (!id || modeRef.current !== id) {
-            return;
-        }
-        if (listeners) {
-            for (let type of Object.keys(listeners)) {
-                removeEventListener(type)
+            elem = elem.parentNode;
+            if (elem) {
+                return getHandlerForAction(action, elem, true, passed)
             }
-        }
-        modeRef.current = null;
-        registry().setFixCursor(null);
-    };
-
-    const addEventListener = (type, listener, options = false) => {
-        if (!modeRef.current) throw Error(`No call of start exclusive mode before addEventListener`);
-
-        const handler = (event, ...params) => {
-            let result = false;
-            try {
-                result = listener(event, ...params);
-            } catch (e) {
-                console.error(`An error occured in the event handler "${type}": ${e}`);
-                endExclusiveMode(modeRef.current);
-            }
-            if (options.once) {
-                removeEventListener(type)
-            }
-            if (!options.propagate) {
-                event.stopPropagation();
-            }
-            return result
+            return passed ? undefined : false
         };
-        window.addEventListener(type, handler, options);
-        if (!listeners[type]) {
-            listeners[type] = [];
-        }
-        listeners[type].push({handler, options});
-    };
 
-    const removeEventListener = type => {
-        const handlers = listeners[type];
-        if (!handlers || handlers.length === 0) {
-            return;
-        }
-        const last = handlers.pop();
-        window.removeEventListener(type, last.handler, last.options);
-        if (last.options.cleanUp) {
-            last.options.cleanUp()
-        }
-    };
+        const setStyleLock = state => {
+            const { styleLock, theme, links } = registry();
 
-    const registerEditor = (id, clear) => {
-        editors[id] = clear
-    };
-
-    const unregisterEditor = id => {
-        delete editors[id]
-    };
-
-    const clearEditor = id => {
-        if (editors[id]) {
-            editors[id]()
-        }
-    };
-
-    const isStyleLocked = () => styleLock.state !== 'unlocked';
-
-    const setStyleLock = (state, cssStyle = null) => {
-        if (state === 'locked') {
-            styleLock.state = 'locked';
-            styleLock.style = cssStyle;
-            links.backups = theme.linkResources.split(' ');
-        } else if (state === 'saved') {
-            styleLock.state = 'saved';
-        } else if (state === 'unlocked') {
-            if (styleLock.state !== 'saved' && styleLock.style !== null) {
-                for (let [key, value] of Object.entries(styleLock.style)) {
-                    cssContext.cssPropUpdate.current(document.body.style, key, value);
+            if (state === 'locked') {
+                styleLock.state = 'locked';
+                styleLock.style = cssContext.getValues();
+                links.backups = theme.linkResourcesUrls.split(' ')
+            } else if (state === 'saved') {
+                styleLock.state = 'saved';
+            } else if (state === 'unlocked') {
+                if (styleLock.state !== 'saved') {
+                    cssContext.setValues(styleLock.style);
                 }
-            } else {
-                cssContext.update();
+                styleLock.style = null;
+                links.backups = [];
+                styleLock.state = 'unlocked';
             }
-            styleLock.style = null;
-            links.backups = [];
-            styleLock.state = 'unlocked';
-        }
-    };
+        };
 
-    const clearAllSettings = () => {
-        const keys = storage.getKeys();
-        for(let key of keys) {
-            if (!key.startsWith('presets.')) {
-                storage.deleteJson(key);
+        const getFilteredCanvasData = (filter, canvas) => {
+            if (!filter) {
+                return getCanvasForBitmap(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height))
             }
-        }
-    };
+            const result = filters.getCanvasWithFiltersApplied(filter, {elem: canvas, ctx: canvas.getContext('2d')}, 0, 0, canvas.width, canvas.height);
+            return result[0].elem
+        };
 
-    const openSettings = () => {
-        setStyleLock('locked', cssRef.current.values);
-        settingsRef.current.open({
-            defaults: {
-                mapping: defaultMapping,
-                theme: defaultTheme,
-                config: defaultEditorConfig
-            },
-            cleanUp: () => {
-                setStyleLock('unlocked');
-                syncLinks(theme.linkResources);
-            },
-            save: (newSettings, persist = true) => {
-                const diff = [];
-                for (let [action, hotKey] of Object.entries(newSettings.mapping)) {
-                    const oldHotKey = hotKeyActions.action2hotKey[action];
-                    if (hotKey !== oldHotKey) {
-                        diff.push([action, hotKey, oldHotKey]);
-                    }
-                }
-                for(let [action, hotKey, oldHotKey] of diff) {
-                    hotKeyActions.action2hotKey[action] = hotKey;
-                    if (oldHotKey !== null) {
-                        delete hotKeyActions.hotKey2action[oldHotKey];
-                    }
-                    if (hotKey !== null) {
-                        hotKeyActions.hotKey2action[hotKey] = action;
-                    }
-                }
-                for (let [key, value] of Object.entries(newSettings.config)) {
-                    editorConfig[key] = value;
-                }
-
-                for (let [key, value] of Object.entries(newSettings.theme)) {
-                    theme[key] = value;
-                }
-                if (persist) {
-                    storage.storeJson('hotkeys', hotKeyActions.action2hotKey);
-                    storage.storeJson('config', newSettings.config);
-                    storage.storeJson('theme', newSettings.theme);
-                }
-
-                setStyleLock('saved');
-                settingsRef.current.close()
-            }
-        });
-    };
-
-    const getFilteredCanvasData = (filter, canvas) => {
-        if (!filter) {
-            return getCanvasForBitmap(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height))
-        }
-        const result = filters.getCanvasWithFiltersApplied(filter, {elem: canvas, ctx: canvas.getContext('2d')}, 0, 0, canvas.width, canvas.height);
-        return result[0].elem;
-    };
-
-    const getFilteredImageData = (filter, imageData) => {
-        if (!filter) {
-            return getCanvasForBitmap(imageData).getContext('2d').getImageData(0, 0, imageData.width, imageData.height)
-        }
-        const result = getFilteredCanvasData(filter, getCanvasForBitmap(imageData));
-        const ctx = result.getContext('2d');
-        return ctx.getImageData(0, 0, result.width, result.height);
-    };
-
-    const imageIndex = useMemo(() => {
-        const index =  new ImageIndex({});
+        const imageIndex  = new ImageIndex({});
         for (let resource of imageResources) {
-            index.setEntityObject({value: resource.name, image: resource.bitmap});
+            imageIndex.setEntityObject({value: resource.name, image: resource.bitmap});
         }
-        return index
-    });
 
-    const getBaseColorCanvas = () => {
-        let canvas = registry().baseColorCanvas;
-        if (!canvas) {
-            canvas = buildBaseColorCanvas();
-            registryRef.current.baseColorCanvas = canvas;
-        }
-        return canvas;
-    };
-
-    const getColorMaskCanvas = () => {
-        let canvas = registry().colorMaskCanvas;
-        if (!canvas) {
-            canvas = buildColorMaskCanvas();
-            registryRef.current.colorMaskCanvas = canvas;
-        }
-        return canvas;
-    };
-
-    const value = useMemo(() => {
-        return {
-            register: (key, value) => {
-                registryRef.current[key] = value
-            },
-
+        // let's initialize the context with ref-values and methods here...
+        setterRef.current = {
+            // overwrite registry key with new value
+            register,
+            registry,
             game,
+            filters,
+            resourceLoader,
+
             getNewImageResource: (template, width, height) => {
-                const loader = game.getResourceLoader();
                 return (
-                    loader.makeImageResource(
+                    resourceLoader.makeImageResource(
                         getCanvasForDim(width, height),
-                        getUniqueName(template, loader.getAllResourceIds('image'))
+                        getUniqueName(template, resourceLoader.getAllResourceIds('image'))
                     )
                 )
             },
-            storeScreenResource: (...params) => {
-                game.getResourceLoader().storeScreenResource(...params);
+            // TODO kill this
+            storeScreenResource: resourceLoader.storeScreenResouce,
+
+            setConfirmExit: confirm => register('confirm', confirm),
+            needsConfirmation: () => {
+                const confirm = registry('confirm');
+                return confirm && confirm()
             },
-            lastTarget,
-            editorConfig,
-            theme,
-            startExclusiveMode,
+
+            getLastTarget: () => registry('lastTarget'),
+            editorConfig: registry('editorConfig'),
+            theme: registry('theme'),
+
+            startExclusiveMode: (id, cursor = 'auto') => {
+                const { mode, setFixCursor } = registry();
+                if (mode !== null) {
+                    endExclusiveMode(mode);
+                }
+                register('mode', id);
+                setFixCursor(cursor)
+            },
+            isInExclusiveMode: () => registry('mode') !== null,
             endExclusiveMode,
-            isInExclusiveMode,
-            addEventListener,
+
+            addEventListener: (type, listener, options = false) => {
+                const { mode, listeners } = registry();
+
+                if (!mode) throw Error(`No call of start exclusive mode before addEventListener`);
+
+                const handler = (event, ...params) => {
+                    let result = false;
+                    try {
+                        result = listener(event, ...params);
+                    } catch (e) {
+                        console.error(`An error occured in the event handler "${type}": ${e}`);
+                        endExclusiveMode(mode); // problems? get from registry
+                    }
+                    if (options.once) {
+                        removeEventListener(type)
+                    }
+                    if (!options.propagate) {
+                        event.stopPropagation();
+                    }
+                    return result
+                };
+                window.addEventListener(type, handler, options);
+                if (!listeners[type]) {
+                    listeners[type] = [];
+                }
+                listeners[type].push({handler, options});
+            },
             removeEventListener,
+
             getModalLevel,
-            openModal,
-            closeModal,
-            registerEditor,
-            unregisterEditor,
-            clearEditor,
-            addElemKeyBinding,
-            deleteElemKeyBindings,
+            openModal: () => {
+                const { modalStack, focusStack, lastTarget } = registry();
+
+                let zIndex = 10000;
+                const len = modalStack.length;
+                if (len > 0) {
+                    zIndex = modalStack[len - 1] + 10;
+                }
+                modalStack.push(zIndex);
+                focusStack.zIndex = zIndex;
+                focusStack.elem[zIndex] = {top: null, start: null, lastTarget };
+                return zIndex;
+            },
+            closeModal: zIndex => {
+                const { modalStack, focusStack } = registry();
+
+                const index = modalStack.indexOf(zIndex);
+                if (index === -1) {
+                    return;
+                }
+                modalStack.splice(index, 1);
+                register('lastTarget', focusStack.elem[zIndex].lastTarget);
+                delete focusStack.elem[zIndex];
+                focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
+            },
+
+            registerEditor: (id, clear) => registry('editors')[id] = clear,
+            unregisterEditor: id => delete registry('editors')[id],
+            clearEditor: id => registry('editors')[id] && registry('editors')[id](),
+
+            addElemKeyBinding: (elem, action2handlers = {}, area = null, link = null) => {
+                if (elem === null) {
+                    return;
+                }
+                if (!link) {
+                    link = []
+                } else if (!Array.isArray(link)) {
+                    link = [link];
+                }
+                registry('elemKeyBindings').push([elem, action2handlers, area, getModalLevel(), link]);
+            },
+            deleteElemKeyBindings: elem => {
+                const { elemKeyBindings } = registry();
+
+                let index = 0;
+                for (let item of elemKeyBindings) {
+                    if (item[0] === elem) {
+                        elemKeyBindings.splice(index, 1);
+                        break;
+                    }
+                    index++;
+                }
+            },
             getHotKeyArea,
-            focusHotKeyArea,
-            getHandlerForActionKey,
-            hotKeyActions,
-            settingsRef,
-            openSettings,
-            clearAllSettings,
+            focusHotKeyArea: area => {
+                let elem = getHotKeyArea(area);
+                if (elem) {
+                    elem = elem.querySelector('.tabbed');
+                    if (elem) {
+                        elem.focus();
+                        register('lastTarget', elem);
+                        return true;
+                    }
+                }
+                return false;
+            },
+
+            getHandlerForActionKey: (actionKey, elem) => {
+                const { elemKeyBindings, hotKeyActions } = registry();
+                if (elemKeyBindings.length === 0) {
+                    return null;
+                }
+                const action = hotKeyActions.hotKey2action[actionKey];
+                if (!action) {
+                    return null;
+                }
+                let handler = getHandlerForAction(action, elem);
+
+                if (handler === false) {
+                    // try hotkey region 1 when no area was found along the node path
+                    const node = getHotKeyArea(1);
+                    if (node) {
+                        handler = getHandlerForAction(action, node);
+                    }
+                }
+
+                return handler ? handler : null;
+            },
+
+            hotKeyActions: registry('hotKeyActions'),
+
+            clearAllSettings: () => {
+                const keys = storage.getKeys();
+                for(let key of keys) {
+                    if (!key.startsWith('presets.')) {
+                        storage.deleteJson(key);
+                    }
+                }
+            },
+            openSettings: () => {
+                const { settings, editorConfig, theme, hotKeyActions } = registry();
+
+                setStyleLock('locked');
+                settings.open({
+                    defaults: {
+                        mapping: defaultMapping,
+                        theme: defaultTheme,
+                        config: defaultEditorConfig
+                    },
+                    cleanUp: () => {
+                        setStyleLock('unlocked');
+                        syncLinks(theme.linkResourcesUrls);
+                    },
+                    save: (newSettings, persist = true) => {
+                        const diff = [];
+                        for (let [action, hotKey] of Object.entries(newSettings.mapping)) {
+                            const oldHotKey = hotKeyActions.action2hotKey[action];
+                            if (hotKey !== oldHotKey) {
+                                diff.push([action, hotKey, oldHotKey]);
+                            }
+                        }
+                        for(let [action, hotKey, oldHotKey] of diff) {
+                            hotKeyActions.action2hotKey[action] = hotKey;
+                            if (oldHotKey !== null) {
+                                delete hotKeyActions.hotKey2action[oldHotKey];
+                            }
+                            if (hotKey !== null) {
+                                hotKeyActions.hotKey2action[hotKey] = action;
+                            }
+                        }
+                        for (let [key, value] of Object.entries(newSettings.config)) {
+                            editorConfig[key] = value;
+                        }
+
+                        for (let [key, value] of Object.entries(newSettings.theme)) {
+                            theme[key] = value;
+                        }
+                        if (persist) {
+                            storage.storeJson('hotkeys', hotKeyActions.action2hotKey);
+                            storage.storeJson('config', newSettings.config);
+                            storage.storeJson('theme', newSettings.theme);
+                        }
+                        setStyleLock('saved');
+                        settings.close()
+                    }
+                });
+            },
+
             setStyleLock,
-            isStyleLocked,
+            getLockedStyles: () => registry('styleLock').style,
+            isStyleLocked: () => registry('styleLock').state !== 'unlocked',
+
             syncLinks,
-            cssPropUpdate: cssContext.cssPropUpdate,
+
             defaults,
             storage,
-            focusStack,
-            imageIndex,
-            setConfirmExit: confirm => confirmRef.current = confirm,
-            needsConfirmation: () => confirmRef.current && confirmRef.current(),
-            openColorPickerModal: props => registry().openColorPickerModal(props),
-            getFilteredCanvasData,
-            getFilteredImageData,
-            getBaseColorCanvas,
-            getColorMaskCanvas,
-            filters
-        }
-    }, [focusStack]);
 
+            focusStack: registry('focusStack'),
+            imageIndex,
+
+            openColorPickerModal: props => registry().openColorPickerModal(props),
+
+            getFilteredCanvasData,
+            getFilteredImageData: (filter, imageData) => {
+                if (!filter) {
+                    return getCanvasForBitmap(imageData).getContext('2d').getImageData(0, 0, imageData.width, imageData.height)
+                }
+                const result = getFilteredCanvasData(filter, getCanvasForBitmap(imageData));
+                const ctx = result.getContext('2d');
+                return ctx.getImageData(0, 0, result.width, result.height);
+            },
+
+            getBaseColorCanvas: () => {
+                let canvas = registry('baseColorCanvas');
+                if (!canvas) {
+                    canvas = buildBaseColorCanvas();
+                    register('baseColorCanvas', canvas);
+                }
+                return canvas;
+            },
+            getColorMaskCanvas: () => {
+                let canvas = registry('colorMaskCanvas');
+                if (!canvas) {
+                    canvas = buildColorMaskCanvas();
+                    register('colorMaskCanvas', canvas);
+                }
+                return canvas;
+            }
+        }
+    }
+
+    // components init and clean-up
     useEffect(() => {
+        const { theme, links, editorConfig } = registry();
+        const { syncLinks } = setterRef.current;
+
+        const leaveHandler = e => {
+            const confirm = registry('confirm');
+            if (confirm && confirm()) {
+                const confirmationMessage = 'You have unsaved changes, are you sure that you want to leave?';
+                e.returnValue = confirmationMessage;
+                return confirmationMessage;
+            }
+        };
         const contextMenuHandler = e => {
             e.preventDefault();
             e.stopPropagation();
         };
         window.addEventListener('contextmenu', contextMenuHandler, {capture: false});
-        return () => {
-            window.removeEventListener('contextmenu', contextMenuHandler, {catpure: false})
+        window.addEventListener('beforeunload', leaveHandler);
+
+        const elems = document.querySelectorAll('link');
+        d('???', elems);
+        for (let elem of elems) {
+            links.defaults.push(d(elem.href));
         }
-    });
+
+        cssContext.init(editorConfig, theme);
+        syncLinks(theme.linkResourcesUrls);
+
+        return () => {
+            syncLinks('');
+            window.removeEventListener('beforeunload', leaveHandler);
+            window.removeEventListener('contextmenu', contextMenuHandler, {capture: false})
+        }
+    }, []);
 
     return (
-        <WindowContext.Provider value={value}>
-            <ModalColorPicker key="cp" />
-            <FixCursorArea key="em" />
-            {children}
+        <WindowContext.Provider value={setterRef.current}>
+            {cssContext.ready &&
+                <>
+                    <ModalColorPicker key="cp" />
+                    <FixCursorArea key="em" />
+                    {children}
+                </>
+            }
         </WindowContext.Provider>
     )
 }
@@ -1733,13 +1751,13 @@ function useModal() {
         propsRef.current = props;
         setIsOpen(context.openModal());
     };
-    const content = function ({full, fixStyle, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
+    const content = function ({full, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
         const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
         dimProps.zIndex = isOpen;
         return (
             <>
-                {isOpen && <Modal close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} fixStyle={fixStyle} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
             </>
         );
     };
@@ -1794,24 +1812,9 @@ function ActionBarContent({ children, scroll, ...props }) {
     )
 }
 
-function ThemeFreeze({ blockRef, children }) {
-    const cContext = useContext(CssContext);
-    const [fixValue, setFixValue] = useState({ ...cContext.values, setStyles: cContext.setStyles });
-
-    useEffect(() => {
-        fixValue.setStyles(blockRef.current.style);
-    }, []);
-
-    return (
-        <CssContext.Provider value={fixValue}>
-            {children}
-        </CssContext.Provider>
-    )
-}
-
 /**
  */
-const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
+const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
     const trapRef = useRef(null);
@@ -2022,7 +2025,7 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
     </Block>;
 
     if (wContext.isStyleLocked()) {
-        elem = <ThemeFreeze blockRef={trapRef}>{elem}</ThemeFreeze>
+        elem = <ThemeFreeze blockRef={trapRef} values={wContext.getLockedStyles()}>{elem}</ThemeFreeze>
     }
 
     return (
@@ -2032,17 +2035,28 @@ const Modal = function ({ name, close, fixStyle, closeable = true, zIndex = 0, f
     );
 };
 
-function Icon({ name, width, height, className, size = 18 }) {
+function Icon({ name, width, height, center = 'h', className, rotate, size = 18 }) {
     const style = {
         width: width || size,
         height: height || size
     };
-    const cls = ['min-content-h center-h'];
+    const cls = ['min-content-h'];
+    if (center === true || center === 'h') {
+        cls.push('center-h');
+    }
+    if (center === true || center === 'v') {
+        cls.push('center-v');
+    }
     if (className) {
         cls.push(className);
     }
     return (
-        <div style={style} className={cls.join(' ')} dangerouslySetInnerHTML={{ __html: '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block">' + name + '</i>' }} />
+        <div style={style} className={cls.join(' ')} dangerouslySetInnerHTML={
+            {
+                __html: !name ? '' :
+                    '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block; ' + (rotate ? 'transform: rotate(' + rotate + 'deg)' : '')  + ' ">' + name + '</i>'
+            }
+        } />
     );
 }
 
@@ -2061,132 +2075,180 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
-function getCssConstProp(prop) {
-    let i = 0;
-    const iMax = prop.length;
-    let result = '--';
-    while (i < iMax) {
-        const char = prop[i];
-        const lc = char.toLowerCase();
-        if (lc !== char) {
-            result += '-';
-        }
-        result +=  lc;
-        i++;
-    }
-    return result;
+function ThemeFreeze({ blockRef, values, children }) {
+    const cssContext = useContext(CssContext);
+
+    return (
+        <CssCtx parent={cssContext} values={values} bindRef={blockRef}>
+            {children}
+        </CssCtx>
+    )
 }
 
 const CssContext = React.createContext();
 
-function CssCtx({ children }) {
-    const [updates, setUpdates] = useState(0);
-    const updatesRef = useRef(null);
-    updatesRef.current = updates;
-    const cssPropUpdate = useRef(null);
+const cssConstTypes = [
+    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc'
+];
 
-    const type2props = useMemo(() => {
-        return {
-            px: [
-                'defaultPadding',
-                'boxBorderWidth',
-                'maxWidth',
-                'maxHeight',
+function CssCtx({ parent, bindRef, children, ...props }) {
 
-                'buttonBorderRadius'
-            ],
-            color: [
-                'boxBorderColor',
-                'toolbarBgColor',
+    const [ ready, setReady ] = useState(!!parent);
 
-                'inputBgColor',
-                'inputColor',
-                'inputBorderColor',
+    const registryRef = useRef(null);
+    const registry = (key = null) => key === null ? registryRef.current : registryRef.current[key];
+    const register = (key, value) => registryRef.current[key] = value;
 
-                'editorBgColor',
-                'editorColor',
-                'buttonBgColor',
-                'buttonColor',
-                'buttonBorderColor'
-            ],
-            string: [
-                'buttonFontFamily',
-                'buttonBorderStyle'
-            ],
-            url: ['linkResources']
+    if (!registry()) {
+
+        // extract css relevant keys from defaults
+        const key2type = {};
+        const key2const = {};
+        const regexpCamelCaseLast = /([A-Z][a-z]*)$/;
+
+        const extractKeys2types = obj => {
+            for (let key of Object.keys(obj)) {
+                const match = key.match(regexpCamelCaseLast);
+                if (match.length < 2) continue;
+
+                const type = match[1].toLowerCase();
+                if (!type || !cssConstTypes.includes(type)) continue;
+
+                key2type[key] = type;
+
+                const parts = [];
+                let i = 0;
+                let currPart = '';
+                while (i < key.length) {
+                    let char = key[i];
+                    if (char >= 'A' && char <= 'Z') {
+                        parts.push(currPart);
+                        currPart = '';
+                        char = char.toLowerCase()
+                    }
+                    currPart += char;
+                    i++
+                }
+                if (currPart !== '') {
+                    parts.push(currPart)
+                }
+                const constName = '--' + parts.join('-');
+                key2const[key] = constName;
+            }
+        };
+        extractKeys2types(defaultValues.config);
+        extractKeys2types(defaultValues.theme);
+
+        const getConstValues = (source, target = null) => {
+            const result = target ? target : {};
+            for (let [key, value] of Object.entries(source)) {
+                if (result[key] === undefined && key2type[key]) {
+                    result[key] = value
+                }
+            }
+            return result
+        };
+
+        const setStyleProp = (style, key, value) => {
+            const type = key2type[key];
+            if (!type) return;
+
+            if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
+                value += 'px';
+            }
+            style.setProperty(key2const[key], value);
+        };
+
+        const setValue = (name, value) => {
+            if (parent) {
+                return parent.setValue(name, value)
+            }
+            setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
+            registry('values')[name] = value
+        };
+
+        const applyTo = node => {
+            const { values } = registry();
+            const style = node.style;
+
+            for (let [key, value] of Object.entries(values)) {
+                setStyleProp(style, key, value)
+            }
+        };
+
+        const api = {
+
+            init: (config, theme) => {
+                const values = getConstValues(config);
+                getConstValues(theme, values);
+
+                register('values', values);
+
+                const body = registry('body');
+                const bodyStyle = document.body.style;
+                for(let key of Object.keys(key2type)) {
+                    const prop = key2const[key];
+                    const value = bodyStyle.getPropertyValue(prop);
+                    body[prop] = value !== undefined ? value : null;
+                }
+
+                applyTo(!bindRef ? document.body : bindRef.current);
+                setReady(true)
+            },
+
+            getValues: () => {
+                return { ...registry('values') }
+            },
+
+            getValue: name => registry('values')[name],
+
+            setValue,
+
+            setValues: values => {
+                for (let [key, value] of Object.entries(values)) {
+                    setValue(key, value);
+                }
+            },
+
+            applyTo
+        };
+
+        registryRef.current = {
+            api,
+            body: {}
+        };
+
+        if (parent && props.values) {
+            register('values', props.values);
+        }
+    }
+
+    useEffect(() => {
+        if (bindRef && bindRef.current) {
+            registry('api').applyTo(bindRef.current)
+        }
+        if (parent) return;
+
+        return () => {
+            const props = registry('body');
+            const bodyStyle = document.body.style;
+            for (let [prop, value] of Object.entries(props)) {
+                if (value === null) {
+                    bodyStyle.removeProperty(prop)
+                } else {
+                    bodyStyle.setProperty(prop, value)
+                }
+            }
         }
     }, []);
 
-    const value = useMemo(() => {
-        const style = getComputedStyle(document.body);
-        const values = {};
-
-        for(let prop of type2props.px) {
-            const constProp = getCssConstProp(prop);
-            const value = parseInt(style.getPropertyValue(constProp), 10);
-            values[prop] = value;
-        }
-        for(let prop of type2props.color) {
-            const constProp = getCssConstProp(prop);
-            const value = style.getPropertyValue(constProp).trim();
-            values[prop] = value;
-        }
-        for(let prop of type2props.url) {
-            const constProp = getCssConstProp(prop);
-            const value = style.getPropertyValue(constProp).trim();
-            values[prop] = value.substr(1, value.length - 2);
-        }
-        for (let prop of type2props.string) {
-            const constProp = getCssConstProp(prop);
-            const value = style.getPropertyValue(constProp).trim();
-            values[prop] = value;
-        }
-
-        cssPropUpdate.current = (css, prop, value) => {
-            const constProp = getCssConstProp(prop);
-            if (type2props.px.includes(prop)) {
-                value = value + 'px';
-            }
-            css.setProperty(constProp, value);
-        };
-        const setStyles = (style, props = null) => {
-            let pxProps = type2props.px;
-            let colProps = type2props.color;
-            if (props) {
-                pxProps = pxProps.filter(prop => props.includes(prop));
-                colProps = colProps.filter(prop => props.includes(prop));
-            }
-
-            for(let prop of pxProps) {
-                const constProp = getCssConstProp(prop);
-                style.setProperty(constProp, values[prop] + 'px');
-            }
-            for(let prop of colProps) {
-                const constProp = getCssConstProp(prop);
-                style.setProperty(constProp, values[prop])
-            }
-        };
-
-        const setStyleToValues = (style, values) => {
-            for (let [key, value] of Object.entries(values)) {
-                cssPropUpdate.current(style, key, value);
-            }
-        };
-        return {
-            values,
-            update: () => setUpdates(updatesRef.current + 1),
-            cssPropUpdate,
-            setStyles,
-            setStyleToValues
-        };
-    }, [updates]);
-
     return (
-        <CssContext.Provider value={value}>
+        <CssContext.Provider value={ { ...registry('api'), ready } }>
             {children}
         </CssContext.Provider>
     )
 }
+
 function useComponentUpdate() {
     const mounted = useMounted();
     const [updates, setUpdates] = useState(false);

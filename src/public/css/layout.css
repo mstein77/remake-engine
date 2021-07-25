@@ -1,11 +1,11 @@
 /* Layout CSS */
 
 :root {
-    --default-padding: 5px;
-    --box-border-width: 5px;
-    --box-border-color: #000000;
-    --max-width: 1200px;
-    --max-height: 1200px;
+    --default-padding-px: 5px;
+    --box-border-width-px: 5px;
+    --box-border-rgb: #000000;
+    --max-width-px: 1200px;
+    --max-height-px: 1200px;
 }
 
 html, body, #app {
@@ -18,8 +18,8 @@ html, body, #app {
 }
 
 .editor-bounds {
-    max-width: var(--max-width);
-    max-height: var(--max-height);
+    max-width: var(--max-width-px);
+    max-height: var(--max-height-px);
 }
 
 .wrap-normal.full-h {
@@ -155,13 +155,13 @@ html, body, #app {
 }
 
 .flow-padding > div {
-    margin-top: var(--default-padding);
-    margin-left: var(--default-padding)
+    margin-top: var(--default-padding-px);
+    margin-left: var(--default-padding-px)
 }
 
 .flow-padding-1 > div {
-    padding-right: var(--default-padding);
-    margin-bottom: var(--default-padding);
+    padding-right: var(--default-padding-px);
+    margin-bottom: var(--default-padding-px);
 }
 
 .flow-padding-1 {
@@ -169,8 +169,8 @@ html, body, #app {
 }
 
 .flow-padding {
-    padding-bottom: var(--default-padding);
-    padding-right: var(--default-padding);
+    padding-bottom: var(--default-padding-px);
+    padding-right: var(--default-padding-px);
     box-sizing: border-box
 }
 
@@ -179,7 +179,7 @@ html, body, #app {
 }
 
 .grid-gap {
-    grid-gap: var(--default-padding)
+    grid-gap: var(--default-padding-px)
 }
 
 .grid-cells-centered {
@@ -194,12 +194,12 @@ textarea.full-v {
 }
 
 .indented {
-    padding: var(--default-padding);
+    padding: var(--default-padding-px);
     box-sizing: border-box
 }
 
 .padded {
-    padding: var(--default-padding);
+    padding: var(--default-padding-px);
     box-sizing: border-box
 }
 
@@ -209,28 +209,28 @@ textarea.full-v {
 }
 
 .padded-h {
-    padding-left: var(--default-padding);
-    padding-right: var(--default-padding);
+    padding-left: var(--default-padding-px);
+    padding-right: var(--default-padding-px);
     box-sizing: border-box
 }
 
 .padded-v {
-    padding-top: var(--default-padding);
-    padding-bottom: var(--default-padding);
+    padding-top: var(--default-padding-px);
+    padding-bottom: var(--default-padding-px);
     box-sizing: border-box
 }
 
 .padded-1 {
-    padding-top: var(--default-padding)
+    padding-top: var(--default-padding-px)
 }
 .padded-2 {
-    padding-bottom: var(--default-padding)
+    padding-bottom: var(--default-padding-px)
 }
 .padded-4 {
-    padding-left: var(--default-padding)
+    padding-left: var(--default-padding-px)
 }
 .padded-8 {
-    padding-right: var(--default-padding)
+    padding-right: var(--default-padding-px)
 }
 .border-box {
     box-sizing: border-box;
@@ -241,11 +241,11 @@ textarea.full-v {
 }
 
 .inner-space-v > div:not(:first-child) {
-    margin-top: var(--default-padding)
+    margin-top: var(--default-padding-px)
 }
 
 .inner-space-h > div:not(:first-child) {
-    margin-left: var(--default-padding)
+    margin-left: var(--default-padding-px)
 }
 
 .inner-space-v-1 > div:not(:first-child) {
@@ -267,18 +267,18 @@ textarea.full-v {
 */
 
 .border-div-v {
-    background-color: var(--box-border-color);
-    height: var(--box-border-width);
+    background-color: var(--box-border-rgb);
+    height: var(--box-border-width-px);
     align-self: stretch;
 }
 
 .inner-border-h > div:not(:first-child) {
-    border-left: var(--box-border-width) solid var(--box-border-color);
+    border-left: var(--box-border-width-px) solid var(--box-border-rgb);
     box-sizing: border-box;
 }
 
 .boxed {
-    border: var(--box-border-width) solid var(--box-border-color);
+    border: var(--box-border-width-px) solid var(--box-border-rgb);
 }
 
 .no-border-1 {
@@ -296,7 +296,7 @@ textarea.full-v {
 
 .boxed-1,
 .thin-boxed {
-    border: 1px solid var(--box-border-color);
+    border: 1px solid var(--box-border-rgb);
 }
 
 div.boxed, div.thin-boxed {
@@ -304,7 +304,7 @@ div.boxed, div.thin-boxed {
 }
 
 .border-bg {
-    background-color: var(--box-border-color)
+    background-color: var(--box-border-rgb)
 }
 
 .stretch {
@@ -333,26 +333,26 @@ div.boxed, div.thin-boxed {
 
 .borders-h {
     align-self: stretch;
-    width: var(--box-border-width);
-    background-color: var(--box-border-color)
+    width: var(--box-border-width-px);
+    background-color: var(--box-border-rgb)
 }
 
 .borders-1-h {
     align-self: stretch;
     width: 1px;
-    background-color: var(--box-border-color)
+    background-color: var(--box-border-rgb)
 }
 
 .borders-v {
     width: 100%;
-    height: var(--box-border-width);
-    background-color: var(--box-border-color)
+    height: var(--box-border-width-px);
+    background-color: var(--box-border-rgb)
 }
 
 .borders-1-v {
     width: 100%;
     height: 1px;
-    background-color: var(--box-border-color)
+    background-color: var(--box-border-rgb)
 }
 
 *:focus {

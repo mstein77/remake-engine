@@ -310,7 +310,7 @@ function FlexStack({ auto, scaling,
     const cssContext = useContext(CssContext);
     const aContext = useContext(AvailContext);
 
-    const gap = cssContext.values.defaultPadding;
+    const gap = cssContext.getValue('defaultPaddingPx');
 
     const getZoomAndHeight = () => {
         const varSpaceY = aContext.height - fixHeight - 2 * gap;
@@ -430,7 +430,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     }
     const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
-    const padding = cssContext.values.defaultPadding;
+    const padding = cssContext.getValue('defaultPaddingPx');
 
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>

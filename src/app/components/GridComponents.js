@@ -778,7 +778,7 @@ function GridRulerH({ posX, width }) {
     const gContext = useContext(GridContext);
     const cssContext = useContext(CssContext);
 
-    const rulerPadding = cssContext.values.defaultPadding;
+    const rulerPadding = cssContext.getValue('defaultPaddingPx');
     const fontSize = 10;
     const fontWidth = 10;
     const height = 22 - rulerPadding;
@@ -823,7 +823,7 @@ function GridRulerV({ posY, height, cellsPerLine }) {
     const gContext = useContext(GridContext);
     const cssContext = useContext(CssContext);
 
-    const rulerPadding = cssContext.values.defaultPadding;
+    const rulerPadding = cssContext.getValue('defaultPaddingPx');
     const fontSize = 10;
     const fontWidth = 10;
     const width = 38 - rulerPadding;
@@ -2081,9 +2081,9 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         if (!aContext.width || !aContext.height) return null;
 
         // TODO: check & replace magic numbers
-        let spaceX = Math.max(aContext.width - border - 2 * cssContext.values.defaultPadding -
+        let spaceX = Math.max(aContext.width - border - 2 * cssContext.getValue('defaultPaddingPx') -
             (rulers ? 38 : 0), 0);
-        let spaceY = Math.max(aContext.height - border - 2 * cssContext.values.defaultPadding -
+        let spaceY = Math.max(aContext.height - border - 2 * cssContext.getValue('defaultPaddingPx') -
             (rulers ? 22 : 0), 0);
 
         const wrap = !!gridProvider.setWrapWidth;

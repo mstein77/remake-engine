@@ -11,12 +11,13 @@ import {
     useComponentUpdate,
     useModal,
     WindowContext,
+    CssContext,
     WindowCtx
 } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { OkCancelForm, Button, CheckboxProp, LabelProp, Checkbox, Number, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import { PropSection, OkCancelForm, Button, Select, Input, CheckboxProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
-import {d, getRebuildJsonForModel} from "../helper/helper";
+import { d } from "../helper/helper";
 import ReactDOM from "react-dom";
 
 function PresetsManager({ id, set, config, ...props }) {
@@ -114,44 +115,55 @@ function PresetsManager({ id, set, config, ...props }) {
     )
 }
 
+function NumberOrNoneProp({ name, value, set, def, min = 0, ...props }) {
+    const none = value === 'none';
+    const [ noneValue, setNoneValue ] = useState(none ? (def === undefined ? min : def) : value);
+
+    const toggleNone = newNone => {
+        if (newNone) {
+            set('none')
+        } else {
+            set(noneValue);
+        }
+    };
+    const setNumber = newNumber => {
+        set(newNumber);
+        setNoneValue(newNumber)
+    };
+
+    return (
+        <LabelProp name={name}>
+            <Stack vertical full="h">
+                <Checkbox name="Unlimited" value={none} set={toggleNone} />
+                <Number
+                    disabled={none} slider="h" min={min}
+                    value={none ? noneValue : value}
+                    set={setNumber} { ...props }
+                />
+            </Stack>
+        </LabelProp>
+    )
+}
+
 function ConfigSettings({ config, setConfig }) {
-    const lastDim = useRef(null);
-
-    useEffect(() => {
-        const width = config.noMaxWidth ? 'none' : config.maxWidth;
-        const height = config.noMaxHeight ? 'none' : config.maxHeight;
-
-        if (lastDim.current === null) {
-            lastDim.current = {width, height};
-        }
-        if (lastDim.current.width !== width) {
-            document.body.style.setProperty('--max-width', width + (width !== 'none' ?  'px' : ''));
-            lastDim.current.width = width
-        }
-        if (lastDim.current.height !== height) {
-            document.body.style.setProperty('--max-height', height + (height !== 'none' ? 'px' : ''));
-            lastDim.current.height = height
-        }
-    });
-
-    const propSetter = prop => value => setConfig({ ...config, [prop]: value});
+    const propSetter = prop => value => {
+        setConfig({ ...config, [prop]: value});
+    };
 
     return (
         <Stack full borders>
             <Block padded full="h">
                 <PropertyGrid padded>
-                    <LabelProp name="Max Width">
-                        <Stack vertical full="h">
-                            <Checkbox name="Unlimited" value={config.noMaxWidth} set={propSetter('noMaxWidth')} />
-                            <Number disabled={config.noMaxWidth} slider="h" value={config.maxWidth} max={5000} set={propSetter('maxWidth')} min={400} />
-                        </Stack>
-                    </LabelProp>
-                    <LabelProp name="Max Height">
-                        <Stack vertical full="h">
-                            <Checkbox name="Unlimited" value={config.noMaxHeight} set={propSetter('noMaxHeight')} />
-                            <NumberProp disabled={config.noMaxHeight} slider="h" value={config.maxHeight} max={5000} set={propSetter('maxHeight')} min={400} />
-                        </Stack>
-                    </LabelProp>
+                    <NumberOrNoneProp
+                        name="Max Width"
+                        value={config.maxWidthPx} set={propSetter('maxWidthPx')}
+                        min={400} max={5000} def={1000}
+                    />
+                    <NumberOrNoneProp
+                        name="Max Height"
+                        value={config.maxHeightPx} set={propSetter('maxHeightPx')}
+                        min={400} max={5000} def={1000}
+                    />
                     <CheckboxProp name="UI Animations" value={config.uiAnimations} set={propSetter('uiAnimations')} />
                     <NumberProp name="History size" value={config.maxHistory} max={100} set={propSetter('maxHistory')} min={5} />
                 </PropertyGrid>
@@ -228,55 +240,139 @@ function ConcatList({ value, set, separator }) {
     )
 }
 
+const borderStyleOptions = [
+    {id: 'solid', name: 'solid'},
+    {id: 'dotted', name: 'dotted'},
+    {id: 'dashed', name: 'dashed'},
+    {id: 'inset', name: 'inset'},
+    {id: 'outset', name: 'outset'},
+    {id: 'double', name: 'double'},
+    {id: 'groove', name: 'groove'},
+    {id: 'ridge', name: 'ridge'},
+    {id: 'none', name: 'none'}
+];
 
-function ThemeSettings({ theme, setTheme, cssPropUpdate }) {
-    const wContext = useContext(WindowContext);
-    const themeRef = useRef(null);
-
-    useEffect(() => {
-        if (!themeRef.current) {
-            themeRef.current = { ...theme };
-        }
-        for (let key of Object.keys(themeRef.current)) {
-            if (theme[key] !== themeRef.current[key]) {
-                themeRef.current[key] = theme[key];
-                cssPropUpdate(document.body.style, key, theme[key]);
-                if (key === 'linkResources') {
-                    wContext.syncLinks(theme[key]);
-                }
-            }
-        }
-    });
-
+function ThemeSettings({ theme, setTheme }) {
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
 
     return (
         <Stack full borders>
             <Block full="h" padded scroll>
                 <PropertyGrid>
-                    <ColorProp name="Background" value={theme.editorBgColor} set={propSetter('editorBgColor')} />
-                    <ColorProp name="Color" value={theme.editorColor} set={propSetter('editorColor')} />
-                    <NumberProp name="Padding" value={theme.defaultPadding} max={20} set={propSetter('defaultPadding')} min={0} />
 
-                    <NumberProp name="Border Width" value={theme.boxBorderWidth} max={10} set={propSetter('boxBorderWidth')} min={0} />
-                    <ColorProp name="Border Color" value={theme.boxBorderColor} set={propSetter('boxBorderColor')} />
+                    <PropSection name="Editor" />
 
-                    <ColorProp name="Toolbar Background" value={theme.toolbarBgColor} set={propSetter('toolbarBgColor')} />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.editorBgRgb} set={propSetter('editorBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.editorRgb} set={propSetter('editorRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="border_color" />
+                                <ColorProp value={theme.boxBorderRgb} set={propSetter('boxBorderRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
 
-                    <ColorProp name="Input Color" value={theme.inputColor} set={propSetter('inputColor')} />
-                    <ColorProp name="Input Background" value={theme.inputBgColor} set={propSetter('inputBgColor')} />
-                    <ColorProp name="Input Border Color" value={theme.inputBorderColor} set={propSetter('inputBorderColor')} />
+                    <LabelProp name="Defaults">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="padding" />
+                                <Number value={theme.defaultPaddingPx} max={20} set={propSetter('defaultPaddingPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="line_weight" />
+                                <Number value={theme.boxBorderWidthPx} max={10} set={propSetter('boxBorderWidthPx')} min={0} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
 
+                    <PropSection name="Toolbar" />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.toolbarBgRgb} set={propSetter('toolbarBgRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
 
-                    <ColorProp name="Button Background" value={theme.buttonBgColor} set={propSetter('buttonBgColor')} />
-                    <ColorProp name="Button Color" value={theme.buttonColor} set={propSetter('buttonColor')} />
-                    <InputProp name="Button Font" value={theme.buttonFontFamily} set={propSetter('buttonFontFamily')} />
-                    <InputProp name="Button Border Style" value={theme.buttonBorderStyle} set={propSetter('buttonBorderStyle')} />
-                    <ColorProp name="Button Border Color" value={theme.buttonBorderColor} set={propSetter('buttonBorderColor')} />
-                    <NumberProp name="Button radius" value={theme.buttonBorderRadius} max={10} set={propSetter('buttonBorderRadius')} min={0} />
+                    <PropSection name="Input" />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.inputBgRgb} set={propSetter('inputBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.inputRgb} set={propSetter('inputRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="border_color" />
+                                <ColorProp value={theme.inputBorderRgb} set={propSetter('inputBorderRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
 
-                    <LabelProp name="Link-Resources">
-                        <ConcatList value={theme.linkResources} separator=" " set={propSetter('linkResources')} />
+                    <PropSection name="Button" />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.buttonBgRgb} set={propSetter('buttonBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.buttonRgb} set={propSetter('buttonRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="border_color" />
+                                <ColorProp value={theme.buttonBorderRgb} set={propSetter('buttonBorderRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <LabelProp name="Border">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="line_style" />
+                                <Block width={110}>
+                                    <Select full="h" value={theme.buttonBstyle} options={borderStyleOptions} set={propSetter('buttonBstyle')} />
+                                </Block>
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="line_weight" />
+                                <Number value={theme.buttonBorderWidthPx} max={10} set={propSetter('buttonBorderWidthPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="rounded_corner" />
+                                <Number value={theme.buttonBorderRadiusPx} max={10} set={propSetter('buttonBorderRadiusPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="padding" />
+                                <Number value={theme.buttonPaddingPx} max={10} set={propSetter('buttonPaddingPx')} min={0} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <LabelProp name="Font">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="text_format" />
+                                <Input value={theme.buttonFont} set={propSetter('buttonFont')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <PropSection name="Meta" />
+                    <LabelProp name="Resources">
+                        <ConcatList value={theme.linkResourcesUrls} separator=" " set={propSetter('linkResourcesUrls')} />
                     </LabelProp>
                 </PropertyGrid>
             </Block>
@@ -475,13 +571,38 @@ function HotKeySettings({ mapping, setMapping }) {
 }
 
 function Settings({ save, close, defaults }) {
+    const cssContext = useContext(CssContext);
     const wContext = useContext(WindowContext);
 
     const beforeRef = useRef(null);
     const afterRef = useRef(null);
 
-    const [config, setConfig] = useState(wContext.editorConfig);
-    const [theme, setTheme] = useState(wContext.theme);
+    const [config, setConfigRaw] = useState(wContext.editorConfig);
+    const configRef = useRef(null);
+    configRef.current = config;
+    const setConfig = newConfig => {
+        for (let [key, value] of Object.entries(newConfig)) {
+            if (configRef.current[key] !== newConfig[key] &&
+                ['maxWidthPx', 'maxHeightPx'].includes(key)) {
+                    cssContext.setValue(key, value)
+                }
+        }
+        setConfigRaw(newConfig)
+    };
+    const [theme, setThemeRaw] = useState(wContext.theme);
+    const themeRef = useRef(null);
+    themeRef.current = theme;
+    const setTheme = newTheme => {
+        for (let [key, value] of Object.entries(newTheme)) {
+            if (themeRef.current[key] !== newTheme[key]) {
+                cssContext.setValue(key, value)
+                if (key === 'linkResourcesUrls') {
+                    wContext.syncLinks(value);
+                }
+            }
+        }
+        setThemeRaw(newTheme)
+    };
     const [mapping, setMapping] = useState(wContext.hotKeyActions.action2hotKey);
 
     useEffect(() => {
@@ -510,12 +631,10 @@ function Settings({ save, close, defaults }) {
     const rightButtons = [
         <Button key="clear" name="Clear all settings" padded="h" onClick={() => {
             wContext.clearAllSettings();
-            // TODO: find a better solution to update css live props
-            for (let [key, value] of Object.entries(defaults.theme)) {
-                wContext.cssPropUpdate.current(document.body.style, key, value);
-            }
-            wContext.cssPropUpdate.current(document.body.style, 'maxWidth', defaults.config.maxWidth);
-            wContext.cssPropUpdate.current(document.body.style, 'maxHeight', defaults.config.maxHeight);
+
+            setConfig(defaults.config);
+            setTheme(defaults.theme);
+            setMapping(defaults.mapping);
             save({
                 config: defaults.config,
                 theme: defaults.theme,
@@ -531,11 +650,11 @@ function Settings({ save, close, defaults }) {
                 </SideTab>
 
                 <SideTab name="Theme" full>
-                    <ThemeSettings theme={theme} setTheme={setTheme} cssPropUpdate={wContext.cssPropUpdate.current} />
+                    <ThemeSettings theme={theme} setTheme={setTheme} />
                 </SideTab>
 
                 <SideTab name="HotKeys" full scroll>
-                    <HotKeySettings mapping={mapping} defaults={defaults.mapping} setMapping={setMapping} />
+                    <HotKeySettings mapping={mapping} setMapping={setMapping} />
                 </SideTab>
             </SideTabs>
         </OkCancelForm>
@@ -547,7 +666,7 @@ function BaseAppInner({ children }) {
     const SettingsModal = useModal();
     const { openConfirmModal, Modals } = useConfirmDialog();
 
-    wContext.settingsRef.current = SettingsModal;
+    wContext.register('settings', SettingsModal);
 
     const confirm = callback => {
         if (wContext.needsConfirmation()) {
@@ -575,7 +694,7 @@ function BaseAppInner({ children }) {
     };
 
     const onFocus = e => {
-        wContext.lastTarget.current = e.target;
+        wContext.register('lastTarget', e.target);
         const zIndex = wContext.focusStack.zIndex;
         if (!zIndex) {
             return;
@@ -626,7 +745,7 @@ function BaseAppInner({ children }) {
             if (!actionKey) {
                 return;
             }
-            const elem = document.activeElement === document.body ? wContext.lastTarget.current : document.activeElement;
+            const elem = document.activeElement === document.body ? wContext.getLastTarget() : document.activeElement;
             const handler = wContext.getHandlerForActionKey(actionKey, elem);
             if (handler) {
                 if (!e.repeat) {
@@ -643,7 +762,7 @@ function BaseAppInner({ children }) {
             }
         };
         const clickListener = e => {
-            wContext.lastTarget.current = e.target;
+            wContext.register('lastTarget', e.target);
         };
         window.addEventListener('mousedown', clickListener, {});
         window.addEventListener('keydown', hotkeyListener, {});
@@ -658,7 +777,7 @@ function BaseAppInner({ children }) {
                 <Block full="h">
                     <Stack full="h">
                         <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
-                        <Block padded="h" center="v" full="h" shorten></Block>
+                        <Block padded="h" center="v" full="h" shorten />
                         <Stack gaps center="v">
                             <Button icon="build" onClick={() => wContext.openSettings()} />
                             <Button name="Play" icon="play_circle_outline" padded="h" />
@@ -669,7 +788,7 @@ function BaseAppInner({ children }) {
                 {children}
             </Stack>
 
-            <SettingsModal.content name="Settings" height="50%" width="50%" minWidth={500} maxWidth={650} closeable={false} fixStyle transparent drag>
+            <SettingsModal.content name="Settings" height="50%" width="50%" minWidth={500} maxWidth={650} closeable={false} transparent drag>
                 <Settings { ...SettingsModal.props } />
             </SettingsModal.content>
 
