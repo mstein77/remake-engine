@@ -36,10 +36,22 @@ html, body {
 .button-color {
     color: var(--button-rgb)
 }
-.button-padding {
-    padding: var(--button-padding-px);
+.button-padding-h {
+    padding-left: var(--button-padding-px) !important;
+    padding-right: var(--button-padding-px) !important;
     box-sizing: border-box
 }
+.button-padding-v {
+    padding-top: var(--button-padding-px) !important;
+    padding-bottom: var(--button-padding-px) !important;
+    box-sizing: border-box
+}
+
+.button-padding {
+    padding: var(--button-min-padding-px);
+    box-sizing: border-box
+}
+
 .button-border-color {
     border-color: var(--button-border-rgb)
 }
@@ -51,6 +63,49 @@ html, body {
 }
 .button-border-radius {
     border-radius: var(--button-border-radius-px)
+}
+.button-font {
+    font-family: var(--button-font)
+}
+
+/*
+   Input styles
+ */
+.input-bg {
+    background-color: var(--input-bg-rgb)
+}
+.input-color {
+    color: var(--input-rgb)
+}
+.input-padding {
+    padding-left: var(--input-padding-px);
+    padding-right: var(--input-padding-px);
+    box-sizing: border-box
+}
+.input-border-color {
+    border-color: var(--input-border-rgb)
+}
+.input-border-style {
+    border-style: var(--input-bstyle)
+}
+.input-border-width {
+    border-width: var(--input-border-width-px)
+}
+.input-border-radius {
+    border-radius: var(--input-border-radius-px)
+}
+
+
+.active-bg {
+    background-color: var(--active-bg-rgb)
+}
+
+.active-color {
+    color: var(--active-rgb)
+}
+
+.active-border-color {
+    border-color: var(--active-border-rgb)
 }
 
 .error-bg {
@@ -258,11 +313,7 @@ html, body {
     background-color: var(--scrollbar-rgb);
 }
 
-.active-bg {
-    background-color: rgba(91, 170, 43, 0.93);
-    color: white;
-}
-
+/*
 .active-highlight {
     background-color: rgba(91, 170, 43, 0.93) !important;
     color: white !important;
@@ -276,6 +327,7 @@ html, body {
     border: solid rgba(91, 170, 43, 0.93) 2px !important;
 
 }
+ */
 
 .disabled {
     opacity: 0.45
@@ -393,17 +445,19 @@ input:invalid {
     background-color: var(--marker-rgb)
 }
 
+/*
 .checkbox {
     color: var(--input-bg-rgb);
 }
 
 .input {
-    background-color: var(--input-bg-rgb);
-    color: var(--input-rgb);
-    border-color: var(--input-border-rgb);
-    border-style: solid;
-    border-width: 1px
+        background-color: var(--input-bg-rgb);
+        color: var(--input-rgb);
+        border-color: var(--input-border-rgb);
+        border-style: solid;
+        border-width: 1px
 }
+*/
 
 .resize-handle-h {
     width: 6px;
@@ -415,6 +469,7 @@ input:invalid {
     border-radius: unset !important;
 }
 
+/*
 .button {
     color: var(--button-rgb);
     font-family: var(--button-font);
@@ -425,6 +480,7 @@ input:invalid {
 .button:not(.active-bg) {
     background-color: var(--button-bg-rgb);
 }
+*/
 
 /* obsolete */
 .button-border {

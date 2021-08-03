@@ -21,24 +21,34 @@ const defaultValues = {
         boxBorderWidthPx: 1,
         maxWidthPx: 1200,
         maxHeightPx: 1200,
-        buttonBorderRadiusPx: 4,
         boxBorderRgb: "#2b7797",
         toolbarBgRgb: "#2f304b",
         inputBgRgb: "#b0aec1",
         inputRgb: "#29292e",
         inputBorderRgb: "#a8a8a8",
+        inputBstyle: "solid",
+        inputBorderWidthPx: 1,
+        inputPaddingPx: 5,
+        inputBorderRadiusPx: 4,
+        checkBoxType: '0',
         editorBgRgb: "#080808",
         editorRgb: "#9aa0a2",
         buttonBgRgb: "#1e42ae",
         buttonRgb: "#b0d5e8",
         buttonBorderRgb: "#347f66",
+        buttonBstyle: "solid",
         buttonBorderWidthPx: 1,
-        buttonPaddingPx: 3,
+        buttonMinPaddingPx: 3,
+        buttonPaddingPx: 5,
+        buttonBorderRadiusPx: 4,
+        activeRgb: '#fafbff',
+        activeBgRgb: '#5baa2b',
+        activeBorderRgb: '#D0D0F0',
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
+        focusRgba: '#FFFFDFCC',
         linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
         buttonFont: "Monospace",
-        buttonBstyle: "solid",
         fontUrl: "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
     },
     mapping: {
@@ -379,8 +389,8 @@ function UndoRedoButtons({ hotKeys }) {
     }
     return (
         <Stack gaps="1">
-            <Button icon="undo" onClick={hotKeys.undo}>Undo</Button>
-            <Button icon="redo" onClick={hotKeys.redo}>Redo</Button>
+            <Button icon="undo" onClick={hotKeys.undo} />
+            <Button icon="redo" onClick={hotKeys.redo} />
         </Stack>
 
     )
@@ -1509,7 +1519,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
         window.addEventListener('beforeunload', leaveHandler);
 
         const elems = document.querySelectorAll('link');
-        d('???', elems);
         for (let elem of elems) {
             links.defaults.push(d(elem.href));
         }
@@ -1627,7 +1636,7 @@ function ButtonStack({ items, onClick }) {
     const tabs = [];
     for(let item of items) {
         tabs.push(
-            <Button key={item} full onClick={() => onClick(item)} name={item} rev icon="keyboard_arrow_right" />
+            <Button key={item} full="h" padded="h" onClick={() => onClick(item)} name={item}><Icon name="keyboard_arrow_right" /></Button>
         );
     }
     return (
@@ -1698,7 +1707,7 @@ function SideTabs({ children, ...props }) {
     const tabs = [];
     for(let item of items.current) {
         tabs.push(
-            <Button key={item} full padded="h" current={active} value={item} onClick={setActive} name={item} rev icon="keyboard_arrow_right" />
+            <Button key={item} full="h" padded="h" current={active} value={item} onClick={({value}) => setActive(value)} name={item}><Icon name="keyboard_arrow_right" /></Button>
         );
     }
     return (
@@ -1737,6 +1746,7 @@ function useModal() {
     const [ isOpen, setIsOpen ] = useState(false);
     const propsRef = useRef(null);
     const currRef = useRef(null);
+    const openedRef = useRef(0);
     currRef.current = isOpen;
 
     const close = () => {
@@ -1748,6 +1758,7 @@ function useModal() {
         setIsOpen(false);
     };
     const open = props => {
+        openedRef.current++;
         propsRef.current = props;
         setIsOpen(context.openModal());
     };
@@ -1757,7 +1768,7 @@ function useModal() {
         dimProps.zIndex = isOpen;
         return (
             <>
-                {isOpen && <Modal close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
             </>
         );
     };
@@ -2088,7 +2099,7 @@ function ThemeFreeze({ blockRef, values, children }) {
 const CssContext = React.createContext();
 
 const cssConstTypes = [
-    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc'
+    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'type'
 ];
 
 function CssCtx({ parent, bindRef, children, ...props }) {
@@ -2151,7 +2162,7 @@ function CssCtx({ parent, bindRef, children, ...props }) {
 
         const setStyleProp = (style, key, value) => {
             const type = key2type[key];
-            if (!type) return;
+            if (!type || type === 'type') return;
 
             if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
                 value += 'px';

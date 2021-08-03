@@ -1123,7 +1123,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                 </Stack>
                             </LabelProp>
                             <CheckboxProp name="Align to grid:" undo="alignGrid" value={currBlock.alignToGrid} set={setEntityProp('alignToGrid')} />
-                            <RadioProp undo="textalign" name="Text Align:" options={alignOptions} gaps="1" icon value={currBlock.textAlign} set={setEntityProp('textAlign')} />
+                            <RadioProp undo="textalign" name="Text Align:" options={alignOptions} gaps="1" padded="1" icon value={currBlock.textAlign} set={setEntityProp('textAlign')} />
                             <FullProp name="Text:">
                                 <TextArea undo="text" value={currBlock.text} set={setEntityProp('text')} full="h" rows={5} />
                             </FullProp>

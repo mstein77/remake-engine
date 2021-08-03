@@ -1,7 +1,6 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
     BackgroundCtx,
-    CenterInfo,
     CssCtx,
     Icon,
     PropertyGrid,
@@ -15,7 +14,7 @@ import {
     WindowCtx
 } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { PropSection, OkCancelForm, Button, Select, Input, CheckboxProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import { PropSection, OkCancelForm, Button, Select, Input, CheckboxProp, RadioProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
 import { d } from "../helper/helper";
 import ReactDOM from "react-dom";
@@ -39,7 +38,7 @@ function PresetsManager({ id, set, config, ...props }) {
         for (let item of defaults) {
             defaultItems.push(
                 <Block key={item.name} padded="h" full="h">
-                    <Button full="h" name={'< ' + item.name} padded="h" onClick={() => setDefaultedValues({ ...item.values })} />
+                    <Button full="h" name={item.name} padded="h" onClick={() => setDefaultedValues({ ...item.values })} rev><Icon name="keyboard_arrow_left" /></Button>
                 </Block>
             )
         }
@@ -51,7 +50,7 @@ function PresetsManager({ id, set, config, ...props }) {
         reserved.push(item.name);
         customItems.push(
             <Stack vertical key={item.name} padded="h" full="h" gaps="1">
-                <Button full="h" name={'< ' + item.name} padded="h" onClick={() => setDefaultedValues(item.values)} />
+                <Button full="h" name={item.name} padded="h" onClick={() => setDefaultedValues(item.values)} rev><Icon name="keyboard_arrow_left" /></Button>
                 <Stack full="h" gaps="1">
                     <Block full="h"></Block>
                     <Button icon="edit" onClick={() => editPresets(item.name)} />
@@ -252,6 +251,11 @@ const borderStyleOptions = [
     {id: 'none', name: 'none'}
 ];
 
+const checkboxStyleOptions = [
+    {id: '0', name: 'Input'},
+    {id: '1', name: 'Button'}
+];
+
 function ThemeSettings({ theme, setTheme }) {
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
 
@@ -302,6 +306,24 @@ function ThemeSettings({ theme, setTheme }) {
                         </Stack>
                     </LabelProp>
 
+                    <PropSection name="Active" />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.activeBgRgb} set={propSetter('activeBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.activeRgb} set={propSetter('activeRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="border_color" />
+                                <ColorProp value={theme.activeBorderRgb} set={propSetter('activeBorderRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
                     <PropSection name="Input" />
                     <LabelProp name="Colors">
                         <Stack wrap gaps full="h">
@@ -319,6 +341,35 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                         </Stack>
                     </LabelProp>
+
+                    <LabelProp name="Border">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="line_style" />
+                                <Block width={110}>
+                                    <Select full="h" value={theme.inputBstyle} options={borderStyleOptions} set={propSetter('inputBstyle')} />
+                                </Block>
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="line_weight" />
+                                <Number value={theme.inputBorderWidthPx} max={10} set={propSetter('inputBorderWidthPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="rounded_corner" />
+                                <Number value={theme.inputBorderRadiusPx} max={10} set={propSetter('inputBorderRadiusPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="padding" />
+                                <Number value={theme.inputPaddingPx} max={10} set={propSetter('inputPaddingPx')} min={0} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <PropSection name="Checkbox" />
+                    <LabelProp name="Style">
+                        <RadioProp value={theme.checkBoxType} set={propSetter('checkBoxType')} options={checkboxStyleOptions} gaps padded="h" />
+                    </LabelProp>
+
 
                     <PropSection name="Button" />
                     <LabelProp name="Colors">
@@ -357,6 +408,8 @@ function ThemeSettings({ theme, setTheme }) {
                             <Stack gaps>
                                 <Icon name="padding" />
                                 <Number value={theme.buttonPaddingPx} max={10} set={propSetter('buttonPaddingPx')} min={0} />
+                                <Block>-</Block>
+                                <Number value={theme.buttonMinPaddingPx} max={10} set={propSetter('buttonMinPaddingPx')} min={0} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -576,6 +629,7 @@ function Settings({ save, close, defaults }) {
 
     const beforeRef = useRef(null);
     const afterRef = useRef(null);
+    const [ beforeState, setBeforeState ] = useState(0);
 
     const [config, setConfigRaw] = useState(wContext.editorConfig);
     const configRef = useRef(null);
@@ -618,18 +672,20 @@ function Settings({ save, close, defaults }) {
         setConfig(beforeRef.current.config);
         setTheme(beforeRef.current.theme);
         setMapping(beforeRef.current.mapping);
+        setBeforeState(1);
     };
     const restoreAfter  = () => {
         setConfig(afterRef.current.config);
         setTheme(afterRef.current.theme);
         setMapping(afterRef.current.mapping);
+        setBeforeState(0);
         afterRef.current = null;
     };
     const leftButtons = [
-        <Button key="before" icon="visibility" name="before" padded="h" direct onClick={showBefore} onClickEnd={restoreAfter} />
+        <Button key="before" state={beforeState} icon="visibility" name="before" padded="h" onClick={showBefore} onClickEnd={restoreAfter} />
     ];
     const rightButtons = [
-        <Button key="clear" name="Clear all settings" padded="h" onClick={() => {
+        <Button key="clear" icon="delete" name="Clear all settings" padded="h" onClick={() => {
             wContext.clearAllSettings();
 
             setConfig(defaults.config);
@@ -779,7 +835,7 @@ function BaseAppInner({ children }) {
                         <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
                         <Block padded="h" center="v" full="h" shorten />
                         <Stack gaps center="v">
-                            <Button icon="build" onClick={() => wContext.openSettings()} />
+                            <Button icon="build" padded="1" onClick={() => wContext.openSettings()} />
                             <Button name="Play" icon="play_circle_outline" padded="h" />
                             <Button name="Exit" icon="logout" padded="h" onClick={() => confirm(play)} />
                         </Stack>

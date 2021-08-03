@@ -13,7 +13,7 @@ import {
     useFocusKeyBindings,
     useRefocus,
     useMounted,
-    useComponentUpdate, AvailContext
+    useComponentUpdate, AvailContext, CssContext
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -287,12 +287,14 @@ function OkCancelForm({ full, save, cancel, submit, left = [], right = [], child
     return  elem
 }
 
-function Checkbox2({ name, value, set, rev, size = 14, readOnly, disabled, tab = true, ...props }) {
+function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = true, ...props }) {
+    const cssContext = useContext(CssContext);
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
 
-    const cls = ['button-bg button-color button-border-width button-border-radius button-border-style button-border-color'];
+    const type = cssContext.getValue('checkBoxType') === '0' ? 'input' : 'button';
+    const cls = [type + '-bg ' + type + '-color ' + type + '-border-width ' + type + '-border-radius ' + type + '-border-style ' + type + '-border-color'];
     if (disabled) {
         cls.push('disabled');
         readOnly = true
@@ -350,110 +352,12 @@ function Checkbox2({ name, value, set, rev, size = 14, readOnly, disabled, tab =
     )
 }
 
-/**
- * Checkbox
- *
- * STRUCTURES:
- *
- *  A) icon and no name
- *
- *     <Button icon="checkbox" />
- *
- *  B) icon and name (optional rev for reverse)
- *
- *     <Stack gaps h.*>
- *         <Button icon="checkbox" />
- *         <Block full="h" center="v" shorten>{name}</Block>
- *     </Stack>
- *
- * Behaviour
- *  - name should be centered vertically
- *  - checkbox elem should be min-width and name element flex-width with shortening
- *  - abs- or rel-width should only be applied to stack
- *  - full-vertical should be ignored
- *  - stack should be min-width by default
- *
- * Features:
- *  - readOnly (no change)
- *  - disabled (no change and opacity)
- *  - tabbed
- */
-function Checkbox({ name, value, tab = true, disabled, readOnly, rev, icon = true, ...props }) {
-
-    const set = useSet(value, props);
-
-    const items = [];
-    if (icon) {
-        items.push(
-            <Button
-                key={1}
-                border={false}
-                tab={tab}
-                className="transparent"
-                iconCls="checkbox"
-                icon={value ? 'check_box' : 'check_box_outline_blank'}
-                padded={false}
-                disabled={disabled}
-                onClick={
-                    readOnly ? null :
-                    () => {
-                        set(!value)
-                    }
-                }
-            />
-        )
-    } else {
-        const inputProps = {};
-        if (disabled || readOnly) {
-            tab = false;
-        }
-        if (!tab) {
-            inputProps.tabIndex = -1
-        } else {
-            inputProps.className = "tabbed"
-        }
-        items.push(
-            <input
-                key={1}
-                type="checkbox"
-                checked={!!value}
-                readOnly={readOnly}
-                disabled={disabled}
-                onClick={e => {
-                    if (readOnly) {
-                        e.preventDefault();
-                        e.stopPropagation()
-                    }
-                }}
-                onChange={e => {
-                    set(e.target.checked)
-                }}
-                {...inputProps}
-            />
-        )
-    }
-    if (name) {
-        items.push(
-            <Block full="h" key={2} shorten center="v">{name}</Block>
-        )
-    }
-    if (rev) {
-        items.reverse()
-    }
-    if (items.length === 1) {
-        return items[0]
-    }
-    return (
-        <Stack gaps {...getDimHAttr(props)}>{items}</Stack>
-    )
-}
-
 function useStatePrefix(state, def = null) {
     if (state) {
-        if (state === 1) {
+        if ([STATE.ACTIVE, STATE.AWAITING].includes(state)) {
             return 'active'
         }
-        if (state === 2) {
+        if (state === STATE.ERROR) {
             return 'error'
         }
     }
@@ -463,7 +367,7 @@ function useStatePrefix(state, def = null) {
 /**
  * - Focus-Keys
  */
-function Handle({ axis = true, circle, cursor = 'grab', onMove, onMoveEnd, onDirKey, tab, className, children, ...props }) {
+function Handle({ axis = true, border, disabled, circle, cursor = 'grab', onClick, onClickEnd, onDirKey, tab, className, children, ...props }) {
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
@@ -476,7 +380,18 @@ function Handle({ axis = true, circle, cursor = 'grab', onMove, onMoveEnd, onDir
     if (circle) {
         cls.push('transparent circle-handle');
     } else {
-        cls.push('button-bg button-border-width button-border-style button-border-color button-border-radius hover-change');
+        cls.push('button-bg button-border-style button-border-color button-border-radius');
+        if (border === '1') {
+            attr.border = '1'
+        } else {
+            cls.push('button-border-width')
+        }
+    }
+    if (disabled) {
+        tab = false;
+        cursor = false
+    } else {
+        cls.push('hover-change')
     }
     if (clicked) {
         cls.push('clicked');
@@ -484,21 +399,20 @@ function Handle({ axis = true, circle, cursor = 'grab', onMove, onMoveEnd, onDir
     if (tab) {
         cls.push('focus-box');
     }
-    const onLeftClick = !onMove ? null : e => {
+    const onLeftClick = (!onClick || disabled) ? null : e => {
         wContext.startExclusiveMode('handle-move', cursor === 'grab' ? 'grabbing' : cursor);
         setClicked(true);
+        if (!tab && document.activeElement) {
+            document.activeElement.blur()
+        }
         wContext.addEventListener('mouseup', () => {
             wContext.endExclusiveMode('handle-move');
             setClicked(false);
-            if (onMoveEnd) {
-                onMoveEnd()
+            if (onClickEnd) {
+                onClickEnd()
             }
         }, {once: true});
-
-        const anchor = {x: e.clientX, y: e.clientY};
-        wContext.addEventListener('mousemove', e => {
-            onMove(e.clientX - anchor.x, e.clientY - anchor.y);
-        })
+        onClick(e)
     };
 
     const onKeyDown = !onDirKey ? null : e => {
@@ -542,14 +456,15 @@ function Handle({ axis = true, circle, cursor = 'grab', onMove, onMoveEnd, onDir
  * TODO
  *  - help
  */
-function Button2({ icon, name, full, state, iconProps = {}, end, center, value, current, rev, disabled, onClick, onClickEnd,
-                     tab = true, cursor = 'pointer', gaps = true, border = true, padded, vertical, children, ...props }) {
+function Button({ icon, name, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd,
+                     tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
+    const mounted = useMounted();
 
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
-    const cls = [statePrefix + '-bg', statePrefix + '-color'];
+    const cls = [statePrefix + '-bg', statePrefix + '-color button-font'];
 
     let repeat = false;
     if (onClick && typeof onClick === 'object') {
@@ -574,12 +489,28 @@ function Button2({ icon, name, full, state, iconProps = {}, end, center, value, 
         cls.push('hover-' + (state ? 'fix' : 'change'));
         cls.push('focus-box');
     }
+    if (tab && value !== undefined && value !== current) {
+        tab = false;
+    }
     if (border) {
         cls.push(statePrefix + '-border-color');
-        cls.push('button-border-width button-border-style button-border-radius')
+        cls.push('button-border-width button-border-style');
+        if (radius) {
+            cls.push('button-border-radius');
+        }
     }
     if (padded) {
-        cls.push('button-padding');
+        if (padded !== true) {
+            cls.push('button-padding');
+        }
+        if (padded !== '1') {
+            if (padded !== 'v') {
+                cls.push('button-padding-h');
+            }
+            if (padded !== 'h') {
+                cls.push('button-padding-v');
+            }
+        }
     }
     if (clicked && (!state || value !== undefined)) {
         cls.push('clicked');
@@ -612,15 +543,17 @@ function Button2({ icon, name, full, state, iconProps = {}, end, center, value, 
     }
     const attr = getDimAttr(props);
     if (!(disabled || readOnly)) {
-        const handleClick = upEvent => {
+        const handleClick = (upEvent, event = null) => {
             setClicked(true);
             wContext.startExclusiveMode('button-click', upEvent === 'mouseup' ? cursor : false);
-            onClick(value);
+            onClick({value, event});
             wContext.addEventListener(upEvent, () => {
                 wContext.endExclusiveMode('button-click');
-                setClicked(false);
                 if (onClickEnd) {
                     onClickEnd()
+                }
+                if (mounted.current) {
+                    setClicked(false);
                 }
             }, {once: true})
         };
@@ -633,23 +566,23 @@ function Button2({ icon, name, full, state, iconProps = {}, end, center, value, 
                 handleClick('keyup')
             };
         }
-        attr.onLeftClick = () => {
-            handleClick('mouseup')
+        attr.onLeftClick = e => {
+            handleClick('mouseup', e)
         }
     }
     if (full && full !== oppDir) {
         attr.full = dir
     }
     const hasStack = items.length > 1;
-    const fullStack = !(end || center) ? dir : false;
+    const fullStack = !(end || centerItems) ? dir : false;
     if (!hasStack && !fullStack) {
-        items[0] = <Block key="e" end={end} center={center}>{items[0]}</Block>;
+        items[0] = <Block key="e" end={end} center={centerItems}>{items[0]}</Block>;
     }
     return (
-        <Block gaps tab={tab} className={cls.join(' ')} cursor={cursor} { ...attr }>
+        <Block gaps tab={tab} center={center} className={cls.join(' ')} cursor={cursor} { ...attr }>
             {!hasStack ?
                 items[0] :
-                <Stack key="s" gaps={gaps} center={center} end={end} vertical={vertical} full={fullStack}>
+                <Stack key="s" gaps={gaps} center={centerItems} end={end} vertical={vertical} full={fullStack}>
                     {items}
                 </Stack>
             }
@@ -657,207 +590,35 @@ function Button2({ icon, name, full, state, iconProps = {}, end, center, value, 
     )
 }
 
+const STATE = {
+    INACTIVE: 0,
+    ACTIVE: 1,
+    ERROR: 2,
+    AWAITING: 3
+};
 
-/**
- * Button
- *
- * STRUCTURES:
- *
- *  A) icon and no name
- *
- *    <Block>
- *       <Icon name={icon} />
- *    </Block>
- *
- *  B) name and no icon
- *
- *    <Block>
- *       <Block center={oppDir} shorten full={dir}>{name}</Block>
- *    </Block>
- *
- *  C) icon and name
- *
- *    <Block>
- *       <Stack vertical={vert?} gaps full="h">
- *          <Icon name={icon} />
- *          <Block center={oppDir} shorten full={dir}>{name}</Block>
- *       </Stack>
- *    </Block>
- *
- * VARIANTS:
- *  - simple click button:
- *      button-bg / button-color / button-border / button-radius
- *      onLeftClick: sets clicked until release and invokes handler (without event?)
- *      cursor: pointer
- *      keys: space
- *
- *  - radio button
- *      (active|button)-bg / (active|button-)color / border / radius
- *      onLeftClick: sets clicked until release and invokes handler (with activation-value)
- *      shows active-state if current-value = activation-value
- *      cursor: pointer
- *      keys: space / arrows
- *
- *  - state button
- *      (active|button|error)-bg / (active|button|error)-color / border /radius
- *      cursor: pointer
- *      keys: space
- *
- *      "Before"
- *        => Click: state = 'active'
- *        => endClick: state = 'default'
- *
- *      "Copy2Clipboard"
- *        => Click: export().then(state = 'active').catch(state = 'error')
- *        => endClick: state = 'default'
- *
- *  - suffix button
- *      ...simple/state button but with a suffix-text, normally combined with full-dir and
- *      shortening and full on the text elem part
- *
- *  - checkbox button
- *      cursor: pointer
- *      keys: space
- *
- *  - normal slider button
- *      button-bg / border / radius(?)
- *      onLeftClick: MOVE-DIR
- *      cursor: grab(bing)
- *      keys: arrows / shift
- *
- *  - plain slider button
- *      button-bg / border
- *      onLeftClick: MOVE-DIR
- *      cursor: grab(bing)
- *      keys: arrows / shift
- *
- *  - position button
- *      transparent-bg / fix-white-round-border
- *      onLeftClick: MOVE
- *      cursor: grab(bing)
- *      keys: arrows / shift
- *
- */
-function Button({ name, icon, rotate, current, vertical, value, disabled, warning, iconWidth, iconHeight, iconCls, onClick, onClickEnd, direct, rev, size = 18, cursor = 'default', padded = (name ? true : false), tab = true, border = "1", className, ...props }) {
-    const wContext = useContext(WindowContext);
+function AsyncButton({ onClick, onClickEnd, ...props }) {
+    const [ state, setState ] = useState(STATE.INACTIVE);
 
-    const mounted = useMounted();
-    const focusRef = useRef(null);
-
-    const [ clicked, setClicked ] = useState(false);
-
-    if (onClick && typeof onClick === 'object') {
-        if (onClick.can && !onClick.can()) {
-            disabled = true
-        } else {
-            const exec = onClick.exec;
-            onClick = () => exec();
-        }
-    }
-
-    const readOnly = !onClick;
-    let attr = { ...props };
-    const cls = ['button'];
-    if (border) {
-        cls.push('button-border');
-    }
-    if (className) {
-        cls.push(className);
-    }
-
-    let active = false;
-    if (value !== undefined) {
-        if (value == current) {
-            cls.push('active');
-            active = true;
-        } else {
-            tab = (value === true);
-        }
-    }
-    if (disabled) {
-        cls.push('disabled');
-    } else {
-        cls.push('hover-highlight');
-    }
-    if (tab && (disabled || readOnly)) {
-        tab = false;
-    }
-    attr = { ...attr, tab, border, padded, cursor, indented: (padded ? false : '1'), center: 'v' };
-
-    attr.ref = focusRef;
-
-    const items = [];
-    if (icon) {
-        items.push(
-            <Icon name={icon} width={iconWidth} className={iconCls} height={iconHeight} size={size} rotate={rotate} />
+    const startAction = () => {
+        setState(STATE.LOADING);
+        onClick().then(
+            () => {
+                setState(STATE.ACTIVE);
+                if (onClickEnd) {
+                    onClickEnd()
+                }
+            }
+        ).catch(
+            e => setState(STATE.ERROR)
         )
-    }
-    if (name) {
-        items.push(
-            <Block center={vertical ? 'h' : 'v'} shorten full={vertical ? 'v' : 'h'} key={2}>{name}</Block>
-        );
-    }
-    if (rev) {
-        items.reverse()
-    }
-    if (clicked) {
-        cls.push('clicked');
-    }
-    if (warning) {
-        cls.push('invalid-highlight');
-    } else if ((name || border)) {
-        cls.push(active ? 'active-bg' : 'control-bg');
-    }
-    const text = items.length === 1 ? items[0] : <Stack vertical={vertical} gaps full="h">{items}</Stack>;
-
-    attr.onFocus = e => {
-        if (tab && !(disabled || readOnly)) {
-            e.target.focus();
-        } else {
-            e.target.blur();
-        }
     };
 
-    if (!(disabled || readOnly) && onClick && !clicked) {
-        const handleClick = (endEvent, directEvent = false) => {
-            wContext.startExclusiveMode('button-click', cursor === 'grab' ? 'grabbing' : cursor);
-            wContext.addEventListener(endEvent, () => {
-                if (!directEvent) {
-                    onClick(value);
-                }
-                if (mounted.current) {
-                    setClicked(false);
-                }
-                if (onClickEnd) {
-                    onClickEnd();
-                }
-                wContext.endExclusiveMode('button-click');
-            }, {once: true});
-            setClicked(true);
-            if (directEvent) {
-                onClick(directEvent);
-            }
-        };
-
-        if (tab) {
-            attr.onKeyDown = e => {
-                if (e.keyCode !== 32) {
-                    return;
-                }
-                e.preventDefault();
-                handleClick('keyup', direct ? e : null);
-            }
-
-        }
-        attr.onLeftClick = e => {
-            handleClick('mouseup', direct ? e : null);
-// TODO: check selection problem: e.preventDefault();
-        }
-    }
     return (
-        <Block className={cls.join(' ')} {...attr}>{text}</Block>
+        <Button state={state} onClick={startAction} { ...props } />
     )
 }
+
 
 /**
  *
@@ -869,7 +630,7 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
 
     const radioRef = useRef(null);
     const refocus = useRefocus(radioRef);
-    const setAndRefocus = value => {
+    const setAndRefocus = ({value}) => {
         refocus();
         set(value)
     };
@@ -883,7 +644,7 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
                     () => {
                         const id = optionHandler.getNextId();
                         if (id !== null) {
-                            setAndRefocus(id)
+                            setAndRefocus({value: id})
                         }
                     }
             },
@@ -893,7 +654,7 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
                 () => {
                     const id = optionHandler.getPrevId();
                     if (id !== null) {
-                        setAndRefocus(id)
+                        setAndRefocus({value: id})
                     }
                 }
             }
@@ -927,6 +688,8 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
     )
 }
 
+const numberIconProps = {width: 13, size: 8};
+
 function Number({name, disabled, value, min, max, step, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, ...props }) {
     const wContext = useContext(WindowContext);
 
@@ -956,7 +719,10 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
     const stepHandler = getStepHandler(min, max, decimals, step);
     if (slider === true) {
 
-        const startSliding = e => {
+        const startSliding = click => {
+            const e = click.event;
+            if (!e) return;
+
             const anchor = e.clientY;
             const anchorValue = value;
             const range = (min !== undefined && max !== undefined) ? Math.abs(max - min) : null;
@@ -980,40 +746,43 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
                         set(stepHandler.round(anchorValue + newOffset));
                     }
                 }
-            }, {
-                cleanUp: () => {
-                    setSliding(false);
-                    if (dim && !slideRef.current.reenter) {
-                        setDim(null);
-                    }
-                }
             });
             setSliding(true);
             setReenter(true);
             blurActive()
         };
+        const stopSliding = () => {
+            setSliding(false);
+            if (dim && !slideRef.current.reenter) {
+                setDim(null);
+            }
+        };
         items.push(
-            <Button key={1} size={14} padding={false} direct disabled={disabled || (min === max && min !== undefined)} onClick={startSliding} cursor="row-resize" icon="height" tab={false} />
+            <Button center="v" key={1} full="v" centerItems radius={true} iconProps={{size: 12}} direct disabled={disabled || (min === max && min !== undefined)} onClick={startSliding} onClickEnd={stopSliding} cursor="row-resize" icon="height" tab={false} vertical />
         );
     } else if (hasRange && slider === 'h') {
         items.push(
-            <Block key={1} full="h" padded="h" center="v">
+            <Block key={1} full="h" padded={DIR.RIGHT|DIR.TOP|DIR.BOTTOM} center="v">
                 <Slider key={1} tab={false} end disabled={disabled} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set} />
             </Block>
         )
     }
+    const inputCls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
+    if (!(readOnly || disabled)) {
+        inputCls.push('hover-change');
+    }
     items.push(
-        <Input key={2} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus} decimals={decimals} step={stepHandler.step} number max={max} min={min} value={value} set={set} />
+        <Input key={2} className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus} decimals={decimals} step={stepHandler.step} number max={max} min={min} value={value} set={set} />
     );
     if (buttons) {
         items.push(
-            <Stack key={3} vertical gaps="1">
-                <Button key={4} iconWidth={14} size={8} disabled={disabled || max === value} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less"></Button>
-                <Button key={3} iconWidth={14} size={8} disabled={disabled || min === value} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more"></Button>
+            <Stack center="v" key={3} vertical gaps="1">
+                <Button key={4} iconProps={numberIconProps} disabled={disabled || max === value} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
+                <Button key={3} iconProps={numberIconProps} disabled={disabled || min === value} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
             </Stack>
         );
     }
-    let elem = items.length === 1 ? items[0] : <Stack full={props.full}>{items}</Stack>;
+    let elem = items.length === 1 ? items[0] : <Stack gaps="1" full={props.full}>{items}</Stack>;
 
     if ((buttons || slider) || !(readOnly || disabled)) {
         const onMouseEnter = e => {
@@ -1075,7 +844,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     const [edit, setEdit] = useState(false);
 
     const isFloat = number && (decimals && decimals > 0);
-    const cls = ['input'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
     if (className) {
         cls.push(className);
     }
@@ -1155,6 +924,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
 
     const attr = {
         value: edit ? curr : value,
+        style: {},
         onFocus: e => {
             if (readOnly || disabled) {
                 e.target.blur();
@@ -1207,6 +977,9 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     }
     if (readOnly || disabled) {
         tab = false;
+        attr.style.cursor = 'default'
+    } else {
+        cls.push('hover-change');
     }
     if (!tab) {
         attr.tabIndex = -1
@@ -1326,7 +1099,7 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
 function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, ...props }) {
     const fContext = useContext(FormContext);
 
-    const cls = ['input'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
     const optionHandler = getOptionHandler(options, value);
     if (readOnly) {
         buttons = false;
@@ -1349,7 +1122,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
                 icon={'navigate_before'}
                 size={14}
                 onClick={
-                    e => {
+                    () => {
                         const id = optionHandler.getPrevId();
                         if (id !== null) set(id);
                     }
@@ -1389,6 +1162,9 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (dimAttr.full || dimAttr.full !== 'v') {
         cls.push('full-h');
     }
+    if (!(readOnly || disabled)) {
+        cls.push('hover-change');
+    }
     attr.className = cls.join(' ');
     items.push(
         readOnly ?
@@ -1419,7 +1195,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
                 icon={'navigate_next'}
                 size={14}
                 onClick={
-                    e => {
+                    () => {
                         const id = optionHandler.getNextId();
                         if (id !== null) set(id);
                     }
@@ -1490,7 +1266,10 @@ function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, ro
     if (!resize) {
         attr.style.resize = 'none'
     }
-    const cls = ['input'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
+    if (!(readOnly || disabled)) {
+        cls.push('hover-change');
+    }
     if (className) {
         cls.push(className);
     }
@@ -1814,9 +1593,13 @@ const sliderHandleSize = 20;
 function Slider({ vertical, center, size, end, maxSize = 250, minSize = 100, ...props }) {
     const axisKey = vertical ? 'height' : 'width';
     const oppAxisKey = vertical ? 'width' : 'height';
+    const cssContext = useContext(CssContext);
 
+    const sliderSize = props.plain ?
+        16 :
+        sliderHandleSize + 2 * cssContext.getValue('buttonBorderWidthPx');
     const attr = {
-        [oppAxisKey]: sliderHandleSize,
+        [oppAxisKey]: sliderSize,
         ['min' + ucfirst(axisKey)]: minSize,
         ['max' + ucfirst(axisKey)]: maxSize
     };
@@ -1835,8 +1618,10 @@ function Slider({ vertical, center, size, end, maxSize = 250, minSize = 100, ...
 }
 
 function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value, set, tab = true }) {
+
     const aContext = useContext(AvailContext);
     const wContext = useContext(WindowContext);
+    const cssContext = useContext(CssContext);
 
     const divRef = useRef(null);
     const propsRef = useRef(null);
@@ -1847,14 +1632,27 @@ function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value,
     const axisKey = vertical ? 'height' : 'width';
     const size = aContext[axisKey];
 
+    const sliderSize = plain ? 16 :
+        sliderHandleSize + 3 * cssContext.getValue('buttonBorderWidthPx');
+    const halfSlider = Math.ceil(sliderSize / 2);
     const space = 8;
-    const points = max - min;
+    const points = (max - min) + 1;
 
-    // take handle size (with borders) into account
-    const pointDist = (size - 12) / points;
+    /*
+       <---- a.width --------------------------------->
+       Half-Handle | ... | Half-Handle | DefaultPadding
+       <-------------->
+       0            a.width - handle - defaultPadding
+
+       => pointDist = (a.width - handle - defaultPadding) / points
+
+
+     */
+
+    const pointDist = (size - halfSlider)  / points;
 
     const startOffset = value - min;
-    const startDist = points === 0 ? size - 12 : startOffset * pointDist;
+    const startDist = points <= 1 ? size - halfSlider : startOffset * pointDist;
 
     const axis = vertical ? 'y' : 'x';
     const oppAxisKey = vertical ? 'width' : 'height';
@@ -1867,10 +1665,9 @@ function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value,
     const dimMax = {
         [oppAxisKey]: space
     };
-
     const cls = ['relative overflow'];
     const dim = {
-        [oppAxisKey]: sliderHandleSize,
+        [oppAxisKey]: sliderSize,
         [axisKey]: size
     };
 
@@ -1887,7 +1684,6 @@ function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value,
             oldDist = dist;
 
             const newValue = round(clamp(min, anchorValue + dist, max), decimals);
-
             if (propsRef.current !== newValue) {
                 set(newValue);
             }
@@ -1924,12 +1720,12 @@ function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value,
     return (
         <Block full={dirKey} { ...dim } ref={divRef} className={cls.join(' ')}>
             <Stack full vertical={vertical} className={"slider-padding-" + dir}>
-                <Block center={oppDir} cursor="pointer"  onMouseDown={setPos} {...dimMin} className={plain ? "transparent" : "slider-bg-less"} />
+                <Block center={oppDir} cursor="pointer" onMouseDown={setPos} {...dimMin} className={plain ? "transparent" : "slider-bg-less"} />
                 <Block center={oppDir} full={dirKey} cursor="pointer" onMouseDown={setPos} className={plain ? "transparent" :"slider-bg-more"} {...dimMax} />
             </Stack>
 
             <div className="absolute all-events" style={handleStyle}>
-                <Button name=" " cursor="grab" tab={tab} direct onClick={startSliding} className={"slider-handle-" + dir} />
+                <Handle width={10} border="1" disabled={disabled} height={sliderHandleSize} onClick={startSliding} tab={tab} axis="v" onDirKey={(dir, factor, shift) => d('KEY', dir, factor, shift)} />
             </div>
         </Block>
     )
@@ -2307,9 +2103,11 @@ export {
     OkCancelForm,
     FormContext,
     Button,
+    AsyncButton,
     Submit,
     Number,
     NumberProp,
+    Handle,
     Checkbox,
     CheckboxProp,
     Radio,
@@ -2334,9 +2132,5 @@ export {
     LabelProp,
     Hidden,
     FullProp,
-    PropSection,
-
-    Checkbox2,
-    Button2,
-    Handle
+    PropSection
 }

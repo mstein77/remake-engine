@@ -6,6 +6,7 @@ import { PictureCell } from "./BaseComponents";
 import {
     FileDropZone,
     Button,
+    AsyncButton,
     Color,
     ColorProp,
     Checkbox,
@@ -752,17 +753,34 @@ function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
     )
 }
 
+function ExportDialog({code, close}) {
+    const copy = () => {
+        return copy2clipboard(code);
+    };
+
+    return (
+        <Stack vertical borders full>
+            <Block padded full>
+                <TextArea full copy readOnly value={code} />
+            </Block>
+            <Block padded full="h">
+                <Stack gaps>
+                    <AsyncButton
+                        name="Copy" onClick={copy} onClickEnd={close}
+                        icon="content_paste" padded="h" className="autofocus"
+                    />
+                    <Button name="Close" icon="close" padded="h" onClick={close} />
+                </Stack>
+            </Block>
+        </Stack>
+    )
+}
+
 function useExportModal({ model, resource, update, name }) {
     const wContext = useContext(WindowContext);
     const ExportModal = useModal();
     const LoadingModal = useModal();
     const ErrorModal = useModal();
-
-    const [ copying, setCopying ] = useState(false);
-    const [ copied, setCopied ] = useState(null);
-
-    const propsRef = useRef(null);
-    propsRef.current = { copying, copied };
 
     const getResourceDef = (type, id, value, details) => {
         if (type === 'image') {
@@ -820,30 +838,6 @@ function useExportModal({ model, resource, update, name }) {
         return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
     };
 
-    const copy = () => {
-        setCopying(true);
-        setCopied(null);
-        copy2clipboard(ExportModal.props.code).then(
-            () => {
-                setCopied(false);
-                if (propsRef.current.copying === false) {
-                    ExportModal.close()
-                } else {
-                    setCopied(true)
-                }
-            },
-            err => {
-                console.error('Failed copying to clipboard', err);
-                setCopied(false);
-            }
-        );
-    };
-    const copyCleanUp = () => {
-        setCopying(false);
-        if (propsRef.current.copied) {
-            ExportModal.close()
-        }
-    };
     const getModelConfig = () => {
         const rebuildJson = getRebuildJsonForModel(resource.cls, model, true);
         return new resource.config(rebuildJson);
@@ -870,7 +864,6 @@ function useExportModal({ model, resource, update, name }) {
             resourcesInfo.dependencies
         ).then(
             response => {
-                d('GOT', response);
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
                 gameRef.reloadScreen(1);
             }
@@ -908,22 +901,7 @@ function useExportModal({ model, resource, update, name }) {
         Modals: () =>
             <>
                 <ExportModal.content name={'Export as Code: ' + name} width="80%" height="75%">
-                    <Stack vertical borders full>
-                        <Block padded full>
-                            <TextArea full copy readOnly value={ExportModal.props.code} />
-                        </Block>
-                        <Block padded full="h">
-                            <Stack gaps>
-                                <Button
-                                    name="Copy" warning={copying && copied === false}
-                                    current={copying} value={true} direct
-                                    onClick={copy} onClickEnd={copyCleanUp}
-                                    icon="content_paste" padded="h" className="autofocus"
-                                />
-                                <Button name="Close" icon="close" padded="h" onClick={() => ExportModal.close()} />
-                            </Stack>
-                        </Block>
-                    </Stack>
+                    <ExportDialog { ...ExportModal.props }/>
                 </ExportModal.content>
 
                 <LoadingModal.content name={"Deploying " + name} closeable={false} width={200}>
