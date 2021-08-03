@@ -1,0 +1,170 @@
+Aktueller Ablauf:
+
+1.) CSS-Context
+
+Holt sich bei jedem update, die computed styles aus den Konstanten im
+document.body indem es über die type2props iteriert und anhand des typs
+die values parsed.
+
+Speichert diese dann im Context, zusammen mit:
+  - update
+      Ein Context-Update-Trigger
+
+  - cssPropUpdate:
+      Eine Ref auf eine Update-Methode, die auf einem übergebenen
+      StyleObject ein CSS property auf einen value setzt
+
+  - setStyles:
+      Eine Methode welche alle (oder spezielle) Werte aus dem Context
+      als Constanten auf einem Style-Object setzt
+
+  - setStyleToValues
+      Setzt die übergebenen key-values auf dem Style-Object anhand
+      cssPropUpdate
+
+2.) Window-Context
+
+ Init:
+
+   a) Erstellt das Theme aus dem Default-Theme und dem im Storage
+   b) Extrahiert die hrefs aus den aktuellen Meta-Links und speichert diese
+      im Array unter links.defaults der registry
+   c) Setzt die Werte aus dem aktuellen Theme auf document.body.style
+      (setStyleToValues)
+   d) Setzt die Max-Dim-Werte aus der editorConfig auf document.body.style
+   e) synchronisiert die Werte aus theme.linkResources über syncLinks
+
+ Speichert die Werte aus dem theme und der editorConfig im Kontext, zudem:
+
+   - syncLinks
+
+   - cssPropUpdate (wird nur aus CssContext verlinkt)
+
+   - isStyleLocked
+       => LOCKED?
+
+   - setStyleLock
+       Setzt den übergebenen styleLock state:
+         LOCKED   => übernimmt den übergebenen cssStyle und setzte die
+                     linkResources aus dem theme in links.backups
+         SAVED    => übernimmt den state
+         UNLOCKED => Falls der letzte State SAVED und wenn ein cssStyle:
+                        iteriere über key/values aus diesem und setze
+                        diese auf dem document.body.style über cssPropUpdate
+                     Ansonsten:
+                        Update auf CssContext
+                     Finally:
+                        Lösche cssStyle und Backups
+
+   - openSettings:
+       Erstellt einen styleLock('LOCKED', cssRef.current.values)
+       Öffne Settings-Modal
+
+         cleanUp:
+            styleLock('UNLOCKED')
+            syncLinks(theme.linkResources)
+
+         save:
+            Speichert das Theme im Storage und in der Registry
+            styleLock('SAVED');
+
+3.) Modal
+
+   if (wContext.isStyleLocked()) {
+       modal umklammern mit <ThemeFreeze blockRef={trapRef} />
+   }
+
+4.) ThemeFreeze
+
+   Erstellt einen neuen CssContext aus dem parent-Style aber biegt den
+   setStyles so um, dass dieser auf dem parent arbeitet
+   Setzt auf dem parent-context anschliessend blockRef.current.style
+
+
+
+
+
+BLUE:
+
+{
+    "defaultPadding": 9,
+    "boxBorderWidth": 1,
+    "maxWidth": 1200,
+    "maxHeight": 1200,
+    "buttonBorderRadius": 4,
+    "boxBorderColor": "#2b7797",
+    "toolbarBgColor": "#2f304b",
+    "inputBgColor": "#b0aec1",
+    "inputColor": "#29292e",
+    "inputBorderColor": "#a8a8a8",
+    "editorBgColor": "#080808",
+    "editorColor": "#9aa0a2",
+    "buttonBgColor": "#1e42ae",
+    "buttonColor": "#b0d5e8",
+    "buttonBorderColor": "#347f66",
+    "linkResources": "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
+    "buttonFontFamily": "Monospace",
+    "buttonBorderStyle": "solid",
+    "fontUrl": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
+}
+
+GRAY:
+
+{
+    "defaultPadding": 9,
+    "boxBorderWidth": 1,
+    "maxWidth": 1200,
+    "maxHeight": 1200,
+    "buttonBorderRadius": 4,
+    "boxBorderColor": "#000000",
+    "toolbarBgColor": "#606060",
+    "inputBgColor": "#c9d2c2",
+    "inputColor": "#4a6077",
+    "inputBorderColor": "#296064",
+    "editorBgColor": "#404040",
+    "editorColor": "#B0B0B0",
+    "buttonBgColor": "#6c83a0",
+    "buttonColor": "#303020",
+    "buttonBorderColor": "#606060",
+    "linkResources": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i https://fonts.googleapis.com/icon?family=Material+Icons",
+    "buttonFontFamily": "Arial",
+    "buttonBorderStyle": "inset"
+}
+
+LAST:
+
+{
+    "defaultPaddingPx": 7,
+    "boxBorderWidthPx": 1,
+    "maxWidthPx": 1200,
+    "maxHeightPx": 1200,
+    "boxBorderRgb": "#2b7797",
+    "toolbarBgRgb": "#13192b",
+    "inputBgRgb": "#b0aec1",
+    "inputRgb": "#29292e",
+    "inputBorderRgb": "#a8a8a8",
+    "inputBstyle": "solid",
+    "inputBorderWidthPx": 1,
+    "inputPaddingPx": 5,
+    "inputBorderRadiusPx": 4,
+    "checkBoxType": "1",
+    "editorBgRgb": "#080808",
+    "editorRgb": "#9aa0a2",
+    "buttonBgRgb": "#1e4274",
+    "buttonRgb": "#b0d5e8",
+    "buttonBorderRgb": "#536a91",
+    "buttonBstyle": "solid",
+    "buttonBorderWidthPx": 1,
+    "buttonMinPaddingPx": 1,
+    "buttonPaddingPx": 9,
+    "buttonBorderRadiusPx": 5,
+    "activeRgb": "#14240e",
+    "activeBgRgb": "#5b952b",
+    "activeBorderRgb": "#D0D0F0",
+    "errorBgRgb": "#AA0020",
+    "errorRgb": "#E0E0A0",
+    "focusRgba": "#FFFFDFCC",
+    "linkResourcesUrls": "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
+    "buttonFont": "Monospace",
+    "fontUrl": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
+}

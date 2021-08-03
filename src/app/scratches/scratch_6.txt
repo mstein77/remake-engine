@@ -1,0 +1,153 @@
+ ---------------------------------
+  TODO:
+ ---------------------------------
+  - BUG: Delete löscht nicht
+
+ ---------------------------------
+  - Rulers überarbeiten
+
+  - ResizeGrid
+
+  - Entity-Manager: Clear-Selection on Action
+  - Entity-Manager: HotKeys
+  - Managed-Grid: HotKeys
+  - Zoom-Übernahme
+  - Scroll-Bar Colors wie Buttons
+
+  - Exclusive-Mode failure -> clean-up
+
+=> zoomOrAvail => Canvas - Helper
+=> modeParams haben keine default-Werte im eContext
+=> AutoAvail Recursive-Trap
+
+--------------------
+
+--------------------
+
+
+  Calls:
+    a) Import-Chars:
+        {fixed: true, multi: true, width: char.width, height: char.height, doubleClick: save()}
+    b) Resize-Select:
+        {unfix: true, multi: true, doubleClick: save}
+    c) Char-Select:
+        {fixed: true, width: char.width, height: char.height, doubleClick: save}
+
+  MODE: selection
+  -------------------
+   modeParams:
+     unfix=false
+     fixed=false
+     multi=false
+     type='rect'
+     width=1
+     height=1
+     resetMarker=true
+     doubleClick=null
+  --------------------
+  cursor:
+    - type: modeParams.type
+    - size: fixed ? modeParams.width/height : 1/1
+    - click:
+        () =>
+            setMarker(modeParams.type, cursor.width, cursor.height);
+            fixed ? marker.move(e.x, e.y) : marker.resize(e.x, e.y, modeParams.width, modeParams.height)
+  marker:
+    - onMove: marker.move(e.x, e.y)
+    - onResize: fixed && !multi ? null : marker.resize(e.x, e.y, modeParams.width, modeParams.height)
+    - autoMatrix: fixed && multi ? {width: modeParams.width, height: modeParams.height} : null;
+
+  fixer:
+    - onClick: !unfix ?
+        null :
+        setMode('selection', { ...modeParams, fixed: !fixed, resetMarker: false });
+
+Wann brauchen wir die Selection?
+  1. dbl-click marker
+  2. save
+
+
+
+  1. cursor-click
+      -> setzt marker und geht dann in markerMove oder -resize
+      -> mouseUp: setSelection
+
+  2. marker vorhanden
+     a) move
+     b) resize
+      -> mouseUp: setSelection
+
+     c) button-change (marker-pos, -size, -gap, -segments, -pin)
+      -> keyUp: setSelection
+
+
+
+
+
+
+
+
+
+A) Free-Selection
+    IN: fixed=false, multi=false
+    cursor:
+      - size: 1x1
+      - click: setMarker(1x1)->resizeMarker(NxM)
+    marker:
+      onMove: moveMarker
+      onResize: resizeMarker(NxM)
+
+B) Fixed-Selection
+    IN: fixed=true, markerSize=NxM, multi=false
+    cursor:
+      - size: NxM
+      - click: setMarker(NxM)->moveMarker
+    marker:
+      onMove: moveMarker
+      onResize: null
+
+C) Multi-Fixed-Selection
+    IN: fixed=true, markerSize=NxM, multi=true
+    cursor:
+      - size: NxM
+      - click: setMarker(NxM)->resizeMarker(+NxM)
+    marker:
+      onMove: moveMarker
+      onResize: resizeMarker(+NxM)
+
+- Free-Multi-Fixed-Selection
+    IN: fixed=
+    a)
+      cursor:
+        - size: 1x1
+        - click: setMarker(1x1)->resizeMarker(NxM)
+      marker:
+        onMove: moveMarker
+        onResize: resizeMarker(NxM)
+      fixer:
+        onClick: setMode(b)
+
+    b)
+      cursor:
+        - size: NxM
+        - click: setMarker(NxM)->resizeMarker(+NxM)
+      marker:
+        onMove: moveMarker
+        onResize: resizeMarker(+NxM)
+      fixer:
+        onClick: setMode(a)
+
+
+
+    1.)
+      Cursor: 1x1
+      Click: Marker-Resize
+    2.)
+      Marker-Move/Resize
+    3.)
+      Fixing:
+      Marker-Move/Resize-Fix
+      Cursor: NxM
+      Click: SetMarker
+
+
