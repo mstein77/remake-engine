@@ -61,6 +61,9 @@ html, body {
 .button-border-width {
     border-width: var(--button-border-width-px)
 }
+.button-border-1 {
+    border-width: 1px
+}
 .button-border-radius {
     border-radius: var(--button-border-radius-px)
 }
@@ -90,6 +93,9 @@ html, body {
 }
 .input-border-width {
     border-width: var(--input-border-width-px)
+}
+.input-border-1 {
+    border-width: 1px
 }
 .input-border-radius {
     border-radius: var(--input-border-radius-px)
@@ -149,8 +155,12 @@ html, body {
     outline: 1px solid var(--box-border-rgb)
 }
 
+.border-box {
+    box-sizing: border-box !important
+}
+
 .content-box {
-    box-sizing: content-box !important;
+    box-sizing: content-box !important
 }
 
 .material-icons.md-18 {
@@ -218,6 +228,7 @@ html, body {
     filter: brightness(calc(1 - var(--brightness-factor-float) * 0.25));
 }
 
+/*
 .slider-handle-h {
     width: 11px;
     height: 20px;
@@ -255,6 +266,7 @@ html, body {
 .slider-bg-more {
     background-color: var(--input-bg-rgb)
 }
+*/
 
 .scrollbar-handle:hover {
     filter: brightness(1);

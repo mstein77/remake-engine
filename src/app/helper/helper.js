@@ -1220,7 +1220,9 @@ function cloneDeep(value) {
 }
 
 function clamp(min, curr, max) {
-    return Math.min(Math.max(min, curr), max)
+    const minValue = min === null ? curr : Math.max(min, curr);
+    if (max == null) return minValue;
+    return Math.min(minValue, max)
 }
 
 function areDisjoint(a, b) {

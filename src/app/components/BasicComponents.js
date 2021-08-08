@@ -2086,6 +2086,24 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
+function Gradient({ from, to, vertical, plain }) {
+    const aContext = useContext(AvailContext);
+    const render = ctx => {
+        ctx.clearRect(0, 0, aContext.width, aContext.height);
+        const grd = ctx.createLinearGradient(0, 0,
+            vertical ? 0 : aContext.width,
+            vertical ? aContext.height : 0
+        );
+        grd.addColorStop(0, from);
+        grd.addColorStop(1, to);
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, aContext.width, aContext.height);
+    }
+    return (
+        <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
+    )
+}
+
 function ThemeFreeze({ blockRef, values, children }) {
     const cssContext = useContext(CssContext);
 
@@ -2299,7 +2317,7 @@ function useFocusKeyBindings({keyHandlers = [], disabled = false, direct }) {
             attr.onKeyDown = e => {
                 for (let item of keyHandlers) {
                     if (item.keys && item.keys.includes(e.key)) {
-                        item.handler();
+                        item.handler(e);
                         break;
                     }
                 }
@@ -2377,6 +2395,7 @@ export {
     CenterInfo,
     ActionBarContent,
     Kbd,
+    Gradient,
     LoadingIndicator,
 
     PropertyGrid,

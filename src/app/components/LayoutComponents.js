@@ -700,7 +700,7 @@ function Grid({children, columns, rows, gaps, full, centerItems, className, ...p
 
 const OverlayContext = React.createContext();
 
-function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, scroll, className, children }) {
+function Overlays({ width, maxWidth, full, height, cursor, originX = 0, originY = 0, scroll, className, children }) {
     const cls = ['relative block'];
     if (className) {
         cls.push(className);
@@ -718,6 +718,21 @@ function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, s
         cls.push('max-v');
         cls.push('max-h');
     }
+    const originCls = [];
+    if (full) {
+        if (full !== 'h') {
+            if (!style.height) {
+                cls.push('full-v')
+            }
+            originCls.push('full-v')
+        }
+        if (full !== 'v') {
+            if (!style.width) {
+                cls.push('full-h')
+            }
+            originCls.push('full-h')
+        }
+    }
     const overlay = {
         width,
         height,
@@ -725,10 +740,11 @@ function Overlays({ width, maxWidth, height, cursor, originX = 0, originY = 0, s
         originY
     };
     if (originX !== 0 || originY !== 0) {
+        originCls.push('relative');
         overlay.width -= originX;
         overlay.height -= originY;
         const originStyle = {marginLeft: originX, marginTop: originY};
-        children = <div className="relative" style={originStyle}>{children}</div>;
+        children = <div className={originCls.join(' ')} style={originStyle}>{children}</div>;
     }
     return (
         <OverlayContext.Provider value={overlay}>

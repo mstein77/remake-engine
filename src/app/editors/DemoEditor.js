@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState, useRef } from "react"
 import { Stack, Block } from "../components/LayoutComponents"
-import { Button, Checkbox, Handle } from "../components/FormComponents"
-import { Kbd, Icon } from "../components/BasicComponents";
+import { Button, Checkbox, Handle, Slider } from "../components/FormComponents"
+import { Kbd, Icon, Canvas, Gradient } from "../components/BasicComponents";
 import { d } from "../helper/helper"
 
 function DemoEditor({}) {
@@ -19,9 +19,53 @@ function DemoEditor({}) {
     };
 
     const [ state, setState ] = useState(0);
+    const [ sliderValue, setSliderValue ] = useState(200);
+    const [ test, setTest ] = useState(0);
+    const [ decValue, setDecValue ] = useState(0.0);
     const [ check1, setCheck1 ] = useState(true);
     const [ check2, setCheck2 ] = useState(false);
     const [ radio, setRadio ] = useState(0);
+
+    const renderRail = ctx => {
+        const size = 150;
+        const grdBlack = ctx.createLinearGradient(0, 0, size - 1, 0);
+        grdBlack.addColorStop(0, "#00000000");
+        grdBlack.addColorStop(1, "#000000FF");
+        ctx.clearRect(0, 0, size, 15);
+        ctx.fillStyle = grdBlack;
+        ctx.fillRect(0, 0, size, 15);
+    }
+
+    const renderRailV = ctx => {
+        const size = 150;
+        ctx.clearRect(0, 0, 15, size);
+        const grdBlack = ctx.createLinearGradient(0, 0, 0, size - 1);
+        grdBlack.addColorStop(0, "#FF0000");
+        grdBlack.addColorStop(1, "#0000FF");
+        ctx.fillStyle = grdBlack;
+        ctx.fillRect(0, 0, 15, size);
+    }
+
+    const renderIndicator = () => {
+        const render = ctx => {
+            ctx.clearRect(0, 0, 15, 15);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.moveTo(5, 6);
+            ctx.lineTo(14, 0);
+            ctx.lineTo(14, 12);
+            ctx.fill();
+            ctx.strokeStyle = '#000000';
+            ctx.moveTo(4, 6);
+            ctx.lineTo(13, 0);
+//            ctx.stroke();
+            ctx.moveTo(4, 6);
+            ctx.lineTo(13, 12);
+            ctx.stroke();
+        };
+        return <Canvas plain width={15} height={12} render={render} />
+    }
+
 
     return (
         <Stack gaps>
@@ -71,6 +115,35 @@ function DemoEditor({}) {
                 <Checkbox disabled size={14} name="Rulers" value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" maxWidth={80} value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" full="h" value={check2} set={setCheck2} />
+            </Stack>
+
+            <Slider min={100} max={400} value={sliderValue} set={setSliderValue} vertical />
+            <Slider tab min={200} max={201} value={sliderValue} set={setSliderValue}  vertical />
+            <Slider readOnly min={100} max={400} value={sliderValue} set={setSliderValue}  vertical />
+            <Slider min={100} max={400} value={sliderValue} set={setSliderValue}  vertical railProps={{long: 10}} />
+            <Slider
+                vertical tab min={100} max={400} value={sliderValue} set={setSliderValue} getIndicator={renderIndicator}
+                sledProps={{long: 15, short: 10, margin: 13, radius: false, border: '1'}}
+                railProps={{outline: true, border: true, oppSize: 15, center: false}}
+                ><Gradient plain from="#6AA0D7" to="#AA4450" vertical /></Slider>
+            <Block height={300} border>
+                <Slider vertical full="v" sledProps={{margin: 10}} railProps={{oppSize: 15, center: false}} min={100} max={400} value={sliderValue} set={setSliderValue} />
+            </Block>
+
+            <Stack vertical gaps>
+                <Slider center sledProps={{margin: 10}} railProps={{oppSize: 15, center: false}} min={100} max={400} full="h" value={sliderValue} set={setSliderValue} />
+                <Slider tab min={0} max={1} value={decValue} set={setDecValue} decimals={2} />
+                <Slider min={100} max={400} value={sliderValue} set={setSliderValue} />
+                <Slider min={sliderValue} max={sliderValue} value={sliderValue} set={setSliderValue} />
+                <Slider tab min={-10} max={5} value={test} set={setTest} />
+                <Slider min={100} max={400} value={sliderValue} set={setSliderValue}  rail={10}><Canvas width={150} height={10} render={renderRail} /></Slider>
+                <Slider min={100} max={400} value={sliderValue} set={setSliderValue}
+                        railProps={{outline: true, oppSize: 15,  center: false}}
+                        sledProps={{radius: false, margin: 5}}>
+                    <Gradient from="#00000000" to="#000000FF" />
+                </Slider>
+                <Slider min={100} border={false} max={400} value={sliderValue} set={setSliderValue}  long={8} short={8} radius={false} />
+                <Slider disabled min={100} max={400} value={sliderValue} set={setSliderValue} rail={15} radius={false} centerItems={false} margin={5}><Canvas width={150} height={15} render={renderRail} /></Slider>
             </Stack>
         </Stack>
     )

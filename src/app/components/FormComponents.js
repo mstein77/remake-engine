@@ -178,6 +178,15 @@ function getDimHAttr({ full, width, minWidth, maxWidth }) {
     }
 }
 
+function getDimVAttr({ full, height, minHeight, maxHeight }) {
+    return {
+        full: full && full !== 'v' ? 'h' : false,
+        height,
+        minHeight,
+        maxHeight
+    }
+}
+
 function getDimAttr({ full, width, minWidth, maxWidth, height, minHeight, maxHeight }) {
     return {
         full,
@@ -1588,146 +1597,278 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
     )
 }
 
-const sliderHandleSize = 20;
 
-function Slider({ vertical, center, size, end, maxSize = 250, minSize = 100, ...props }) {
-    const axisKey = vertical ? 'height' : 'width';
-    const oppAxisKey = vertical ? 'width' : 'height';
+/**
+ * TODO:
+ *   - bessere Lösung für outline
+ */
+function Slider({ vertical, center, end, padded, size, full, sledProps = {}, railProps = {}, ...props }) {
     const cssContext = useContext(CssContext);
+    const oppDir = vertical ? 'h' : 'v';
 
-    const sliderSize = props.plain ?
-        16 :
-        sliderHandleSize + 2 * cssContext.getValue('buttonBorderWidthPx');
-    const attr = {
-        [oppAxisKey]: sliderSize,
-        ['min' + ucfirst(axisKey)]: minSize,
-        ['max' + ucfirst(axisKey)]: maxSize
-    };
-    if (size) {
-        attr[axisKey] = size
+    const noSize = !railProps.size;
+    railProps = { size: 150, radius: true, oppSize: 8, minSize: 100, maxSize: 250, outline: false, center: true, ...railProps };
+    sledProps = { border: true, short: 10, long: 25, margin: 0, radius: true, ...sledProps, borders };
+    let borders = 0;
+    if (sledProps.border) {
+        borders = sledProps.border === '1' ? 1 : cssContext.getValue('buttonBorderWidthPx');
+    }
+
+    const attr = vertical ? getDimVAttr(props) : getDimHAttr(props);
+
+    let railAndSled = null;
+    if (full && full !== oppDir && noSize) {
+        attr.full = vertical ? 'v' : 'h';
+        attr[vertical ? 'width' : 'height'] = sledProps.margin + sledProps.long + 2 * borders;
+        railAndSled = (
+            <AvailContextProvider>
+                <SliderInner end={end} center={center} vertical={vertical} { ...props } borders={borders} railProps={railProps} sledProps={sledProps} />
+            </AvailContextProvider>
+        )
     } else {
-        attr.full = vertical ? 'v' : 'h'
+        // TODO: center & end doesn't work here on vertical slider
+        attr.center = center
+        attr.end = end;
+        railAndSled = <RailAndSled vertical={vertical} size={size} borders={borders} { ...props } railProps={railProps} sledProps={sledProps} />
     }
     return (
-        <Block center={center} end={end} { ...attr }>
-            <AvailContextProvider>
-                <SliderInner vertical={vertical} { ...props } />
-            </AvailContextProvider>
+        <Block padded={padded} { ...attr }>
+            {railAndSled}
         </Block>
     )
 }
 
-function SliderInner({ vertical, plain, min, max, disabled, decimals = 0, value, set, tab = true }) {
-
+function SliderInner({ vertical, sledProps, railProps, borders, end, center, ...props }) {
     const aContext = useContext(AvailContext);
+    const axisDim = vertical ? 'height' : 'width';
+    railProps.size = clamp(railProps.minSize, aContext[axisDim] - sledProps.short - 2 * borders, railProps.maxSize);
+    return (
+        <Block end={end} center={center}>
+            <RailAndSled vertical={vertical} sledProps={sledProps} railProps={railProps} borders={borders} { ...props } />
+        </Block>
+    )
+}
+
+function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabled, decimals = 0,
+        railProps = {}, sledProps = {}, getIndicator, borders, children }) {
+
     const wContext = useContext(WindowContext);
-    const cssContext = useContext(CssContext);
+
+    const [ clicked, setClicked ] = useState(false);
 
     const divRef = useRef(null);
+    const sledRef = useRef(null);
     const propsRef = useRef(null);
-    propsRef.current = value;
+    propsRef.current = { value };
 
-    const dirKey = vertical ? 'v' : 'h';
+    const { oppSize, size, minSize, maxSize, outline, center, radius: railRadius } = railProps;
+    const { border, short, long, margin, radius } = sledProps;
 
-    const axisKey = vertical ? 'height' : 'width';
-    const size = aContext[axisKey];
+    const cls = ['overflow'];
+    const stackCls = [];
 
-    const sliderSize = plain ? 16 :
-        sliderHandleSize + 3 * cssContext.getValue('buttonBorderWidthPx');
-    const halfSlider = Math.ceil(sliderSize / 2);
-    const space = 8;
-    const points = (max - min) + 1;
+    if (outline) {
+        stackCls.push('input-border-1 input-border-color input-border-style border-box');
+    }
+    const sledBorders = 2 * borders;
+    const sledShort = short + sledBorders;
+    const sledLong = long + sledBorders + margin;
 
-    /*
-       <---- a.width --------------------------------->
-       Half-Handle | ... | Half-Handle | DefaultPadding
-       <-------------->
-       0            a.width - handle - defaultPadding
+    const clampedSize = clamp(minSize, size, maxSize);
+    let interval = Math.abs(max - min);
+    let points = interval;
+    let i = 0;
+    let step = 1;
+    while(i < decimals) {
+        step *= 0.1;
+        points *= 10;
+        i++
+    }
+    points++;
+    const pixelSize = interval / clampedSize;
+    const pixelPoints = points / clampedSize;
+    const pointDist = Math.max(clampedSize / points, 1);
 
-       => pointDist = (a.width - handle - defaultPadding) / points
-
-
-     */
-
-    const pointDist = (size - halfSlider)  / points;
-
-    const startOffset = value - min;
-    const startDist = points <= 1 ? size - halfSlider : startOffset * pointDist;
-
-    const axis = vertical ? 'y' : 'x';
-    const oppAxisKey = vertical ? 'width' : 'height';
-    const client = 'client' + axis.toUpperCase();
-
-    const dimMin = {
-        [axisKey]: startDist,
-        [oppAxisKey]: space
-    };
-    const dimMax = {
-        [oppAxisKey]: space
-    };
-    const cls = ['relative overflow'];
-    const dim = {
-        [oppAxisKey]: sliderSize,
-        [axisKey]: size
-    };
-
-    const startSliding = disabled || points === 0 ? null : e => {
-        const anchorPos = e[client];
-        const anchorValue = value;
-        let oldDist = 0;
-
-        wContext.addEventListener('mousemove', e => {
-            const dist = Math.round((e[client] - anchorPos) / pointDist);
-
-            if (dist === oldDist) return;
-
-            oldDist = dist;
-
-            const newValue = round(clamp(min, anchorValue + dist, max), decimals);
-            if (propsRef.current !== newValue) {
-                set(newValue);
+    let valuePos;
+    const invalid = !(value >= min && value <= max);
+    if (!invalid) {
+        if (min === max) {
+            valuePos = vertical ? 0 : size;
+            readOnly = true
+        } else {
+            valuePos = -Math.round((value - min) / pixelSize);
+            if (vertical) {
+                valuePos += size;
+            } else {
+                valuePos *= -1;
             }
-        });
-        e.stopPropagation();
-        e.preventDefault();
-    };
+        }
+    }
+    const axis = vertical ? 'Y' : 'X';
+    const oppDir = vertical ? 'h' : 'v';
+    const axisDim = vertical ? 'height' : 'width';
+    const oppAxisDim = vertical ? 'width' : 'height';
+    const axisMargin = vertical ? 'top' : 'left';
+    const oppAxisMargin = vertical ? 'left' : 'top';
 
-    const setPos = disabled || plain ? null : e => {
+    const overlayAttr = {
+        ['origin' + axis]: (sledShort >> 1),
+        [axisDim]: size + (sledShort >> 1),
+        [oppAxisDim]: sledLong
+    };
+    const stackAttr = {
+        [axisDim]: clampedSize,
+        [oppAxisDim]: oppSize
+    };
+    const valueAttr = invalid ? {} : {
+        [axisDim]: vertical ? size - valuePos : valuePos
+    };
+    const sledOverlayAttr = invalid ? {} : {
+        [axisMargin]: -(sledShort >> 1) + valuePos,
+        [oppAxisMargin]: margin
+    };
+    const indicatorAttr = invalid ? {} : {
+        [axisMargin]: -(sledShort >> 1) + valuePos
+    };
+    const handleAttr = {
+        [axisDim]: sledShort - sledBorders,
+        [oppAxisDim]: sledLong - sledBorders - margin
+    }
+    if (disabled) {
+        cls.push('disabled');
+        readOnly = true
+    }
+    const gripCls = ['button-bg'];
+    if (border) {
+        gripCls.push('button-border-' + (border === '1' ? '1' : 'width'));
+        gripCls.push('button-border-color button-border-style')
+    }
+    if (radius) {
+        gripCls.push('button-border-radius')
+    }
+    if (railRadius) {
+        stackCls.push('input-border-radius');
+    }
+    if (!readOnly) {
+        gripCls.push('hover-change')
+    } else {
+        cls.push('no-events');
+        tab = false
+    }
+    if (clicked) {
+        gripCls.push('clicked')
+    }
+    if (invalid) {
+        children = <Block full className="input-bg invalid" tab={tab} onKeyDown={e => e.key === ' ' && set(min)} />;
+    } else if (!children) {
+        children = [];
+        children.push(
+            <Block key="a" full={oppDir} className="button-bg" { ...valueAttr } />
+        );
+        children.push(
+            <Block key="b" full className="input-bg" />
+        );
+        if (vertical) {
+            children.reverse()
+        }
+    }
+
+    const setSliderPos = readOnly ? null : e => {
         wContext.startExclusiveMode('set-slider', 'pointer');
         wContext.addEventListener('mouseup', () => {
             wContext.endExclusiveMode('set-slider')
         }, {once: true});
-
         const rect = divRef.current.getBoundingClientRect();
-        const dist = (e[client] - rect.x - 5);
-        const newValue = round(clamp(min, min + dist / pointDist, max), decimals);
-        if (propsRef.current !== newValue) {
-            set(newValue);
+        let dist = (e['client' + axis] - rect[axis.toLowerCase()]);
+        if (vertical) {
+            dist = clampedSize - dist
+        }
+        if (pixelPoints < 1) {
+            dist = Math.round(Math.max(dist - (pointDist / 2), 0) / pointDist) * step;
+        } else {
+            dist *= pixelSize;
+        }
+        set(clamp(min, round(min + dist, decimals), max));
+        if (tab) {
+            requestAnimationFrame(() => sledRef.current && sledRef.current.focus());
         }
     };
-    const handleStyle = {
-        [vertical ? 'left' : 'top']: 0,
-        [vertical ? 'top' : 'left']: startDist
-    };
 
-    const dir = vertical ? 'v' : 'h';
-    const oppDir = vertical ? 'h' : 'v';
-
-    if (disabled) {
-        cls.push('disabled')
+    const startSliding = readOnly ? null : e => {
+        const rect = divRef.current.getBoundingClientRect();
+        const start = rect[axis.toLowerCase()];
+        wContext.startExclusiveMode('move-slider', 'grabbing');
+        setClicked(true);
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('move-slider');
+            setClicked(false)
+        }, {once: true});
+        wContext.addEventListener('mousemove', e => {
+            const { value } = propsRef.current;
+            let dist = e['client' + axis] - start;
+            if (vertical) {
+                dist = clampedSize - dist
+            }
+            dist *= pixelSize;
+            const newValue = clamp(min, round(min + dist, decimals), max);
+            if (value !== newValue) {
+                set(newValue)
+            }
+        })
     }
 
+    const focusAttr = useFocusKeyBindings({
+        keyHandlers: [
+            {
+                keys: ['ArrowDown', 'ArrowLeft'],
+                handler:
+                    e => {
+                        const { value } = propsRef.current;
+                        const newValue =
+                            clamp(min, value - (e.shiftKey ? step * 10 : step), max);
+                        if (newValue !== value) {
+                            set(newValue)
+                        }
+                    }
+            },
+            {
+                keys: ['ArrowUp', 'ArrowRight'],
+                handler:
+                    e => {
+                        const { value } = propsRef.current;
+                        const newValue =
+                            clamp(min, value + (e.shiftKey ? step * 10 : step), max);
+                        if (newValue !== value) {
+                            set(newValue)
+                        }
+                    }
+            },
+        ]
+    }, readOnly);
     return (
-        <Block full={dirKey} { ...dim } ref={divRef} className={cls.join(' ')}>
-            <Stack full vertical={vertical} className={"slider-padding-" + dir}>
-                <Block center={oppDir} cursor="pointer" onMouseDown={setPos} {...dimMin} className={plain ? "transparent" : "slider-bg-less"} />
-                <Block center={oppDir} full={dirKey} cursor="pointer" onMouseDown={setPos} className={plain ? "transparent" :"slider-bg-more"} {...dimMax} />
-            </Stack>
+        <Overlays full={oppDir} className={cls.join(' ')} { ...overlayAttr }>
 
-            <div className="absolute all-events" style={handleStyle}>
-                <Handle width={10} border="1" disabled={disabled} height={sliderHandleSize} onClick={startSliding} tab={tab} axis="v" onDirKey={(dir, factor, shift) => d('KEY', dir, factor, shift)} />
-            </div>
-        </Block>
+            <Overlay className={'full-' + oppDir}>
+                <Block full centerItems={center} ref={divRef}>
+                    <AvailContext.Provider value={{[axisDim]: clampedSize, [oppAxisDim]: railProps.oppSize}}>
+                        <Stack className={stackCls.join(' ')} onLeftClick={setSliderPos} cursor="pointer" vertical={vertical} { ...stackAttr }>
+                            {children}
+                        </Stack>
+                    </AvailContext.Provider>
+                </Block>
+            </Overlay>
+            {
+                getIndicator && !invalid &&
+                    <Overlay className="no-events" { ...indicatorAttr }>
+                        {getIndicator()}
+                    </Overlay>
+            }
+            {!invalid &&
+                <Overlay { ...sledOverlayAttr }>
+                    <Block ref={sledRef} cursor="grab" tab={tab} onLeftClick={startSliding} className={gripCls.join(' ')} { ...handleAttr } { ...focusAttr } />
+                </Overlay>
+            }
+        </Overlays>
     )
 }
 

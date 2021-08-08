@@ -1,85 +1,52 @@
-Aktueller Ablauf:
+TODO:
+ * Slider: Positionierungs-Probleme
+ - Handle: Styling für Vertical Slider
+ - BUG: rotate auf icon geht nicht (shift-buttons)
+ - Color-Input: Styling
 
-1.) CSS-Context
+---------------------------------
+ axisKey = width (h) oder height (v)
+ oppAxisKey = rev(axisKey)
+ sliderSize
 
-Holt sich bei jedem update, die computed styles aus den Konstanten im
-document.body indem es über die type2props iteriert und anhand des typs
-die values parsed.
+ DIM des äußeren Blocks bestimmen:
+   - in Ziehrichtung wird max und min gesetzt
+   - in die andere wird die lange Handle-Seite gesetzt
 
-Speichert diese dann im Context, zusammen mit:
-  - update
-      Ein Context-Update-Trigger
 
-  - cssPropUpdate:
-      Eine Ref auf eine Update-Methode, die auf einem übergebenen
-      StyleObject ein CSS property auf einen value setzt
 
-  - setStyles:
-      Eine Methode welche alle (oder spezielle) Werte aus dem Context
-      als Constanten auf einem Style-Object setzt
 
-  - setStyleToValues
-      Setzt die übergebenen key-values auf dem Style-Object anhand
-      cssPropUpdate
+             avail-space
+  <------------------------------->
+                 w=sledShort
+  ---------------|----------------- h=sledSize
 
-2.) Window-Context
+Zieh-Achse: h => clamp(min, *width, max), height = handleSize
 
- Init:
+Die axisDim sollte sich immer auf die Laufleiste beziehen
 
-   a) Erstellt das Theme aus dem Default-Theme und dem im Storage
-   b) Extrahiert die hrefs aus den aktuellen Meta-Links und speichert diese
-      im Array unter links.defaults der registry
-   c) Setzt die Werte aus dem aktuellen Theme auf document.body.style
-      (setStyleToValues)
-   d) Setzt die Max-Dim-Werte aus der editorConfig auf document.body.style
-   e) synchronisiert die Werte aus theme.linkResources über syncLinks
 
- Speichert die Werte aus dem theme und der editorConfig im Kontext, zudem:
 
-   - syncLinks
+ <Block full=dir padded=x>
+ <AvailContextProvider oppAxisKey=sledLong>
 
-   - cssPropUpdate (wird nur aus CssContext verlinkt)
+   clampSize = clamp(min, avail[axisKey] - sledShort, max);
 
-   - isStyleLocked
-       => LOCKED?
+   <Overlays [originAxis]=halfSledShort [originOppAxis]=halfSledLong
+       axisKey=clampSize+sledShort oppAxisKey=sledLong>
 
-   - setStyleLock
-       Setzt den übergebenen styleLock state:
-         LOCKED   => übernimmt den übergebenen cssStyle und setzte die
-                     linkResources aus dem theme in links.backups
-         SAVED    => übernimmt den state
-         UNLOCKED => Falls der letzte State SAVED und wenn ein cssStyle:
-                        iteriere über key/values aus diesem und setze
-                        diese auf dem document.body.style über cssPropUpdate
-                     Ansonsten:
-                        Update auf CssContext
-                     Finally:
-                        Lösche cssStyle und Backups
+     <Overlay>
+        <Stack [axisKey]=clampSize [oppAxisKey]=sledLong>
+            <Block [axisKey]=value full=oppDir color="button" />
+            <Block full color="input" />
+        </Stack>
+     </Overlay>
 
-   - openSettings:
-       Erstellt einen styleLock('LOCKED', cssRef.current.values)
-       Öffne Settings-Modal
+     <Overlay [axisMargin]=-halfSledLong [oppAxisMargin]=-halfSledShort+value>
+        <Handle />
+     </Overlay>
 
-         cleanUp:
-            styleLock('UNLOCKED')
-            syncLinks(theme.linkResources)
-
-         save:
-            Speichert das Theme im Storage und in der Registry
-            styleLock('SAVED');
-
-3.) Modal
-
-   if (wContext.isStyleLocked()) {
-       modal umklammern mit <ThemeFreeze blockRef={trapRef} />
-   }
-
-4.) ThemeFreeze
-
-   Erstellt einen neuen CssContext aus dem parent-Style aber biegt den
-   setStyles so um, dass dieser auf dem parent arbeitet
-   Setzt auf dem parent-context anschliessend blockRef.current.style
-
+   </Overlays>
 
 
 
