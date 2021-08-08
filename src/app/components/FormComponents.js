@@ -8,7 +8,10 @@ import {
     PropertyGrid,
     Kbd,
     Canvas,
+    Gradient,
     Icon,
+    SideTab,
+    SideTabs,
     AvailContextProvider,
     useFocusKeyBindings,
     useRefocus,
@@ -699,7 +702,7 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
 
 const numberIconProps = {width: 13, size: 8};
 
-function Number({name, disabled, value, min, max, step, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, ...props }) {
+function Number({name, disabled, value, min, max, step, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, ...props }) {
     const wContext = useContext(WindowContext);
 
     const set = useSet(value, props);
@@ -771,8 +774,8 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
         );
     } else if (hasRange && slider === 'h') {
         items.push(
-            <Block key={1} full="h" padded={DIR.RIGHT|DIR.TOP|DIR.BOTTOM} center="v">
-                <Slider key={1} tab={false} end disabled={disabled} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set} />
+            <Block key={1} full="h" padded={DIR.RIGHT|DIR.BOTTOM} center="v">
+                <Slider key={1} tab={false} full="h" end disabled={disabled} railProps={railProps} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set}>{gradient}</Slider>
             </Block>
         )
     }
@@ -1343,6 +1346,9 @@ function ColorPicker({ value, set, alpha }) {
     const wContext = useContext(WindowContext);
     const PickerModal = useModal();
 
+    const [ before ] = useState(value.current);
+    const afterRef = useState(null);
+
     const rgb = hex2rgb(value.current);
     const update = useComponentUpdate();
 
@@ -1353,10 +1359,16 @@ function ColorPicker({ value, set, alpha }) {
     const setBaseColorIndex = index => {
         setBaseColorIndexRaw(index);
         const ctx = baseColorCanvas.getContext('2d');
-        const data = ctx.getImageData(0, index, 1, 1).data;
+        const data = ctx.getImageData(0, 191 - index, 1, 1).data;
         setBaseColor(rgb2hex({r: data[0], g: data[1], b: data[2]}));
     };
     const [ baseColor, setBaseColor ] = useState('#FF0000');
+
+    useEffect(() => {
+        return () => {
+            wContext.addLastColor(value.current);
+        }
+    }, []);
 
     const height = baseColorCanvas.height;
 
@@ -1411,58 +1423,166 @@ function ColorPicker({ value, set, alpha }) {
     const len = alpha ? 8 : 6;
     const isValid = hex => hex.length === len && hex.match(/^[a-fA-F0-9]+$/);
 
+    const getColorWithChannel = (color, channel, value) => {
+        let result = '#';
+        let pos = 1;
+        if (channel > 0) {
+            const len = (channel - 1) * 2 + 2;
+            result += color.substr(1,  len);
+            pos += len;
+        }
+        result += value;
+        pos += 2;
+        if (pos < (color.length - 1)) {
+            result += color.substr(pos)
+        }
+        return result
+    }
+
+    const redGradient = <Gradient
+        from={getColorWithChannel(value.current, 0, '00')}
+        to={getColorWithChannel(value.current, 0, 'FF')} />;
+    const greenGradient = <Gradient
+        from={getColorWithChannel(value.current, 1, '00')}
+        to={getColorWithChannel(value.current, 1, 'FF')} />;
+    const blueGradient = <Gradient
+        from={getColorWithChannel(value.current, 2, '00')}
+        to={getColorWithChannel(value.current, 2, 'FF')} />;
+    const alphaGradient = alpha && <Gradient
+        from={value.current.substr(0, 7) + '00'} to={value.current.substr(0, 7) + 'FF'} />;
+    const railProps = {
+        outline: true,
+        oppSize: 12
+    };
+
+    const renderIndicator = () => {
+        const render = ctx => {
+            ctx.clearRect(0, 0, 13, 15);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.moveTo(5, 6);
+            ctx.lineTo(12, 0);
+            ctx.lineTo(12, 12);
+            ctx.fill();
+            ctx.strokeStyle = '#00000066';
+            ctx.moveTo(4, 6);
+            ctx.lineTo(11, 0);
+            ctx.moveTo(4, 6);
+            ctx.lineTo(11, 12);
+            ctx.stroke();
+        };
+        return <Canvas plain width={15} height={12} render={render} />
+    }
+    const setColorFromPicker = color => {
+        set(color);
+        PickerModal.close();
+        requestAnimationFrame(update)
+    }
+
+    const setColorFromEntityPicker = index => {
+        let color = wContext.lastColorsIndex.getEntityValue(index);
+        if (alpha) {
+            color += value.current.substr(7)
+        }
+        set(color);
+        requestAnimationFrame(update)
+    }
+
+    const undoOp = {
+        exec: () => {set(before); requestAnimationFrame(update)},
+        can: () => value.current !== before
+    };
+    const showBeforeOp = {
+        exec: () => {
+            afterRef.current = value.current;
+            set(before);
+            requestAnimationFrame(update)
+        },
+        can: () => value.current !== before
+    };
+    const showBeforeEnd = () => {
+        set(afterRef.current);
+        requestAnimationFrame(update)
+    };
     return (
-        <Stack borders>
-            <Stack vertical borders width={280}>
-                <Stack gaps padded>
-                    <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
-                    <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
-                    <Button icon="colorize" onClick={() => PickerModal.open({})} />
+        <>
+        <Stack vertical borders height={260}>
+            <Stack borders full="h">
+                <Stack vertical borders width={310}>
+                    <Stack gaps padded>
+                        <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
+                        <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
+                        <Stack center="v" gaps>
+                            <Button icon="colorize" onClick={() => PickerModal.open({})} />
+                            <Button icon="undo" onClick={undoOp} />
+                            <Button icon="visibility" onClick={showBeforeOp} onClickEnd={showBeforeEnd} />
+                        </Stack>
+                    </Stack>
+
+                    <Block full="h">
+                        <SideTabs icon={false} full>
+                            <SideTab full active name="RGB">
+                                <Block padded full="h">
+                                    <PropertyGrid>
+                                        <NumberProp name="R" full="h" gradient={redGradient} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
+                                        <NumberProp name="G" full="h" gradient={greenGradient} railProps={railProps} value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
+                                        <NumberProp name="B" full="h" gradient={blueGradient} railProps={railProps} value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
+                                        {alpha &&
+                                            <NumberProp name="A" gradient={alphaGradient} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
+                                        }
+                                    </PropertyGrid>
+                                </Block>
+                            </SideTab>
+
+                            <SideTab full name="HSL">
+                                <Block padded full="h">
+                                    <PropertyGrid>
+                                        <NumberProp name="H" full="h" gradient={redGradient} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
+                                        <NumberProp name="S" full="h" gradient={greenGradient} railProps={railProps} value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
+                                        <NumberProp name="L" full="h" gradient={blueGradient} railProps={railProps} value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
+                                        {alpha &&
+                                            <NumberProp name="A" gradient={alphaGradient} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
+                                        }
+                                    </PropertyGrid>
+                                </Block>
+                            </SideTab>
+                        </SideTabs>
+                    </Block>
                 </Stack>
 
-                <Block padded full="h">
-                    <PropertyGrid>
-                        <NumberProp name="R" full="h" value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
-                        <NumberProp name="G" full="h" value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
-                        <NumberProp name="B" full="h" value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
-                        {alpha &&
-                            <NumberProp name="A" full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
-                        }
-                    </PropertyGrid>
+                <Block padded>
+                    <Stack gaps>
+
+                        <CanvasHitRegion plain width={height} height={height} border render={renderSquare}
+                                         onHit={(x, y) => {
+                                             d('HIT', x, y);
+                                         }}
+                        />
+
+                        <Slider vertical tab
+                                sledProps={{margin: 10, short: 10, long: 14, radius: true}}
+                                railProps={{size: 192, oppSize: 12, center: false, radius: false}}
+                                min={0} max={191} value={baseColorIndex} set={setBaseColorIndex}
+                                getIndicator={renderIndicator}
+                        >
+                            <Canvas width={12} height={192} render={renderRainbow} />
+                        </Slider>
+                    </Stack>
                 </Block>
+
             </Stack>
 
-            <Block padded>
-                <Stack gaps>
-
-                    <CanvasHitRegion plain width={height} height={height} border render={renderSquare}
-                        onHit={(x, y) => {
-                            d('HIT', x, y);
-                        }}
-                    />
-
-                    <Overlays width={baseColorCanvas.width + 11} height={height + 16}>
-                        <Overlay top={5} width={baseColorCanvas.width} height={height + 16}>
-                            <CanvasHitRegion
-                                plain width={15} height={height}
-                                onHit={(x, y) => {
-                                    const posY = round(y - 2);
-                                    setBaseColorIndex(posY);
-                                }}
-                                render={renderRainbow}
-                            />
-                        </Overlay>
-                        <Overlay top={1 + baseColorIndex} left={7} width={10} height={10}><Block className="slider-arrow-left" /></Overlay>
-                        <Overlay left={12} width={15} height={204} className="no-events"><Slider vertical plain min={0} max={191} value={baseColorIndex} set={setBaseColorIndex} /></Overlay>
-
-                    </Overlays>
-                </Stack>
-            </Block>
-
-            <PickerModal.content name="Pick a color..." full>
-                <BitmapSelector save={() => d(666)} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
-            </PickerModal.content>
+            <Stack gaps full>
+                <Block padded width={150}><Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  /></Block>
+                <Block full>
+                    <EntityPicker entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
+                </Block>
+            </Stack>
         </Stack>
+            <PickerModal.content name="Pick a color..." full>
+                <BitmapSelector type={alpha ? 'rgba' : 'rgb'} save={setColorFromPicker} close={PickerModal.close} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
+            </PickerModal.content>
+        </>
     )
 }
 

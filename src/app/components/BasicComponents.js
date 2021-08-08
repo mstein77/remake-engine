@@ -5,7 +5,7 @@ import { DIR, Block, Stack, Grid } from "./LayoutComponents";
 import { Button, Number, Color, OkCancelForm, ColorPicker } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
-import { ImageIndex } from "../classes/EntityIndex";
+import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
 
 const defaultValues = {
     config: {
@@ -1119,7 +1119,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
             links: {
                 defaults: [],
                 backups: []
-            }
+            },
+
+            lastColorsIndex: new ColorIndex({colors: []})
         };
 
         const resourceLoader = game.getResourceLoader();
@@ -1244,6 +1246,8 @@ function WindowCtx({ imageResources, filters, children, game }) {
             game,
             filters,
             resourceLoader,
+
+            lastColorsIndex: registry('lastColorsIndex'),
 
             getNewImageResource: (template, width, height) => {
                 return (
@@ -1494,6 +1498,18 @@ function WindowCtx({ imageResources, filters, children, game }) {
                     register('colorMaskCanvas', canvas);
                 }
                 return canvas;
+            },
+
+            addLastColor: value => {
+                value = value.substr(0, 7);
+                const index = registry('lastColorsIndex');
+                if (index.hasPropValue('value', value)) return;
+
+                const len = index.getLength();
+                index.setEntityObject({index: 0, value});
+                if (len >= 3) {
+                    index.deleteEntity(len);
+                }
             }
         }
     }
@@ -1647,7 +1663,7 @@ function ButtonStack({ items, onClick }) {
 }
 
 
-function SideTabs({ children, ...props }) {
+function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...props }) {
 
     const tabsRef = useRef(null);
     const refocus = useRefocus(tabsRef);
@@ -1657,7 +1673,6 @@ function SideTabs({ children, ...props }) {
         refocus();
         setActiveRaw(value)
     };
-
     const items = useRef([]);
 
     const attr = useFocusKeyBindings({
@@ -1707,20 +1722,29 @@ function SideTabs({ children, ...props }) {
     const tabs = [];
     for(let item of items.current) {
         tabs.push(
-            <Button key={item} full="h" padded="h" current={active} value={item} onClick={({value}) => setActive(value)} name={item}><Icon name="keyboard_arrow_right" /></Button>
+            <Button key={item} full="h" padded="h" current={active} value={item} onClick={({value}) => setActive(value)} name={item}>{icon ? <Icon name={icon} /> : ''}</Button>
         );
     }
-    return (
-        <Stack scroll full borders>
-            <Block ref={tabsRef} scroll padded="h">
-                <Stack indented vertical gaps {...attr}>{tabs}</Stack>
-            </Block>
 
-            <Block full>
-                <TabContext.Provider value={value}>
-                    {children}
-                </TabContext.Provider>
-            </Block>
+    const stackItems = [];
+    stackItems.push(
+        <Block ref={tabsRef} scroll padded="h" key="a">
+            <Stack indented vertical={!vertical} gaps {...attr}>{tabs}</Stack>
+        </Block>
+    );
+    stackItems.push(
+        <Block full key="b">
+            <TabContext.Provider value={value}>
+                {children}
+            </TabContext.Provider>
+        </Block>
+    );
+    if (rev) {
+        stackItems.reverse()
+    }
+    return (
+        <Stack vertical={vertical} scroll full borders>
+            {stackItems}
         </Stack>
     )
 }

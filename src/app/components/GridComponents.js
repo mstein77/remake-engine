@@ -1710,18 +1710,22 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                         }, {once: true});
                                     } :
                                     (e, x, y) => {
-                                    setLastClick('pick', e, () => setMode('write'));
+                                    if (modes.includes('write')) {
+                                        setLastClick('pick', e, () => setMode('write'));
+                                    }
                                     wContext.startExclusiveMode('pick', 'pointer');
-                                    eContext.setSelection(
-                                        gridProvider.getSelection(x, y, 1, 1, eContextRef.current.targetCellValue)
-                                    );
+                                    const lastSelection = gridProvider.getSelection(x, y, 1, 1, eContextRef.current.targetCellValue);
+                                    eContext.setSelection(lastSelection);
                                     wContext.addEventListener('mouseup', e => {
                                         checkLastClick(e);
                                         resetMarker();
                                         wContext.endExclusiveMode('pick');
                                         const last = {clientX: e.clientX, clientY: e.clientY};
                                         cursor.propsRef.current.last = last;
-                                        update()
+                                        update();
+                                        if (data.onPick) {
+                                            data.onPick(lastSelection.getCell())
+                                        }
                                     }, {once: true});
                                     setMarker('rect', x, y)
                                 }
@@ -2018,6 +2022,7 @@ function ManagedGrid({
     }, [mode, modeParams]);
 
     useMemo(() => {
+        d('mode?', props.mode);
         if (props.mode) {
             eContext.setMode(props.mode, props.modeParams);
         }
@@ -2427,7 +2432,9 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
         return options
     }, [targetValues]);
 
-    const modes = edit ? ['select', 'pick', 'write'] : ['select'];
+    const modes = props.modes ? props.modes : (edit ? ['select', 'pick', 'write'] : 'select');
+    const startMode = (modes.length === 1) ? modes[0] : 'select';
+    const startModeParams = startMode === 'select' ? selection : props.modeParams;
     const hasMode = value => modes.includes(value);
     const modeParams = eContext.modeParams;
 
@@ -2486,7 +2493,7 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
             </Toolbar>
             <Block full>
                 <FramedFlexGrid
-                    modes={modes} mode="select" modeParams={selection}
+                    modes={modes} mode={startMode} modeParams={startModeParams}
                     gridProvider={gridProvider} cellType={cellType}
                     zoom={zoom} border={border} rulers={rulers}
                     posX={posX} setPosX={setPosX} posY={posY} setPosY={setPosY}

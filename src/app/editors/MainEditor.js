@@ -135,6 +135,7 @@ function NumberOrNoneProp({ name, value, set, def, min = 0, ...props }) {
             <Stack vertical full="h">
                 <Checkbox name="Unlimited" value={none} set={toggleNone} />
                 <Number
+                    full="h"
                     disabled={none} slider="h" min={min}
                     value={none ? noneValue : value}
                     set={setNumber} { ...props }

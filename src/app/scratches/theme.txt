@@ -1,5 +1,11 @@
 TODO:
- * Slider: Positionierungs-Probleme
+ - ColorPicker:
+    * Selection-Picker
+    - RGB/HSV-Switcher
+    - Palette: last used
+    - Mask-Cursor
+    - Calculation
+
  - Handle: Styling für Vertical Slider
  - BUG: rotate auf icon geht nicht (shift-buttons)
  - Color-Input: Styling

@@ -468,7 +468,7 @@ function ImagePicker({ images, save, empty = 'No images available', onClick }) {
     )
 }
 
-function BitmapSelectorInner({ save, close, selection }) {
+function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
 
@@ -500,7 +500,11 @@ function BitmapSelectorInner({ save, close, selection }) {
         });
     };
 
-    const doSave = () => {
+    const doSave = value => {
+        if (type !== 'image') {
+            save(type === 'rgb' ? value.substr(0, 7) : value);
+            return;
+        }
         const markerSelection = eContext.getSelection();
         const baseCells = selection.multi ? markerSelection.getBaseCells() : [markerSelection.getCells()];
         const images = [];
@@ -589,6 +593,7 @@ function BitmapSelectorInner({ save, close, selection }) {
                     {activeImage === null ?
                         <ImagePicker images={images} onClick={setActiveImage} save={addTempImage} /> :
                         <BitmapSelectionGrid
+                            type={type}
                             selection={selection}
                             image={activeImage === tempIndex ? tempImage : imageIndex.getEntityPropValue(activeImage, 'image')}
                             onDoubleClick={doSave}
@@ -740,13 +745,19 @@ function BitmapEditor(props) {
     )
 }
 
-function BitmapSelectionGrid({ image, selection, onDoubleClick }) {
+function BitmapSelectionGrid({ image, selection, type, onDoubleClick }) {
     const bitmapGrid = useMemo(() => {
         return new BitmapGrid({image: getImageDataForImage(image)});
     }, [ image ]);
 
+    const pickParams = {
+        onPick: onDoubleClick
+    };
+
     return (
         <BaseGrid
+            modes={type !== 'image' ? ['pick'] : ['select']}
+            modeParams={type !== 'image' ? pickParams : selection}
             gridProvider={bitmapGrid}
             selection={selection}
         />
