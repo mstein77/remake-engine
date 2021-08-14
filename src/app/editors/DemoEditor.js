@@ -125,7 +125,7 @@ function DemoEditor({}) {
                 vertical tab min={100} max={400} value={sliderValue} set={setSliderValue} getIndicator={renderIndicator}
                 sledProps={{long: 15, short: 10, margin: 13, radius: false, border: '1'}}
                 railProps={{outline: true, border: true, oppSize: 15, center: false}}
-                ><Gradient plain from="#6AA0D7" to="#AA4450" vertical /></Slider>
+                ><Gradient plain colors="#6AA0D7 #AA4450" vertical /></Slider>
             <Block height={300} border>
                 <Slider vertical full="v" sledProps={{margin: 10}} railProps={{oppSize: 15, center: false}} min={100} max={400} value={sliderValue} set={setSliderValue} />
             </Block>
@@ -140,7 +140,7 @@ function DemoEditor({}) {
                 <Slider min={100} max={400} value={sliderValue} set={setSliderValue}
                         railProps={{outline: true, oppSize: 15,  center: false}}
                         sledProps={{radius: false, margin: 5}}>
-                    <Gradient from="#00000000" to="#000000FF" />
+                    <Gradient colors="#00000000 #000000FF" />
                 </Slider>
                 <Slider min={100} border={false} max={400} value={sliderValue} set={setSliderValue}  long={8} short={8} radius={false} />
                 <Slider disabled min={100} max={400} value={sliderValue} set={setSliderValue} rail={15} radius={false} centerItems={false} margin={5}><Canvas width={150} height={15} render={renderRail} /></Slider>

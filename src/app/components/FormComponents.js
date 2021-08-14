@@ -16,7 +16,9 @@ import {
     useFocusKeyBindings,
     useRefocus,
     useMounted,
-    useComponentUpdate, AvailContext, CssContext
+    useCssProps,
+    useCallAfterwards,
+    useComponentUpdate, AvailContext
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -300,12 +302,12 @@ function OkCancelForm({ full, save, cancel, submit, left = [], right = [], child
 }
 
 function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = true, ...props }) {
-    const cssContext = useContext(CssContext);
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
 
-    const type = cssContext.getValue('checkBoxType') === '0' ? 'input' : 'button';
+    const { checkBoxType } = useCssProps('checkBoxType');
+    const type = checkBoxType === '0' ? 'input' : 'button';
     const cls = [type + '-bg ' + type + '-color ' + type + '-border-width ' + type + '-border-radius ' + type + '-border-style ' + type + '-border-color'];
     if (disabled) {
         cls.push('disabled');
@@ -1342,6 +1344,58 @@ function ColorBox({color, width, height, className}) {
     )
 }
 
+
+const MAX_H = 360;
+const MAX_S = 100;
+const MAX_V = 100;
+
+const H_SEG = MAX_H / 6;
+const H_FACTOR = 256 / H_SEG;
+
+const getHueRgb = h => {
+    const b = [{i: 0, v: 0}, {i: 1, v: 0}, {i: 2, v: 0}];
+    if (h < H_SEG) {
+        b[0].v = 255;
+        b[1].v = h * H_FACTOR
+    } else if (h < (2 * H_SEG)) {
+        b[1].v = 255;
+        b[0].v = 255 - (h - (H_SEG - 1)) * H_FACTOR
+    } else if (h < (3 * H_SEG)) {
+        b[1].v = 255;
+        b[2].v = (h - (2 * H_SEG - 1)) * H_FACTOR
+    } else if (h < (4 * H_SEG)) {
+        b[2].v = 255;
+        b[1].v = 255 - (h - (3 * H_SEG - 1)) * H_FACTOR
+    } else if (h < (5 * H_SEG)) {
+        b[2].v = 255;
+        b[0].v = (h - (4 * H_SEG - 1)) * H_FACTOR
+    } else {
+        b[0].v = 255;
+        b[2].v = 255 - (h - (5 * H_SEG - 1)) * H_FACTOR
+    }
+    return b;
+}
+
+const hsv2rgb = (h, s, v) => {
+    const b = getHueRgb(h);
+    const sorted = [ ...b ].sort((a, b) => a.v === b.v ? 0 : (a.v > b.v ? -1 : 1));
+    const b2 = Math.round(sorted[1].v / 255 * s);
+
+    sorted[0].n = s;
+    sorted[2].n = Math.round(s / 255 * v);
+    sorted[1].n = Math.round((s - b2) / 255 * v + b2);
+
+    sorted.sort((a, b) => a.i === b.i ? 0 : (a.i < b.i ? -1 : 1));
+    //        ( S / 255 * V  ,   S,   (255 - B2) / 255 * V + B2 )
+    //        C3            C1            C2
+
+    let rgb = '#';
+    for (let item of sorted) {
+        rgb += (item.n).toString(16).padStart(2, '0')
+    }
+    return rgb;
+}
+
 function ColorPicker({ value, set, alpha }) {
     const wContext = useContext(WindowContext);
     const PickerModal = useModal();
@@ -1351,6 +1405,10 @@ function ColorPicker({ value, set, alpha }) {
 
     const rgb = hex2rgb(value.current);
     const update = useComponentUpdate();
+
+    const [h, setH] = useState(100);
+    const [s, setS] = useState(255);
+    const [v, setV] = useState(0);
 
     const baseColorCanvas = wContext.getBaseColorCanvas();
     const colorMaskCanvas = wContext.getColorMaskCanvas();
@@ -1387,6 +1445,66 @@ function ColorPicker({ value, set, alpha }) {
             }
             set(newValue);
 
+            /*
+                HSV -> RGB
+
+                H = 120
+                S = 55   (Saturation also Höhe von 0)
+                V = 100  (Lightness also Breite von )
+
+                über H kommen wir auf BaseColor [b1, b2]
+                V bestimmt den Wert
+                   C-B1 = S
+                   C-B2 = S * b2 / 255  +  |b1 - b2| / 255 * V
+                   C-B3 = V
+
+                b1 = 255, b2 = 210
+
+                C-B1 = 55
+                C-B2 = 55 * (210 / 255) + 45 / (255 * 100)
+                     = 45.29 + 17.6 = 63
+                C-B3 = 100
+
+             V=255                V=128               V=0    b2
+        255, 255, 255  --->  (128, 255, 188) --->   0, 255, 120   S=255
+              |    S                |                   |    b2*
+        128, 128, 128  --->  ( 64, 128,  94) --->   0, 128,  60   S=128
+              |                     |                   |
+          0,   0,   0  --->  (  0,   0,   0) --->   0,   0,   0   S=0
+
+       ( S / 255 * V  ,   S,   (255 - B2) / 255 * V + B2 )
+           C3            C1            C2
+
+           (S - b2*) * v + b2*
+
+           => B2 (aus H), S, V
+
+
+
+
+255 / 128 = 120 / x <=> x = (120 * 128) / 255
+
+
+                MaxChannel = Max(c)
+                MidChannel
+
+
+                Die beiden größten Channels bestimmen c1, c2
+                S = |c1|
+
+
+
+
+                HSV
+                -----------------
+                white -------> baseColor (Hue)
+                  |              |
+                  |              |
+                black -------> black
+
+             */
+
+
             // TODO calc base color
             /*
             const rgb = hex2rgb(newValue);
@@ -1411,7 +1529,8 @@ function ColorPicker({ value, set, alpha }) {
     };
 
     const renderSquare = ctx => {
-        ctx.fillStyle = baseColor;
+        ctx.fillStyle =
+            hsv2rgb(h, 255, 0);
         ctx.fillRect(0, 0, 192, 192);
         ctx.drawImage(colorMaskCanvas, 0, 0, 192, 192);
     };
@@ -1440,16 +1559,52 @@ function ColorPicker({ value, set, alpha }) {
     }
 
     const redGradient = <Gradient
-        from={getColorWithChannel(value.current, 0, '00')}
-        to={getColorWithChannel(value.current, 0, 'FF')} />;
+        colors={getColorWithChannel(value.current, 0, '00') + ' ' +
+            getColorWithChannel(value.current, 0, 'FF')} />;
     const greenGradient = <Gradient
-        from={getColorWithChannel(value.current, 1, '00')}
-        to={getColorWithChannel(value.current, 1, 'FF')} />;
+        colors={getColorWithChannel(value.current, 1, '00') + ' ' +
+            getColorWithChannel(value.current, 1, 'FF')} />;
     const blueGradient = <Gradient
-        from={getColorWithChannel(value.current, 2, '00')}
-        to={getColorWithChannel(value.current, 2, 'FF')} />;
+        colors={getColorWithChannel(value.current, 2, '00') + ' ' +
+            getColorWithChannel(value.current, 2, 'FF')} />;
+    const grad = alpha ? value.current.substr(7, 2) : '';
     const alphaGradient = alpha && <Gradient
-        from={value.current.substr(0, 7) + '00'} to={value.current.substr(0, 7) + 'FF'} />;
+        colors={value.current.substr(0, 7) + '00 ' + value.current.substr(0, 7) + 'FF'} />;
+    const hGradient = <Gradient
+        colors={"#FF0000" + grad + " #FFFF00" + grad + " #00FF00" + grad + " #00FFFF" + grad + " #0000FF" + grad + " #FF00FF" + grad + " #FF0001" + grad}
+        plain={grad === ''}
+    />
+    const sGradient = <Gradient
+        colors={hsv2rgb(h, 0, v) + grad + ' ' + hsv2rgb(h, 255, v) + grad} />;
+    const vGradient = <Gradient
+        colors={hsv2rgb(h, s, 0) + grad + ' ' + hsv2rgb(h, s, 255) + grad} />;
+    /*
+    1     +254    +254   +254   +254   +254   +253
+    [00]   [FF]   [00]   [FF]   [00]   [FF]   [01]
+    0 ..   255 .. 509 .. 763 .. 1017   1271   1524
+    FF0000 FFFF00 00FF00 00FFFF 0000FF FF00FF FF0001
+    0 ..   60  .. 120 .. 180 .. 240 .  300 .. 359
+
+    255 / 59 = 4.32
+    1 * 4.32 = 4
+    2 * 4.32 = 9
+    10 * 4.32 = 43
+    20 * 4,32 = 96
+    59 * 4,32 = 255
+
+
+    0 .. 1524
+
+    1525 / 5 = 305
+
+    1525 / 256 =
+
+    Deg: 0 .. 359
+
+    360 / 6 = 36
+
+    256 / 36
+*/
     const railProps = {
         outline: true,
         oppSize: 12
@@ -1517,6 +1672,7 @@ function ColorPicker({ value, set, alpha }) {
                             <Button icon="undo" onClick={undoOp} />
                             <Button icon="visibility" onClick={showBeforeOp} onClickEnd={showBeforeEnd} />
                         </Stack>
+                        <ColorBox className="thin-boxed" color={hsv2rgb(h, s, v)} width={35} height={26} />
                     </Stack>
 
                     <Block full="h">
@@ -1534,12 +1690,12 @@ function ColorPicker({ value, set, alpha }) {
                                 </Block>
                             </SideTab>
 
-                            <SideTab full name="HSL">
+                            <SideTab full name="HSV">
                                 <Block padded full="h">
                                     <PropertyGrid>
-                                        <NumberProp name="H" full="h" gradient={redGradient} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
-                                        <NumberProp name="S" full="h" gradient={greenGradient} railProps={railProps} value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
-                                        <NumberProp name="L" full="h" gradient={blueGradient} railProps={railProps} value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
+                                        <NumberProp name="H" full="h" gradient={hGradient} railProps={railProps} value={h} set={setH} min={0} max={MAX_H - 1} slider="h" />
+                                        <NumberProp name="S" full="h" gradient={sGradient} railProps={railProps} value={s} set={setS} min={0} max={255} slider="h" />
+                                        <NumberProp name="V" full="h" gradient={vGradient} railProps={railProps} value={v} set={setV} min={0} max={255} slider="h" />
                                         {alpha &&
                                             <NumberProp name="A" gradient={alphaGradient} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
                                         }
@@ -1554,15 +1710,17 @@ function ColorPicker({ value, set, alpha }) {
                     <Stack gaps>
 
                         <CanvasHitRegion plain width={height} height={height} border render={renderSquare}
+                                         x={255 - v} y={255 - s}
                                          onHit={(x, y) => {
-                                             d('HIT', x, y);
+                                             setV(255 - x);
+                                             setS(255 - y);
                                          }}
                         />
 
                         <Slider vertical tab
                                 sledProps={{margin: 10, short: 10, long: 14, radius: true}}
                                 railProps={{size: 192, oppSize: 12, center: false, radius: false}}
-                                min={0} max={191} value={baseColorIndex} set={setBaseColorIndex}
+                                min={0} max={MAX_H - 1} value={h} set={setH}
                                 getIndicator={renderIndicator}
                         >
                             <Canvas width={12} height={192} render={renderRainbow} />
@@ -1575,7 +1733,7 @@ function ColorPicker({ value, set, alpha }) {
             <Stack gaps full>
                 <Block padded width={150}><Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  /></Block>
                 <Block full>
-                    <EntityPicker entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
+                    <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
                 </Block>
             </Stack>
         </Stack>
@@ -1586,23 +1744,34 @@ function ColorPicker({ value, set, alpha }) {
     )
 }
 
-function CanvasHitRegion({width, height, render, plain, onHit }) {
+function CanvasHitRegion({width, height, render, plain, onHit, x, y }) {
     const wContext = useContext(WindowContext);
     const blockRef = useRef(null);
 
     const onLeftClick = e => {
         const rect = blockRef.current.getBoundingClientRect();
-        onHit(round(e.clientX - rect.x), round(e.clientY - rect.y));
+        onHit(round(256 / width * (e.clientX - rect.x)), round(256 / height * (e.clientY - rect.y)));
         wContext.startExclusiveMode('set-hit', 'pointer');
         wContext.addEventListener('mouseup', () => {
             wContext.endExclusiveMode('set-hit')
         }, {once: true});
     };
-
+    const handleSize = 9;
+    const handleHalfSize = handleSize >> 1;
+    const posX = width / 256 * x;
+    const posY = height / 256 * y;
     return (
-        <Block ref={blockRef} onLeftClick={onLeftClick} cursor="pointer">
-            <Canvas plain={plain} width={width} height={height} border="1" render={render} />
-        </Block>
+        <Overlays width={width + handleSize} height={height + handleSize} originX={handleHalfSize} originY={handleHalfSize}>
+            <Overlay>
+                <Block ref={blockRef} onLeftClick={onLeftClick} cursor="pointer">
+                    <Canvas plain={plain} width={width} height={height} border="1" render={render} />
+                </Block>
+            </Overlay>
+
+            <Overlay top={-handleHalfSize + posY} left={-handleHalfSize + posX}>
+                <Handle tab width={handleSize} height={handleSize} circle />
+            </Overlay>
+        </Overlays>
     )
 }
 
@@ -1721,17 +1890,18 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
 /**
  * TODO:
  *   - bessere Lösung für outline
+ *   - end / center auf funktioniert vertical noch nicht richtig
  */
 function Slider({ vertical, center, end, padded, size, full, sledProps = {}, railProps = {}, ...props }) {
-    const cssContext = useContext(CssContext);
+    const { buttonBorderWidthPx } = useCssProps('buttonBorderWidthPx');
     const oppDir = vertical ? 'h' : 'v';
 
     const noSize = !railProps.size;
-    railProps = { size: 150, radius: true, oppSize: 8, minSize: 100, maxSize: 250, outline: false, center: true, ...railProps };
+    railProps = { size: 150, radius: true, oppSize: 8, minSize: 100, maxSize: 200, outline: false, center: true, ...railProps };
     sledProps = { border: true, short: 10, long: 25, margin: 0, radius: true, ...sledProps, borders };
     let borders = 0;
     if (sledProps.border) {
-        borders = sledProps.border === '1' ? 1 : cssContext.getValue('buttonBorderWidthPx');
+        borders = sledProps.border === '1' ? 1 : buttonBorderWidthPx;
     }
 
     const attr = vertical ? getDimVAttr(props) : getDimHAttr(props);
@@ -2294,13 +2464,14 @@ function Submit({ disabled, className, ...props }) {
 }
 
 function Hidden({ invalid }) {
+    const callAfterwards = useCallAfterwards();
     const fContext = useContext(FormContext);
 
     const cls = [];
     if (invalid) {
         cls.push('invalid');
         if (fContext) {
-            fContext.markInvalid()
+            callAfterwards(fContext.markInvalid)
         }
     }
     return (

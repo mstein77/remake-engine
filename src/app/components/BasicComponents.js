@@ -782,7 +782,7 @@ function PropLabel({ name, children }) {
 }
 
 function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto, gaps }) {
-    const cssContext = useContext(CssContext);
+    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
 
     const scrollbarX = x !== undefined && (!auto || (x > 0 || maxX > pageX));
     const scrollbarY = y !== undefined && (!auto || (y > 0 || maxY > pageY));
@@ -814,7 +814,7 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
         };
     }
     return (
-        <Grid full gaps={gaps ? cssContext.getValue('defaultPaddingPx') : null} columns={columns.join(' ')} rows={rows.join(' ')}>
+        <Grid full gaps={gaps ? defaultPaddingPx : null} columns={columns.join(' ')} rows={rows.join(' ')}>
             <Block key="a" full onWheel={onWheel}>{children}</Block>
             {scrollbarY && <Scrollbar key="b" vertical pos={y} max={maxY} page={pageY} set={setY} />}
             {scrollbarX && <Scrollbar key="c" pos={x} max={maxX} page={pageX} set={setX} />}
@@ -1536,7 +1536,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
         const elems = document.querySelectorAll('link');
         for (let elem of elems) {
-            links.defaults.push(d(elem.href));
+            links.defaults.push(elem.href);
         }
 
         cssContext.init(editorConfig, theme);
@@ -2110,6 +2110,30 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
+function Gradient({colors, vertical, plain}) {
+    const aContext = useContext(AvailContext);
+    const stops = colors.split(' ');
+    const dist = 1 / (stops.length - 1);
+    const render = ctx => {
+        ctx.clearRect(0, 0, aContext.width, aContext.height);
+        const grd = ctx.createLinearGradient(0, 0,
+            vertical ? 0 : aContext.width,
+            vertical ? aContext.height : 0
+        );
+        let pos = 0;
+        for(let color of stops) {
+            grd.addColorStop(pos, color);
+            pos += dist
+        }
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, aContext.width, aContext.height)
+    }
+    return (
+        <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
+    )
+}
+
+/*
 function Gradient({ from, to, vertical, plain }) {
     const aContext = useContext(AvailContext);
     const render = ctx => {
@@ -2127,6 +2151,8 @@ function Gradient({ from, to, vertical, plain }) {
         <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
     )
 }
+
+ */
 
 function ThemeFreeze({ blockRef, values, children }) {
     const cssContext = useContext(CssContext);
@@ -2212,12 +2238,19 @@ function CssCtx({ parent, bindRef, children, ...props }) {
             style.setProperty(key2const[key], value);
         };
 
-        const setValue = (name, value) => {
+        const setValue = (name, value, notify = true) => {
             if (parent) {
-                return parent.setValue(name, value)
+                return parent.setValue(name, value, notify)
             }
             setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
-            registry('values')[name] = value
+            registry('values')[name] = value;
+            if (notify) {
+                const watcher = registry('watcher')[name];
+                if (!watcher) return;
+                for (let watch of watcher) {
+                    watch();
+                }
+            }
         };
 
         const applyTo = node => {
@@ -2259,8 +2292,34 @@ function CssCtx({ parent, bindRef, children, ...props }) {
 
             setValues: values => {
                 for (let [key, value] of Object.entries(values)) {
-                    setValue(key, value);
+                    setValue(key, value, false);
                 }
+                const watcher = registry('watcher');
+                const notified = [];
+                for (let values of Object.values(watcher)) {
+                    for (let value of values) {
+                        if (notified.includes(value)) continue;
+                        value();
+                        notified.push(value)
+                    }
+                }
+            },
+
+            watch: (prop, updater) => {
+                const watcher = registry('watcher');
+                if (!watcher[prop]) {
+                    watcher[prop] = [];
+                }
+                if (!watcher[prop].includes(updater)) {
+                    watcher[prop].push(updater);
+                }
+            },
+            unwatch: (prop, updater) => {
+                const watcher = registry('watcher');
+                if (!watcher[prop]) return;
+                const index = watcher[prop].indexOf(updater);
+                if (index === -1) return;
+                watcher[prop].splice(index, 1);
             },
 
             applyTo
@@ -2268,7 +2327,8 @@ function CssCtx({ parent, bindRef, children, ...props }) {
 
         registryRef.current = {
             api,
-            body: {}
+            body: {},
+            watcher: {}
         };
 
         if (parent && props.values) {
@@ -2390,6 +2450,41 @@ function useUpdateOnEntityIndexChanges(entityIndex, callback) {
     return update;
 }
 
+function useCallAfterwards() {
+    const items = [];
+    useEffect(() => {
+        while (items.length) {
+            const [setter, ...value] = items.pop();
+            setter(...value)
+        }
+    });
+    return (setter, ...value) => {
+        items.push([setter, ...value]);
+    }
+}
+
+function useCssProps( ...props ) {
+    const cssContext = useContext(CssContext);
+    const update = useComponentUpdate();
+
+    useEffect(() => {
+        for(let prop of props) {
+            cssContext.watch(prop, update)
+        }
+        return () => {
+            for (let prop of props) {
+                cssContext.unwatch(prop, update)
+            }
+        }
+    }, []);
+
+    const values = {};
+    for (let prop of props) {
+        values[prop] = cssContext.getValue(prop)
+    }
+    return values;
+}
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -2430,5 +2525,7 @@ export {
     useUpdateOnEntityIndexChanges,
     useMounted,
     useFocusKeyBindings,
-    useRefocus
+    useRefocus,
+    useCallAfterwards,
+    useCssProps
 }

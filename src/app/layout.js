@@ -304,7 +304,9 @@ function LayoutApp() {
     )
 }
 
+/*
 ReactDOM.render(
     <LayoutApp />,
     document.getElementById('app')
 );
+ */

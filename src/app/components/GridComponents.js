@@ -7,7 +7,7 @@ import {
     Canvas,
     ScrollArea,
     WindowContext,
-    EditorContext, useModal, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
+    EditorContext, useCallAfterwards, useModal, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
 } from "./BasicComponents";
 import { FiltersModal } from "./EditorComponents";
 import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
@@ -1921,6 +1921,7 @@ function ManagedGrid({
     const gContext = useContext(GridContext);
     const eContext = useContext(EditorContext);
     const mounted = useMounted();
+    const callAfterwards = useCallAfterwards();
 
     const ApplyModal = useModal();
 
@@ -2022,9 +2023,9 @@ function ManagedGrid({
     }, [mode, modeParams]);
 
     useMemo(() => {
-        d('mode?', props.mode);
         if (props.mode) {
-            eContext.setMode(props.mode, props.modeParams);
+            callAfterwards(eContext.setMode, props.mode, props.modeParams);
+//            eContext.setMode(props.mode, props.modeParams);
         }
     }, []);
 
@@ -2074,9 +2075,10 @@ function ManagedGrid({
 }
 
 function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, setMaxZoom, setZoom,
-    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, undo, ...props }) {
+    width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, undo, center = true, ...props }) {
     const aContext = useContext(AvailContext);
     const cssContext = useContext(CssContext);
+    const callAfterwards = useCallAfterwards();
 
     let gridWidth = gridProvider.getWidth();
     let gridHeight = gridProvider.getHeight();
@@ -2120,10 +2122,10 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         if (maxZoom !== undefined) {
             const newMaxZoom = Math.max(cellType.getMinZoom(), cellDim.maxZoom);
             if (maxZoom !== newMaxZoom) {
-                setMaxZoom(newMaxZoom);
+                callAfterwards(setMaxZoom, newMaxZoom)
             }
             if (zoom > newMaxZoom) {
-                setZoom(newMaxZoom);
+                callAfterwards(setZoom, newMaxZoom)
             }
         }
         return {
@@ -2146,17 +2148,17 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
     const maxPosX = Math.max(gridWidth - value.maxPageX, 0);
     const maxPosY = Math.max(gridHeight - value.maxPageY, 0);
 
-    if (posX > maxPosX) setPosX(maxPosX);
-    if (posY > maxPosY) setPosY(maxPosY);
+    if (posX > maxPosX) callAfterwards(setPosX, maxPosX);
+    if (posY > maxPosY) callAfterwards(setPosY, maxPosY);
 
     let pageX = width;
     let pageY = height;
     if (value.maxPageX !== pageX) {
-        setWidth(value.maxPageX);
+        callAfterwards(setWidth, value.maxPageX);
         pageX = value.maxPageX
     }
     if (value.maxPageY != pageY) {
-        setHeight(value.maxPageY);
+        callAfterwards(setHeight, value.maxPageY);
         pageY = value.maxPageY
     }
     value.dimX = pageX * value.cellPlusBorderSizeX + border;
@@ -2169,7 +2171,7 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
                 x={posX} setX={setPosX} maxX={gridWidth} pageX={pageX}
                 y={posY} setY={setPosY} maxY={gridHeight} pageY={pageY}
             >
-                <Block full centerItems>
+                <Block full centerItems={center} padded={!center}>
                     <ManagedGrid
                         undo={undo}
                         gridProvider={gridProvider} cellType={cellType}

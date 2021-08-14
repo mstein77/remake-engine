@@ -477,10 +477,13 @@ image.decode().then(
         ctx.drawImage(image, 0, 0);
         model.fonts[0].image = canvas;
 
+/*
         ReactDOM.render(
             <MainEditor>{test ? <TextPaneEditor model={model} /> : <RealApp />}</MainEditor>,
             document.getElementById('app')
         )
+
+ */
     }
 );
 

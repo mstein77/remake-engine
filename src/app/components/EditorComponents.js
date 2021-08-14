@@ -23,7 +23,7 @@ import {
 import { Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker } from "./EntityComponents";
 import { FlexGrid, BaseGrid } from "./GridComponents";
-import { BitmapGrid, CellValue, EmptyGrid } from "../classes/Grid";
+import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BackgroundControl, Icon } from "./BasicComponents";
 import ReactDOM from "react-dom";

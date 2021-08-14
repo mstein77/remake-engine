@@ -1,4 +1,4 @@
-import React, {useContext, useMemo, useRef, useState} from "react";
+import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, getEmptyImageData, getCanvasForBitmap } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
@@ -17,7 +17,9 @@ import {
     ToolGroup,
     ScrollArea,
     BackgroundControl,
-    useUpdateOnEntityIndexChanges, AvailContext, CssContext, WindowContext
+    useUpdateOnEntityIndexChanges,
+    useCallAfterwards,
+    AvailContext, WindowContext, useCssProps
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { FiltersModal } from "./EditorComponents";
@@ -307,10 +309,11 @@ function FlexStack({ auto, scaling,
        varWidth, fixWidth = 0, minWidth,
        page, setPage, maxPage, items, render}) {
 
-    const cssContext = useContext(CssContext);
+    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
     const aContext = useContext(AvailContext);
 
-    const gap = cssContext.getValue('defaultPaddingPx');
+    const callAfterwards = useCallAfterwards();
+    const gap = defaultPaddingPx;
 
     const getZoomAndHeight = () => {
         const varSpaceY = aContext.height - fixHeight - 2 * gap;
@@ -324,15 +327,15 @@ function FlexStack({ auto, scaling,
         if (auto) {
             maxAvailZoom = maxZoom ? Math.min(maxAvailZoom, maxZoom) : maxAvailZoom;
             if (zoom !== maxAvailZoom) {
-                setZoom(maxAvailZoom)
+                callAfterwards(setZoom,  maxAvailZoom)
             }
             zoom = maxAvailZoom
         } else {
             if (maxZoom !== maxAvailZoom) {
-                setMaxZoom(maxAvailZoom)
+                callAfterwards(setZoom,  maxAvailZoom)
             }
             if (zoom > maxAvailZoom) {
-                setZoom(maxAvailZoom);
+                callAfterwards(setZoom,  maxAvailZoom);
                 return null;
             }
         }
@@ -360,7 +363,7 @@ function FlexStack({ auto, scaling,
     }
     const newPage = Math.max(1, Math.min(maxPage, Math.floor( spaceX / (elemWidth + gap))));
     if (newPage !== page) {
-        setPage(newPage);
+        callAfterwards(setPage, newPage);
     }
     const count = Math.min(items.length, newPage);
 
@@ -383,7 +386,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                            entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
-    const cssContext = useContext(CssContext);
+    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
 
     const ApplyModal = useModal();
 
@@ -430,7 +433,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     }
     const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
-    const padding = cssContext.getValue('defaultPaddingPx');
+    const padding = defaultPaddingPx;
 
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
@@ -749,7 +752,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     )
 }
 
-function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, ...props }) {
+function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, centerItems = true, ...props }) {
     const [pos, setPos] = useState(0);
     const [zoom, setZoom] = useState(props.zoom ? props.zoom : 5);
     const [maxZoom, setMaxZoom] = useState(10);
@@ -816,7 +819,7 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                                 gridProvider={gridProvider} cellType={cellType}
                                 zoom={zoom} setZoom={setZoom} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
                                 setBorder={setBorder} setRulers={setRulers}
-                                border={border} rulers={rulers}
+                                border={border} rulers={rulers} center={centerItems}
                                 posX={0} setPosX={noop} posY={pos} setPosY={setPos}
                                 width={width} setWidth={setWidth} height={height} setHeight={setHeight}
 
