@@ -132,7 +132,7 @@ function NumberOrNoneProp({ name, value, set, def, min = 0, ...props }) {
 
     return (
         <LabelProp name={name}>
-            <Stack vertical full="h">
+            <Stack vertical full="h" gaps>
                 <Checkbox name="Unlimited" value={none} set={toggleNone} />
                 <Number
                     full="h"

@@ -213,6 +213,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                             decimals={def.decimals}
                             step={def.step}
                             value={params[def.key]}
+                            full="h"
                             set={value => {
                                 const newParams = { ...params, [def.key]: value };
                                 filterIndex.setEntityPropValue(activeFilter, 'params', newParams);

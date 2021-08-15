@@ -1591,7 +1591,7 @@ function AvailContextProvider({ children }) {
     const observerRef = useRef(null);
     const divRef = useRef(null);
 
-    propsRef.current = {width, height};
+    propsRef.current = { width, height };
 
     useLayoutEffect(() => {
         const checkSize = () => {
@@ -1624,10 +1624,23 @@ function AvailContextProvider({ children }) {
         [width, height]
     );
 
+    const cls = ['bounds overlay'];
+    const style = {};
+    if (width === 0) {
+        cls.push('full-h')
+    } else {
+        style.width = width
+    }
+    if (height === 0) {
+        cls.push('full-v')
+    } else {
+        style.height = height
+    }
+
     return (
         <div ref={divRef} className="full-v full-h overlays">
             <AvailContext.Provider value={value}>
-                <div className="bounds overlay" style={value}>
+                <div className={cls.join(' ')} style={style}>
                     {children}
                 </div>
             </AvailContext.Provider>
@@ -2485,6 +2498,81 @@ function useCssProps( ...props ) {
     return values;
 }
 
+function MinMaxCtx({ vertical, min, max, full, end, center, width, height, padded, border, children }) {
+    const { defaultPaddingPx, boxBorderWidthPx } = useCssProps('defaultPaddingPx', 'boxBorderWidthPx');
+    const add = {
+        h: 0,
+        v: 0
+    }
+    if (padded) {
+        if (padded === '1') {
+            add.h += 2;
+            add.v += 2
+        } else {
+            if (typeof padded === 'number') {
+                if (padded & DIR.LEFT) {
+                    add.h++
+                }
+                if (padded & DIR.RIGHT) {
+                    add.h++
+                }
+                if (padded & DIR.TOP) {
+                    add.v++
+                }
+                if (padded & DIR.BOTTOM) {
+                    add.v++;
+                }
+            } else {
+                if (padded !== 'v') {
+                    add.h = 2;
+                }
+                if (padded !== 'h') {
+                    add.v = 2;
+                }
+            }
+            add.h *= defaultPaddingPx;
+            add.v *= defaultPaddingPx
+        }
+    }
+    if (border) {
+        if (border === '1') {
+            add.h += 2;
+            add.v += 2
+        } else {
+            add.h += 2 * boxBorderWidthPx;
+            add.v += 2 * boxBorderWidthPx
+        }
+    }
+    if (width) {
+        width += add.h
+    }
+    if (height) {
+        height += add.v
+    }
+    const axisDir = vertical ? 'v' : 'h';
+    full = full && full !== axisDir ? true : axisDir;
+    const dimProps = { width, height, border, padded, full };
+    const axisDim = vertical ? 'Height' : 'Width';
+    if (min) {
+        dimProps['min' + axisDim] = min + add[axisDir];
+    }
+    if (max) {
+        dimProps['max' + axisDim] = max + add[axisDir];
+    }
+    if (end) {
+        dimProps.className = 'margin-' + (vertical ? 'top' : 'left') + '-auto';
+    } else if (center) {
+        dimProps.className = 'margin-' + (vertical ? 'v' : 'h') + '-auto';
+    }
+    return (
+        <Block { ...dimProps }>
+            <AvailContextProvider>
+                {children}
+            </AvailContextProvider>
+        </Block>
+    )
+}
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -2516,7 +2604,7 @@ export {
     Kbd,
     Gradient,
     LoadingIndicator,
-
+    MinMaxCtx,
     PropertyGrid,
     ValueProp,
 

@@ -473,6 +473,24 @@ input:invalid {
     animation: rotate 1.2s linear infinite;
 }
 
+.margin-top-auto {
+    margin-top: auto
+}
+
+.margin-left-auto {
+    margin-left: auto
+}
+
+.margin-v-auto {
+    margin-top: auto;
+    margin-bottom: auto
+}
+
+.margin-h-auto {
+    margin-left: auto;
+    margin-right: auto
+}
+
 @keyframes rotate {
     to {
         transform: rotate(360deg);

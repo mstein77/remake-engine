@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState, useRef } from "react"
-import { Stack, Block } from "../components/LayoutComponents"
+import {Stack, Block, DIR} from "../components/LayoutComponents"
 import { Button, Checkbox, Handle, Slider } from "../components/FormComponents"
 import { Kbd, Icon, Canvas, Gradient } from "../components/BasicComponents";
 import { d } from "../helper/helper"
@@ -68,7 +68,7 @@ function DemoEditor({}) {
 
 
     return (
-        <Stack gaps>
+        <Stack gaps full>
             <Stack vertical gaps>
                 <Button icon="delete" name="Checker!" padded onClick={onClick} />
                 <Button icon="delete" name="Checker!" padded gaps={false} onClick={onClick} />
@@ -145,6 +145,57 @@ function DemoEditor({}) {
                 <Slider min={100} border={false} max={400} value={sliderValue} set={setSliderValue}  long={8} short={8} radius={false} />
                 <Slider disabled min={100} max={400} value={sliderValue} set={setSliderValue} rail={15} radius={false} centerItems={false} margin={5}><Canvas width={150} height={15} render={renderRail} /></Slider>
             </Stack>
+
+            <Stack vertical gaps full="h">
+                <Stack full="h" end>
+                    <Slider end full="h" border min={100} max={400} padded="1" value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack full="h" end>
+                    <Slider full="h" railProps={{maxSize: null}} border min={100} max={400} padded="1" value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack full="h" end>
+                    <Slider full="h" railProps={{minSize: null}} border min={100} max={400} padded="1" value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack>
+                    <Slider padded={DIR.RIGHT} size={166} railProps={{minSize: null}} border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack>
+                    <Slider border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+            </Stack>
+
+            <Stack gaps full="v">
+                <Stack className="xalign-center" vertical full="v">
+                    <Slider center vertical full="v" border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack vertical full="v">
+                    <Slider vertical full="v" railProps={{maxSize: null}} border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack vertical full="v">
+                    <Slider vertical full="v" railProps={{minSize: null}} border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+
+                <Stack vertical>
+                    <Slider vertical size={166} border min={100} max={400} value={sliderValue} set={setSliderValue} />
+                    <Block>End</Block>
+                </Stack>
+            </Stack>
+
         </Stack>
     )
 }

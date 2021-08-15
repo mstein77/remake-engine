@@ -18,7 +18,8 @@ import {
     useMounted,
     useCssProps,
     useCallAfterwards,
-    useComponentUpdate, AvailContext
+    useComponentUpdate,
+    AvailContext, MinMaxCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -776,9 +777,7 @@ function Number({name, disabled, value, min, max, step, autoFocus, slider = true
         );
     } else if (hasRange && slider === 'h') {
         items.push(
-            <Block key={1} full="h" padded={DIR.RIGHT|DIR.BOTTOM} center="v">
-                <Slider key={1} tab={false} full="h" end disabled={disabled} railProps={railProps} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set}>{gradient}</Slider>
-            </Block>
+            <Slider key={1} padded={DIR.RIGHT} tab={false} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set}>{gradient}</Slider>
         )
     }
     const inputCls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
@@ -1892,39 +1891,30 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
  *   - bessere Lösung für outline
  *   - end / center auf funktioniert vertical noch nicht richtig
  */
-function Slider({ vertical, center, end, padded, size, full, sledProps = {}, railProps = {}, ...props }) {
-    const { buttonBorderWidthPx } = useCssProps('buttonBorderWidthPx');
-    const oppDir = vertical ? 'h' : 'v';
+function Slider({ vertical, center, end, padded, border, size, full, sledProps = {}, railProps = {}, ...props }) {
+    const { buttonBorderWidthPx } = useCssProps('buttonBorderWidthPx', 'defaultPaddingPx');
 
-    const noSize = !railProps.size;
-    railProps = { size: 150, radius: true, oppSize: 8, minSize: 100, maxSize: 200, outline: false, center: true, ...railProps };
+    railProps = { size: 150, radius: true, oppSize: 8, minSize: 80, maxSize: 180, outline: false, center: true, ...railProps };
     sledProps = { border: true, short: 10, long: 25, margin: 0, radius: true, ...sledProps, borders };
+    if (size) {
+        railProps.size = size;
+        railProps.minSize = size;
+        railProps.maxSize = size;
+    }
     let borders = 0;
     if (sledProps.border) {
         borders = sledProps.border === '1' ? 1 : buttonBorderWidthPx;
     }
-
-    const attr = vertical ? getDimVAttr(props) : getDimHAttr(props);
-
-    let railAndSled = null;
-    if (full && full !== oppDir && noSize) {
-        attr.full = vertical ? 'v' : 'h';
-        attr[vertical ? 'width' : 'height'] = sledProps.margin + sledProps.long + 2 * borders;
-        railAndSled = (
-            <AvailContextProvider>
-                <SliderInner end={end} center={center} vertical={vertical} { ...props } borders={borders} railProps={railProps} sledProps={sledProps} />
-            </AvailContextProvider>
-        )
-    } else {
-        // TODO: center & end doesn't work here on vertical slider
-        attr.center = center
-        attr.end = end;
-        railAndSled = <RailAndSled vertical={vertical} size={size} borders={borders} { ...props } railProps={railProps} sledProps={sledProps} />
-    }
+    const min = (railProps.minSize === null) ? false : railProps.minSize + sledProps.short + 2 * buttonBorderWidthPx;
+    let max = (railProps.maxSize === null) ? false : railProps.maxSize + sledProps.short + 2 * buttonBorderWidthPx;
+    const attr = {
+        full: vertical ? 'v' : 'h',
+        [vertical ? 'width' : 'height']: sledProps.margin + sledProps.long + 2 * borders
+    };
     return (
-        <Block padded={padded} { ...attr }>
-            {railAndSled}
-        </Block>
+        <MinMaxCtx vertical={vertical} padded={padded} end={end} center={center} min={min} max={max} border={border} { ...attr }>
+            <SliderInner end={end} center={center} vertical={vertical} { ...props } borders={borders} railProps={railProps} sledProps={sledProps} />
+        </MinMaxCtx>
     )
 }
 
@@ -1933,9 +1923,7 @@ function SliderInner({ vertical, sledProps, railProps, borders, end, center, ...
     const axisDim = vertical ? 'height' : 'width';
     railProps.size = clamp(railProps.minSize, aContext[axisDim] - sledProps.short - 2 * borders, railProps.maxSize);
     return (
-        <Block end={end} center={center}>
-            <RailAndSled vertical={vertical} sledProps={sledProps} railProps={railProps} borders={borders} { ...props } />
-        </Block>
+        <RailAndSled vertical={vertical} sledProps={sledProps} railProps={railProps} borders={borders} { ...props } />
     )
 }
 

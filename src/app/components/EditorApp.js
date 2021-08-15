@@ -593,7 +593,6 @@ function EditorApp(props) {
 
             if (resource.type !== 'TextPane') continue;
 
-
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
