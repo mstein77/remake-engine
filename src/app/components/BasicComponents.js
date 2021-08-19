@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import { d, Storage, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
-import { DIR, Block, Stack, Grid } from "./LayoutComponents";
-import { Button, Number, Color, OkCancelForm, ColorPicker } from "./FormComponents";
+import { d, Storage, clamp, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
+import { DIR, Block, Stack, Grid, Overlays, Overlay } from "./LayoutComponents";
+import { Button, Color, OkCancelForm, ColorPicker } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
@@ -139,6 +139,120 @@ function BackgroundControl() {
 
     return (
         <Color name="Background:" value={bContext.color} alpha set={bContext.setColor} />
+    )
+}
+
+function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y, setY, readOnly, tab = true, children }) {
+
+    const wContext = useContext(WindowContext);
+    const [rect, setRect] = useState(null);
+
+    const divRef = useRef(null);
+    const propsRef = useRef(null);
+
+    const width = rect ? rect.width : space;
+    const height = rect ? rect.height : space;
+
+    propsRef.current = {x, y, width, height};
+
+    size += 4;
+    const halfSize = size >> 1;
+
+    const distX = width / rangeX;
+    const distY = height / rangeY;
+    const pixelX = width ? rangeX / width : 0;
+    const pixelY = height ? rangeY / height : 0;
+
+    const posX = Math.round(distX * x);
+    const posY = Math.round(distY * y);
+
+    useEffect(() => {
+        setRect(divRef.current.getBoundingClientRect());
+    }, []);
+
+    if (readOnly) {
+        tab = false;
+    }
+    const setAndMove = readOnly ? null : e => {
+        const currRect = divRef.current.getBoundingClientRect();
+        const offX = e.clientX - currRect.x;
+        const offY = e.clientY - currRect.y;
+
+        const off = {
+            x: clamp(0, offX * pixelX, rangeX - 1),
+            y: clamp(0, offY * pixelY, rangeY - 1)
+        };
+        setRect(currRect);
+        setX(off.x);
+        setY(off.y);
+        startMove(e, off);
+    }
+
+    const startMove = readOnly ? null : (e, off = null) => {
+        const anchor = {x: e.clientX, y: e.clientY};
+
+        const startX = off ? off.x : x;
+        const startY = off ? off.y : y;
+        let lastX = startX;
+        let lastY = startY;
+        wContext.startExclusiveMode('drag-circle', 'none');
+        wContext.addEventListener('mousemove', e => {
+            const newX = clamp(0, Math.round(startX + pixelX * (e.clientX - anchor.x)), rangeX - 1);
+            const newY = clamp(0, Math.round(startY + pixelY * (e.clientY - anchor.y)), rangeY - 1);
+
+            if (newX === lastX && newY === lastY) return;
+            lastX = newX;
+            lastY = newY;
+            setX(newX);
+            setY(newY)
+        });
+        wContext.addEventListener('mouseup', e => {
+            wContext.endExclusiveMode('drag-circle', {once: true})
+        })
+    }
+
+    const onKeyDown = readOnly ? null : e => {
+        const shift = e.shiftKey;
+        let newX = propsRef.current.x;
+        let newY = propsRef.current.y;
+        if (e.key === 'ArrowLeft') {
+            newX -= (shift ? 10 : 1) * pixelX;
+        }
+        if (e.key === 'ArrowRight') {
+            newX += (shift ? 10 : 1) * pixelX;
+        }
+        if (e.key === 'ArrowUp') {
+            newY -= (shift ? 10 : 1) * pixelY;
+        }
+        if (e.key === 'ArrowDown') {
+            newY += (shift ? 10 : 1) * pixelY;
+        }
+        newX = clamp(0, newX, rangeX - 1);
+        newY = clamp(0, newY, rangeY - 1);
+        if (newX !== propsRef.current.x) {
+            setX(newX)
+        }
+        if (newY !== propsRef.current.y) {
+            setY(newY)
+        }
+    };
+
+    return (
+        <Overlays width={width + size} height={height + size}
+            originX={halfSize} originY={halfSize}
+        >
+            <Overlay width={width} height={height}>
+                <Block ref={divRef} onLeftClick={setAndMove}>
+                    {children}
+                </Block>
+            </Overlay>
+
+            <Overlay width={size} height={size}
+                left={-halfSize + posX} top={-halfSize + posY}
+            >
+                <Block tab={tab} cursor={readOnly ? false : 'grab'} onLeftClick={startMove} className="circle-border" width={size - 4} height={size - 4} onKeyDown={onKeyDown} />
+            </Overlay>
+        </Overlays>
     )
 }
 
@@ -973,7 +1087,7 @@ function buildBaseColorCanvas() {
         if (up) {
             while (rgb[key] <= 255) {
                 ctx.fillStyle = rgb2hex(rgb);
-                ctx.fillRect(0, y, 15, 1);
+                ctx.fillRect(0, height - y, 15, 1);
                 rgb[key] += steps;
                 y++;
             }
@@ -981,7 +1095,7 @@ function buildBaseColorCanvas() {
         } else {
             while (rgb[key] >= 0) {
                 ctx.fillStyle = rgb2hex(rgb);
-                ctx.fillRect(0, y, 15, 1);
+                ctx.fillRect(0, height - y, 15, 1);
                 rgb[key] -= steps;
                 y++;
             }
@@ -1681,7 +1795,11 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
     const tabsRef = useRef(null);
     const refocus = useRefocus(tabsRef);
 
-    const [ active, setActiveRaw ] = useState(props.active !== undefined ? props.active : null);
+    let [ active, setActiveRaw ] = useState(props.active !== undefined ? props.active : null);
+    if (props.setActive) {
+        active = props.active;
+        setActiveRaw = props.setActive
+    }
     const setActive = value => {
         refocus();
         setActiveRaw(value)
@@ -2135,6 +2253,7 @@ function Gradient({colors, vertical, plain}) {
         );
         let pos = 0;
         for(let color of stops) {
+            if (color.length > 9) d('FFF', colors);
             grd.addColorStop(pos, color);
             pos += dist
         }
@@ -2145,27 +2264,6 @@ function Gradient({colors, vertical, plain}) {
         <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
     )
 }
-
-/*
-function Gradient({ from, to, vertical, plain }) {
-    const aContext = useContext(AvailContext);
-    const render = ctx => {
-        ctx.clearRect(0, 0, aContext.width, aContext.height);
-        const grd = ctx.createLinearGradient(0, 0,
-            vertical ? 0 : aContext.width,
-            vertical ? aContext.height : 0
-        );
-        grd.addColorStop(0, from);
-        grd.addColorStop(1, to);
-        ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, aContext.width, aContext.height);
-    }
-    return (
-        <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
-    )
-}
-
- */
 
 function ThemeFreeze({ blockRef, values, children }) {
     const cssContext = useContext(CssContext);
@@ -2607,6 +2705,7 @@ export {
     MinMaxCtx,
     PropertyGrid,
     ValueProp,
+    PixelMarker,
 
     useModal,
     useComponentUpdate,
