@@ -148,6 +148,7 @@ function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y
     const [rect, setRect] = useState(null);
 
     const divRef = useRef(null);
+    const handleRef = useRef(null);
     const propsRef = useRef(null);
 
     const width = rect ? rect.width : space;
@@ -207,7 +208,10 @@ function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y
             setY(newY)
         });
         wContext.addEventListener('mouseup', e => {
-            wContext.endExclusiveMode('drag-circle', {once: true})
+            wContext.endExclusiveMode('drag-circle', {once: true});
+            if (!readOnly && handleRef.current) {
+                handleRef.current.focus()
+            }
         })
     }
 
@@ -250,7 +254,7 @@ function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y
             <Overlay width={size} height={size}
                 left={-halfSize + posX} top={-halfSize + posY}
             >
-                <Block tab={tab} cursor={readOnly ? false : 'grab'} onLeftClick={startMove} className="circle-border" width={size - 4} height={size - 4} onKeyDown={onKeyDown} />
+                <Block ref={handleRef} tab={tab} cursor={readOnly ? false : 'grab'} onLeftClick={startMove} className="circle-border" width={size - 4} height={size - 4} onKeyDown={onKeyDown} />
             </Overlay>
         </Overlays>
     )
@@ -867,7 +871,7 @@ function Section({ ...props }) {
     )
 }
 
-function PropertyGrid({ propWidth = '-', valueWidth = '*', ...props }) {
+function PropGrid({ propWidth = '-', valueWidth = '*', ...props }) {
     // TODO use CSS value
     return (
         <Grid gaps={5} columns={propWidth + " " + valueWidth} {...props} />
@@ -1110,7 +1114,9 @@ function ModalColorPicker({}) {
     const PickerModal = useModal();
 
     useEffect(() =>{
-        wContext.register('openColorPickerModal', PickerModal.open)
+        wContext.register('openColorPickerModal',
+            props => PickerModal.open({ close: PickerModal.close, ...props })
+        )
     }, []);
 
     return (
@@ -2671,6 +2677,19 @@ function MinMaxCtx({ vertical, min, max, full, end, center, width, height, padde
     )
 }
 
+function PropertyGrid({ labelProps = {}, children }) {
+    labelProps = { width: '-', end: false, ...labelProps };
+    if (typeof labelProps.width === 'number') {
+        labelProps.width += 'px'
+    }
+    return (
+        <Grid padded={DIR.TOP} scroll full="h" columns={labelProps.width + ' minmax(min-content, auto)'}>
+            { children }
+        </Grid>
+    )
+}
+
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -2706,6 +2725,8 @@ export {
     PropertyGrid,
     ValueProp,
     PixelMarker,
+
+    PropGrid,
 
     useModal,
     useComponentUpdate,

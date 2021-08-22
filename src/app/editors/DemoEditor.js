@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState, useRef } from "react"
 import {Stack, Block, DIR} from "../components/LayoutComponents"
-import { Button, Checkbox, Handle, Slider } from "../components/FormComponents"
-import { Kbd, Icon, Canvas, Gradient } from "../components/BasicComponents";
+import { Button, Checkbox, Slider } from "../components/FormComponents"
+import {Kbd, Icon, Canvas, Gradient, PropGrid, AvailContextProvider} from "../components/BasicComponents";
 import { d } from "../helper/helper"
 
 function DemoEditor({}) {
@@ -104,9 +104,6 @@ function DemoEditor({}) {
             <Button vertical icon="add" padded gaps={false} name="10" full rev onClick={onClick}>HA</Button>
 
             <Stack vertical gaps>
-                <Handle width={10} height={30} tab axis="v" onMove={(x, y) => d('OFF', x, y)} onDirKey={(dir, factor, shift) => d('KEY', dir, factor, shift)} />
-                <Handle tab axis="v" className="button-color" onMove={(x, y) => d('OFF', x, y)}><Icon name="add" /></Handle>
-                <Handle circle width={5} height={5} tab />
                 <Checkbox size={14} value={check1} set={setCheck1} />
                 <Checkbox value={check2} set={setCheck2} />
                 <Checkbox size={14} name="Rulers" value={check1} set={setCheck1} />
@@ -115,6 +112,21 @@ function DemoEditor({}) {
                 <Checkbox disabled size={14} name="Rulers" value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" maxWidth={80} value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" full="h" value={check2} set={setCheck2} />
+                    <PropGrid labelProps={{width: 60}}>
+                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} shorten>Where are we?</Block>
+                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
+
+                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} wrap={true}>Where are here?</Block>
+                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
+
+                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block end>a:</Block></Block>
+                        <Block full="h" className="input-bg" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
+                            Here we stop</Block>
+
+                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block shorten wrap end>another label:</Block></Block>
+                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
+                            Here we go with a long line</Block>
+                    </PropGrid>
             </Stack>
 
             <Slider min={100} max={400} value={sliderValue} set={setSliderValue} vertical />
@@ -146,7 +158,7 @@ function DemoEditor({}) {
                 <Slider disabled min={100} max={400} value={sliderValue} set={setSliderValue} rail={15} radius={false} centerItems={false} margin={5}><Canvas width={150} height={15} render={renderRail} /></Slider>
             </Stack>
 
-            <Stack vertical gaps full="h">
+            <Stack vertical gaps xfull="h">
                 <Stack full="h" end>
                     <Slider end full="h" border min={100} max={400} padded="1" value={sliderValue} set={setSliderValue} />
                     <Block>End</Block>

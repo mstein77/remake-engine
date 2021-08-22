@@ -1098,8 +1098,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
             >
                 {currBlock === null ?
                     <Block center className="less">No block selected</Block> :
-                    <Block padded full="h" scroll>
-                        <Grid gaps columns="90px *" full="h">
+                    <Block full="h" scroll>
+                        <PropertyGrid>
                             <SelectProp name="Font:" full="h" undo="font" options={fontOptions} value={currBlock.font} set={setEntityProp('font')} />
                             <TupleProp name="Position:" undo="position"
                                x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
@@ -1135,7 +1135,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                     <Button disabled={currBlock.filters === ''} icon="clear" onClick={clearFilter} />
                                 </Stack>
                             </LabelProp>
-                        </Grid>
+                        </PropertyGrid>
                     </Block>
                 }
             </EntityStackSections>

@@ -9,6 +9,8 @@ const DIR = {
     RIGHT: 8,
     ALL: 15
 };
+DIR.H = DIR.LEFT | DIR.RIGHT;
+DIR.V = DIR.TOP | DIR.BOTTOM;
 
 /**
  * @module LayoutComponents
@@ -653,9 +655,16 @@ function getGridTemplateString(value) {
     return newParts.join(' ');
 }
 
-function Grid({children, columns, rows, gaps, full, centerItems, className, ...props}) {
+function Grid({children, columns, rows, padded, gaps, full, centerItems, scroll, className, ...props}) {
     const cls = ['grid'];
     const bCls = ['max-h block'];
+    if (scroll) {
+        bCls.push('scroll');
+    }
+    if (padded) {
+        // TODO
+        bCls.push('padded-v');
+    }
     if (className) {
         cls.push(className);
     }

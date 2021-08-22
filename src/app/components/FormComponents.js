@@ -236,7 +236,7 @@ function useStatePrefix(state, def = null) {
 
 const FormContext = React.createContext();
 
-function Form({ children, submit, ...props }) {
+function Form({ children, submit, onKeyDown, ...props }) {
     const [invalid, setInvalid] = useState(false);
     const mounted = useMounted();
 
@@ -283,6 +283,8 @@ function Form({ children, submit, ...props }) {
             submit();
             e.preventDefault();
             e.stopPropagation();
+        } else if (onKeyDown) {
+            onKeyDown(e);
         }
     };
 
@@ -703,6 +705,10 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
 
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
+    if (props.inputRef) {
+        props.inputRef.current = inputRef.current;
+    }
+    const callAfterwards = useCallAfterwards();
 
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
@@ -857,7 +863,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     if (!valid(attr.value, edit)) {
         cls.push('invalid');
         if (fContext) {
-            fContext.markInvalid()
+            callAfterwards(fContext.markInvalid)
         }
     }
     if (active) {
@@ -930,6 +936,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
 
     const divRef = useRef(null);
     const slideRef = useRef(null);
+    const inputRef = useRef(null);
 
     const [dim, setDim] = useState(null);
     const [reenter, setReenter] = useState(false);
@@ -1006,7 +1013,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
         );
     } else if (hasRange && slider === 'h') {
         items.push(
-            <Slider key={1} padded={DIR.RIGHT} tab={false} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={vValue} decimals={vDecimals} min={vMin} max={vMax} set={vSet}>{gradient}</Slider>
+            <Slider key={1} padded={DIR.RIGHT} tab={false} focusRef={inputRef} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={vValue} decimals={vDecimals} min={vMin} max={vMax} set={vSet}>{gradient}</Slider>
         )
     }
     const inputCls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
@@ -1017,7 +1024,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     items.push(
         <Input key={2} number className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus}
                decimals={vDecimals} step={vStep} max={vMax} min={vMin}
-               value={vValue} set={vSet} />
+               value={vValue} set={vSet} inputRef={inputRef} />
     );
     if (buttons) {
         items.push(
@@ -1386,7 +1393,6 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...pro
         }, {once: true});
         wContext.openColorPickerModal({
             value: colorRef,
-            test: value,
             alpha,
             set
         });
@@ -1494,20 +1500,20 @@ const svPercProps = {decimals: 1, step: 0.1};
 
 /**
  * TODO
- *  - inverse-color
- *  - persistierung hsv/rgb (last-color?)
- *  - BUGFIX: korrekte Umrechnung
- *  - transparency (perc im HSV-Mode)
+ *  - BUGFIX: slider im HSV-Modus nicht per Keys steuerbar
  *  - BUGFIX: Ausrichtung
- *  - RETURN => close, ESC => Cancel
+ *  - BUGFIX: korrekte Umrechnung
+
+ *  - persistierung hsv/rgb (last-color?)
+ *  - transparency (perc im HSV-Mode)
  *  - Modal-Fixierung ausssetzen, bis Sizing durch
  *  - Normaler Modal
  *  - Positionierung nahe ColorBox
  *  - Invalid-State für Color
- *  - BUGFIX: slider im HSV-Modus nicht per Keys steuerbar
  *  - Modal: keine Transparenz => Active-Border
+ *  - CHECK: modal-cancel reset
  */
-function ColorPicker({ value, set, alpha }) {
+function ColorPicker({ value, set, alpha, close }) {
 
     const wContext = useContext(WindowContext);
     const PickerModal = useModal();
@@ -1563,7 +1569,6 @@ function ColorPicker({ value, set, alpha }) {
         setH(hsv.h);
         setS(hsv.s);
         setV(hsv.v);
-        requestAnimationFrame(update);
     }
 
     const renderSquare = ctx => {
@@ -1702,24 +1707,36 @@ function ColorPicker({ value, set, alpha }) {
             requestAnimationFrame(update);
         });
     }
-
     const setHue = newH => {
         setH(newH);
         syncColor2Hsv()
     }
-
     const setSaturation = newS => {
         setS(newS);
         syncColor2Hsv()
     }
-
     const setVelocity = newV => {
         setV(newV);
         syncColor2Hsv()
     }
+    const invertColor = () => {
+        const rgb = hex2rgb(value.current.substr(0, 7));
+        rgb.r = 255 - rgb.r;
+        rgb.g = 255 - rgb.g;
+        rgb.b = 255 - rgb.b;
+        setAndSync(rgb2hex(rgb) + hsvRef.current.grad);
+    }
+    const handleEsc = e => {
+        if (e.key === 'Escape') {
+            set(before);
+            requestAnimationFrame(close);
+            e.stopPropagation();
+            e.preventDefault()
+        }
+    };
 
     return (
-        <>
+        <Form submit={close} onKeyDown={handleEsc}>
         <Stack vertical borders height={260}>
             <Stack borders full="h">
                 <Stack vertical borders width={310}>
@@ -1728,6 +1745,7 @@ function ColorPicker({ value, set, alpha }) {
                         <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
                         <Stack center="v" gaps>
                             <Button icon="colorize" onClick={() => PickerModal.open({})} />
+                            <Button icon="invert_colors" onClick={invertColor} />
                             <Button icon="undo" onClick={undoOp} />
                             <Button icon="visibility" onClick={showBeforeOp} onClickEnd={showBeforeEnd} />
                         </Stack>
@@ -1798,7 +1816,7 @@ function ColorPicker({ value, set, alpha }) {
             <PickerModal.content name="Pick a color..." full>
                 <BitmapSelector type={alpha ? 'rgba' : 'rgb'} save={setColorFromPicker} close={PickerModal.close} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
             </PickerModal.content>
-        </>
+        </Form>
     )
 }
 
@@ -1931,7 +1949,7 @@ function SliderInner({ vertical, sledProps, railProps, borders, end, center, ...
 }
 
 function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabled, decimals = 0,
-        railProps = {}, sledProps = {}, getIndicator, borders, children }) {
+        railProps = {}, sledProps = {}, getIndicator, borders, focusRef, children }) {
 
     const wContext = useContext(WindowContext);
 
@@ -2079,7 +2097,10 @@ function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabl
         setClicked(true);
         wContext.addEventListener('mouseup', () => {
             wContext.endExclusiveMode('move-slider');
-            setClicked(false)
+            setClicked(false);
+            if (focusRef && focusRef.current) {
+                focusRef.current.focus();
+            }
         }, {once: true});
         wContext.addEventListener('mousemove', e => {
             const { value } = propsRef.current;
@@ -2337,10 +2358,10 @@ function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props 
 function LabelProp({name, children}) {
     return (
         <>
-            <Block className="small-font">
+            <Block shorten padded={DIR.LEFT|DIR.RIGHT|DIR.BOTTOM} className="small-font">
                 {name}
             </Block>
-            <Block>
+            <Block full="h" padded={DIR.RIGHT|DIR.BOTTOM}>
                 {children}
             </Block>
         </>
@@ -2399,8 +2420,8 @@ function CheckboxProp({ name, ...props }) {
 function FullProp({ name, children}) {
     return (
         <>
-            {name && <Block full="h" className="small-font col-span-2">{name}</Block>}
-            <Block full="h" className="col-span-2">
+            {name && <Block padded={DIR.H|DIR.BOTTOM} full="h" className="small-font col-span-2">{name}</Block>}
+            <Block padded={DIR.H|DIR.BOTTOM} full="h" className="col-span-2">
                 {children}
             </Block>
         </>

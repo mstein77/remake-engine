@@ -1,52 +1,76 @@
+--------------------------------
+ Property Grid
+--------------------------------
+ a) Modal mit Min-Width
+
+    Die width vom PropGrid ist dann, das Minimum aus
+     - max(cells-min-width, min-width auf PropGrid)
+     - max-width auf dem PropGrid
+     - max-width auf dem Modal
+
+   In den letzten beiden Fällen übersteigt die min-
+   width des PropGrids die Avail-Width deswegen muss
+   dann ein Scrollbar angezeigt werden
+
+   <Block>
+     <Grid maxWidth={400} columns="- -">
+        <Label>Name1</Label>
+        <Block full="h">...</Block>
+
+        <Label>Name2</Label>
+        <Block full="h">...</Block>
+
+     </Grid>
+   </Block>
+
+   Was wir hier nicht brauchen ist ein auffüllen auf
+   die volle Width des umgebenden Blocks falls dieser
+   eine avail-width > min-content hat.
+
+ b) Modal mit Min-Width und Flex-Cells
+
+    wie zuvor aber wenn der letzte fall eintritt dann
+    wird die avail-width statt des min-contents für
+    die width des grids genommen.
+
+
+
+
+
+
+ height: min-content (evt. auch Full, wenn GridProperty?)
+ width: full
+
+ Die Content-Cells richten sich nach längsten Content-Cell, wenn
+ diese kleiner gleich dem verfügbaren Platz ist => full
+ ansonsten hat jede Cell die gleiche Länge wie die Content-Cell
+ Bei Überlänge muss das Ganze Grid Scrollbar sein (in beide Richtungen)
+
+ Die Länge der Name-Cells ist entweder vorgegeben oder min-content,
+ wobei für den Name defaultmäßig ein Ellipsis genutzt wird, aber auch
+ ein Wrapping aktiviert werden kann.
+
+ Padding: das Property-Grid selber übernimmt nur ein vertikales padding
+ Die Name Cells sind bottom-left padded die content-cells bottom-left-right
+
+ Sind borders aktiviert dann gibt es
+
+
+ <Block full scroll>
+    <Grid columns={nameCellWidth + ' *'}>
+        <Block end shorten padded={BOTTOM|LEFT}>Test1:</Block>
+        <Block full="h" padded={BOTTOM|LEFT|RIGHT}>Fill me!</Block>
+
+        <Block end shorten padded={BOTTOM|LEFT}>Test2:</Block>
+        <Block full="h" padded={BOTTOM|LEFT|RIGHT}>Kill me!</Block>
+
+
+    </Grid>
+ </Block>
+
+
 TODO:
- - Handle: Styling für Vertical Slider
  - BUG: rotate auf icon geht nicht (shift-buttons)
- - Color-Input: Styling
-
----------------------------------
- axisKey = width (h) oder height (v)
- oppAxisKey = rev(axisKey)
- sliderSize
-
- DIM des äußeren Blocks bestimmen:
-   - in Ziehrichtung wird max und min gesetzt
-   - in die andere wird die lange Handle-Seite gesetzt
-
-
-
-
-             avail-space
-  <------------------------------->
-                 w=sledShort
-  ---------------|----------------- h=sledSize
-
-Zieh-Achse: h => clamp(min, *width, max), height = handleSize
-
-Die axisDim sollte sich immer auf die Laufleiste beziehen
-
-
-
- <Block full=dir padded=x>
- <AvailContextProvider oppAxisKey=sledLong>
-
-   clampSize = clamp(min, avail[axisKey] - sledShort, max);
-
-   <Overlays [originAxis]=halfSledShort [originOppAxis]=halfSledLong
-       axisKey=clampSize+sledShort oppAxisKey=sledLong>
-
-     <Overlay>
-        <Stack [axisKey]=clampSize [oppAxisKey]=sledLong>
-            <Block [axisKey]=value full=oppDir color="button" />
-            <Block full color="input" />
-        </Stack>
-     </Overlay>
-
-     <Overlay [axisMargin]=-halfSledLong [oppAxisMargin]=-halfSledShort+value>
-        <Handle />
-     </Overlay>
-
-   </Overlays>
-
 
 
 
