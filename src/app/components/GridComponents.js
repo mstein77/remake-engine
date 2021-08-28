@@ -1973,7 +1973,9 @@ function ManagedGrid({
     }
     const hasSelection = marker.use && markerX !== null;
     if (eContext.hasSelection !== hasSelection) {
-        eContext.setHasSelection(hasSelection)
+        callAfterwards(
+            eContext.setHasSelection, hasSelection
+        )
     }
 
     const mode = eContext.mode;
@@ -2025,7 +2027,6 @@ function ManagedGrid({
     useMemo(() => {
         if (props.mode) {
             callAfterwards(eContext.setMode, props.mode, props.modeParams);
-//            eContext.setMode(props.mode, props.modeParams);
         }
     }, []);
 
@@ -2278,7 +2279,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     {navi &&
                         <Button icon="north" disabled={posY === 0} onClick={() => setPosY(0)} />}
                         {edit &&
-                            <Button icon="system_update_alt" rotate={180} onClick={() => shiftRow(true)} />}
+                            <Button icon="system_update_alt" iconProps={{rotate: 180}} onClick={() => shiftRow(true)} />}
                         {resize &&
                             <>
                                 <Button icon="add" name="10" onClick={addRows(10, true)} />
@@ -2302,7 +2303,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     }
                     {navi && <Button icon="west" disabled={posX === 0} onClick={() => setPosX(0)} />}
                     {edit &&
-                        <Button icon="system_update_alt" rotate={90} onClick={() => shiftColumn(true)} />}
+                        <Button icon="system_update_alt" iconProps={{rotate: 90}} onClick={() => shiftColumn(true)} />}
                         {resize &&
                             <>
                                 <Button vertical icon="add" name="10" onClick={addColumns(10, true)} />
@@ -2323,7 +2324,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                         </>
                     }
                     {navi && <Button icon="east" disabled={posX === maxPosX} onClick={() => setPosX(maxPosX)} />}
-                    {edit && <Button icon="system_update_alt" rotate={-90} onClick={() => shiftColumn(false)} />}
+                    {edit && <Button icon="system_update_alt" iconProps={{rotate: -90}} onClick={() => shiftColumn(false)} />}
                     {resize &&
                         <>
                             <Button vertical icon="add" name="10" onClick={addColumns(10, false)} />
@@ -2475,9 +2476,9 @@ function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], u
                             {edit && hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
                             {edit && hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
                             {edit && hasMode('drag') && <Button icon="pan_tool" current={eContext.mode} value={'drag'} onClick={() => eContext.setMode('drag')} />}
-                            {edit && hasMode('add') && <Button icon="exposure" rotate={180} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
+                            {edit && hasMode('add') && <Button icon="exposure" iconProps={{rotate: 180}} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
                             {hasMode('select') && <Button icon="highlight_alt" current={modeParams.type || (mode === 'select' && 'rect')} value={'rect'} onClick={() => eContext.setMode('select', selection)} />}
-                            {edit && hasMode('select')  && <Button icon="view_week" rotate={-90} current={modeParams.type} value={'rows'} onClick={() => eContext.setMode('select', {type: 'rows'})} />}
+                            {edit && hasMode('select')  && <Button icon="view_week" iconProps={{rotate: -90}} current={modeParams.type} value={'rows'} onClick={() => eContext.setMode('select', {type: 'rows'})} />}
                             {edit && hasMode('select') && <Button icon="view_week" current={modeParams.type} value={'columns'} onClick={() => eContext.setMode('select', {type: 'columns'})} />}
                             {resize && hasMode('select')  && <Button icon="border_horizontal" current={modeParams.type} value={'row-gap'} onClick={() => eContext.setMode('select', {type: 'row-gap'})} />}
                             {resize && hasMode('select') && <Button icon="border_vertical" current={modeParams.type} value={'column-gap'} onClick={() => eContext.setMode('select', {type: 'column-gap'})} />}

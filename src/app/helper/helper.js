@@ -1301,6 +1301,11 @@ const ucfirst = (value) => {
     return value[0].toUpperCase() + value.substring(1);
 };
 
+const isEventInRect = (e, rect) => {
+    return (rect.x <= e.clientX && (rect.x + rect.width) >= e.clientX &&
+        rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
+}
+
 const noop = () => {};
 
 module.exports = {
@@ -1341,6 +1346,7 @@ module.exports = {
     getBlockDim,
     getBlockPos,
     cloneDeep,
+    isEventInRect,
     drawCanvasToAvail,
     drawEventsValue,
     getCanvasForIndexMatrix,

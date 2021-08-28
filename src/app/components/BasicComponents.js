@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import { d, Storage, clamp, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
+import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay } from "./LayoutComponents";
 import { Button, Color, OkCancelForm, ColorPicker } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
@@ -142,7 +142,7 @@ function BackgroundControl() {
     )
 }
 
-function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y, setY, readOnly, tab = true, children }) {
+function PixelMarker({ size, rangeX = null, rangeY = null, x, setX, y, setY, readOnly, tab = true, children }) {
 
     const wContext = useContext(WindowContext);
     const [rect, setRect] = useState(null);
@@ -151,8 +151,8 @@ function PixelMarker({ size, space = 0, rangeX = null, rangeY = null, x, setX, y
     const handleRef = useRef(null);
     const propsRef = useRef(null);
 
-    const width = rect ? rect.width : space;
-    const height = rect ? rect.height : space;
+    const width = rect ? rect.width : 0;
+    const height = rect ? rect.height : 0;
 
     propsRef.current = {x, y, width, height};
 
@@ -871,13 +871,6 @@ function Section({ ...props }) {
     )
 }
 
-function PropGrid({ propWidth = '-', valueWidth = '*', ...props }) {
-    // TODO use CSS value
-    return (
-        <Grid gaps={5} columns={propWidth + " " + valueWidth} {...props} />
-    );
-}
-
 function ValueProp({ name, children }) {
     return (
         <PropLabel name={name}>
@@ -1441,7 +1434,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 }
                 modalStack.push(zIndex);
                 focusStack.zIndex = zIndex;
-                focusStack.elem[zIndex] = {top: null, start: null, lastTarget };
+                focusStack.elem[zIndex] = {top: null, start: null, setShadow: null, lastTarget};
                 return zIndex;
             },
             closeModal: zIndex => {
@@ -1455,6 +1448,12 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 register('lastTarget', focusStack.elem[zIndex].lastTarget);
                 delete focusStack.elem[zIndex];
                 focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
+                if (focusStack.zIndex) {
+                    const old = focusStack.elem[focusStack.zIndex];
+                    if (old && old.setShadow) {
+                        old.setShadow()
+                    }
+                }
             },
 
             registerEditor: (id, clear) => registry('editors')[id] = clear,
@@ -1994,6 +1993,20 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
     const [left, setLeft] = useState(null);
     const [top, setTop] = useState(null);
     const [dim, setDim] = useState(null);
+    const [shadow, setShadow] = useState(null);
+    const mounted = useMounted();
+
+    const enableShadow = () => {
+        setTimeout(() => {
+            if (mounted.current) {
+                setShadow(true);
+            }
+        }, 100)
+    }
+
+    if (shadow === null && transparent) {
+        enableShadow();
+    }
 
     useEffect(() => {
         const focusElem = wContext.focusStack.elem[zIndex];
@@ -2051,15 +2064,24 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
                 }
             );
             observer.observe(document.body);
-
-            const rect = dimRef.current.getBoundingClientRect();
-            setDim(rect);
-            setLeft(rect.left);
-            setTop(rect.top);
-
+            requestAnimationFrame(() => {
+                const rect = dimRef.current.getBoundingClientRect();
+                setDim(rect);
+                setLeft(rect.left);
+                setTop(rect.top)
+            });
             return () => {
                 observer.disconnect();
             };
+        }
+    }, []);
+
+    useEffect(() => {
+        if (transparent) {
+            const focusElem = wContext.focusStack.elem[zIndex];
+            if (focusElem) {
+                focusElem.setShadow = enableShadow
+            }
         }
     }, []);
 
@@ -2119,8 +2141,29 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
     if (full && full !== 'h') {
         vDivCls.push('full-v');
     }
-    if (transparent) {
-        vDivCls.push('shadow');
+    const dimAttr = {};
+    if (transparent && shadow !== null) {
+        if (shadow) {
+            vDivCls.push('shadow');
+        }
+        const modalLevel = wContext.getModalLevel();
+        dimAttr.onMouseEnter = e => setShadow(false);
+        dimAttr.onMouseLeave = e => {
+            if (wContext.getModalLevel() !== modalLevel) {
+                setShadow(false);
+                return;
+            }
+            const rect = dimRef.current.getBoundingClientRect();
+            if (!isEventInRect(e, rect)) {
+                setShadow(true);
+            } else if (wContext.isInExclusiveMode()) {
+                window.addEventListener('mouseup', e => {
+                    if (!isEventInRect(e, rect)) {
+                        setShadow(true)
+                    }
+                }, {once: true});
+            }
+        }
     }
 
     const hotKeys = {};
@@ -2183,7 +2226,7 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
         <div className="center-v center-h full-h editor-bounds">
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
-                    <div ref={dimRef} className={vDivCls.join(' ')} style={vDivStyle}>
+                    <div ref={dimRef} { ...dimAttr } className={vDivCls.join(' ')} style={vDivStyle}>
                         <Stack gaps full="h" { ...nameAttr } padded>
                             <Block center="v" shorten full="h">{name}</Block>
                             {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
@@ -2208,16 +2251,28 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
 };
 
 function Icon({ name, width, height, center = 'h', className, rotate, size = 18 }) {
+    if (rotate) d('#', rotate);
     const style = {
         width: width || size,
         height: height || size
     };
-    const cls = ['min-content-h'];
-    if (center === true || center === 'h') {
-        cls.push('center-h');
+    if (width && width < size) {
+        size = width
     }
-    if (center === true || center === 'v') {
-        cls.push('center-v');
+    if (height && height < size) {
+        size = height
+    }
+    if (typeof size === 'number') {
+        size += 'px';
+    }
+    const cls = ['min-content-h'];
+    if (center) {
+        if (center !== 'v') {
+            cls.push('center-h');
+        }
+        if (center !== 'h') {
+            cls.push('center-v');
+        }
     }
     if (className) {
         cls.push(className);
@@ -2226,7 +2281,7 @@ function Icon({ name, width, height, center = 'h', className, rotate, size = 18 
         <div style={style} className={cls.join(' ')} dangerouslySetInnerHTML={
             {
                 __html: !name ? '' :
-                    '<i class="material-icons center-h min-content-h" style="font-size: ' + size + 'px; display: block; ' + (rotate ? 'transform: rotate(' + rotate + 'deg)' : '')  + ' ">' + name + '</i>'
+                    '<i class="material-icons center-h min-content-h" style="font-size: ' + size + '; display: block; ' + (rotate ? 'transform: rotate(' + rotate + 'deg)' : '')  + ' ">' + name + '</i>'
             }
         } />
     );
@@ -2268,6 +2323,25 @@ function Gradient({colors, vertical, plain}) {
     }
     return (
         <Canvas plain={plain} width={aContext.width} height={aContext.height} render={render} />
+    )
+}
+
+function ColorBox({ color, width, height, className }) {
+    const boxStyle = {
+        width,
+        height
+    };
+    const bgStyle = {
+        backgroundColor: color
+    };
+    const cls = ['checkerboard-bg relative'];
+    if (className) {
+        cls.push(className);
+    }
+    return (
+        <div className={cls.join(' ')} style={boxStyle}>
+            <div className="absolute full-h full-v" style={bgStyle} />
+        </div>
     )
 }
 
@@ -2725,8 +2799,7 @@ export {
     PropertyGrid,
     ValueProp,
     PixelMarker,
-
-    PropGrid,
+    ColorBox,
 
     useModal,
     useComponentUpdate,

@@ -309,8 +309,16 @@ html, body {
     z-index: 2000000;
 }
 
-.shadow {
+.shadow-old {
     box-shadow: 5px 5px 5px #00000088;
+}
+
+.shadow {
+    box-shadow: 0 0 0px 5px var(--active-bg-rgb);
+}
+
+.shadow:hover {
+    box-shadow: none;
 }
 
 .rev-cols {

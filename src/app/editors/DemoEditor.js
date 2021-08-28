@@ -1,7 +1,7 @@
-import React, { useContext, useEffect, useMemo, useState, useRef } from "react"
+import React, { useState } from "react"
 import {Stack, Block, DIR} from "../components/LayoutComponents"
-import { Button, Checkbox, Slider } from "../components/FormComponents"
-import {Kbd, Icon, Canvas, Gradient, PropGrid, AvailContextProvider} from "../components/BasicComponents";
+import { TextArea, Button, Radio, Checkbox, Slider, Input } from "../components/FormComponents"
+import {Kbd, Icon, Canvas, Gradient, PropertyGrid } from "../components/BasicComponents";
 import { d } from "../helper/helper"
 
 function DemoEditor({}) {
@@ -18,6 +18,11 @@ function DemoEditor({}) {
         size: 10
     };
 
+    const radioOptions = [
+        {id: 0, name: 'Jantipa'}, {id: 1, name: 'Dao'}, {id: 2, name: 'Joy'},
+        {id: 3, name: 'Jantipa'}, {id: 4, name: 'Dao'}, {id: 5, name: 'Joy'},
+    ];
+
     const [ state, setState ] = useState(0);
     const [ sliderValue, setSliderValue ] = useState(200);
     const [ test, setTest ] = useState(0);
@@ -25,6 +30,8 @@ function DemoEditor({}) {
     const [ check1, setCheck1 ] = useState(true);
     const [ check2, setCheck2 ] = useState(false);
     const [ radio, setRadio ] = useState(0);
+    const [ radio2, setRadio2 ] = useState(0);
+    const [ text, setText ] = useState('Here...');
 
     const renderRail = ctx => {
         const size = 150;
@@ -58,7 +65,6 @@ function DemoEditor({}) {
             ctx.strokeStyle = '#000000';
             ctx.moveTo(4, 6);
             ctx.lineTo(13, 0);
-//            ctx.stroke();
             ctx.moveTo(4, 6);
             ctx.lineTo(13, 12);
             ctx.stroke();
@@ -112,21 +118,35 @@ function DemoEditor({}) {
                 <Checkbox disabled size={14} name="Rulers" value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" maxWidth={80} value={check2} set={setCheck2} />
                 <Checkbox name="Very very long Rulers" full="h" value={check2} set={setCheck2} />
-                    <PropGrid labelProps={{width: 60}}>
-                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} shorten>Where are we?</Block>
-                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
+                <PropertyGrid labelProps={{width: 60}}>
+                    <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} shorten>Where are we?</Block>
+                    <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
 
-                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} wrap={true}>Where are here?</Block>
-                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
+                    <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT} wrap={true}>Where are here?</Block>
+                    <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT}>Here we go with a long line</Block>
 
-                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block end>a:</Block></Block>
-                        <Block full="h" className="input-bg" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
-                            Here we stop</Block>
+                    <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block end>a:</Block></Block>
+                    <Block full="h" className="input-bg" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
+                        Here we stop</Block>
 
-                        <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block shorten wrap end>another label:</Block></Block>
-                        <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
-                            Here we go with a long line</Block>
-                    </PropGrid>
+                    <Block padded={DIR.LEFT|DIR.BOTTOM|DIR.RIGHT}><Block shorten wrap end>another label:</Block></Block>
+                    <Block full="h" padded={DIR.BOTTOM|DIR.RIGHT} wrap>
+                        Here we go with a long line</Block>
+                </PropertyGrid>
+                <Input value={sliderValue} set={setSliderValue} number full="h" />
+                <Input value={sliderValue} set={setSliderValue} number full="h" maxWidth={false} />
+                <Input value={sliderValue} set={setSliderValue} maxWidth={150} number full="h" />
+                <Input value={sliderValue} set={setSliderValue} number />
+                <Input value={sliderValue} set={setSliderValue} number size={8} />
+                <Input value={sliderValue} set={setSliderValue} number size={8} minWidth={150} />
+                <Input value={sliderValue} set={setSliderValue} width={120} number />
+                <Input value={sliderValue} set={setSliderValue} number />
+                <Input value={'' + sliderValue} set={setSliderValue} />
+                <Input value={'' + sliderValue} clear set={setSliderValue} />
+                <Input value={sliderValue} number clear set={setSliderValue} full="h" />
+                <Input name="Check it out:" value={'' + sliderValue} set={setSliderValue} />
+                <TextArea value={text} set={setText} />
+                <TextArea name="Forza:" minWidth={250} value={text} set={setText} full="h" />
             </Stack>
 
             <Slider min={100} max={400} value={sliderValue} set={setSliderValue} vertical />
@@ -183,6 +203,8 @@ function DemoEditor({}) {
                     <Slider border min={100} max={400} value={sliderValue} set={setSliderValue} />
                     <Block>End</Block>
                 </Stack>
+
+                <Radio options={radioOptions} name="Who?" value={radio2} set={setRadio2} padded gaps />
 
             </Stack>
 

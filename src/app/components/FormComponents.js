@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { d, round, clamp, ucfirst, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
+import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
 import { Block, Stack, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
     WindowContext,
@@ -9,6 +9,7 @@ import {
     Kbd,
     Canvas,
     Gradient,
+    ColorBox,
     Icon,
     SideTab,
     SideTabs,
@@ -168,17 +169,51 @@ function useSet(value, { undo, set }) {
  *
  *   - full height should be ignored because in flow-context height should only be abs or min
  */
-function ComponentWithName({ name, children, ...props }) {
+function ComponentWithName({ name, center = 'v', children, ...props }) {
     if (name) {
         const attr = getDimHAttr(props);
         children = (
             <Stack gaps {...attr}>
-                <Block center="v" full={attr.full} shorten>{name}</Block>
+                <Block center={center} full={attr.full} shorten>{name}</Block>
                 {children}
             </Stack>
         )
     }
     return children
+}
+
+function getStackAndDimHAttr(props, defaults = {}) {
+    let { full, width, minWidth, maxWidth } = getDimHAttr(props);
+
+    const stackAttr = {};
+    const dimAttr = {};
+    let flexCls = 'full-h';
+
+    if (width) {
+        // fix width
+        stackAttr.width = width;
+        dimAttr.full = 'h'
+    } else {
+        if (!minWidth && minWidth !== false) {
+            minWidth = defaults.min
+        }
+        if (!maxWidth && maxWidth !== false) {
+            maxWidth = defaults.max
+        }
+        stackAttr.minWidth = minWidth;
+        stackAttr.maxWidth = maxWidth;
+        if (full) {
+            stackAttr.full = 'h';
+            dimAttr.full = 'h'
+        } else {
+            flexCls = '';
+        }
+    }
+    return {
+        stackAttr,
+        dimAttr,
+        flexCls
+    }
 }
 
 function getDimHAttr({ full, width, minWidth, maxWidth }) {
@@ -547,16 +582,10 @@ function AsyncButton({ onClick, onClickEnd, ...props }) {
     )
 }
 
-
-/**
- * TODO:
- *  - wrapping
- *  - min/max-Width
- *  - callAfterwards für invalid
- */
-function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, tab = true, ...props }) {
+function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, wrap, tab = true, floatProps = {}, ...props }) {
     const fContext = useContext(FormContext);
 
+    const callAfterwards = useCallAfterwards();
     const set = useSet(value, props);
 
     const radioRef = useRef(null);
@@ -565,6 +594,8 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
         refocus();
         set(value)
     };
+
+    const dimProps = getDimHAttr(props);
 
     const optionHandler = getOptionHandler(options, value);
     const attr = useFocusKeyBindings({
@@ -608,100 +639,17 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, t
     if (!found) {
         attr.className = 'invalid';
         if (fContext) {
-            fContext.markInvalid()
+            callAfterwards(fContext.markInvalid)
         }
     }
     return (
-        <ComponentWithName name={name} {...props}>
-            <Block ref={radioRef}><Stack {...attr}>{items}</Stack></Block>
+        <ComponentWithName name={name} { ...floatProps }>
+            <Block ref={radioRef} { ...dimProps }><Stack full="h" wrap={wrap} { ...attr }>{items}</Stack></Block>
         </ComponentWithName>
     )
 }
 
-/*
-    -----------------------
-     STRUCTURES
-    -----------------------
-     A) Einfacher Input ohne Namen
-         - Flex-Length (mit Min- bzw. Max)
-               <Block full="h" minWidth=x maxWidth=y>
-                  <Input full-h />
-               </Block>
-
-         - Fix-Length (size)
-               <Block>
-                  <Input size=x />
-               </Block>
-
-         - Fix-Width (width)
-               <Block width="x">
-                  <Input full="h"  />
-               </Block>
-
-         - Default-Length
-               <Block>
-                  <Input size=calcMin />
-               </Block>
-
-     B) Einfacher Input mit Namen (float-context)
-
-            TODO: wohin führt der full auf dem Stack? Wäre es nicht
-            besser dem Block einfach ein Flex zu verpassen damit es
-            notfalls schrumpfen kann?
-
-            <Stack gaps full="h">
-               <Block center="v" full="h" shorten>{name}</Block>
-               *
-            </Stack>
-
-         - Flex-Length:
-                TODO: hier macht das Fix im Prinzip keinen Sinn
-                 => Fallback auf Default/Fix-Width
-
-         - Fix-length/Width:
-             Sollte problemlos funktionieren
-
-         - Default-Size
-             "
-
-
-     C) Input mit Button ohne Namen
-
-
-     D) Input mit Button mit Namen
-
-
-     PLAIN:
-      a) without name
-
-        <Block>
-            <Input />
-        </Block>
-
-      b) with name
-
-        <Stack full="h">
-            <Block>
-                {name}
-            </Block>
-
-            <Block center="v">
-                <Input />
-            </Block>
-
-        </Stack>
-
-     CLEAR:
-        <Stack>
-           <Input />
-           <Button />
-        </Stack>
-
-
-
-
- */
-function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, onMax, className, ...props }) {
+function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, onMax, floatProps = {}, onClear, onClick, className, ...props }) {
 
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
@@ -791,13 +739,19 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
         return (!match || match(newValue))
     };
 
-    if (props.full && props.full !== 'v') {
+    const hDimAttr = getDimHAttr(props);
+    if (!hDimAttr.width && !hDimAttr.maxWidth && hDimAttr.maxWidth !== false) {
+        hDimAttr.maxWidth = number ? 80 : 200;
+    }
+    if (hDimAttr.width || (props.full && props.full !== 'v')) {
         cls.push('full-h');
     }
-
     const attr = {
         value: edit ? curr : value,
-        style: {},
+        style: {
+            minWidth: hDimAttr.minWidth,
+            maxWidth: hDimAttr.maxWidth
+        },
         onFocus: e => {
             if (readOnly || disabled) {
                 e.target.blur();
@@ -908,25 +862,39 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     }
     attr.size = size;
 
-    let input = <input ref={inputRef} type="text" {...attr} className={cls.join(' ')} />;
+    // TODO handle better with key/click-Locking
+    let onKeyDown = null;
+    if (onClick) {
+        attr.style.cursor = 'pointer';
+        attr.readOnly = true;
+        onKeyDown = e => {
+            if (e.key === ' ') {
+                onClick();
+                e.preventDefault()
+            }
+        }
+    }
+    let input = (
+        <Block center="v" { ...hDimAttr } onKeyDown={onKeyDown} onClick={onClick}>
+            <input ref={inputRef} type="text" { ...attr } className={cls.join(' ')} />
+        </Block>
+    );
 
     if (clear && !readOnly) {
         input =
-            <Stack full={props.full}>
+            <Stack { ...hDimAttr } gaps="1">
                 {input}
-                <Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={() => set('')} />
+                <Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={onClear ? onClear : () => set('')} />
             </Stack>
-    } else {
-        input = <Block center="v" full={props.full}>{input}</Block>
     }
     return (
-        <ComponentWithName name={name} {...props}>
+        <ComponentWithName name={name} { ...floatProps }>
             {input}
         </ComponentWithName>
     )
 }
 
-const numberIconProps = {width: 13, size: 8};
+const numberIconProps = {width: 13, center: true, size: 8};
 
 function Number({name, disabled, value, min, max, step, percentage, percProps = {}, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, ...props }) {
     const wContext = useContext(WindowContext);
@@ -941,7 +909,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     const [dim, setDim] = useState(null);
     const [reenter, setReenter] = useState(false);
     const [sliding, setSliding] = useState(false);
-    slideRef.current = {sliding, reenter};
+    slideRef.current = { sliding, reenter, dim };
 
     const items = [];
 
@@ -967,7 +935,9 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     } : set;
 
     const hasRange = (min !== undefined && max !== undefined);
-    const stepHandler = getStepHandler(vMin, vMax, vDecimals, vStep);
+    const vStepHandler = getStepHandler(vMin, vMax, vDecimals, vStep);
+    const stepHandler = getStepHandler(min, max, decimals, step);
+
     if (slider === true) {
 
         const startSliding = click => {
@@ -985,7 +955,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
                 const relPos = anchor - e.clientY;
                 if (relPos !== lastPos) {
                     lastPos = relPos;
-                    let newOffset = stepHandler.round(range ? relPos / Math.max(1, 200 / range) : relPos);
+                    let newOffset = vStepHandler.round(range ? relPos / Math.max(1, 200 / range) : relPos);
                     if (maxOffset !== null) {
                         newOffset = Math.min(maxOffset, newOffset);
                     }
@@ -994,7 +964,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
                     }
                     if (newOffset !== lastOffset) {
                         lastOffset = newOffset;
-                        set(stepHandler.round(anchorValue + newOffset));
+                        set(vStepHandler.round(anchorValue + newOffset));
                     }
                 }
             });
@@ -1022,40 +992,39 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     }
 
     items.push(
-        <Input key={2} number className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus}
-               decimals={vDecimals} step={vStep} max={vMax} min={vMin}
-               value={vValue} set={vSet} inputRef={inputRef} />
+        <Input
+            key={2} number className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus}
+            decimals={vDecimals} step={vStep} max={vMax} min={vMin}
+            value={vValue} set={vSet} inputRef={inputRef}
+        />
     );
     if (buttons) {
         items.push(
-            <Stack center="v" key={3} vertical gaps="1">
-                <Button key={4} iconProps={numberIconProps} disabled={disabled || vMax === vValue} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
-                <Button key={3} iconProps={numberIconProps} disabled={disabled || vMin === vValue} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
-            </Stack>
+            <div key={3} className="center-v parent block">
+                <Block height="50%">
+                    <Button vertical center="v" full="v" centerItems key={4} iconProps={numberIconProps} disabled={disabled || vMax === vValue} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
+                </Block>
+                <Block height="50%">
+                    <Button vertical center="v" full="v" centerItems key={3} iconProps={numberIconProps} disabled={disabled || vMin === vValue} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
+                </Block>
+            </div>
         );
     }
+
     let elem = items.length === 1 ? items[0] : <Stack gaps="1" full={props.full}>{items}</Stack>;
 
+    let setDimOnClick = null;
     if ((buttons || slider) || !(readOnly || disabled)) {
-        const onMouseEnter = e => {
-            const rect = divRef.current.getBoundingClientRect();
-            if (!slideRef.current.sliding) {
+        setDimOnClick = e => {
+            if (!slideRef.current.dim) {
+                const rect = divRef.current.getBoundingClientRect();
                 setDim(rect);
-            } else {
-                setReenter(true);
             }
-        };
-
-        const onMouseLeave = e => {
-            if (!slideRef.current.sliding) {
-                setDim(null);
-            } else {
-                setReenter(false);
-            }
-        };
+        }
 
         const attr = {};
         if (dim) {
+            const currLevel = wContext.getModalLevel();
             attr.style = {
                 top: dim.top,
                 left: dim.left,
@@ -1063,14 +1032,23 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
                 height: dim.height,
                 zIndex: 2000000
             };
-            attr.onMouseLeave = onMouseLeave;
+            attr.onMouseLeave = () => {
+                if (wContext.getModalLevel() !== currLevel || !wContext.isInExclusiveMode()) {
+                    setDim(null);
+                    return;
+                }
+                window.addEventListener('mouseup', e => {
+                    if (!isEventInRect(e, dim)) {
+                        setDim(null)
+                    }
+                }, {once: true});
+            }
             attr.className = 'fixed';
         } else {
             attr.className = props.full && props.full !== 'v' ? null : 'min-content-h';
         }
-
         elem = (
-            <Block full={props.full} onMouseEnter={onMouseEnter} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
+            <Block full={props.full} onLeftClick={setDimOnClick} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
                 <div { ...attr }>
                     {elem}
                 </div>
@@ -1127,8 +1105,10 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
     );
 }
 
-function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, ...props }) {
+function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, floatProps = {}, ...props }) {
+
     const fContext = useContext(FormContext);
+    const callAfterwards = useCallAfterwards();
 
     const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
     const optionHandler = getOptionHandler(options, value);
@@ -1138,7 +1118,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (optionHandler.id === null) {
         cls.push('invalid');
         if (fContext) {
-            fContext.markInvalid()
+            callAfterwards(fContext.markInvalid)
         }
     }
     const set = useSet(value, props);
@@ -1189,33 +1169,36 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (tab) {
         cls.push('tabbed');
     }
-    const dimAttr = getDimHAttr(props);
-    if (dimAttr.full || dimAttr.full !== 'v') {
-        cls.push('full-h');
+    const { stackAttr, dimAttr, flexCls } = getStackAndDimHAttr(props, {min: 100, max: 250});
+    if (flexCls) {
+        cls.push(flexCls);
     }
     if (!(readOnly || disabled)) {
         cls.push('hover-change');
     }
     attr.className = cls.join(' ');
     items.push(
-        readOnly ?
-            <Block><input key={1} onFocus={e => e.target.blur()} tabIndex={-1} value={optionHandler.name} readOnly={true} /></Block> :
-            <select
-                key={1}
-                value={value}
-                disabled={disabled}
-                onChange={
-                    e => {set(optionHandler.intIds ? parseInt(e.target.value, 10) : e.target.value)}
-                }
-                {...attr}
-            >
-                {options.map(
-                    item =>
-                        <option key={item.id} value={item.id}>
-                            {item.name}
-                        </option>
-                )}
-            </select>
+        <Block key={1} center="v" { ...dimAttr }>
+            {readOnly ?
+                <input onFocus={e => e.target.blur()} tabIndex={-1} value={optionHandler.name} readOnly={true} className={cls.join(' ') + " full-h"} /> :
+                <select
+                    key={1}
+                    value={value}
+                    disabled={disabled}
+                    onChange={
+                        e => {set(optionHandler.intIds ? parseInt(e.target.value, 10) : e.target.value)}
+                    }
+                    { ...attr }
+                >
+                    {options.map(
+                        item =>
+                            <option key={item.id} value={item.id}>
+                                {item.name}
+                            </option>
+                    )}
+                </select>
+            }
+        </Block>
     );
     if (buttons) {
         items.push(
@@ -1235,16 +1218,17 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
         );
     }
     return (
-        <ComponentWithName name={name} {...props}>
-            {items.length === 1 ? items[0] : <Stack full={dimAttr.full}>{items}</Stack>}
+        <ComponentWithName name={name} { ...floatProps }>
+            <Stack { ...stackAttr }>{items}</Stack>
         </ComponentWithName>
     )
 }
 
-function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
+function TextArea({ name, value, autoFocus, resize, floatProps = {}, copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
 
+    const callAfterwards = useCallAfterwards();
     const inputRef = useRef(null);
     const set = useSet(value, props);
     const [copying, setCopying] = useState(false);
@@ -1258,7 +1242,14 @@ function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, ro
         style.cursor = 'copy';
     }
     const dimAttr = getDimAttr(props);
-
+    if (!style.width && !style.minWidth && style.minWidth !== false) {
+        dimAttr.minWidth = 60;
+        style.minWidth = 60
+    }
+    if (!style.height && !style.minHeight && style.minHeight !== false) {
+        dimAttr.minHeight = 20;
+        style.minHeight = 20
+    }
     const attr = {
         wrap,
         rows,
@@ -1318,14 +1309,13 @@ function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, ro
     if ((required && value === '') || match && !match(value)) {
         cls.push('invalid');
         if (fContext) {
-            fContext.markInvalid()
+            callAfterwards(fContext.markInvalid);
         }
     }
     if (readOnly || disabled) {
         tab = false;
         attr.onFocus = e => e.target.blur()
     }
-
     if (!tab) {
         attr.tabIndex = -1;
     } else {
@@ -1333,31 +1323,12 @@ function TextArea({ name, value, autoFocus, resize, copy, readOnly, disabled, ro
     }
 
     return (
-        <ComponentWithName name={name} {...props}>
-            <Block {...dimAttr}><textarea
+        <ComponentWithName name={name} center={false} { ...floatProps }>
+            <Block { ...dimAttr }><textarea
                 className={cls.join(' ')}
-                {...attr}
+                { ...attr }
             ></textarea></Block>
         </ComponentWithName>
-    )
-}
-
-function ColorBox({ color, width, height, className }) {
-    const boxStyle = {
-        width,
-        height
-    };
-    const bgStyle = {
-        backgroundColor: color
-    };
-    const cls = ['checkerboard-bg relative'];
-    if (className) {
-        cls.push(className);
-    }
-    return (
-        <div className={cls.join(' ')} style={boxStyle}>
-            <div className="absolute full-h full-v" style={bgStyle} />
-        </div>
     )
 }
 
@@ -1366,16 +1337,23 @@ function ColorBox({ color, width, height, className }) {
       - rightClick => copy
       - tooltip with hex/dec value
  */
-function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...props }) {
+function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatProps = {} }) {
+    const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
-    const colorRef = useRef(null);
 
+    const callAfterwards = useCallAfterwards();
+    const colorRef = useRef(null);
     const [ clicked, setClicked ] = useState(false);
     colorRef.current = value;
 
-    const btnCls = 'button-bg button-border-1';
-    const cls = [btnCls, 'color-input-padding button-border-color border-outset'];
-    const innerCls = [btnCls, ' button-border-color border-inset'];
+    const invalid = typeof value !== 'string' || !value.match(alpha ?/^#[0-9a-f]{8}$/i : /^#[0-9a-f]{6}$/i);
+    if (invalid && fContext) {
+        callAfterwards(fContext.markInvalid);
+    }
+
+    const btnCls = 'button-border-1';
+    const cls = ['button-bg ' + btnCls, 'color-input-padding button-border-color border-outset'];
+    const innerCls = ['toolbar-bg ' + btnCls, ' button-border-color border-inset'];
     if (disabled) {
         readOnly = true;
         cls.push('disabled')
@@ -1386,6 +1364,9 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...pro
         tab = false
     }
     const handleClick = upEvent => {
+        if (invalid) {
+            colorRef.current = '#000000' + (alpha ? '00' : '');
+        }
         wContext.startExclusiveMode('pick-color', 'pointer');
         wContext.addEventListener(upEvent, () => {
             wContext.endExclusiveMode('pick-color');
@@ -1396,11 +1377,13 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...pro
             alpha,
             set
         });
-        setClicked(true)
+        setClicked(true);
+        if (invalid) set(colorRef.current);
     };
-
+    const width = 30;
+    const height = 13;
     return (
-        <ComponentWithName name={name} { ...props }>
+        <ComponentWithName name={name} { ...floatProps }>
             <Block className={cls.join(' ')} cursor={readOnly ? false : "pointer"} tab={tab}
                    onLeftClick={readOnly ? null : () => handleClick('mouseup')}
                    onKeyDown={readOnly ? null : e => {
@@ -1411,7 +1394,10 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...pro
                        handleClick('keyup')
                    }}>
                 <Block className={innerCls.join(' ')}>
-                    <ColorBox color={value} width={30} height={13} />
+                    {invalid ?
+                        <Block width={width} height={height} className="invalid" /> :
+                        <ColorBox color={value} width={width} height={height} />
+                    }
                 </Block>
             </Block>
         </ComponentWithName>
@@ -1419,8 +1405,8 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, ...pro
 }
 
 const MAX_H = 360;
-const MAX_S = 100;
-const MAX_V = 100;
+const MAX_S = 255;
+const MAX_V = 255;
 
 const H_SEG = MAX_H / 6;
 const H_FACTOR = 256 / H_SEG;
@@ -1500,17 +1486,14 @@ const svPercProps = {decimals: 1, step: 0.1};
 
 /**
  * TODO
- *  - BUGFIX: slider im HSV-Modus nicht per Keys steuerbar
+ *  * BUGFIX: slider im HSV-Modus nicht per Keys steuerbar
  *  - BUGFIX: Ausrichtung
  *  - BUGFIX: korrekte Umrechnung
 
  *  - persistierung hsv/rgb (last-color?)
  *  - transparency (perc im HSV-Mode)
- *  - Modal-Fixierung ausssetzen, bis Sizing durch
  *  - Normaler Modal
  *  - Positionierung nahe ColorBox
- *  - Invalid-State für Color
- *  - Modal: keine Transparenz => Active-Border
  *  - CHECK: modal-cancel reset
  */
 function ColorPicker({ value, set, alpha, close }) {
@@ -1519,6 +1502,7 @@ function ColorPicker({ value, set, alpha, close }) {
     const PickerModal = useModal();
 
     const [ before ] = useState(value.current);
+    const [ showingBefore, setShowingBefore ] = useState(false);
     const afterRef = useState(null);
 
     const rgb = hex2rgb(value.current);
@@ -1534,8 +1518,8 @@ function ColorPicker({ value, set, alpha, close }) {
     const [ v, setV ] = useState(hsv.v);
 
     const grad = alpha ? value.current.substr(7, 2) : '';
-    const hsvRef = useRef(null);
-    hsvRef.current = {h, s, v, grad};
+    const propsRef = useRef(null);
+    propsRef.current = { h, s, v, grad, showingBefore };
 
     const hueSelectorCanvas = wContext.getBaseColorCanvas();
     const colorMaskCanvas = wContext.getColorMaskCanvas();
@@ -1569,6 +1553,7 @@ function ColorPicker({ value, set, alpha, close }) {
         setH(hsv.h);
         setS(hsv.s);
         setV(hsv.v);
+        requestAnimationFrame(update)
     }
 
     const renderSquare = ctx => {
@@ -1639,17 +1624,19 @@ function ColorPicker({ value, set, alpha, close }) {
 
     const undoOp = {
         exec: () => {set(before); requestAnimationFrame(update)},
-        can: () => value.current !== before
+        can: () => showingBefore || value.current !== before
     };
     const showBeforeOp = {
         exec: () => {
             afterRef.current = value.current;
+            setShowingBefore(true);
             setAndSync(before);
         },
-        can: () => value.current !== before
+        can: () => showingBefore || value.current !== before
     };
     const showBeforeEnd = () => {
         setAndSync(afterRef.current);
+        setShowingBefore(false);
     };
 
     const gradients = gradientsRef.current;
@@ -1702,7 +1689,7 @@ function ColorPicker({ value, set, alpha, close }) {
 
     const syncColor2Hsv = () => {
         requestAnimationFrame(() => {
-            const newHsv = hsvRef.current;
+            const newHsv = propsRef.current;
             set(hsv2rgb(newHsv.h, newHsv.s, newHsv.v) + newHsv.grad);
             requestAnimationFrame(update);
         });
@@ -1724,7 +1711,7 @@ function ColorPicker({ value, set, alpha, close }) {
         rgb.r = 255 - rgb.r;
         rgb.g = 255 - rgb.g;
         rgb.b = 255 - rgb.b;
-        setAndSync(rgb2hex(rgb) + hsvRef.current.grad);
+        setAndSync(rgb2hex(rgb) + propsRef.current.grad);
     }
     const handleEsc = e => {
         if (e.key === 'Escape') {
@@ -1756,7 +1743,7 @@ function ColorPicker({ value, set, alpha, close }) {
                         <SideTabs active={active} setActive={setActive} icon={false} full>
                             <SideTab full active name="RGB">
                                 {active === 'RGB' &&
-                                    <Block padded full="h">
+                                    <Block full="h">
                                         <PropertyGrid>
                                             <NumberProp name="R" full="h" gradient={gradients.red} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
                                             <NumberProp name="G" full="h" gradient={gradients.green} railProps={railProps} value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
@@ -1771,7 +1758,7 @@ function ColorPicker({ value, set, alpha, close }) {
 
                             <SideTab full name="HSV">
                                 {active === 'HSV' &&
-                                    <Block padded full="h">
+                                    <Block full="h">
                                         <PropertyGrid>
                                             <NumberProp name="H" full="h" gradient={gradients.hue} percentage percProps={huePercProps} railProps={railProps} value={h} set={setHue} min={0} max={MAX_H - 1} slider="h" />
                                             <NumberProp name="S" full="h" gradient={gradients.s} percentage percProps={svPercProps} railProps={railProps} value={s} set={setSaturation} min={0} max={255} slider="h" />
@@ -1789,7 +1776,7 @@ function ColorPicker({ value, set, alpha, close }) {
 
                 <Block padded>
                     <Stack>
-                        <PixelMarker size={7} space={192} rangeX={256} rangeY={256} setX={value => setVelocity(255 - value)} x={255 - v} y={255 - s} setY={value => setSaturation(255 - value)}>
+                        <PixelMarker size={7} rangeX={256} rangeY={256} setX={value => setVelocity(255 - value)} x={255 - v} y={255 - s} setY={value => setSaturation(255 - value)}>
                             <Canvas width={192} height={192} render={renderSquare} plain />
                         </PixelMarker>
 
@@ -1812,6 +1799,7 @@ function ColorPicker({ value, set, alpha, close }) {
                     <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
                 </Block>
             </Stack>
+
         </Stack>
             <PickerModal.content name="Pick a color..." full>
                 <BitmapSelector type={alpha ? 'rgba' : 'rgb'} save={setColorFromPicker} close={PickerModal.close} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
@@ -2174,6 +2162,7 @@ function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabl
 function FileDropZone({ type, full, save, required }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
+    const callAfterwards = useCallAfterwards();
 
     const [error, setError] = useState('');
     const [showTooltip, setShowTooltip] = useState(false);
@@ -2277,8 +2266,8 @@ function FileDropZone({ type, full, save, required }) {
             setShowTooltip(false)
         }
     }
-    if (required) {
-        fContext.markInvalid()
+    if (required && fContext) {
+        callAfterwards(fContext.markInvalid)
     }
     return (
         <Block

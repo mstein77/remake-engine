@@ -1,3 +1,13 @@
+ - Percentage -> Slider + Number
+    => ColorPicker: HSVA
+ - Number Dim
+ - Persistierung
+    => ColorPicker: hsv/rgb-Persistierung
+---------------------------
+ * Button: Tooltips
+
+
+
 --------------------------------
  Property Grid
 --------------------------------
@@ -68,9 +78,6 @@
     </Grid>
  </Block>
 
-
-TODO:
- - BUG: rotate auf icon geht nicht (shift-buttons)
 
 
 

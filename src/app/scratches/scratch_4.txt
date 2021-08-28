@@ -410,6 +410,30 @@ b) Der ScreenInit bindet einen neuen ResourceRequest, damit nur die erforderlich
 => der load checkt jedes mal ob die Perm-Resourcen noch nicht geladen wurden und fügt diese in dem Fall in die Queue ein
 => der Screen-Reload löscht das flag, dass die Perm-Resourcen bereits geladen wurden
 
+     A) Einfacher Input ohne Namen
+         - Flex-Length (mit Min- bzw. Max)
+               <Block full="h" minWidth=x maxWidth=y>
+                  <Input full-h />
+               </Block>
+
+         - Fix-Length (size)
+               <Block>
+                  <Input size=x />
+               </Block>
+
+         - Fix-Width (width)
+               <Block width="x">
+                  <Input full="h"  />
+               </Block>
+
+         - Default-Length
+               <Block>
+                  <Input size=calcMin />
+               </Block>
+
+   <Stack max>
+      <Child
+   </Parent>
 
 
 

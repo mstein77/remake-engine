@@ -686,7 +686,7 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
                     {currChars && <CharManager charIndex={currChars} />}
                 </Section>
 
-                <NewFontModal.content name={NewFontModal.props.name} width={500}>
+                <NewFontModal.content name={NewFontModal.props.name}>
                     <FontProperties { ...NewFontModal.props } />
                 </NewFontModal.content>
 
@@ -1085,7 +1085,11 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const dim = getBlockDim(currBlock);
     const actual = getActualBlockPos(currBlock, dim);
     const font = currBlock && fonts[currBlock.font];
+/*
+                                    <Block full tab onClick={changeFilter} onKeyDown={e => e.keyCode === 32 ? changeFilter() : null}>
+                                    <Button disabled={currBlock.filters === ''} icon="clear" onClick={clearFilter} />
 
+ */
     return (
         <Stack full>
             <EntityStackSections
@@ -1128,12 +1132,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                 <TextArea undo="text" value={currBlock.text} set={setEntityProp('text')} full="h" rows={5} />
                             </FullProp>
                             <LabelProp name="Filters:">
-                                <Stack full="h" minWidth={100}>
-                                    <Block full tab onClick={changeFilter} onKeyDown={e => e.keyCode === 32 ? changeFilter() : null}>
-                                        <Input full="h" readOnly value={currBlock.filters} />
-                                    </Block>
-                                    <Button disabled={currBlock.filters === ''} icon="clear" onClick={clearFilter} />
-                                </Stack>
+                                <Input full="h" clear maxWidth={false} onClick={changeFilter} onClear={clearFilter} value={currBlock.filters} />
                             </LabelProp>
                         </PropertyGrid>
                     </Block>
@@ -1150,7 +1149,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                         </ToolGroup>
                         <Checkbox name="Show marker" value={marker} set={setMarker} />
                     </Toolbar>
-                    <Block full centerItems padded scroll>
+                    <Block full centerItems padded className="scroll">
                         <Overlays className="thin-boxed" width={width * zoom} height={height * zoom}>
                             <Overlay>
                                 <Canvas render={renderScreen} width={width * zoom} height={height * zoom} />
