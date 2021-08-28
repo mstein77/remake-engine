@@ -1,6 +1,5 @@
- - Percentage -> Slider + Number
+ * Percentage -> Slider + Number
     => ColorPicker: HSVA
- - Number Dim
  - Persistierung
     => ColorPicker: hsv/rgb-Persistierung
 ---------------------------

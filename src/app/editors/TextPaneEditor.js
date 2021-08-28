@@ -705,13 +705,13 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const NewBlockModal = useModal();
     const FilterModal = useModal();
 
-    const [activeBlock, setActiveBlock] = useState(blockIndex.getLength() ? 0 : null);
-    const [background, setBackground] = useState('#000000');
-    const [zoom, setZoom] = useState(1);
-    const [marker, setMarker] = useState(true);
-    const [highlight, setHighlight] = useState(false);
-    const [width, setWidth] = useState(320);
-    const [height, setHeight] = useState(200);
+    const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
+    const [ background, setBackground ] = useState('#000000');
+    const [ zoom, setZoom ] = useState(1);
+    const [ marker, setMarker ] = useState(true);
+    const [ highlight, setHighlight ] = useState(false);
+    const [ width, setWidth ] = useState(320);
+    const [ height, setHeight ] = useState(200);
     const screenRef = useRef(null);
     const onMoveRef = useRef(null);
 
@@ -1085,11 +1085,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const dim = getBlockDim(currBlock);
     const actual = getActualBlockPos(currBlock, dim);
     const font = currBlock && fonts[currBlock.font];
-/*
-                                    <Block full tab onClick={changeFilter} onKeyDown={e => e.keyCode === 32 ? changeFilter() : null}>
-                                    <Button disabled={currBlock.filters === ''} icon="clear" onClick={clearFilter} />
 
- */
     return (
         <Stack full>
             <EntityStackSections
@@ -1105,13 +1101,13 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                     <Block full="h" scroll>
                         <PropertyGrid>
                             <SelectProp name="Font:" full="h" undo="font" options={fontOptions} value={currBlock.font} set={setEntityProp('font')} />
-                            <TupleProp name="Position:" undo="position"
+                            <TupleProp name="Position:" undo="position" wrap
                                x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
                                y={currBlock.y} setY={setEntityProp('y')} minY={fieldProps.y.min} maxY={fieldProps.y.max} stepY={currBlock.alignToGrid ? font.height : 1} disabledY={currBlock.autoCenteringY}
                             />
                             <LabelProp name="- actual:">
                                 <Stack gaps="1" wrap full="h">
-                                    <Tuple readOnly
+                                    <Tuple center="v" readOnly
                                            minX={fieldProps.x.min} maxX={fieldProps.x.max}
                                            minY={fieldProps.y.min} maxY={fieldProps.y.max}
                                            x={actual.x} y={actual.y}
@@ -1182,7 +1178,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 </Stack>
             </Section>
 
-            <NewBlockModal.content name="New Text Block" width={250}>
+            <NewBlockModal.content name="New Text Block">
                 <NameDialog { ...NewBlockModal.props } />
             </NewBlockModal.content>
 

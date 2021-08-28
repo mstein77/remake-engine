@@ -844,12 +844,12 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
 
     let maxLen = 0;
     if (number) {
-        const decimalPart = isFloat ? decimals + 1 : 0;
+        const decimalPart = isFloat ? decimals /* + 1 */ : 0;
         if (min !== undefined) {
-            maxLen = Math.max(maxLen, ('' + Math.round(min)).length + decimalPart);
+            maxLen = Math.max(maxLen, ('' + Math.abs(round(min))).length + decimalPart);
         }
         if (max !== undefined) {
-            maxLen = Math.max(maxLen, ('' + Math.round(max)).length + decimalPart);
+            maxLen = Math.max(maxLen, ('' + Math.abs(round(max))).length + decimalPart);
         }
     } else if (max !== undefined && max > 0) {
         maxLen = max;
@@ -896,7 +896,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
 
 const numberIconProps = {width: 13, center: true, size: 8};
 
-function Number({name, disabled, value, min, max, step, percentage, percProps = {}, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, ...props }) {
+function Number({ name, disabled, value, size, min, max, step, percentage, percProps = {}, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, floatProps = {}, ...props }) {
     const wContext = useContext(WindowContext);
 
     percProps = { max: 100, decimals: 0, step: 1, ...percProps }
@@ -906,10 +906,11 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     const slideRef = useRef(null);
     const inputRef = useRef(null);
 
-    const [dim, setDim] = useState(null);
-    const [reenter, setReenter] = useState(false);
-    const [sliding, setSliding] = useState(false);
-    slideRef.current = { sliding, reenter, dim };
+    const [ dim, setDim ] = useState(null);
+    const [ sliding, setSliding ] = useState(false);
+    slideRef.current = { sliding, dim };
+
+    const dimProps = getDimHAttr(props);
 
     const items = [];
 
@@ -918,12 +919,10 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
             document.activeElement.blur()
         }
     };
-
     if (readOnly) {
         buttons = false;
         slider = false;
     }
-
     const vMax = percentage ? percProps.max : max;
     const points = vMax ? Math.abs((max - min) / vMax) : 0;
     const vDecimals =  percentage ? percProps.decimals : decimals;
@@ -937,6 +936,8 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
     const hasRange = (min !== undefined && max !== undefined);
     const vStepHandler = getStepHandler(vMin, vMax, vDecimals, vStep);
     const stepHandler = getStepHandler(min, max, decimals, step);
+
+    const fullSlider = hasRange && slider === 'h';
 
     if (slider === true) {
 
@@ -969,33 +970,25 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
                 }
             });
             setSliding(true);
-            setReenter(true);
             blurActive()
         };
         const stopSliding = () => {
             setSliding(false);
-            if (dim && !slideRef.current.reenter) {
-                setDim(null);
-            }
         };
         items.push(
             <Button center="v" key={1} full="v" centerItems radius iconProps={{size: 12}} direct disabled={disabled || (min === max && min !== undefined)} onClick={startSliding} onClickEnd={stopSliding} cursor="row-resize" icon="height" tab={false} vertical />
         );
-    } else if (hasRange && slider === 'h') {
-        items.push(
-            <Slider key={1} padded={DIR.RIGHT} tab={false} focusRef={inputRef} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={vValue} decimals={vDecimals} min={vMin} max={vMax} set={vSet}>{gradient}</Slider>
-        )
     }
     const inputCls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
     if (!(readOnly || disabled)) {
         inputCls.push('hover-change');
     }
-
     items.push(
         <Input
             key={2} number className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus}
-            decimals={vDecimals} step={vStep} max={vMax} min={vMin}
-            value={vValue} set={vSet} inputRef={inputRef}
+            decimals={vDecimals} step={vStep} max={vMax} min={vMin} size={size}
+            value={vValue} set={vSet} inputRef={inputRef} { ...dimProps }
+            full={fullSlider ? false : dimProps.full}
         />
     );
     if (buttons) {
@@ -1010,12 +1003,20 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
             </div>
         );
     }
+    let elem = items.length === 1 ? items[0] : <Stack gaps="1" full={dimProps.full}>{items}</Stack>;
 
-    let elem = items.length === 1 ? items[0] : <Stack gaps="1" full={props.full}>{items}</Stack>;
+    if (fullSlider) {
+        elem = (
+            <Stack full="h" gaps>
+                <Slider key={1} tab={false} focusRef={inputRef} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={vValue} decimals={vDecimals} min={vMin} max={vMax} set={vSet}>{gradient}</Slider>
+                <Block center="v">{elem}</Block>
+            </Stack>
+        )
+    }
 
     let setDimOnClick = null;
     if ((buttons || slider) || !(readOnly || disabled)) {
-        setDimOnClick = e => {
+        setDimOnClick = () => {
             if (!slideRef.current.dim) {
                 const rect = divRef.current.getBoundingClientRect();
                 setDim(rect);
@@ -1048,7 +1049,7 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
             attr.className = props.full && props.full !== 'v' ? null : 'min-content-h';
         }
         elem = (
-            <Block full={props.full} onLeftClick={setDimOnClick} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
+            <Block full={dimProps.full} onLeftClick={setDimOnClick} ref={divRef} width={dim ? dim.width : null} height={dim ? dim.height : null}>
                 <div { ...attr }>
                     {elem}
                 </div>
@@ -1056,13 +1057,13 @@ function Number({name, disabled, value, min, max, step, percentage, percProps = 
         );
     }
     return (
-        <ComponentWithName name={name} {...props}>
+        <ComponentWithName name={name} { ...floatProps }>
             {elem}
         </ComponentWithName>
     )
 }
 
-function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = true, size, step, readOnly, disabled, autoFocus, full, ...props }) {
+function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = true, size, step, readOnly, disabled, autoFocus, full, wrap, center, ...props }) {
     const attr = getDimHAttr(props);
     const xAttr = {
         name,
@@ -1096,8 +1097,12 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
         buttons,
         slider
     };
+    const cls = [];
+    if (wrap) {
+        cls.push('wrap full-h')
+    }
     return (
-        <Stack {...attr} gaps="1">
+        <Stack {...attr} gaps="1" center={center} className={cls.join(' ')}>
             <Number {...xAttr} />
             <Block center="v"><Icon name="clear" className="less" size={12} /></Block>
             <Number {...yAttr} />

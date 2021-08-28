@@ -2251,7 +2251,6 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
 };
 
 function Icon({ name, width, height, center = 'h', className, rotate, size = 18 }) {
-    if (rotate) d('#', rotate);
     const style = {
         width: width || size,
         height: height || size
