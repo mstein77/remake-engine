@@ -139,7 +139,8 @@ html, body {
  */
 .circle-border {
     border: 2px solid #ffffff;
-    border-radius: 100%
+    border-radius: 100%;
+    box-shadow: 1px 1px 4px #00000088
 }
 
 

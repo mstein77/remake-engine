@@ -142,7 +142,7 @@ function BackgroundControl() {
     )
 }
 
-function PixelMarker({ size, rangeX = null, rangeY = null, x, setX, y, setY, readOnly, tab = true, children }) {
+function CanvasCircleMarker({ size, rangeX = null, rangeY = null, x, setX, y, setY, setXY, readOnly, tab = true, children }) {
 
     const wContext = useContext(WindowContext);
     const [rect, setRect] = useState(null);
@@ -204,8 +204,12 @@ function PixelMarker({ size, rangeX = null, rangeY = null, x, setX, y, setY, rea
             if (newX === lastX && newY === lastY) return;
             lastX = newX;
             lastY = newY;
-            setX(newX);
-            setY(newY)
+            if (setXY) {
+                setXY(newX, newY)
+            } else {
+                setX(newX);
+                setY(newY)
+            }
         });
         wContext.addEventListener('mouseup', e => {
             wContext.endExclusiveMode('drag-circle', {once: true});
@@ -1037,7 +1041,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
 
 const WindowContext = React.createContext();
 
-function buildColorMaskCanvas() {
+function buildHueMaskCanvas() {
     const size = 192;
     const canvas = getCanvasForDim(size, size);
     const ctx = canvas.getContext('2d');
@@ -1063,7 +1067,7 @@ function buildColorMaskCanvas() {
     return canvas
 }
 
-function buildBaseColorCanvas() {
+function buildHueColorsCanvas() {
     const height = 192;
     const canvas = getCanvasForDim(15, height);
     const ctx = canvas.getContext('2d');
@@ -1130,9 +1134,27 @@ function ModalColorPicker({}) {
 function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
 
+    const gameId = game.getId();
+
     const [ storage ] = useState(() => {
         return new Storage(localStorage, 'remake-engine.editor.');
     });
+
+    useEffect(() => {
+        const doPersistCache = force => {
+            if (force === true || document.visibilityState === 'hidden') {
+                const cache = registry('cache');
+                storage.storeJson('cache.global', cache.global);
+                storage.storeJson('cache.game.' + gameId, cache.game);
+            }
+        };
+        document.addEventListener('visibilitychange', doPersistCache);
+
+        return () => {
+            document.removeEventListener('visibilitychange', doPersistCache);
+            doPersistCache(true)
+        }
+    }, []);
 
     const setterRef = useRef();
 
@@ -1205,6 +1227,8 @@ function WindowCtx({ imageResources, filters, children, game }) {
             }
         };
 
+        const gameCache = storage.getDefaultedJson('cache.game.' + gameId, {});
+
         registryRef.current = {
             lastTarget: null,
             mode: null,
@@ -1234,7 +1258,12 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 backups: []
             },
 
-            lastColorsIndex: new ColorIndex({colors: []})
+            cache: {
+                global: storage.getDefaultedJson('cache.global', {}),
+                game: gameCache
+            },
+
+            lastColorsIndex: new ColorIndex({colors: (gameCache.lastColors ? gameCache.lastColors.split(' ') : [])})
         };
 
         const resourceLoader = game.getResourceLoader();
@@ -1382,6 +1411,8 @@ function WindowCtx({ imageResources, filters, children, game }) {
             getLastTarget: () => registry('lastTarget'),
             editorConfig: registry('editorConfig'),
             theme: registry('theme'),
+
+            cache: registry('cache'),
 
             startExclusiveMode: (id, cursor = 'auto') => {
                 const { mode, setFixCursor } = registry();
@@ -1602,19 +1633,19 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 return ctx.getImageData(0, 0, result.width, result.height);
             },
 
-            getBaseColorCanvas: () => {
-                let canvas = registry('baseColorCanvas');
+            getHueColorsCanvas: () => {
+                let canvas = registry('hueColorsCanvas');
                 if (!canvas) {
-                    canvas = buildBaseColorCanvas();
-                    register('baseColorCanvas', canvas);
+                    canvas = buildHueColorsCanvas();
+                    register('hueColorsCanvas', canvas);
                 }
                 return canvas;
             },
-            getColorMaskCanvas: () => {
-                let canvas = registry('colorMaskCanvas');
+            getHueMaskCanvas: () => {
+                let canvas = registry('hueMaskCanvas');
                 if (!canvas) {
-                    canvas = buildColorMaskCanvas();
-                    register('colorMaskCanvas', canvas);
+                    canvas = buildHueMaskCanvas();
+                    register('hueMaskCanvas', canvas);
                 }
                 return canvas;
             },
@@ -1626,9 +1657,10 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
                 const len = index.getLength();
                 index.setEntityObject({index: 0, value});
-                if (len >= 3) {
+                if (len >= 10) {
                     index.deleteEntity(len);
                 }
+                gameCache.lastColors = index.getPropValues('value').join(' ')
             }
         }
     }
@@ -1797,6 +1829,8 @@ function ButtonStack({ items, onClick }) {
 
 function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...props }) {
 
+    const [ ready, setReady ] = useState(false);
+
     const tabsRef = useRef(null);
     const refocus = useRefocus(tabsRef);
 
@@ -1807,7 +1841,7 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
     }
     const setActive = value => {
         refocus();
-        setActiveRaw(value)
+        setActiveRaw(value);
     };
     const items = useRef([]);
 
@@ -1846,18 +1880,22 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
         ]
     });
 
-    const value = {
+    const ctx = {
         active,
         setActive,
         add: name => {
             if (!items.current.includes(name)) {
                 items.current.push(name);
+                requestAnimationFrame(
+                    () => setReady(true)
+                );
             }
-        }
+        },
+        ready
     };
-    const tabs = [];
+    const tabElems = [];
     for(let item of items.current) {
-        tabs.push(
+        tabElems.push(
             <Button key={item} full="h" padded="h" current={active} value={item} onClick={({value}) => setActive(value)} name={item}>{icon ? <Icon name={icon} /> : ''}</Button>
         );
     }
@@ -1865,12 +1903,12 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
     const stackItems = [];
     stackItems.push(
         <Block ref={tabsRef} scroll padded="h" key="a">
-            <Stack indented vertical={!vertical} gaps {...attr}>{tabs}</Stack>
+            <Stack indented vertical={!vertical} gaps {...attr}>{tabElems}</Stack>
         </Block>
     );
     stackItems.push(
         <Block full key="b">
-            <TabContext.Provider value={value}>
+            <TabContext.Provider value={ctx}>
                 {children}
             </TabContext.Provider>
         </Block>
@@ -1887,13 +1925,15 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
 
 function SideTab({ name, active, children }) {
     const tabContext = useContext(TabContext);
+
     useEffect(() => {
         tabContext.add(name);
-        if (active) {
+        if (active || tabContext.active === name) {
             tabContext.setActive(name);
         }
     }, []);
-    if (tabContext.active !== name) {
+
+    if (!tabContext.ready || tabContext.active !== name) {
         return null;
     }
     return (
@@ -1990,10 +2030,10 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
 
     const trapRef = useRef(null);
     const dimRef = useRef(null);
-    const [left, setLeft] = useState(null);
-    const [top, setTop] = useState(null);
-    const [dim, setDim] = useState(null);
-    const [shadow, setShadow] = useState(null);
+    const [ left, setLeft ] = useState(null);
+    const [ top, setTop ] = useState(null);
+    const [ dim, setDim ] = useState(null);
+    const [ shadow, setShadow ] = useState(null);
     const mounted = useMounted();
 
     const enableShadow = () => {
@@ -2003,11 +2043,6 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
             }
         }, 100)
     }
-
-    if (shadow === null && transparent) {
-        enableShadow();
-    }
-
     useEffect(() => {
         const focusElem = wContext.focusStack.elem[zIndex];
         if (!focusElem) {
@@ -2082,6 +2117,7 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
             if (focusElem) {
                 focusElem.setShadow = enableShadow
             }
+            enableShadow();
         }
     }, []);
 
@@ -2162,6 +2198,7 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
                         setShadow(true)
                     }
                 }, {once: true});
+                setShadow(false);
             }
         }
     }
@@ -2687,25 +2724,13 @@ function MinMaxCtx({ vertical, min, max, full, end, center, width, height, padde
             add.v += 2
         } else {
             if (typeof padded === 'number') {
-                if (padded & DIR.LEFT) {
-                    add.h++
-                }
-                if (padded & DIR.RIGHT) {
-                    add.h++
-                }
-                if (padded & DIR.TOP) {
-                    add.v++
-                }
-                if (padded & DIR.BOTTOM) {
-                    add.v++;
-                }
+                if (padded & DIR.LEFT) add.h++;
+                if (padded & DIR.RIGHT) add.h++
+                if (padded & DIR.TOP) add.v++;
+                if (padded & DIR.BOTTOM) add.v++
             } else {
-                if (padded !== 'v') {
-                    add.h = 2;
-                }
-                if (padded !== 'h') {
-                    add.v = 2;
-                }
+                if (padded !== 'v') add.h = 2;
+                if (padded !== 'h') add.v = 2
             }
             add.h *= defaultPaddingPx;
             add.v *= defaultPaddingPx
@@ -2715,17 +2740,23 @@ function MinMaxCtx({ vertical, min, max, full, end, center, width, height, padde
         if (border === '1') {
             add.h += 2;
             add.v += 2
+        } else if (typeof border === 'number') {
+            let h = 0;
+            let v = 0;
+            if (border & DIR.TOP) v++;
+            if (border & DIR.BOTTOM) v++;
+            if (border & DIR.LEFT) h++;
+            if (border & DIR.RIGHT) h++;
+            add.h += h * boxBorderWidthPx;
+            add.v += v * boxBorderWidthPx
         } else {
             add.h += 2 * boxBorderWidthPx;
             add.v += 2 * boxBorderWidthPx
         }
     }
-    if (width) {
-        width += add.h
-    }
-    if (height) {
-        height += add.v
-    }
+    if (width) width += add.h;
+    if (height) height += add.v;
+
     const axisDir = vertical ? 'v' : 'h';
     full = full && full !== axisDir ? true : axisDir;
     const dimProps = { width, height, border, padded, full };
@@ -2797,7 +2828,7 @@ export {
     MinMaxCtx,
     PropertyGrid,
     ValueProp,
-    PixelMarker,
+    CanvasCircleMarker,
     ColorBox,
 
     useModal,

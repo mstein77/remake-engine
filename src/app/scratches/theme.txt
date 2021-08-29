@@ -1,9 +1,47 @@
- * Percentage -> Slider + Number
-    => ColorPicker: HSVA
- - Persistierung
-    => ColorPicker: hsv/rgb-Persistierung
+--------------------------
+ PERSISTIERUNG:
+--------------------------
+ Caches:
+   - "global" (globale Ebene)
+       + Farb-Modell
+       + bitmapEditorBorders
+
+   - "game.<id>" (Game-Ebene)
+       + LastColors
+       + zoomPixelRatio
+       + defaultTransparencyColor (?)
+
+   - "game.<id>.<editorId>" (Editor-Ebene)
+       + sectionSize
+       + sectionCollapse
+
+   - "game.<id>.<resource>" (Resource-Ebene)
+
+--------------------------
+ Beispiel TextPane:
+   - Preview:
+      + BgColor wird durch Resource initialisiert (=> kein Caching)
+      + Zoom: aktueller Game-Zoom oder Preview-Pixel-Ratio auf Game-Ebene
+      + Show-Marker aus Globaler-Ebene
+
+   - Characters:
+      + BgColor:
+
 ---------------------------
- * Button: Tooltips
+ - Persistierung
+    - Editor-Section-Props
+    - Cache-Clear (Auto?)
+    - Type-Check
+---------------------------
+ - Button: Tooltips
+ - Font-Styling
+ - Sections
+ - Key-Bindings (+Marking)
+ - Scrollbars
+---------------------------
+ - Entity-Stack (Styling, Dragn-Drop)
+ - Entity-Manager
+---------------------------
 
 
 

@@ -11,6 +11,10 @@ const DIR = {
 };
 DIR.H = DIR.LEFT | DIR.RIGHT;
 DIR.V = DIR.TOP | DIR.BOTTOM;
+DIR.ALL_BUT_TOP = DIR.H | DIR.BOTTOM;
+DIR.ALL_BUT_BOTTOM = DIR.H | DIR.TOP;
+DIR.ALL_BUT_LEFT = DIR.V | DIR.RIGHT;
+DIR.ALL_BUT_RIGHT = DIR.V | DIR.LEFT;
 
 /**
  * @module LayoutComponents
@@ -44,42 +48,51 @@ const handleLeftRightClick = (leftHandler, rightHandler) => {
     }
 };
 
+function addBorderCls(cls, border) {
+    if (!border) {
+        return;
+    }
+    cls.push((border !== true ? 'thin-' : '') + 'boxed');
+    if (typeof border === 'number') {
+        let i = 1;
+        while (i < 16) {
+            if (!(border & i)) {
+                cls.push('no-border-' + i);
+            }
+            i = i << 1;
+        }
+    }
+}
+
+function addPaddedCls(cls, padded) {
+    if (!padded) return;
+
+    if (padded === 'h') {
+        cls.push('padded-h')
+    } else if (typeof padded === 'number') {
+        cls.push('border-box');
+        let i = 1;
+        while (i < 16) {
+            if ((padded & i)) {
+                cls.push('padded-' + i);
+            }
+            i = i << 1
+        }
+    } else if (padded === '1') {
+        cls.push('padded-p')
+    } else {
+        cls.push('padded' + (padded === 'v' ? '-v' : ''))
+    }
+
+}
+
 function useGetLayoutProps({className, padded, end, border, zIndex, cursor, tab, onLeftClick, onRightClick,  ...props}) {
     const dimCls = [];
     if (className) {
         dimCls.push(className);
     }
-    if (padded) {
-        if (padded === 'h') {
-            dimCls.push('padded-h')
-        } else if (typeof padded === 'number') {
-            dimCls.push('border-box');
-            let i = 1;
-            while (i < 16) {
-                if ((padded & i)) {
-                    dimCls.push('padded-' + i);
-                }
-                i = i << 1
-            }
-        } else if (padded === '1') {
-            dimCls.push('padded-p')
-        } else {
-            dimCls.push('padded' + (padded === 'v' ? '-v' : ''))
-        }
-    }
-    if (border) {
-        dimCls.push((border !== true ? 'thin-' : '') + 'boxed');
-        if (typeof border === 'number') {
-            let i = 1;
-            while (i < 16) {
-                if (!(border & i)) {
-                    dimCls.push('no-border-' + i);
-                }
-                i = i << 1;
-            }
-        }
-    }
-
+    addPaddedCls(dimCls, padded);
+    addBorderCls(dimCls, border);
     const dimAttr = {};
     if (onLeftClick || onRightClick) {
         if (props.onMouseDown) {
@@ -420,7 +433,12 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
     }
     const parentStyle = {};
     if (scroll) {
-        parentCls.push('scroll max-v max-h');
+        // TODO: remove centerItems check in case of problems
+        if (centerItems) {
+            dimCls.push('scroll')
+        } else {
+            parentCls.push('scroll max-v max-h');
+        }
         if (!isMinH && !dimStyle.width) {
             parentCls.push('full-h');
         }
@@ -787,5 +805,7 @@ export {
     OverlayContext,
     Tooltip,
     DIR,
+    addBorderCls,
+    addPaddedCls,
     handleLeftRightClick
 }

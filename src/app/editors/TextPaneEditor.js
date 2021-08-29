@@ -1105,7 +1105,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
                                y={currBlock.y} setY={setEntityProp('y')} minY={fieldProps.y.min} maxY={fieldProps.y.max} stepY={currBlock.alignToGrid ? font.height : 1} disabledY={currBlock.autoCenteringY}
                             />
-                            <LabelProp name="- actual:">
+                            <LabelProp name="- actual:" labelProps={{className: 'less'}} bottomPadding={false}>
                                 <Stack gaps="1" wrap full="h">
                                     <Tuple center="v" readOnly
                                            minX={fieldProps.x.min} maxX={fieldProps.x.max}
@@ -1145,7 +1145,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                         </ToolGroup>
                         <Checkbox name="Show marker" value={marker} set={setMarker} />
                     </Toolbar>
-                    <Block full centerItems padded className="scroll">
+                    <Block full centerItems padded scroll>
                         <Overlays className="thin-boxed" width={width * zoom} height={height * zoom}>
                             <Overlay>
                                 <Canvas render={renderScreen} width={width * zoom} height={height * zoom} />

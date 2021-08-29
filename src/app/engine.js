@@ -1895,6 +1895,7 @@ class Game {
         SM = new StorageManager(localStorage);
         RL = new ResourceLoader(new BackEndFetcher('http://localhost:8080/'), SM);
 
+        this.id = 'TODO';
         this.width = width;
         this.height = height;
         this.init = init.bind(this);
@@ -1927,6 +1928,10 @@ class Game {
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
         });
+    }
+
+    getId() {
+        return this.id
     }
 
     setStateInitHandler(handler) {

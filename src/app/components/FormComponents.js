@@ -19,7 +19,7 @@ import {
     useCssProps,
     useCallAfterwards,
     useComponentUpdate,
-    AvailContext, MinMaxCtx, PixelMarker
+    AvailContext, MinMaxCtx, CanvasCircleMarker
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -894,14 +894,41 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     )
 }
 
+function VirtualNumber({ value, set, min = 0, max, decimals, virtualMin = 0, virtualMax = 100, rangeDecimals, ...props }) {
+    const callAfterwards = useCallAfterwards();
+    const valueDist = Math.abs(max - min);
+    const virtualDist = Math.abs(virtualMax - virtualMin);
+    const lastValueRef = useRef(value);
+
+    const value2virtual = round(virtualMin + (valueDist ? (value - min) * virtualDist / valueDist : 0), rangeDecimals);
+    const [ virtual, setVirtualRaw ] = useState(value2virtual);
+
+    const setVirtual = newVirtual => {
+        const newValue = round(min + (virtualDist ? (newVirtual - virtualMin) * valueDist / virtualDist : 0), decimals);
+        if (value !== newValue) {
+            lastValueRef.current = newValue;
+            set(newValue);
+        }
+        setVirtualRaw(newVirtual)
+    };
+    if (value !== lastValueRef.current) {
+        callAfterwards(setVirtualRaw, value2virtual);
+        lastValueRef.current = value;
+    }
+    return (
+        <Number value={virtual} set={setVirtual} min={virtualMin} max={virtualMax}
+            decimals={rangeDecimals} { ...props }
+        />
+    )
+}
+
 const numberIconProps = {width: 13, center: true, size: 8};
 
-function Number({ name, disabled, value, size, min, max, step, percentage, percProps = {}, autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, floatProps = {}, ...props }) {
+function Number({ name, disabled, value, size, min, max, step,
+                    autoFocus, slider = true, decimals = 0, readOnly, buttons = true, tab = true, railProps, gradient, floatProps = {}, ...props }) {
     const wContext = useContext(WindowContext);
 
-    percProps = { max: 100, decimals: 0, step: 1, ...percProps }
     const set = useSet(value, props);
-
     const divRef = useRef(null);
     const slideRef = useRef(null);
     const inputRef = useRef(null);
@@ -923,18 +950,7 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
         buttons = false;
         slider = false;
     }
-    const vMax = percentage ? percProps.max : max;
-    const points = vMax ? Math.abs((max - min) / vMax) : 0;
-    const vDecimals =  percentage ? percProps.decimals : decimals;
-    const vStep = percentage ? percProps.step : step;
-    const vMin = percentage ? 0 : min;
-    const vValue = percentage ? round(points ? (value - min) / points : 0, vDecimals) : value;
-    const vSet = percentage ? perc => {
-        set(round(min + perc * points, decimals));
-    } : set;
-
     const hasRange = (min !== undefined && max !== undefined);
-    const vStepHandler = getStepHandler(vMin, vMax, vDecimals, vStep);
     const stepHandler = getStepHandler(min, max, decimals, step);
 
     const fullSlider = hasRange && slider === 'h';
@@ -956,7 +972,7 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
                 const relPos = anchor - e.clientY;
                 if (relPos !== lastPos) {
                     lastPos = relPos;
-                    let newOffset = vStepHandler.round(range ? relPos / Math.max(1, 200 / range) : relPos);
+                    let newOffset = stepHandler.round(range ? relPos / Math.max(1, 200 / range) : relPos);
                     if (maxOffset !== null) {
                         newOffset = Math.min(maxOffset, newOffset);
                     }
@@ -965,7 +981,7 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
                     }
                     if (newOffset !== lastOffset) {
                         lastOffset = newOffset;
-                        set(vStepHandler.round(anchorValue + newOffset));
+                        set(stepHandler.round(anchorValue + newOffset));
                     }
                 }
             });
@@ -986,8 +1002,8 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
     items.push(
         <Input
             key={2} number className={inputCls.join(' ')} tab={tab} readOnly={readOnly} disabled={disabled} autoFocus={autoFocus}
-            decimals={vDecimals} step={vStep} max={vMax} min={vMin} size={size}
-            value={vValue} set={vSet} inputRef={inputRef} { ...dimProps }
+            decimals={decimals} step={step} max={max} min={min} size={size}
+            value={value} set={set} inputRef={inputRef} { ...dimProps }
             full={fullSlider ? false : dimProps.full}
         />
     );
@@ -995,10 +1011,10 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
         items.push(
             <div key={3} className="center-v parent block">
                 <Block height="50%">
-                    <Button vertical center="v" full="v" centerItems key={4} iconProps={numberIconProps} disabled={disabled || vMax === vValue} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
+                    <Button vertical center="v" full="v" centerItems key={4} iconProps={numberIconProps} disabled={disabled || max === value} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
                 </Block>
                 <Block height="50%">
-                    <Button vertical center="v" full="v" centerItems key={3} iconProps={numberIconProps} disabled={disabled || vMin === vValue} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
+                    <Button vertical center="v" full="v" centerItems key={3} iconProps={numberIconProps} disabled={disabled || min === value} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
                 </Block>
             </div>
         );
@@ -1008,7 +1024,7 @@ function Number({ name, disabled, value, size, min, max, step, percentage, percP
     if (fullSlider) {
         elem = (
             <Stack full="h" gaps>
-                <Slider key={1} tab={false} focusRef={inputRef} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={vValue} decimals={vDecimals} min={vMin} max={vMax} set={vSet}>{gradient}</Slider>
+                <Slider key={1} tab={false} focusRef={inputRef} full="h" disabled={disabled} railProps={railProps} readOnly={readOnly} value={value} decimals={decimals} min={min} max={max} set={set}>{gradient}</Slider>
                 <Block center="v">{elem}</Block>
             </Stack>
         )
@@ -1099,7 +1115,7 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
     };
     const cls = [];
     if (wrap) {
-        cls.push('wrap full-h')
+        cls.push('wrap full-h flow-padding-gaps')
     }
     return (
         <Stack {...attr} gaps="1" center={center} className={cls.join(' ')}>
@@ -1486,17 +1502,33 @@ const rgb2hsv = rgb => {
     };
 }
 
-const huePercProps = {max: 359, decimals: 1, step: 0.1};
-const svPercProps = {decimals: 1, step: 0.1};
+function useCachedState(level, id, value) {
+    const wContext = useContext(WindowContext);
+
+    const cache = wContext.cache[level];
+    if (cache[id] === undefined) {
+        cache[id] = value
+    }
+    const [cacheValue, setCacheValue] = useState(cache[id]);
+
+    return [
+        cacheValue,
+        newValue => {
+            cache[id] = newValue;
+            setCacheValue(newValue);
+        }
+    ]
+}
+
+const COLOR_MODEL = {
+    RGB: 'RGB',
+    HSV: 'HSV'
+}
 
 /**
  * TODO
- *  * BUGFIX: slider im HSV-Modus nicht per Keys steuerbar
- *  - BUGFIX: Ausrichtung
  *  - BUGFIX: korrekte Umrechnung
 
- *  - persistierung hsv/rgb (last-color?)
- *  - transparency (perc im HSV-Mode)
  *  - Normaler Modal
  *  - Positionierung nahe ColorBox
  *  - CHECK: modal-cancel reset
@@ -1513,7 +1545,7 @@ function ColorPicker({ value, set, alpha, close }) {
     const rgb = hex2rgb(value.current);
     const update = useComponentUpdate();
 
-    const [ active, setActive ] = useState(null);
+    const [ colorModel, setColorModel ] = useCachedState('global','lastColorModel', COLOR_MODEL.RGB);
     const gradientsRef = useRef({colors: {}});
 
     const hsv = rgb2hsv(value.current);
@@ -1522,12 +1554,12 @@ function ColorPicker({ value, set, alpha, close }) {
     const [ s, setS ] = useState(hsv.s);
     const [ v, setV ] = useState(hsv.v);
 
-    const grad = alpha ? value.current.substr(7, 2) : '';
+    const alphaHex = alpha ? value.current.substr(7, 2) : '';
     const propsRef = useRef(null);
-    propsRef.current = { h, s, v, grad, showingBefore };
+    propsRef.current = { h, s, v, alphaHex, showingBefore };
 
-    const hueSelectorCanvas = wContext.getBaseColorCanvas();
-    const colorMaskCanvas = wContext.getColorMaskCanvas();
+    const hueSelectorCanvas = wContext.getHueColorsCanvas();
+    const colorMaskCanvas = wContext.getHueMaskCanvas();
 
     useEffect(() => {
         return () => {
@@ -1657,7 +1689,7 @@ function ColorPicker({ value, set, alpha, close }) {
         'alpha',
         value.current.substr(0, 7) + '00 ' + value.current.substr(0, 7) + 'FF'
     );
-    if (active === 'RGB' || !gradients.red) {
+    if (colorModel === COLOR_MODEL.RGB || !gradients.red) {
         updateGradient(
             'red',
             getColorWithChannel(value.current, 0, '00') + ' ' +
@@ -1674,49 +1706,58 @@ function ColorPicker({ value, set, alpha, close }) {
             getColorWithChannel(value.current, 2, 'FF')
         )
     }
-    if (active === 'HSV' || !gradients.hue) {
+    if (colorModel === COLOR_MODEL.HSV || !gradients.hue) {
+        const hueColors = [
+            '#FF0000', '#FFFF00', '#00FF00', '#00FFFF',
+            '#0000FF', '#FF00FF', '#FF0001'
+        ];
         updateGradient(
             'hue',
-            "#FF0000" + grad + " #FFFF00" + grad + " #00FF00" + grad + " #00FFFF" +
-            grad + " #0000FF" + grad + " #FF00FF" + grad + " #FF0001" + grad
+            hueColors.join(alphaHex + ' ') + alphaHex
         );
         updateGradient(
             's',
-            hsv2rgb(h, 0, v) + grad + ' ' +
-            hsv2rgb(h, 255, v) + grad
+            hsv2rgb(h, 0, v) + alphaHex + ' ' +
+            hsv2rgb(h, 255, v) + alphaHex
         );
         updateGradient(
             'v',
-            hsv2rgb(h, s, 0) + grad + ' ' +
-            hsv2rgb(h, s, 255) + grad
+            hsv2rgb(h, s, 0) + alphaHex + ' ' +
+            hsv2rgb(h, s, 255) + alphaHex
         )
     }
 
     const syncColor2Hsv = () => {
         requestAnimationFrame(() => {
             const newHsv = propsRef.current;
-            set(hsv2rgb(newHsv.h, newHsv.s, newHsv.v) + newHsv.grad);
+            set(hsv2rgb(newHsv.h, newHsv.s, newHsv.v) + newHsv.alphaHex);
             requestAnimationFrame(update);
         });
     }
-    const setHue = newH => {
+    const setHsvH = newH => {
         setH(newH);
         syncColor2Hsv()
     }
-    const setSaturation = newS => {
+    const setHsvS = newS => {
         setS(newS);
         syncColor2Hsv()
     }
-    const setVelocity = newV => {
+    const setHsvV = newV => {
         setV(newV);
         syncColor2Hsv()
     }
+    const setHsvSV = (newS, newV) => {
+        setV(newV);
+        setS(newS);
+        syncColor2Hsv()
+    }
+
     const invertColor = () => {
         const rgb = hex2rgb(value.current.substr(0, 7));
         rgb.r = 255 - rgb.r;
         rgb.g = 255 - rgb.g;
         rgb.b = 255 - rgb.b;
-        setAndSync(rgb2hex(rgb) + propsRef.current.grad);
+        setAndSync(rgb2hex(rgb) + propsRef.current.alphaHex);
     }
     const handleEsc = e => {
         if (e.key === 'Escape') {
@@ -1730,9 +1771,9 @@ function ColorPicker({ value, set, alpha, close }) {
     return (
         <Form submit={close} onKeyDown={handleEsc}>
         <Stack vertical borders height={260}>
-            <Stack borders full="h">
-                <Stack vertical borders width={310}>
-                    <Stack gaps padded>
+            <Stack borders full>
+                <Stack vertical borders width={310} full="v">
+                    <Stack gaps padded full="h">
                         <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
                         <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
                         <Stack center="v" gaps>
@@ -1744,10 +1785,10 @@ function ColorPicker({ value, set, alpha, close }) {
                         <ColorBox className="thin-boxed" color={hsv2rgb(h, s, v)} width={35} height={26} />
                     </Stack>
 
-                    <Block full="h">
-                        <SideTabs active={active} setActive={setActive} icon={false} full>
-                            <SideTab full active name="RGB">
-                                {active === 'RGB' &&
+                    <Block full>
+                        <SideTabs active={colorModel} setActive={setColorModel} icon={false} full>
+                            <SideTab full name="RGB">
+                                {colorModel === COLOR_MODEL.RGB &&
                                     <Block full="h">
                                         <PropertyGrid>
                                             <NumberProp name="R" full="h" gradient={gradients.red} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
@@ -1762,14 +1803,21 @@ function ColorPicker({ value, set, alpha, close }) {
                             </SideTab>
 
                             <SideTab full name="HSV">
-                                {active === 'HSV' &&
+                                {colorModel === COLOR_MODEL.HSV &&
                                     <Block full="h">
                                         <PropertyGrid>
-                                            <NumberProp name="H" full="h" gradient={gradients.hue} percentage percProps={huePercProps} railProps={railProps} value={h} set={setHue} min={0} max={MAX_H - 1} slider="h" />
-                                            <NumberProp name="S" full="h" gradient={gradients.s} percentage percProps={svPercProps} railProps={railProps} value={s} set={setSaturation} min={0} max={255} slider="h" />
-                                            <NumberProp name="V" full="h" gradient={gradients.v} percentage percProps={svPercProps} railProps={railProps} value={v} set={setVelocity} min={0} max={255} slider="h" />
+                                            <VirtualNumberProp name="H" full="h" gradient={gradients.hue} virtualMax={359}
+                                                       railProps={railProps} value={h} set={setHsvH} min={0} max={MAX_H - 1}
+                                                       slider="h" size={4} />
+                                            <VirtualNumberProp name="S" full="h" gradient={gradients.s} railProps={railProps}
+                                                       value={s} rangeDecimals={1} set={setHsvS} min={0} max={255}
+                                                       slider="h" size={4} />
+                                            <VirtualNumberProp name="V" full="h" gradient={gradients.v} railProps={railProps}
+                                                       value={v} rangeDecimals={1} set={setHsvV} min={0} max={255}
+                                                       slider="h" size={4} />
                                             {alpha &&
-                                                <NumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
+                                                <VirtualNumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h"
+                                                           value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" size={4} />
                                             }
                                         </PropertyGrid>
                                     </Block>
@@ -1781,14 +1829,19 @@ function ColorPicker({ value, set, alpha, close }) {
 
                 <Block padded>
                     <Stack>
-                        <PixelMarker size={7} rangeX={256} rangeY={256} setX={value => setVelocity(255 - value)} x={255 - v} y={255 - s} setY={value => setSaturation(255 - value)}>
+                        <CanvasCircleMarker
+                            size={7} rangeX={256} rangeY={256}
+                             x={255 - v} setX={value => setHsvV(255 - value)}
+                             y={255 - s} setY={value => setHsvS(255 - value)}
+                             setXY={(newX, newY) => setHsvSV(255 - newY, 255 - newX)}
+                        >
                             <Canvas width={192} height={192} render={renderSquare} plain />
-                        </PixelMarker>
+                        </CanvasCircleMarker>
 
                         <Slider vertical tab
                                 sledProps={{margin: 10, short: 10, long: 14, radius: true}}
                                 railProps={{size: 192, oppSize: 12, center: false, radius: false}}
-                                min={0} max={MAX_H - 1} value={h} set={setHue}
+                                min={0} max={MAX_H - 1} value={h} set={setHsvH}
                                 getIndicator={renderIndicator}
                         >
                             <Canvas width={12} height={192} render={renderHue} />
@@ -1798,8 +1851,10 @@ function ColorPicker({ value, set, alpha, close }) {
 
             </Stack>
 
-            <Stack gaps full>
-                <Block padded width={150}><Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  /></Block>
+            <Stack gaps full="h">
+                <Block padded width={150}>
+                    <Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  />
+                </Block>
                 <Block full>
                     <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
                 </Block>
@@ -2349,13 +2404,19 @@ function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props 
     )
 }
 
-function LabelProp({name, children}) {
+function LabelProp({name, labelProps, bottomPadding = true, children}) {
+    let leftPadding = DIR.H;
+    let rightPadding = DIR.RIGHT;
+    if (bottomPadding) {
+        leftPadding |= DIR.BOTTOM;
+        rightPadding |= DIR.BOTTOM
+    }
     return (
         <>
-            <Block shorten padded={DIR.LEFT|DIR.RIGHT|DIR.BOTTOM} className="small-font">
+            <Block shorten padded={leftPadding} className="small-font" { ...labelProps }>
                 {name}
             </Block>
-            <Block full="h" padded={DIR.RIGHT|DIR.BOTTOM}>
+            <Block full="h" padded={rightPadding}>
                 {children}
             </Block>
         </>
@@ -2372,7 +2433,7 @@ function InputProp({ name, ...props }) {
 
 function TupleProp({ name, ...props }) {
     return (
-        <LabelProp name={name}>
+        <LabelProp name={name} bottomPadding={false}>
             <Tuple {...props} />
         </LabelProp>
     )
@@ -2398,6 +2459,14 @@ function NumberProp({ name, ...props }) {
     return (
         <LabelProp name={name}>
             <Number {...props} />
+        </LabelProp>
+    )
+}
+
+function VirtualNumberProp({ name, ...props }) {
+    return (
+        <LabelProp name={name}>
+            <VirtualNumber {...props} />
         </LabelProp>
     )
 }
@@ -2542,6 +2611,8 @@ export {
     Submit,
     Number,
     NumberProp,
+    VirtualNumber,
+    VirtualNumberProp,
     Checkbox,
     CheckboxProp,
     Radio,

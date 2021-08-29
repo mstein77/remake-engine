@@ -280,8 +280,8 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                             <Number name="Zoom:" value={zoom} set={setZoom} min={1} max={9} />
                             <Color name="Background:" value={background} set={setBackground} />
                         </Toolbar>
-                        <Block full padded>
-                            <Block full centerItems className="scroll">
+                        <Block full>
+                            <Block full padded centerItems scroll>
                                 <Canvas
                                     border="1"
                                     width={currImage.width * zoom}
