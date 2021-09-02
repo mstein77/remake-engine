@@ -12,6 +12,7 @@ import {
     useUpdateOnEntityIndexChanges,
     PropertyGrid,
     Section,
+    useCachedState,
     WindowContext,
 } from "../components/BasicComponents";
 import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
@@ -670,7 +671,7 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
     return (
         <Stack vertical full>
             <Stack full>
-                <Section inner
+                <Section id="fonts" inner
                          name="Fonts" size={250} maxWidth="33%" collapse="h" full="v">
                     <EntityStack
                         area={3} entityIndex={fontIndex}
@@ -708,7 +709,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
     const [ background, setBackground ] = useState('#000000');
     const [ zoom, setZoom ] = useState(1);
-    const [ marker, setMarker ] = useState(true);
+    const [ marker, setMarker ] = useCachedState('page', 'previewMarker', true);
     const [ highlight, setHighlight ] = useState(false);
     const [ width, setWidth ] = useState(320);
     const [ height, setHeight ] = useState(200);
@@ -1089,6 +1090,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     return (
         <Stack full>
             <EntityStackSections
+                id="textBlocks"
                 sectionProps={{inner: true, name: 'Text Blocks', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 detailProps={{inner: true, name: 'Text Block Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 entityIndex={blockIndex}
@@ -1182,7 +1184,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 <NameDialog { ...NewBlockModal.props } />
             </NewBlockModal.content>
 
-            <FilterModal.content name="Filter" width="75%" height="75%">
+            <FilterModal.content id="FilterPipelineModal" name="Filter" width="75%" height="75%">
                 <FiltersModal { ...FilterModal.props } />
             </FilterModal.content>
         </Stack>
@@ -1242,7 +1244,7 @@ function TextPaneEditor({ model, resource }) {
     return (
         <Stack full vertical gaps>
             <EditorSection
-                id="pane" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
+                id="textPaneEditor" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
                 confirm tree={tree}
 
                actions={
@@ -1264,7 +1266,7 @@ function TextPaneEditor({ model, resource }) {
                 <FontEditor full resource={resource} fontIndex={fontIndex} blockIndex={blockIndex} activeFont={activeFont} setActiveFont={setActiveFont} />
             </EditorSection>
 
-            <EditorSection id="preview" area={2} full name="Preview" actions={
+            <EditorSection id="textPanePreview" area={2} full name="Preview" actions={
                 eContextRef => {
                     return {
                         export: () => {

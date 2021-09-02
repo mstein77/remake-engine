@@ -326,6 +326,7 @@ const EditorContext = React.createContext();
 
 function EditorCtx({ id, children }) {
     const wContext = useContext(WindowContext);
+    const cache = usePageCache(id);
 
     const [ lastMode, setLastMode ] = useState(null);
     const [ lastModeParams, setLastModeParams ] = useState({});
@@ -347,6 +348,8 @@ function EditorCtx({ id, children }) {
     propsRef.current = {
         mode: lastMode,
         modeParams: lastModeParams,
+        id,
+        cache,
         past,
         future,
         storePos,
@@ -521,12 +524,12 @@ function UndoRedoButtons({ hotKeys }) {
 function EditorSection({ id, ...props }) {
     return (
         <EditorCtx id={id}>
-            <EditorSectionInner { ...props } />
+            <EditorSectionInner id={id} { ...props } />
         </EditorCtx>
     )
 }
 
-function EditorSectionInner({ name, actions = [], area, tree, link, confirm, children, ...props }) {
+function EditorSectionInner({ id, name, actions = [], area, tree, link, confirm, children, ...props }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
     const eContextRef = useRef(null);
@@ -582,6 +585,7 @@ function EditorSectionInner({ name, actions = [], area, tree, link, confirm, chi
     );
     return (
         <SectionFrame
+            id={id}
             header={header}
             hotKeys={hotKeys}
             link={link}
@@ -592,19 +596,29 @@ function EditorSectionInner({ name, actions = [], area, tree, link, confirm, chi
     );
 }
 
-function SectionFrame({ header, name, children, hotKeys, area, link, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
+function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
     const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
 
     const contentRef = useRef(null);
 
-    const [ collapsed, setCollapsed ] = useState(props.collapsed === true);
+    const [ collapsed, setCollapsed ] = useCachedState(
+    inner ? 'page' : null,
+        id,
+        props.collapsed === true,
+        'bool'
+    );
     const collapseH = collapse === 'h';
     const minDefault = collapseH ? 100 : 25;
     if (!minSize || minSize < minDefault) {
         minSize = minDefault;
     }
-    const [ size, setSize ] = useState(props.size && Math.max(props.size, minSize));
+    const [ size, setSize ] = useCachedState(
+        'page',
+        id ? id + '.size' : null,
+        props.size && Math.max(props.size, minSize),
+        'number'
+    );
 
     const offsetRef = useRef(null);
 
@@ -1140,14 +1154,18 @@ function WindowCtx({ imageResources, filters, children, game }) {
         return new Storage(localStorage, 'remake-engine.editor.');
     });
 
-    useEffect(() => {
-        const doPersistCache = force => {
-            if (force === true || document.visibilityState === 'hidden') {
-                const cache = registry('cache');
-                storage.storeJson('cache.global', cache.global);
-                storage.storeJson('cache.game.' + gameId, cache.game);
+    const doPersistCache = force => {
+        if (force === true || document.visibilityState === 'hidden') {
+            const cache = registry('cache');
+            storage.storeJson('cache.global', cache.global);
+            storage.storeJson('cache.game.' + gameId, cache.game);
+            for (let [id, values] of Object.entries(cache.page)) {
+                storage.storeJson('cache.page.' + id, values)
             }
-        };
+        }
+    };
+
+    useEffect(() => {
         document.addEventListener('visibilitychange', doPersistCache);
 
         return () => {
@@ -1188,6 +1206,28 @@ function WindowCtx({ imageResources, filters, children, game }) {
             ]
         };
 
+        const getCacheProps = id => {
+            const rawCache = storage.getDefaultedJson('cache.' + id, {});
+            const cache = {};
+            for (let [prop, value] of Object.entries(rawCache)) {
+                const index = prop.lastIndexOf('_');
+                if (index !== -1) {
+                    let type = prop.substr(index + 1);
+                    switch(type) {
+                        case 'bool':
+                            type = 'boolean';
+                        case 'number':
+                        case 'boolean':
+                        case 'string':
+                            if (index === 0 || (typeof value !== type)) continue;
+                            break;
+                    }
+                }
+                cache[prop] = value;
+            }
+            return cache;
+        }
+
         const action2hotKey = storage.getDefaultedJson('hotkeys', defaultMapping);
         const hotKey2action = {};
         for (let [action, key] of Object.entries(action2hotKey)) {
@@ -1227,7 +1267,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             }
         };
 
-        const gameCache = storage.getDefaultedJson('cache.game.' + gameId, {});
+        const gameCache = getCacheProps('game.' + gameId);
 
         registryRef.current = {
             lastTarget: null,
@@ -1235,6 +1275,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             confirm: null,
             settings: null,
             modalStack: [],
+            modalIds: [],
             focusStack: {
                 elem: {},
                 zIndex: null
@@ -1259,8 +1300,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
             },
 
             cache: {
-                global: storage.getDefaultedJson('cache.global', {}),
-                game: gameCache
+                global: getCacheProps('global'),
+                game: gameCache,
+                page: {}
             },
 
             lastColorsIndex: new ColorIndex({colors: (gameCache.lastColors ? gameCache.lastColors.split(' ') : [])})
@@ -1382,6 +1424,24 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
         // let's initialize the context with ref-values and methods here...
         setterRef.current = {
+            clearAllCaches: () => {
+                const cache = registry('cache');
+                storage.deleteJson('cache.global');
+                cache.global = {};
+
+                const gameIds = Object.keys(cache.game);
+                for (let id of gameIds) {
+                    storage.deleteJson('cache.game.' + id);
+                }
+                cache.game = {};
+
+                const pageKeys = Object.keys(cache.page);
+                for (let key of pageKeys) {
+                    storage.deleteJson('cache.page.' + key);
+                }
+                cache.page = {};
+            },
+
             // overwrite registry key with new value
             register,
             registry,
@@ -1413,6 +1473,13 @@ function WindowCtx({ imageResources, filters, children, game }) {
             theme: registry('theme'),
 
             cache: registry('cache'),
+            loadPageCache: id => {
+                const cache = registry('cache');
+                if (!cache.page[id]) {
+                    cache.page[id] = getCacheProps('page.' + id)
+                }
+                return cache.page[id]
+            },
 
             startExclusiveMode: (id, cursor = 'auto') => {
                 const { mode, setFixCursor } = registry();
@@ -1454,6 +1521,16 @@ function WindowCtx({ imageResources, filters, children, game }) {
             },
             removeEventListener,
 
+            pushModalId: id => registry('modalIds').push(id),
+            popModalId: () => registry('modalIds').pop(),
+            getCurrModalCache: () => {
+                const modalIds = registry('modalIds');
+                if (!modalIds.length) return {};
+
+                const id = modalIds[modalIds.length - 1];
+                const cache = registry('cache').page[id];
+                return cache
+            },
             getModalLevel,
             openModal: () => {
                 const { modalStack, focusStack, lastTarget } = registry();
@@ -1962,13 +2039,16 @@ function useModal() {
         propsRef.current = props;
         setIsOpen(context.openModal());
     };
-    const content = function ({full, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
+    const content = function ({id, full, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
         const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
         dimProps.zIndex = isOpen;
+        if (!id && propsRef.current && propsRef.current.id) {
+            id = propsRef.current.id
+        }
         return (
             <>
-                {isOpen && <Modal key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal id={id} key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
             </>
         );
     };
@@ -1978,7 +2058,7 @@ function useModal() {
         close,
         get props() {
             const props = propsRef.current === null ? {} : propsRef.current;
-            return props.close ? props : {...props, close};
+            return props.close ? props : { ...props, close };
         }
     };
 }
@@ -2025,7 +2105,7 @@ function ActionBarContent({ children, scroll, ...props }) {
 
 /**
  */
-const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
+const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
     const trapRef = useRef(null);
@@ -2043,6 +2123,20 @@ const Modal = function ({ name, close, closeable = true, zIndex = 0, full, width
             }
         }, 100)
     }
+
+    const cacheRef = useRef(false);
+    if (id && !cacheRef.current) {
+        wContext.pushModalId(id);
+        wContext.loadPageCache(id);
+        cacheRef.current = true
+    }
+    useEffect(() => {
+        if (!id) return;
+        return () => {
+            wContext.popModalId(id)
+        }
+    });
+
     useEffect(() => {
         const focusElem = wContext.focusStack.elem[zIndex];
         if (!focusElem) {
@@ -2793,6 +2887,53 @@ function PropertyGrid({ labelProps = {}, children }) {
     )
 }
 
+function usePageCache(id) {
+    const wContext = useContext(WindowContext);
+    const cacheRef = useRef(null);
+    if (!id) {
+        return {}
+    }
+    if (!cacheRef.current) {
+        cacheRef.current = wContext.loadPageCache(id);
+    }
+    return cacheRef.current;
+}
+
+function useCachedState(level, id, value, type) {
+    const wContext = useContext(WindowContext);
+    const eContext = useContext(EditorContext);
+    let cache = null;
+    let pre = value;
+
+    if (level && id) {
+        if (id && type) {
+            id += '_' + type
+        }
+        if (level === 'page') {
+            if (wContext.getModalLevel() > 0) {
+                cache = wContext.getCurrModalCache()
+            } else {
+                cache = eContext.cache
+            }
+        } else {
+            cache = wContext.cache[level]
+        }
+        if (cache[id] === undefined) {
+            cache[id] = value
+        }
+        pre = cache[id]
+    }
+    const [ cacheValue, setCacheValue ] = useState(pre);
+
+    return [
+        cacheValue,
+        cache !== null ?
+            newValue => {
+                cache[id] = newValue;
+                setCacheValue(newValue);
+            } : setCacheValue
+    ]
+}
 
 export {
     AvailContext,
@@ -2838,5 +2979,7 @@ export {
     useFocusKeyBindings,
     useRefocus,
     useCallAfterwards,
-    useCssProps
+    useCssProps,
+    usePageCache,
+    useCachedState
 }

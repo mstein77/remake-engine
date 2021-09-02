@@ -624,6 +624,18 @@ function HotKeySettings({ mapping, setMapping }) {
     )
 }
 
+function StorageSettings() {
+    const wContext = useContext(WindowContext);
+
+    return (
+        <Block full="h" centerItems="h">
+            <Stack padded>
+                <Button padded="h" name="Clear Cache" onClick={wContext.clearAllCaches} />
+            </Stack>
+        </Block>
+    )
+}
+
 function Settings({ save, close, defaults }) {
     const cssContext = useContext(CssContext);
     const wContext = useContext(WindowContext);
@@ -710,8 +722,12 @@ function Settings({ save, close, defaults }) {
                     <ThemeSettings theme={theme} setTheme={setTheme} />
                 </SideTab>
 
-                <SideTab name="HotKeys" full scroll>
+                <SideTab name="HotKeys" full>
                     <HotKeySettings mapping={mapping} setMapping={setMapping} />
+                </SideTab>
+
+                <SideTab name="Storage" full>
+                    <StorageSettings />
                 </SideTab>
             </SideTabs>
         </OkCancelForm>

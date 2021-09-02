@@ -282,18 +282,18 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     return elem
 }
 
-function EntityStackSections({ sectionProps, detailProps, active, children, ...props}) {
+function EntityStackSections({ id, sectionProps, detailProps, active, children, ...props}) {
 
     const items = [];
 
     items.push(
-        <Section key={0} { ...sectionProps }>
+        <Section key={0} id={id} { ...sectionProps }>
             <EntityStack active={active} { ...props } />
         </Section>
     );
     if (children) {
         items.push(
-            <Section key={1} { ...detailProps }>{children}</Section>
+            <Section key={1} id={id ? id + '.props' : null} { ...detailProps }>{children}</Section>
         );
     }
     return (

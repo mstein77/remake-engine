@@ -261,10 +261,11 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
     return (
         <OkCancelForm full save={saveFilters} cancel={close}>
             <Stack full>
-                <Section inner full="v" inner collapse="h" size={170} name="Filters">
+                <Section id="filterSelection" inner full="v" collapse="h" size={170} name="Filters">
                     <ButtonStack items={Object.keys(filterDefinitions).sort()} onClick={addFilter} />
                 </Section>
                 <EntityStackSections
+                    id="filterPipeline"
                     sectionProps={{inner: true, name: 'Pipeline', size: 170, maxWidth: '33%', collapse: 'h', full: 'v'}}
                     detailProps={{inner: true, name: 'Filter Properties', size: 200, maxWidth: '33%', collapse: 'h', full: 'v'}}
                     entityIndex={filterIndex}
@@ -274,7 +275,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                 >
                     {getItemProperties()}
                 </EntityStackSections>
-                <Section inner full name="Preview">
+                <Section id="filterPreview" inner full name="Preview">
                     <Stack vertical full borders>
                         <Toolbar>
                             <Number name="Zoom:" value={zoom} set={setZoom} min={1} max={9} />
@@ -556,7 +557,7 @@ function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
     return (
         <OkCancelForm submit full save={doSave} cancel={close}>
             <Stack full>
-                <Section collapse="h" inner full="v" size={200} name="Images">
+                <Section id="bitmapSelector" collapse="h" inner full="v" size={200} name="Images">
                     <Stack vertical borders full>
                         <Block full>
                             <EntityStack

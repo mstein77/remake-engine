@@ -17,6 +17,7 @@ import {
     useRefocus,
     useMounted,
     useCssProps,
+    useCachedState,
     useCallAfterwards,
     useComponentUpdate,
     AvailContext, MinMaxCtx, CanvasCircleMarker
@@ -1500,24 +1501,6 @@ const rgb2hsv = rgb => {
         v: sorted[2].v,
         h: getHueIndex(sorted[0].i, sorted[1].i, sorted[0].v - sorted[1].v)
     };
-}
-
-function useCachedState(level, id, value) {
-    const wContext = useContext(WindowContext);
-
-    const cache = wContext.cache[level];
-    if (cache[id] === undefined) {
-        cache[id] = value
-    }
-    const [cacheValue, setCacheValue] = useState(cache[id]);
-
-    return [
-        cacheValue,
-        newValue => {
-            cache[id] = newValue;
-            setCacheValue(newValue);
-        }
-    ]
 }
 
 const COLOR_MODEL = {

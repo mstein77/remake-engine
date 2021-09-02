@@ -28,16 +28,12 @@
       + BgColor:
 
 ---------------------------
- - Persistierung
-    - Editor-Section-Props
-    - Cache-Clear (Auto?)
-    - Type-Check
----------------------------
- - Button: Tooltips
- - Font-Styling
- - Sections
+ * Button: Tooltips
+ - Input-Error-Marking + Padding
  - Key-Bindings (+Marking)
  - Scrollbars
+ - Font-Styling
+ - Sections
 ---------------------------
  - Entity-Stack (Styling, Dragn-Drop)
  - Entity-Manager
