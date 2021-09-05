@@ -289,8 +289,8 @@ function Tooltip({ children }) {
  */
 const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, tab, full, shorten, scroll, wrap, zIndex, verticalText, ...props }, ref) => {
     const divRef = useRef(null);
-    const [start, setStart] = useState(null);
-    const [showTooltip, setShowTooltip] = useState(false);
+    const [ start, setStart ] = useState(null);
+    const [ showTooltip, setShowTooltip ] = useState(false);
     const timeRef = useRef(null);
     timeRef.current = start;
 
@@ -302,7 +302,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
     const parentCls = [];
     const childCls = [];
 
-    const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
+    const { dimCls, dimAttr, dimStyle } = useGetLayoutProps(props);
     dimCls.push('block');
     if (ref) {
         dimAttr['ref'] = ref;

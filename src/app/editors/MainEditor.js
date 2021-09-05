@@ -7,6 +7,9 @@ import {
     Ruler,
     SideTab,
     SideTabs,
+    HotKeyKeys,
+    HotKeySingleKeys,
+    HotKeySkipValues,
     useComponentUpdate,
     useModal,
     WindowContext,
@@ -164,6 +167,7 @@ function ConfigSettings({ config, setConfig }) {
                         value={config.maxHeightPx} set={propSetter('maxHeightPx')}
                         min={400} max={5000} def={1000}
                     />
+                    <CheckboxProp name="Help Tooltips" value={config.tooltips} set={propSetter('tooltips')} />
                     <CheckboxProp name="UI Animations" value={config.uiAnimations} set={propSetter('uiAnimations')} />
                     <NumberProp name="History size" value={config.maxHistory} max={100} set={propSetter('maxHistory')} min={5} />
                 </PropertyGrid>
@@ -523,50 +527,6 @@ function HotKeyRecorder({ action, save, close, mapping, ...props }) {
     )
 }
 
-const HotKeySingleKeys = ['Escape'];
-const HotKeySkipValues = ['Meta', 'Control', 'Alt', 'Shift'];
-
-function HotKeyKeys({ hotKey, empty }) {
-
-    const keys = [];
-    let elems = [];
-    if (hotKey !== null) {
-        const [hotPart, keyPart] = hotKey.split(' ');
-        if (hotPart.startsWith('m')) {
-            keys.push('CMD ⌘')
-        } else if (hotPart.startsWith('c')) {
-            keys.push('CTRL')
-        } else if (hotPart.startsWith('a')) {
-            keys.push('ALT');
-        }
-        if (keys.length > 0) {
-            if (hotPart.indexOf('i') !== -1) {
-                keys.push('SHIFT');
-            }
-            if (keyPart) {
-                keys.push(keyPart);
-            }
-        } else if (HotKeySingleKeys.includes(hotPart)) {
-            keys.push(hotPart);
-        }
-    }
-    if (keys.length) {
-        for(let key of keys) {
-            if (elems.length) {
-                elems.push(<Block center="v" key={'_' + elems.length}><Icon name="add" size={12} className="less" /></Block>);
-            }
-            elems.push(<Block key={key} padded border="1"><kbd>{key}</kbd></Block>);
-
-        }
-        return (
-            <Stack center="v" gaps="1">{elems}</Stack>
-        )
-    }
-    return (
-        <Block centerItems full className="less">{empty}</Block>
-    )
-}
-
 function HotKeySettings({ mapping, setMapping }) {
     const RecordModal = useModal();
 
@@ -700,6 +660,7 @@ function Settings({ save, close, defaults }) {
     const rightButtons = [
         <Button key="clear" icon="delete" name="Clear all settings" padded="h" onClick={() => {
             wContext.clearAllSettings();
+            wContext.clearAllCaches();
 
             setConfig(defaults.config);
             setTheme(defaults.theme);
@@ -852,9 +813,9 @@ function BaseAppInner({ children }) {
                         <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
                         <Block padded="h" center="v" full="h" shorten />
                         <Stack gaps center="v">
-                            <Button icon="build" padded="1" onClick={() => wContext.openSettings()} />
+                            <Button icon="build" help="Editor Settings" padded="1" onClick={() => wContext.openSettings()} />
                             <Button name="Play" icon="play_circle_outline" padded="h" />
-                            <Button name="Exit" icon="logout" padded="h" onClick={() => confirm(play)} />
+                            <Button name="Exit" click="double" help={{title: "Exit editor", hotKey: "c h", details: "Returns to the game, all changes will be lost"}} icon="logout" padded="h" onClick={() => confirm(play)} />
                         </Stack>
                     </Stack>
                 </Block>

@@ -13,6 +13,7 @@ import {
     Icon,
     SideTab,
     SideTabs,
+    HotKeyKeys,
     useFocusKeyBindings,
     useRefocus,
     useMounted,
@@ -20,7 +21,7 @@ import {
     useCachedState,
     useCallAfterwards,
     useComponentUpdate,
-    AvailContext, MinMaxCtx, CanvasCircleMarker
+    AvailContext, MinMaxCtx, CanvasCircleMarker, Portal
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, BitmapEditor } from "./EditorComponents";
@@ -423,11 +424,137 @@ function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = 
     )
 }
 
+function FixTooltip({ title, hotKey, click, children, hostRef }) {
+    const [ ready, setReady ] = useState(false);
+
+    const hostRect = hostRef.current ? hostRef.current.getBoundingClientRect() : null;
+    const divRef = useRef(null);
+    const dist = 10;
+    const styleRef = useRef({
+        zIndex: 10000
+    });
+    const cls = ['fixed tooltip small-font padded thin-boxed wrap-normal'];
+    if (!ready) {
+        cls.push('invisible')
+    }
+
+    useEffect(() => {
+        if (!hostRef.current || !divRef.current) return;
+
+        const rect = divRef.current.getBoundingClientRect();
+        const out = {
+            top: rect.top < 0,
+            left: rect.left < 0,
+            bottom: rect.bottom > window.innerHeight,
+            right: rect.right > window.innerWidth
+        };
+        if (out.right) {
+            styleRef.current.marginLeft = window.innerWidth - rect.right - dist
+        } else if (out.left) {
+            styleRef.current.marginLeft = -rect.left
+        }
+        if (out.bottom) {
+            styleRef.current.marginTop = -(rect.height + hostRect.height + 2 * dist);
+        } else if (out.top) {
+            styleRef.current.marginTop = -rect.top
+        }
+        setReady(true);
+    }, [hostRef.current, divRef.current]);
+
+    if (!hostRef.current) return '';
+
+    if (styleRef.current.top === undefined) {
+        styleRef.current.top = hostRect.top + hostRect.height + dist;
+        styleRef.current.left = hostRect.left;
+    }
+
+    return (
+        <Portal id="modals-container">
+            <div ref={divRef} style={{ ...styleRef.current }} className={cls.join(' ')}>
+                {title}
+                {title && children ? <br /> : ''}
+                {children}
+                {(hotKey || click) && <>
+                <Stack gaps end padded={DIR.TOP}>
+                    {click &&
+                        <>
+                            <Block center="v"><Icon name="mouse" size={13} /></Block>
+                            <Block border="1" center="v" padded="h">{click}</Block>
+                        </>
+                    }
+                    {hotKey &&
+                        <>
+                            <Block center="v"><Icon name="keyboard" /></Block>
+                            <HotKeyKeys padded="h" className="align-end" hotKey={hotKey} />
+                        </>
+                    }
+                </Stack>
+                </>}
+            </div>
+        </Portal>
+    )
+}
+
+function useTooltip({ title, hotKey, clicked, info, click }) {
+    const wContext = useContext(WindowContext);
+
+    const hostRef = useRef(null);
+    const mounted = useMounted();
+
+    const [ showTooltip, setShowTooltipRaw ] = useState(false);
+    const setShowTooltip = value => {
+        if (!mounted.current) return;
+        setShowTooltipRaw(value)
+    }
+    const propsRef = useRef();
+    propsRef.current = {
+        showTooltip,
+        setShowTooltip
+    };
+
+    if (!wContext.editorConfig.tooltips || !(title || info)) {
+        return {enabled: false}
+    }
+
+    const checkTooltip = () => {
+        wContext.clearTooltipTimer(propsRef);
+        if (wContext.isInExclusiveMode()) {
+            wContext.addEventListener(
+                'mouseup', e => {
+                    if (!isEventInRect(e, hostRef.current.getBoundingClientRect())) {
+                        setShowTooltip(false)
+                    }
+                },
+                {once: true}
+            );
+            setShowTooltip(null);
+            return;
+        }
+        setShowTooltip(false)
+    }
+
+    if (clicked && showTooltip !== null) {
+        checkTooltip()
+    }
+
+    const attr = {
+        ref: hostRef,
+        onMouseOver: () => {
+            wContext.startTooltipTimer(propsRef);
+        },
+        onMouseOut: checkTooltip
+    };
+
+    return {
+        enabled: true,
+        attr,
+        render: showTooltip && <FixTooltip title={title} hotKey={hotKey} click={click} hostRef={hostRef}>{info}</FixTooltip>
+    }
+}
+
 /**
- * TODO
- *  - help
  */
-function Button({ icon, name, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd,
+function Button({ icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
                      tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
 
@@ -489,6 +616,35 @@ function Button({ icon, name, full, state, iconProps = {}, end, center, centerIt
     const dir = vertical ? 'v' : 'h';
     const oppDir = vertical ? 'h' : 'v';
 
+    const helpProps = {
+        title: '',
+        clicked
+    };
+    if (help && !(disabled || readOnly)) {
+        if (action) {
+            helpProps.hotKey = wContext.hotKeyActions.action2hotKey[action];
+        }
+        if (click) {
+            helpProps.click = click
+        }
+        if (typeof help === 'string') {
+            helpProps.title = help;
+        } else {
+            if (help.title) {
+                helpProps.title = help.title
+            }
+            if (help.details) {
+                helpProps.info = <span className="less">
+                    {help.details}
+                </span>
+            }
+            if (help.hotKey) {
+                helpProps.hotKey = help.hotKey
+            }
+        }
+    }
+    const tooltip = useTooltip(helpProps)
+
     const items = [];
     if (icon) {
         items.push(
@@ -497,7 +653,7 @@ function Button({ icon, name, full, state, iconProps = {}, end, center, centerIt
     }
     if (name) {
         items.push(
-            <Block key="n" center={oppDir} full={dir} shorten>
+            <Block key="n" center={oppDir} full={dir} shorten={!tooltip.enabled}>
                 {name}
             </Block>
         )
@@ -550,13 +706,16 @@ function Button({ icon, name, full, state, iconProps = {}, end, center, centerIt
         items[0] = <Block key="e" end={end} center={centerItems}>{items[0]}</Block>;
     }
     return (
-        <Block gaps tab={tab} center={center} className={cls.join(' ')} cursor={cursor} { ...attr }>
+        <Block gaps tab={tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
+            <>
             {!hasStack ?
                 items[0] :
                 <Stack key="s" gaps={gaps} center={centerItems} end={end} vertical={vertical} full={fullStack}>
                     {items}
                 </Stack>
             }
+            {tooltip.render}
+            </>
         </Block>
     )
 }
@@ -629,9 +788,9 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
     }
     const items = [];
     let found = false;
-    for (let {id, name} of options) {
+    for (let { id, name, help } of options) {
         items.push(
-            <Button key={id} tab={tab} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={value} onClick={readOnly ? null : setAndRefocus} />
+            <Button key={id} tab={tab} help={help} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={value} onClick={readOnly ? null : setAndRefocus} />
         );
         if (id === value) {
             found = true;
@@ -1012,10 +1171,10 @@ function Number({ name, disabled, value, size, min, max, step,
         items.push(
             <div key={3} className="center-v parent block">
                 <Block height="50%">
-                    <Button vertical center="v" full="v" centerItems key={4} iconProps={numberIconProps} disabled={disabled || max === value} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
+                    <Button vertical help="Increase" center="v" full="v" centerItems key={4} iconProps={numberIconProps} disabled={disabled || max === value} onClick={() => {set(stepHandler.getStepUp(value)); blurActive()}} padded={false} tab={false} icon="expand_less" />
                 </Block>
                 <Block height="50%">
-                    <Button vertical center="v" full="v" centerItems key={3} iconProps={numberIconProps} disabled={disabled || min === value} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
+                    <Button vertical help="Decrease" center="v" full="v" centerItems key={3} iconProps={numberIconProps} disabled={disabled || min === value} onClick={() => {set(stepHandler.getStepDown(value)); blurActive()}} padded={false} tab={false} icon="expand_more" />
                 </Block>
             </div>
         );
@@ -1357,7 +1516,6 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, copy, readO
 /*
     TODO
       - rightClick => copy
-      - tooltip with hex/dec value
  */
 function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatProps = {} }) {
     const fContext = useContext(FormContext);
@@ -1367,6 +1525,8 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
     const colorRef = useRef(null);
     const [ clicked, setClicked ] = useState(false);
     colorRef.current = value;
+
+    const tooltip = useTooltip({title: value, clicked});
 
     const invalid = typeof value !== 'string' || !value.match(alpha ?/^#[0-9a-f]{8}$/i : /^#[0-9a-f]{6}$/i);
     if (invalid && fContext) {
@@ -1407,7 +1567,9 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
     return (
         <ComponentWithName name={name} { ...floatProps }>
             <Block className={cls.join(' ')} cursor={readOnly ? false : "pointer"} tab={tab}
+                   { ...tooltip.attr }
                    onLeftClick={readOnly ? null : () => handleClick('mouseup')}
+                   onRightClick={readOnly ? null : () => copy2clipboard(value)}
                    onKeyDown={readOnly ? null : e => {
                        if (e.keyCode !== 32 || clicked) {
                            return
@@ -1421,6 +1583,7 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
                         <ColorBox color={value} width={width} height={height} />
                     }
                 </Block>
+                {tooltip.render}
             </Block>
         </ComponentWithName>
     )

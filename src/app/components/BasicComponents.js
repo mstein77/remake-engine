@@ -13,6 +13,7 @@ const defaultValues = {
         noMaxWidth: false,
         maxHeightPx: 1200,
         noMaxHeight: true,
+        tooltips: true,
         uiAnimations: true,
         maxHistory: 10
     },
@@ -514,8 +515,8 @@ function UndoRedoButtons({ hotKeys }) {
     }
     return (
         <Stack gaps="1">
-            <Button icon="undo" onClick={hotKeys.undo} />
-            <Button icon="redo" onClick={hotKeys.redo} />
+            <Button icon="undo" help="Undo" action="undo" onClick={hotKeys.undo} />
+            <Button icon="redo" help="Redo" action="redo" onClick={hotKeys.redo} />
         </Stack>
 
     )
@@ -1274,6 +1275,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             mode: null,
             confirm: null,
             settings: null,
+            tooltipTimer: null,
             modalStack: [],
             modalIds: [],
             focusStack: {
@@ -1422,6 +1424,12 @@ function WindowCtx({ imageResources, filters, children, game }) {
             imageIndex.setEntityObject({value: resource.name, image: resource.bitmap});
         }
 
+        const clearTooltipTimer = () => {
+            const lastId = registry('tooltipTimer');
+            if (!lastId) return;
+            clearTimeout(lastId)
+        }
+
         // let's initialize the context with ref-values and methods here...
         setterRef.current = {
             clearAllCaches: () => {
@@ -1448,6 +1456,21 @@ function WindowCtx({ imageResources, filters, children, game }) {
             game,
             filters,
             resourceLoader,
+
+            startTooltipTimer: propsRef => {
+                clearTooltipTimer();
+                if (propsRef.current.showTooltip === false) {
+                    registry().tooltipTimer = setTimeout(
+                        () => {
+                            if (propsRef.current.showTooltip === false) {
+                                propsRef.current.setShowTooltip(true)
+                            }
+                        },
+                        1000
+                    );
+                }
+            },
+            clearTooltipTimer,
 
             lastColorsIndex: registry('lastColorsIndex'),
 
@@ -2509,7 +2532,7 @@ function CssCtx({ parent, bindRef, children, ...props }) {
         const extractKeys2types = obj => {
             for (let key of Object.keys(obj)) {
                 const match = key.match(regexpCamelCaseLast);
-                if (match.length < 2) continue;
+                if (match === null || match.length < 2) continue;
 
                 const type = match[1].toLowerCase();
                 if (!type || !cssConstTypes.includes(type)) continue;
@@ -2887,6 +2910,54 @@ function PropertyGrid({ labelProps = {}, children }) {
     )
 }
 
+const HotKeySingleKeys = ['Escape'];
+const HotKeySkipValues = ['Meta', 'Control', 'Alt', 'Shift'];
+
+function HotKeyKeys({ hotKey, empty, className, padded = true }) {
+
+    const keys = [];
+    let elems = [];
+    if (hotKey !== null) {
+        const [hotPart, keyPart] = hotKey.split(' ');
+        if (hotPart.startsWith('m')) {
+            keys.push('CMD ⌘')
+        } else if (hotPart.startsWith('c')) {
+            keys.push('CTRL')
+        } else if (hotPart.startsWith('a')) {
+            keys.push('ALT');
+        }
+        if (keys.length > 0) {
+            if (hotPart.indexOf('i') !== -1) {
+                keys.push('SHIFT');
+            }
+            if (keyPart) {
+                keys.push(keyPart);
+            }
+        } else if (HotKeySingleKeys.includes(hotPart)) {
+            keys.push(hotPart);
+        }
+    }
+    const cls = [];
+    if (keys.length) {
+        if (className) {
+            cls.push(className);
+        }
+        for(let key of keys) {
+            if (elems.length) {
+                elems.push(<Block center="v" key={'_' + elems.length}><Icon name="add" size={12} className="less" /></Block>);
+            }
+            elems.push(<Block key={key} padded={padded} border="1"><kbd>{key}</kbd></Block>);
+
+        }
+        return (
+            <Stack className={cls.join(' ')} center="v" gaps="1">{elems}</Stack>
+        )
+    }
+    return (
+        <Block centerItems full className="less">{empty}</Block>
+    )
+}
+
 function usePageCache(id) {
     const wContext = useContext(WindowContext);
     const cacheRef = useRef(null);
@@ -2971,6 +3042,9 @@ export {
     ValueProp,
     CanvasCircleMarker,
     ColorBox,
+    HotKeyKeys,
+    HotKeySingleKeys,
+    HotKeySkipValues,
 
     useModal,
     useComponentUpdate,

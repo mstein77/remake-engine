@@ -28,10 +28,13 @@
       + BgColor:
 
 ---------------------------
- * Button: Tooltips
+ Fine-Schliff
+
+---------------------------
  - Input-Error-Marking + Padding
- - Key-Bindings (+Marking)
  - Scrollbars
+
+ - Key-Bindings (+Marking)
  - Font-Styling
  - Sections
 ---------------------------

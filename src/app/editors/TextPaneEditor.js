@@ -132,7 +132,7 @@ function FontProperties({ font, reserved, save, close }) {
             </Block>
 
             <ImportFontModal.content name="Select Size" full>
-                <BitmapSelector { ...ImportFontModal.props } />
+                <BitmapSelector id="BitmapSelectorModal" { ...ImportFontModal.props } />
             </ImportFontModal.content>
         </OkCancelForm>
     )
@@ -541,7 +541,7 @@ function CharManager({ charIndex }) {
                 <CharAssignments { ...AssignCharsModal.props } />
             </AssignCharsModal.content>
 
-            <BitmapSelectorModal.content name="Select Image" full>
+            <BitmapSelectorModal.content id="BitmapSelectorModal" name="Select Image" full>
                 <BitmapSelector { ...BitmapSelectorModal.props } />
             </BitmapSelectorModal.content>
 
@@ -725,9 +725,9 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const imagesRef = useRef({});
 
     const alignOptions = [
-        {id: 'left', name: 'format_align_left'},
-        {id: 'center', name: 'format_align_center'},
-        {id: 'right', name: 'format_align_right'}
+        {id: 'left', name: 'format_align_left', help: 'Align left'},
+        {id: 'center', name: 'format_align_center', help: 'Align center'},
+        {id: 'right', name: 'format_align_right', help: 'Align right'}
     ];
 
     // TODO use from config
@@ -1107,7 +1107,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
                                y={currBlock.y} setY={setEntityProp('y')} minY={fieldProps.y.min} maxY={fieldProps.y.max} stepY={currBlock.alignToGrid ? font.height : 1} disabledY={currBlock.autoCenteringY}
                             />
-                            <LabelProp name="- actual:" labelProps={{className: 'less'}} bottomPadding={false}>
+                            <LabelProp name="- actual:" bottomPadding={false}>
                                 <Stack gaps="1" wrap full="h">
                                     <Tuple center="v" readOnly
                                            minX={fieldProps.x.min} maxX={fieldProps.x.max}
