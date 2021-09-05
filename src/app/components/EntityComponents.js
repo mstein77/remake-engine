@@ -1,10 +1,9 @@
 import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, getEmptyImageData, getCanvasForBitmap } from "../helper/helper";
+import { d, noop, getEmptyImageData } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
 import {
     EditorCtx,
-    useModal,
     CenterInfo,
     EditorContext,
     Section,
@@ -22,7 +21,7 @@ import {
     AvailContext, WindowContext, useCssProps
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
-import { FiltersModal } from "./EditorComponents";
+import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
 import { WrappingIndexGrid } from "../classes/Grid";
 import { PictureCell } from "./BaseComponents";
@@ -388,7 +387,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     const wContext = useContext(WindowContext);
     const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
 
-    const ApplyModal = useModal();
+    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
 
     const doAction = eContext && undo ? eContext.doAction : action => action();
 
@@ -576,7 +575,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
             for (let index of indices) {
                 undoImages.push(entityIndex.getEntityPropValue(index, 'image'));
             }
-            ApplyModal.open({
+            openFilterPipelineModal({
                 type: 'imageData',
                 images: undoImages,
                 save: filters => {
@@ -604,7 +603,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                             }
                         )
                     }
-                    ApplyModal.close()
+                    closeFilterPipelineModal()
                 }
             });
         };
@@ -745,9 +744,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                     </Stack>
             }
 
-            <ApplyModal.content name="Apply Filters..." width="75%" height="75%">
-                <FiltersModal { ...ApplyModal.props } />
-            </ApplyModal.content>
+            {FilterPipelineModal}
         </Stack>
     )
 }

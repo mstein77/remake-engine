@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useL
 import ReactDOM from "react-dom";
 import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay } from "./LayoutComponents";
-import { Button, Color, OkCancelForm, ColorPicker } from "./FormComponents";
+import { Button, Color, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
@@ -1121,27 +1121,6 @@ function buildHueColorsCanvas() {
     return canvas;
 }
 
-function ModalColorPicker({}) {
-    const wContext = useContext(WindowContext);
-    const PickerModal = useModal();
-
-    useEffect(() =>{
-        wContext.register('openColorPickerModal',
-            props => PickerModal.open({ close: PickerModal.close, ...props })
-        )
-    }, []);
-
-    return (
-        <PickerModal.content name="Change color" drag transparent>
-            <BackgroundCtx>
-                <EditorCtx>
-                    <ColorPicker { ...PickerModal.props } />
-                </EditorCtx>
-            </BackgroundCtx>
-        </PickerModal.content>
-    )
-}
-
 /**
  * registry
  *  - used to store values/methods from children
@@ -1721,8 +1700,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
             focusStack: registry('focusStack'),
             imageIndex,
 
-            openColorPickerModal: props => registry().openColorPickerModal(props),
-
             getFilteredCanvasData,
             getFilteredImageData: (filter, imageData) => {
                 if (!filter) {
@@ -1804,7 +1781,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
         <WindowContext.Provider value={setterRef.current}>
             {cssContext.ready &&
                 <>
-                    <ModalColorPicker key="cp" />
                     <FixCursorArea key="em" />
                     {children}
                 </>

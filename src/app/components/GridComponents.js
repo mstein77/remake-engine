@@ -9,12 +9,12 @@ import {
     WindowContext,
     EditorContext, useCallAfterwards, useModal, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
 } from "./BasicComponents";
-import { FiltersModal } from "./EditorComponents";
 import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
 import { d, clamp, areDisjoint, getCanvasForBitmap } from "../helper/helper";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { PictureCell } from "./BaseComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
+import { useFilterPipelineModal } from "./EditorComponents";
 
 function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onRightClick, initMove, initResize, autoMatrix }) {
     const gContext = useContext(GridContext);
@@ -1418,7 +1418,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
             },
             apply: {
                 exec: () => {
-                    const { ApplyModal, markerX, markerY, markerWidth, markerHeight, markerType } = propsRef.current;
+                    const { openFilterPipelineModal, closeFilterPipelineModal, markerX, markerY, markerWidth, markerHeight, markerType } = propsRef.current;
                     const undoSelection = gridProvider.getSelection(
                         markerX,
                         markerY,
@@ -1428,7 +1428,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                     const provider = new BitmapCellProvider(1);
                     provider.setMap(undoSelection.getCells());
                     const image = provider.getImageData();
-                    ApplyModal.open({
+                    openFilterPipelineModal({
                         images: [ getCanvasForBitmap(image) ],
                         background: '#000000',
                         filters: '',
@@ -1443,7 +1443,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                     gridProvider.writeSelection(markerX, markerY, undoSelection)
                                 }
                             );
-                            ApplyModal.close()
+                            closeFilterPipelineModal()
                         }
                     });
                 },
@@ -1923,7 +1923,7 @@ function ManagedGrid({
     const mounted = useMounted();
     const callAfterwards = useCallAfterwards();
 
-    const ApplyModal = useModal();
+    const { FilterPipelineModal, closeFilterPipelineModal, openFilterPipelineModal } = useFilterPipelineModal('Apply filters to selection...');
 
     const lastControllerRef = useRef(null);
     const update = useComponentUpdate();
@@ -1992,7 +1992,7 @@ function ManagedGrid({
 
     const propsRef = useRef(null);
     propsRef.current = {
-        mounted, ApplyModal,
+        mounted, openFilterPipelineModal, closeFilterPipelineModal,
         gridProvider, trackX, trackY,
         cursorWidth, cursorHeight, cursorType,
         mode, modeParams, writeTransparent,
@@ -2068,9 +2068,7 @@ function ManagedGrid({
                     { ...marker.propsRef.current }
                 />
             }
-            <ApplyModal.content name="Apply filters to selection..." full>
-                <FiltersModal { ...ApplyModal.props } />
-            </ApplyModal.content>
+            {FilterPipelineModal}
         </Overlays>
     )
 }

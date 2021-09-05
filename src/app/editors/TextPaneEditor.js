@@ -21,9 +21,10 @@ import {
     useExportModal,
     NameDialog,
     FiltersModal,
-    BitmapSelector,
     ResizeProps,
-    BitmapEditor
+    useFilterPipelineModal,
+    useBitmapSelectionModal,
+    useEditBitmapModal
 } from "../components/EditorComponents";
 import {
     Checkbox,
@@ -52,7 +53,7 @@ import { GridCellMarker } from "../components/GridComponents";
 import ReactDOM from "react-dom";
 
 function FontProperties({ font, reserved, save, close }) {
-    const ImportFontModal = useModal();
+    const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select Size');
 
     const [value, setValue] = useState(font.value);
     const [width, setWidth] = useState(font.width);
@@ -71,7 +72,7 @@ function FontProperties({ font, reserved, save, close }) {
     );
 
     const importFont = () => {
-        ImportFontModal.open({
+        openBitmapSelectionModal({
             selection: {
                 multi: true,
                 unfix: true
@@ -80,17 +81,17 @@ function FontProperties({ font, reserved, save, close }) {
                 setWidth(bitmaps[0].width);
                 setHeight(bitmaps[0].height);
                 setImages(bitmaps);
-                ImportFontModal.close()
+                closeBitmapSelectionModal()
             }
         });
     };
     const selectSize = () => {
-        ImportFontModal.open({
+        openBitmapSelectionModal({
             selection: {},
             save: bitmap => {
                 setWidth(bitmap.width);
                 setHeight(bitmap.height);
-                ImportFontModal.close()
+                closeBitmapSelectionModal()
             }
         })
     };
@@ -131,9 +132,7 @@ function FontProperties({ font, reserved, save, close }) {
                 </PropertyGrid>
             </Block>
 
-            <ImportFontModal.content name="Select Size" full>
-                <BitmapSelector id="BitmapSelectorModal" { ...ImportFontModal.props } />
-            </ImportFontModal.content>
+            {BitmapSelectionModal}
         </OkCancelForm>
     )
 }
@@ -315,8 +314,8 @@ function CharManager({ charIndex }) {
 
     const CharPropsModal = useModal();
     const AssignCharsModal = useModal();
-    const BitmapSelectorModal = useModal();
-    const EditBitmapModal = useModal();
+    const { openBitmapSelectionModal, closeBitmapSelectionModal, BitmapSelectionModal } = useBitmapSelectionModal();
+    const { openEditBitmapModal, closeEditBitmapModal, EditBitmapModal } = useEditBitmapModal('Edit char');
 
     const editChar = index => {
         const char = charIndex.getEntityObject(index);
@@ -335,7 +334,7 @@ function CharManager({ charIndex }) {
 
     const editBitmap = index => {
         const image = charIndex.getEntityPropValue(index, 'image');
-        EditBitmapModal.open({
+        openEditBitmapModal({
             image,
             colors: new ColorIndex({colors: getColorsFromCanvas(charIndex.img)}),
             save: newImage => {
@@ -351,7 +350,7 @@ function CharManager({ charIndex }) {
                     }
                 );
 
-                EditBitmapModal.close()
+                closeEditBitmapModal()
             }
         });
     };
@@ -390,9 +389,9 @@ function CharManager({ charIndex }) {
                 index++;
             }
             assignImagesToChars(chars);
-            BitmapSelectorModal.close();
+            closeBitmapSelectionModal();
         };
-        BitmapSelectorModal.open({
+        openBitmapSelectionModal({
             selection: {
                 type: 'rect',
                 width: charIndex.getSizeX(),
@@ -541,13 +540,9 @@ function CharManager({ charIndex }) {
                 <CharAssignments { ...AssignCharsModal.props } />
             </AssignCharsModal.content>
 
-            <BitmapSelectorModal.content id="BitmapSelectorModal" name="Select Image" full>
-                <BitmapSelector { ...BitmapSelectorModal.props } />
-            </BitmapSelectorModal.content>
+            {BitmapSelectionModal}
 
-            <EditBitmapModal.content name="Edit Char" full>
-                <BitmapEditor { ...EditBitmapModal.props } />
-            </EditBitmapModal.content>
+            {EditBitmapModal}
         </>
     )
 }
@@ -704,7 +699,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const eContext = useContext(EditorContext);
 
     const NewBlockModal = useModal();
-    const FilterModal = useModal();
+    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal();
 
     const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
     const [ background, setBackground ] = useState('#000000');
@@ -762,7 +757,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         const undoFilters = currBlock.filters;
         const index = currBlock.index;
 
-        FilterModal.open({
+        openFilterPipelineModal({
             images: [getBaseBlockImage(currBlock)],
             background,
             filters: undoFilters,
@@ -779,7 +774,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                         blockIndex.notify()
                     }
                 );
-                FilterModal.close()
+                closeFilterPipelineModal()
             }
         });
     };
@@ -1184,9 +1179,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 <NameDialog { ...NewBlockModal.props } />
             </NewBlockModal.content>
 
-            <FilterModal.content id="FilterPipelineModal" name="Filter" width="75%" height="75%">
-                <FiltersModal { ...FilterModal.props } />
-            </FilterModal.content>
+            {FilterPipelineModal}
         </Stack>
     )
 }

@@ -299,17 +299,17 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
 }
 
 function ResizeProps({ entityIndex, width, height, newWidth, newHeight, maxWidth, maxHeight, setNewWidth, setNewHeight, offsetX, offsetY, setOffsetX, setOffsetY }) {
-    const ImportFontModal = useModal();
+    const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select New Size');
 
     const [ index, setIndex ] = useState(0);
 
     const selectNewSize = () => {
-        ImportFontModal.open({
+        openBitmapSelectionModal({
             selection: {},
             save: bitmap => {
                 setNewWidth(bitmap.width);
                 setNewHeight(bitmap.height);
-                ImportFontModal.close()
+                closeBitmapSelectionModal()
             }
         })
     };
@@ -385,9 +385,6 @@ function ResizeProps({ entityIndex, width, height, newWidth, newHeight, maxWidth
                 </Block>
             </LabelProp>
 
-            <ImportFontModal.content name="Select New Size" full>
-                <BitmapSelector { ...ImportFontModal.props } />
-            </ImportFontModal.content>
         </>
     )
 }
@@ -700,7 +697,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
     return (
         <OkCancelForm cancel={close} save={doSave} full>
             <Stack full>
-                <Section inner full="v" inner collapse="h" size={170} name="Selection">
+                <Section id="markerSelection" inner full="v" inner collapse="h" size={170} name="Selection">
                     <Stack vertical full>
                         <Block padded>Selected:</Block>
                         <Block padded centerItems full="h">
@@ -930,14 +927,65 @@ function useExportModal({ model, resource, update, name }) {
     };
 }
 
+function useEditBitmapModal(name = 'Edit image') {
+    const EditModal = useModal();
+    return useMemo(() => {
+        return {
+            openEditBitmapModal: props => {
+                EditModal.open({id: 'EditBitmapModal', ...props })
+            },
+            closeEditBitmapModal: EditModal.close,
+            EditBitmapModal: (
+                <EditModal.content name={name} full>
+                    <BitmapEditor { ...EditModal.props } />
+                </EditModal.content>
+            )
+        }
+    }, [EditModal.props])
+}
+
+function useBitmapSelectionModal(name = 'Select image') {
+    const SelectionModal = useModal();
+    return useMemo(() => {
+        return {
+            openBitmapSelectionModal: props => {
+                SelectionModal.open({id: 'BitmapSelectionModal', ...props });
+            },
+            closeBitmapSelectionModal: SelectionModal.close,
+            BitmapSelectionModal: <SelectionModal.content name={name} full>
+                <BitmapSelector { ...SelectionModal.props } />
+            </SelectionModal.content>
+        }
+    }, [SelectionModal.props])
+}
+
+function useFilterPipelineModal(name = 'Filter') {
+    const FilterModal = useModal();
+    return useMemo(() => {
+        return {
+            openFilterPipelineModal: props => {
+                FilterModal.open({id: 'FilterPipelineModal', ...props })
+            },
+            closeFilterPipelineModal: FilterModal.close,
+            FilterPipelineModal: (
+                <FilterModal.content name={name} width="75%" height="75%">
+                    <FiltersModal { ...FilterModal.props } />
+                </FilterModal.content>
+            )
+        }
+    }, [FilterModal.props])
+}
+
 export {
     MarkerMoveGrid,
     ResizeProps,
     BitmapEditor,
     BitmapSelector,
     BitmapSelectionGrid,
-    FiltersModal,
     NameDialog,
     useExportModal,
-    useConfirmDialog
+    useConfirmDialog,
+    useFilterPipelineModal,
+    useBitmapSelectionModal,
+    useEditBitmapModal
 }

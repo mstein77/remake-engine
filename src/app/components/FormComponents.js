@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
 import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
 import { Block, Stack, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
@@ -21,10 +21,10 @@ import {
     useCachedState,
     useCallAfterwards,
     useComponentUpdate,
-    AvailContext, MinMaxCtx, CanvasCircleMarker, Portal
+    AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
-import { BitmapSelector, BitmapEditor } from "./EditorComponents";
+import {BitmapSelector, useBitmapSelectionModal, useEditBitmapModal} from "./EditorComponents";
 
 const STATE = {
     INACTIVE: 0,
@@ -1513,10 +1513,6 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, copy, readO
     )
 }
 
-/*
-    TODO
-      - rightClick => copy
- */
 function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatProps = {} }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
@@ -1524,6 +1520,9 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
     const callAfterwards = useCallAfterwards();
     const colorRef = useRef(null);
     const [ clicked, setClicked ] = useState(false);
+
+    const { openColorPickerModal, ColorPickerModal } = useColorPickerModal();
+
     colorRef.current = value;
 
     const tooltip = useTooltip({title: value, clicked});
@@ -1554,7 +1553,7 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
             wContext.endExclusiveMode('pick-color');
             setClicked(false)
         }, {once: true});
-        wContext.openColorPickerModal({
+        openColorPickerModal({
             value: colorRef,
             alpha,
             set
@@ -1585,6 +1584,7 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
                 </Block>
                 {tooltip.render}
             </Block>
+            {ColorPickerModal}
         </ComponentWithName>
     )
 }
@@ -1671,11 +1671,29 @@ const COLOR_MODEL = {
     HSV: 'HSV'
 }
 
+function useColorPickerModal() {
+    const PickerModal = useModal();
+    return useMemo(
+        () => {
+            return {
+                openColorPickerModal: props => PickerModal.open({id: 'ColorPickerModal', close: PickerModal.close, ...props }),
+                ColorPickerModal: <PickerModal.content name="Change color" drag transparent>
+                    <BackgroundCtx>
+                        <EditorCtx>
+                            <ColorPicker { ...PickerModal.props } />
+                        </EditorCtx>
+                    </BackgroundCtx>
+                </PickerModal.content>
+            }
+        },
+        [PickerModal.props]
+    );
+}
+
 /**
  * TODO
  *  - BUGFIX: korrekte Umrechnung
 
- *  - Normaler Modal
  *  - Positionierung nahe ColorBox
  *  - CHECK: modal-cancel reset
  */
@@ -2015,17 +2033,17 @@ function ColorPicker({ value, set, alpha, close }) {
 }
 
 function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
-    const EditBitmapModal = useModal();
+    const { EditBitmapModal, openEditBitmapModal, closeEditBitmapModal } = useEditBitmapModal();
     const CopyBitmapModal = useModal();
-    const ImportBitmapModal = useModal();
+    const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select image...');
 
     const editBitmap = () => {
-        EditBitmapModal.open({
+        openEditBitmapModal({
             image: value,
             colors,
             save: newImage => {
                 set(newImage);
-                EditBitmapModal.close()
+                closeEditBitmapModal()
             }
         });
     };
@@ -2033,9 +2051,9 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
     const importBitmap = () => {
         const selected = image => {
             set(image);
-            ImportBitmapModal.close();
+            closeBitmapSelectionModal()
         };
-        ImportBitmapModal.open({
+        openBitmapSelectionModal({
             zoom: 1,
             border: 0,
             save: selected,
@@ -2083,13 +2101,9 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
                 </Block>
             </Stack>
 
-            <EditBitmapModal.content name="Edit Bitmap" full>
-                <BitmapEditor { ...EditBitmapModal.props } />
-            </EditBitmapModal.content>
+            {EditBitmapModal}
 
-            <ImportBitmapModal.content name="Select image..." full>
-                <BitmapSelector {...ImportBitmapModal.props} />
-            </ImportBitmapModal.content>
+            {BitmapSelectionModal}
 
             {entityIndex &&
                 <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
@@ -2774,7 +2788,6 @@ export {
     TextAreaProp,
     Color,
     ColorProp,
-    ColorPicker,
     Slider,
     Bitmap,
     BitmapProp,
