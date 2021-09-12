@@ -46,12 +46,10 @@ html, body {
     padding-bottom: var(--button-padding-px) !important;
     box-sizing: border-box
 }
-
 .button-padding {
     padding: var(--button-min-padding-px);
     box-sizing: border-box
 }
-
 .button-border-color {
     border-color: var(--button-border-rgb)
 }
@@ -81,8 +79,22 @@ html, body {
     color: var(--input-rgb)
 }
 .input-padding {
-    padding-left: var(--input-padding-px);
-    padding-right: var(--input-padding-px);
+    padding: var(--input-min-padding-px);
+    box-sizing: border-box
+}
+.input-padding-1-v {
+    padding-top: var(--input-min-padding-px);
+    padding-bottom: var(--input-min-padding-px);
+    box-sizing: border-box
+}
+.input-padding-h {
+    padding-left: var(--input-padding-px) !important;
+    padding-right: var(--input-padding-px) !important;
+    box-sizing: border-box
+}
+.input-padding-v {
+    padding-top: var(--input-padding-px) !important;
+    padding-bottom: var(--input-padding-px) !important;
     box-sizing: border-box
 }
 .input-border-color {
@@ -112,6 +124,18 @@ html, body {
 
 .active-border-color {
     border-color: var(--active-border-rgb)
+}
+
+.warning-bg {
+    background-color: var(--warning-bg-rgb)
+}
+
+.warning-color {
+    color: var(--warning-rgb)
+}
+
+.warning-border-color {
+    border-color: var(--warning-border-rgb)
 }
 
 .error-bg {
@@ -150,6 +174,9 @@ html, body {
 
 .less {
     opacity: 0.5
+}
+.more {
+    filter: brightness(150%)
 }
 
 .outline-1 {
@@ -211,7 +238,6 @@ html, body {
 /* Scrollbar */
 
 .scrollbar-div {
-    border: 1px inset var(--toolbar-bg-rgb);
     padding: 1px;
     margin: 0px;
     background-color: var(--toolbar-bg-rgb)
@@ -223,20 +249,9 @@ html, body {
 }
 
 .scrollbar-handle {
-    flex: 1;
     border: 1px outset var(--button-border-rgb);
     background-color: var(--button-bg-rgb);
-    filter: brightness(calc(1 - var(--brightness-factor-float) * 0.25));
 }
-
-.scrollbar-handle:hover {
-    filter: brightness(1);
-}
-
-.scrollbar-handle.active {
-    filter: brightness(calc(1 + var(--brightness-factor-float) * 0.25));
-}
-
 
 /* ALL:   */
 
@@ -363,8 +378,16 @@ html, body {
 }
 
 @-webkit-keyframes input-warning {
-    from {background-color: var(--input-bg-rgb)}
-    to {background-color: var(--warning-rgb)}
+    from {
+        color: var(--input-rgb);
+        background-color: var(--input-bg-rgb);
+        border-color: var(--input-border-rgb)
+    }
+    to {
+        color: var(--warning-rgb);
+        background-color: var(--warning-bg-rgb);
+        border-color: var(--warning-border-rgb)
+    }
 }
 
 div.invalid,
@@ -505,11 +528,11 @@ input:invalid {
 }
 
 .border-outset {
-    border-style: outset
+    border-style: outset !important
 }
 
 .border-inset {
-    border-style: inset
+    border-style: inset !important
 }
 
 @keyframes rotate {

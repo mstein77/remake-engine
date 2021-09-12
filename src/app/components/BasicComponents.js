@@ -30,6 +30,7 @@ const defaultValues = {
         inputBstyle: "solid",
         inputBorderWidthPx: 1,
         inputPaddingPx: 5,
+        inputMinPaddingPx: 1,
         inputBorderRadiusPx: 4,
         checkBoxType: '0',
         editorBgRgb: "#080808",
@@ -45,6 +46,9 @@ const defaultValues = {
         activeRgb: '#fafbff',
         activeBgRgb: '#5baa2b',
         activeBorderRgb: '#D0D0F0',
+        warningBgRgb: '#987672',
+        warningRgb: '#000000',
+        warningBorderRgb: '#000000',
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
         focusRgba: '#FFFFDFCC',
@@ -567,7 +571,7 @@ function EditorSectionInner({ id, name, actions = [], area, tree, link, confirm,
     const header = (
         <Stack full="h" key="eh">
             <Stack full="h" gaps>
-                <Block center="v" padded xshorten>{name}</Block>
+                <Block center="v" padded className="more">{name}</Block>
                 {tree &&
                     <>
                         <Block className="control-bg" center="v" padded>From:</Block>
@@ -952,9 +956,11 @@ function ScrollArea({ children, x, setX, maxX, pageX, y, setY, maxY, pageY, auto
     )
 }
 
+const iconPropsScrollbar = {size: 14};
+
 function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
     const wContext = useContext(WindowContext);
-    const [ tracking, setTracking ] = useState(false);
+    const [ clicked, setClicked ] = useState(false);
     const divRef = useRef(null);
 
     const pagePerc = max ? Math.round(page / max * 100) : 100;
@@ -972,6 +978,9 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
     const oppAxisKey = vertical ? 'width' : 'height';
     const client = 'client' + axis.toUpperCase();
     const dirKey = (axis === 'x' ? 'h' : 'v');
+    const oppDirKey = vertical ? 'h' : 'v';
+    const cursor = (vertical ? 'ns' : 'ew') + '-resize';
+    const arrows = vertical ? ['drop_up', 'drop_down'] : ['left', 'right'];
 
     const dimMin = {
         [axisKey]: minPerc + '%',
@@ -998,7 +1007,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         };
         let lastPos = 0;
 
-        wContext.startExclusiveMode('scroll-handle');
+        wContext.startExclusiveMode('scroll-handle', cursor);
         wContext.addEventListener('mousemove', e => {
             const relPos = getOffset(e[client]);
             if (relPos !== lastPos) {
@@ -1007,50 +1016,51 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
             }
         });
         wContext.addEventListener('mouseup', () => {
-            setTracking(false);
+            setClicked(false);
             wContext.endExclusiveMode('scroll-handle')
         }, {once: true});
 
-        setTracking(true);
-        e.stopPropagation();
+        setClicked(true);
         e.preventDefault();
     };
 
-    const nextPage = e => {
-        if (pos < maxSteps) {
-            set(Math.min(maxSteps, pos + page));
-        }
-        e.stopPropagation();
-    };
+    const changePos = (e, value) => {
+        const newPos = clamp(0, pos + value, maxSteps);
+        if (newPos === pos) return;
 
-    const prevPage = e => {
-        if (pos > 0) {
-            set(Math.max(0, pos - page));
-        }
-        e.stopPropagation();
-    };
+        set(newPos)
+    }
 
-    const cls = ['scrollbar-div'];
     const dim = {[oppAxisKey]: space};
     if (size) {
         dim[axisKey] = size;
     } else {
         dim[axisKey] = 'calc(100% - 6px)';
     }
-
-    const handleCls = ['scrollbar-handle'];
-    if (tracking) {
-        handleCls.push('active');
+    const handleCls = ['scrollbar-handle hover-change'];
+    if (clicked) {
+        handleCls.push('clicked');
     }
-
     return (
-        <Block full={dirKey} {...dim} ref={divRef} className={cls.join(' ')}>
-            <Stack full={dirKey} vertical={vertical}>
-                <Block onMouseDown={prevPage} {...dimMin} />
-                <Block width={vertical ? 13 : false} full={vertical ? 'v' : true} onMouseDown={onMouseDown} className={handleCls.join(' ')}/>
-                <Block onMouseDown={nextPage} {...dimMax} />
-            </Stack>
-        </Block>
+        <Stack vertical={vertical} full={dirKey} className="scrollbar-div">
+            <Button
+                vertical={!vertical} icon={'arrow_' + arrows[0]} full={oppDirKey}
+                onClick={e => changePos(e, -1)} disabled={pos === 0}
+                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="border-outset"
+            />
+            <Block full={dirKey} { ...dim } ref={divRef}>
+                <Stack full={dirKey} vertical={vertical}>
+                    <Block cursor="pointer" onMouseDown={e => changePos(e, -page)} {...dimMin} />
+                    <Block cursor={cursor} width={vertical ? 13 : false} full={vertical ? 'v' : true} onMouseDown={onMouseDown} className={handleCls.join(' ')}/>
+                    <Block cursor="pointer" onMouseDown={e => changePos(e, page)} {...dimMax} />
+                </Stack>
+            </Block>
+            <Button
+                vertical={!vertical} icon={'arrow_' + arrows[1]}  full={oppDirKey}
+                onClick={e => changePos(e, 1)} disabled={pos === maxSteps}
+                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="border-outset"
+            />
+        </Stack>
     );
 }
 
@@ -2358,7 +2368,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
                     <div ref={dimRef} { ...dimAttr } className={vDivCls.join(' ')} style={vDivStyle}>
                         <Stack gaps full="h" { ...nameAttr } padded>
-                            <Block center="v" shorten full="h">{name}</Block>
+                            <Block center="v" shorten full="h" className="more">{name}</Block>
                             {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
                         </Stack>
                         <div className="border-div-v"></div>

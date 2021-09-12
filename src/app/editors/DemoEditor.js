@@ -11,13 +11,11 @@ function DemoEditor({}) {
         exec: () => d('yeah!'),
         can: () => true
     };
-
     const iProps = {
         width: 20,
         height: 10,
         size: 10
     };
-
     const radioOptions = [
         {id: 0, name: 'Jantipa'}, {id: 1, name: 'Dao'}, {id: 2, name: 'Joy'},
         {id: 3, name: 'Jantipa'}, {id: 4, name: 'Dao'}, {id: 5, name: 'Joy'},

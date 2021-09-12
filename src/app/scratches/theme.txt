@@ -28,20 +28,16 @@
       + BgColor:
 
 ---------------------------
- Fine-Schliff
-
----------------------------
- - Input-Error-Marking + Padding
- - Scrollbars
+ - Theme-Backgrounds
+ - Font-Styling
 
  - Key-Bindings (+Marking)
- - Font-Styling
  - Sections
 ---------------------------
  - Entity-Stack (Styling, Dragn-Drop)
  - Entity-Manager
 ---------------------------
-
+ BUG: opacity-Filter setzen und wieder öffnen => falsche Übernahme
 
 
 --------------------------------

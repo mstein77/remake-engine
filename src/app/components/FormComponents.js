@@ -552,17 +552,37 @@ function useTooltip({ title, hotKey, clicked, info, click }) {
     }
 }
 
+function addPaddingCls(cls, padded, type) {
+    if (padded) {
+        if (padded !== true) {
+            cls.push(type + '-padding');
+        }
+        if (padded !== '1') {
+            if (padded !== 'v') {
+                cls.push(type + '-padding-h');
+            }
+            if (padded !== 'h') {
+                cls.push(type + '-padding-v');
+            }
+        }
+    }
+}
+
 /**
  */
 function Button({ icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
-                     tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
+                   className,  tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
     const mounted = useMounted();
 
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
+
     const cls = [statePrefix + '-bg', statePrefix + '-color button-font'];
+    if (className) {
+        cls.push(className);
+    }
 
     let repeat = false;
     if (onClick && typeof onClick === 'object') {
@@ -597,19 +617,8 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
             cls.push('button-border-radius');
         }
     }
-    if (padded) {
-        if (padded !== true) {
-            cls.push('button-padding');
-        }
-        if (padded !== '1') {
-            if (padded !== 'v') {
-                cls.push('button-padding-h');
-            }
-            if (padded !== 'h') {
-                cls.push('button-padding-v');
-            }
-        }
-    }
+    addPaddingCls(cls, padded, 'button');
+
     if (clicked && (!state || value !== undefined)) {
         cls.push('clicked');
     }
@@ -809,7 +818,9 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
     )
 }
 
-function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, onMax, floatProps = {}, onClear, onClick, className, ...props }) {
+const iconPropsInputButton = {size: 14};
+
+function Input({ name, value, size, min, max, autoFocus, required, disabled, number, clear, readOnly, match, active, step, force = number, decimals = 0, tab = true, padded = 'h', onMax, floatProps = {}, onClear, onClick, className, ...props }) {
 
     const fContext = useContext(FormContext);
     const inputRef = useRef(null);
@@ -825,11 +836,11 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     const [edit, setEdit] = useState(false);
 
     const isFloat = number && (decimals && decimals > 0);
-    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius'];
+    addPaddingCls(cls, padded, 'input');
     if (className) {
         cls.push(className);
     }
-
     useEffect(() => {
         if (autoFocus) {
             requestAnimationFrame(() => {
@@ -973,7 +984,6 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     } else {
         cls.push('tabbed');
     }
-
     if (!valid(attr.value, edit)) {
         cls.push('invalid');
         if (fContext) {
@@ -1022,7 +1032,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     }
     attr.size = size;
 
-    // TODO handle better with key/click-Locking
+    // TODO improve with key/click-Locking
     let onKeyDown = null;
     if (onClick) {
         attr.style.cursor = 'pointer';
@@ -1044,7 +1054,7 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
         input =
             <Stack { ...hDimAttr } gaps="1">
                 {input}
-                <Button icon="clear" center="v" disabled={disabled || value === ''} tab={!(disabled || value === '')} size={14} onClick={onClear ? onClear : () => set('')} />
+                <Button vertical full="v" iconProps={iconPropsInputButton} icon="clear" centerItems disabled={disabled || value === ''} tab={!(disabled || value === '')} onClick={onClear ? onClear : () => set('')} />
             </Stack>
     }
     return (
@@ -1152,7 +1162,7 @@ function Number({ name, disabled, value, size, min, max, step,
             setSliding(false);
         };
         items.push(
-            <Button center="v" key={1} full="v" centerItems radius iconProps={{size: 12}} direct disabled={disabled || (min === max && min !== undefined)} onClick={startSliding} onClickEnd={stopSliding} cursor="row-resize" icon="height" tab={false} vertical />
+            <Button key={1} vertical center="v" full="v" centerItems radius iconProps={iconPropsInputButton} disabled={disabled || (min === max && min !== undefined)} onClick={startSliding} onClickEnd={stopSliding} cursor="row-resize" icon="height" tab={false} />
         );
     }
     const inputCls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
@@ -1286,12 +1296,13 @@ function Tuple({ name, x, setX, y, setY, undo, min, max, buttons, slider, tab = 
     );
 }
 
-function Select({ name, value, disabled, options, readOnly, buttons = true, tab = true, floatProps = {}, ...props }) {
+function Select({ name, value, disabled, options, readOnly, padded = '1', buttons = true, tab = true, floatProps = {}, ...props }) {
 
     const fContext = useContext(FormContext);
     const callAfterwards = useCallAfterwards();
 
-    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius'];
+    addPaddingCls(cls, padded, 'input');
     const optionHandler = getOptionHandler(options, value);
     if (readOnly) {
         buttons = false;
@@ -1308,11 +1319,9 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (buttons) {
         items.push(
             <Button
-                key={0}
-                disabled={disabled || options.length < 2}
-                tab={false}
-                icon={'navigate_before'}
-                size={14}
+                vertical full="v" key={0} disabled={disabled || options.length < 2}
+                centerItems iconProps={iconPropsInputButton}
+                tab={false} icon={'navigate_before'}
                 onClick={
                     () => {
                         const id = optionHandler.getPrevId();
@@ -1321,7 +1330,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
                 }
             />
         );
-    }
+    };
     const attr = useFocusKeyBindings({
         keyHandlers: [
             {
@@ -1351,6 +1360,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
         cls.push('tabbed');
     }
     const { stackAttr, dimAttr, flexCls } = getStackAndDimHAttr(props, {min: 100, max: 250});
+    stackAttr.gaps = '1';
     if (flexCls) {
         cls.push(flexCls);
     }
@@ -1384,11 +1394,10 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     if (buttons) {
         items.push(
             <Button
-                key={2}
-                disabled={disabled || options.length < 2}
+                vertical full="v" key={2} disabled={disabled || options.length < 2}
+                centerItems iconProps={iconPropsInputButton}
                 tab={false}
                 icon={'navigate_next'}
-                size={14}
                 onClick={
                     () => {
                         const id = optionHandler.getNextId();
@@ -1405,7 +1414,7 @@ function Select({ name, value, disabled, options, readOnly, buttons = true, tab 
     )
 }
 
-function TextArea({ name, value, autoFocus, resize, floatProps = {}, copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
+function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h', copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
 
@@ -1469,7 +1478,8 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, copy, readO
     if (!resize) {
         attr.style.resize = 'none'
     }
-    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius input-padding'];
+    const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius'];
+    addPaddingCls(cls, padded, 'input');
     if (!(readOnly || disabled)) {
         cls.push('hover-change');
     }
@@ -2564,17 +2574,23 @@ function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props 
     )
 }
 
-function LabelProp({name, labelProps, bottomPadding = true, children}) {
+function LabelProp({name, labelProps, inputPadding = true, bottomPadding = true, children}) {
     let leftPadding = DIR.H;
     let rightPadding = DIR.RIGHT;
     if (bottomPadding) {
         leftPadding |= DIR.BOTTOM;
         rightPadding |= DIR.BOTTOM
     }
+    const innerCls = [];
+    if (inputPadding) {
+        innerCls.push('input-padding-1-v');
+    }
     return (
         <>
             <Block shorten padded={leftPadding} className="small-font" { ...labelProps }>
-                {name}
+                <Block className={innerCls.join(' ')}>
+                    {name}
+                </Block>
             </Block>
             <Block full="h" padded={rightPadding}>
                 {children}
@@ -2633,13 +2649,12 @@ function VirtualNumberProp({ name, ...props }) {
 
 function CheckboxProp({ name, ...props }) {
     return (
-        <LabelProp name={name}>
+        <LabelProp name={name} inputPadding={false}>
             <Checkbox {...props} />
         </LabelProp>
     )
 }
 
-// TODO: braucht full eine Dim?
 function FullProp({ name, children}) {
     return (
         <>
@@ -2654,7 +2669,9 @@ function FullProp({ name, children}) {
 function PropSection({ name }) {
     return (
         <FullProp>
-            <Block full="h" border={DIR.BOTTOM} className="less">{name}</Block>
+            <Block full="h" border={DIR.BOTTOM}>
+                <Block className="more" full="h">{name}</Block>
+            </Block>
         </FullProp>
     )
 }

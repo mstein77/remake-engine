@@ -3,29 +3,14 @@ import { ColorIndex, FilterIndex } from "../classes/EntityIndex";
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
 import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
 import { PictureCell } from "./BaseComponents";
-import {
-    FileDropZone,
-    Button,
-    AsyncButton,
-    Color,
-    ColorProp,
-    Checkbox,
-    ImageProp,
-    InputProp,
-    Number,
-    NumberProp,
-    Tuple,
-    Hidden,
-    TupleProp,
-    LabelProp,
-    TextArea
-} from "./FormComponents";
+import { FileDropZone, Button, AsyncButton, Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker } from "./EntityComponents";
 import { FlexGrid, BaseGrid } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BackgroundControl, Icon } from "./BasicComponents";
+
 import ReactDOM from "react-dom";
 
 function ConfirmDialog({ close, save, msg }) {

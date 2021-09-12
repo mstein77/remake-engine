@@ -308,10 +308,10 @@ function FlexStack({ auto, scaling,
        varWidth, fixWidth = 0, minWidth,
        page, setPage, maxPage, items, render}) {
 
-    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
     const aContext = useContext(AvailContext);
 
     const callAfterwards = useCallAfterwards();
+    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
     const gap = defaultPaddingPx;
 
     const getZoomAndHeight = () => {
@@ -391,16 +391,16 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
 
     const doAction = eContext && undo ? eContext.doAction : action => action();
 
-    let [posRaw, setPos] = useState(props.pos !== undefined ? props.pos : 0);
+    let [ posRaw, setPos ] = useState(props.pos !== undefined ? props.pos : 0);
     let pos = posRaw;
     if (props.setPos) {
         setPos = props.setPos;
         pos = props.pos
     }
-    const [zoom, setZoom] = useState(props.zoom ? props.zoom : 1);
-    const [maxZoom, setMaxZoom] = useState(props.maxZoom ? props.maxZoom : null);
+    const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : 1);
+    const [ maxZoom, setMaxZoom ] = useState(props.maxZoom ? props.maxZoom : null);
+    let [ pageRaw, setPage ] = useState(props.page !== undefined ? props.page : 1);
 
-    let [pageRaw, setPage] = useState(props.page !== undefined ? props.page : 1);
     let page = pageRaw;
     if (props.setPage) {
         setPage = props.setPage;
@@ -412,7 +412,6 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         setPos(0);
         setFilterRaw(value);
     };
-
     useUpdateOnEntityIndexChanges(entityIndex);
 
     const matcher = props.filter && filter ? filter : null;
@@ -421,12 +420,10 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     if (filter) {
         view.matches = view.matches.slice(0, page);
     }
-
     const viewEnd = Math.max(view.count - page, 0);
     if (pos > viewEnd) {
         setPos(viewEnd);
     }
-
     if (minWidth === undefined) {
         minWidth = 50;
     }
@@ -660,8 +657,6 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                 return (cell.width === entityIndex.getSizeX() && cell.height === entityIndex.getSizeY());
             }
         };
-
-
         bottomItems.push(
             <Stack gaps key="actions">
                 <Block center="v" className="active-bg-text">Actions:</Block>
@@ -684,8 +679,6 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                 {bottomItems[i]}
             </ToolGroup>
     }
-
-
     return (
         <Stack full borders>
             {!readOnly &&
@@ -750,16 +743,16 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
 }
 
 function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, centerItems = true, ...props }) {
-    const [pos, setPos] = useState(0);
-    const [zoom, setZoom] = useState(props.zoom ? props.zoom : 5);
-    const [maxZoom, setMaxZoom] = useState(10);
-    const [rulers, setRulers] = useState(false);
-    const [border, setBorder] = useState(1);
-    const [width, setWidth] = useState(1);
-    const [height, setHeight] = useState(1);
-    const [markerX, setMarkerX] = useState(null);
-    const [markerY, setMarkerY] = useState(null);
-    const [filter, setFilterRaw] = useState('');
+    const [ pos, setPos ] = useState(0);
+    const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : 5);
+    const [ maxZoom, setMaxZoom ] = useState(10);
+    const [ rulers, setRulers ] = useState(false);
+    const [ border, setBorder ] = useState(1);
+    const [ width, setWidth ] = useState(1);
+    const [ height, setHeight ] = useState(1);
+    const [ markerX, setMarkerX ] = useState(null);
+    const [ markerY, setMarkerY ] = useState(null);
+    const [ filter, setFilterRaw ] = useState('');
 
     if (zoom > maxZoom) {
         setZoom(maxZoom);

@@ -329,6 +329,24 @@ function ThemeSettings({ theme, setTheme }) {
                         </Stack>
                     </LabelProp>
 
+                    <PropSection name="Warning" />
+                    <LabelProp name="Colors">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.warningBgRgb} set={propSetter('warningBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.warningRgb} set={propSetter('warningRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="border_color" />
+                                <ColorProp value={theme.warningBorderRgb} set={propSetter('warningBorderRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
                     <PropSection name="Input" />
                     <LabelProp name="Colors">
                         <Stack wrap gaps full="h">
@@ -365,6 +383,8 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="padding" />
+                                <Number value={theme.inputMinPaddingPx} max={10} set={propSetter('inputMinPaddingPx')} min={0} />
+                                <Block center="v">-</Block>
                                 <Number value={theme.inputPaddingPx} max={10} set={propSetter('inputPaddingPx')} min={0} />
                             </Stack>
                         </Stack>
@@ -412,9 +432,9 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="padding" />
-                                <Number value={theme.buttonPaddingPx} max={10} set={propSetter('buttonPaddingPx')} min={0} />
-                                <Block>-</Block>
                                 <Number value={theme.buttonMinPaddingPx} max={10} set={propSetter('buttonMinPaddingPx')} min={0} />
+                                <Block center="v">-</Block>
+                                <Number value={theme.buttonPaddingPx} max={10} set={propSetter('buttonPaddingPx')} min={0} />
                             </Stack>
                         </Stack>
                     </LabelProp>
