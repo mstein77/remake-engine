@@ -167,7 +167,6 @@ html, body {
     box-shadow: 1px 1px 4px #00000088
 }
 
-
 .hidden {
     display: none
 }
@@ -225,8 +224,7 @@ html, body {
 
 /* TODO */
 .tooltip {
-    background-color: #b3bbb1;
-    color: #000000;
+    box-shadow: 5px 5px 5px #00000088;
     width: max-content;
     max-width: 50vw
 }
@@ -235,17 +233,26 @@ html, body {
     display: block !important
 }
 
+.triangle-v {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+}
+
+.triangle-up {
+    border-bottom: 10px solid var(--primary-rgb);
+}
+
+.triangle-down {
+    border-top: 10px solid var(--primary-rgb);
+}
+
 /* Scrollbar */
 
 .scrollbar-div {
     padding: 1px;
-    margin: 0px;
-    background-color: var(--toolbar-bg-rgb)
-}
-
-.scrollbar-space {
-    background-color: #000000;
-    opacity: 0.5
+    margin: 0px
 }
 
 .scrollbar-handle {
@@ -352,6 +359,15 @@ html, body {
     }
 }
 
+@-webkit-keyframes opacity-blinker {
+    from {
+        opacity: var(--max-opacity-float);
+    }
+    to {
+        opacity: var(--min-opacity-float);
+    }
+}
+
 .blink {
     opacity: 0.5;
     -webkit-animation-name: blinker;
@@ -441,8 +457,24 @@ input:invalid {
     background-color: var(--marker-color-highlight-rgb)
 }
 
-.toolbar-bg {
-    background-color: var(--toolbar-bg-rgb)
+.primary-bg {
+    background-color: var(--primary-bg-rgb)
+}
+
+.primary-color {
+    color: var(--primary-rgb)
+}
+
+.secondary-bg {
+    background-color: var(--secondary-bg-rgb)
+}
+
+.secondary-color {
+    color: var(--secondary-rgb)
+}
+
+.ghost-bg {
+    background-color: var(--ghost-bg-rgb)
 }
 
 .cursor-bg-hover:hover {
@@ -483,6 +515,12 @@ input:invalid {
 
 .all-events {
     pointer-events: all;
+}
+
+.area-flicker {
+    -webkit-animation-duration: 0.1s !important;
+    -webkit-animation-name: opacity-blinker;
+    outline: 6px solid var(--active-bg-rgb)
 }
 
 .cursor-neswresize {
@@ -538,5 +576,11 @@ input:invalid {
 @keyframes rotate {
     to {
         transform: rotate(360deg);
+    }
+}
+
+@-moz-document url-prefix() {
+    input {
+        font-family: Monospace
     }
 }

@@ -28,16 +28,74 @@
       + BgColor:
 
 ---------------------------
- - Theme-Backgrounds
  - Font-Styling
-
- - Key-Bindings (+Marking)
  - Sections
+     * handle
+     - font
+     - types
+ - Persistierung
+     - Zoom
+     - Background
 ---------------------------
  - Entity-Stack (Styling, Dragn-Drop)
  - Entity-Manager
 ---------------------------
- BUG: opacity-Filter setzen und wieder öffnen => falsche Übernahme
+ BUG: tooltip-mouseout wird manchmal nicht getriggert
+ - Tooltips zusammenfassen?
+ - Preview: Double-Click => New on position
+ - Preview: Auto-Scroll on Drag
+
+
+
+
+ /**
+
+ PREVIEW:
+
+   Der Background im Preview sollte
+    - per Default den BG aus der Reource nehmen, ABER den gibt es nicht :D
+        => man könnte diesen evt. aus einer BG-Pane ermitteln, die dahinter liegt
+
+    - wird dieser überschrieben, dann wird das auf Editor-Resourcen-Ebene gespeichert und
+      per X-Button zurücksetzbar gemacht (evt. reicht Cache-Clear?)
+
+   Für Dim und Zoom wird der Default ebenfalls aus Resource (Dim) bzw. Game (Zoom)
+   bestimmt.
+
+   Der FilterPipelineModal übernimmt die aktuelle BG-Color und Zoom
+   Änderungen an der BG-Color und am Zoom werden verworfen (bzw. man könnte sich beim
+   Zoom auch die Pixel-Ratio merken und als Minimum anwenden)
+
+ CHARACTERS:
+
+   Der Hintergrund wird hier per Default auf die Default-Transparenz gesetzt
+   Wird überschrieben, dann wird dies Resource-Abhängig gesetzt und in alle weiteren
+   Modale, die von hier getriggert werden genauso gehandhabt.
+
+ EDIT-Preivew:
+   Zoom Einpassung an Platzvorgabe, evt. mit Min-Pixel-Ratio?
+
+ COPY-ENTITY:
+
+   Ruler + Border werden global gepeichert
+   Zoom wird mit Picker-Pixel-Ratio ermittelt und bei Änderungen auf Resourcen-Ebene
+   gespeichert
+
+
+ EDIT-BITMAP:
+   Borders und Rulers kommen aus dem globalen Cache.
+   Der Zoom kann hier global gespeichert werden, oder auch per pixel-ratio vorbelegt
+   werden
+
+ BITMAP-Selection:
+   BG wird mit Default-BG belegt und bei Änderungen auf Globaler-Ebene gespeichert
+   (evt. sinnvoller: übernahme aus Resource?)
+   Zoom wird ebenfalls auf Globaler Ebene gespeichert
+
+ */
+
+
+
 
 
 --------------------------------

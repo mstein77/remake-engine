@@ -23,7 +23,7 @@ const defaultValues = {
         maxWidthPx: 1200,
         maxHeightPx: 1200,
         boxBorderRgb: "#2b7797",
-        toolbarBgRgb: "#2f304b",
+
         inputBgRgb: "#b0aec1",
         inputRgb: "#29292e",
         inputBorderRgb: "#a8a8a8",
@@ -32,9 +32,18 @@ const defaultValues = {
         inputPaddingPx: 5,
         inputMinPaddingPx: 1,
         inputBorderRadiusPx: 4,
+
         checkBoxType: '0',
+
         editorBgRgb: "#080808",
         editorRgb: "#9aa0a2",
+
+        primaryBgRgb: "#080808",
+        primaryRgb: "#9aa0a2",
+        secondaryBgRgb: "#2f304b",
+        secondaryRgb: "#9aa0a2",
+        ghostBgRgb: "#181818",
+
         buttonBgRgb: "#1e42ae",
         buttonRgb: "#b0d5e8",
         buttonBorderRgb: "#347f66",
@@ -43,6 +52,7 @@ const defaultValues = {
         buttonMinPaddingPx: 3,
         buttonPaddingPx: 5,
         buttonBorderRadiusPx: 4,
+
         activeRgb: '#fafbff',
         activeBgRgb: '#5baa2b',
         activeBorderRgb: '#D0D0F0',
@@ -52,6 +62,7 @@ const defaultValues = {
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
         focusRgba: '#FFFFDFCC',
+
         linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
         buttonFont: "Monospace",
         fontUrl: "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
@@ -321,7 +332,7 @@ function Canvas({ id, width, height, smoothing, render, plain, border, className
 
 function Toolbar({ children }) {
     return (
-        <Stack full="h" wrap gaps centerItems className="toolbar-bg">
+        <Stack full="h" wrap gaps centerItems className="secondary-bg secondary-color">
             {children}
         </Stack>
     )
@@ -670,7 +681,10 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
             }
         }
     }
-
+    const parentCls = [
+        'primary-bg primary-color',
+        'stack' + (!collapseH && rev ? ' rev-cols' : '')
+    ];
     const parentAttr = {
         full: parentFull,
         center,
@@ -679,7 +693,7 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
         hotKeys,
         area,
         link,
-        className: 'stack' + (!collapseH && rev ? ' rev-cols' : ''),
+        className: parentCls.join(' '),
         ...dimProps
     };
     if (collapsedByH) {
@@ -985,12 +999,12 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
     const dimMin = {
         [axisKey]: minPerc + '%',
         [oppAxisKey]: space,
-        className: 'scrollbar-space'
+        className: 'ghost-bg'
     };
     const dimMax = {
         [axisKey]: maxPerc + '%',
         [oppAxisKey]: space,
-        className: 'scrollbar-space'
+        className: 'ghost-bg'
     };
 
     const onMouseDown = e => {
@@ -1042,7 +1056,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         handleCls.push('clicked');
     }
     return (
-        <Stack vertical={vertical} full={dirKey} className="scrollbar-div">
+        <Stack vertical={vertical} full={dirKey} className="scrollbar-div secondary-bg">
             <Button
                 vertical={!vertical} icon={'arrow_' + arrows[0]} full={oppDirKey}
                 onClick={e => changePos(e, -1)} disabled={pos === 0}
@@ -1607,8 +1621,12 @@ function WindowCtx({ imageResources, filters, children, game }) {
             focusHotKeyArea: area => {
                 let elem = getHotKeyArea(area);
                 if (elem) {
+                    const areaElem = elem;
                     elem = elem.querySelector('.tabbed');
                     if (elem) {
+                        const { markFocusArea } = registry();
+                        const rectElem = areaElem.parentNode && areaElem.parentNode.classList.contains('parent') ? areaElem.parentNode : areaElem;
+                        markFocusArea(rectElem.getBoundingClientRect());
                         elem.focus();
                         register('lastTarget', elem);
                         return true;
@@ -1792,10 +1810,51 @@ function WindowCtx({ imageResources, filters, children, game }) {
             {cssContext.ready &&
                 <>
                     <FixCursorArea key="em" />
+                    <AreaMarker key="am" />
                     {children}
                 </>
             }
         </WindowContext.Provider>
+    )
+}
+
+function AreaMarker() {
+    const wContext = useContext(WindowContext);
+
+    const update = useComponentUpdate();
+    const [ active, setActive ] = useState(0);
+    const styleRef = useRef({zIndex: 100000});
+    const timerRef = useRef(null);
+    const divRef = useRef();
+
+    useEffect(() => {
+        wContext.register('markFocusArea', rect => {
+            styleRef.current.width = rect.width;
+            styleRef.current.height = rect.height;
+            styleRef.current.left = rect.x;
+            styleRef.current.top = rect.y;
+            if (timerRef.current) {
+                clearTimeout(timerRef.current)
+            }
+            timerRef.current = setTimeout(
+                () => {
+                    timerRef.current = null;
+                    setActive(false)
+                },
+                1000
+            );
+            setActive(true);
+            update()
+        });
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        }
+    }, []);
+
+    if (!active) return '';
+
+    return (
+        <div ref={divRef} style={{ ...styleRef.current }} className="transparent fixed border-box blink area-flicker" />
     )
 }
 
@@ -1815,8 +1874,8 @@ function FixCursorArea() {
         style.display = 'none'
     }
     return (
-        <div key="fc" style={style} className={'fixed pos-0 transparent full-h full-v'} />
-    );
+        <div key="fc" style={style} className="fixed pos-0 transparent full-h full-v" />
+    )
 }
 
 const AvailContext = React.createContext();
@@ -2377,6 +2436,12 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
                 </div>
             </div>
         </div>
+        <Block width={0} height={0} tab onFocus={() => {
+            const focusElem = wContext.focusStack.elem[zIndex];
+            if (focusElem && focusElem.start) {
+                focusElem.start.focus()
+            }
+        }} />
     </Block>;
 
     if (wContext.isStyleLocked()) {
@@ -2969,16 +3034,18 @@ function useCachedState(level, id, value, type) {
         if (level === 'page') {
             if (wContext.getModalLevel() > 0) {
                 cache = wContext.getCurrModalCache()
-            } else {
+            } else if (eContext) {
                 cache = eContext.cache
             }
         } else {
             cache = wContext.cache[level]
         }
-        if (cache[id] === undefined) {
-            cache[id] = value
+        if (cache) {
+            if (cache[id] === undefined) {
+                cache[id] = value
+            }
+            pre = cache[id]
         }
-        pre = cache[id]
     }
     const [ cacheValue, setCacheValue ] = useState(pre);
 

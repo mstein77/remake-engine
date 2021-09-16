@@ -101,7 +101,6 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                 const params = filterDefinitions[name].params;
                 for (let i = 0; i < params.length; i++) {
                     params[i](values[i], item);
-                    item[name] = params;
                 }
             }
             index.setEntityObject({value: name, params: { ...item }});
@@ -369,7 +368,7 @@ function ResizeProps({ entityIndex, width, height, newWidth, newHeight, maxWidth
                     />
                 </Block>
             </LabelProp>
-
+            {BitmapSelectionModal}
         </>
     )
 }
@@ -657,7 +656,7 @@ function MarkerMoveGrid({ gridProvider, markerWidth, markerHeight, markerX, mark
     )
 }
 
-function BitmapEditorInner({ image, colors, resize, save, close }) {
+function BitmapEditorInner({ pageId, image, colors, resize, save, close }) {
     const eContext = useContext(EditorContext);
 
     const doSave = () => {
@@ -712,7 +711,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
                 </Section>
                 <Block full>
                     <BaseGrid
-                        undo edit resize={resize} navi zoom={4}
+                        pageId={pageId} undo edit resize={resize} navi zoom={4}
                         gridProvider={gridProvider} selection={selection}
                     />
                 </Block>
@@ -723,7 +722,7 @@ function BitmapEditorInner({ image, colors, resize, save, close }) {
 
 function BitmapEditor(props) {
     return (
-       <EditorCtx>
+       <EditorCtx id="BitmapEditor">
            <BitmapEditorInner { ...props } />
        </EditorCtx>
     )

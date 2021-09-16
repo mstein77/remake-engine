@@ -18,6 +18,7 @@ import {
     BackgroundControl,
     useUpdateOnEntityIndexChanges,
     useCallAfterwards,
+    useCachedState,
     AvailContext, WindowContext, useCssProps
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
@@ -38,6 +39,7 @@ function makeOp(customOp, defaultOp, defaultCan = true) {
 
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
+    const callAfterwards = useCallAfterwards();
 
     const doAction = undo && eContext ? eContext.doAction : action => action();
 
@@ -122,10 +124,10 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const indexSize = entityIndex.getLength();
     if (active !== null && indexSize === 0) {
-        setActiveRaw(null);
+        callAfterwards(setActiveRaw, null);
         return '';
     } else if (indexSize > 0 && active >= indexSize) {
-        setActiveRaw(indexSize - 1);
+        callAfterwards(setActiveRaw,indexSize - 1);
         return ''
     }
 
@@ -151,7 +153,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             attr.tab = true;
         }
         items.push(
-            <Stack key={index} border={DIR.BOTTOM} gaps className={'hover-highlight' + (isActive ? ' active-bg' : ' control-bg')} full="h" {...attr}>
+            <Stack key={index} border={DIR.BOTTOM} cursor="pointer" gaps className={'hover-highlight' + (isActive ? ' active-bg active-color' : ' ghost-bg')} full="h" { ...attr }>
                 <Block width={numLen} className="less" padded>#{index + 1}</Block>
                 <Stack vertical full="h" padded gaps>
                     <Block shorten>{getName(entity)}</Block>
@@ -254,7 +256,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     let elem = (
         <Stack vertical borders full area={area} hotKeys={hotKeys}>
             <Block full="h">
-                <Stack full wrap gaps className="toolbar-bg">
+                <Stack full wrap gaps className="secondary-bg">
                     {add && <Button icon="add" onClick={hotKeys.new} />}
                     {edit && <Button icon="edit" onClick={hotKeys.edit} />}
                     {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
@@ -445,10 +447,10 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     };
 
     const render = index => {
-        const cls = [];
-        if (marked.includes(index)) {
-            cls.push('active-bg');
-        }
+        const cls = [
+            'hover-change',
+            marked.includes(index) ? 'active-bg active-color' : 'ghost-bg'
+        ];
         const itemRender = ctx => {
             entityIndex.drawEntity(ctx, index, 0, 0, zoom);
         };
@@ -458,6 +460,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                 full
                 border="1"
                 className={cls.join(' ')}
+                cursor="pointer"
                 onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                 onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
                 onLeftClick={readOnly ? null : () => toggleMarker(index)}>
@@ -682,7 +685,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     return (
         <Stack full borders>
             {!readOnly &&
-                <Block full="v" className="toolbar-bg">
+                <Block full="v" className="secondary-bg">
                     <Stack vertical gaps padded scroll>
                         <Button icon="add" onClick={addOp} />
                         <Button icon="playlist_add" onClick={importOp} />
@@ -743,11 +746,12 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
 }
 
 function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, centerItems = true, ...props }) {
+
     const [ pos, setPos ] = useState(0);
     const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : 5);
     const [ maxZoom, setMaxZoom ] = useState(10);
-    const [ rulers, setRulers ] = useState(false);
-    const [ border, setBorder ] = useState(1);
+    const [ rulers, setRulers ] = useCachedState(props.rulers !== undefined ? null : 'global', 'EntityPickerRulers', props.rulers !== undefined ? props.rulers : false, 'bool');
+    const [ border, setBorder ] = useCachedState(props.border !== undefined ? null : 'global', 'EntityPickerBorder', props.border !== undefined ? props.border : 1, 'number');
     const [ width, setWidth ] = useState(1);
     const [ height, setHeight ] = useState(1);
     const [ markerX, setMarkerX ] = useState(null);

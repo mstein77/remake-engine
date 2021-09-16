@@ -301,12 +301,36 @@ function ThemeSettings({ theme, setTheme }) {
                         </Stack>
                     </LabelProp>
 
-                    <PropSection name="Toolbar" />
-                    <LabelProp name="Colors">
+                    <PropSection name="Content" />
+                    <LabelProp name="Primary">
                         <Stack wrap gaps full="h">
                             <Stack gaps>
                                 <Icon name="image" />
-                                <Color value={theme.toolbarBgRgb} set={propSetter('toolbarBgRgb')} />
+                                <Color value={theme.primaryBgRgb} set={propSetter('primaryBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.primaryRgb} set={propSetter('primaryRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Secondary">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.secondaryBgRgb} set={propSetter('secondaryBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="format_color_text" />
+                                <Color value={theme.secondaryRgb} set={propSetter('secondaryRgb')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Ghost">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.ghostBgRgb} set={propSetter('ghostBgRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -592,7 +616,7 @@ function HotKeySettings({ mapping, setMapping }) {
     return (
         <Stack full borders>
             <Block padded scroll full="h">
-                <Grid columns="- + 80px" full="v" gaps>
+                <Grid columns="- + 80px" full="h" gaps>
                     {items}
                 </Grid>
                 <RecordModal.content name="Assign HotKey">

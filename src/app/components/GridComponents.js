@@ -7,7 +7,8 @@ import {
     Canvas,
     ScrollArea,
     WindowContext,
-    EditorContext, useCallAfterwards, useModal, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
+    EditorContext, useCallAfterwards, useModal,
+    useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
 } from "./BasicComponents";
 import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
 import { d, clamp, areDisjoint, getCanvasForBitmap } from "../helper/helper";
@@ -2360,25 +2361,25 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
     );
 }
 
-function BaseGrid({ gridProvider, selection, onDoubleClick, targetValues = [], undo, resize, edit, navi, minZoom = 1, maxZoom = 10, ...props }) {
+function BaseGrid({ pageId, gridProvider, selection, onDoubleClick, targetValues = [], undo, resize, edit, navi, minZoom = 1, maxZoom = 10, ...props }) {
     const eContext = useContext(EditorContext);
 
-    const [posX, setPosX] = useState(0);
-    const [posY, setPosY] = useState(0);
-    const [width, setWidth] = useState(1);
-    const [height, setHeight] = useState(1);
-    const [zoom, setZoom] = useState(props.zoom ? props.zoom : (minZoom !== undefined ? minZoom : 1));
-    const [border, setBorder] = useState(1);
-    const [rulers, setRulers] = useState(false);
-    const [writeTransparent, setWriteTransparent] = useState(false);
+    const [ posX, setPosX ] = useState(0);
+    const [ posY, setPosY ] = useState(0);
+    const [ width, setWidth ] = useState(1);
+    const [ height, setHeight ] = useState(1);
+    const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : (minZoom !== undefined ? minZoom : 1));
+    const [ border, setBorder ] = useCachedState('page', 'border', 1, 'number');
+    const [ rulers, setRulers ] = useCachedState('page', 'rulers', false, 'bool');
+    const [ writeTransparent, setWriteTransparent ] = useState(false);
 
-    const [markerType, setMarkerType] = useState('rect');
-    const [markerX, setMarkerX] = useState(null);
-    const [markerY, setMarkerY] = useState(null);
-    const [markerWidth, setMarkerWidth] = useState(null);
-    const [markerHeight, setMarkerHeight] = useState(null);
-    const [markerGapX, setMarkerGapX] = useState(0);
-    const [markerGapY, setMarkerGapY] = useState(0);
+    const [ markerType, setMarkerType ] = useState('rect');
+    const [ markerX, setMarkerX ] = useState(null);
+    const [ markerY, setMarkerY ] = useState(null);
+    const [ markerWidth, setMarkerWidth ] = useState(null);
+    const [ markerHeight, setMarkerHeight ] = useState(null);
+    const [ markerGapX, setMarkerGapX ] = useState(0);
+    const [ markerGapY, setMarkerGapY ] = useState(0);
 
     const sizeX = gridProvider.getCellSizeX();
     const sizeY = gridProvider.getCellSizeY();

@@ -340,7 +340,7 @@ function OkCancelForm({ full, save, cancel, submit, left = [], right = [], child
             <Block full={full} scroll>
                 {children}
             </Block>
-            <Stack className="toolbar-bg" full="h" gaps padded>
+            <Stack className="secondary-bg" full="h" gaps padded>
                 {submit ? <Submit padded="h" name="OK" onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
                 <Button padded="h" onClick={cancel} name="Cancel" icon="close" />
                 {left}
@@ -425,16 +425,17 @@ function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = 
 }
 
 function FixTooltip({ title, hotKey, click, children, hostRef }) {
-    const [ ready, setReady ] = useState(false);
+    const [ arrow, setArrow ] = useState(false);
 
     const hostRect = hostRef.current ? hostRef.current.getBoundingClientRect() : null;
     const divRef = useRef(null);
     const dist = 10;
     const styleRef = useRef({
-        zIndex: 10000
+        zIndex: 10000,
+        arrowUp: true
     });
-    const cls = ['fixed tooltip small-font padded thin-boxed wrap-normal'];
-    if (!ready) {
+    const cls = ['fixed tooltip primary-bg primary-color small-font padded thin-boxed wrap-normal'];
+    if (!arrow) {
         cls.push('invisible')
     }
 
@@ -458,7 +459,9 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
         } else if (out.top) {
             styleRef.current.marginTop = -rect.top
         }
-        setReady(true);
+        if (!arrow) {
+            setArrow(out.bottom ? 'down' : 'up');
+        }
     }, [hostRef.current, divRef.current]);
 
     if (!hostRef.current) return '';
@@ -467,6 +470,11 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
         styleRef.current.top = hostRect.top + hostRect.height + dist;
         styleRef.current.left = hostRect.left;
     }
+    const arrowStyle = {
+        top: hostRect.top + (arrow === 'up' ? hostRect.height + 1 : - (dist)),
+        left: hostRect.left + 5,
+        zIndex: styleRef.current.zIndex
+    };
 
     return (
         <Portal id="modals-container">
@@ -475,22 +483,23 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
                 {title && children ? <br /> : ''}
                 {children}
                 {(hotKey || click) && <>
-                <Stack gaps end padded={DIR.TOP}>
-                    {click &&
-                        <>
-                            <Block center="v"><Icon name="mouse" size={13} /></Block>
-                            <Block border="1" center="v" padded="h">{click}</Block>
-                        </>
-                    }
-                    {hotKey &&
-                        <>
-                            <Block center="v"><Icon name="keyboard" /></Block>
-                            <HotKeyKeys padded="h" className="align-end" hotKey={hotKey} />
-                        </>
-                    }
-                </Stack>
+                    <Stack gaps end padded={DIR.TOP}>
+                        {click &&
+                            <>
+                                <Block center="v"><Icon name="mouse" size={13} /></Block>
+                                <Block border="1" center="v" padded="h">{click}</Block>
+                            </>
+                        }
+                        {hotKey &&
+                            <>
+                                <Block center="v"><Icon name="keyboard" /></Block>
+                                <HotKeyKeys padded="h" className="align-end" hotKey={hotKey} />
+                            </>
+                        }
+                    </Stack>
                 </>}
             </div>
+            <div className="fixed" style={arrowStyle}><div className={"triangle-v triangle-" + arrow} /></div>
         </Portal>
     )
 }
@@ -1544,7 +1553,7 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
 
     const btnCls = 'button-border-1';
     const cls = ['button-bg ' + btnCls, 'color-input-padding button-border-color border-outset'];
-    const innerCls = ['toolbar-bg ' + btnCls, ' button-border-color border-inset'];
+    const innerCls = ['secondary-bg ' + btnCls, ' button-border-color border-inset'];
     if (disabled) {
         readOnly = true;
         cls.push('disabled')
@@ -2030,7 +2039,7 @@ function ColorPicker({ value, set, alpha, close }) {
                     <Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  />
                 </Block>
                 <Block full>
-                    <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} />
+                    <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} border={1} rulers={false} />
                 </Block>
             </Stack>
 
@@ -2574,7 +2583,7 @@ function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props 
     )
 }
 
-function LabelProp({name, labelProps, inputPadding = true, bottomPadding = true, children}) {
+function LabelProp({ name, labelProps, inputPadding = true, bottomPadding = true, children }) {
     let leftPadding = DIR.H;
     let rightPadding = DIR.RIGHT;
     if (bottomPadding) {
@@ -2587,7 +2596,7 @@ function LabelProp({name, labelProps, inputPadding = true, bottomPadding = true,
     }
     return (
         <>
-            <Block shorten padded={leftPadding} className="small-font" { ...labelProps }>
+            <Block padded={leftPadding} className="small-font" { ...labelProps }>
                 <Block className={innerCls.join(' ')}>
                     {name}
                 </Block>
@@ -2607,10 +2616,10 @@ function InputProp({ name, ...props }) {
     )
 }
 
-function TupleProp({ name, ...props }) {
+function TupleProp({ name, wrap, ...props }) {
     return (
-        <LabelProp name={name} bottomPadding={false}>
-            <Tuple {...props} />
+        <LabelProp name={name} bottomPadding={!wrap}>
+            <Tuple wrap={wrap} {...props} />
         </LabelProp>
     )
 }

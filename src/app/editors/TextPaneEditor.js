@@ -55,14 +55,14 @@ import ReactDOM from "react-dom";
 function FontProperties({ font, reserved, save, close }) {
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select Size');
 
-    const [value, setValue] = useState(font.value);
-    const [width, setWidth] = useState(font.width);
-    const [height, setHeight] = useState(font.height);
-    const [newWidth, setNewWidth] = useState(font.width);
-    const [newHeight, setNewHeight] = useState(font.height);
-    const [offsetX, setOffsetX] = useState(0);
-    const [offsetY, setOffsetY] = useState(0);
-    const [images, setImages] = useState(null);
+    const [ value, setValue ] = useState(font.value);
+    const [ width, setWidth ] = useState(font.width);
+    const [ height, setHeight ] = useState(font.height);
+    const [ newWidth, setNewWidth ] = useState(font.width);
+    const [ newHeight, setNewHeight ] = useState(font.height);
+    const [ offsetX, setOffsetX ] = useState(0);
+    const [ offsetY, setOffsetY ] = useState(0);
+    const [ images, setImages ] = useState(null);
 
     const saveFont = () => save(
         { ...font,
@@ -98,8 +98,8 @@ function FontProperties({ font, reserved, save, close }) {
 
     return (
         <OkCancelForm submit save={saveFont} cancel={close} full>
-            <Block full="h" padded>
-                <PropertyGrid full="h" padded>
+            <Block full="h" padded scroll>
+                <PropertyGrid full="h">
                     <InputProp name="ID:" full="h" maxWidth={250} required match={value => !reserved.includes(value)} value={value} set={setValue} />
                     {font.index === undefined &&
                         <LabelProp name="Size:">
@@ -130,9 +130,9 @@ function FontProperties({ font, reserved, save, close }) {
                         />
                     }
                 </PropertyGrid>
+                {BitmapSelectionModal}
             </Block>
 
-            {BitmapSelectionModal}
         </OkCancelForm>
     )
 }
@@ -141,8 +141,8 @@ function CharAssignments({ close, save, assignIndex }) {
 
     useUpdateOnEntityIndexChanges(assignIndex);
 
-    const [pos, setPos] = useState(0);
-    const [page, setPage] = useState(1);
+    const [ pos, setPos ] = useState(0);
+    const [ page, setPage ] = useState(1);
 
     const managerRef = useRef(null);
 
@@ -219,7 +219,6 @@ function CharAssignments({ close, save, assignIndex }) {
             }
         }
     };
-
     const focusNextFrom = from => {
         if (values[from] === '') {
             setFocusIndex(from);
@@ -231,7 +230,6 @@ function CharAssignments({ close, save, assignIndex }) {
             setFocusIndex(next);
         }
     };
-
     const doSave = () => {
         save(assignIndex.getEntityObjects())
     };
@@ -521,7 +519,7 @@ function CharManager({ charIndex }) {
                         return (
                             <Stack full="h" padded>
                                 <Block full="h">
-                                    <Kbd className="padded input" value={'&#' + code + ';'} />
+                                    <Block padded={DIR.H} border="1" className="secondary-bg secondary-color"><Kbd value={'&#' + code + ';'} /></Block>
                                 </Block>
                                 <Block>
                                     <Kbd value={code} />
@@ -650,7 +648,7 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
                     eContext.doAction(
                         () => {
                             editFont.chars.resize(editFont.newWidth, editFont.newHeight, editFont.offsetX, editFont.offsetY);
-                            fontIndex.setEntityObject(d({ ...editFont, width: editFont.newWidth, height: editFont.newHeight }), true);
+                            fontIndex.setEntityObject({ ...editFont, width: editFont.newWidth, height: editFont.newHeight }, true);
                         },
                         () => {
                             editFont.chars.resize(undoSizeX, undoSizeY);
@@ -715,7 +713,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     useUpdateOnEntityIndexChanges(fontIndex, () => imagesRef.current = {});
 
     const blockRef = useRef(null);
-    blockRef.current = activeBlock === null || !blockIndex.getLength() ? null : blockIndex.getEntityObject(activeBlock);
+
+    blockRef.current = activeBlock === null || !blockIndex.getLength() || !blockIndex.hasIndex(activeBlock) ? null : blockIndex.getEntityObject(activeBlock);
 
     const imagesRef = useRef({});
 
@@ -1222,7 +1221,7 @@ function TextPaneEditor({ model, resource }) {
 
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TextPane', model, resource, update });
 
-    const [activeFont, setActiveFont] = useState(0);
+    const [ activeFont, setActiveFont ] = useState(0);
 
     const fontIndex = useMemo(() => {
         return new FontIndex(model);

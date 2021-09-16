@@ -207,7 +207,7 @@ function Tooltip({ children }) {
                 {children}
             </div>
             <Portal id="modals-container">
-                <div style={portalStyle} className="fixed tooltip font-small padded thin-boxed wrap-normal">{children}</div>
+                <div style={portalStyle} className="fixed tooltip primary-bg primary-color font-small padded thin-boxed wrap-normal">{children}</div>
             </Portal>
         </>
     );
