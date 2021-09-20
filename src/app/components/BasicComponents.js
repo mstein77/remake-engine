@@ -23,6 +23,9 @@ const defaultValues = {
         maxWidthPx: 1200,
         maxHeightPx: 1200,
         boxBorderRgb: "#2b7797",
+        lessPerc: 50,
+        morePerc: 150,
+        disabledPerc: 45,
 
         inputBgRgb: "#b0aec1",
         inputRgb: "#29292e",
@@ -33,7 +36,14 @@ const defaultValues = {
         inputMinPaddingPx: 1,
         inputBorderRadiusPx: 4,
 
-        checkBoxType: '0',
+        fontSizeSmallPx: 11,
+        fontSizeMediumPx: 12,
+        fontSizeBigPx: 14,
+
+        monoFont: '"Lucida Console", Courier, monospace',
+
+        checkBoxType: 0,
+        headerType: 0,
 
         editorBgRgb: "#080808",
         editorRgb: "#9aa0a2",
@@ -62,6 +72,7 @@ const defaultValues = {
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
         focusRgba: '#FFFFDFCC',
+        sectionGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
 
         linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
         buttonFont: "Monospace",
@@ -545,11 +556,13 @@ function EditorSection({ id, ...props }) {
     )
 }
 
-function EditorSectionInner({ id, name, actions = [], area, tree, link, confirm, children, ...props }) {
+function EditorSectionInner({ id, name, sub, details, actions = [], area, link, confirm, children, ...props }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
     const eContextRef = useRef(null);
     eContextRef.current = eContext;
+
+    const { headerType } = useCssProps('headerType');
 
     const hotKeys = {
         undo: {
@@ -576,23 +589,13 @@ function EditorSectionInner({ id, name, actions = [], area, tree, link, confirm,
 
     const buttons = [];
     for (let [action, op] of Object.entries(actionHotKeys)) {
-        buttons.push(<Button key={action} padded="h" name={action} onClick={op} />);
+        buttons.push(
+            <Button key={action} padded="h" name={action} onClick={op} />
+        );
     }
-
     const header = (
-        <Stack full="h" key="eh">
-            <Stack full="h" gaps>
-                <Block center="v" padded className="more">{name}</Block>
-                {tree &&
-                    <>
-                        <Block className="control-bg" center="v" padded>From:</Block>
-                        <Block center="v" padded className="less">{tree[0].source}</Block>
-                        <Block className="control-bg" center="v" padded>Resources:</Block>
-                        <Block center="v" padded className="less">{tree.length}</Block>
-                        <Block full="h"> </Block>
-                    </>
-                }
-            </Stack>
+        <Stack full="h" key="eh" className={headerType === 1 ? "gradient-bg" : ""}>
+            <TitleBlocks title={name} sub={sub} details={details} />
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <Stack center="v" padded="h" gaps="1">
                 {buttons}
@@ -606,13 +609,14 @@ function EditorSectionInner({ id, name, actions = [], area, tree, link, confirm,
             hotKeys={hotKeys}
             link={link}
             area={area}
+            float={headerType === 2}
             name={name} {...props}>
             {children}
         </SectionFrame>
     );
 }
 
-function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
+function SectionFrame({ id, header, name, children, float, hotKeys, area, link, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
     const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
 
@@ -682,25 +686,27 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
         }
     }
     const parentCls = [
-        'primary-bg primary-color',
-        'stack' + (!collapseH && rev ? ' rev-cols' : '')
+        float ? 'editor-bg editor-color' : 'primary-bg primary-color',
+        'xxxxxxxxx stack' + (!collapseH && rev ? ' rev-cols' : '')
     ];
-    const parentAttr = {
-        full: parentFull,
-        center,
-        scroll,
-        indented,
+    const relAttr = {
         hotKeys,
         area,
         link,
         className: parentCls.join(' '),
         ...dimProps
     };
+    const parentAttr = {
+        full: parentFull,
+        center,
+        scroll,
+        indented
+    };
     if (collapsedByH) {
-        parentAttr.width = 'min-content';
+        relAttr.width = 'min-content';
     } else if (collapsed) {
-        parentAttr.minHeight = false;
-        parentAttr.height = 'min-content';
+        relAttr.minHeight = false;
+        relAttr.height = 'min-content';
     }
     const headerAttr = {
         full: collapsedByH ? false : 'h',
@@ -724,7 +730,7 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
             offsetRef.current = stackElem[offProp] - elem[offProp];
             update();
         }
-    }, [collapsed]);
+    }, [collapsed, float]);
 
     let items;
     let contentElem = '';
@@ -733,17 +739,17 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
         const attr = {};
         if (size) {
             if (collapseH) {
-                parentAttr.width = size + offsetRef.current;
+                relAttr.width = size + offsetRef.current;
             } else if (offsetRef.current) {
-                parentAttr.height = size + offsetRef.current;
-                if (parentAttr.maxHeight) {
-                    parentAttr.maxHeight = 'max(' + (minSize + offsetRef.current) + 'px, ' + parentAttr.maxHeight +  ')';
+                relAttr.height = size + offsetRef.current;
+                if (relAttr.maxHeight) {
+                    relAttr.maxHeight = 'max(' + (minSize + offsetRef.current) + 'px, ' + relAttr.maxHeight +  ')';
                 }
             }
             attr.ref = contentRef;
         }
         contentElem = (
-            <Block key="a" {...attr} full={collapseH ? parentAttr.full : true} { ...contentAttr }>
+            <Block key="a" { ...attr } full={collapseH ? parentAttr.full : true} { ...contentAttr }>
                 {children}
             </Block>
         );
@@ -820,11 +826,15 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
                 }
             };
 
+            const hStackAttr = {
+                [sizeProp]: 4
+            };
+
             const handleElem = (
-                <Block onKeyDown={handleKey} padded="1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} {...handleAttr} cursor={cursor}>
-                    <Stack center vertical={collapseH} tab gaps="1" className="hover-highlight">
-                        <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
-                        <Block full={collapseH ? 'h' : 'v'} className={'button ' + handleCls}></Block>
+                <Block onKeyDown={handleKey} padded="1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} { ...handleAttr } cursor={cursor} className="primary-bg">
+                    <Stack center vertical={collapseH} tab gaps="1" className="hover-highlight overflow" { ...hStackAttr }>
+                        <Block full={collapseH ? 'h' : 'v'} className={'button-bg overflow hover-change ' + handleCls}></Block>
+                        <Block full={collapseH ? 'h' : 'v'} className={'button-bg overflow hover-change ' + handleCls}></Block>
                     </Stack>
                 </Block>
             );
@@ -864,12 +874,11 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
         items.push(header);
     } else {
         items.push(
-            <Block key="c" verticalText={collapsedByH} full={(!collapsed && collapseH && rev) ? 'h' : false}  center={collapsedByH ? false : 'v'}  shorten padded={collapsedByH ? 'v' : 'h'}>
+            <Block key="c" className="more" verticalText={collapsedByH} full={(!collapsed && collapseH && rev) ? 'h' : false}  center={collapsedByH ? 'h' : 'v'}  shorten padded={collapsedByH ? 'v' : 'h'}>
                 {name}
             </Block>
         );
     }
-
     if (collapse) {
         let dir;
         if (collapseH) {
@@ -888,16 +897,65 @@ function SectionFrame({ id, header, name, children, hotKeys, area, link, inner, 
             items.unshift(button);
         }
     }
-
     const headerElem = (
-        <Stack key="h" padded={!header} {...headerAttr}>
+        <Stack key="h" padded={!header} { ...headerAttr }>
             {items}
         </Stack>
     );
-    items = [headerElem, contentElem];
-    return (
-        <Stack vertical {...parentAttr} borders border={inner ? (collapseH ? DIR.RIGHT : false) : true}>
+
+    items = [];
+    const innerAttr = float ? { ...parentAttr } : { ...parentAttr, ...relAttr };
+    if (!float) {
+        items.push(headerElem);
+    } else {
+        relAttr.full = true;
+        innerAttr.full = true;
+    }
+    items.push(contentElem);
+
+    const stack = (
+        <Stack vertical { ...innerAttr } borders border={inner ? (collapseH ? DIR.RIGHT : false) : true}>
             {items}
+        </Stack>
+    );
+    if (!float) return stack;
+
+    return (
+        <Stack vertical { ...relAttr }>
+            {headerElem}
+            {stack}
+        </Stack>
+    )
+}
+
+function Separator() {
+    return (
+        <Block>
+            <Block width={1} height={20} className="separator-h less"></Block>
+        </Block>
+    )
+}
+
+function TitleBlocks({title, sub, details}) {
+    const detailBlocks = [];
+    if (details) {
+        for (let [name, value] of Object.entries(details)) {
+            detailBlocks.push(
+                <Stack key={name} gaps center="v" padded={DIR.RIGHT}>
+                    <Block center="v" className="small less">{name}</Block>
+                    <Block center="v" className="medium">{value}</Block>
+                </Stack>
+            );
+        }
+    }
+    return (
+        <Stack wrap gaps full="h">
+            <Block center="v" className="big more">{title}</Block>
+            {sub &&
+                <Block center="v" className="medium">{sub}</Block>
+            }
+            {details && <Separator />}
+            {details && detailBlocks}
         </Stack>
     )
 }
@@ -919,7 +977,7 @@ function ValueProp({ name, children }) {
 function PropLabel({ name, children }) {
     return (
         <>
-            <Block shorten className="small-font">
+            <Block shorten className="small">
                 {name}
             </Block>
             <Block full="h">
@@ -1059,8 +1117,8 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         <Stack vertical={vertical} full={dirKey} className="scrollbar-div secondary-bg">
             <Button
                 vertical={!vertical} icon={'arrow_' + arrows[0]} full={oppDirKey}
-                onClick={e => changePos(e, -1)} disabled={pos === 0}
-                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="border-outset"
+                onClick={e => changePos(e, -1)} disabled={pos === 0} border={false}
+                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="button-border-1 border-outset button-border-color"
             />
             <Block full={dirKey} { ...dim } ref={divRef}>
                 <Stack full={dirKey} vertical={vertical}>
@@ -1071,8 +1129,8 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
             </Block>
             <Button
                 vertical={!vertical} icon={'arrow_' + arrows[1]}  full={oppDirKey}
-                onClick={e => changePos(e, 1)} disabled={pos === maxSteps}
-                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="border-outset"
+                onClick={e => changePos(e, 1)} disabled={pos === maxSteps} border={false}
+                iconProps={iconPropsScrollbar} tab={false} radius={false} centerItems className="button-border-1 border-outset button-border-color"
             />
         </Stack>
     );
@@ -1948,9 +2006,7 @@ function ToolGroup({ children }) {
     return (
         <>
             {children}
-            <Block>
-                <Block width={1} height={25} className="separator-h less"></Block>
-            </Block>
+            <Separator />
         </>
     );
 }
@@ -2184,6 +2240,12 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
     const [ shadow, setShadow ] = useState(null);
     const mounted = useMounted();
 
+    const lockedStyles = wContext.isStyleLocked() ? wContext.getLockedStyles() : null;
+    let { headerType } = useCssProps('headerType');
+    if (lockedStyles) {
+        headerType = lockedStyles.headerType
+    }
+
     const enableShadow = () => {
         setTimeout(() => {
             if (mounted.current) {
@@ -2335,7 +2397,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
         height: 'calc(100% - 50px)'
     };
 
-    const vDivCls = ['stack-v full-h boxed modal-centered'];
+    const vDivCls = ['stack-v full-h boxed modal-centered primary-color primary-bg medium'];
     if (full && full !== 'h') {
         vDivCls.push('full-v');
     }
@@ -2426,8 +2488,8 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
                     <div ref={dimRef} { ...dimAttr } className={vDivCls.join(' ')} style={vDivStyle}>
-                        <Stack gaps full="h" { ...nameAttr } padded>
-                            <Block center="v" shorten full="h" className="more">{name}</Block>
+                        <Stack gaps full="h" className={headerType === 1 ? 'gradient-bg' : ''} { ...nameAttr } padded>
+                            <Block center="v" shorten full="h" className="more big">{name}</Block>
                             {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
                         </Stack>
                         <div className="border-div-v"></div>
@@ -2444,8 +2506,8 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
         }} />
     </Block>;
 
-    if (wContext.isStyleLocked()) {
-        elem = <ThemeFreeze blockRef={trapRef} values={wContext.getLockedStyles()}>{elem}</ThemeFreeze>
+    if (lockedStyles) {
+        elem = <ThemeFreeze blockRef={trapRef} values={lockedStyles}>{elem}</ThemeFreeze>
     }
 
     return (
@@ -2530,6 +2592,25 @@ function Gradient({colors, vertical, plain}) {
     )
 }
 
+function GradientBox({ value, width, height, className }) {
+    const boxStyle = {
+        width,
+        height
+    };
+    const bgStyle = {
+        background: value
+    };
+    const cls = ['checkerboard-bg relative'];
+    if (className) {
+        cls.push(className);
+    }
+    return (
+        <div className={cls.join(' ')} style={boxStyle}>
+            <div className="absolute full-h full-v" style={bgStyle} />
+        </div>
+    )
+}
+
 function ColorBox({ color, width, height, className }) {
     const boxStyle = {
         width,
@@ -2562,7 +2643,7 @@ function ThemeFreeze({ blockRef, values, children }) {
 const CssContext = React.createContext();
 
 const cssConstTypes = [
-    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'type'
+    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'grad', 'type'
 ];
 
 function CssCtx({ parent, bindRef, children, ...props }) {
@@ -2616,8 +2697,21 @@ function CssCtx({ parent, bindRef, children, ...props }) {
         const getConstValues = (source, target = null) => {
             const result = target ? target : {};
             for (let [key, value] of Object.entries(source)) {
-                if (result[key] === undefined && key2type[key]) {
-                    result[key] = value
+                const keyType = key2type[key];
+                if (result[key] === undefined && keyType) {
+                    let propValue = value;
+                    switch(keyType) {
+                        case 'perc':
+                            if (typeof value === 'string') {
+                                value = value.substr(0, value.length - 1);
+                                propValue = parseInt(value, 10)
+                            }
+                            break;
+                        case 'type':
+                            propValue = parseInt(value, 10);
+                            break
+                    }
+                    result[key] = propValue
                 }
             }
             return result
@@ -2625,19 +2719,26 @@ function CssCtx({ parent, bindRef, children, ...props }) {
 
         const setStyleProp = (style, key, value) => {
             const type = key2type[key];
-            if (!type || type === 'type') return;
+            if (!type) return;
 
-            if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
-                value += 'px';
+            if (['type', 'perc'].includes(type) && typeof value === 'string') {
+                value = parseInt(value, 10);
             }
-            style.setProperty(key2const[key], value);
+            let cssValue = value;
+            if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
+                cssValue += 'px';
+            } else if (type === 'perc') {
+                cssValue += '%';
+            }
+            style.setProperty(key2const[key], cssValue);
+            return value
         };
 
         const setValue = (name, value, notify = true) => {
             if (parent) {
                 return parent.setValue(name, value, notify)
             }
-            setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
+            value = setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
             registry('values')[name] = value;
             if (notify) {
                 const watcher = registry('watcher')[name];
@@ -3095,6 +3196,7 @@ export {
     ValueProp,
     CanvasCircleMarker,
     ColorBox,
+    GradientBox,
     HotKeyKeys,
     HotKeySingleKeys,
     HotKeySkipValues,

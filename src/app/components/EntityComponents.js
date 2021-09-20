@@ -683,6 +683,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
             </ToolGroup>
     }
     return (
+        <>
         <Stack full borders>
             {!readOnly &&
                 <Block full="v" className="secondary-bg">
@@ -740,8 +741,9 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                     </Stack>
             }
 
-            {FilterPipelineModal}
         </Stack>
+        {FilterPipelineModal}
+        </>
     )
 }
 

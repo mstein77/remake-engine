@@ -17,7 +17,7 @@ import {
     WindowCtx
 } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { PropSection, OkCancelForm, Button, Select, Input, CheckboxProp, RadioProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import { PropSection, OkCancelForm, Button, Select, Input, CssGradientProp, CheckboxProp, RadioProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
 import { d } from "../helper/helper";
 import ReactDOM from "react-dom";
@@ -257,8 +257,14 @@ const borderStyleOptions = [
 ];
 
 const checkboxStyleOptions = [
-    {id: '0', name: 'Input'},
-    {id: '1', name: 'Button'}
+    {id: 0, name: 'Input'},
+    {id: 1, name: 'Button'}
+];
+
+const headerStyleOptions = [
+    {id: 0, name: 'Window'},
+    {id: 1, name: 'Gradient'},
+    {id: 2, name: 'Floating'}
 ];
 
 function ThemeSettings({ theme, setTheme }) {
@@ -298,6 +304,16 @@ function ThemeSettings({ theme, setTheme }) {
                                 <Icon name="line_weight" />
                                 <Number value={theme.boxBorderWidthPx} max={10} set={propSetter('boxBorderWidthPx')} min={0} />
                             </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Font Size">
+                        <Stack gaps>
+                            <Block center="v"><Icon name="format_size" size={12} /></Block>
+                            <Number value={theme.fontSizeSmallPx} min={7} max={20} set={propSetter('fontSizeSmallPx')} />
+                            <Block center="v"><Icon name="format_size" size={16} /></Block>
+                            <Number value={theme.fontSizeMediumPx} min={7} max={20} set={propSetter('fontSizeMediumPx')} />
+                            <Block center="v"><Icon name="format_size" size={20} /></Block>
+                            <Number value={theme.fontSizeBigPx} min={7} max={20} set={propSetter('fontSizeBigPx')} />
                         </Stack>
                     </LabelProp>
 
@@ -414,11 +430,18 @@ function ThemeSettings({ theme, setTheme }) {
                         </Stack>
                     </LabelProp>
 
+                    <PropSection name="Header" />
+                    <LabelProp name="Style">
+                        <RadioProp value={theme.headerType} set={propSetter('headerType')} options={headerStyleOptions} gaps padded="h" />
+                    </LabelProp>
+                    <LabelProp name="Gradient">
+                        <CssGradientProp disabled={theme.headerType !== 1} value={theme.sectionGrad} set={propSetter('sectionGrad')} />
+                    </LabelProp>
+
                     <PropSection name="Checkbox" />
                     <LabelProp name="Style">
                         <RadioProp value={theme.checkBoxType} set={propSetter('checkBoxType')} options={checkboxStyleOptions} gaps padded="h" />
                     </LabelProp>
-
 
                     <PropSection name="Button" />
                     <LabelProp name="Colors">
@@ -468,6 +491,32 @@ function ThemeSettings({ theme, setTheme }) {
                             <Stack gaps>
                                 <Icon name="text_format" />
                                 <Input value={theme.buttonFont} set={propSetter('buttonFont')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <PropSection name="Other" />
+                    <LabelProp name="Dark Text">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="opacity" />
+                                <Number min={0} max={100} slider="h" value={theme.lessPerc} set={propSetter('lessPerc')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Bright Text">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="brightness_medium" />
+                                <Number min={0} max={200} slider="h" value={theme.morePerc} set={propSetter('morePerc')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Disabled">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="opacity" />
+                                <Number min={0} max={100} slider="h" value={theme.disabledPerc} set={propSetter('disabledPerc')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -674,7 +723,7 @@ function Settings({ save, close, defaults }) {
         }
         setThemeRaw(newTheme)
     };
-    const [mapping, setMapping] = useState(wContext.hotKeyActions.action2hotKey);
+    const [ mapping, setMapping ] = useState(wContext.hotKeyActions.action2hotKey);
 
     useEffect(() => {
         beforeRef.current = {

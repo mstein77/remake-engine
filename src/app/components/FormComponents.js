@@ -10,6 +10,7 @@ import {
     Canvas,
     Gradient,
     ColorBox,
+    GradientBox,
     Icon,
     SideTab,
     SideTabs,
@@ -365,7 +366,7 @@ function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = 
     const [ clicked, setClicked ] = useState(false);
 
     const { checkBoxType } = useCssProps('checkBoxType');
-    const type = checkBoxType === '0' ? 'input' : 'button';
+    const type = checkBoxType === 0 ? 'input' : 'button';
     const cls = [type + '-bg ' + type + '-color ' + type + '-border-width ' + type + '-border-radius ' + type + '-border-style ' + type + '-border-color'];
     if (disabled) {
         cls.push('disabled');
@@ -434,7 +435,7 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
         zIndex: 10000,
         arrowUp: true
     });
-    const cls = ['fixed tooltip primary-bg primary-color small-font padded thin-boxed wrap-normal'];
+    const cls = ['fixed tooltip primary-bg primary-color small padded thin-boxed wrap-normal'];
     if (!arrow) {
         cls.push('invisible')
     }
@@ -671,7 +672,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     }
     if (name) {
         items.push(
-            <Block key="n" center={oppDir} full={dir} shorten={!tooltip.enabled}>
+            <Block key="n" center={icon || children ? oppDir : false} full={dir} shorten={!tooltip.enabled}>
                 {name}
             </Block>
         )
@@ -768,7 +769,7 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
 
     const radioRef = useRef(null);
     const refocus = useRefocus(radioRef);
-    const setAndRefocus = ({value}) => {
+    const setAndRefocus = ({ value }) => {
         refocus();
         set(value)
     };
@@ -806,11 +807,12 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
     }
     const items = [];
     let found = false;
+    const searchValue = optionHandler.intIds && typeof value === 'string' ? parseInt(value, 10) : value;
     for (let { id, name, help } of options) {
         items.push(
-            <Button key={id} tab={tab} help={help} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={value} onClick={readOnly ? null : setAndRefocus} />
+            <Button key={id} tab={tab} help={help} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={searchValue} onClick={readOnly ? null : setAndRefocus} />
         );
-        if (id === value) {
+        if (id === searchValue) {
             found = true;
         }
     }
@@ -1532,6 +1534,72 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h
     )
 }
 
+function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatProps = {} }) {
+    const fContext = useContext(FormContext);
+    const wContext = useContext(WindowContext);
+    const { openGradientModal, closeGradientModal, GradientModal } = useGradientModal();
+
+    const callAfterwards = useCallAfterwards();
+    const [ clicked, setClicked ] = useState(false);
+
+    const tooltip = useTooltip({title: value, clicked});
+
+    const invalid = typeof value !== 'string';
+    // || !value.match(alpha ?/^#[0-9a-f]{8}$/i : /^#[0-9a-f]{6}$/i);
+    if (invalid && fContext) {
+        callAfterwards(fContext.markInvalid);
+    }
+
+    const btnCls = 'button-border-1';
+    const cls = ['button-bg ' + btnCls, 'color-input-padding button-border-color border-outset'];
+    const innerCls = ['secondary-bg ' + btnCls, ' button-border-color border-inset'];
+    if (disabled) {
+        readOnly = true;
+        cls.push('disabled')
+    }
+    if (!readOnly) {
+        cls.push('hover-change')
+    } else {
+        tab = false
+    }
+    const handleClick = upEvent => {
+        openGradientModal({
+            value,
+            set,
+            save: () => {
+                closeGradientModal()
+            }
+        })
+    };
+
+    const width = 45;
+    const height = 13;
+
+    return (
+        <ComponentWithName name={name} { ...floatProps }>
+        <Block className={cls.join(' ')} cursor={readOnly ? false : "pointer"} tab={tab}
+               { ...tooltip.attr }
+               onLeftClick={readOnly ? null : () => handleClick('mouseup')}
+               onRightClick={readOnly ? null : () => copy2clipboard(value)}
+               onKeyDown={readOnly ? null : e => {
+                   if (e.keyCode !== 32 || clicked) {
+                       return
+                   }
+                   e.preventDefault();
+                   handleClick('keyup')
+               }}>
+            <Block className={innerCls.join(' ')}>
+                {invalid ?
+                    <Block width={width} height={height} className="invalid" /> :
+                    <GradientBox value={value} width={width} height={height} />
+                }
+            </Block>
+            {GradientModal}
+        </Block>
+        </ComponentWithName>
+    )
+}
+
 function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatProps = {} }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
@@ -1690,6 +1758,113 @@ const COLOR_MODEL = {
     HSV: 'HSV'
 }
 
+function useGradientModal() {
+    const GradientModal = useModal();
+    return useMemo(
+        () => {
+            return {
+                openGradientModal: props => GradientModal.open({id: 'ColorPickerModal', close: GradientModal.close, ...props }),
+                GradientModal: <GradientModal.content name="Change gradient" drag transparent>
+                    <BackgroundCtx>
+                        <EditorCtx>
+                            <GradientPicker { ...GradientModal.props } />
+                        </EditorCtx>
+                    </BackgroundCtx>
+                </GradientModal.content>
+            }
+        },
+        [GradientModal.props]
+    )
+}
+
+function getParsedCssValueRec(value, splitBy = false) {
+    if (value === null) {
+        return null;
+    }
+    const result = [];
+    const parts = splitBy !== undefined ? value.split(splitBy) : [value];
+
+    for(let part of parts) {
+        part = part.trim();
+        if (part === '') continue;
+
+        if (part.match(/^[a-z\-]+\(/i)) {
+            const index = part.indexOf('(');
+            const lastIndex = part.lastIndexOf(')')
+            const func = part.substr(0, index);
+            const params = part.substr(index + 1, (lastIndex - index));
+            result.push({
+                func,
+                params: getParsedCssValueRec(params, ',')
+            });
+        } else {
+            const subValues = part.indexOf(' ') >= 0 ? getParsedCssValueRec(part, ' ') : part;
+            if (subValues !== null) {
+                result.push(subValues)
+            }
+        }
+    }
+    return (
+        result.length === 1 ? result[0] : result
+    )
+}
+
+function GradientPicker({value, set, save, close}) {
+    const update = useComponentUpdate();
+    const parsed = getParsedCssValueRec(value);
+    const points = [
+        parseInt(parsed.params[0].substr(0, parsed.params[0].length - 3), 10)
+    ];
+    if (typeof parsed === 'object' && parsed.func === 'linear-gradient') {
+        let i = 1;
+        while(i < parsed.params.length) {
+            const dist = parsed.params[i][1];
+            points.push(parsed.params[i][0]);
+            points.push(parseInt(dist.substr(0, dist.length - 1), 10));
+            i++
+        }
+    }
+    const propsRef = useRef(null);
+    propsRef.current = points;
+
+    const buildCss = () => {
+        const [ rot, ...stops ] = propsRef.current;
+        let parts = [rot + 'deg'];
+        let i = 0;
+        while(i < stops.length) {
+            parts.push(stops[i]);
+            parts.push(stops[i + 1] + '%');
+            i += 2;
+        }
+        set('linear-gradient(' + parts.join(' ') + ')');
+        requestAnimationFrame(update)
+    }
+
+    const getSetColorIndex = index => {
+        return value => {
+            propsRef.current[index] = value;
+            buildCss()
+        }
+    }
+
+    const colors = [];
+    let i = 1;
+    while(i < points.length) {
+        colors.push(
+            <Color key={'col' + i} alpha value={points[i]} set={() => {}} />
+        );
+        i += 2
+    }
+    return (
+        <Form submit={close} onKeyDown={save}>
+            <Stack vertical padded gaps>
+                <Number value={points[0]} set={getSetColorIndex(0)} min={0} max={359} />
+                <Stack gaps>{colors}</Stack>
+            </Stack>
+        </Form>
+    )
+}
+
 function useColorPickerModal() {
     const PickerModal = useModal();
     return useMemo(
@@ -1706,7 +1881,7 @@ function useColorPickerModal() {
             }
         },
         [PickerModal.props]
-    );
+    )
 }
 
 /**
@@ -2596,7 +2771,7 @@ function LabelProp({ name, labelProps, inputPadding = true, bottomPadding = true
     }
     return (
         <>
-            <Block padded={leftPadding} className="small-font" { ...labelProps }>
+            <Block padded={leftPadding} className="small" { ...labelProps }>
                 <Block className={innerCls.join(' ')}>
                     {name}
                 </Block>
@@ -2667,7 +2842,7 @@ function CheckboxProp({ name, ...props }) {
 function FullProp({ name, children}) {
     return (
         <>
-            {name && <Block padded={DIR.H|DIR.BOTTOM} full="h" className="small-font col-span-2">{name}</Block>}
+            {name && <Block padded={DIR.H|DIR.BOTTOM} full="h" className="small col-span-2">{name}</Block>}
             <Block padded={DIR.H|DIR.BOTTOM} full="h" className="col-span-2">
                 {children}
             </Block>
@@ -2697,6 +2872,14 @@ function ColorProp({ name, ...props }) {
     return (
         <LabelProp name={name}>
             <Color {...props} />
+        </LabelProp>
+    )
+}
+
+function CssGradientProp({ name, ...props }) {
+    return (
+        <LabelProp name={name}>
+            <CssGradient {...props} />
         </LabelProp>
     )
 }
@@ -2814,6 +2997,8 @@ export {
     TextAreaProp,
     Color,
     ColorProp,
+    CssGradient,
+    CssGradientProp,
     Slider,
     Bitmap,
     BitmapProp,

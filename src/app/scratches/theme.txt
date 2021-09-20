@@ -28,11 +28,66 @@
       + BgColor:
 
 ---------------------------
+
+---------------------------
+ CssCtx
+       getConstValues(source, target = null)
+         ...iteriert über alle source-key/values und falls für
+            den Key ein Typ feststeht und der key noch nicht im
+            target, dann übernehme diesen mit Wert und gebe
+            Ergebnis zurück
+
+       setStyleProp(style, key, value)
+         ...setzt auf dem style die CssConst zum key auf
+            den value
+
+
+   - init(config, theme)
+        baue values durch
+          1. getConstValues(config)
+          2. getConstValues(theme, values)
+        Speichere values in reg:values
+
+        // sichern
+        Iteriere über alle key2type:
+          prop = konstante zu key
+          value = doc.body.style.getPropertyValue(prop)
+          speichere value|null in reg:body[prop]
+
+        applyTo(doc.body)
+
+   - getValues() => reg:values
+   - getValue(name) => reg:values[name]
+   - setValue
+       setzt über setStyleProp den name auf den value
+       und speichert diesen auch in reg:values und wird
+       alle Watcher notifien
+
+   - setValues
+       ...analog wie zuvor nur für merhere keys und nur
+       einer Notification
+
+   - applyTo(node)
+        Iteriere über alle key/value in reg:values:
+          Setze StyleProp(node.style, key, value)
+
+   => reg:body
+
+
+---------------------------
  - Font-Styling
  - Sections
-     * handle
-     - font
-     - types
+     * gradient-input
+
+     - Theme-Consts: factor + focus-color
+     - handle-focus-marker
+
+     - title-types
+     - shadow für button
+
+     - zentrale ColorPickerModals
+     BUG: quick-keys im modal-modus sperren
+
  - Persistierung
      - Zoom
      - Background
@@ -234,7 +289,7 @@ LAST:
     "inputBorderWidthPx": 1,
     "inputPaddingPx": 5,
     "inputBorderRadiusPx": 4,
-    "checkBoxType": "1",
+    "checkBoxType": 1,
     "editorBgRgb": "#080808",
     "editorRgb": "#9aa0a2",
     "buttonBgRgb": "#1e4274",

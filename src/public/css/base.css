@@ -1,16 +1,24 @@
 /* Base CSS */
 
 :root {
+/*
     --link-resources-urls: 'https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i https://fonts.googleapis.com/icon?family=Material+Icons';
+ */
+    /* hover-change-dir */
     --brightness-factor-float: -1;
+    /* overlay-bg */
     --modal-overlay-bg-rgb: #000000a3;
 
+    /* min/max-marker-width */
     --marker-width-px: 8px;
+    /* => use active bg color for marker */
     --marker-color-highlight-rgb: #FF4747;
     --marker-color-rgb: #FFFFFF77;
 
+    /* min/max-marker-opacity */
     --min-opacity-float: 0.2;
     --max-opacity-float: 0.7;
+    /* max-marker-invert */
     --max-invert-perc: 50%;
 }
 
@@ -18,7 +26,8 @@ html, body {
     cursor: auto;
     overscroll-behavior-x: contain;
     background-color: var(--editor-bg-rgb);
-    color: var(--editor-rgb)
+    color: var(--editor-rgb);
+    font-size: var(--font-size-medium-px)
 }
 
 
@@ -117,11 +126,9 @@ html, body {
 .active-bg {
     background-color: var(--active-bg-rgb)
 }
-
 .active-color {
     color: var(--active-rgb)
 }
-
 .active-border-color {
     border-color: var(--active-border-rgb)
 }
@@ -129,11 +136,9 @@ html, body {
 .warning-bg {
     background-color: var(--warning-bg-rgb)
 }
-
 .warning-color {
     color: var(--warning-rgb)
 }
-
 .warning-border-color {
     border-color: var(--warning-border-rgb)
 }
@@ -141,7 +146,6 @@ html, body {
 .error-bg {
     background-color: var(--error-bg-rgb)
 }
-
 .error-color {
     color: var(--error-rgb)
 }
@@ -172,10 +176,10 @@ html, body {
 }
 
 .less {
-    opacity: 0.5
+    opacity: var(--less-perc)
 }
 .more {
-    filter: brightness(150%)
+    filter: brightness(var(--more-perc))
 }
 
 .outline-1 {
@@ -304,6 +308,7 @@ html, body {
     filter: brightness(calc(1 + var(--brightness-factor-float) * 0.25)) !important;
 }
 
+/*
 .control-bg {
     background-color: var(--scrollbar-rgb);
 }
@@ -325,7 +330,7 @@ html, body {
  */
 
 .disabled {
-    opacity: 0.45
+    opacity: var(--disabled-perc)
 }
 
 .top {
@@ -483,10 +488,12 @@ input:invalid {
 
 .resize-handle-h {
     width: 6px;
+    height: 2px;
     border-radius: unset !important;
 }
 
 .resize-handle-v {
+    width: 2px;
     height: 6px;
     border-radius: unset !important;
 }
@@ -581,6 +588,27 @@ input:invalid {
 
 @-moz-document url-prefix() {
     input {
-        font-family: Monospace
+        font-family: Monospace !important
     }
+}
+
+.small {
+    font-size: var(--font-size-small-px)
+}
+
+.medium {
+    font-size: var(--font-size-medium-px)
+}
+
+.big {
+    font-size: var(--font-size-big-px)
+}
+
+kbd, input, textarea, .mono {
+    font-family: var(--mono-font);
+    font-size: var(--font-size-medium-px)
+}
+
+.gradient-bg {
+    background: var(--section-grad);
 }

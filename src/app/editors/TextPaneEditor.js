@@ -543,6 +543,9 @@ function CharManager({ charIndex }) {
             {EditBitmapModal}
         </>
     )
+    /*
+
+     */
 }
 
 function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont }) {
@@ -1232,11 +1235,15 @@ function TextPaneEditor({ model, resource }) {
     }, [model]);
 
     const tree = getResourceTree();
-
+    const details = {
+        'From:': 'Browser',
+        'Resources:': tree.length
+    };
     return (
         <Stack full vertical gaps>
             <EditorSection
                 id="textPaneEditor" area={1} link={3} full="h" centerItems size={300} maxSize={400} name="TextPane"
+                sub={model.id} details={details}
                 confirm tree={tree}
 
                actions={
