@@ -17,7 +17,22 @@ import {
     WindowCtx
 } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { PropSection, OkCancelForm, Button, Select, Input, CssGradientProp, CheckboxProp, RadioProp, LabelProp, Checkbox, Number, Color, ColorProp, InputProp, NumberProp } from "../components/FormComponents";
+import {
+    PropSection,
+    OkCancelForm,
+    Button,
+    Select,
+    Input,
+    CssGradient,
+    CheckboxProp,
+    Radio,
+    LabelProp,
+    Checkbox,
+    Number,
+    Color,
+    NumberProp,
+    VirtualNumber
+} from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
 import { d } from "../helper/helper";
 import ReactDOM from "react-dom";
@@ -267,6 +282,17 @@ const headerStyleOptions = [
     {id: 2, name: 'Floating'}
 ];
 
+const titleStyleOptions = [
+    {id: 0, name: 'Plain'},
+    {id: 1, name: 'Color'},
+    {id: 2, name: 'Gradient'}
+];
+
+const hoverChangeOptions = [
+    {id: -1, name: 'darker'},
+    {id: 1, name: 'brighter'}
+];
+
 function ThemeSettings({ theme, setTheme }) {
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
 
@@ -289,7 +315,7 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="border_color" />
-                                <ColorProp value={theme.boxBorderRgb} set={propSetter('boxBorderRgb')} />
+                                <Color value={theme.boxBorderRgb} set={propSetter('boxBorderRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -350,6 +376,24 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                         </Stack>
                     </LabelProp>
+                    <LabelProp name="Overlay">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color value={theme.overlayBgRgba} alpha set={propSetter('overlayBgRgba')} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+
+                    <PropSection name="Focus" />
+                    <LabelProp name="Border">
+                        <Stack gaps>
+                            <Icon name="image" />
+                            <Color value={theme.focusBgRgba} alpha set={propSetter('focusBgRgba')} />
+                            <Icon name="line_weight" />
+                            <Number value={theme.focusWidthPx} max={10} set={propSetter('focusWidthPx')} min={0} />
+                        </Stack>
+                    </LabelProp>
 
                     <PropSection name="Active" />
                     <LabelProp name="Colors">
@@ -364,7 +408,7 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="border_color" />
-                                <ColorProp value={theme.activeBorderRgb} set={propSetter('activeBorderRgb')} />
+                                <Color value={theme.activeBorderRgb} set={propSetter('activeBorderRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -382,7 +426,7 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="border_color" />
-                                <ColorProp value={theme.warningBorderRgb} set={propSetter('warningBorderRgb')} />
+                                <Color value={theme.warningBorderRgb} set={propSetter('warningBorderRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -400,7 +444,7 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="border_color" />
-                                <ColorProp value={theme.inputBorderRgb} set={propSetter('inputBorderRgb')} />
+                                <Color value={theme.inputBorderRgb} set={propSetter('inputBorderRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -432,15 +476,33 @@ function ThemeSettings({ theme, setTheme }) {
 
                     <PropSection name="Header" />
                     <LabelProp name="Style">
-                        <RadioProp value={theme.headerType} set={propSetter('headerType')} options={headerStyleOptions} gaps padded="h" />
+                        <Radio value={theme.headerType} set={propSetter('headerType')} options={headerStyleOptions} gaps padded="h" />
                     </LabelProp>
                     <LabelProp name="Gradient">
-                        <CssGradientProp disabled={theme.headerType !== 1} value={theme.sectionGrad} set={propSetter('sectionGrad')} />
+                        <CssGradient disabled={theme.headerType !== 1} value={theme.sectionGrad} set={propSetter('sectionGrad')} />
+                    </LabelProp>
+
+                    <PropSection name="Title" />
+                    <LabelProp name="Style">
+                        <Radio value={theme.titleType} set={propSetter('titleType')} options={titleStyleOptions} gaps padded="h" />
+                    </LabelProp>
+
+                    <LabelProp name="Background">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="image" />
+                                <Color disabled={theme.titleType !== 1} value={theme.titleBgRgb} set={propSetter('titleBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="gradient" />
+                                <CssGradient disabled={theme.titleType !== 2} value={theme.titleGrad} set={propSetter('titleGrad')} />
+                            </Stack>
+                        </Stack>
                     </LabelProp>
 
                     <PropSection name="Checkbox" />
                     <LabelProp name="Style">
-                        <RadioProp value={theme.checkBoxType} set={propSetter('checkBoxType')} options={checkboxStyleOptions} gaps padded="h" />
+                        <Radio value={theme.checkBoxType} set={propSetter('checkBoxType')} options={checkboxStyleOptions} gaps padded="h" />
                     </LabelProp>
 
                     <PropSection name="Button" />
@@ -456,7 +518,7 @@ function ThemeSettings({ theme, setTheme }) {
                             </Stack>
                             <Stack gaps>
                                 <Icon name="border_color" />
-                                <ColorProp value={theme.buttonBorderRgb} set={propSetter('buttonBorderRgb')} />
+                                <Color value={theme.buttonBorderRgb} set={propSetter('buttonBorderRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -495,7 +557,42 @@ function ThemeSettings({ theme, setTheme }) {
                         </Stack>
                     </LabelProp>
 
+                    <PropSection name="Marker" />
+                    <LabelProp name="Highlighted">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon name="line_weight" />
+                                <Number value={theme.markerWidthMinPx} max={10} set={propSetter('markerWidthMinPx')} min={1} />
+                                <Block>...</Block>
+                                <Number value={theme.markerWidthMaxPx} max={10} set={propSetter('markerWidthMaxPx')} min={0} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="opacity" />
+                                <Number value={theme.markerOpacityMinPerc} set={propSetter('markerOpacityMinPerc')} min={0} max={100} />
+                                <Block>...</Block>
+                                <Number value={theme.markerOpacityMaxPerc} set={propSetter('markerOpacityMaxPerc')} min={0} max={100} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon name="invert_colors" />
+                                <Number value={theme.markerInvertMaxPerc} set={propSetter('markerInvertMaxPerc')} min={0} max={100} />
+                            </Stack>
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="Cursor">
+                        <Stack gaps>
+                            <Icon name="image" />
+                            <Color value={theme.cursorBgRgba} alpha set={propSetter('cursorBgRgba')} />
+                        </Stack>
+                    </LabelProp>
+
                     <PropSection name="Other" />
+                    <LabelProp name="Hover change">
+                        <Stack vertical gaps>
+                            <Radio value={theme.hoverChangeType} set={propSetter('hoverChangeType')} options={hoverChangeOptions} gaps padded="h" />
+                            <VirtualNumber min={0} max={1} value={theme.hoverIntensityFloat} set={propSetter('hoverIntensityFloat')} decimals={2} />
+                        </Stack>
+
+                    </LabelProp>
                     <LabelProp name="Dark Text">
                         <Stack wrap gaps full="h">
                             <Stack gaps>

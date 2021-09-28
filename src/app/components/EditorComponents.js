@@ -64,10 +64,10 @@ function NameDialog({ close, save, max, reserved = [], ...props }) {
 function FiltersModal({ save, close, model, images, filters = '', type = 'canvas', ...props }) {
     const wContext = useContext(WindowContext);
 
-    const [zoom, setZoom] = useState(1);
-    const [background, setBackground] = useState(props.background ? props.background :'#000000');
+    const [ zoom, setZoom ] = useState(1);
+    const [ background, setBackground ] = useState(props.background ? props.background :'#000000');
+    const [ index, setIndex ] = useState(0);
 
-    const [index, setIndex] = useState(0);
     const inputData = useMemo(() => {
         const data = [];
         for (let image of images) {
@@ -108,7 +108,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
         return index;
     }, [model]);
 
-    const [activeFilter, setActiveFilter] = useState(filterIndex.getLength() ? 0 : null);
+    const [ activeFilter, setActiveFilter ] = useState(filterIndex.getLength() ? 0 : null);
 
     useUpdateOnEntityIndexChanges(filterIndex);
 
@@ -458,9 +458,9 @@ function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
     const NewImageModal = useModal();
     const StoreTempModal = useModal();
 
-    const [activeImage, setActiveImage] = useState(null);
-    const [tempImage, setTempImage] = useState(null);
-    const [tempName, setTempName]  = useState('');
+    const [ activeImage, setActiveImage ] = useState(null);
+    const [ tempImage, setTempImage ] = useState(null);
+    const [ tempName, setTempName ]  = useState('');
 
     const imageIndex = wContext.imageIndex;
 
@@ -560,7 +560,7 @@ function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
                                     <Button icon="delete" onClick={() => { setTempImage(null); setActiveImage(null) }} />
                                 </Stack>
                                 <Stack vertical gaps full="h" onClick={() => setActiveImage(activeImage === tempIndex ? null : tempIndex)} padded
-                                       className={activeImage === tempIndex ? 'hover-highlight active-bg active-text' : 'control-bg hover-highlight'}>
+                                       className={'hover-change ' + (activeImage === tempIndex ? 'active-bg active-text' : 'control-bg')}>
                                     <Block shorten>{tempName ? tempName : 'No name'}</Block>
                                     <Block className="less"><Kbd value={tempImage.width + ' x ' + tempImage.height} /></Block>
                                 </Stack>
@@ -948,12 +948,14 @@ function useFilterPipelineModal(name = 'Filter') {
     return useMemo(() => {
         return {
             openFilterPipelineModal: props => {
-                FilterModal.open({id: 'FilterPipelineModal', ...props })
+                FilterModal.open({ id: 'FilterPipelineModal', ...props })
             },
             closeFilterPipelineModal: FilterModal.close,
             FilterPipelineModal: (
                 <FilterModal.content name={name} width="75%" height="75%">
-                    <FiltersModal { ...FilterModal.props } />
+                    <EditorCtx>
+                        <FiltersModal { ...FilterModal.props } />
+                    </EditorCtx>
                 </FilterModal.content>
             )
         }

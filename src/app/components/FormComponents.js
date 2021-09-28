@@ -1,6 +1,6 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
 import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
-import { Block, Stack, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
+import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
     WindowContext,
     EditorContext,
@@ -377,7 +377,7 @@ function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = 
     } else {
         tab = false;
         if (!disabled) {
-            cls.push('hover-fix')
+            cls.push('darker')
         }
     }
     if (tab) {
@@ -986,6 +986,9 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     }
     if (readOnly || disabled) {
         tab = false;
+        if (readOnly) {
+            cls.push('darker');
+        }
         attr.style.cursor = 'default'
     } else {
         cls.push('hover-change');
@@ -1538,6 +1541,8 @@ function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatPr
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
     const { openGradientModal, closeGradientModal, GradientModal } = useGradientModal();
+    const valueRef = useRef(null);
+    valueRef.current = value;
 
     const callAfterwards = useCallAfterwards();
     const [ clicked, setClicked ] = useState(false);
@@ -1563,13 +1568,19 @@ function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatPr
         tab = false
     }
     const handleClick = upEvent => {
+        wContext.startExclusiveMode('openGradientPicker', 'pointer');
+        wContext.addEventListener(upEvent, () => {
+            wContext.endExclusiveMode('openGradientPicker');
+            setClicked(false)
+        }, {once: true})
         openGradientModal({
-            value,
+            valueRef,
             set,
             save: () => {
                 closeGradientModal()
             }
-        })
+        });
+        setClicked(true)
     };
 
     const width = 45;
@@ -1577,25 +1588,25 @@ function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatPr
 
     return (
         <ComponentWithName name={name} { ...floatProps }>
-        <Block className={cls.join(' ')} cursor={readOnly ? false : "pointer"} tab={tab}
-               { ...tooltip.attr }
-               onLeftClick={readOnly ? null : () => handleClick('mouseup')}
-               onRightClick={readOnly ? null : () => copy2clipboard(value)}
-               onKeyDown={readOnly ? null : e => {
-                   if (e.keyCode !== 32 || clicked) {
-                       return
-                   }
-                   e.preventDefault();
-                   handleClick('keyup')
-               }}>
-            <Block className={innerCls.join(' ')}>
-                {invalid ?
-                    <Block width={width} height={height} className="invalid" /> :
-                    <GradientBox value={value} width={width} height={height} />
-                }
+            <Block className={cls.join(' ')} cursor={readOnly ? false : "pointer"} tab={tab}
+                   { ...tooltip.attr }
+                   onLeftClick={readOnly ? null : () => handleClick('mouseup')}
+                   onRightClick={readOnly ? null : () => copy2clipboard(value)}
+                   onKeyDown={readOnly ? null : e => {
+                       if (e.keyCode !== 32 || clicked) {
+                           return
+                       }
+                       e.preventDefault();
+                       handleClick('keyup')
+                   }}>
+                <Block className={innerCls.join(' ')}>
+                    {invalid ?
+                        <Block width={width} height={height} className="invalid" /> :
+                        <GradientBox value={value} width={width} height={height} />
+                    }
+                </Block>
+                {GradientModal}
             </Block>
-            {GradientModal}
-        </Block>
         </ComponentWithName>
     )
 }
@@ -1618,7 +1629,6 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
     if (invalid && fContext) {
         callAfterwards(fContext.markInvalid);
     }
-
     const btnCls = 'button-border-1';
     const cls = ['button-bg ' + btnCls, 'color-input-padding button-border-color border-outset'];
     const innerCls = ['secondary-bg ' + btnCls, ' button-border-color border-inset'];
@@ -1773,7 +1783,7 @@ function useGradientModal() {
                 </GradientModal.content>
             }
         },
-        [GradientModal.props]
+        [ GradientModal.props ]
     )
 }
 
@@ -1809,59 +1819,119 @@ function getParsedCssValueRec(value, splitBy = false) {
     )
 }
 
-function GradientPicker({value, set, save, close}) {
+function GradientPicker({ valueRef, set, save, close }) {
     const update = useComponentUpdate();
+
+    const value = valueRef.current;
     const parsed = getParsedCssValueRec(value);
-    const points = [
+    const parts = [
         parseInt(parsed.params[0].substr(0, parsed.params[0].length - 3), 10)
     ];
     if (typeof parsed === 'object' && parsed.func === 'linear-gradient') {
         let i = 1;
         while(i < parsed.params.length) {
             const dist = parsed.params[i][1];
-            points.push(parsed.params[i][0]);
-            points.push(parseInt(dist.substr(0, dist.length - 1), 10));
+            parts.push(parsed.params[i][0]);
+            parts.push(parseInt(dist.substr(0, dist.length - 1), 10));
             i++
         }
     }
-    const propsRef = useRef(null);
-    propsRef.current = points;
+    const partsRef = useRef([]);
+    const curr = partsRef.current;
+    while (parts.length < curr.length) {
+        curr.pop();
+    }
+    let i = 0;
+    for (let part of parts) {
+        if (curr.length - 1 < i) {
+            curr.push('')
+        }
+        if (part !== curr[i]) {
+            curr[i] = part
+        }
+        i++
+    }
 
     const buildCss = () => {
-        const [ rot, ...stops ] = propsRef.current;
-        let parts = [rot + 'deg'];
+        const [ rot, ...stops ] = partsRef.current;
+        let newParts = [rot + 'deg'];
         let i = 0;
-        while(i < stops.length) {
-            parts.push(stops[i]);
-            parts.push(stops[i + 1] + '%');
+        while (i < stops.length) {
+            newParts.push(stops[i] + ' ' + stops[i + 1] + '%');
             i += 2;
         }
-        set('linear-gradient(' + parts.join(' ') + ')');
+        set('linear-gradient(' + newParts.join(', ') + ')');
         requestAnimationFrame(update)
     }
 
-    const getSetColorIndex = index => {
-        return value => {
-            propsRef.current[index] = value;
+    const getSetPartAtIndex = index => {
+        return newValue => {
+            partsRef.current[index] = newValue;
             buildCss()
         }
     }
 
+    const getDeleteStop = index => {
+        return delIndex => {
+            partsRef.current.splice(index, 2);
+            buildCss()
+        }
+    }
+
+    const setDegrees = value => {
+        partsRef.current[0] = value;
+        buildCss()
+    }
+
+    const addNewStop = () => {
+        partsRef.current.push('#000000ff');
+        partsRef.current.push(100);
+        buildCss()
+    }
+
     const colors = [];
-    let i = 1;
-    while(i < points.length) {
+    i = 1;
+    while(i < curr.length) {
         colors.push(
-            <Color key={'col' + i} alpha value={points[i]} set={() => {}} />
+            <Stack gaps  key={'col' + i} full="h">
+                <Color alpha value={curr[i]} set={getSetPartAtIndex(i)} />
+                <Number full="h" value={curr[i + 1]} set={getSetPartAtIndex(i + 1)} min={0} max={100} slider="h" />
+                <Button icon="delete" disabled={curr.length < 3} onClick={getDeleteStop(i)} />
+            </Stack>
         );
         i += 2
     }
     return (
-        <Form submit={close} onKeyDown={save}>
-            <Stack vertical padded gaps>
-                <Number value={points[0]} set={getSetColorIndex(0)} min={0} max={359} />
-                <Stack gaps>{colors}</Stack>
-            </Stack>
-        </Form>
+        <Stack vertical padded gaps full="h">
+            <PropertyGrid full="h">
+                <FullProp full="h">
+                    <Block border="1"><GradientBox width={400} height={25} value={value} /></Block>
+                </FullProp>
+
+                <LabelProp name="Direction:" floatProps={{full: true}} full="h">
+                    <Stack gaps>
+                        <Number value={curr[0]} set={getSetPartAtIndex(0)} min={0} max={359} />
+                        <Grid gaps columns="- - -" rows="- - -">
+                            <Block><Button icon="add" onClick={() => setDegrees(315)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(0)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(45)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(270)} /></Block>
+                            <Block />
+                            <Block><Button icon="add" onClick={() => setDegrees(90)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(225)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(180)} /></Block>
+                            <Block><Button icon="add" onClick={() => setDegrees(135)} /></Block>
+                        </Grid>
+                    </Stack>
+                </LabelProp>
+                <LabelProp name="Color-Stops:">
+                    <Stack vertical>
+                        <Stack gaps vertical>{colors}</Stack>
+                        <Block padded><Button icon="add" onClick={addNewStop} /></Block>
+                    </Stack>
+                </LabelProp>
+            </PropertyGrid>
+        </Stack>
     )
 }
 
@@ -1880,7 +1950,7 @@ function useColorPickerModal() {
                 </PickerModal.content>
             }
         },
-        [PickerModal.props]
+        [ PickerModal.props ]
     )
 }
 
@@ -2871,7 +2941,7 @@ function TextAreaProp({ name, ...props }) {
 function ColorProp({ name, ...props }) {
     return (
         <LabelProp name={name}>
-            <Color {...props} />
+            <Color { ...props } />
         </LabelProp>
     )
 }
@@ -2879,7 +2949,7 @@ function ColorProp({ name, ...props }) {
 function CssGradientProp({ name, ...props }) {
     return (
         <LabelProp name={name}>
-            <CssGradient {...props} />
+            <CssGradient { ...props } />
         </LabelProp>
     )
 }

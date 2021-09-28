@@ -41,6 +41,12 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     const eContext = useContext(EditorContext);
     const callAfterwards = useCallAfterwards();
 
+    const [ dropIndex, setDropIndex ] = useState(null);
+    const [ dragging, setDragging ] = useState(false);
+    const dropRef = useRef({dragIndex: null});
+    dropRef.current.source = entityIndex;
+    dropRef.current.dropIndex = dropIndex;
+
     const doAction = undo && eContext ? eContext.doAction : action => action();
 
     const add = props.add !== undefined ? props.add : !!addOp;
@@ -131,6 +137,50 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         return ''
     }
 
+    const dragLeave = index => e => {
+        requestAnimationFrame(() => {
+            if (dropRef.current.dropIndex === index) {
+                setDropIndex(null)
+            }
+        });
+        e.preventDefault()
+    }
+    const dragEnter = index => e => {
+        e.preventDefault();
+        setDropIndex(index)
+    }
+    const dragStart = index => e => {
+        e.dataTransfer.dropEffect = "move";
+        dropRef.current.dragIndex = index;
+        setDragging(true);
+        window.addEventListener('dragend', e => {
+            setDropIndex(null);
+            setDragging(false)
+        }, {once: true})
+    };
+
+    const drop = index => e => {
+        if (index === dropRef.current.dragIndex) return;
+
+        const indexDrag = dropRef.current.dragIndex;
+        const indexDrop = index;
+        eContext.doAction(
+            () => {
+                d('BEFORE', entityIndex.model);
+                const dragged = entityIndex.getEntityObject(indexDrag);
+                const dropped = entityIndex.getEntityObject(indexDrop);
+                entityIndex.setEntityObjects(d([{ ...dragged, index: indexDrop}, { ...dropped, index: indexDrag }]), true);
+            },
+            () => {
+                const dragged = entityIndex.getEntityObject(indexDrag);
+                const dropped = entityIndex.getEntityObject(indexDrop);
+                entityIndex.setEntityObjects([{ ...dragged, index: indexDrop}, { ...dropped, index: indexDrag }], true);
+            }
+        );
+        dropRef.current.dragIndex = null;
+        setActive(index)
+    }
+
     const items = [];
     let index = 0;
     // TODO use reasonable font width
@@ -152,8 +202,12 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         if (isActive || (index === shadow && active === null)) {
             attr.tab = true;
         }
+        const itemCls = ['hover-change' + (isActive ? ' active-bg active-color' : ' ghost-bg')];
+        if (index === dropIndex) {
+            itemCls.push('focus-outline');
+        }
         items.push(
-            <Stack key={index} border={DIR.BOTTOM} cursor="pointer" gaps className={'hover-highlight' + (isActive ? ' active-bg active-color' : ' ghost-bg')} full="h" { ...attr }>
+            <Stack key={index} onDragOver={dragging ? e => e.preventDefault() : null} onDrop={dragging ? drop(index) : null} onDragLeave={dragging ? dragLeave(index) : null} onDragEnter={dragging ? dragEnter(index) : null} onDragStart={order ? dragStart(index) : null} border={DIR.BOTTOM} cursor="pointer" gaps className={itemCls.join(' ')} full="h" { ...attr }>
                 <Block width={numLen} className="less" padded>#{index + 1}</Block>
                 <Stack vertical full="h" padded gaps>
                     <Block shorten>{getName(entity)}</Block>
@@ -206,36 +260,44 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const execUp = !order ? null : () => {
         const index = active;
+        const isFirst = index === 0;
+        const maxIndex = entityIndex.getLength() - 1;
         doAction(
             () => {
-                const old = entityIndex.getEntityObject(index - 1);
-                entityIndex.deleteEntity(index - 1);
-                entityIndex.setEntityObject({ ...old, index});
+                const oldIndex = isFirst ? 0 : index - 1;
+                const old = entityIndex.getEntityObject(oldIndex);
+                entityIndex.deleteEntity(oldIndex);
+                entityIndex.setEntityObject({ ...old, index: isFirst ? maxIndex : index });
             },
             () => {
-                const old = entityIndex.getEntityObject(index);
-                entityIndex.deleteEntity(index);
-                entityIndex.setEntityObject({ ...old, index: index - 1});
+                const oldIndex = isFirst ? maxIndex : index;
+                const old = entityIndex.getEntityObject(oldIndex);
+                entityIndex.deleteEntity(oldIndex);
+                entityIndex.setEntityObject({ ...old, index: isFirst ? 0 : index - 1 });
             }
         );
-        setActive(active - 1)
+        setActive(isFirst ? maxIndex : active - 1)
     };
 
     const execDown = !order ? null : () => {
         const index = active;
+        const maxIndex = entityIndex.getLength() - 1;
+        const isLast = index === maxIndex;
         doAction(
             () => {
-                const old = entityIndex.getEntityObject(index + 1);
-                entityIndex.deleteEntity(index + 1);
-                entityIndex.setEntityObject({ ...old, index});
+                const oldIndex = isLast ? maxIndex : index + 1;
+                const old = entityIndex.getEntityObject(oldIndex);
+                entityIndex.deleteEntity(oldIndex);
+                entityIndex.setEntityObject({ ...old, index: isLast ? 0 : index });
             },
             () => {
-                const old = entityIndex.getEntityObject(index);
-                entityIndex.deleteEntity(index);
-                entityIndex.setEntityObject({ ...old, index: index + 1});
+                const oldIndex = isLast ? 0 : index;
+                const old = entityIndex.getEntityObject(oldIndex);
+                entityIndex.deleteEntity(oldIndex);
+                entityIndex.setEntityObject({ ...old, index: isLast ? maxIndex : index + 1 });
             }
         );
-        setActive(active + 1)
+        setActive(isLast ? 0 : active + 1 )
     };
 
     const hotKeys = {
@@ -245,12 +307,12 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         clone: makeOp(cloneOp, execClone, active !== null),
         up: {
             exec: () => execUp(),
-            can: () => active !== null && active > 0
+            can: () => active !== null && entityIndex.getLength() > 1
         },
         down: {
             exec: () => execDown(),
-            can: () => active !== null && active < (entityIndex.getLength() - 1)
-        },
+            can: () => active !== null && entityIndex.getLength() > 1
+        }
     };
 
     let elem = (
@@ -266,7 +328,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 </Stack>
             </Block>
             <Block full ref={stackRef}>
-                <Stack vertical full={isEmpty ? true : "h"} scroll {...stackAttr}>
+                <Stack vertical scroll full={isEmpty ? true : "h"} { ...stackAttr }>
                     {isEmpty ? <CenterInfo>{emptyText}</CenterInfo> : items}
                 </Stack>
             </Block>
@@ -483,7 +545,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     ];
     bottomItems.push(
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
-            <Block key="m" center="v">Marked:</Block>
+            <Block key="m" center="v" className={marked.length ? 'active-underlined' : ''}>Marked:</Block>
             <Block center="v">
                 <Kbd value={'' + marked.length} length={('' + view.count).length} />
             </Block>
@@ -522,7 +584,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         if (hidden > 0) {
             bottomItems.push(
                 <Stack gaps key="hidden">
-                    <Block center="v">Hidden: </Block>
+                    <Block center="v" className="warning-underlined">Hidden: </Block>
                     <Block center="v">
                         <Kbd value={'' + hidden} />
                     </Block>

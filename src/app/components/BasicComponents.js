@@ -44,6 +44,9 @@ const defaultValues = {
 
         checkBoxType: 0,
         headerType: 0,
+        titleType: 0,
+        hoverChangeType: -1,
+        hoverIntensityFloat: 0.25,
 
         editorBgRgb: "#080808",
         editorRgb: "#9aa0a2",
@@ -53,6 +56,11 @@ const defaultValues = {
         secondaryBgRgb: "#2f304b",
         secondaryRgb: "#9aa0a2",
         ghostBgRgb: "#181818",
+        titleBgRgb: "#662341",
+        overlayBgRgba: "#000000a3",
+
+        focusBgRgba: '#FFFFDFCC',
+        focusWidthPx: 1,
 
         buttonBgRgb: "#1e42ae",
         buttonRgb: "#b0d5e8",
@@ -71,8 +79,15 @@ const defaultValues = {
         warningBorderRgb: '#000000',
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
-        focusRgba: '#FFFFDFCC',
+        cursorBgRgba: '#58585888',
         sectionGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
+        titleGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
+
+        markerWidthMinPx: 1,
+        markerWidthMaxPx: 8,
+        markerOpacityMinPerc: 20,
+        markerOpacityMaxPerc: 70,
+        markerInvertMaxPerc: 50,
 
         linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
         buttonFont: "Monospace",
@@ -620,6 +635,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
     const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
 
+    const { titleType } = useCssProps('titleType');
     const contentRef = useRef(null);
 
     const [ collapsed, setCollapsed ] = useCachedState(
@@ -687,7 +703,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
     }
     const parentCls = [
         float ? 'editor-bg editor-color' : 'primary-bg primary-color',
-        'xxxxxxxxx stack' + (!collapseH && rev ? ' rev-cols' : '')
+        'stack' + (!collapseH && rev ? ' rev-cols' : '')
     ];
     const relAttr = {
         hotKeys,
@@ -712,6 +728,10 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
         full: collapsedByH ? false : 'h',
         vertical: collapsedByH
     };
+    if (titleType !== 0) {
+        headerAttr.className = 'title-' + (titleType === 2 ? 'gradient' : 'bg');
+    }
+
     const contentAttr = {centerItems, ...contProps};
 
     const sizeProp = collapseH ? 'width' : 'height';
@@ -792,15 +812,16 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
                 setSize(currSize);
                 e.preventDefault();
 
-                let elem = e.target.querySelector('.tabbed');
+                let elem = e.target.classList && e.target.classList.contains('tabbed') ?
+                    e.target : e.target.querySelector('.tabbed');
                 if (elem === null) {
                     elem = e.target;
                     do {
                         elem = elem.parentNode;
-                        if (!elem) break;
 
+                        if (!elem) break
                     } while (
-                        !elem.classList && elem.classList.contains('.tabbed')
+                        !(elem.classList && elem.classList.contains('tabbed'))
                     )
                 }
                 if (elem) {
@@ -831,8 +852,8 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
             };
 
             const handleElem = (
-                <Block onKeyDown={handleKey} padded="1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} { ...handleAttr } cursor={cursor} className="primary-bg">
-                    <Stack center vertical={collapseH} tab gaps="1" className="hover-highlight overflow" { ...hStackAttr }>
+                <Block onKeyDown={handleKey} tab padded="1" key="t" full={collapseH ? 'v' : 'h'} onMouseDown={onMouseDown} { ...handleAttr } cursor={cursor} className="primary-bg">
+                    <Stack center vertical={collapseH} gaps="1" className="hover-change overflow" { ...hStackAttr }>
                         <Block full={collapseH ? 'h' : 'v'} className={'button-bg overflow hover-change ' + handleCls}></Block>
                         <Block full={collapseH ? 'h' : 'v'} className={'button-bg overflow hover-change ' + handleCls}></Block>
                     </Stack>
@@ -962,7 +983,7 @@ function TitleBlocks({title, sub, details}) {
 
 function Section({ ...props }) {
     return (
-        <SectionFrame {...props} />
+        <SectionFrame { ...props } />
     )
 }
 
@@ -2403,9 +2424,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
     }
     const dimAttr = {};
     if (transparent && shadow !== null) {
-        if (shadow) {
-            vDivCls.push('shadow');
-        }
+        vDivCls.push((shadow ? '' : 'fix-') + 'shadow');
         const modalLevel = wContext.getModalLevel();
         dimAttr.onMouseEnter = e => setShadow(false);
         dimAttr.onMouseLeave = e => {
@@ -2483,7 +2502,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
         vDivStyle.minHeight = null;
     }
 
-    let elem = <Block ref={trapRef} area={1} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
+    let elem = <Block ref={trapRef} area={1} onLeftClick={e => e.stopPropagation()} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
         <div className="center-v center-h full-h editor-bounds">
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>

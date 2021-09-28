@@ -75,18 +75,19 @@
 
 
 ---------------------------
+ - CSS: text-underline
  - Font-Styling
  - Sections
-     * gradient-input
+     * title-types
 
-     - Theme-Consts: factor + focus-color
-     - handle-focus-marker
-
-     - title-types
      - shadow für button
 
      - zentrale ColorPickerModals
      BUG: quick-keys im modal-modus sperren
+
+ - gradient-input
+     - Scroll & Sizing issues
+     - Before/Cancel
 
  - Persistierung
      - Zoom

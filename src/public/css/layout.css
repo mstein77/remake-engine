@@ -1,11 +1,13 @@
 /* Layout CSS */
 
 :root {
+    /*
     --default-padding-px: 5px;
     --box-border-width-px: 5px;
     --box-border-rgb: #000000;
     --max-width-px: 1200px;
     --max-height-px: 1200px;
+     */
 }
 
 html, body, #app {

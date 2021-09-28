@@ -133,6 +133,9 @@ function useGetLayoutProps({className, padded, end, border, zIndex, cursor, tab,
     if (end) {
         dimCls.push('align-end');
     }
+    if (props.onDragStart) {
+        dimAttr.draggable = true
+    }
 
     return {
         dimCls,
@@ -458,7 +461,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
         children = <div className={childCls.join(' ')}>{children}</div>
     }
     const dimDiv = (
-        <div {...dimAttr}  className={dimCls.join(' ')} style={dimStyle}>
+        <div { ...dimAttr }  className={dimCls.join(' ')} style={dimStyle}>
             {children}
             {showTooltip && <Tooltip>{childText}</Tooltip>}
         </div>
@@ -526,7 +529,7 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
     if (useHotKeys(parentRef, hotKeys, area, link)) {
         parentAttr.ref = parentRef;
     }
-    const {dimCls, dimAttr, dimStyle} = useGetLayoutProps(props);
+    const { dimCls, dimAttr, dimStyle } = useGetLayoutProps(props);
 
     const axis = vertical ? 'v' : 'h';
     let hasFullV = axis === 'h';
@@ -597,7 +600,6 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
         }
     }
     if (hasFullV && !wrap) {
-        // TODO: modal title cell bigger than flex cell
         if (full !== 'h') {
             parentCls.push('full-v');
         }
@@ -611,7 +613,6 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
             parentCls.push('center-h');
         }
         if (center !== 'h') {
-//            parentCls.push('full-v center-v');
             parentCls.push('center-v');
             if (style.height) {
                 style.minHeight = style.height;
@@ -620,8 +621,9 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
     }
     if (scroll) {
         parentCls.push('scroll');
+    } else {
+        dimCls.push('max-v');
     }
-    dimCls.push('max-v');
 
     if (indented) {
         parentCls.push(indented === '1' ? 'padded-1' : 'indented');
@@ -649,7 +651,7 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
 
     return (
         <div { ...parentAttr } className={parentCls.join(' ')} style={parentStyle}>
-            <div style={style} className={dimCls.join(' ')} {...dimAttr}>{children}</div>
+            <div style={style} className={dimCls.join(' ')} { ...dimAttr }>{children}</div>
         </div>
     )
 }

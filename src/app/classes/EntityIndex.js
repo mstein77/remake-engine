@@ -555,7 +555,7 @@ class FilterIndex extends EntityIndex {
     }
 
     getEntityProps() {
-        return  [...super.getEntityProps(), 'params'];
+        return [ ...super.getEntityProps(), 'params'];
     }
 
     deleteEntityPropValues(index) {
