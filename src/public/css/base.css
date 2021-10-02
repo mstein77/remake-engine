@@ -98,12 +98,6 @@ html, body {
 .input-border-radius {
     border-radius: var(--input-border-radius-px)
 }
-.title-bg {
-    background-color: var(--title-bg-rgb)
-}
-.title-gradient {
-    background: var(--title-grad)
-}
 
 .active-bg {
     background-color: var(--active-bg-rgb)
@@ -247,10 +241,6 @@ html, body {
     background-color: #888888;
     color: white;
     cursor: pointer;
-}
-
-.font-small {
-    font-size: 14px;
 }
 
 .disabled {
@@ -459,8 +449,21 @@ kbd, input, textarea, .mono {
     font-size: var(--font-size-medium-px)
 }
 
-.gradient-bg {
-    background: var(--section-grad);
+.header-gradient-bg {
+    background: var(--header-bg-grad)
+}
+.header-bg {
+    background-color: var(--header-bg-rgb)
+}
+
+.title-gradient-bg {
+    background: var(--title-bg-grad)
+}
+.title-gradient-bg-90 {
+    background: var(--title-vert-bg-grad)
+}
+.title-bg {
+    background-color: var(--title-bg-rgb)
 }
 
 /* Custom stylings */

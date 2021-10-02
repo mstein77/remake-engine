@@ -470,8 +470,8 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         setPage = props.setPage;
         page = props.page
     }
-    const [marked, setMarked] = useState([]);
-    const [filter, setFilterRaw] = useState('');
+    const [ marked, setMarked ] = useState([]);
+    const [ filter, setFilterRaw ] = useState('');
     const setFilter = value => {
         setPos(0);
         setFilterRaw(value);
@@ -480,7 +480,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
 
     const matcher = props.filter && filter ? filter : null;
     const view = entityIndex.getView(pos, filter ? null : page, matcher);
-    view.all = [ ...view.matches];
+    view.all = [ ...view.matches ];
     if (filter) {
         view.matches = view.matches.slice(0, page);
     }
@@ -571,7 +571,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         </Stack>
     );
 
-    if (marked.length) {
+    if (marked.length && filter) {
         let hidden = 0;
         const notHidden = [];
         for (let index of marked) {
@@ -724,7 +724,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         };
         bottomItems.push(
             <Stack gaps key="actions">
-                <Block center="v" className="active-bg-text">Actions:</Block>
+                <Block center="v" className="active-bg-text active-underlined">Actions:</Block>
                 <Stack gaps="1">
                     <Button name="edit" padded="h" onClick={execEdit} />
                     <Button name="delete" padded="h" onClick={deleteOp} />
@@ -763,11 +763,11 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                     <Stack full vertical borders>
                         <Toolbar>
                             {props.filter &&
-                            <ToolGroup>
-                                <Stack gaps>
-                                    <Input name="Filter:" active={filter !== ''} clear value={filter} set={setFilter} />
-                                </Stack>
-                            </ToolGroup>
+                                <ToolGroup>
+                                    <Stack gaps>
+                                        <Input name="Filter:" active={filter !== ''} clear value={filter} set={setFilter} />
+                                    </Stack>
+                                </ToolGroup>
                             }
                             <ToolGroup>
                                 <Number name="Position:" value={pos} set={setPos} min={0} max={viewEnd} />
@@ -796,7 +796,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                             }
                         </Block>
                         {!readOnly &&
-                            <Toolbar>
+                            <Toolbar minHeight={36}>
                                 {bottomItems}
                             </Toolbar>
                         }

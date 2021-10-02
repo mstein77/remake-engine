@@ -206,11 +206,11 @@ function Tooltip({ children }) {
     // TODO: find a better solution without 2 divs
     return (
         <>
-            <div ref={divRef} style={style} className="tooltip invisible font-small fixed padded thin-boxed wrap-normal">
+            <div ref={divRef} style={style} className="tooltip invisible small fixed padded thin-boxed wrap-normal">
                 {children}
             </div>
             <Portal id="modals-container">
-                <div style={portalStyle} className="fixed tooltip primary-bg primary-color font-small padded thin-boxed wrap-normal">{children}</div>
+                <div style={portalStyle} className="fixed tooltip primary-bg primary-color small padded thin-boxed wrap-normal">{children}</div>
             </Portal>
         </>
     );
@@ -328,7 +328,6 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
             dimCls.push('center-h');
         }
         if (center !== 'h' /* && !fullV */) {
-//            parentCls.push('full-v center-v');
             parentCls.push('center-v');
             if (dimStyle.height) {
                 dimStyle.minHeight = dimStyle.height;
@@ -620,7 +619,12 @@ function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full,
         }
     }
     if (scroll) {
-        parentCls.push('scroll');
+        // TODO check this style.height check
+        if (style.height) {
+            dimCls.push('scroll');
+        } else {
+            parentCls.push('scroll');
+        }
     } else {
         dimCls.push('max-v');
     }

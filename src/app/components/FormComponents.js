@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
-import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex } from "../helper/helper"
+import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec } from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
     WindowContext,
@@ -25,7 +25,7 @@ import {
     AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
-import {BitmapSelector, useBitmapSelectionModal, useEditBitmapModal} from "./EditorComponents";
+import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
 
 const STATE = {
     INACTIVE: 0,
@@ -172,12 +172,16 @@ function useSet(value, { undo, set }) {
  *
  *   - full height should be ignored because in flow-context height should only be abs or min
  */
-function ComponentWithName({ name, center = 'v', children, ...props }) {
+function ComponentWithName({ name, center = 'v', className = '', labelCls = '', children, ...props }) {
     if (name) {
         const attr = getDimHAttr(props);
+        const labelAttr = {};
+        if (labelCls) {
+            labelAttr.className = labelCls
+        }
         children = (
-            <Stack gaps {...attr}>
-                <Block center={center} full={attr.full} shorten>{name}</Block>
+            <Stack gaps { ...attr }>
+                <Block center={center} full={attr.full} { ...labelAttr } shorten>{name}</Block>
                 {children}
             </Stack>
         )
@@ -843,8 +847,8 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
     useAutoFocus(inputRef, {autoFocus, disabled, readOnly});
 
     const set = useSet(value, props);
-    const [curr, setCurr] = useState(value);
-    const [edit, setEdit] = useState(false);
+    const [ curr, setCurr ] = useState(value);
+    const [ edit, setEdit ] = useState(false);
 
     const isFloat = number && (decimals && decimals > 0);
     const cls = ['input-color input-bg input-border-color input-border-style input-border-width input-border-radius'];
@@ -1064,15 +1068,20 @@ function Input({ name, value, size, min, max, autoFocus, required, disabled, num
         </Block>
     );
 
+    let labelCls = '';
     if (clear && !readOnly) {
+        if (active) {
+            labelCls = 'active-underlined';
+        }
         input =
             <Stack { ...hDimAttr } gaps="1">
                 {input}
                 <Button vertical full="v" iconProps={iconPropsInputButton} icon="clear" centerItems disabled={disabled || value === ''} tab={!(disabled || value === '')} onClick={onClear ? onClear : () => set('')} />
             </Stack>
     }
+
     return (
-        <ComponentWithName name={name} { ...floatProps }>
+        <ComponentWithName name={name} { ...floatProps } labelCls={labelCls}>
             {input}
         </ComponentWithName>
     )
@@ -1787,38 +1796,6 @@ function useGradientModal() {
     )
 }
 
-function getParsedCssValueRec(value, splitBy = false) {
-    if (value === null) {
-        return null;
-    }
-    const result = [];
-    const parts = splitBy !== undefined ? value.split(splitBy) : [value];
-
-    for(let part of parts) {
-        part = part.trim();
-        if (part === '') continue;
-
-        if (part.match(/^[a-z\-]+\(/i)) {
-            const index = part.indexOf('(');
-            const lastIndex = part.lastIndexOf(')')
-            const func = part.substr(0, index);
-            const params = part.substr(index + 1, (lastIndex - index));
-            result.push({
-                func,
-                params: getParsedCssValueRec(params, ',')
-            });
-        } else {
-            const subValues = part.indexOf(' ') >= 0 ? getParsedCssValueRec(part, ' ') : part;
-            if (subValues !== null) {
-                result.push(subValues)
-            }
-        }
-    }
-    return (
-        result.length === 1 ? result[0] : result
-    )
-}
-
 function GradientPicker({ valueRef, set, save, close }) {
     const update = useComponentUpdate();
 
@@ -1912,21 +1889,23 @@ function GradientPicker({ valueRef, set, save, close }) {
                     <Stack gaps>
                         <Number value={curr[0]} set={getSetPartAtIndex(0)} min={0} max={359} />
                         <Grid gaps columns="- - -" rows="- - -">
-                            <Block><Button icon="add" onClick={() => setDegrees(315)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(0)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(45)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(270)} /></Block>
+                            <Block><Button icon="north_west" onClick={() => setDegrees(315)} /></Block>
+                            <Block><Button icon="north" onClick={() => setDegrees(0)} /></Block>
+                            <Block><Button icon="north_east" onClick={() => setDegrees(45)} /></Block>
+                            <Block><Button icon="west" onClick={() => setDegrees(270)} /></Block>
                             <Block />
-                            <Block><Button icon="add" onClick={() => setDegrees(90)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(225)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(180)} /></Block>
-                            <Block><Button icon="add" onClick={() => setDegrees(135)} /></Block>
+                            <Block><Button icon="east" onClick={() => setDegrees(90)} /></Block>
+                            <Block><Button icon="south_west" onClick={() => setDegrees(225)} /></Block>
+                            <Block><Button icon="south" onClick={() => setDegrees(180)} /></Block>
+                            <Block><Button icon="south_east" onClick={() => setDegrees(135)} /></Block>
                         </Grid>
                     </Stack>
                 </LabelProp>
                 <LabelProp name="Color-Stops:">
-                    <Stack vertical>
-                        <Stack gaps vertical>{colors}</Stack>
+                    <Stack vertical borders>
+                        <Block full="v" scroll>
+                            <Stack gaps vertical>{colors}</Stack>
+                        </Block>
                         <Block padded><Button icon="add" onClick={addNewStop} /></Block>
                     </Stack>
                 </LabelProp>

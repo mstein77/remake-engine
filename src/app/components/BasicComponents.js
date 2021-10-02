@@ -43,8 +43,6 @@ const defaultValues = {
         monoFont: '"Lucida Console", Courier, monospace',
 
         checkBoxType: 0,
-        headerType: 0,
-        titleType: 0,
         hoverChangeType: -1,
         hoverIntensityFloat: 0.25,
 
@@ -56,7 +54,19 @@ const defaultValues = {
         secondaryBgRgb: "#2f304b",
         secondaryRgb: "#9aa0a2",
         ghostBgRgb: "#181818",
+
+        // header
+        headerType: 0,  // window | floating
+        headerBgType: 0, // primary | color | gradient
+        headerBgRgb: "#86a096",
+        headerBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
+
+        // title
+        titleBgType: 0, // primary | color | gradient
         titleBgRgb: "#662341",
+        titleBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
+        titleVertBgGrad: 'linear-gradient(180deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
+
         overlayBgRgba: "#000000a3",
 
         focusBgRgba: '#FFFFDFCC',
@@ -80,8 +90,6 @@ const defaultValues = {
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
         cursorBgRgba: '#58585888',
-        sectionGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
-        titleGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
 
         markerWidthMinPx: 1,
         markerWidthMaxPx: 8,
@@ -356,9 +364,9 @@ function Canvas({ id, width, height, smoothing, render, plain, border, className
     )
 }
 
-function Toolbar({ children }) {
+function Toolbar({ children, minHeight }) {
     return (
-        <Stack full="h" wrap gaps centerItems className="secondary-bg secondary-color">
+        <Stack full="h" minHeight={minHeight} wrap gaps centerItems className="secondary-bg secondary-color">
             {children}
         </Stack>
     )
@@ -577,7 +585,7 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
     const eContextRef = useRef(null);
     eContextRef.current = eContext;
 
-    const { headerType } = useCssProps('headerType');
+    const { headerType, headerBgType } = useCssProps('headerType', 'headerBgType');
 
     const hotKeys = {
         undo: {
@@ -609,7 +617,7 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
         );
     }
     const header = (
-        <Stack full="h" key="eh" className={headerType === 1 ? "gradient-bg" : ""}>
+        <Stack full="h" key="eh" className={headerBgType === 0 ? '' : (headerBgType === 2 ? "header-gradient-bg" : "header-bg")}>
             <TitleBlocks title={name} sub={sub} details={details} />
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <Stack center="v" padded="h" gaps="1">
@@ -624,7 +632,7 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
             hotKeys={hotKeys}
             link={link}
             area={area}
-            float={headerType === 2}
+            float={headerType === 1}
             name={name} {...props}>
             {children}
         </SectionFrame>
@@ -635,7 +643,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
     const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
 
-    const { titleType } = useCssProps('titleType');
+    const { titleBgType } = useCssProps('titleBgType');
     const contentRef = useRef(null);
 
     const [ collapsed, setCollapsed ] = useCachedState(
@@ -725,14 +733,14 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
         relAttr.height = 'min-content';
     }
     const headerAttr = {
-        full: collapsedByH ? false : 'h',
+        full: collapsedByH ? 'v' : 'h',
         vertical: collapsedByH
     };
-    if (titleType !== 0) {
-        headerAttr.className = 'title-' + (titleType === 2 ? 'gradient' : 'bg');
+    if (titleBgType !== 0 && inner) {
+        const gradDir = collapsedByH ? '-90' : '';
+        headerAttr.className = 'title-' + (titleBgType === 2 ? 'gradient-bg' + gradDir : 'bg');
     }
-
-    const contentAttr = {centerItems, ...contProps};
+    const contentAttr = { centerItems, ...contProps };
 
     const sizeProp = collapseH ? 'width' : 'height';
     const offProp = 'offset' + sizeProp[0].toUpperCase() + sizeProp.substring(1);
@@ -910,7 +918,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
         const toggleCollapse = () => {
             setCollapsed(!collapsed);
         };
-        const button = <Block key="b" center><Button refocus icon={dir} onClick={toggleCollapse} /></Block>;
+        const button = <Block key="b" center={collapsedByH ? 'h' : false}><Button refocus icon={dir} onClick={toggleCollapse} /></Block>;
 
         if (collapseH && rev && !collapsed) {
             items.push(button);
@@ -2262,9 +2270,9 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
     const mounted = useMounted();
 
     const lockedStyles = wContext.isStyleLocked() ? wContext.getLockedStyles() : null;
-    let { headerType } = useCssProps('headerType');
+    let { headerBgType } = useCssProps('headerBgType');
     if (lockedStyles) {
-        headerType = lockedStyles.headerType
+        headerBgType = lockedStyles.headerBgType
     }
 
     const enableShadow = () => {
@@ -2507,7 +2515,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
                     <div ref={dimRef} { ...dimAttr } className={vDivCls.join(' ')} style={vDivStyle}>
-                        <Stack gaps full="h" className={headerType === 1 ? 'gradient-bg' : ''} { ...nameAttr } padded>
+                        <Stack gaps full="h" className={headerBgType === 0 ? '' : (headerBgType === 2 ? 'header-gradient-bg' : 'header-bg')} { ...nameAttr } padded>
                             <Block center="v" shorten full="h" className="more big">{name}</Block>
                             {closeable ? <Button icon="close" onClick={e => close()} /> : ''}
                         </Stack>

@@ -1306,6 +1306,38 @@ const isEventInRect = (e, rect) => {
         rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
 }
 
+function getParsedCssValueRec(value, splitBy = false) {
+    if (value === null) {
+        return null;
+    }
+    const result = [];
+    const parts = splitBy !== undefined ? value.split(splitBy) : [value];
+
+    for(let part of parts) {
+        part = part.trim();
+        if (part === '') continue;
+
+        if (part.match(/^[a-z\-]+\(/i)) {
+            const index = part.indexOf('(');
+            const lastIndex = part.lastIndexOf(')')
+            const func = part.substr(0, index);
+            const params = part.substr(index + 1, (lastIndex - index) - 1);
+            result.push({
+                func,
+                params: getParsedCssValueRec(params, ',')
+            });
+        } else {
+            const subValues = part.indexOf(' ') >= 0 ? getParsedCssValueRec(part, ' ') : part;
+            if (subValues !== null) {
+                result.push(subValues)
+            }
+        }
+    }
+    return (
+        result.length === 1 ? result[0] : result
+    )
+}
+
 const noop = () => {};
 
 module.exports = {
@@ -1345,6 +1377,7 @@ module.exports = {
     getTextBlockImage,
     getBlockDim,
     getBlockPos,
+    getParsedCssValueRec,
     cloneDeep,
     isEventInRect,
     drawCanvasToAvail,

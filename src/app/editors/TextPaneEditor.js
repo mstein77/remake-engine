@@ -1,52 +1,9 @@
-import React, { useContext, useEffect, useMemo, useState, useRef } from "react";
-import {
-    EditorSection,
-    Kbd,
-    CenterInfo,
-    EditorContext,
-    Toolbar,
-    ToolGroup,
-    Canvas,
-    useModal,
-    useComponentUpdate,
-    useUpdateOnEntityIndexChanges,
-    PropertyGrid,
-    Section,
-    useCachedState,
-    WindowContext,
-} from "../components/BasicComponents";
-import { DIR, Block, Grid, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import { d, getCanvasForDim, getEmptyImageData, getColorsFromImageData, getColorsFromCanvas } from "../helper/helper";
-import {
-    useExportModal,
-    NameDialog,
-    FiltersModal,
-    ResizeProps,
-    useFilterPipelineModal,
-    useBitmapSelectionModal,
-    useEditBitmapModal
-} from "../components/EditorComponents";
-import {
-    Checkbox,
-    Input,
-    InputProp,
-    KeyInput,
-    NumberProp,
-    Number,
-    RadioProp,
-    SelectProp,
-    LabelProp,
-    CheckboxProp,
-    FullProp,
-    Color,
-    Button,
-    TextArea,
-    Tuple,
-    TupleProp,
-    BitmapProp,
-    Hidden,
-    OkCancelForm
-} from "../components/FormComponents";
+import React, { useContext, useMemo, useState, useRef } from "react";
+import { EditorSection, Kbd, CenterInfo, EditorContext, Toolbar, ToolGroup, Canvas, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, useCachedState, WindowContext } from "../components/BasicComponents";
+import { DIR, Block, Stack, Overlays, Overlay } from "../components/LayoutComponents";
+import { d, getCanvasForDim, getEmptyImageData, getColorsFromCanvas } from "../helper/helper";
+import { useExportModal, NameDialog, FiltersModal, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal } from "../components/EditorComponents";
+import { Checkbox, Input, InputProp, KeyInput, NumberProp, Number, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Color, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "../components/FormComponents";
 import { AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
@@ -539,13 +496,9 @@ function CharManager({ charIndex }) {
             </AssignCharsModal.content>
 
             {BitmapSelectionModal}
-
             {EditBitmapModal}
         </>
     )
-    /*
-
-     */
 }
 
 function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont }) {
@@ -1186,39 +1139,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     )
 }
 
-// TODO: remove
-function FastCanvas() {
-    const sizeX = 2;
-    const sizeY = 2;
-    const cells = 100;
-    const width = sizeX * cells;
-    const height = sizeY * cells;
-    const buffer = new ArrayBuffer((cells * cells) << 2);
-    const colors32 = new Uint32Array(buffer);
-    for (let y = 0; y < cells; y++ ) {
-        for (let x = 0; x < cells; x++) {
-            colors32[y * cells + x] = parseInt((x + y) % 2 === 0 ? 'F04040FF' : 'D0D0D0FF', 16);
-        }
-    }
-    const render = ctx => {
-        let pos = 0;
-        let posY = 0;
-        for (let y = 0; y < cells; y++) {
-            let posX = 0;
-            for (let x = 0; x < cells; x++) {
-                ctx.fillStyle = '#' + colors32[pos].toString(16);
-                ctx.fillRect(posX, posY, sizeX, sizeY);
-                pos++;
-                posX += sizeX;
-            }
-            posY += sizeY;
-        }
-    };
-    return (
-        <Block><Canvas border width={width} height={height} render={render} /></Block>
-    );
-}
-
 function TextPaneEditor({ model, resource }) {
     const update = useComponentUpdate();
 
@@ -1286,6 +1206,39 @@ function TextPaneEditor({ model, resource }) {
 
         </Stack>
     )
+}
+
+// TODO: remove
+function FastCanvas() {
+    const sizeX = 2;
+    const sizeY = 2;
+    const cells = 100;
+    const width = sizeX * cells;
+    const height = sizeY * cells;
+    const buffer = new ArrayBuffer((cells * cells) << 2);
+    const colors32 = new Uint32Array(buffer);
+    for (let y = 0; y < cells; y++ ) {
+        for (let x = 0; x < cells; x++) {
+            colors32[y * cells + x] = parseInt((x + y) % 2 === 0 ? 'F04040FF' : 'D0D0D0FF', 16);
+        }
+    }
+    const render = ctx => {
+        let pos = 0;
+        let posY = 0;
+        for (let y = 0; y < cells; y++) {
+            let posX = 0;
+            for (let x = 0; x < cells; x++) {
+                ctx.fillStyle = '#' + colors32[pos].toString(16);
+                ctx.fillRect(posX, posY, sizeX, sizeY);
+                pos++;
+                posX += sizeX;
+            }
+            posY += sizeY;
+        }
+    };
+    return (
+        <Block><Canvas border width={width} height={height} render={render} /></Block>
+    );
 }
 
 export {

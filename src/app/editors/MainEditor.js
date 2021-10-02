@@ -1,40 +1,9 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-    BackgroundCtx,
-    CssCtx,
-    Icon,
-    PropertyGrid,
-    Ruler,
-    SideTab,
-    SideTabs,
-    HotKeyKeys,
-    HotKeySingleKeys,
-    HotKeySkipValues,
-    useComponentUpdate,
-    useModal,
-    WindowContext,
-    CssContext,
-    WindowCtx
-} from "../components/BasicComponents";
+import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, HotKeyKeys, HotKeySingleKeys, HotKeySkipValues, useComponentUpdate, useModal, WindowContext, CssContext, WindowCtx } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import {
-    PropSection,
-    OkCancelForm,
-    Button,
-    Select,
-    Input,
-    CssGradient,
-    CheckboxProp,
-    Radio,
-    LabelProp,
-    Checkbox,
-    Number,
-    Color,
-    NumberProp,
-    VirtualNumber
-} from "../components/FormComponents";
+import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
-import { d } from "../helper/helper";
+import { d, getParsedCssValueRec } from "../helper/helper";
 import ReactDOM from "react-dom";
 
 function PresetsManager({ id, set, config, ...props }) {
@@ -276,10 +245,15 @@ const checkboxStyleOptions = [
     {id: 1, name: 'Button'}
 ];
 
-const headerStyleOptions = [
+const headerTypeOptions = [
     {id: 0, name: 'Window'},
-    {id: 1, name: 'Gradient'},
-    {id: 2, name: 'Floating'}
+    {id: 1, name: 'Floating'},
+];
+
+const bgTypeOptions = [
+    {id: 0, name: 'Primary'},
+    {id: 1, name: 'Color'},
+    {id: 2, name: 'Gradient'}
 ];
 
 const titleStyleOptions = [
@@ -295,6 +269,23 @@ const hoverChangeOptions = [
 
 function ThemeSettings({ theme, setTheme }) {
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
+
+    const setTitleGrad = titleBgGrad => {
+        const parsed = getParsedCssValueRec(titleBgGrad);
+        const currDeg = parsed.params[0];
+        const parts = [
+            (parseInt(currDeg.substr(0,currDeg.length - 3), 10) + 90) + 'deg'
+        ];
+        let i = 1;
+        while(i < parsed.params.length) {
+            if (typeof parsed.params[i] !== 'string') {
+                parts.push(parsed.params[i][0] + ' ' + parsed.params[i][1])
+            }
+            i++
+        }
+        const titleVertBgGrad = 'linear-gradient(' + parts.join(', ') + ')';
+        setTheme({ ...theme, titleBgGrad, titleVertBgGrad });
+    }
 
     return (
         <Stack full borders>
@@ -354,6 +345,10 @@ function ThemeSettings({ theme, setTheme }) {
                                 <Icon name="format_color_text" />
                                 <Color value={theme.primaryRgb} set={propSetter('primaryRgb')} />
                             </Stack>
+                            <Stack gaps>
+                                <Icon className="less" name="image" />
+                                <Color value={theme.ghostBgRgb} set={propSetter('ghostBgRgb')} />
+                            </Stack>
                         </Stack>
                     </LabelProp>
                     <LabelProp name="Secondary">
@@ -365,14 +360,6 @@ function ThemeSettings({ theme, setTheme }) {
                             <Stack gaps>
                                 <Icon name="format_color_text" />
                                 <Color value={theme.secondaryRgb} set={propSetter('secondaryRgb')} />
-                            </Stack>
-                        </Stack>
-                    </LabelProp>
-                    <LabelProp name="Ghost">
-                        <Stack wrap gaps full="h">
-                            <Stack gaps>
-                                <Icon name="image" />
-                                <Color value={theme.ghostBgRgb} set={propSetter('ghostBgRgb')} />
                             </Stack>
                         </Stack>
                     </LabelProp>
@@ -475,27 +462,46 @@ function ThemeSettings({ theme, setTheme }) {
                     </LabelProp>
 
                     <PropSection name="Header" />
-                    <LabelProp name="Style">
-                        <Radio value={theme.headerType} set={propSetter('headerType')} options={headerStyleOptions} gaps padded="h" />
+                    <LabelProp name="Type">
+                        <Stack wrap gaps full="h">
+                            <Radio value={theme.headerType} set={propSetter('headerType')} options={headerTypeOptions} gaps padded="h" />
+                        </Stack>
                     </LabelProp>
-                    <LabelProp name="Gradient">
-                        <CssGradient disabled={theme.headerType !== 1} value={theme.sectionGrad} set={propSetter('sectionGrad')} />
+                    <LabelProp name="Background">
+                        <Stack wrap gaps full="h">
+                            <Radio value={theme.headerBgType} set={propSetter('headerBgType')} options={bgTypeOptions} gaps padded="h" />
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="">
+                        <Stack wrap gaps full="h">
+                            <Stack gaps>
+                                <Icon className={theme.headerBgType !== 1 ? 'disabled' : ''} name="image" />
+                                <Color disabled={theme.headerBgType !== 1} value={theme.headerBgRgb} set={propSetter('headerBgRgb')} />
+                            </Stack>
+                            <Stack gaps>
+                                <Icon className={theme.headerBgType !== 2 ? 'disabled' : ''} name="gradient" />
+                                <CssGradient disabled={theme.headerBgType !== 2} value={theme.headerBgGrad} set={propSetter('headerBgGrad')} />
+                            </Stack>
+                        </Stack>
                     </LabelProp>
 
                     <PropSection name="Title" />
-                    <LabelProp name="Style">
-                        <Radio value={theme.titleType} set={propSetter('titleType')} options={titleStyleOptions} gaps padded="h" />
-                    </LabelProp>
-
                     <LabelProp name="Background">
                         <Stack wrap gaps full="h">
+                            <Radio value={theme.titleBgType} set={propSetter('titleBgType')} options={bgTypeOptions} gaps padded="h" /><br />
+                        </Stack>
+                    </LabelProp>
+                    <LabelProp name="">
+                        <Stack wrap gaps full="h">
                             <Stack gaps>
-                                <Icon name="image" />
-                                <Color disabled={theme.titleType !== 1} value={theme.titleBgRgb} set={propSetter('titleBgRgb')} />
+                                <Icon className={theme.titleBgType !== 1 ? 'disabled' : ''} name="image" />
+                                <Color disabled={theme.titleBgType !== 1} value={theme.titleBgRgb} set={propSetter('titleBgRgb')} />
                             </Stack>
                             <Stack gaps>
-                                <Icon name="gradient" />
-                                <CssGradient disabled={theme.titleType !== 2} value={theme.titleGrad} set={propSetter('titleGrad')} />
+                                <Icon className={theme.titleBgType !== 2 ? 'disabled' : ''} name="gradient" />
+                                <CssGradient disabled={theme.titleBgType !== 2} value={theme.titleBgGrad}
+                                    set={setTitleGrad}
+                                />
                             </Stack>
                         </Stack>
                     </LabelProp>
