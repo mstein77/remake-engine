@@ -466,6 +466,10 @@ kbd, input, textarea, .mono {
     background-color: var(--title-bg-rgb)
 }
 
+.transparent-color {
+    color: transparent !important
+}
+
 /* Custom stylings */
 
 .separator-h {

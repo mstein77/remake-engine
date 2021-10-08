@@ -2076,6 +2076,7 @@ function ManagedGrid({
 
 function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, setMaxZoom, setZoom,
     width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, undo, center = true, ...props }) {
+
     const aContext = useContext(AvailContext);
     const cssContext = useContext(CssContext);
     const callAfterwards = useCallAfterwards();
@@ -2085,45 +2086,68 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
     const gridLength = gridProvider.getLength;
 
     const value = useMemo(() => {
+        // noch keine Avail-Dim? Dann aussteigen mit null
         if (!aContext.width || !aContext.height) return null;
 
         // TODO: check & replace magic numbers
+        // verfügbare Restbreite und Höhe berechnen (inclusive Rulers fals aktiv)
         let spaceX = Math.max(aContext.width - border - 2 * cssContext.getValue('defaultPaddingPx') -
             (rulers ? 38 : 0), 0);
         let spaceY = Math.max(aContext.height - border - 2 * cssContext.getValue('defaultPaddingPx') -
             (rulers ? 22 : 0), 0);
 
         const wrap = !!gridProvider.setWrapWidth;
+        // berechne Cellmaße und den maximal möglichen Zoom, die sich aus dem
+        // aktuellen Zoom, der Border und der Restbreite/Höhe ergeben
         const cellDim = cellType.getCellSize(spaceX, spaceY, zoom, border);
 
+        // Falls wrapping aktiv, dann übernehme Zellzahl als MaxWidth,
+        // ansonsten die aktuelle breite des Grids
         const maxWidth = wrap ? gridLength : gridWidth;
+        // analog für die Höhe
         const maxHeight = wrap ? gridLength : gridHeight;
 
+        // Berechne wieviele der verfügbaren Zellen, maximal in die Restbreite passen
         let maxPageX = Math.min(maxWidth,  Math.floor(spaceX / cellDim.xPlusBorder));
+        // Berechne wieviele der verfügbaren Zellen, maximal in die Resthöhe passen
         let maxPageY = Math.min(maxHeight, Math.floor(spaceY / cellDim.yPlusBorder));
 
+        // falls wrapping aktiv, dann setze die berechnete WrapWidth im Grid
         if (wrap) {
             gridProvider.setWrapWidth(
                 cellDim.wrapWidth
             );
+            // übernehme die neue Breite und Höhe des Grids, die sich
+            // dadurch ergibt
             gridWidth = gridProvider.getWidth();
             gridHeight = gridProvider.getHeight()
         }
+        // passen weniger als alle verfügbaren Elemente in die Restbreite
+        // und ist in der Restbreite noch Platz für eine Scrollbar?
+        // Dann ziehe die ScrollbarHöhe von der verfügbaren Höhe ab
         if (maxPageX < gridWidth && spaceX >= 21) {
             spaceY -= 21 // scrollbarHeight;
         }
+        // analog für die Resthöhe
         if (maxPageY < gridHeight && spaceY >= 21) {
             spaceX -= 21 // scrollbarWidth;
         }
+        // berechne erneut, wieviele der verfügbaren Zellen, in die neue Restbreite passen
+        maxPageX = clamp(1, Math.floor(spaceX / cellDim.xPlusBorder), gridWidth);
+        // analog für Resthöhe
+        maxPageY = clamp(1, Math.floor(spaceY / cellDim.yPlusBorder), gridHeight);
 
-        maxPageX = Math.max(Math.min(Math.floor(spaceX / cellDim.xPlusBorder), gridWidth), 1);
-        maxPageY = Math.max(Math.min(Math.floor(spaceY / cellDim.yPlusBorder), gridHeight), 1);
-
+        // wurde eine maximaler Zoom vorgegeben?
         if (maxZoom !== undefined) {
+            // ermittel den neuen MaxZoom aus dem berechneten maxZoom und der
+            // minZoom als unterer Schranke
             const newMaxZoom = Math.max(cellType.getMinZoom(), cellDim.maxZoom);
+            // ergab sich dadurch ein neuer maxZoom, dann übernehme diesen
             if (maxZoom !== newMaxZoom) {
                 callAfterwards(setMaxZoom, newMaxZoom)
             }
+            // übersteigt der aktuelle Zoom den neuen maxZoom, dann
+            // übernehme diesen
             if (zoom > newMaxZoom) {
                 callAfterwards(setZoom, newMaxZoom)
             }
@@ -2145,12 +2169,18 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
 
     if (!value) return '';
 
+    // berechne die maximale mögliche X/Y-Pos des Grids für die
+    // aktuelle Seitengröße
     const maxPosX = Math.max(gridWidth - value.maxPageX, 0);
     const maxPosY = Math.max(gridHeight - value.maxPageY, 0);
 
+    // wenn die aktuelle Position diese übersteigt, passe diese an
     if (posX > maxPosX) callAfterwards(setPosX, maxPosX);
     if (posY > maxPosY) callAfterwards(setPosY, maxPosY);
 
+    // Falls die aktuelle Breite/Höhe des Views nicht mit der
+    // berechneten übereinstimmt, dann passe diese an und rechne
+    // mit den ermittelten werten weiter
     let pageX = width;
     let pageY = height;
     if (value.maxPageX !== pageX) {
@@ -2161,6 +2191,8 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         callAfterwards(setHeight, value.maxPageY);
         pageY = value.maxPageY
     }
+    // berechne die komplette Breite des Grids, die sich durch
+    // die View-Breite, den Zoom und die Border ergibt
     value.dimX = pageX * value.cellPlusBorderSizeX + border;
     value.dimY = pageY * value.cellPlusBorderSizeY + border;
 

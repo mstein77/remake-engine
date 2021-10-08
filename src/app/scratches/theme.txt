@@ -1,3 +1,4 @@
+
 --------------------------
  PERSISTIERUNG:
 --------------------------
@@ -75,17 +76,14 @@
 
 
 ---------------------------
- - CSS: text-underline
  - Font-Styling
  - Sections
-     * title-types
-
      - shadow für button
-
      - zentrale ColorPickerModals
-     BUG: quick-keys im modal-modus sperren
+     - BUG: quick-keys im modal-modus sperren
 
  - gradient-input
+     - BUG: vertical scroll not working
      - Scroll & Sizing issues
      - Before/Cancel
 
@@ -93,8 +91,21 @@
      - Zoom
      - Background
 ---------------------------
- - Entity-Stack (Styling, Dragn-Drop)
+ - FOCUS-Handling
+    * BUG: space on toolbar action triggers selection
+       * BUG: tooltip funzen nicht mehr
+       - BUG: Colapser-Focus geht verloren, wird nicht gesetzt
+       - BUG: Drag-Drop deaktiviert element
+       - disabled button: tabIndex erst bei blur entfernen
+       - Stack/Radio: Focus-Handling überarbeiten
+       - Handling checken
+
  - Entity-Manager
+    - FixHeight im Font-Manager richtig berechnen
+    - marked-reset
+    - sorting
+    - area-selection & scroll
+    - focus-key-movement
 ---------------------------
  BUG: tooltip-mouseout wird manchmal nicht getriggert
  - Tooltips zusammenfassen?

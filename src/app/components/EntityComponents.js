@@ -1,26 +1,8 @@
 import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, getEmptyImageData } from "../helper/helper";
+import { d, noop, clamp, getEmptyImageData } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import {
-    EditorCtx,
-    CenterInfo,
-    EditorContext,
-    Section,
-    Canvas,
-    Kbd,
-    AvailContextProvider,
-    useFocusKeyBindings,
-    useRefocus,
-    Toolbar,
-    ToolGroup,
-    ScrollArea,
-    BackgroundControl,
-    useUpdateOnEntityIndexChanges,
-    useCallAfterwards,
-    useCachedState,
-    AvailContext, WindowContext, useCssProps
-} from "./BasicComponents";
+import { EditorCtx, useRefocusFirst, CenterInfo, EditorContext, Section, Canvas, Kbd, AvailContextProvider, useFocusKeyBindings, useRefocus, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
@@ -56,22 +38,26 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     useUpdateOnEntityIndexChanges(entityIndex);
 
-    let [active, setActiveRaw] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
+    let [ active, setActiveRaw ] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
     const entities = entityIndex.getEntityObjects();
     if (props.setActive !== undefined) {
         setActiveRaw = props.setActive;
         active = props.active;
     }
-    let [shadow, setShadow] = useState(active);
+    let [ shadow, setShadow ] = useState(active);
 
     const stackRef = useRef(null);
-    const refocus = useRefocus(stackRef);
-    const setActive = value => {
-        refocus();
+    const { canRefocus, refocus } = useRefocusFirst(stackRef);
+
+    const setActive = (value, forceFocus = false) => {
+        const doRefocus = forceFocus || canRefocus();
         if (value !== null) {
             setShadow(value);
         }
-        setActiveRaw(value)
+        setActiveRaw(value);
+        if (doRefocus) {
+            refocus()
+        }
     };
 
     const stackAttr = useFocusKeyBindings({
@@ -86,9 +72,9 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                         }
                         if (active === null) {
                             setShadow(newIndex);
-                            refocus();
+                            refocus()
                         } else {
-                            setActive(newIndex);
+                            setActive(newIndex, true)
                         }
                     }
             },
@@ -104,7 +90,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                             setShadow(newIndex);
                             refocus()
                         } else {
-                            setActive(newIndex);
+                            setActive(newIndex, true);
                         }
                     }
             },
@@ -112,7 +98,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 keys: [' '],
                 handler:
                     () => {
-                        if (entities.length === 0) {
+                    if (entities.length === 0) {
                             return
                         }
                         if (!deselect && active !== null) {
@@ -121,7 +107,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                         if (active === null) {
                             setActive(shadow !== null ? shadow : 0);
                         } else {
-                            setActive(null);
+                            setActive(null, true);
                         }
                     }
             }
@@ -133,10 +119,14 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         callAfterwards(setActiveRaw, null);
         return '';
     } else if (indexSize > 0 && active >= indexSize) {
-        callAfterwards(setActiveRaw,indexSize - 1);
-        return ''
+        const doRefocus = canRefocus();
+        callAfterwards(() => {
+            setActiveRaw(indexSize - 1);
+            if (doRefocus) {
+                refocus()
+            }
+        });
     }
-
     const dragLeave = index => e => {
         requestAnimationFrame(() => {
             if (dropRef.current.dropIndex === index) {
@@ -158,7 +148,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             setDragging(false)
         }, {once: true})
     };
-
     const drop = index => e => {
         if (index === dropRef.current.dragIndex) return;
 
@@ -166,10 +155,9 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         const indexDrop = index;
         eContext.doAction(
             () => {
-                d('BEFORE', entityIndex.model);
                 const dragged = entityIndex.getEntityObject(indexDrag);
                 const dropped = entityIndex.getEntityObject(indexDrop);
-                entityIndex.setEntityObjects(d([{ ...dragged, index: indexDrop}, { ...dropped, index: indexDrag }]), true);
+                entityIndex.setEntityObjects([{ ...dragged, index: indexDrop}, { ...dropped, index: indexDrag }], true);
             },
             () => {
                 const dragged = entityIndex.getEntityObject(indexDrag);
@@ -180,7 +168,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         dropRef.current.dragIndex = null;
         setActive(index)
     }
-
     const items = [];
     let index = 0;
     // TODO use reasonable font width
@@ -189,13 +176,13 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         const curr = index;
         const isActive = index === active;
         const attr = {
-            onClick: () => {
+            onLeftClick: () => {
                 if (curr === active) {
                     if (deselect) {
                         setActive(null);
                     }
                 } else {
-                    setActive(curr);
+                    setActive(curr, true);
                 }
             }
         };
@@ -316,15 +303,15 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     };
 
     let elem = (
-        <Stack vertical borders full area={area} hotKeys={hotKeys}>
+        <Stack key="stack" vertical borders full area={area} hotKeys={hotKeys}>
             <Block full="h">
-                <Stack full wrap gaps className="secondary-bg">
-                    {add && <Button icon="add" onClick={hotKeys.new} />}
-                    {edit && <Button icon="edit" onClick={hotKeys.edit} />}
-                    {clone && <Button icon="content_copy" onClick={hotKeys.clone} />}
-                    {del && <Button icon="delete" onClick={hotKeys.delete} />}
-                    {order && <Button icon="keyboard_arrow_up" onClick={hotKeys.up} />}
-                    {order && <Button icon="keyboard_arrow_down" onClick={hotKeys.down} />}
+                <Stack key="buttons" full wrap gaps className="secondary-bg">
+                    {add && <Button key="add" icon="add" onClick={hotKeys.new} />}
+                    {edit && <Button key="edit" icon="edit" onClick={hotKeys.edit} />}
+                    {clone && <Button key="clone" icon="content_copy" onClick={hotKeys.clone} />}
+                    {del && <Button key="del" icon="delete" onClick={hotKeys.delete} />}
+                    {order && <Button key="up" icon="keyboard_arrow_up" onClick={hotKeys.up} />}
+                    {order && <Button key="down" icon="keyboard_arrow_down" onClick={hotKeys.down} />}
                 </Stack>
             </Block>
             <Block full ref={stackRef}>
@@ -336,10 +323,12 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     );
 
     if (children) {
-        elem = <Stack>
-            {elem}
-            <Block>{children}</Block>
-        </Stack>
+        return (
+            <Stack>
+                {elem}
+                <Block>{children}</Block>
+            </Stack>
+        )
     }
 
     return elem
@@ -366,11 +355,13 @@ function EntityStackSections({ id, sectionProps, detailProps, active, children, 
     )
 }
 
-function FlexStack({ auto, scaling,
-       zoom, setZoom, minZoom, maxZoom, setMaxZoom,
-       varHeight, fixHeight = 0,
-       varWidth, fixWidth = 0, minWidth,
-       page, setPage, maxPage, items, render}) {
+
+function FlexStackInner({
+        zoom, setZoom, minZoom, maxZoom, setMaxZoom,
+        varHeight, fixHeight = 0,
+        varWidth, fixWidth = 0, minWidth,
+        pos, setPos, page, setPage, maxPage,
+        auto, scaling, items, render}) {
 
     const aContext = useContext(AvailContext);
 
@@ -378,70 +369,91 @@ function FlexStack({ auto, scaling,
     const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
     const gap = defaultPaddingPx;
 
-    const getZoomAndHeight = () => {
-        const varSpaceY = aContext.height - fixHeight - 2 * gap;
-        if (varSpaceY < 0) return null;
-
-        let maxAvailZoom = varSpaceY / varHeight;
+    const getFlexPropsForDim = (width, height) => {
+        let maxAvailZoom = height / varHeight;
         if (!scaling) {
             maxAvailZoom = Math.floor(maxAvailZoom);
         }
-        if (maxAvailZoom < minZoom) return null;
-        if (auto) {
-            maxAvailZoom = maxZoom ? Math.min(maxAvailZoom, maxZoom) : maxAvailZoom;
-            if (zoom !== maxAvailZoom) {
-                callAfterwards(setZoom,  maxAvailZoom)
-            }
-            zoom = maxAvailZoom
-        } else {
-            if (maxZoom !== maxAvailZoom) {
-                callAfterwards(setZoom,  maxAvailZoom)
-            }
-            if (zoom > maxAvailZoom) {
-                callAfterwards(setZoom,  maxAvailZoom);
-                return null;
-            }
+        if (minZoom && maxAvailZoom < minZoom) return null;
+
+        const newZoom = clamp(minZoom, auto ? maxAvailZoom : zoom, maxAvailZoom);
+        const elemWidth = clamp(minWidth, newZoom * varWidth + fixWidth);
+        const newPage = clamp(1, Math.floor( width / (elemWidth + gap)), maxPage);
+
+        return {
+            zoom: newZoom,
+            maxZoom: maxAvailZoom,
+            elemWidth,
+            page: newPage
         }
-        const zoomHeight = zoom * varHeight;
+    }
+
+    const flex = useMemo(() => {
+        if (!aContext.width || !aContext.height) return null;
+
+        let varSpaceY = aContext.height - fixHeight - 2 * gap;
+        if (varSpaceY < 0) return null;
+
+        const spaceX = aContext.width - gap;
+
+        let calc = getFlexPropsForDim(spaceX, varSpaceY);
+        if (!calc) return null;
+
+        if (calc.page < maxPage) {
+            calc = getFlexPropsForDim(spaceX, varSpaceY - 21);
+            if (!calc) return null;
+        }
+        if (calc.zoom !== zoom) {
+            callAfterwards(setZoom, calc.zoom)
+        }
+        if (!auto && maxZoom && maxZoom !== calc.maxZoom) {
+            callAfterwards(setMaxZoom,  calc.maxZoom)
+        }
+        const zoomHeight = calc.zoom * varHeight;
         if (varSpaceY < zoomHeight) {
             return null;
         }
-        return {
-            height: zoomHeight + fixHeight,
-            zoom
+        if (calc.page !== page) {
+            callAfterwards(setPage, calc.page);
         }
-    };
+        const count = Math.min(items.length, calc.page);
 
-    const box = getZoomAndHeight();
-    if (!box) {
+        return {
+            elemWidth: calc.elemWidth,
+            count,
+            page: calc.page,
+            height: zoomHeight + fixHeight,
+        }
+    }, [zoom, aContext.width, aContext.height, items.length, maxPage, gap, fixWidth, fixHeight, varWidth, varHeight]);
+
+    if (!flex) {
         return (
             <CenterInfo>No space to render!</CenterInfo>
         )
     }
-
-    let spaceX = aContext.width - gap;
-    let elemWidth = box.zoom * varWidth + fixWidth;
-    if (minWidth) {
-        elemWidth = Math.max(minWidth, elemWidth);
-    }
-    const newPage = Math.max(1, Math.min(maxPage, Math.floor( spaceX / (elemWidth + gap))));
-    if (newPage !== page) {
-        callAfterwards(setPage, newPage);
-    }
-    const count = Math.min(items.length, newPage);
-
     const blocks = [];
     let index = 0;
-    while (blocks.length < count) {
+    while (blocks.length < flex.count) {
         blocks.push(
-            <Block key={index} width={elemWidth} height={box.height} full="v">{render(items[index])}</Block>
+            <Block key={index} width={flex.elemWidth} height={flex.height} full="v">{render(items[index])}</Block>
         );
         index++;
     }
     return (
-        <Stack center gaps>
-            {blocks}
-        </Stack>
+        <ScrollArea
+            auto setX={setPos} pageX={flex.page} x={pos} maxX={maxPage}>
+            <Stack center gaps>
+                {blocks}
+            </Stack>
+        </ScrollArea>
+    )
+}
+
+function FlexStack({ ...props }) {
+    return (
+        <AvailContextProvider>
+            <FlexStackInner { ...props } />
+        </AvailContextProvider>
     )
 }
 
@@ -449,7 +461,9 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                            entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
-    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
+    const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
+
+    const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
 
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
 
@@ -535,15 +549,16 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
         )
     };
 
-    const bottomItems = [
+    const bottomItems = {};
+    bottomItems.info = (
         <Stack gaps key="info" gaps>
             <Block>{filter ? 'Matching:' : 'Total:'}</Block>
             <Block center="v"><Kbd value={'' + view.count} /></Block>
             {filter && <Block>of</Block>}
             {filter && <Block center="v"><Kbd value={'' + entityIndex.getLength()} /></Block>}
         </Stack>
-    ];
-    bottomItems.push(
+    );
+    bottomItems.selection = (
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
             <Block key="m" center="v" className={marked.length ? 'active-underlined' : ''}>Marked:</Block>
             <Block center="v">
@@ -582,7 +597,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
             }
         }
         if (hidden > 0) {
-            bottomItems.push(
+            bottomItems.hidden = (
                 <Stack gaps key="hidden">
                     <Block center="v" className="warning-underlined">Hidden: </Block>
                     <Block center="v">
@@ -722,7 +737,7 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                 return (cell.width === entityIndex.getSizeX() && cell.height === entityIndex.getSizeY());
             }
         };
-        bottomItems.push(
+        bottomItems.actions = (
             <Stack gaps key="actions">
                 <Block center="v" className="active-bg-text active-underlined">Actions:</Block>
                 <Stack gaps="1">
@@ -738,11 +753,9 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
             </Stack>
         );
     }
-    for (let i = 0; i < bottomItems.length - 1; i++) {
-        bottomItems[i] =
-            <ToolGroup key={i}>
-                {bottomItems[i]}
-            </ToolGroup>
+    const groups = [];
+    for(let [key, elem] of Object.entries(bottomItems)) {
+        groups.push(<ToolGroup key={key}>{elem}</ToolGroup>);
     }
     return (
         <>
@@ -779,25 +792,21 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                             {
                                 view.count === 0 ?
                                     <CenterInfo>{'No items found matching "' + filter + '"'}</CenterInfo> :
-                                    <ScrollArea
-                                        auto setX={setPos} pageX={page} x={pos} maxX={view.count}>
-                                        <AvailContextProvider>
-                                            <FlexStack
-                                                auto={auto} scaling={scaling}
-                                                render={render} items={view.matches}
-                                                zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
-                                                varWidth={sizeX} fixWidth={2 * padding} minWidth={minWidth}
-                                                fixHeight={titleHeight} varHeight={sizeY}
-                                                page={page} maxPage={view.count} setPage={setPage}
-                                                onDoubleClick={onDoubleClick}
-                                            />
-                                        </AvailContextProvider>
-                                    </ScrollArea>
+                                    <FlexStack
+                                        auto={auto} scaling={scaling}
+                                        render={render} items={view.matches}
+                                        zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
+                                        varWidth={sizeX} fixWidth={2 * padding} minWidth={minWidth}
+                                        fixHeight={titleHeight} varHeight={sizeY}
+                                        page={page} maxPage={view.count} setPage={setPage}
+                                        pos={pos} setPos={setPos}
+                                        onDoubleClick={onDoubleClick}
+                                    />
                             }
                         </Block>
                         {!readOnly &&
-                            <Toolbar minHeight={36}>
-                                {bottomItems}
+                            <Toolbar minHeight={minHeightToolbar}>
+                                {groups}
                             </Toolbar>
                         }
                     </Stack>

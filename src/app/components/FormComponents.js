@@ -590,6 +590,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
 
     const [ clicked, setClicked ] = useState(false);
     const mounted = useMounted();
+    const focusRef = useRef(null);
 
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
 
@@ -692,6 +693,10 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
         items.reverse()
     }
     const attr = getDimAttr(props);
+    if (tab) {
+        attr.ref = focusRef
+    }
+
     if (!(disabled || readOnly)) {
         const handleClick = (upEvent, event = null) => {
             setClicked(true);
@@ -717,6 +722,9 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
             };
         }
         attr.onLeftClick = e => {
+            if (tab) {
+                focusRef.current.focus()
+            }
             handleClick('mouseup', e)
         }
     }
@@ -1559,7 +1567,6 @@ function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatPr
     const tooltip = useTooltip({title: value, clicked});
 
     const invalid = typeof value !== 'string';
-    // || !value.match(alpha ?/^#[0-9a-f]{8}$/i : /^#[0-9a-f]{6}$/i);
     if (invalid && fContext) {
         callAfterwards(fContext.markInvalid);
     }
@@ -1577,6 +1584,9 @@ function CssGradient({ name, value, set, readOnly, disabled, tab = true, floatPr
         tab = false
     }
     const handleClick = upEvent => {
+        if (tab) {
+            tooltip.attr.ref.current.focus()
+        }
         wContext.startExclusiveMode('openGradientPicker', 'pointer');
         wContext.addEventListener(upEvent, () => {
             wContext.endExclusiveMode('openGradientPicker');
@@ -1651,6 +1661,9 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
         tab = false
     }
     const handleClick = upEvent => {
+        if (tab) {
+            tooltip.attr.ref.current.focus()
+        }
         if (invalid) {
             colorRef.current = '#000000' + (alpha ? '00' : '');
         }

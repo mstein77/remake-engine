@@ -290,7 +290,7 @@ function Tooltip({ children }) {
  *
  * @param {object} [ref] A React reference to which this component should be bound
  */
-const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, tab, full, shorten, scroll, wrap, zIndex, verticalText, ...props }, ref) => {
+const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, tab, full, shorten, scroll, wrap, verticalText, ...props }, ref) => {
     const divRef = useRef(null);
     const [ start, setStart ] = useState(null);
     const [ showTooltip, setShowTooltip ] = useState(false);

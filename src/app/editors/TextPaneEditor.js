@@ -1041,6 +1041,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         <Stack full>
             <EntityStackSections
                 id="textBlocks"
+                key="tb"
                 sectionProps={{inner: true, name: 'Text Blocks', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 detailProps={{inner: true, name: 'Text Block Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 entityIndex={blockIndex}
@@ -1049,8 +1050,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 active={activeBlock} setActive={setActiveBlock}
             >
                 {currBlock === null ?
-                    <Block center className="less">No block selected</Block> :
-                    <Block full="h" scroll>
+                    <Block key="es" center className="less">No block selected</Block> :
+                    <Block key="pg" full="h" scroll>
                         <PropertyGrid>
                             <SelectProp name="Font:" full="h" undo="font" options={fontOptions} value={currBlock.font} set={setEntityProp('font')} />
                             <TupleProp name="Position:" undo="position" wrap
@@ -1087,7 +1088,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 }
             </EntityStackSections>
 
-            <Section name="Screen" full inner>
+            <Section key="sc" name="Screen" full inner>
                 <Stack vertical full borders>
                     <Toolbar>
                         <ToolGroup>

@@ -639,6 +639,61 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
     );
 }
 
+function FontMetrics() {
+    const cssContext = useContext(CssContext);
+
+    const divRef = useRef(null);
+    const observerRef = useRef(null);
+    const update = useComponentUpdate();
+
+    useEffect(() => {
+        const observer = new ResizeObserver(update);
+        observerRef.current = observer;
+        observer.observe(divRef.current);
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        const heights = [];
+        for(let node of divRef.current.getElementsByClassName('fm')) {
+            heights.push(node.getBoundingClientRect().height);
+        }
+        let i = 0;
+        const changes = {};
+        let hasChanges = false;
+        for (let item of Object.keys(metrics)) {
+            const curr = cssContext.getValue(item);
+            const height = heights[i];
+            if (curr !== height) {
+                hasChanges = true;
+                changes[item] = height
+            }
+            i++;
+        }
+        if (hasChanges) {
+            cssContext.setValues(changes);
+        }
+    });
+
+    const divs = [];
+    for(let [name, css] of Object.entries(metrics)) {
+        divs.push(
+            <div key={name} className={'fm ' + css}>T</div>
+        );
+    }
+    return (
+        <Block ref={divRef} className="fixed" zIndex={-1000}>
+            <Stack vertical className="transparent-color">
+                {divs}
+            </Stack>
+        </Block>
+    )
+}
+
 function SectionFrame({ id, header, name, children, float, hotKeys, area, link, inner, rev, maxSize, minSize, center, centerItems, indented, scroll, full, collapse, ...props }) {
     const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
@@ -1655,7 +1710,11 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 }
                 modalStack.push(zIndex);
                 focusStack.zIndex = zIndex;
-                focusStack.elem[zIndex] = {top: null, start: null, setShadow: null, lastTarget};
+                focusStack.elem[zIndex] = {
+                    top: null, start: null, setShadow: null,
+                    lastFocus: document.activeElement,
+                    lastTarget
+                };
                 return zIndex;
             },
             closeModal: zIndex => {
@@ -1666,7 +1725,13 @@ function WindowCtx({ imageResources, filters, children, game }) {
                     return;
                 }
                 modalStack.splice(index, 1);
-                register('lastTarget', focusStack.elem[zIndex].lastTarget);
+                const { lastTarget, lastFocus } = focusStack.elem[zIndex];
+
+                register('lastTarget', lastTarget);
+                if (lastFocus) {
+                    requestAnimationFrame(() => lastFocus.focus());
+                }
+
                 delete focusStack.elem[zIndex];
                 focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
                 if (focusStack.zIndex) {
@@ -2256,12 +2321,32 @@ function ActionBarContent({ children, scroll, ...props }) {
     )
 }
 
+function Modal({ ...props }) {
+    const trapRef = useRef(null);
+    const wContext = useContext(WindowContext);
+    if (wContext.isStyleLocked()) {
+        const lockedStyles = wContext.getLockedStyles();
+        return (
+            <Portal id="modals-container">
+                <ThemeFreeze blockRef={trapRef} values={lockedStyles}>
+                    <ModalInner trapRef={trapRef} lockedStyles={lockedStyles} { ...props } />
+                </ThemeFreeze>
+            </Portal>
+        )
+    }
+    return (
+        <Portal id="modals-container">
+            <ModalInner trapRef={trapRef} { ...props } />
+        </Portal>
+    )
+}
+
 /**
  */
-const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
+const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
-    const trapRef = useRef(null);
+//    const trapRef = useRef(null);
     const dimRef = useRef(null);
     const [ left, setLeft ] = useState(null);
     const [ top, setTop ] = useState(null);
@@ -2269,7 +2354,7 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
     const [ shadow, setShadow ] = useState(null);
     const mounted = useMounted();
 
-    const lockedStyles = wContext.isStyleLocked() ? wContext.getLockedStyles() : null;
+    // const lockedStyles = wContext.isStyleLocked() ? wContext.getLockedStyles() : null;
     let { headerBgType } = useCssProps('headerBgType');
     if (lockedStyles) {
         headerBgType = lockedStyles.headerBgType
@@ -2510,7 +2595,8 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
         vDivStyle.minHeight = null;
     }
 
-    let elem = <Block ref={trapRef} area={1} onLeftClick={e => e.stopPropagation()} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
+    return (
+        <Block ref={trapRef} area={1} onLeftClick={e => e.stopPropagation()} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
         <div className="center-v center-h full-h editor-bounds">
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
@@ -2531,11 +2617,14 @@ const Modal = function ({ id, name, close, closeable = true, zIndex = 0, full, w
                 focusElem.start.focus()
             }
         }} />
-    </Block>;
+    </Block>);
 
+    /*
     if (lockedStyles) {
         elem = <ThemeFreeze blockRef={trapRef} values={lockedStyles}>{elem}</ThemeFreeze>
     }
+
+     */
 
     return (
         <Portal id="modals-container">
@@ -2673,6 +2762,17 @@ const cssConstTypes = [
     'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'grad', 'type'
 ];
 
+const metrics = {
+    fmDefaultSmall: 'small',
+    fmDefaultMedium: 'medium',
+    fmDefaultBig: 'big',
+    fmMonoSmall: 'mono small',
+    fmMonoMedium: 'mono medium',
+    fmMonoBig: 'mono big',
+    fmButton: 'button-font'
+};
+const metricKeys = Object.keys(metrics);
+
 function CssCtx({ parent, bindRef, children, ...props }) {
 
     const [ ready, setReady ] = useState(!!parent);
@@ -2762,10 +2862,12 @@ function CssCtx({ parent, bindRef, children, ...props }) {
         };
 
         const setValue = (name, value, notify = true) => {
-            if (parent) {
-                return parent.setValue(name, value, notify)
+            if (!metricKeys.includes(name)) {
+                if (parent) {
+                    return parent.setValue(name, value, notify)
+                }
+                value = setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
             }
-            value = setStyleProp(bindRef ? bindRef.current.style : document.body.style, name, value);
             registry('values')[name] = value;
             if (notify) {
                 const watcher = registry('watcher')[name];
@@ -2781,7 +2883,9 @@ function CssCtx({ parent, bindRef, children, ...props }) {
             const style = node.style;
 
             for (let [key, value] of Object.entries(values)) {
-                setStyleProp(style, key, value)
+                if (!metricKeys.includes(key)) {
+                    setStyleProp(style, key, value)
+                }
             }
         };
 
@@ -2800,8 +2904,10 @@ function CssCtx({ parent, bindRef, children, ...props }) {
                     const value = bodyStyle.getPropertyValue(prop);
                     body[prop] = value !== undefined ? value : null;
                 }
-
                 applyTo(!bindRef ? document.body : bindRef.current);
+                for (let key of metricKeys) {
+                    values[key] = 10
+                }
                 setReady(true)
             },
 
@@ -2881,6 +2987,7 @@ function CssCtx({ parent, bindRef, children, ...props }) {
     return (
         <CssContext.Provider value={ { ...registry('api'), ready } }>
             {children}
+            {ready && <FontMetrics />}
         </CssContext.Provider>
     )
 }
@@ -2935,6 +3042,30 @@ function useFocusKeyBindings({keyHandlers = [], disabled = false, direct }) {
         }
     }
     return attr;
+}
+
+function useRefocusFirst(ref) {
+    return {
+        canRefocus: () => {
+            let elem = document.activeElement;
+            if (!elem || !ref.current) return true;
+
+            while (elem && elem !== ref.current) {
+                if (!elem.parentNode) break;
+                elem = elem.parentNode
+            }
+            return elem === ref.current
+        },
+        refocus: () => {
+            requestAnimationFrame(() => {
+                if (!ref.current) return;
+                const elem = ref.current.querySelector('.tabbed');
+                if (elem) {
+                    elem.focus()
+                }
+            });
+        }
+    }
 }
 
 function useRefocus(parentRef, direct = false) {
@@ -3227,6 +3358,7 @@ export {
     HotKeyKeys,
     HotKeySingleKeys,
     HotKeySkipValues,
+    FontMetrics,
 
     useModal,
     useComponentUpdate,
@@ -3234,6 +3366,7 @@ export {
     useMounted,
     useFocusKeyBindings,
     useRefocus,
+    useRefocusFirst,
     useCallAfterwards,
     useCssProps,
     usePageCache,
