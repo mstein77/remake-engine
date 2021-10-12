@@ -6,6 +6,7 @@ import { Button, Color, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
+import {Content} from "./BaseComponents";
 
 const defaultValues = {
     config: {
@@ -155,6 +156,42 @@ function Ruler({ }) {
             <Block height={3}></Block>
             <Block height={3} full="h" border={DIR.TOP}></Block>
         </Stack>
+    )
+}
+
+function JsonView({ json, defaultJson = {}, skipKeys = [], trim, ...props }) {
+    const base = { ...defaultJson, ...json };
+    for (let key of skipKeys) {
+        delete base[key];
+    }
+    let jsonString = JSON.stringify(base, null, 2);
+    if (jsonString === '{}') {
+        jsonString = '{\n}';
+    }
+    const lines = jsonString.split("\n");
+
+    let defJsonString = JSON.stringify(defaultJson, null, 2);
+    if (defJsonString === '{}') {
+        defJsonString = '{\n}';
+    }
+    const defLines = defJsonString.split("\n");
+    const render = line => {
+        if (trim && line.match(/^[ ]+\"[^"]*\"\:/)) {
+            return line.replace(/\"/, '').replace(/\"/, '');
+        }
+        return line
+    };
+
+    return (
+        <Block border="1" scroll { ...props }>
+            <pre className="scroll padded-h">
+            {
+                lines.map(
+                    (line, index) =>
+                        <span key={index} className={defLines.includes(line) || defLines.includes(line + ',') ? 'less' : ''}>{render(line)}{"\n"}</span>)
+            }
+            </pre>
+        </Block>
     )
 }
 
@@ -352,15 +389,18 @@ function Canvas({ id, width, height, smoothing, render, plain, border, className
     if (className) {
         cls.push(className);
     }
-    if (border) {
-        cls.push('outline' + (border !== true ? '-1' : ''));
-    }
-
-    return (
-        <div className={cls.join(' ')} style={{height, width}}>
+    const elem = (
+        <div className={cls.join(' ')} style={{ width, height }}>
             {!plain && <CanvasBackground />}
             <canvas className="absolute" width={width} height={height} ref={canvasRef} />
         </div>
+    );
+    if (!border) return elem;
+
+    return (
+        <Block border={border}>
+            {elem}
+        </Block>
     )
 }
 
@@ -973,7 +1013,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
         const toggleCollapse = () => {
             setCollapsed(!collapsed);
         };
-        const button = <Block key="b" center={collapsedByH ? 'h' : false}><Button refocus icon={dir} onClick={toggleCollapse} /></Block>;
+        const button = <Block key="b" center={collapsedByH ? 'h' : false}><Button icon={dir} onClick={toggleCollapse} /></Block>;
 
         if (collapseH && rev && !collapsed) {
             items.push(button);
@@ -998,7 +1038,7 @@ function SectionFrame({ id, header, name, children, float, hotKeys, area, link, 
     items.push(contentElem);
 
     const stack = (
-        <Stack vertical { ...innerAttr } borders border={inner ? (collapseH ? DIR.RIGHT : false) : true}>
+        <Stack vertical { ...innerAttr } borders border={inner ? (collapseH ? (rev ? DIR.LEFT : DIR.RIGHT) : false) : true}>
             {items}
         </Stack>
     );
@@ -3359,6 +3399,7 @@ export {
     HotKeySingleKeys,
     HotKeySkipValues,
     FontMetrics,
+    JsonView,
 
     useModal,
     useComponentUpdate,

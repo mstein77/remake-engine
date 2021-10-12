@@ -16,6 +16,7 @@ import {
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
+import { TilesPaneEditor as TilesPaneEditorNew } from "./../editors/TilesPaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
@@ -26,6 +27,9 @@ import {
     getResourceTreeForJsonModel
 } from '../helper/helper';
 import ReactDOM from "react-dom";
+import { Block, Grid } from "../components/LayoutComponents";
+import { Section as NewSection } from "./BasicComponents";
+import { Button } from "../components/FormComponents";
 import { MainEditor } from "../editors/MainEditor";
 import { DemoEditor } from "../editors/DemoEditor";
 
@@ -486,6 +490,8 @@ function EditorApp(props) {
     const isNew = 1;
     const [ ready, setReady ] = useState(false);
 
+    const [ selected, setSelected ] = useState(null);
+
     useEffect(() => {
         const syncLinks = parts => {
             const elems = document.querySelectorAll('link');
@@ -588,24 +594,71 @@ function EditorApp(props) {
     if (isNew) {
         let editor = '';
         const resourceLoader = props.game.getResourceLoader();
-        for (let resource of resources) {
-            // editor = <DemoEditor />; break;
-
-            if (resource.type !== 'TextPane') continue;
-
-            if (resource.data === null) {
-                resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+        if (selected === null) {
+            let i = 0;
+            const options = [];
+            while (i < resources.length) {
+                const option = i;
+                const resource = resources[i];
+                switch(resource.type) {
+                    case 'TilesMap':
+                    case 'TextPane':
+                        options.push(
+                            <Fragment key={option}>
+                                <Block center="v" padded className="big">{resource.type}</Block>
+                                <Block center="v" padded className="big more">{resource.id}</Block>
+                                <Block center="v" padded><Button padded="h" name="Edit" onClick={() => setSelected(option)} /></Block>
+                            </Fragment>
+                        );
+                }
+                i++;
             }
-            const model = getJsonModelOfInstance(resource.data);
 
-            model.blocks = resource.blocks;
+            return (
+                <>
+                    <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>
+                        <Block full border="1">
+                            <NewSection name="Resources" full inner>
+                                <Grid padded columns="+ + +">
+                                    {options}
+                                </Grid>
+                            </NewSection>
+                        </Block>
+                    </MainEditor>
+                    <div id="modals-container" />
+                </>
+            )
+        }
 
-            const tree = getResourceTreeForJsonModel(resource.cls, model);
-            editor = <TextPaneEditorNew resource={resource} model={model} />;
+        const resource = resources[selected];
+
+        editor = null;
+        let model = null;
+        let tree = null;
+
+        switch (resource.type) {
+            case 'TilesMap':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <TilesPaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'TextPane':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                model.blocks = resource.blocks;
+                tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <TextPaneEditorNew resource={resource} model={model} />;
+                break;
         }
         return  (
             <>
-                <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>{editor}</MainEditor>
+                <MainEditor back={() => setSelected(null)} game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>{editor}</MainEditor>
                 <div id="modals-container"></div>
             </>
         )

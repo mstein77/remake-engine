@@ -1,3 +1,61 @@
+REACT-HOOKS:
+
+a) Funktionale Komponente
+
+function({ name }) {
+    //
+
+    // return dom
+    return (
+        <div>
+          Hello {name}
+        </div>
+    )
+}
+
+b) Funktionale Komponente mit Hooks
+
+function({ name }) {
+   // hooks
+
+   //return dom
+   return (
+   )
+}
+
+
+// 1. state hook: useState
+const [counter, setCounter] = useState(3);
+
+// 2. lifecycle hook: useEffect
+useEffect(() => {
+    console.log('MOUNTED');
+    return () => {
+        console.log('UNMOUNTED');
+    }
+}, []);
+
+// 3. context hook: useContext
+function App() {
+  const myAppContext = {
+    x: y,
+
+  };
+  return (
+        <AppContext.provider value={myAppContext}>
+           <blah>
+              <Foo></Foo>
+           </blah>
+        </AppContext>
+  );
+}
+const appContext = useContext(AppContext);
+
+// 4. Reference-Hook: useRef
+const divRef = useRef(null);
+
+{current: null}
+
 
 --------------------------
  PERSISTIERUNG:
@@ -92,11 +150,9 @@
      - Background
 ---------------------------
  - FOCUS-Handling
-    * BUG: space on toolbar action triggers selection
-       * BUG: tooltip funzen nicht mehr
-       - BUG: Colapser-Focus geht verloren, wird nicht gesetzt
+    - BUG: space on toolbar action triggers selection
+       * disabled button: tabIndex erst bei blur entfernen
        - BUG: Drag-Drop deaktiviert element
-       - disabled button: tabIndex erst bei blur entfernen
        - Stack/Radio: Focus-Handling überarbeiten
        - Handling checken
 
@@ -113,6 +169,12 @@
  - Preview: Auto-Scroll on Drag
 
 
+=======================================
+ TILES-PANE EDITOR
+=======================================
+ * Selected-Anzeige
+
+ - EntityPicker/Manager: TextAndPicture
 
 
  /**

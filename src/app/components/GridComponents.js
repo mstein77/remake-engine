@@ -1,15 +1,6 @@
 import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import { Block, DIR, Overlay, Overlays, Grid, Stack, handleLeftRightClick } from "./LayoutComponents";
-import {
-    AvailContext,
-    AvailContextProvider,
-    CssContext,
-    Canvas,
-    ScrollArea,
-    WindowContext,
-    EditorContext, useCallAfterwards, useModal,
-    useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd
-} from "./BasicComponents";
+import { AvailContext, AvailContextProvider, CssContext, Canvas, ScrollArea, WindowContext, EditorContext, useCallAfterwards, useCssProps, useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd } from "./BasicComponents";
 import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
 import { d, clamp, areDisjoint, getCanvasForBitmap } from "../helper/helper";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
@@ -1648,7 +1639,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
             actions.insert = {
                 buttons: [
                     {icon: 'add', padded: false, params: {no: 1}},
-                    {icon: 'add', padded: false, name: '10', params: {no: 10}}
+                    {icon: 'add', gaps: false, padded: false, name: '10', params: {no: 10}}
                 ],
                 has: () => propsRef.current.markerType && propsRef.current.markerType.endsWith('gap'),
                 exec: data => {
@@ -2078,12 +2069,12 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
     width, setWidth, height, setHeight, posX, setPosX, posY, setPosY, undo, center = true, ...props }) {
 
     const aContext = useContext(AvailContext);
-    const cssContext = useContext(CssContext);
+    const { defaultPaddingPx } = useCssProps('defaultPaddingPx');
     const callAfterwards = useCallAfterwards();
 
     let gridWidth = gridProvider.getWidth();
     let gridHeight = gridProvider.getHeight();
-    const gridLength = gridProvider.getLength;
+    const gridLength = gridProvider.getLength();
 
     const value = useMemo(() => {
         // noch keine Avail-Dim? Dann aussteigen mit null
@@ -2091,11 +2082,10 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
 
         // TODO: check & replace magic numbers
         // verfügbare Restbreite und Höhe berechnen (inclusive Rulers fals aktiv)
-        let spaceX = Math.max(aContext.width - border - 2 * cssContext.getValue('defaultPaddingPx') -
+        let spaceX = Math.max(aContext.width - border - 2 * defaultPaddingPx -
             (rulers ? 38 : 0), 0);
-        let spaceY = Math.max(aContext.height - border - 2 * cssContext.getValue('defaultPaddingPx') -
+        let spaceY = Math.max(aContext.height - border - 2 * defaultPaddingPx -
             (rulers ? 22 : 0), 0);
-
         const wrap = !!gridProvider.setWrapWidth;
         // berechne Cellmaße und den maximal möglichen Zoom, die sich aus dem
         // aktuellen Zoom, der Border und der Restbreite/Höhe ergeben
@@ -2111,7 +2101,6 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         let maxPageX = Math.min(maxWidth,  Math.floor(spaceX / cellDim.xPlusBorder));
         // Berechne wieviele der verfügbaren Zellen, maximal in die Resthöhe passen
         let maxPageY = Math.min(maxHeight, Math.floor(spaceY / cellDim.yPlusBorder));
-
         // falls wrapping aktiv, dann setze die berechnete WrapWidth im Grid
         if (wrap) {
             gridProvider.setWrapWidth(
@@ -2134,6 +2123,12 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         }
         // berechne erneut, wieviele der verfügbaren Zellen, in die neue Restbreite passen
         maxPageX = clamp(1, Math.floor(spaceX / cellDim.xPlusBorder), gridWidth);
+        if (wrap && maxPageX < gridWidth) {
+            gridProvider.setWrapWidth(maxPageX);
+            gridWidth = gridProvider.getWidth();
+            gridHeight = gridProvider.getHeight();
+        }
+
         // analog für Resthöhe
         maxPageY = clamp(1, Math.floor(spaceY / cellDim.yPlusBorder), gridHeight);
 
@@ -2141,7 +2136,10 @@ function FlexGridInner({ gridProvider, cellType, border, zoom, rulers, maxZoom, 
         if (maxZoom !== undefined) {
             // ermittel den neuen MaxZoom aus dem berechneten maxZoom und der
             // minZoom als unterer Schranke
-            const newMaxZoom = Math.max(cellType.getMinZoom(), cellDim.maxZoom);
+            let newMaxZoom = Math.max(cellType.getMinZoom(), cellDim.maxZoom);
+            if (props.maxAvailZoom !== undefined) {
+                newMaxZoom = Math.min(newMaxZoom, props.maxAvailZoom)
+            }
             // ergab sich dadurch ein neuer maxZoom, dann übernehme diesen
             if (maxZoom !== newMaxZoom) {
                 callAfterwards(setMaxZoom, newMaxZoom)
@@ -2304,7 +2302,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     {resize &&
                         <>
                             <Button icon="remove" onClick={addRows(-1, true)} />
-                            <Button icon="remove" name="10" onClick={addRows(-10, true)} />
+                            <Button icon="remove" name="10" gaps={false} onClick={addRows(-10, true)} />
                         </>
                     }
                     {navi &&
@@ -2313,7 +2311,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                             <Button icon="system_update_alt" iconProps={{rotate: 180}} onClick={() => shiftRow(true)} />}
                         {resize &&
                             <>
-                                <Button icon="add" name="10" onClick={addRows(10, true)} />
+                                <Button icon="add" name="10" gaps={false} onClick={addRows(10, true)} />
                                 <Button icon="add" onClick={addRows(1, true)} />
                             </>
                         }
@@ -2329,7 +2327,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     {resize &&
                         <>
                             <Button icon="remove" onClick={addColumns(-1, true)} />
-                            <Button vertical icon="remove" name="10" onClick={addColumns(-10, true)} />
+                            <Button vertical icon="remove" name="10" gaps={false} onClick={addColumns(-10, true)} />
                         </>
                     }
                     {navi && <Button icon="west" disabled={posX === 0} onClick={() => setPosX(0)} />}
@@ -2337,7 +2335,7 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                         <Button icon="system_update_alt" iconProps={{rotate: 90}} onClick={() => shiftColumn(true)} />}
                         {resize &&
                             <>
-                                <Button vertical icon="add" name="10" onClick={addColumns(10, true)} />
+                                <Button vertical icon="add" name="10" gaps={false} onClick={addColumns(10, true)} />
                                 <Button icon="add" onClick={addColumns(1, true)} />
                             </>
                         }
@@ -2351,14 +2349,14 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     {resize &&
                         <>
                             <Button icon="remove" onClick={addColumns(-1, false)} />
-                            <Button vertical icon="remove" name="10" onClick={addColumns(-10, false)} />
+                            <Button vertical icon="remove" name="10" gaps={false} onClick={addColumns(-10, false)} />
                         </>
                     }
                     {navi && <Button icon="east" disabled={posX === maxPosX} onClick={() => setPosX(maxPosX)} />}
                     {edit && <Button icon="system_update_alt" iconProps={{rotate: -90}} onClick={() => shiftColumn(false)} />}
                     {resize &&
                         <>
-                            <Button vertical icon="add" name="10" onClick={addColumns(10, false)} />
+                            <Button vertical icon="add" name="10" gaps={false} onClick={addColumns(10, false)} />
                             <Button icon="add" onClick={addColumns(1, false)} />
                         </>
                     }
@@ -2373,14 +2371,14 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
                     {resize &&
                         <>
                             <Button icon="remove" onClick={addRows(-1, false)} />
-                            <Button icon="remove" name="10" onClick={addRows(-10, false)} />
+                            <Button icon="remove" name="10" gaps={false} onClick={addRows(-10, false)} />
                         </>
                     }
                     {navi && <Button icon="south" disabled={posY === maxPosY} onClick={() => setPosY(maxPosY)} />}
                     {edit && <Button icon="system_update_alt" onClick={() => shiftRow(false)} />}
                     {resize &&
                         <>
-                            <Button icon="add" name="10" onClick={addRows(10, false)} />
+                            <Button icon="add" name="10" gaps={false} onClick={addRows(10, false)} />
                             <Button icon="add" onClick={addRows(1, false)} />
                         </>
                     }
@@ -2466,7 +2464,7 @@ function BaseGrid({ pageId, gridProvider, selection, onDoubleClick, targetValues
         return options
     }, [targetValues]);
 
-    const modes = props.modes ? props.modes : (edit ? ['select', 'pick', 'write'] : 'select');
+    const modes = props.modes ? props.modes : (edit ? ['select', 'pick', 'write', 'add'] : 'select');
     const startMode = (modes.length === 1) ? modes[0] : 'select';
     const startModeParams = startMode === 'select' ? selection : props.modeParams;
     const hasMode = value => modes.includes(value);
@@ -2541,7 +2539,7 @@ function BaseGrid({ pageId, gridProvider, selection, onDoubleClick, targetValues
                     writeTransparent={writeTransparent}
                     pinned={isPinned} edit={edit}
                     resize={resize} navi={navi}
-                    onDoubleClick={onDoubleClick} undo={undo}
+                    onDoubleClick={onDoubleClick} undo
                 />
             </Block>
             <Toolbar full="h">

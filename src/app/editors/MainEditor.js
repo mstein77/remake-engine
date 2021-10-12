@@ -286,7 +286,6 @@ function ThemeSettings({ theme, setTheme }) {
         const titleVertBgGrad = 'linear-gradient(' + parts.join(', ') + ')';
         setTheme({ ...theme, titleBgGrad, titleVertBgGrad });
     }
-
     return (
         <Stack full borders>
             <Block full="h" padded scroll>
@@ -891,7 +890,7 @@ function Settings({ save, close, defaults }) {
     )
 }
 
-function BaseAppInner({ children }) {
+function BaseAppInner({ back, children }) {
     const wContext = useContext(WindowContext);
     const SettingsModal = useModal();
     const { openConfirmModal, Modals } = useConfirmDialog();
@@ -910,8 +909,6 @@ function BaseAppInner({ children }) {
             callback()
         }
     };
-
-    const back = () => d('TODO!');
 
     const play = () => {
         const gameRef = wContext.game;
@@ -1006,7 +1003,7 @@ function BaseAppInner({ children }) {
             <Stack vertical gaps full>
                 <Block full="h">
                     <Stack full="h">
-                        <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
+                        {back && <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />}
                         <Block padded="h" center="v" full="h" shorten />
                         <Stack gaps center="v">
                             <Button icon="build" help="Editor Settings" padded="1" onClick={() => wContext.openSettings()} />

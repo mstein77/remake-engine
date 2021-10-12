@@ -1,5 +1,17 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
-import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec } from "../helper/helper"
+import {
+    d,
+    round,
+    clamp,
+    isEventInRect,
+    drawCanvasToAvail,
+    getCanvasForBitmap,
+    copy2clipboard,
+    hex2rgb,
+    rgb2hex,
+    getParsedCssValueRec,
+    Players
+} from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
     WindowContext,
@@ -26,6 +38,7 @@ import {
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
+import {ActionBox, Content, TextField} from "./BaseComponents";
 
 const STATE = {
     INACTIVE: 0,
@@ -509,11 +522,13 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
     )
 }
 
-function useTooltip({ title, hotKey, clicked, info, click }) {
+function useTooltip({ title, hotKey, clicked, info, click, ref }) {
     const wContext = useContext(WindowContext);
 
-    const hostRef = useRef(null);
+    const divRef = useRef(null);
     const mounted = useMounted();
+
+    const hostRef = ref ? ref : divRef;
 
     const [ showTooltip, setShowTooltipRaw ] = useState(false);
     const setShowTooltip = value => {
@@ -552,13 +567,14 @@ function useTooltip({ title, hotKey, clicked, info, click }) {
     }
 
     const attr = {
-        ref: hostRef,
         onMouseOver: () => {
             wContext.startTooltipTimer(propsRef);
         },
         onMouseOut: checkTooltip
     };
-
+    if (!ref) {
+        attr.ref = hostRef
+    }
     return {
         enabled: true,
         attr,
@@ -582,8 +598,6 @@ function addPaddingCls(cls, padded, type) {
     }
 }
 
-/**
- */
 function Button({ icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
                    className,  tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
@@ -591,9 +605,13 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     const [ clicked, setClicked ] = useState(false);
     const mounted = useMounted();
     const focusRef = useRef(null);
-
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
 
+    const helpProps = {
+        title: '',
+        clicked,
+        ref: focusRef
+    };
     const cls = [statePrefix + '-bg', statePrefix + '-color button-font'];
     if (className) {
         cls.push(className);
@@ -640,10 +658,6 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     const dir = vertical ? 'v' : 'h';
     const oppDir = vertical ? 'h' : 'v';
 
-    const helpProps = {
-        title: '',
-        clicked
-    };
     if (help && !(disabled || readOnly)) {
         if (action) {
             helpProps.hotKey = wContext.hotKeyActions.action2hotKey[action];
@@ -667,7 +681,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
             }
         }
     }
-    const tooltip = useTooltip(helpProps)
+    const tooltip = useTooltip(helpProps);
 
     const items = [];
     if (icon) {
@@ -693,9 +707,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
         items.reverse()
     }
     const attr = getDimAttr(props);
-    if (tab) {
-        attr.ref = focusRef
-    }
+    attr.ref = focusRef;
 
     if (!(disabled || readOnly)) {
         const handleClick = (upEvent, event = null) => {
@@ -723,7 +735,12 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
         }
         attr.onLeftClick = e => {
             if (tab) {
-                focusRef.current.focus()
+                focusRef.current.focus();
+                requestAnimationFrame(() => {
+                    if (focusRef.current) {
+                        focusRef.current.focus()
+                    }
+                })
             }
             handleClick('mouseup', e)
         }
@@ -738,7 +755,6 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     }
     return (
         <Block gaps tab={tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
-            <>
             {!hasStack ?
                 items[0] :
                 <Stack key="s" gaps={gaps} center={centerItems} end={end} vertical={vertical} full={fullStack}>
@@ -746,7 +762,6 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
                 </Stack>
             }
             {tooltip.render}
-            </>
         </Block>
     )
 }
@@ -2288,7 +2303,88 @@ function ColorPicker({ value, set, alpha, close }) {
     )
 }
 
-function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
+function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, animationIndex = null }) {
+    const EntityPickerModal = useModal();
+
+    const index = entityIndex.getEntityByPropValue('value', value);
+    let width = null;
+    let height = null;
+
+    if (index !== null) {
+        width = typeof zoomOrAvail === 'object' ? zoomOrAvail.width : zoomOrAvail * value.width;
+        height = typeof zoomOrAvail === 'object' ? zoomOrAvail.height : zoomOrAvail * value.height;
+    }
+
+    const playerRef = useRef(null);
+
+    let animation = '';
+    if (animationIndex && index !== null) {
+        animation = entityIndex.hasEntityProp('animation') ?
+            entityIndex.getEntityPropValue(index, 'animation') : value
+    }
+
+    const prePlayers = useMemo(() => {
+        if (!animationIndex || !animation) {
+            return null;
+        }
+        const obj = new Players(animationIndex);
+        obj.setAnimations([animation]);
+        return obj;
+    }, [animation]);
+    const players = null; // useAnimationPlayers(entityIndex, animationIndex, prePlayers);
+
+    playerRef.current = players;
+
+    const pick = readOnly ? null : () => {
+        EntityPickerModal.open({
+            entityIndex,
+            animationIndex,
+            controls: true,
+            select: index => {
+                set(entityIndex.getEntityPropValue(index, 'value'));
+                EntityPickerModal.close();
+            }
+        });
+    };
+    const render = ctx => {
+        entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, playerRef.current);
+    };
+
+    return (
+        <>
+            <Stack vertical>
+                {!readOnly &&
+                    <Block>
+                        <Stack>
+                            <Block gaps="1">
+                                <Button onClick={pick}>Pick</Button>
+                            </Block>
+                            <Block onLeftClick={pick}>
+                                <Input value={value} readOnly />
+                            </Block>
+                            {reset && <Button onClick={() => set('')} icon="delete" />}
+                        </Stack>
+                    </Block>
+                }
+                <Block>
+                    {width !== null &&
+                        <Block onLeftClick={pick}>
+                            <Canvas border="1" width={width} height={height} render={render} />
+                        </Block>
+                    }
+                </Block>
+            </Stack>
+
+            <EntityPickerModal.content width="800" height="400">
+                <EditorCtx>
+                    <EntityPicker { ...EntityPickerModal.props } />
+                </EditorCtx>
+            </EntityPickerModal.content>
+        </>
+    )
+}
+
+function Bitmap({ value, set, readOnly, colors, empty, zoomOrAvail = 1, entityIndex }) {
     const { EditBitmapModal, openEditBitmapModal, closeEditBitmapModal } = useEditBitmapModal();
     const CopyBitmapModal = useModal();
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select image...');
@@ -2346,12 +2442,14 @@ function Bitmap({ value, set, colors, empty, zoomOrAvail = 1, entityIndex }) {
     return (
         <>
             <Stack vertical>
-                <Stack gaps="1">
-                    <Button name="edit" padded="h" onClick={editBitmap} />
-                    <Button name="import" onClick={importBitmap} padded="h" />
-                    {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
-                    {empty && <Button icon="clear" onClick={() => set(null)} />}
-                </Stack>
+                {!readOnly &&
+                    <Stack gaps="1">
+                        <Button name="edit" padded="h" onClick={editBitmap} />
+                        <Button name="import" onClick={importBitmap} padded="h" />
+                        {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
+                        {empty && <Button icon="clear" onClick={() => set(null)} />}
+                    </Stack>
+                }
                 <Block padded onLeftClick={editBitmap}>
                     <Canvas width={width} height={height} render={render} border="1" />
                 </Block>
@@ -2954,6 +3052,14 @@ function BitmapProp({ name, ...props }) {
     )
 }
 
+function EntityProp({ name, ...props }) {
+    return (
+        <LabelProp name={name}>
+            <Entity { ...props } />
+        </LabelProp>
+    )
+}
+
 function Submit({ disabled, className, ...props }) {
     const fContext = useContext(FormContext);
     const cls = ['submit'];
@@ -3061,6 +3167,8 @@ export {
     ColorProp,
     CssGradient,
     CssGradientProp,
+    Entity,
+    EntityProp,
     Slider,
     Bitmap,
     BitmapProp,

@@ -361,7 +361,7 @@ function FlexStackInner({
         varHeight, fixHeight = 0,
         varWidth, fixWidth = 0, minWidth,
         pos, setPos, page, setPage, maxPage,
-        auto, scaling, items, render}) {
+        auto, scaling, items, render, ...props }) {
 
     const aContext = useContext(AvailContext);
 
@@ -373,6 +373,9 @@ function FlexStackInner({
         let maxAvailZoom = height / varHeight;
         if (!scaling) {
             maxAvailZoom = Math.floor(maxAvailZoom);
+        }
+        if (props.maxAvailZoom) {
+            maxAvailZoom = Math.min(maxAvailZoom, props.maxAvailZoom);
         }
         if (minZoom && maxAvailZoom < minZoom) return null;
 
@@ -457,12 +460,13 @@ function FlexStack({ ...props }) {
     )
 }
 
-function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick,
-                           entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props }) {
+function EntityManager({
+       addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick,
+       entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props
+    }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
     const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
-
     const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
 
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
@@ -794,10 +798,10 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
                                     <CenterInfo>{'No items found matching "' + filter + '"'}</CenterInfo> :
                                     <FlexStack
                                         auto={auto} scaling={scaling}
-                                        render={render} items={view.matches}
+                                        render={render} items={view.matches} maxAvailZoom={props.maxZoom}
                                         zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
-                                        varWidth={sizeX} fixWidth={2 * padding} minWidth={minWidth}
-                                        fixHeight={titleHeight} varHeight={sizeY}
+                                        varWidth={sizeX} fixWidth={2 * padding + 2} minWidth={minWidth}
+                                        fixHeight={titleHeight + padding + 2} varHeight={sizeY}
                                         page={page} maxPage={view.count} setPage={setPage}
                                         pos={pos} setPos={setPos}
                                         onDoubleClick={onDoubleClick}
@@ -818,11 +822,13 @@ function EntityManager({ addOp, editOp, importOp, reassignOp, readOnly, onDouble
     )
 }
 
-function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, base = null, centerItems = true, ...props }) {
+function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, empty = 'No items available!', base = null, centerItems = true, ...props }) {
+
+    const callAfterwards = useCallAfterwards();
 
     const [ pos, setPos ] = useState(0);
-    const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : 5);
-    const [ maxZoom, setMaxZoom ] = useState(10);
+    const [ zoom, setZoom ] = useState(props.zoom !== undefined ? props.zoom : 1);
+    const [ maxZoom, setMaxZoom ] = useState(props.maxZoom !== undefined ? props.maxZoom : 10);
     const [ rulers, setRulers ] = useCachedState(props.rulers !== undefined ? null : 'global', 'EntityPickerRulers', props.rulers !== undefined ? props.rulers : false, 'bool');
     const [ border, setBorder ] = useCachedState(props.border !== undefined ? null : 'global', 'EntityPickerBorder', props.border !== undefined ? props.border : 1, 'number');
     const [ width, setWidth ] = useState(1);
@@ -832,7 +838,7 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
     const [ filter, setFilterRaw ] = useState('');
 
     if (zoom > maxZoom) {
-        setZoom(maxZoom);
+        callAfterwards(setZoom, maxZoom);
     }
 
     const players = null; // useAnimationPlayers(entityIndex, animationIndex);
@@ -862,10 +868,12 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
         }
     }, []);
 
+    const hasItems = gridProvider.getWidth() > 0;
+
     return (
         <EditorCtx>
             <Stack vertical full borders>
-                {controls &&
+                {hasItems && controls &&
                     <Toolbar>
                         {props.filter &&
                             <Input name="Filter:" clear active={filter !== ''} value={filter} set={setFilter} />
@@ -878,13 +886,14 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                 }
                 <Block full>
                     {gridProvider.getWidth() === 0 ?
-                        <CenterInfo>No items available!</CenterInfo> :
+                        <CenterInfo>{empty}</CenterInfo> :
                         <Block full>
                             <FlexGrid
                                 { ...modeProps }
 
                                 gridProvider={gridProvider} cellType={cellType}
                                 zoom={zoom} setZoom={setZoom} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
+                                maxAvailZoom={props.maxZoom}
                                 setBorder={setBorder} setRulers={setRulers}
                                 border={border} rulers={rulers} center={centerItems}
                                 posX={0} setPosX={noop} posY={pos} setPosY={setPos}
