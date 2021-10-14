@@ -1,5 +1,20 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import { EditorSection, Kbd, CenterInfo, EditorContext, Toolbar, ToolGroup, Canvas, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, useCachedState, WindowContext } from "../components/BasicComponents";
+import {
+    EditorSection,
+    Kbd,
+    CenterInfo,
+    EditorContext,
+    Toolbar,
+    ToolGroup,
+    Canvas,
+    useModal,
+    useComponentUpdate,
+    useUpdateOnEntityIndexChanges,
+    PropertyGrid,
+    Section,
+    useCachedState,
+    WindowContext
+} from "../components/BasicComponents";
 import { DIR, Block, Stack, Overlays, Overlay } from "../components/LayoutComponents";
 import { d, getCanvasForDim, getEmptyImageData, getColorsFromCanvas } from "../helper/helper";
 import { useExportModal, NameDialog, FiltersModal, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal } from "../components/EditorComponents";

@@ -132,6 +132,21 @@ const divRef = useRef(null);
 
    => reg:body
 
+---------------------------
+FocusNavigation
+---------------------------
+ TAB von vorherigen DOM-Elem:
+   -> focusMarker auf aktives Element oder 1.
+ LEFT/RIGHT:
+   -> Nächstes/Vorheriges bzw. Erstes/Letztes
+      focusMarker
+ SPACE:
+   -> Aktivierung und focusMarker=Pos
+
+ BLUR:
+   -> focusMarker = active/erstes
+---------------------------
+
 
 ---------------------------
  - Font-Styling
@@ -151,9 +166,8 @@ const divRef = useRef(null);
 ---------------------------
  - FOCUS-Handling
     - BUG: space on toolbar action triggers selection
-       * disabled button: tabIndex erst bei blur entfernen
        - BUG: Drag-Drop deaktiviert element
-       - Stack/Radio: Focus-Handling überarbeiten
+       * Stack/Radio: Focus-Handling überarbeiten
        - Handling checken
 
  - Entity-Manager

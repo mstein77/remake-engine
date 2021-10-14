@@ -603,8 +603,11 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
+    const [ focused, setFocused ] = useState(false);
     const mounted = useMounted();
     const focusRef = useRef(null);
+    const focusedRef = useRef(null);
+    focusedRef.current = focused;
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
 
     const helpProps = {
@@ -708,7 +711,12 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     }
     const attr = getDimAttr(props);
     attr.ref = focusRef;
-
+    attr.onFocus = () => setFocused(true);
+    attr.onBlur = () => {
+        requestAnimationFrame(
+            () => setFocused(false)
+        );
+    }
     if (!(disabled || readOnly)) {
         const handleClick = (upEvent, event = null) => {
             setClicked(true);
@@ -754,7 +762,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
         items[0] = <Block key="e" end={end} center={centerItems}>{items[0]}</Block>;
     }
     return (
-        <Block gaps tab={tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
+        <Block gaps tab={focused || tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
             {!hasStack ?
                 items[0] :
                 <Stack key="s" gaps={gaps} center={centerItems} end={end} vertical={vertical} full={fullStack}>

@@ -3358,6 +3358,16 @@ function useCachedState(level, id, value, type) {
     ]
 }
 
+function useDebugMount(name) {
+    useEffect(() => {
+        if (!name) return;
+        d('MOUNTING', name);
+        return () => {
+            d('UNMOUNTING', name);
+        }
+    }, []);
+}
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -3411,5 +3421,6 @@ export {
     useCallAfterwards,
     useCssProps,
     usePageCache,
-    useCachedState
+    useCachedState,
+    useDebugMount
 }

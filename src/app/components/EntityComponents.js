@@ -2,7 +2,28 @@ import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import { EditorCtx, useRefocusFirst, CenterInfo, EditorContext, Section, Canvas, Kbd, AvailContextProvider, useFocusKeyBindings, useRefocus, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps } from "./BasicComponents";
+import {
+    EditorCtx,
+    useRefocusFirst,
+    CenterInfo,
+    EditorContext,
+    Section,
+    Canvas,
+    Kbd,
+    AvailContextProvider,
+    useFocusKeyBindings,
+    useRefocus,
+    Toolbar,
+    ToolGroup,
+    ScrollArea,
+    BackgroundControl,
+    useUpdateOnEntityIndexChanges,
+    useCallAfterwards,
+    useCachedState,
+    AvailContext,
+    WindowContext,
+    useCssProps
+} from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
@@ -117,7 +138,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     const indexSize = entityIndex.getLength();
     if (active !== null && indexSize === 0) {
         callAfterwards(setActiveRaw, null);
-        return '';
     } else if (indexSize > 0 && active >= indexSize) {
         const doRefocus = canRefocus();
         callAfterwards(() => {
@@ -265,7 +285,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         );
         setActive(isFirst ? maxIndex : active - 1)
     };
-
     const execDown = !order ? null : () => {
         const index = active;
         const maxIndex = entityIndex.getLength() - 1;
@@ -321,7 +340,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             </Block>
         </Stack>
     );
-
     if (children) {
         return (
             <Stack>
@@ -330,14 +348,12 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             </Stack>
         )
     }
-
     return elem
 }
 
 function EntityStackSections({ id, sectionProps, detailProps, active, children, ...props}) {
 
     const items = [];
-
     items.push(
         <Section key={0} id={id} { ...sectionProps }>
             <EntityStack active={active} { ...props } />
