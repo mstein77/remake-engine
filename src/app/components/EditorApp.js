@@ -17,6 +17,7 @@ import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
 import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
 import { TilesPaneEditor as TilesPaneEditorNew } from "./../editors/TilesPaneEditor";
+import { SpritePaneEditor as SpritePaneEditorNew } from "./../editors/SpritePaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
@@ -432,11 +433,10 @@ function PageSelector(props) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
             model = getJsonModelOfInstance(resource.data);
-
             tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <TilesMapEditor key={'tilesMap_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TilesMapEditor key={'tilesMap_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} { ...editorProps } />
                 </Restorable>
             );
             break;
@@ -450,7 +450,7 @@ function PageSelector(props) {
             tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} { ...editorProps } />
                 </Restorable>
             );
             break;
@@ -489,7 +489,6 @@ function PageSelector(props) {
 function EditorApp(props) {
     const isNew = 1;
     const [ ready, setReady ] = useState(false);
-
     const [ selected, setSelected ] = useState(null);
 
     useEffect(() => {
@@ -509,8 +508,12 @@ function EditorApp(props) {
                 linkNode.rel = 'stylesheet';
                 linkNode.type ='text/css';
                 linkNode.onload = function() { this.title = '1' };
-                head.appendChild(
-                    linkNode
+                requestAnimationFrame(
+                    () => {
+                        head.appendChild(
+                            linkNode
+                        )
+                    }
                 );
             }
         };
@@ -524,7 +527,7 @@ function EditorApp(props) {
                     break
                 }
             }
-            setReady(true)
+            setReady(true);
         }, 200);
 
         return () => {
@@ -601,6 +604,7 @@ function EditorApp(props) {
                 const option = i;
                 const resource = resources[i];
                 switch(resource.type) {
+                    case 'spriteSheet':
                     case 'TilesMap':
                     case 'TextPane':
                         options.push(
@@ -654,6 +658,16 @@ function EditorApp(props) {
                 model.blocks = resource.blocks;
                 tree = getResourceTreeForJsonModel(resource.cls, model);
                 editor = <TextPaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'spriteSheet':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                model.blocks = resource.blocks;
+                // tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <SpritePaneEditorNew resource={resource} model={model} />;
                 break;
         }
         return  (

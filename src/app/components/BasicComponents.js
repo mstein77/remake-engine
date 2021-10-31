@@ -1,12 +1,22 @@
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex } from "../helper/helper"
+import {
+    d,
+    Storage,
+    clamp,
+    isEventInRect,
+    getCanvasForBitmap,
+    getCanvasForDim,
+    getUniqueName,
+    hex2rgb,
+    rgb2hex,
+    Players
+} from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay } from "./LayoutComponents";
-import { Button, Color, OkCancelForm } from "./FormComponents";
+import { Button, Color, OkCancelForm, getDimAttr } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
-import {Content} from "./BaseComponents";
 
 const defaultValues = {
     config: {
@@ -196,6 +206,7 @@ function JsonView({ json, defaultJson = {}, skipKeys = [], trim, ...props }) {
 }
 
 function BackgroundCtx({ children }) {
+    // TODO: use default from theme
     const [ color, setColor ] = useState('#20222288');
 
     const value = {
@@ -539,7 +550,7 @@ function EditorCtx({ id, children }) {
                     setPast(newPast);
                     setFuture(newFuture);
                     setHistoryPos(historyPos - 1);
-                    action.undoAction();
+                    action.undoAction()
                 },
                 redoAction: () => {
                     const { past, future, historyPos } = propsRef.current;
@@ -554,7 +565,7 @@ function EditorCtx({ id, children }) {
                     setPast(newPast);
                     setFuture(newFuture);
                     setHistoryPos(historyPos + 1);
-                    action.doAction();
+                    action.doAction()
                 },
                 hasFuture: () => propsRef.current.future.length > 0,
                 hasPast: () => propsRef.current.past.length > 0,
@@ -1366,6 +1377,8 @@ function WindowCtx({ imageResources, filters, children, game }) {
     const defaultTheme = defaultValues.theme;
     const defaultMapping = defaultValues.mapping;
 
+    const resourceLoader = game.getResourceLoader();
+
     // the registry is used for storing values which are either expensive to calculate
     // or come from child components
     const registryRef = useRef();
@@ -1461,6 +1474,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             confirm: null,
             settings: null,
             tooltipTimer: null,
+            dirty: false,
             modalStack: [],
             modalIds: [],
             focusStack: {
@@ -1494,8 +1508,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             lastColorsIndex: new ColorIndex({colors: (gameCache.lastColors ? gameCache.lastColors.split(' ') : [])})
         };
-
-        const resourceLoader = game.getResourceLoader();
 
         const register = (key, value) => {
             registryRef.current[key] = value
@@ -1614,7 +1626,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
             if (!lastId) return;
             clearTimeout(lastId)
         }
-
         // let's initialize the context with ref-values and methods here...
         setterRef.current = {
             clearAllCaches: () => {
@@ -1667,8 +1678,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
                     )
                 )
             },
-            // TODO kill this
-            storeScreenResource: resourceLoader.storeScreenResouce,
 
             setConfirmExit: confirm => register('confirm', confirm),
             needsConfirmation: () => {
@@ -1912,6 +1921,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
             getLockedStyles: () => registry('styleLock').style,
             isStyleLocked: () => registry('styleLock').state !== 'unlocked',
 
+            isDirty: () => registry('dirty'),
+            markDirty: () => register('dirty', true),
+
             syncLinks,
 
             defaults,
@@ -2147,7 +2159,7 @@ function ToolGroup({ children }) {
 
 const TabContext = React.createContext();
 
-function ButtonStack({ items, onClick }) {
+function ButtonStack2({ items, onClick }) {
     const tabs = [];
     for(let item of items) {
         tabs.push(
@@ -2707,6 +2719,50 @@ function Icon({ name, width, height, center = 'h', className, rotate, size = 18 
             }
         } />
     );
+}
+
+function ButtonStack({ buttons, buttonProps = {}, ...props }) {
+    const stackRef = useRef(null);
+    const { focusItem, attr, ...focus } = useFocusElements({
+        divRef: stackRef,
+        count: buttons.length,
+        active: 0,
+        setActive: () => {}
+    });
+    const elems = [];
+    let i = 0;
+    for (let button of buttons) {
+        const curr = i;
+        const elemProps = { ...buttonProps, ...button };
+        let onClick = null;
+        if (!elemProps.readOnly) {
+            const focusHandler = focus.leftClick(curr);
+            const oldHandler = elemProps.onClickEnd;
+            if (oldHandler) {
+                onClick = e => {
+                    oldHandler(e);
+                    focusHandler()
+                }
+            } else {
+                onClick = focusHandler
+            }
+        }
+        elems.push(
+            <Button
+                key={i}
+                { ...elemProps }
+                tabControlled
+                tab={focusItem === curr}
+                onClickEnd={onClick}
+            />
+        )
+        i++
+    }
+    return (
+        <Stack { ...attr } stackRef={stackRef} { ...props }>
+            {elems}
+        </Stack>
+    )
 }
 
 function Kbd({ value = '', length = null, className }) {
@@ -3358,6 +3414,151 @@ function useCachedState(level, id, value, type) {
     ]
 }
 
+function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
+    const wContext = useContext(WindowContext);
+
+    const mounted = useMounted();
+    const frameRef = useRef(null);
+    const players = useMemo(() => {
+        if (!animationIndex) return null;
+
+        if (prePlayers) {
+            return prePlayers;
+        }
+        return new Players(animationIndex);
+    }, [animationIndex, prePlayers]);
+
+    const update = useComponentUpdate();
+    useEffect(() => {
+        if (!animationIndex) {
+            return;
+        }
+        const compUpdate = () => {
+            if (animationIndex) {
+                players.clear();
+            }
+            update();
+        };
+        entityIndex.addListener(compUpdate);
+        animationIndex.addListener(compUpdate)
+        return () => {
+            entityIndex.removeListener(compUpdate);
+            animationIndex.removeListener(compUpdate);
+        }
+    }, [prePlayers]);
+
+    useEffect(() => {
+        if (!players) {
+            return;
+        }
+        const level = wContext.getModalLevel();
+
+        const runAnimations = () => {
+            frameRef.current = requestAnimationFrame(() => {
+                if (!mounted.current) {
+                    return;
+                }
+                if (level === wContext.getModalLevel()) {
+                    if (players.nextStep()) {
+                        update();
+                    }
+                }
+                runAnimations();
+            });
+        };
+        runAnimations();
+        return () => {
+            cancelAnimationFrame(frameRef.current);
+            players.clear();
+        };
+    }, [players]);
+
+    return players;
+}
+
+function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, active, page, reset, ...props }) {
+    const [ focusItem, setFocusItem ] = useState(0);
+    const setActive = value => {
+        if (value !== null) {
+            setFocusItem(value);
+        }
+        props.setActive(value)
+    };
+    const elemRef = useRef(null);
+    const divRef = props.divRef ? props.divRef : elemRef;
+    if (!page) {
+        page = count
+    }
+    const lastPos = Math.max(count - page, 0);
+    const lastIndex = count - 1;
+    const last = Math.min(lastIndex, lastPos + page - 1, pos + page - 1);
+    const nextPageStart = pos + page;
+
+    const hasPaging = page < count;
+    const isOutsideFocus = hasPaging && (active < pos || active >= nextPageStart);
+
+    const refocus = () => {
+        requestAnimationFrame(() => {
+            const elem = divRef.current.querySelector('.tabbed');
+            if (elem) {
+                elem.focus()
+            }
+        })
+    };
+    const onKeyDown = e => {
+        if (e.key === 'ArrowLeft') {
+            if (focusItem === 0) {
+                setFocusItem(lastIndex);
+                setPos(lastPos)
+            } else if (!hasPaging) {
+                setFocusItem(
+                    e.shiftKey ? 0 : clamp(0, focusItem - 1)
+                );
+            } else {
+                let newPos = clamp(0, focusItem - (e.shiftKey ? page : 1));
+                if (newPos < pos) {
+                    setPos(clamp(0,pos - page))
+                }
+                setFocusItem(newPos)
+            }
+        } else if (e.key === 'ArrowRight') {
+            if (focusItem === lastIndex) {
+                setFocusItem(0);
+                setPos(0)
+            } else if (!hasPaging) {
+                setFocusItem(
+                    e.shiftKey ? lastIndex : Math.min(lastIndex, focusItem + 1)
+                )
+            } else {
+                const newPos = Math.min(focusItem + (e.shiftKey ? page : 1), lastIndex);
+                if (newPos >= nextPageStart) {
+                    setPos(Math.min(nextPageStart, lastPos))
+                }
+                setFocusItem(newPos)
+            }
+        } else if (handleSpace && e.key === ' ') {
+            setActive(reset && active === focusItem ? null : focusItem)
+        } else {
+            return;
+        }
+        refocus()
+    }
+    const attr = {
+        onBlur: e => setFocusItem((isOutsideFocus || (reset && active === null)) ? pos : active),
+        onKeyDown
+    }
+    if (!props.divRef) {
+        attr.ref = divRef
+    }
+    return {
+        attr,
+        leftClick: curr => () => {setActive(reset && active === curr ? null : curr); refocus()},
+        focusItem,
+        last,
+        refocus
+    }
+}
+
 function useDebugMount(name) {
     useEffect(() => {
         if (!name) return;
@@ -3422,5 +3623,7 @@ export {
     useCssProps,
     usePageCache,
     useCachedState,
-    useDebugMount
+    useDebugMount,
+    useAnimationPlayers,
+    useFocusElements
 }

@@ -5,6 +5,14 @@ import EditorApp from './components/EditorApp';
 
 class GameEditor {
 
+    unmount() {
+        requestAnimationFrame(
+            () => {
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+            }
+        );
+    }
+
     constructor(game, active) {
         function extractEditablesFromAreas(areas, editables) {
             if (!Array.isArray(areas)) {
@@ -28,6 +36,7 @@ class GameEditor {
 
         const panes = [];
         extractEditablesFromAreas(game.screens[game.currentScreen].areas, panes);
+        this.oldStyle = JSON.stringify(document.body.style);
 
         const play = () => {
             ReactDOM.unmountComponentAtNode(document.getElementById('editor'));

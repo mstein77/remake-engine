@@ -1,44 +1,12 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
-import {
-    d,
-    round,
-    clamp,
-    isEventInRect,
-    drawCanvasToAvail,
-    getCanvasForBitmap,
-    copy2clipboard,
-    hex2rgb,
-    rgb2hex,
-    getParsedCssValueRec,
-    Players
-} from "../helper/helper"
+import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
-import {
-    WindowContext,
-    EditorContext,
-    useModal,
-    PropertyGrid,
-    Kbd,
-    Canvas,
-    Gradient,
-    ColorBox,
-    GradientBox,
-    Icon,
-    SideTab,
-    SideTabs,
-    HotKeyKeys,
-    useFocusKeyBindings,
-    useRefocus,
-    useMounted,
-    useCssProps,
-    useCachedState,
-    useCallAfterwards,
-    useComponentUpdate,
-    AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
+import { WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useRefocus, useAnimationPlayers, useMounted,
+    useFocusElements, useCssProps, useCachedState, useCallAfterwards,
+    useComponentUpdate, AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
-import {ActionBox, Content, TextField} from "./BaseComponents";
 
 const STATE = {
     INACTIVE: 0,
@@ -598,7 +566,7 @@ function addPaddingCls(cls, padded, type) {
     }
 }
 
-function Button({ icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
+function Button({ tabControlled, icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
                    className,  tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
 
@@ -609,6 +577,8 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     const focusedRef = useRef(null);
     focusedRef.current = focused;
     const statePrefix = (value === undefined || value !== current) ? useStatePrefix(state, 'button') : 'active';
+
+    const rawTab = tab === true;
 
     const helpProps = {
         title: '',
@@ -713,9 +683,11 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
     attr.ref = focusRef;
     attr.onFocus = () => setFocused(true);
     attr.onBlur = () => {
-        requestAnimationFrame(
-            () => setFocused(false)
-        );
+        requestAnimationFrame(() => {
+            if (mounted.current) {
+                setFocused(false)
+            }
+        });
     }
     if (!(disabled || readOnly)) {
         const handleClick = (upEvent, event = null) => {
@@ -732,7 +704,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
                 }
             }, {once: true})
         };
-        if (tab) {
+        if (tab || value !== undefined) {
             attr.onKeyDown = e => {
                 if (e.keyCode !== 32 || (clicked && !repeat)) {
                     return
@@ -742,7 +714,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
             };
         }
         attr.onLeftClick = e => {
-            if (tab) {
+            if (tab && !tabControlled) {
                 focusRef.current.focus();
                 requestAnimationFrame(() => {
                     if (focusRef.current) {
@@ -762,7 +734,7 @@ function Button({ icon, name, help, action, full, state, iconProps = {}, end, ce
         items[0] = <Block key="e" end={end} center={centerItems}>{items[0]}</Block>;
     }
     return (
-        <Block gaps tab={focused || tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
+        <Block gaps tab={(tabControlled && rawTab) || (!tabControlled && focused) || tab} center={center} className={cls.join(' ')} cursor={cursor} { ...tooltip.attr } { ...attr }>
             {!hasStack ?
                 items[0] :
                 <Stack key="s" gaps={gaps} center={centerItems} end={end} vertical={vertical} full={fullStack}>
@@ -798,68 +770,63 @@ function AsyncButton({ onClick, onClickEnd, ...props }) {
 
 function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, wrap, tab = true, floatProps = {}, ...props }) {
     const fContext = useContext(FormContext);
-
     const callAfterwards = useCallAfterwards();
+    const stackRef = useRef(null);
+    const [ optionIndex ] = useState(() => {
+        const items = [];
+        for (let option of options) {
+            items.push(option.id);
+        }
+        return items
+    });
     const set = useSet(value, props);
-
-    const radioRef = useRef(null);
-    const refocus = useRefocus(radioRef);
-    const setAndRefocus = ({ value }) => {
-        refocus();
-        set(value)
+    const [ active, setActiveRaw ] = useState(() => {
+        const index = optionIndex.indexOf(value);
+        return index === -1 ? null : index
+    });
+    const setActive = index => {
+        setActiveRaw(index)
+        set(optionIndex[index])
     };
-
+    const { focusItem, attr, ...focus } = useFocusElements({count: optionIndex.length, active, setActive, divRef: stackRef });
     const dimProps = getDimHAttr(props);
 
-    const optionHandler = getOptionHandler(options, value);
-    const attr = useFocusKeyBindings({
-        keyHandlers: [
-            {
-                keys: ['ArrowDown', 'ArrowRight'],
-                handler:
-                    () => {
-                        const id = optionHandler.getNextId();
-                        if (id !== null) {
-                            setAndRefocus({value: id})
-                        }
-                    }
-            },
-            {
-                keys: ['ArrowUp', 'ArrowLeft'],
-                    handler:
-                () => {
-                    const id = optionHandler.getPrevId();
-                    if (id !== null) {
-                        setAndRefocus({value: id})
-                    }
-                }
-            }
-        ],
-        disabled
-    });
-    if (gaps) {
-        attr.gaps = gaps;
-    }
-    const items = [];
-    let found = false;
-    const searchValue = optionHandler.intIds && typeof value === 'string' ? parseInt(value, 10) : value;
-    for (let { id, name, help } of options) {
-        items.push(
-            <Button key={id} tab={tab} help={help} padded={padded} disabled={disabled} name={icon ? null : name} icon={icon ? name : null} value={id} current={searchValue} onClick={readOnly ? null : setAndRefocus} />
+    const buttons = [];
+    let i = 0;
+    for (let { name, help } of options) {
+        const curr = i;
+        buttons.push(
+            <Button
+                key={optionIndex[i]} tab={focusItem === curr} help={help}
+                tabControlled
+                padded={padded} disabled={disabled} name={icon ? null : name}
+                icon={icon ? name : null} value={i} current={active}
+                onClick={readOnly ? null : focus.leftClick(curr)}
+            />
         );
-        if (id === searchValue) {
-            found = true;
-        }
+        i++
     }
-    if (!found) {
-        attr.className = 'invalid';
+    const cls = ['stack-h'];
+    if (gaps) {
+        attr.gaps = gaps
+    }
+    if (wrap) {
+        attr.wrap = wrap
+    }
+    const valueIndex = optionIndex.indexOf(value);
+    if (valueIndex === -1) {
+        cls.push('invalid');
         if (fContext) {
             callAfterwards(fContext.markInvalid)
         }
+    } else if (valueIndex !== active) {
+        callAfterwards(() => {setActiveRaw(valueIndex)})
     }
     return (
         <ComponentWithName name={name} { ...floatProps }>
-            <Block ref={radioRef} { ...dimProps }><Stack full="h" wrap={wrap} { ...attr }>{items}</Stack></Block>
+            <Stack stackRef={stackRef} { ...attr } { ...dimProps } className={cls.join(' ')}>
+                {buttons}
+            </Stack>
         </ComponentWithName>
     )
 }
@@ -1468,7 +1435,7 @@ function Select({ name, value, disabled, options, readOnly, padded = '1', button
     )
 }
 
-function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h', copy, readOnly, disabled, rows, cols, wrap, tab = true, required, match, className, ...props }) {
+function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h', copy, readOnly, disabled, rows, cols, wrap, tab = true, required, invalid, match, className, ...props }) {
     const fContext = useContext(FormContext);
     const wContext = useContext(WindowContext);
 
@@ -1551,7 +1518,7 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h
     if (dimAttr.full && dimAttr.full !== 'h') {
         cls.push('full-v');
     }
-    if ((required && value === '') || match && !match(value)) {
+    if (invalid || (required && value === '') || (match && !match(value))) {
         cls.push('invalid');
         if (fContext) {
             callAfterwards(fContext.markInvalid);
@@ -2311,7 +2278,7 @@ function ColorPicker({ value, set, alpha, close }) {
     )
 }
 
-function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, animationIndex = null }) {
+function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, number, animationIndex = null }) {
     const EntityPickerModal = useModal();
 
     const index = entityIndex.getEntityByPropValue('value', value);
@@ -2330,7 +2297,6 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, ani
         animation = entityIndex.hasEntityProp('animation') ?
             entityIndex.getEntityPropValue(index, 'animation') : value
     }
-
     const prePlayers = useMemo(() => {
         if (!animationIndex || !animation) {
             return null;
@@ -2339,7 +2305,8 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, ani
         obj.setAnimations([animation]);
         return obj;
     }, [animation]);
-    const players = null; // useAnimationPlayers(entityIndex, animationIndex, prePlayers);
+
+    const players = useAnimationPlayers(entityIndex, animationIndex, prePlayers);
 
     playerRef.current = players;
 
@@ -2360,19 +2327,17 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, ani
 
     return (
         <>
-            <Stack vertical>
+            <Stack vertical gaps="1">
                 {!readOnly &&
-                    <Block>
-                        <Stack>
-                            <Block gaps="1">
-                                <Button onClick={pick}>Pick</Button>
-                            </Block>
-                            <Block onLeftClick={pick}>
-                                <Input value={value} readOnly />
-                            </Block>
-                            {reset && <Button onClick={() => set('')} icon="delete" />}
-                        </Stack>
-                    </Block>
+                    <Stack gaps="1">
+                        <Block center="v">
+                            <Button name="Pick" padded="h" onClick={pick} />
+                        </Block>
+                        <Block center="v" onLeftClick={pick}>
+                            <Input value={value} number={number} readOnly />
+                        </Block>
+                        {reset && <Block center="v"><Button onClick={() => set('')} icon="delete" /></Block>}
+                    </Stack>
                 }
                 <Block>
                     {width !== null &&
@@ -2392,7 +2357,7 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, ani
     )
 }
 
-function Bitmap({ value, set, readOnly, colors, empty, zoomOrAvail = 1, entityIndex }) {
+function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, entityIndex }) {
     const { EditBitmapModal, openEditBitmapModal, closeEditBitmapModal } = useEditBitmapModal();
     const CopyBitmapModal = useModal();
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select image...');
@@ -2401,6 +2366,7 @@ function Bitmap({ value, set, readOnly, colors, empty, zoomOrAvail = 1, entityIn
         openEditBitmapModal({
             image: value,
             colors,
+            resize,
             save: newImage => {
                 set(newImage);
                 closeEditBitmapModal()
@@ -2445,12 +2411,17 @@ function Bitmap({ value, set, readOnly, colors, empty, zoomOrAvail = 1, entityIn
 
     const render = ctx => {
         ctx.clearRect(0, 0, width, height);
-        drawCanvasToAvail(getCanvasForBitmap(value), ctx, 0, 0, {width, height});
+        if (value) {
+            drawCanvasToAvail(getCanvasForBitmap(value), ctx, 0, 0, {width, height});
+        }
     };
+    const setEmptyImage = () => {
+        set(getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY()));
+    }
     return (
         <>
             <Stack vertical>
-                {!readOnly &&
+                {!readOnly && value &&
                     <Stack gaps="1">
                         <Button name="edit" padded="h" onClick={editBitmap} />
                         <Button name="import" onClick={importBitmap} padded="h" />
@@ -2458,15 +2429,17 @@ function Bitmap({ value, set, readOnly, colors, empty, zoomOrAvail = 1, entityIn
                         {empty && <Button icon="clear" onClick={() => set(null)} />}
                     </Stack>
                 }
-                <Block padded onLeftClick={editBitmap}>
-                    <Canvas width={width} height={height} render={render} border="1" />
-                </Block>
+                {value &&
+                    <Block padded onLeftClick={editBitmap}>
+                        <Canvas width={width} height={height} render={render} border="1" />
+                    </Block>
+                }
+                {!readOnly && !value && empty &&
+                    <Button name="add" padded="h" onClick={setEmptyImage} />
+                }
             </Stack>
-
             {EditBitmapModal}
-
             {BitmapSelectionModal}
-
             {entityIndex &&
                 <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
                     <EntityPicker {...CopyBitmapModal.props} />
@@ -2926,7 +2899,56 @@ function ImageProp({ name, value, set, setName, required, zoomOrAvail, ...props 
     )
 }
 
-function LabelProp({ name, labelProps, inputPadding = true, bottomPadding = true, children }) {
+function PositionPicker({ entityIndex, position, entity, setPosition, setEntity, preserve, setPreserve, animationIndex }) {
+    const EntityPickerModal = useModal();
+
+    const pick = () => {
+        EntityPickerModal.open({
+            controls: true,
+            entityIndex,
+            animationIndex,
+            select: index => {
+                setEntity(index);
+                EntityPickerModal.close();
+            }
+        });
+    };
+    const picker = <Block onClick={pick}><Number size={5} readOnly value={entity} /></Block>;
+
+    return (
+        <>
+            <Stack vertical gaps>
+                <Stack gaps="1">
+                    <Button name="Start" padded="h" current={position} value={'start'} onClick={() => setPosition('start')} />
+                    <Button name="Before" padded="h" current={position} value={'before'} onClick={() => setPosition('before')} />
+                    {position === 'before' && picker}
+                    <Button name="After" padded="h" current={position} value={'after'} onClick={() => setPosition('after')} />
+                    {position === 'after' && picker}
+                    <Button name="End" padded="h" current={position} value={'end'} onClick={() => setPosition('end')} />
+                </Stack>
+                {preserve !== undefined &&
+                    <Checkbox name="Preserve tiles" disabled={position === 'end'} value={preserve} set={setPreserve} />
+                }
+            </Stack>
+
+            <EntityPickerModal.content width={400} height={400}>
+                <EditorCtx>
+                    <EntityPicker { ...EntityPickerModal.props } />
+                </EditorCtx>
+            </EntityPickerModal.content>
+        </>
+    )
+}
+
+function PositionPickerProp({ name, ...props }) {
+    return (
+        <LabelProp name={name}>
+            <PositionPicker { ...props } />
+        </LabelProp>
+    )
+}
+
+function LabelProp({ name, labelProps, shorten, inputPadding = true, bottomPadding = true, children }) {
     let leftPadding = DIR.H;
     let rightPadding = DIR.RIGHT;
     if (bottomPadding) {
@@ -2944,7 +2966,7 @@ function LabelProp({ name, labelProps, inputPadding = true, bottomPadding = true
                     {name}
                 </Block>
             </Block>
-            <Block full="h" padded={rightPadding}>
+            <Block full="h" shorten={shorten} padded={rightPadding}>
                 {children}
             </Block>
         </>
@@ -3185,5 +3207,8 @@ export {
     LabelProp,
     Hidden,
     FullProp,
-    PropSection
+    PropSection,
+    PositionPicker,
+    PositionPickerProp,
+    getDimAttr
 }

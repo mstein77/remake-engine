@@ -1924,6 +1924,7 @@ class Game {
         this.editorRun = 0;
         this.restartEditorWithId = null;
         this.lastState = null;
+        this.editor = null;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -2117,7 +2118,7 @@ class Game {
         RL.loadPermanentResources().then(() => {
             this.getDomElem('game').style.display = 'none';
             this.getDomElem('editor').style.display = 'block';
-            new gameEditor.GameEditor(this, this.activeResource);
+            this.editor = new gameEditor.GameEditor(this, this.activeResource)
         });
     }
 

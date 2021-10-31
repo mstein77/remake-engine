@@ -1,16 +1,45 @@
-import React, { useContext, useMemo, useState, useRef } from "react";
-import { ColorIndex, FilterIndex } from "../classes/EntityIndex";
-import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext } from "./BasicComponents";
-import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData } from "../helper/helper";
-import { PictureCell } from "./BaseComponents";
-import { FileDropZone, Button, AsyncButton, Color, ColorProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
+import React, {useContext, useMemo, useState, useRef, useEffect} from "react";
+import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex";
+import {
+    EditorContext,
+    EditorCtx,
+    LoadingIndicator,
+    ButtonStack,
+    Canvas,
+    CenterInfo,
+    Kbd,
+    OkCancelForm,
+    PropertyGrid,
+    Section,
+    Toolbar,
+    useModal,
+    useUpdateOnEntityIndexChanges,
+    WindowContext,
+    AvailContextProvider,
+    useMounted,
+    useCssProps,
+    useComponentUpdate, AvailContext
+} from "./BasicComponents";
+import {
+    d,
+    rgb2hex,
+    getEmptyImageData,
+    copy2clipboard,
+    drawCanvasToAvail,
+    getResourceTreeForJsonModel,
+    getRebuildJsonForModel,
+    getCanvasForBitmap,
+    getImageDataForImage,
+    getColorsFromImageData,
+    BitmapPlayer
+} from "../helper/helper";
+import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { Block, Stack } from "./LayoutComponents";
-import { EntityStack, EntityStackSections, EntityPicker } from "./EntityComponents";
-import { FlexGrid, BaseGrid } from "./GridComponents";
+import {EntityStack, EntityStackSections, EntityPicker, EntityManager} from "./EntityComponents";
+import { FlexGrid, BaseGrid, PictureCell } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BackgroundControl, Icon } from "./BasicComponents";
-
 import ReactDOM from "react-dom";
 
 function ConfirmDialog({ close, save, msg }) {
@@ -242,11 +271,19 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
         save(getFilterString());
     };
 
+    const buttons = useMemo(() => {
+        const items = [];
+        for (let name of Object.keys(filterDefinitions).sort()) {
+            items.push({name, full: 'h', onClick: () => addFilter(name), children: '>'});
+        }
+        return items
+    }, []);
+
     return (
         <OkCancelForm full save={saveFilters} cancel={close}>
             <Stack full>
                 <Section id="filterSelection" inner full="v" collapse="h" size={170} name="Filters">
-                    <ButtonStack items={Object.keys(filterDefinitions).sort()} onClick={addFilter} />
+                    <ButtonStack padded full="h" buttons={buttons} buttonProps={{padded: 'h'}} vertical gaps />
                 </Section>
                 <EntityStackSections
                     id="filterPipeline"
@@ -831,7 +868,6 @@ function useExportModal({ model, resource, update, name }) {
         }
         return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
     };
-
     const getModelConfig = () => {
         const rebuildJson = getRebuildJsonForModel(resource.cls, model, true);
         return new resource.config(rebuildJson);
@@ -839,13 +875,12 @@ function useExportModal({ model, resource, update, name }) {
     const getModelResources = () => {
         return getModelConfig().getResources();
     };
-
     const storeModel = eContextRef => {
-        wContext.storeScreenResource(wContext.game.currentScreen, getModelConfig());
+        wContext.resourceLoader.storeScreenResource(wContext.game.currentScreen, getModelConfig());
         eContextRef.current.updateRestorePos();
+        wContext.markDirty()
         update();
     };
-
     const deployModel = () => {
         const gameRef = wContext.game;
         const resourcesInfo = getModelResources();
@@ -911,6 +946,376 @@ function useExportModal({ model, resource, update, name }) {
     };
 }
 
+function AnimationProps({ animationIndex }) {
+    const animation = animationIndex.getEntityObject(0);
+    const dirOptions = [
+        {id: 0, name: 'Forward'},
+        {id: 1, name: 'Backward'},
+        {id: 2, name: 'Forward Backward'},
+        {id: 3, name: 'Backward Forward'}
+    ];
+    const endOptions = [
+        {id: 0, name: 'Loop'},
+        {id: 1, name: 'Stop'},
+        {id: 2, name: 'Destroy'}
+    ];
+    const setProp = (prop, value) => {
+        animationIndex.setEntityPropValue(0, prop, value);
+    };
+    return (
+        <Block padded full="h">
+            <PropertyGrid>
+                <InputProp name="Name:" value={animation.value}
+                   set={value => animationIndex.setEntityObject({ ...animationIndex.getEntityObject(0), value }, true)}
+                />
+                <NumberProp name="Speed:" value={animation.speed} set={value => setProp('speed', value)} decimals={2} min={0.0} max={2.0} slider="h" />
+                <RadioProp name="Direction:" gaps="1" padded="h" options={dirOptions} value={animation.dir} set={value => setProp( 'dir', value)} />
+                <RadioProp name="End:" gaps="1" padded="h" options={endOptions} value={animation.end} set={value => setProp( 'end', value)} />
+                <CheckboxProp name="Synchronous:" value={animation.synchronous} set={value => setProp( 'synchronous', value)} />
+            </PropertyGrid>
+        </Block>
+    )
+}
+
+function PlayerCanvas({ player, spriteIndex }) {
+    const aContext = useContext(AvailContext);
+    const wContext = useContext(WindowContext);
+
+    const width = aContext.width;
+    const height = aContext.height;
+    const update = useComponentUpdate();
+    const mounted = useMounted();
+    const lastRef = useRef(null);
+    const lastPlayer = useRef(null);
+    lastPlayer.current = player;
+
+    useEffect(() => {
+        const level = wContext.getModalLevel();
+
+        const run = () => {
+            lastRef.current = requestAnimationFrame(() => {
+                if (lastPlayer.current !== player && !mounted.current) {
+                    return;
+                }
+                if (!(player.isPaused() || level !== wContext.getModalLevel())) {
+                    if (player.hasEnded()) {
+                        player.reset();
+                    } else {
+                        player.nextStep();
+                    }
+                    if (player.isDirty()) {
+                        update();
+                    }
+                }
+                run();
+            })
+        };
+        run();
+
+        return () => {
+            if (lastRef.current) {
+                cancelAnimationFrame(lastRef.current);
+            }
+        }
+    }, [player]);
+
+    return (
+        <Canvas width={width} height={height} render={ctx => {
+            const frame = lastPlayer.current.getFrame();
+            if (!frame) {
+                return;
+            }
+            spriteIndex.drawEntity(ctx, spriteIndex.getEntityByPropValue('value', frame.id) , 0, 0, {width, height});
+        }} />
+    )
+}
+
+function AnimationPreview({ animationIndex, frameIndex, spriteIndex }) {
+    useUpdateOnEntityIndexChanges(frameIndex);
+    const [ stopped, setStopped ] = useState(false);
+
+    const player = new BitmapPlayer();
+    const frames = frameIndex.getPropValues('value');
+    const dir = animationIndex.getEntityPropValue(0, 'dir');
+    const end = animationIndex.getEntityPropValue(0, 'end');
+    const speed = animationIndex.getEntityPropValue(0, 'speed');
+
+    player.loadAnimation(frames, end, dir, speed);
+    if (stopped) {
+        player.pause();
+    }
+    const toggleStopped = () => {
+        setStopped(!stopped)
+    };
+    return (
+        <Section name="Preview" inner width={200} full="v">
+            <Stack vertical borders full>
+                <Block full padded>
+                    <AvailContextProvider>
+                        <Block center border="1">
+                            <PlayerCanvas spriteIndex={animationIndex.index} player={player} />
+                        </Block>
+                    </AvailContextProvider>
+                </Block>
+                <Block full="h" className="secondary-bg" padded>
+                    <Block center>
+                        <Button icon={stopped ? 'play_arrow' : 'stop'} onClick={toggleStopped} />
+                    </Block>
+                </Block>
+            </Stack>
+        </Section>
+    )
+}
+
+function FramePicker({ fixSize, frameIndex, width, height, select }) {
+    return (
+        <EntityPicker
+            entityIndex={frameIndex.index}
+            filter
+            base={fixSize ? null : index => (
+                frameIndex.index.getEntityPropValue(index, 'width') === width &&
+                frameIndex.index.getEntityPropValue(index, 'height') === height
+            )}
+            select={select}
+        />
+    )
+}
+
+function FrameManager({ frameIndex, fixSize, width, height }) {
+    const eContext = useContext(EditorContext);
+
+    const NewFrameModal = useModal();
+    const addFrame = () => {
+        NewFrameModal.open({
+            frameIndex,
+            fixSize,
+            width,
+            height,
+            select: index => {
+                const sprite = frameIndex.index.getEntityValue(index);
+                let undoIndex = null;
+                eContext.doAction(
+                    () => {
+                        undoIndex = frameIndex.setEntityObject({value: {id: sprite, duration: 1, padding: {x: 0, y: 0}}});
+                    },
+                    () => {
+                        frameIndex.deleteEntity(undoIndex);
+                    }
+                );
+                NewFrameModal.close();
+            }
+        });
+    };
+
+    const { defaultPaddingPx, fmMonoMedium } = useCssProps('defaultPaddingPx', 'fmMonoMedium');
+    const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
+
+    return (
+        <>
+            <EntityManager
+                entityIndex={frameIndex}
+                titleHeight={titleHeight}
+                footerHeight={20 + 2 * defaultPaddingPx}
+                minWidth={150}
+                filter
+                auto
+                undo
+                addOp={addFrame}
+                empty="No animations defined. Add new one"
+                renderTitle={index => {
+                    const name = frameIndex.getEntityValue(index).id;
+                    return (
+                        <Stack gaps padded full="h">
+                            <Block className="less">#{index}</Block>
+                            <Block full="h" shorten>{name}</Block>
+                        </Stack>
+                    )
+                }}
+                renderFooter={index => {
+                    const frame = frameIndex.getEntityValue(index);
+                    return (
+                        <Stack padded className="less small" full="h" gaps>
+                            <Block center="v">Duration: </Block>
+                            <Block center="v" full="h"><Number size={3} min={1} value={frame.duration} set={duration => {frame.duration = duration; frameIndex.notify()}} /></Block>
+                        </Stack>
+                    )
+                }}
+            />
+
+            <NewFrameModal.content name="Pick sprite for frame" width={600} height={500}>
+                <FramePicker { ...NewFrameModal.props } />
+            </NewFrameModal.content>
+        </>
+    )
+}
+
+function AnimationForm({ animation, spriteIndex, save, close, isValid }) {
+    const update = useComponentUpdate();
+
+    const animationIndex = useMemo(
+        () => {
+            const animationIndex = new AnimationIndex(spriteIndex, {animations: []});
+            animationIndex.setEntityObject({ ...animation, index: 0 });
+            animationIndex.addListener(update);
+            return animationIndex
+        },
+        [animation]
+    );
+    const width = animation.sizeX;
+    const height = animation.sizeY;
+    const frameIndex = useMemo(
+        () => {
+            return new FrameIndex(animation, spriteIndex, width, height)
+        },
+        [animation]
+    );
+    const name = animationIndex.getEntityValue(0);
+    const canSave = () => name !== '' && isValid(name);
+    const saveAnimation = () => {
+        save({
+            ...animationIndex.getEntityObject(0),
+            frames: [ ...frameIndex.getPropValues('value') ]
+        })
+    }
+    return (
+        <EditorCtx>
+            <OkCancelForm submit save={saveAnimation} cancel={close} full>
+                <Hidden invalid={!canSave} />
+                <Stack vertical full borders>
+                    <Stack full borders>
+                        <FrameManager fixSize={animationIndex.fixSize} width={width} height={height} frameIndex={frameIndex} />
+                        <AnimationPreview animationIndex={animationIndex} spriteIndex={spriteIndex} frameIndex={frameIndex} />
+                    </Stack>
+                    <AnimationProps animationIndex={animationIndex} />
+                </Stack>
+            </OkCancelForm>
+        </EditorCtx>
+    )
+}
+
+function AnimationFormNew({ save, close, isValid, ...props }) {
+    const [ name, setName ] = useState(props.name);
+    const [ width, setWidth ] = useState(props.width);
+    const [ height, setHeight ] = useState(props.height);
+
+    const canSave = () => name !== '' && isValid(name);
+    const saveAnimation = () => {
+        save({
+            value: name,
+            frames: [],
+            end: 0,
+            dir: 0,
+            synchronous: true,
+            sizeX: width,
+            sizeY: height
+        })
+    };
+    return (
+        <OkCancelForm submit save={saveAnimation} cancel={close}>
+            <PropertyGrid full>
+                <InputProp name="Name:" value={name} set={setName} invalid={!canSave()} />
+                <TupleProp name="Size:" x={width} setX={setWidth} y={height} setY={setHeight} min={1} max={32} buttons />
+            </PropertyGrid>
+        </OkCancelForm>
+    )
+}
+
+function AnimationManager({ animationIndex, spriteIndex }) {
+    const eContext = useContext(EditorContext);
+
+    const NewAnimationModal = useModal();
+    const EditAnimationModal = useModal();
+
+    const addAnimation = () => {
+        NewAnimationModal.open({
+            name: '',
+            speed: 1,
+            width: animationIndex.fixSize ? animationIndex.getSizeX() : 16,
+            height: animationIndex.fixSize ? animationIndex.getSizeY() : 16,
+            isValid: value => !animationIndex.hasPropValue('value', value),
+            save: newAnimation => {
+                let index = null;
+                eContext.doAction(
+                    () => {
+                        index = animationIndex.setEntityObject({ ...newAnimation });
+                    },
+                    () => {
+                        animationIndex.deleteEntity(index);
+                    }
+                );
+                NewAnimationModal.close();
+            }
+        })
+    };
+    const editAnimation = index => {
+        const animation = animationIndex.getEntityObject(index);
+        EditAnimationModal.open({
+            name: animationIndex.getEntityValue(index),
+            spriteIndex,
+            animation,
+            isValid: value => animation.value === value || !animationIndex.hasPropValue('value', value),
+            save: newAnimation => {
+                let plan = null;
+                if (animation.value !== newAnimation.value) {
+                    plan = animationIndex.getRenamePlan(animation.value, newAnimation.value);
+                }
+                eContext.doAction(
+                    () => {
+                        if (plan) {
+                            animationIndex.doRenamePlan(plan);
+                        }
+                        animationIndex.setEntityObject({ ...newAnimation, index }, true);
+                    },
+                    () => {
+                        if (plan) {
+                            animationIndex.undoRenamePlan(plan);
+                        }
+                        animationIndex.setEntityObject(animation, true);
+                    }
+                );
+                EditAnimationModal.close();
+            }
+        });
+    };
+    const { defaultPaddingPx, fmMonoMedium } = useCssProps('defaultPaddingPx', 'fmMonoMedium');
+    const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
+    return (
+        <>
+            <EntityManager
+                entityIndex={animationIndex}
+                animationIndex={animationIndex}
+                titleHeight={titleHeight}
+                footerHeight={titleHeight}
+                minWidth={100}
+                filter
+                auto
+                addOp={addAnimation}
+                editOp={editAnimation}
+                empty="No animations defined. Add new one"
+                onDoubleClick={editAnimation}
+                renderTitle={index => {
+                    const name = animationIndex.getEntityValue(index);
+                    return <Block padded full="h" shorten>{name}</Block>
+                }}
+                renderFooter={index => {
+                    const frames = animationIndex.getEntityPropValue(index, 'frames').length;
+                    return (
+                        <Stack full="h" padded className="less small"><Block>Frames: </Block><Kbd value={frames} /></Stack>
+                    )
+                }}
+            />
+
+            <EditAnimationModal.content name="Edit Animation" width={1200} height={500}>
+                <AnimationForm { ...EditAnimationModal.props } />
+            </EditAnimationModal.content>
+
+            <NewAnimationModal.content name="New Animation">
+                <AnimationFormNew { ...NewAnimationModal.props } />
+            </NewAnimationModal.content>
+        </>
+    )
+}
+
 function useEditBitmapModal(name = 'Edit image') {
     const EditModal = useModal();
     return useMemo(() => {
@@ -969,6 +1374,7 @@ export {
     BitmapSelector,
     BitmapSelectionGrid,
     NameDialog,
+    AnimationManager,
     useExportModal,
     useConfirmDialog,
     useFilterPipelineModal,

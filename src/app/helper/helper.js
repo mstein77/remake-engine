@@ -1192,16 +1192,6 @@ class Players {
     reset() {
         this.allPlayers(player => player.reset())
     }
-/*
-    setSpeed(speed) {
-        this.speed = speed;
-        this.allPlayers(player => player.setSpeed(speed))
-    }
-
-    getSpeed() {
-        return this.speed;
-    }
- */
 }
 
 function cloneDeep(value) {

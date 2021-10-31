@@ -345,7 +345,7 @@ class EntityIndex {
             let index = 0;
             for (let oldIndex of newItems) {
                 if (oldIndex !== index) {
-                    updates.push([index, {...this.getEntityObject(oldIndex), value: index}]);
+                    updates.push([index, { ...this.getEntityObject(oldIndex), value: index }]);
                 }
                 newItems[index] = index;
                 index++;

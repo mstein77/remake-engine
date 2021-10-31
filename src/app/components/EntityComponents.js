@@ -5,6 +5,7 @@ import { Button, Input, Number, Checkbox } from "./FormComponents";
 import {
     EditorCtx,
     useRefocusFirst,
+    useAnimationPlayers,
     CenterInfo,
     EditorContext,
     Section,
@@ -12,7 +13,6 @@ import {
     Kbd,
     AvailContextProvider,
     useFocusKeyBindings,
-    useRefocus,
     Toolbar,
     ToolGroup,
     ScrollArea,
@@ -22,13 +22,14 @@ import {
     useCachedState,
     AvailContext,
     WindowContext,
-    useCssProps
+    useCssProps,
+    UndoRedoButtons
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
 import { WrappingIndexGrid } from "../classes/Grid";
-import { PictureCell } from "./BaseComponents";
+import { PictureCell, PictureAndTextCell } from "./GridComponents";
 
 function makeOp(customOp, defaultOp, defaultCan = true) {
     const isObj = typeof customOp === 'object';
@@ -80,7 +81,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             refocus()
         }
     };
-
     const stackAttr = useFocusKeyBindings({
         keyHandlers: [
             {
@@ -477,8 +477,9 @@ function FlexStack({ ...props }) {
 }
 
 function EntityManager({
-       addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick,
-       entityIndex, emptyText, auto, scaling, minWidth, titleHeight, renderTitle, undo, ...props
+       addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick, animationIndex,
+       entityIndex, emptyText, auto, scaling, minWidth, undo,
+       titleHeight, footerHeight = 0, renderTitle, renderFooter, ...props
     }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
@@ -487,7 +488,7 @@ function EntityManager({
 
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
 
-    const doAction = eContext && undo ? eContext.doAction : action => action();
+    const doAction = eContext && undo !== false ? eContext.doAction : action => action();
 
     let [ posRaw, setPos ] = useState(props.pos !== undefined ? props.pos : 0);
     let pos = posRaw;
@@ -512,12 +513,28 @@ function EntityManager({
     };
     useUpdateOnEntityIndexChanges(entityIndex);
 
+    const players = useAnimationPlayers(entityIndex, animationIndex);
+
     const matcher = props.filter && filter ? filter : null;
     const view = entityIndex.getView(pos, filter ? null : page, matcher);
     view.all = [ ...view.matches ];
     if (filter) {
         view.matches = view.matches.slice(0, page);
     }
+    if (players) {
+        const hasAnimationProp = animationIndex && entityIndex.hasEntityProp('animation');
+        const animations = [];
+        for (let index of view.matches) {
+            const animation = hasAnimationProp ?
+                entityIndex.getEntityPropValue(index, 'animation') :
+                entityIndex.getEntityValue(index);
+            if (animation !== '') {
+                animations.push(animation);
+            }
+        }
+        players.setAnimations(animations);
+    }
+
     const viewEnd = Math.max(view.count - page, 0);
     if (pos > viewEnd) {
         setPos(viewEnd);
@@ -528,6 +545,9 @@ function EntityManager({
     const sizeX = entityIndex.getSizeX();
     const sizeY = entityIndex.getSizeY();
     const padding = defaultPaddingPx;
+
+    const avail = sizeY * zoom;
+    const zoomOrAvail = auto ? {width: avail, height: avail} : zoom;
 
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
@@ -548,7 +568,7 @@ function EntityManager({
             marked.includes(index) ? 'active-bg active-color' : 'ghost-bg'
         ];
         const itemRender = ctx => {
-            entityIndex.drawEntity(ctx, index, 0, 0, zoom);
+            entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players);
         };
         return (
             <Stack
@@ -562,9 +582,12 @@ function EntityManager({
                 onLeftClick={readOnly ? null : () => toggleMarker(index)}>
                 {renderTitle(index)}
                 <Block className="overflow" full centerItems padded="h">
-                    <Canvas render={itemRender} width={zoom * sizeX} height={zoom * sizeY} border="1" />
+                    {entityIndex.hasEntityImage(index) ?
+                        <Canvas render={itemRender} width={avail} height={avail} border="1" /> :
+                        <Block border="1"><Block width={avail} height={avail} /></Block>
+                    }
                 </Block>
-                <Block height={padding}></Block>
+                <Block height={footerHeight || padding}>{renderFooter ? renderFooter(index) : ''}</Block>
             </Stack>
         )
     };
@@ -635,12 +658,16 @@ function EntityManager({
             can: () => marked.length === 1
         };
         const deleteOp = () => {
-            const undoEntities = entityIndex.getEntityObjects(marked);
-            const doMarked = [ ...marked ];
-            doAction(
-                () => entityIndex.deleteEntities(doMarked),
-                () => entityIndex.setEntityObjects(undoEntities)
-            );
+            if (props.deleteOp) {
+                props.deleteOp([ ...marked ]);
+            } else {
+                const undoEntities = entityIndex.getEntityObjects(marked);
+                const doMarked = [ ...marked ];
+                doAction(
+                    () => entityIndex.deleteEntities(doMarked),
+                    () => entityIndex.setEntityObjects(undoEntities)
+                );
+            }
             setMarked([]);
         };
 
@@ -784,7 +811,7 @@ function EntityManager({
                 <Block full="v" className="secondary-bg">
                     <Stack vertical gaps padded scroll>
                         <Button icon="add" onClick={addOp} />
-                        <Button icon="playlist_add" onClick={importOp} />
+                        {importOp && <Button icon="playlist_add" onClick={importOp} />}
                     </Stack>
                 </Block>
             }
@@ -795,6 +822,7 @@ function EntityManager({
                     </Block> :
                     <Stack full vertical borders>
                         <Toolbar>
+                            {undo && <UndoRedoButtons />}
                             {props.filter &&
                                 <ToolGroup>
                                     <Stack gaps>
@@ -817,7 +845,7 @@ function EntityManager({
                                         render={render} items={view.matches} maxAvailZoom={props.maxZoom}
                                         zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
                                         varWidth={sizeX} fixWidth={2 * padding + 2} minWidth={minWidth}
-                                        fixHeight={titleHeight + padding + 2} varHeight={sizeY}
+                                        fixHeight={footerHeight + titleHeight + padding + 2} varHeight={sizeY}
                                         page={page} maxPage={view.count} setPage={setPage}
                                         pos={pos} setPos={setPos}
                                         onDoubleClick={onDoubleClick}
@@ -838,7 +866,7 @@ function EntityManager({
     )
 }
 
-function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, empty = 'No items available!', base = null, centerItems = true, ...props }) {
+function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, empty = 'No items available!', base = null, centerItems = true, text, ...props }) {
 
     const callAfterwards = useCallAfterwards();
 
@@ -857,7 +885,7 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
         callAfterwards(setZoom, maxZoom);
     }
 
-    const players = null; // useAnimationPlayers(entityIndex, animationIndex);
+    const players = useAnimationPlayers(entityIndex, animationIndex);
 
     const gridProvider = useMemo(() => {
         return new WrappingIndexGrid(entityIndex, base, players);
@@ -865,21 +893,49 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
 
     const sizeX = gridProvider.getCellSizeX();
     const sizeY = gridProvider.getCellSizeY();
+    let render = null;
     const cellType = useMemo(() => {
+        if (text) {
+            return new PictureAndTextCell(sizeX, sizeY, text);
+        }
         return new PictureCell(sizeX, sizeY)
-    }, [sizeX, sizeY]);
+    }, [sizeX, sizeY, text]);
+    render = !text ? null : (x, y) => {
+        const index = gridProvider.getCellValue(x, y);
+        if (index === null) {
+            return '';
+        }
+        return (
+            <Stack center="v" gaps padded full="h">
+                {zoom > 0 &&
+                    <Block center="v">{
+                        entityIndex.hasEntityImage(index) ?
+                        <Canvas width={sizeX * zoom} height={sizeY * zoom} render={ctx => gridProvider.index.drawEntity(ctx, index, 0, 0, {width: sizeX * zoom, height: sizeY * zoom}, players)} border /> :
+                        <Block border="1" width={sizeX * zoom} height={sizeY * zoom} />
+                    }</Block>
+                }
+                <Block center="v" full="h" shorten>{entityIndex.getEntityValue(index)}</Block>
+            </Stack>
+        )
+    }
 
     const setFilter = value => {
         gridProvider.setMatch(value === '' ? null : value);
         setFilterRaw(value);
         setPos(0);
     };
+
+    gridProvider.setMatch(filter === '' ? null : filter);
+    if (players) {
+        gridProvider.updatePlayers(pos, width, height);
+    }
     const modeProps = useMemo(() => {
         return {
             modes: ['pick'],
             mode: 'pick',
             modeParams: {
-                onLeftClick: (e, x, y) => select(gridProvider.getCellValue(x, y))
+                onLeftClick: (e, x, y) => select(gridProvider.getCellValue(x, y)),
+                onDoubleClick: props.doubleClick ? e => d(e, 'TODO: Implement!') : null
             }
         }
     }, []);
@@ -914,6 +970,7 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                                 border={border} rulers={rulers} center={centerItems}
                                 posX={0} setPosX={noop} posY={pos} setPosY={setPos}
                                 width={width} setWidth={setWidth} height={height} setHeight={setHeight}
+                                render={render}
 
                                 markerType="rect" setMarkerType={noop}
                                 markerWidth={1} setMarkerWidth={noop}

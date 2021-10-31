@@ -1,4 +1,4 @@
-:root {
+body {
     --screen-bg-color: #303030;
 
     --box-border-width: 2px;
@@ -39,9 +39,6 @@
     --marker-color: #FFFFFF77;
 
     --small-font-size: 14px;
-}
-
-body {
     background-color: var(--screen-bg-color);
     overflow: hidden;
 }

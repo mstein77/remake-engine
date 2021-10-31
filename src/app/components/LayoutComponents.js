@@ -520,10 +520,13 @@ function getFlatChildren(children, result = []) {
  * @param {string|number} [props.minHeight] - A CSS min-height for this component
  * @param {string|number} [props.maxHeight] - A CSS max-height for this component
  */
-function Stack({children, vertical, wrap, gaps, indented, borders, scroll, full, hotKeys, area, link, center, centerItems, ...props}) {
+function Stack({ children, stackRef, vertical, wrap, gaps, indented, borders, scroll, full, hotKeys, area, link, center,centerItems, ...props}) {
     const parentCls = ['bounds'];
     const parentAttr = {};
-    const parentRef = useRef(null);
+    const ownParentRef = useRef(null);
+    const parentRef = stackRef ? stackRef : ownParentRef;
+
+    if (stackRef) parentAttr.ref = parentRef;
 
     if (useHotKeys(parentRef, hotKeys, area, link)) {
         parentAttr.ref = parentRef;
@@ -700,7 +703,11 @@ function Grid({children, columns, rows, padded, gaps, full, centerItems, scroll,
         }
     }
     if (gaps) {
-        cls.push('grid-gap');
+        if (typeof gaps === 'number') {
+            style.gridGap = gaps
+        } else {
+            cls.push('grid-gap');
+        }
     }
     if (centerItems) {
         cls.push('grid-cells-centered');

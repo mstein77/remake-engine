@@ -474,7 +474,7 @@ function CharManager({ charIndex }) {
     return (
         <>
             <EntityManager
-                filter auto undo
+                filter auto
                 emptyText="No chars yet, please add or import chars by clicking on the icons on the left side"
                 entityIndex={charIndex}
                 addOp={addChar}

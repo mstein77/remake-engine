@@ -35,7 +35,6 @@ import {
     ANIMATION
 } from './engine';
 
-
 new Game(320, 224, {zoom: 2, debug: false}, function () {
 
     this.setStateInitHandler(function () {

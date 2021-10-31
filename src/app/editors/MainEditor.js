@@ -913,7 +913,7 @@ function BaseAppInner({ back, children }) {
     const play = () => {
         const gameRef = wContext.game;
         ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
-        if (false && context.dirty) {
+        if (wContext.isDirty()) {
             gameRef.reloadScreen();
         } else {
             gameRef.restart();

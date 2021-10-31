@@ -135,31 +135,103 @@ const divRef = useRef(null);
 ---------------------------
 FocusNavigation
 ---------------------------
- TAB von vorherigen DOM-Elem:
-   -> focusMarker auf aktives Element oder 1.
- LEFT/RIGHT:
-   -> Nächstes/Vorheriges bzw. Erstes/Letztes
-      focusMarker
- SPACE:
-   -> Aktivierung und focusMarker=Pos
+  Button-Verhalten:
 
- BLUR:
-   -> focusMarker = active/erstes
+  a) Radio:
+      - jeder Button hat eindeutigen value
+      - nur ein Button ist active (current === value)
+      - focus ist exclusive (aber optional möglich)
+      - click => value
+      - disabled (kein click-focus, aber nav-focus)
+
+  b) ButtonGroup:
+      - buttons haben keine values aber triggern actions
+      - focus ist exclusive
+      - click => action
+      - disabled (kein click-focus, aber nav-focus)
+
+  Markierung:
+    - normal-select: click/space
+       setze marked auf geklicktes item
+       TODO: nur falls nicht schon in marked, oder immer?
+    - multi-select: cmd+click/space
+       wenn curr-item in marked, dann nehme curr-item raus
+       ansonsten: füge curr-item zu marked hinzu
+    - range-select: shift-space / outside-click-move
+
+    - grow/shrink/move: arrow left/right up/down
+        Erfordert dass das focus item auf einem marked item
+        steht....die arrow-taste macht die action in der
+        entsprechenden richtung und setzt position dann sinnvoll
+
+
 ---------------------------
+BUGS:
+ * TextPaneEditor: Preview-Markierung kaputt
+ - EntityPicker: leeres Filterergebnis macht Ansicht kaputt
+ - EntityPicker: DoubleClick funktioniert nicht
+ - TilesMapEditor: Bitmap-Editor lädt doppelte Farben in Picker
+
+ - Marker: Resize-Handles kaputt
+ - TextPaneEditor: Undo von Checkbox in BlockProps funzt nicht
+ - Modal: kein Submit bei Return
+ - Tooltip: automatischer Hide funktioniert nicht
+ - AnimationManager: Footer abkoppeln um Duration-Eingabe zu fixen
+ - JsonView: default-Erkennung schlägt manchmal fehl
+ - TilesMapEditor: editieren im Tiles-Editor => EntityTextPicker fail
+ - TextPaneEditor: Multi-Select aktiv => Actions werden angezeigt
+ - Sidebar: keine Scrollbar wenn Tabs overflowen
+ - TextPaneEditor: Reassign auf markierte Chars führt zu leeren images
+ - BaseGrid => ManagedGrid update nicht im callAfterwards
+ - TextPaneEditor: Fehler in Undo/Redo-Logik auf Chars
+ - Picker: Ruler-Beschriftung in vertikaler Richtung falsch
+ - Modal: quick-keys im modal-modus sperren
+
+REFACT:
+ - Ruler: Berechnung und Farben umstellen auf Theme
+ - From im EditorSection Header richtig befüllen
+ - EntityStack: ButtonStack & Active auf Focus-Group-Logik umstellen
+ - TextTuple
+ - ColorPicker: auf OkCancel umstellen
+ - JsonView: Default bei Eingabe
+ - UndoRedo umstellen auf ButtonStack
+ - UndoRedo sperren bis Ausführung fertig
+ - Event-Edit: Add falls kein image
+ - Button: tab bei deaktivierung immer drin lassen
+ - Bitmap: close-Button ausrichten und auf Stack-Group umstellen
+ - Bitmap-Editor: Farbe-Hexwert ausgeben
+ - Bitmap-Editor: Pixel/Position-Tracking
+ - Marker: Invert funktioniert nicht
+ - Grid: Umstellung auf ButtonStacks und ToolbarGroups fixen
+ - Canvas: inaktiven Bereich dunkler ausgrauen
+ - Grid: Side-Buttons deaktivierbar machen
+ - Grid: Side-Buttons nur bei Hover/Focus einblenden
+ - SpriteEditor: Preview-Bereich aus TextEditor übernehmen
+ - TextEditor: Reassign Lösung zum deaktivieren und Umstellung auf Footer
+ - SpriteEditor: Sprites/Animations über SideTabs
+ - SpriteEditor: new Sprite über Form
+ - SpriteEditor: import über Multi-Select
+ - Sprite/TilesMap: Resize über ResizeProps
+ - Grid: umstellen der Border-Color
+ - Grid: Subgrid-Unterstützung
+ - BitmapEditor: Light-Table feature
+ - Context-Palette für ColorPicker (vor allem bei Theme)
+ - EntityStack: Drag & Drop (Animation Frames!)
+ - EntityStack: Multi/Range-Select via Key+Mouse inklusive Overscroll
+ - Zoom-Persistierung
+ - Bg-Persistierung
 
 
 ---------------------------
  - Font-Styling
  - Sections
      - shadow für button
-     - zentrale ColorPickerModals
-     - BUG: quick-keys im modal-modus sperren
+     - zentrale ColorPickerModals (?)
 
  - gradient-input
      - BUG: vertical scroll not working
      - Scroll & Sizing issues
      - Before/Cancel
-
  - Persistierung
      - Zoom
      - Background
@@ -167,8 +239,7 @@ FocusNavigation
  - FOCUS-Handling
     - BUG: space on toolbar action triggers selection
        - BUG: Drag-Drop deaktiviert element
-       * Stack/Radio: Focus-Handling überarbeiten
-       - Handling checken
+       * Stack: Focus-Handling überarbeiten
 
  - Entity-Manager
     - FixHeight im Font-Manager richtig berechnen
