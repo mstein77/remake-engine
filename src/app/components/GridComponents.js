@@ -134,16 +134,15 @@ function GridEventsOverlay({ gridProvider, posX, posY, width, height, border, zo
 
 function GridCursorOverlay({
            cursorType, cursorWidth = 1, cursorHeight = 1, cursorPointer = 'crosshair',
-           posX, posY, width, height, gridWidth, gridHeight,
-           fixed, valid, matrix, inclusion, highlight, last,
-           onLeftClick, onRightClick, onDoubleClick
+           posX, posY, width, height, gridWidth, gridHeight, fixed, valid, matrix,
+           inclusion, highlight, last, onLeftClick, onRightClick, onDoubleClick
        }) {
+
     const gContext = useContext(GridContext);
     const tContext = useContext(TrackingContext);
-
     const tracking = useMemo(() => {
         if (!tContext) return () => {};
-        return tContext.getTracking(d(gContext.trackId + '.cursor'))
+        return tContext.getTracking((gContext.trackId ? gContext.trackId + '.' : '') + 'cursor')
     }, []);
 
     const divRef = useRef(null);
@@ -152,19 +151,15 @@ function GridCursorOverlay({
 
     let marker;
     const markerType = cursorType;
-
     const isGap = markerType.endsWith('gap');
 
     if (offX !== null) {
-
         let hasTop = true;
         let hasBottom = true;
         let hasLeft = true;
         let hasRight = true;
-
         let markerWidth = markerType.startsWith('row') ? width : Math.min(cursorWidth, width - offX);
         let markerHeight = markerType.startsWith('column') ? height : Math.min(cursorHeight, height - offY);
-
         let offWidth = cursorWidth;
         let offHeight = cursorHeight;
         if (markerType === 'row-gap') {
@@ -198,21 +193,18 @@ function GridCursorOverlay({
                 hasRight = false;
                 break;
         }
-
         const onClick = !onLeftClick ? null : e => {
             const offset = getOffsetPos(e);
             e.stopPropagation();
             e.preventDefault();
             return onLeftClick(e, posX + offset.x, posY + offset.y, 1, 1);
         };
-
         const onClickRight = !onRightClick ? null : e => {
             const offset = getOffsetPos(e);
             e.stopPropagation();
             e.preventDefault();
             return onRightClick(e, posX + offset.x, posY + offset.y);
         };
-
         if (!(inclusion &&
             (posY + offY > gridHeight - offHeight ||
                 posX + offX > gridWidth - offWidth
@@ -243,7 +235,6 @@ function GridCursorOverlay({
             />;
         }
     }
-
     const adjustPosX = isGap ? gContext.cellSizeX >> 1 : 0;
     let maxPosX = width;
     const adjustPosY = isGap ? gContext.cellSizeY >> 1 : 0;
@@ -252,7 +243,6 @@ function GridCursorOverlay({
         maxPosX++;
         maxPosY++;
     }
-
     const getOffsetPos = e => {
         if (!divRef.current) return false;
 
@@ -962,10 +952,13 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
     eContextRef.current = eContext;
 
     const lastRef = useRef(null);
-
     const lastClickRef = useRef(null);
 
-    return useMemo(() => {
+    useEffect(() => {
+        return () => eContextRef.current.unsetModesContext()
+    }, []);
+
+    useMemo(() => {
         const { gridProvider, edit, resize } = propsRef.current;
         const {
             setMarkerX, setMarkerY, setPosX, setPosY,
@@ -1769,7 +1762,6 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
             }
         }
 
-
         const controller = {};
         for (let mode of modes) {
             let obj = null;
@@ -1832,6 +1824,14 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                     dragCell = {x, y, value};
                                     eContext.setSelection(new CellSelection('rect', [[value]], cellValue));
                                     setMarker('rect', x, y);
+                                    let lastPos = null;
+                                    wContext.addEventListener('mousemove', e => {
+                                        const newPos = getGridPosFromEvent(e, false);
+                                        if (newPos === lastPos) return;
+                                        lastPos = newPos;
+                                        cursor.propsRef.current.last = {clientX: e.clientX, clientY: e.clientY};
+                                        update()
+                                    });
                                     wContext.addEventListener('mouseup', e => {
                                         const pos = getGridPosFromEvent(e, false);
                                         if (pos.x === pos.rawX && pos.y === pos.rawY) {
@@ -1855,6 +1855,9 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                                         }
                                         resetMarker();
                                         wContext.endExclusiveMode('drag');
+                                        cursor.propsRef.current.last = {clientX: e.clientX, clientY: e.clientY};
+                                        cursor.propsRef.current.fixed = false;
+                                        update()
                                     }, {once: true});
                                 }
                             }
@@ -1868,37 +1871,45 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                             setCursor('rect');
                             cursor.propsRef.current = {
                                 onLeftClick: data.onLeftClick ? (e, x, y) => {
+                                        if (data.onDoubleClick) {
+                                            setLastClick('pick', e, () => data.onDoubleClick(e, x, y))
+                                        }
                                         wContext.startExclusiveMode('pick', 'pointer');
                                         setMarker('rect', x, y)
                                         data.onLeftClick(e, x, y);
                                         wContext.addEventListener('mouseup', e => {
+                                            checkLastClick(e);
                                             resetMarker();
                                             wContext.endExclusiveMode('pick');
+                                            setCursor('rect');
+                                            cursor.propsRef.current.last = {clientX: e.clientX, clientY: e.clientY};
+                                            update()
                                         }, {once: true});
                                     } :
                                     (e, x, y) => {
-                                    if (modes.includes('write')) {
-                                        setLastClick('pick', e, () => setMode('write'));
-                                    }
-                                    wContext.startExclusiveMode('pick', 'pointer');
-                                    const lastSelection = gridProvider.getSelection(x, y, 1, 1, eContextRef.current.targetCellValue);
-                                    eContext.setSelection(lastSelection);
-                                    wContext.addEventListener('mouseup', e => {
-                                        checkLastClick(e);
-                                        resetMarker();
-                                        wContext.endExclusiveMode('pick');
-                                        const last = {clientX: e.clientX, clientY: e.clientY};
-                                        cursor.propsRef.current.last = last;
-                                        update();
-                                        if (data.onPick) {
-                                            data.onPick(lastSelection.getCell())
+                                        if (modes.includes('write')) {
+                                            setLastClick('pick', e, () => setMode('write'));
                                         }
-                                    }, {once: true});
-                                    setMarker('rect', x, y)
+                                        wContext.startExclusiveMode('pick', 'pointer');
+                                        const lastSelection = gridProvider.getSelection(x, y, 1, 1, eContextRef.current.targetCellValue);
+                                        eContext.setSelection(lastSelection);
+                                        wContext.addEventListener('mouseup', e => {
+                                            checkLastClick(e);
+                                            resetMarker();
+                                            wContext.endExclusiveMode('pick');
+                                            const last = {clientX: e.clientX, clientY: e.clientY};
+                                            cursor.propsRef.current.last = last;
+                                            update();
+                                            if (data.onPick) {
+                                                data.onPick(lastSelection.getCell())
+                                            }
+                                        }, {once: true});
+                                        setMarker('rect', x, y)
+                                    }
                                 }
-                            }
                         },
                         cleanUp: () => {
+                            d('CLEANING PICK...')
                             cursor.propsRef.current = {}
                         }
                     };
@@ -2072,8 +2083,10 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
                 controller[mode] = obj;
             }
         }
-        return { controller, actions }
+        eContext.setModesContext({ controller, actions });
     }, []);
+
+    return;
 }
 
 function ManagedGrid({
@@ -2089,12 +2102,8 @@ function ManagedGrid({
     const eContext = useContext(EditorContext);
     const mounted = useMounted();
     const callAfterwards = useCallAfterwards();
-
     const { FilterPipelineModal, closeFilterPipelineModal, openFilterPipelineModal } = useFilterPipelineModal('Apply filters to selection...');
-
-    const lastControllerRef = useRef(null);
     const update = useComponentUpdate();
-
     const [ cursorWidth, setCursorWidth ] = useState(1);
     const [ cursorHeight, setCursorHeight ] = useState(1);
     const [ cursorType, setCursorType ] = useState('rect');
@@ -2111,7 +2120,6 @@ function ManagedGrid({
             trackX = false;
         }
     }
-
     const cursorPropsRef = useRef(null);
     const cursor = useMemo(() => {
         return {
@@ -2167,37 +2175,13 @@ function ManagedGrid({
         markerType, markerGapX, markerGapY, ...props
     };
 
-    const { controller, actions } = useGridModes({modes, propsRef, cursor, marker, setter});
-    useMemo(() => {
-        eContext.setGridActions(actions)
-    }, []);
-
-    useMemo(() => {
-        const lastController = lastControllerRef.current;
-        if (lastController && lastController.cleanUp) {
-            lastController.cleanUp()
-        }
-        if (mode === null) {
-            return;
-        }
-        const modeController = controller[mode];
-        if (modeController) {
-            modeController.init(
-                modeController.defaults ?
-                    { ...modeController.defaults, ...modeParams  } : modeParams
-            );
-        }
-        lastControllerRef.current = modeController
-    }, [mode, modeParams]);
-
+    useGridModes({modes, propsRef, cursor, marker, setter});
     useMemo(() => {
         if (props.mode) {
             callAfterwards(eContext.setMode, props.mode, props.modeParams);
-        }
+        } else d('TODO: NO MODE???');
     }, []);
-
     const pointer = mode === 'pick' ? 'pointer' : 'crosshair';
-
     return (
         <Overlays originX={rulers ? 38 : 0} originY={rulers ? 22 : 0} width={gContext.dimX} height={gContext.dimY} className="overflow">
             <CellGrid
@@ -2210,7 +2194,7 @@ function ManagedGrid({
                 <GridRulerH posX={posX} width={width} />
             }
             {rulers &&
-                <GridRulerV posY={posY} height={height} />
+                <GridRulerV posY={posY} height={height} cellsPerLine={gridProvider.setWrapWidth ? gridProvider.wrapWidth : null} />
             }
             {events && gridProvider.hasEvents() &&
                 <GridEventsOverlay
@@ -2408,10 +2392,10 @@ function FlexGrid({  ...props }) {
     )
 }
 
-function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, height, resize, edit, navi, undo, ...props}) {
+function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, height, resize, edit, navi, undo, ...props }) {
     const eContext = useContext(EditorContext);
-
     useUpdateOnGridDimChanges(gridProvider);
+
     const doAction = undo && eContext ? eContext.doAction : action => action();
     const gridWidth = gridProvider.getWidth();
     const gridHeight = gridProvider.getHeight();
@@ -2558,7 +2542,6 @@ function FramedFlexGrid({ gridProvider, posX, posY, setPosX, setPosY, width, hei
 
 function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, targetValues = [], undo, resize, edit, navi, minZoom = 1, maxZoom = 10, animationIndex, ...props }) {
     const eContext = useContext(EditorContext);
-    const callAfterwards = useCallAfterwards();
 
     const [ posX, setPosX ] = useState(0);
     const [ posY, setPosY ] = useState(0);
@@ -2569,7 +2552,6 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
     const [ rulers, setRulers ] = useCachedState('page', 'rulers', false, 'bool');
     const [ events, setEvents ] = useState(true);
     const [ writeTransparent, setWriteTransparent ] = useState(false);
-
     const [ markerType, setMarkerType ] = useState('rect');
     const [ markerX, setMarkerX ] = useState(null);
     const [ markerY, setMarkerY ] = useState(null);
@@ -2590,7 +2572,7 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
         const cellValue = gridProvider.baseCellValue;
         if (cellValue) {
             // TODO take default value from props?
-            callAfterwards(eContext.setSelection, new CellSelection('rect',[[cellValue.getEmpty()]], cellValue))
+            eContext.setSelection(new CellSelection('rect',[[cellValue.getEmpty()]], cellValue))
         }
     }, []);
 
@@ -2651,25 +2633,107 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
         if (action.buttons) {
             for (let button of action.buttons) {
                 const { params, ...buttonProps } = button;
-                const key = '' + buttonProps.name + buttonProps.icon;
                 buttons.push(
-                    <Button { ...buttonProps } key={key} onClick={() => eContext.doGridAction(name, button.params)} />
-                );
+                    { ...buttonProps, onClick: () => eContext.doGridAction(name, button.params) }
+                )
             }
         } else {
-            buttons.push(<Button key={name} name={name} padded="h" onClick={action} />);
+            buttons.push(
+                {name: name, onClick: action}
+            )
         }
     }
-    const markerActions = <Stack>{buttons}</Stack>;
+    let markerButtons = null;
+    if (markerX !== null) {
+        const mButtons = [];
+        if (edit) {
+            mButtons.push({
+                icon: 'clear',
+                onClick: () => {
+                    setMarkerX(null);
+                    setMarkerY(null);
+                    setMarkerWidth(null);
+                    setMarkerHeight(null)
+                }
+            })
+        }
+        if (!(isGap || modeParams.fixed)) {
+            mButtons.push({
+                icon: "select_all",
+                onClick: () => {
+                    setMarkerX(0);
+                    setMarkerY(0);
+                    setMarkerWidth(gridProvider.getWidth());
+                    setMarkerHeight(gridProvider.getHeight())
+                }
+            });
+        }
+        mButtons.push({icon: 'north_west', onClick: () => eContext.doGridAction('goto')});
+        markerButtons = <ButtonStack gaps="1" buttons={mButtons} />
+    }
+    const markerActions = <ButtonStack buttons={buttons} buttonProps={{padded: 'h'}} />;
 
-    return (
-        <Stack vertical borders full>
-            <Toolbar full="h">
-                <ToolGroup>
-                    {undo &&
-                        <UndoRedoButtons />
-                    }
-                    {modes.length > 1 &&
+    let modeButtons = null;
+    if (modes.length > 1) {
+         modeButtons = [];
+         if (edit) {
+             if (hasMode('write'))
+                 modeButtons.push({
+                     icon: "edit",
+                     current: eContext.mode,
+                     value: 'write',
+                     onClick: () => eContext.setMode('write')
+                 });
+             if (hasMode('pick'))
+                 modeButtons.push({
+                     icon: "colorize",
+                     current: eContext.mode,
+                     value: 'pick',
+                     onClick: () => eContext.setMode('pick')
+                 });
+             if (hasMode('add'))
+                 modeButtons.push({
+                     icon: "exposure",
+                     iconProps: {rotate: 180},
+                     current: eContext.mode,
+                     value: 'add',
+                     onClick: () => eContext.setMode('add')
+                 });
+             if (hasMode('drag'))
+                 modeButtons.push({
+                     icon: "pan_tool",
+                     current: eContext.mode,
+                     value: 'drag',
+                     onClick: () => eContext.setMode('drag')
+                 });
+         }
+         if (hasMode('select'))
+             modeButtons.push({icon: "highlight_alt", current: modeParams.type || (mode === 'select' && 'rect'), value: 'rect', onClick: () => eContext.setMode('select', selection)});
+         if (edit) {
+            if (hasMode('select'))
+                modeButtons.push({icon: "view_week", iconProps: {rotate: -90}, current: modeParams.type, value: 'rows', onClick: () => eContext.setMode('select', {type: 'rows'})});
+
+            if (hasMode('select'))
+                modeButtons.push({icon: "view_week", current: modeParams.type, value: 'columns', onClick: () => eContext.setMode('select', {type: 'columns'})});
+         }
+         if (resize && hasMode('select')) {
+             modeButtons.push(
+                 {icon: "border_horizontal", current: modeParams.type, value: 'row-gap', onClick: () => eContext.setMode('select', {type: 'row-gap'})},
+                 {icon: "border_vertical", current: modeParams.type, value: 'column-gap', onClick: () => eContext.setMode('select', {type: 'column-gap'})}
+             );
+         }
+         let currIndex = -1;
+         for (let i = 0; i < modeButtons.length; i++) {
+             if (modeButtons[i].value === eContext.mode) {
+                 currIndex = i;
+                 break;
+             }
+         }
+         modeButtons = <ButtonStack gaps="1" active={currIndex} buttons={modeButtons} />;
+    }
+
+    /*
+    modes.length > 1 &&
                         <Stack gaps="1">
                             {edit && hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
                             {edit && hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
@@ -2681,7 +2745,15 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
                             {resize && hasMode('select')  && <Button icon="border_horizontal" current={modeParams.type} value={'row-gap'} onClick={() => eContext.setMode('select', {type: 'row-gap'})} />}
                             {resize && hasMode('select') && <Button icon="border_vertical" current={modeParams.type} value={'column-gap'} onClick={() => eContext.setMode('select', {type: 'column-gap'})} />}
                         </Stack>
+     */
+    return (
+        <Stack vertical borders full>
+            <Toolbar full="h">
+                <ToolGroup>
+                    {undo &&
+                        <UndoRedoButtons />
                     }
+                    {modeButtons}
                 </ToolGroup>
                 <ToolGroup>
                     <Tuple name="Position:" x={posX} setX={setPosX} maxX={gridWidth - width} min={0}
@@ -2827,31 +2899,7 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
                                min={0}
                         />
                     }
-                    {markerX !== null &&
-                        <Stack gaps="1">
-                            <Button icon="north_west" onClick={
-                                () => {
-                                    eContext.doGridAction('goto');
-                                }
-                            } />
-                            {!(isGap || modeParams.fixed) && <Button icon="select_all" onClick={
-                                () => {
-                                    setMarkerX(0);
-                                    setMarkerY(0);
-                                    setMarkerWidth(gridProvider.getWidth());
-                                    setMarkerHeight(gridProvider.getHeight());
-                                }
-                            } />}
-                            {edit && <Button icon="clear" onClick={
-                                () => {
-                                    setMarkerX(null);
-                                    setMarkerY(null);
-                                    setMarkerWidth(null);
-                                    setMarkerHeight(null)
-                                }
-                            } />}
-                        </Stack>
-                    }
+                    {markerButtons}
                     {showPin &&
                         <Button
                             icon="push_pin"

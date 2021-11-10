@@ -115,9 +115,7 @@ function CharAssignments({ close, save, assignIndex }) {
 
     const [ pos, setPos ] = useState(0);
     const [ page, setPage ] = useState(1);
-
     const managerRef = useRef(null);
-
     const values = assignIndex.getPropValues('value');
 
     const setValueAtIndex = (index, value) => {
@@ -669,7 +667,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
 
     const NewBlockModal = useModal();
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal();
-
     const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
     const [ background, setBackground ] = useState('#000000');
     const [ zoom, setZoom ] = useState(1);
@@ -686,7 +683,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const blockRef = useRef(null);
 
     blockRef.current = activeBlock === null || !blockIndex.getLength() || !blockIndex.hasIndex(activeBlock) ? null : blockIndex.getEntityObject(activeBlock);
-
     const imagesRef = useRef({});
 
     const alignOptions = [
@@ -700,11 +696,9 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
         x: {min: -1000, max: 1000},
         y: {min: -1000, max: 1000}
     };
-
     const invalidateBlockImage = index => {
         delete imagesRef.current[blockIndex.getEntityValue(index)];
     };
-
     const setEntityProp = prop => {
         return value => {
             blockIndex.setEntityPropValue(activeBlock, prop, value);
@@ -714,13 +708,11 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
             blockIndex.notify();
         };
     };
-
     const fontOptions = [];
     const values = fontIndex.getPropValues('value');
     for (let value of values) {
         fontOptions.push({id: value, name: value});
     }
-
     const currBlock = blockRef.current;
 
     const changeFilter = () => {
@@ -1123,8 +1115,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                     {marker && actual &&
                                         <GridCellMarker
                                             blink
-                                            posX={actual.x}
-                                            posY={actual.y}
+                                            posX={actual.x * zoom}
+                                            posY={actual.y * zoom}
                                             zoom={zoom}
                                             cursor={moveCursor}
                                             xdir={
@@ -1133,8 +1125,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                                                 DIR.LEFT |
                                                 (DIR.RIGHT & (currBlock.x + dim.width < width))
                                             }
-                                            width={Math.min(dim.width, width - currBlock.x)}
-                                            height={Math.min(dim.height, height - currBlock.y)}
+                                            width={Math.min(dim.width, width - currBlock.x) * zoom}
+                                            height={Math.min(dim.height, height - currBlock.y) * zoom}
                                             onMove={onMove}
                                             highlight={highlight}
                                         />
@@ -1156,10 +1148,9 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
 }
 
 function TextPaneEditor({ model, resource }) {
+    const wContext = useContext(WindowContext);
     const update = useComponentUpdate();
-
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TextPane', model, resource, update });
-
     const [ activeFont, setActiveFont ] = useState(0);
 
     const fontIndex = useMemo(() => {
@@ -1172,7 +1163,7 @@ function TextPaneEditor({ model, resource }) {
 
     const tree = getResourceTree();
     const details = {
-        'From:': 'Browser',
+        'From:': tree[0].source,
         'Resources:': tree.length
     };
     return (
@@ -1210,8 +1201,7 @@ function TextPaneEditor({ model, resource }) {
                                 const obj = new resource.config.deps.block(block);
                                 jsons.push(obj.getRebuildJson());
                             }
-                            // TODO use tab setting here
-                            openExportModal(JSON.stringify(jsons, null, 4));
+                            openExportModal(JSON.stringify(jsons, null, wContext.editorConfig.tabSpaces));
                         }
                     }
             }}>
@@ -1219,42 +1209,8 @@ function TextPaneEditor({ model, resource }) {
             </EditorSection>
 
             <Modals />
-
         </Stack>
     )
-}
-
-// TODO: remove
-function FastCanvas() {
-    const sizeX = 2;
-    const sizeY = 2;
-    const cells = 100;
-    const width = sizeX * cells;
-    const height = sizeY * cells;
-    const buffer = new ArrayBuffer((cells * cells) << 2);
-    const colors32 = new Uint32Array(buffer);
-    for (let y = 0; y < cells; y++ ) {
-        for (let x = 0; x < cells; x++) {
-            colors32[y * cells + x] = parseInt((x + y) % 2 === 0 ? 'F04040FF' : 'D0D0D0FF', 16);
-        }
-    }
-    const render = ctx => {
-        let pos = 0;
-        let posY = 0;
-        for (let y = 0; y < cells; y++) {
-            let posX = 0;
-            for (let x = 0; x < cells; x++) {
-                ctx.fillStyle = '#' + colors32[pos].toString(16);
-                ctx.fillRect(posX, posY, sizeX, sizeY);
-                pos++;
-                posX += sizeX;
-            }
-            posY += sizeY;
-        }
-    };
-    return (
-        <Block><Canvas border width={width} height={height} render={render} /></Block>
-    );
 }
 
 export {

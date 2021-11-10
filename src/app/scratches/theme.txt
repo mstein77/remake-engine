@@ -166,43 +166,76 @@ FocusNavigation
 
 
 ---------------------------
-BUGS:
- * TextPaneEditor: Preview-Markierung kaputt
- - EntityPicker: leeres Filterergebnis macht Ansicht kaputt
- - EntityPicker: DoubleClick funktioniert nicht
- - TilesMapEditor: Bitmap-Editor lädt doppelte Farben in Picker
+ DONE :)
+---------------------------
+ + TextPaneEditor: Preview-Markierung kaputt
+ + TilesMapEditor: Bitmap-Editor lädt doppelte Farben in Picker
+ + EntityPicker: leeres Filterergebnis macht Ansicht kaputt
+ + FocusElements: up & down-arrow behandeln
+ + From in EditorSection Header richtig befüllen
+ + tabSetting in Exports und JSON-View nutzen
+ + UndoRedo umstellen auf ButtonStack
+ + Modal: kein Submit bei Return
+ + TextPaneEditor: Reassign auf markierte Chars führt zu leeren images
+ + Sidebar: keine Scrollbar wenn Tabs overflowen
+ + Marker: Resize-Handles kaputt
+ + TextPaneEditor: Undo von Checkbox in BlockProps funzt nicht
+ + Picker: Ruler-Beschriftung in vertikaler Richtung falsch
+ + JsonView: default-Erkennung schlägt manchmal fehl
+ + GradientPicker: Overflow-Probleme
+ + Mode-Switching fixen
+ + EntityPicker: DoubleClick funktioniert nicht
+ + Grid: kein Marker/Cursor sichtbar beim Drag-Modus
+ + Modal: Button-Focus bei close in ButtonStack funktioniert nicht
+ + EntityStack: ButtonStack & Active auf Focus-Group-Logik umstellen
+ + Focus auf Button wird bei Klick nicht gesetzt
+ + Grid: marker-clear => mounting-problem
+ + Beim Verschieben auf dem EntityStack wird das falsche FocusItem reaktiviert
+ + Modal: quick-keys im modal-modus sperren
+ + Modal: Submit per Return funzt nicht, wenn focus verloren
+---------------------------
 
- - Marker: Resize-Handles kaputt
- - TextPaneEditor: Undo von Checkbox in BlockProps funzt nicht
- - Modal: kein Submit bei Return
- - Tooltip: automatischer Hide funktioniert nicht
- - AnimationManager: Footer abkoppeln um Duration-Eingabe zu fixen
- - JsonView: default-Erkennung schlägt manchmal fehl
- - TilesMapEditor: editieren im Tiles-Editor => EntityTextPicker fail
+---------------------------
+
+  c) focus and space
+      1. focus auf button
+      2. keyDown
+      3. onClick
+      4. onClickEnd
+
+
+---------------------------
+
+BUGS:
+
+ * AnimationManager: Footer abkoppeln um Duration-Eingabe zu fixen
  - TextPaneEditor: Multi-Select aktiv => Actions werden angezeigt
- - Sidebar: keine Scrollbar wenn Tabs overflowen
- - TextPaneEditor: Reassign auf markierte Chars führt zu leeren images
- - BaseGrid => ManagedGrid update nicht im callAfterwards
- - TextPaneEditor: Fehler in Undo/Redo-Logik auf Chars
- - Picker: Ruler-Beschriftung in vertikaler Richtung falsch
- - Modal: quick-keys im modal-modus sperren
+
+ - Tooltip: automatischer Hide funktioniert nicht
+ - OkCancel: Flexing des Mittelteils funktioniert nicht
+ - Grid: Flex-Berechnung stimmt manchmal nicht (Scrollbars + Rulers)
+ - Marker: Invert funktioniert nicht
+ - TextPaneEditor: Fehler in Undo/Redo-Logik auf Chars (Add Font -> Undo)
+ - TileTracker: Rendering call error
+ - Marker: schnelles Resizing nach Rechts über Rand füllt manchmal nicht bis zum Ende
 
 REFACT:
+ - ButtonStack:
+     - OkCancel: Buttons
+ - Grid: ToolbarGroups fixen
+
+ ? ES2021 generieren
+ - TextEditor: Preview size und BG von resource übernehmen
  - Ruler: Berechnung und Farben umstellen auf Theme
- - From im EditorSection Header richtig befüllen
- - EntityStack: ButtonStack & Active auf Focus-Group-Logik umstellen
  - TextTuple
  - ColorPicker: auf OkCancel umstellen
  - JsonView: Default bei Eingabe
- - UndoRedo umstellen auf ButtonStack
  - UndoRedo sperren bis Ausführung fertig
  - Event-Edit: Add falls kein image
  - Button: tab bei deaktivierung immer drin lassen
  - Bitmap: close-Button ausrichten und auf Stack-Group umstellen
  - Bitmap-Editor: Farbe-Hexwert ausgeben
  - Bitmap-Editor: Pixel/Position-Tracking
- - Marker: Invert funktioniert nicht
- - Grid: Umstellung auf ButtonStacks und ToolbarGroups fixen
  - Canvas: inaktiven Bereich dunkler ausgrauen
  - Grid: Side-Buttons deaktivierbar machen
  - Grid: Side-Buttons nur bei Hover/Focus einblenden
@@ -220,16 +253,16 @@ REFACT:
  - EntityStack: Multi/Range-Select via Key+Mouse inklusive Overscroll
  - Zoom-Persistierung
  - Bg-Persistierung
-
+ - EventOverlay: Count-Boxen Farbe und Font aus Theme
+ - BrushManager: Import from Bitmap
+ - Save-Settings => Editor-Reset bei Änderungen (zB. tabs im JsonView)
 
 ---------------------------
  - Font-Styling
  - Sections
      - shadow für button
      - zentrale ColorPickerModals (?)
-
  - gradient-input
-     - BUG: vertical scroll not working
      - Scroll & Sizing issues
      - Before/Cancel
  - Persistierung
@@ -239,7 +272,6 @@ REFACT:
  - FOCUS-Handling
     - BUG: space on toolbar action triggers selection
        - BUG: Drag-Drop deaktiviert element
-       * Stack: Focus-Handling überarbeiten
 
  - Entity-Manager
     - FixHeight im Font-Manager richtig berechnen

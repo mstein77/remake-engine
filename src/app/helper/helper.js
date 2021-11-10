@@ -520,12 +520,12 @@ const toHex = value => {
     return  ('0' + (value & 0xFF).toString(16)).slice(-2);
 };
 
-const getColorsFromCanvas = canvas => {
+const getColorsFromCanvas = (canvas, alpha = false) => {
     const ctx = canvas.getContext('2d');
-    return getColorsFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    return getColorsFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height), alpha);
 };
 
-const getColorsFromImageData = data => {
+const getColorsFromImageData = (data, alpha = false) => {
     const colors = [];
 
     let pos = 0;
@@ -536,7 +536,7 @@ const getColorsFromImageData = data => {
                 + toHex(data.data[pos])
                 + toHex(data.data[pos + 1])
                 + toHex(data.data[pos + 2])
-                + toHex(data.data[pos + 3]);
+                + (alpha ? toHex(data.data[pos + 3]) : 'ff');
             if (!colors.includes(color)) {
                 colors.push(color);
             }

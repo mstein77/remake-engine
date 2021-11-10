@@ -470,6 +470,21 @@ kbd, input, textarea, .mono {
     color: transparent !important
 }
 
+.cursor-neswresize {
+    cursor: nesw-resize
+}
+
+.cursor-nwseresize {
+    cursor: nwse-resize
+}
+
+.cursor-vresize {
+    cursor: ns-resize
+}
+
+.cursor-hresize {
+    cursor: ew-resize
+}
 /* Custom stylings */
 
 .separator-h {

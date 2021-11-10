@@ -76,7 +76,7 @@ html, body, #app {
 .stack-h > .fix-h,
 .stack-v > .fix-v,
 .stack-h > div:not(.flex):not(.full-h),
-.stack-v > div:not(.flex):not(.full-v) {
+.stack-v > div:not(.flex):not(.full-v):not(.scroll) {
     flex-shrink: 0
 }
 

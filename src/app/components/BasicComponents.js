@@ -1,133 +1,12 @@
-import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
-import {
-    d,
-    Storage,
-    clamp,
-    isEventInRect,
-    getCanvasForBitmap,
-    getCanvasForDim,
-    getUniqueName,
-    hex2rgb,
-    rgb2hex,
-    Players
-} from "../helper/helper"
-import { DIR, Block, Stack, Grid, Overlays, Overlay } from "./LayoutComponents";
-import { Button, Color, OkCancelForm, getDimAttr } from "./FormComponents";
+import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
+import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
+import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents";
+import { Button, Color, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
-
-const defaultValues = {
-    config: {
-        maxWidthPx: 1600,
-        noMaxWidth: false,
-        maxHeightPx: 1200,
-        noMaxHeight: true,
-        tooltips: true,
-        uiAnimations: true,
-        maxHistory: 10
-    },
-    theme: {
-        defaultPaddingPx: 9,
-        boxBorderWidthPx: 1,
-        maxWidthPx: 1200,
-        maxHeightPx: 1200,
-        boxBorderRgb: "#2b7797",
-        lessPerc: 50,
-        morePerc: 150,
-        disabledPerc: 45,
-
-        inputBgRgb: "#b0aec1",
-        inputRgb: "#29292e",
-        inputBorderRgb: "#a8a8a8",
-        inputBstyle: "solid",
-        inputBorderWidthPx: 1,
-        inputPaddingPx: 5,
-        inputMinPaddingPx: 1,
-        inputBorderRadiusPx: 4,
-
-        fontSizeSmallPx: 11,
-        fontSizeMediumPx: 12,
-        fontSizeBigPx: 14,
-
-        monoFont: '"Lucida Console", Courier, monospace',
-
-        checkBoxType: 0,
-        hoverChangeType: -1,
-        hoverIntensityFloat: 0.25,
-
-        editorBgRgb: "#080808",
-        editorRgb: "#9aa0a2",
-
-        primaryBgRgb: "#080808",
-        primaryRgb: "#9aa0a2",
-        secondaryBgRgb: "#2f304b",
-        secondaryRgb: "#9aa0a2",
-        ghostBgRgb: "#181818",
-
-        // header
-        headerType: 0,  // window | floating
-        headerBgType: 0, // primary | color | gradient
-        headerBgRgb: "#86a096",
-        headerBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
-
-        // title
-        titleBgType: 0, // primary | color | gradient
-        titleBgRgb: "#662341",
-        titleBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
-        titleVertBgGrad: 'linear-gradient(180deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
-
-        overlayBgRgba: "#000000a3",
-
-        focusBgRgba: '#FFFFDFCC',
-        focusWidthPx: 1,
-
-        buttonBgRgb: "#1e42ae",
-        buttonRgb: "#b0d5e8",
-        buttonBorderRgb: "#347f66",
-        buttonBstyle: "solid",
-        buttonBorderWidthPx: 1,
-        buttonMinPaddingPx: 3,
-        buttonPaddingPx: 5,
-        buttonBorderRadiusPx: 4,
-
-        activeRgb: '#fafbff',
-        activeBgRgb: '#5baa2b',
-        activeBorderRgb: '#D0D0F0',
-        warningBgRgb: '#987672',
-        warningRgb: '#000000',
-        warningBorderRgb: '#000000',
-        errorBgRgb: '#AA0020',
-        errorRgb: '#E0E0A0',
-        cursorBgRgba: '#58585888',
-
-        markerWidthMinPx: 1,
-        markerWidthMaxPx: 8,
-        markerOpacityMinPerc: 20,
-        markerOpacityMaxPerc: 70,
-        markerInvertMaxPerc: 50,
-
-        linkResourcesUrls: "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
-        buttonFont: "Monospace",
-        fontUrl: "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
-    },
-    mapping: {
-        undo: 'm z',
-        redo: 'm y',
-        save: 'm s',
-        export: 'm x',
-        new: 'c n',
-        select: null,
-        delete: 'c d',
-        quit: 'c q',
-        edit: 'm e',
-        all: 'c a',
-        pick: 'c p',
-        play: 'm p',
-        close: 'Escape'
-    }
-};
+import { defaultValues } from "./Settings";
 
 const BackgroundContext = React.createContext();
 
@@ -170,21 +49,25 @@ function Ruler({ }) {
 }
 
 function JsonView({ json, defaultJson = {}, skipKeys = [], trim, ...props }) {
+    const wContext = useContext(WindowContext);
+
+    const tabSpaces = wContext.editorConfig.tabSpaces;
     const base = { ...defaultJson, ...json };
     for (let key of skipKeys) {
         delete base[key];
     }
-    let jsonString = JSON.stringify(base, null, 2);
+    let jsonString = JSON.stringify(base, null, tabSpaces);
     if (jsonString === '{}') {
         jsonString = '{\n}';
     }
     const lines = jsonString.split("\n");
 
-    let defJsonString = JSON.stringify(defaultJson, null, 2);
+    let defJsonString = JSON.stringify(defaultJson, null, tabSpaces);
     if (defJsonString === '{}') {
         defJsonString = '{\n}';
     }
     const defLines = defJsonString.split("\n");
+
     const render = line => {
         if (trim && line.match(/^[ ]+\"[^"]*\"\:/)) {
             return line.replace(/\"/, '').replace(/\"/, '');
@@ -192,13 +75,21 @@ function JsonView({ json, defaultJson = {}, skipKeys = [], trim, ...props }) {
         return line
     };
 
+    const isInDefaults = line => {
+        if (defLines.includes(line)) return true;
+        if (line.endsWith(',')) {
+            return defLines.includes(line.substring(0, line.length - 1));
+        }
+        return defLines.includes(line + ',')
+    }
+
     return (
         <Block border="1" scroll { ...props }>
             <pre className="scroll padded-h">
             {
                 lines.map(
                     (line, index) =>
-                        <span key={index} className={defLines.includes(line) || defLines.includes(line + ',') ? 'less' : ''}>{render(line)}{"\n"}</span>)
+                        <span key={index} className={isInDefaults(line) ? 'less' : ''}>{render(line)}{"\n"}</span>)
             }
             </pre>
         </Block>
@@ -462,7 +353,8 @@ function EditorCtx({ id, children }) {
     const setter = useMemo(
     () => {
             const renderGrids = {};
-            let gridActions = {};
+            let modesContext = null;
+            let lastController = null;
             let select = {
                 has: false,
                 get: null
@@ -470,19 +362,33 @@ function EditorCtx({ id, children }) {
             let lastId = null;
 
             return {
+                setModesContext: newContext => modesContext = newContext,
+                unsetModesContext: () => modesContext = null,
                 setMode: (mode, params = {}) => {
-                    d('SETTING MODE', mode, params);
+                    if (lastController && lastController.cleanUp) {
+                        lastController.cleanUp()
+                    }
+                    lastController = null;
+                    if (mode !== null) {
+                        const modeController = modesContext.controller[mode];
+                        if (modeController) {
+                            modeController.init(
+                                modeController.defaults ?
+                                    { ...modeController.defaults, ...params  } : params
+                            );
+                        }
+                        lastController = modeController
+                    }
                     setLastMode(mode);
                     setLastModeParams(params);
                 },
-                setGridActions: actions => gridActions = actions,
                 getGridAction: name => {
-                    return gridActions[name];
+                    return modesContext.actions[name];
                 },
-                getGridActions: () => gridActions,
+                getGridActions: () => modesContext ? modesContext.actions : [],
                 doGridAction: (name, data) => {
                     d('DO ACTION', name);
-                    const action = gridActions[name];
+                    const action = modesContext.actions[name];
                     if (!action || (action.can && !action.can())) return;
                     return action.exec(data)
                 },
@@ -600,7 +506,6 @@ function EditorCtx({ id, children }) {
 
 function UndoRedoButtons({ hotKeys }) {
     const eContext = useContext(EditorContext);
-
     if (!hotKeys) {
         hotKeys = {
             undo: {
@@ -613,12 +518,12 @@ function UndoRedoButtons({ hotKeys }) {
             }
         }
     }
+    const buttons = [
+        {icon: 'undo', help: 'Undo', action: 'undo', onClick: hotKeys.undo},
+        {icon: 'redo', help: 'Redo', action: 'redo', onClick: hotKeys.redo}
+    ];
     return (
-        <Stack gaps="1">
-            <Button icon="undo" help="Undo" action="undo" onClick={hotKeys.undo} />
-            <Button icon="redo" help="Redo" action="redo" onClick={hotKeys.redo} />
-        </Stack>
-
+        <ButtonStack gaps="1" buttons={buttons} />
     )
 }
 
@@ -661,19 +566,20 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
         }
     }, []);
 
-    const buttons = [];
-    for (let [action, op] of Object.entries(actionHotKeys)) {
-        buttons.push(
-            <Button key={action} padded="h" name={action} onClick={op} />
-        );
-    }
+    const buttons = useMemo(() => {
+        const items = [];
+        for (let [action, op] of Object.entries(actionHotKeys)) {
+            items.push({
+                key: action, padded: "h", name: action, onClick: op
+            })
+        }
+        return items
+    }, []);
     const header = (
         <Stack full="h" key="eh" className={headerBgType === 0 ? '' : (headerBgType === 2 ? "header-gradient-bg" : "header-bg")}>
             <TitleBlocks title={name} sub={sub} details={details} />
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
-            <Stack center="v" padded="h" gaps="1">
-                {buttons}
-            </Stack>
+            <ButtonStack center="v" padded="h" gaps="1" buttons={buttons} />
         </Stack>
     );
     return (
@@ -684,7 +590,8 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
             link={link}
             area={area}
             float={headerType === 1}
-            name={name} {...props}>
+            name={name} { ...props }
+        >
             {children}
         </SectionFrame>
     );
@@ -1346,11 +1253,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
 
     const gameId = game.getId();
-
     const [ storage ] = useState(() => {
         return new Storage(localStorage, 'remake-engine.editor.');
     });
-
     const doPersistCache = force => {
         if (force === true || document.visibilityState === 'hidden') {
             const cache = registry('cache');
@@ -1361,7 +1266,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
             }
         }
     };
-
     useEffect(() => {
         document.addEventListener('visibilitychange', doPersistCache);
 
@@ -1372,11 +1276,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
     }, []);
 
     const setterRef = useRef();
-
     const defaultEditorConfig = defaultValues.config;
     const defaultTheme = defaultValues.theme;
     const defaultMapping = defaultValues.mapping;
-
     const resourceLoader = game.getResourceLoader();
 
     // the registry is used for storing values which are either expensive to calculate
@@ -1426,7 +1328,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
             }
             return cache;
         }
-
         const action2hotKey = storage.getDefaultedJson('hotkeys', defaultMapping);
         const hotKey2action = {};
         for (let [action, key] of Object.entries(action2hotKey)) {
@@ -1434,7 +1335,6 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 hotKey2action[key] = action;
             }
         }
-
         const syncLinks = currLinks => {
             const links = registry('links');
             const elems = document.querySelectorAll('link');
@@ -1477,6 +1377,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             dirty: false,
             modalStack: [],
             modalIds: [],
+            buttonRefocus: null,
             focusStack: {
                 elem: {},
                 zIndex: null
@@ -1685,6 +1586,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 return confirm && confirm()
             },
 
+            setButtonRefocus: value => {
+                register('buttonRefocus', value)
+            },
             getLastTarget: () => registry('lastTarget'),
             editorConfig: registry('editorConfig'),
             theme: registry('theme'),
@@ -1750,7 +1654,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             },
             getModalLevel,
             openModal: () => {
-                const { modalStack, focusStack, lastTarget } = registry();
+                const { modalStack, focusStack, lastTarget, buttonRefocus } = registry();
 
                 let zIndex = 10000;
                 const len = modalStack.length;
@@ -1761,10 +1665,21 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 focusStack.zIndex = zIndex;
                 focusStack.elem[zIndex] = {
                     top: null, start: null, setShadow: null,
-                    lastFocus: document.activeElement,
+                    submit: null,
+                    lastFocus: buttonRefocus ? buttonRefocus : document.activeElement,
                     lastTarget
                 };
                 return zIndex;
+            },
+            getModalSubmit: () => {
+                const { modalStack, focusStack } = registry();
+                const zIndex = modalStack[modalStack.length - 1];
+                return focusStack.elem[zIndex].submit
+            },
+            setModalSubmit: submit => {
+                const { modalStack, focusStack } = registry();
+                const zIndex = modalStack[modalStack.length - 1];
+                focusStack.elem[zIndex].submit = submit
             },
             closeModal: zIndex => {
                 const { modalStack, focusStack } = registry();
@@ -1775,12 +1690,16 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 }
                 modalStack.splice(index, 1);
                 const { lastTarget, lastFocus } = focusStack.elem[zIndex];
-
                 register('lastTarget', lastTarget);
                 if (lastFocus) {
-                    requestAnimationFrame(() => lastFocus.focus());
+                    requestAnimationFrame(() => {
+                        if (typeof lastFocus === 'function') {
+                            lastFocus();
+                        } else {
+                            lastFocus.focus();
+                        }
+                    });
                 }
-
                 delete focusStack.elem[zIndex];
                 focusStack.zIndex = modalStack.length ? modalStack[modalStack.length - 1] : null;
                 if (focusStack.zIndex) {
@@ -2175,58 +2094,16 @@ function ButtonStack2({ items, onClick }) {
 
 
 function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...props }) {
-
     const [ ready, setReady ] = useState(false);
-
-    const tabsRef = useRef(null);
-    const refocus = useRefocus(tabsRef);
-
     let [ active, setActiveRaw ] = useState(props.active !== undefined ? props.active : null);
     if (props.setActive) {
         active = props.active;
         setActiveRaw = props.setActive
     }
+    const items = useRef([]);
     const setActive = value => {
-        refocus();
         setActiveRaw(value);
     };
-    const items = useRef([]);
-
-    const attr = useFocusKeyBindings({
-        keyHandlers: [
-            {
-                keys: ['ArrowDown', 'ArrowRight'],
-                handler:
-                    () => {
-                        const currIndex = items.current.indexOf(active);
-                        if (currIndex === -1) {
-                            return;
-                        }
-                        let newIndex = currIndex + 1;
-                        if (newIndex >= items.current.length) {
-                            newIndex = 0;
-                        }
-                        setActive(items.current[newIndex]);
-                    }
-            },
-            {
-                keys: ['ArrowUp', 'ArrowLeft'],
-                handler:
-                    () => {
-                        const currIndex = items.current.indexOf(active);
-                        if (currIndex === -1) {
-                            return;
-                        }
-                        let newIndex = currIndex - 1;
-                        if (newIndex < 0) {
-                            newIndex = items.current.length - 1;
-                        }
-                        setActive(items.current[newIndex]);
-                    }
-            },
-        ]
-    });
-
     const ctx = {
         active,
         setActive,
@@ -2241,16 +2118,20 @@ function SideTabs({ vertical, rev, icon = 'keyboard_arrow_right', children, ...p
         ready
     };
     const tabElems = [];
-    for(let item of items.current) {
-        tabElems.push(
-            <Button key={item} full="h" padded="h" current={active} value={item} onClick={({value}) => setActive(value)} name={item}>{icon ? <Icon name={icon} /> : ''}</Button>
-        );
-    }
 
+    const currIndex = items.current.indexOf(active);
+    let i = 0;
+    for(let item of items.current) {
+        const curr = i;
+        tabElems.push(
+            {full: "h", padded: "h", name: item, current: currIndex, value: curr, onClick: ({value}) => {setActive(items.current[value])}, children: icon ? <Icon name={icon} /> : ''}
+        );
+        i++;
+    }
     const stackItems = [];
     stackItems.push(
-        <Block ref={tabsRef} scroll padded="h" key="a">
-            <Stack indented vertical={!vertical} gaps {...attr}>{tabElems}</Stack>
+        <Block padded="h" key="a">
+            <ButtonStack active={currIndex} indented scroll vertical={!vertical} gaps buttons={tabElems} />
         </Block>
     );
     stackItems.push(
@@ -2398,20 +2279,16 @@ function Modal({ ...props }) {
 const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, closeable = true, zIndex = 0, full, width, transparent, maxWidth, minWidth, height, maxHeight, drag, children }) {
     const wContext = useContext(WindowContext);
 
-//    const trapRef = useRef(null);
     const dimRef = useRef(null);
     const [ left, setLeft ] = useState(null);
     const [ top, setTop ] = useState(null);
     const [ dim, setDim ] = useState(null);
     const [ shadow, setShadow ] = useState(null);
     const mounted = useMounted();
-
-    // const lockedStyles = wContext.isStyleLocked() ? wContext.getLockedStyles() : null;
     let { headerBgType } = useCssProps('headerBgType');
     if (lockedStyles) {
         headerBgType = lockedStyles.headerBgType
     }
-
     const enableShadow = () => {
         setTimeout(() => {
             if (mounted.current) {
@@ -2419,7 +2296,6 @@ const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, cl
             }
         }, 100)
     }
-
     const cacheRef = useRef(false);
     if (id && !cacheRef.current) {
         wContext.pushModalId(id);
@@ -2563,7 +2439,7 @@ const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, cl
         height: 'calc(100% - 50px)'
     };
 
-    const vDivCls = ['stack-v full-h boxed modal-centered primary-color primary-bg medium'];
+    const vDivCls = ['block stack-v full-h boxed modal-centered primary-color primary-bg medium'];
     if (full && full !== 'h') {
         vDivCls.push('full-v');
     }
@@ -2590,12 +2466,10 @@ const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, cl
             }
         }
     }
-
     const hotKeys = {};
     if (closeable) {
         hotKeys.close = close
     }
-
     const overlayCls = ['fixed pos-0'];
     if (!transparent) {
         overlayCls.push('modal-overlay');
@@ -2646,9 +2520,18 @@ const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, cl
         vDivStyle.maxHeight = null;
         vDivStyle.minHeight = null;
     }
+    useHotKeys(dimRef,         {
+        ...hotKeys,
+        submit: {
+            exec: () => {
+                const submit = wContext.getModalSubmit();
+                if (submit) submit()
+            }
+        }
+    }, 1);
 
     return (
-        <Block ref={trapRef} area={1} onLeftClick={e => e.stopPropagation()} hotKeys={hotKeys} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
+        <Block ref={trapRef} onLeftClick={e => e.stopPropagation()} full className={overlayCls.join(' ')} onClick={onClick} zIndex={zIndex - 1}>
         <div className="center-v center-h full-h editor-bounds">
             <div className="center-h block" style={parentDivStyle}>
                 <div className={hDivCls.join(' ')} style={hDivStyle}>
@@ -2670,14 +2553,6 @@ const ModalInner = function ({ id, name, trapRef, lockedStyles = null, close, cl
             }
         }} />
     </Block>);
-
-    /*
-    if (lockedStyles) {
-        elem = <ThemeFreeze blockRef={trapRef} values={lockedStyles}>{elem}</ThemeFreeze>
-    }
-
-     */
-
     return (
         <Portal id="modals-container">
             {elem}
@@ -2721,12 +2596,12 @@ function Icon({ name, width, height, center = 'h', className, rotate, size = 18 
     );
 }
 
-function ButtonStack({ buttons, buttonProps = {}, ...props }) {
+function ButtonStack({ buttons, buttonProps = {}, active, ...props }) {
     const stackRef = useRef(null);
-    const { focusItem, attr, ...focus } = useFocusElements({
+    const { focusItem, attr, refocus, ...focus } = useFocusElements({
         divRef: stackRef,
         count: buttons.length,
-        active: 0,
+        active: active !== undefined ? active : 0,
         setActive: () => {}
     });
     const elems = [];
@@ -2752,6 +2627,7 @@ function ButtonStack({ buttons, buttonProps = {}, ...props }) {
                 key={i}
                 { ...elemProps }
                 tabControlled
+                refocus={refocus}
                 tab={focusItem === curr}
                 onClickEnd={onClick}
             />
@@ -3316,11 +3192,10 @@ function PropertyGrid({ labelProps = {}, children }) {
     )
 }
 
-const HotKeySingleKeys = ['Escape'];
+const HotKeySingleKeys = ['Escape', 'Enter'];
 const HotKeySkipValues = ['Meta', 'Control', 'Alt', 'Shift'];
 
 function HotKeyKeys({ hotKey, empty, className, padded = true }) {
-
     const keys = [];
     let elems = [];
     if (hotKey !== null) {
@@ -3476,8 +3351,16 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
-function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, active, page, reset, ...props }) {
+function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, active, page, reset, update, ...props }) {
+    const wContext = useContext(WindowContext);
+
     const [ focusItem, setFocusItem ] = useState(0);
+    const mounted = useMounted();
+    const refocusRef = useRef(false);
+    const levelRef = useRef(null);
+    if (levelRef.current === null) {
+        levelRef.current = wContext.getModalLevel()
+    }
     const setActive = value => {
         if (value !== null) {
             setFocusItem(value);
@@ -3498,15 +3381,19 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
     const isOutsideFocus = hasPaging && (active < pos || active >= nextPageStart);
 
     const refocus = () => {
+        refocusRef.current = true;
         requestAnimationFrame(() => {
-            const elem = divRef.current.querySelector('.tabbed');
+            const elem = divRef.current && divRef.current.querySelector('.tabbed');
             if (elem) {
-                elem.focus()
+                elem.focus();
+                requestAnimationFrame(() => refocusRef.current = false)
+            } else {
+                refocusRef.current = false;
             }
         })
     };
     const onKeyDown = e => {
-        if (e.key === 'ArrowLeft') {
+        if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
             if (focusItem === 0) {
                 setFocusItem(lastIndex);
                 setPos(lastPos)
@@ -3521,7 +3408,7 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
                 }
                 setFocusItem(newPos)
             }
-        } else if (e.key === 'ArrowRight') {
+        } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
             if (focusItem === lastIndex) {
                 setFocusItem(0);
                 setPos(0)
@@ -3544,7 +3431,11 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
         refocus()
     }
     const attr = {
-        onBlur: e => setFocusItem((isOutsideFocus || (reset && active === null)) ? pos : active),
+        onBlur: e => {
+            if (!refocusRef.current && wContext.getModalLevel() === levelRef.current) {
+                setFocusItem((isOutsideFocus || (reset && active === null)) ? pos : active);
+            }
+        },
         onKeyDown
     }
     if (!props.divRef) {
@@ -3552,9 +3443,12 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
     }
     return {
         attr,
-        leftClick: curr => () => {setActive(reset && active === curr ? null : curr); refocus()},
+        leftClick: curr => () => {
+            if (!mounted.current) return;
+            setActive(reset && active === curr ? null : curr); refocus()},
         focusItem,
         last,
+        setActiveFocus: setActive,
         refocus
     }
 }

@@ -33,6 +33,7 @@ import { Section as NewSection } from "./BasicComponents";
 import { Button } from "../components/FormComponents";
 import { MainEditor } from "../editors/MainEditor";
 import { DemoEditor } from "../editors/DemoEditor";
+import {PocEditor} from "../editors/PocEditor";
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
@@ -597,6 +598,7 @@ function EditorApp(props) {
     if (isNew) {
         let editor = '';
         const resourceLoader = props.game.getResourceLoader();
+        resources.push({type: 'poc'});
         if (selected === null) {
             let i = 0;
             const options = [];
@@ -614,6 +616,17 @@ function EditorApp(props) {
                                 <Block center="v" padded><Button padded="h" name="Edit" onClick={() => setSelected(option)} /></Block>
                             </Fragment>
                         );
+                        break;
+
+                    case 'poc':
+                        options.push(
+                            <Fragment key={option}>
+                                <Block></Block>
+                                <Block>POC</Block>
+                                <Block center="v" padded><Button padded="h" name="Edit" onClick={() => setSelected(option)} /></Block>
+                            </Fragment>
+                        );
+                        break;
                 }
                 i++;
             }
@@ -668,6 +681,10 @@ function EditorApp(props) {
                 model.blocks = resource.blocks;
                 // tree = getResourceTreeForJsonModel(resource.cls, model);
                 editor = <SpritePaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'poc':
+                editor = <PocEditor />;
                 break;
         }
         return  (

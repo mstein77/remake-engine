@@ -1,6 +1,7 @@
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, HotKeyKeys, HotKeySingleKeys, HotKeySkipValues, useComponentUpdate, useModal, WindowContext, CssContext, WindowCtx } from "../components/BasicComponents";
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
+import { ButtonStack } from "../components/BasicComponents";
 import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
 import { d, getParsedCssValueRec } from "../helper/helper";
@@ -154,6 +155,7 @@ function ConfigSettings({ config, setConfig }) {
                     <CheckboxProp name="Help Tooltips" value={config.tooltips} set={propSetter('tooltips')} />
                     <CheckboxProp name="UI Animations" value={config.uiAnimations} set={propSetter('uiAnimations')} />
                     <NumberProp name="History size" value={config.maxHistory} max={100} set={propSetter('maxHistory')} min={5} />
+                    <NumberProp name="Tab spaces" value={config.tabSpaces} max={10} set={propSetter('tabSpaces')} min={1} />
                 </PropertyGrid>
             </Block>
 
@@ -998,6 +1000,18 @@ function BaseAppInner({ back, children }) {
             window.removeEventListener('keydown', hotkeyListener, {})
         }
     });
+
+    const rightButtons = useMemo(() => {
+        return [
+            {icon: "build", help: "Editor Settings", padded: "1", onClick: () => wContext.openSettings()},
+            {name: "Play", icon: "play_circle_outline", padded: "h"},
+            {
+                name: "Exit", click: "double", help: {title: "Exit editor", hotKey: "c h", details: "Returns to the game, all changes will be lost"},
+                icon: "logout", padded: "h",  onClick: () => confirm(play)
+            }
+        ]
+    }, []);
+
     return (
         <Block onFocus={onFocus} center full padded className="editor-bounds">
             <Stack vertical gaps full>
@@ -1005,11 +1019,7 @@ function BaseAppInner({ back, children }) {
                     <Stack full="h">
                         {back && <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />}
                         <Block padded="h" center="v" full="h" shorten />
-                        <Stack gaps center="v">
-                            <Button icon="build" help="Editor Settings" padded="1" onClick={() => wContext.openSettings()} />
-                            <Button name="Play" icon="play_circle_outline" padded="h" />
-                            <Button name="Exit" click="double" help={{title: "Exit editor", hotKey: "c h", details: "Returns to the game, all changes will be lost"}} icon="logout" padded="h" onClick={() => confirm(play)} />
-                        </Stack>
+                        <ButtonStack gaps center="v" buttons={rightButtons} />
                     </Stack>
                 </Block>
                 {children}

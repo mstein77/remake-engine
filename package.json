@@ -17,6 +17,10 @@
     "type": "git",
     "url": "git+https://github.com/mstein77/2DFireEngine.git"
   },
+  "browserslist": [
+    "chrome 95",
+    "ff 93"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {

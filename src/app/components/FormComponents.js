@@ -327,7 +327,7 @@ function OkCancelForm({ full, save, cancel, submit, left = [], right = [], child
                 {children}
             </Block>
             <Stack className="secondary-bg" full="h" gaps padded>
-                {submit ? <Submit padded="h" name="OK" onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
+                {submit ? <Submit padded="h" name="OK" modal onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
                 <Button padded="h" onClick={cancel} name="Cancel" icon="close" />
                 {left}
                 {right.length > 0 ? <Block full="h" /> : ''}
@@ -345,11 +345,12 @@ function OkCancelForm({ full, save, cancel, submit, left = [], right = [], child
     return  elem
 }
 
-function Checkbox({ name, value, set, rev, size = 14, readOnly, disabled, tab = true, ...props }) {
+function Checkbox({ name, value, rev, size = 14, readOnly, disabled, tab = true, ...props }) {
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
 
+    const set = useSet(value, props);
     const { checkBoxType } = useCssProps('checkBoxType');
     const type = checkBoxType === 0 ? 'input' : 'button';
     const cls = [type + '-bg ' + type + '-color ' + type + '-border-width ' + type + '-border-radius ' + type + '-border-style ' + type + '-border-color'];
@@ -567,7 +568,7 @@ function addPaddingCls(cls, padded, type) {
 }
 
 function Button({ tabControlled, icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
-                   className,  tab = true, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
+                   className,  tab = true, refocus = null, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
 
     const [ clicked, setClicked ] = useState(false);
@@ -589,7 +590,6 @@ function Button({ tabControlled, icon, name, help, action, full, state, iconProp
     if (className) {
         cls.push(className);
     }
-
     let repeat = false;
     if (onClick && typeof onClick === 'object') {
         if (onClick.repeat !== undefined) {
@@ -608,14 +608,19 @@ function Button({ tabControlled, icon, name, help, action, full, state, iconProp
     }
     if (disabled || readOnly) {
         cursor = 'auto';
-        tab = false;
+        if (readOnly) {
+            tab = false
+        }
     } else {
         cls.push('hover-' + (state ? 'fix' : 'change'));
         cls.push('focus-box');
     }
+    /*
+     TODO: check
     if (tab && value !== undefined && value !== current) {
         tab = false;
     }
+     */
     if (border) {
         cls.push(statePrefix + '-border-color');
         cls.push('button-border-width button-border-style');
@@ -714,6 +719,7 @@ function Button({ tabControlled, icon, name, help, action, full, state, iconProp
             };
         }
         attr.onLeftClick = e => {
+            wContext.setButtonRefocus(refocus);
             if (tab && !tabControlled) {
                 focusRef.current.focus();
                 requestAnimationFrame(() => {
@@ -722,7 +728,8 @@ function Button({ tabControlled, icon, name, help, action, full, state, iconProp
                     }
                 })
             }
-            handleClick('mouseup', e)
+            handleClick('mouseup', e);
+            wContext.setButtonRefocus(null);
         }
     }
     if (full && full !== oppDir) {
@@ -1442,7 +1449,7 @@ function TextArea({ name, value, autoFocus, resize, floatProps = {}, padded = 'h
     const callAfterwards = useCallAfterwards();
     const inputRef = useRef(null);
     const set = useSet(value, props);
-    const [copying, setCopying] = useState(false);
+    const [ copying, setCopying ] = useState(false);
     const propsRef = useRef(null);
     propsRef.current = { copying };
 
@@ -1882,8 +1889,8 @@ function GradientPicker({ valueRef, set, save, close }) {
         i += 2
     }
     return (
-        <Stack vertical padded gaps full="h">
-            <PropertyGrid full="h">
+        <Stack vertical gaps scroll full="h">
+            <PropertyGrid padded full="h">
                 <FullProp full="h">
                     <Block border="1"><GradientBox width={400} height={25} value={value} /></Block>
                 </FullProp>
@@ -3090,15 +3097,21 @@ function EntityProp({ name, ...props }) {
     )
 }
 
-function Submit({ disabled, className, ...props }) {
+function Submit({ disabled, className, modal, ...props }) {
+    const wContext = useContext(WindowContext);
     const fContext = useContext(FormContext);
     const cls = ['submit'];
     if (className) {
         cls.push(className);
     }
+    const cannotSubmit = disabled || (fContext && fContext.invalid);
+    useEffect(() => {
+        if (!modal || !wContext.getModalLevel()) return;
+        wContext.setModalSubmit(cannotSubmit ? null : props.onClick);
+    });
 
     return (
-        <Button icon="done" className={cls.join(' ')} disabled={disabled || (fContext && fContext.invalid)} { ...props } />
+        <Button icon="done" className={cls.join(' ')} disabled={cannotSubmit} { ...props } />
     )
 }
 

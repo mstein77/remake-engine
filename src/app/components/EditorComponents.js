@@ -283,7 +283,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
         <OkCancelForm full save={saveFilters} cancel={close}>
             <Stack full>
                 <Section id="filterSelection" inner full="v" collapse="h" size={170} name="Filters">
-                    <ButtonStack padded full="h" buttons={buttons} buttonProps={{padded: 'h'}} vertical gaps />
+                    <ButtonStack padded full="h" scroll buttons={buttons} buttonProps={{padded: 'h'}} vertical gaps />
                 </Section>
                 <EntityStackSections
                     id="filterPipeline"
@@ -817,7 +817,7 @@ function useExportModal({ model, resource, update, name }) {
         if (type === 'image') {
             value = '"' + value + '"';
         } else if (type === 'json') {
-            const lines = JSON.stringify(value, null, 4).split('\n');
+            const lines = JSON.stringify(value, null, wContext.editorConfig.tabSpaces).split('\n');
             let jsonLines = [];
             if (details.compact) {
                 let no = 0;

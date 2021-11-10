@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import { EditorSection, CenterInfo, SideTabs, SideTab, EditorCtx, Kbd, EditorContext, Toolbar, useModal, PropertyGrid, Section, JsonView, useCssProps, useComponentUpdate } from "../components/BasicComponents";
+import { EditorSection, ButtonStack, CenterInfo, SideTabs, SideTab, EditorCtx, Kbd, EditorContext, Toolbar, useModal, PropertyGrid, Section, JsonView, useCssProps, useComponentUpdate } from "../components/BasicComponents";
 import { DIR, Block, Stack, Grid } from "../components/LayoutComponents";
 import { d, getCanvasForDim, getColorsFromCanvas, getCanvasForEventMatrix, getCanvasForIndexMatrix, getEmptyImageData, cloneDeep } from "../helper/helper";
 import { useBitmapSelectionModal, AnimationManager, useExportModal } from "../components/EditorComponents";
@@ -255,15 +255,17 @@ function ActiveTile({tileIndex, aliasIndex, brushIndex, eventIndex, editTile, ed
             <LabelProp name="Size:"><Kbd value={selection.getWidth() + 'x' + selection.getHeight()} /></LabelProp>
         </>;
     }
+
+    const toolbarButtons = [];
+    if (editAction) toolbarButtons.push({name: 'Edit', onClick: editSelection});
+    if (brushAction) toolbarButtons.push({name: 'to Brush', onClick: saveAsBrush});
+    toolbarButtons.push({name: 'Clear', disabled: !clearAction, onClick: clearSelection});
+
     return (
         <Stack vertical borders full="h">
             {!compact &&
                 <Toolbar>
-                    <Stack gaps="1">
-                        {editAction && <Button padded="h" onClick={editSelection}>Edit</Button>}
-                        {brushAction && <Button padded="h" onClick={saveAsBrush}>To Brush</Button>}
-                        <Button disabled={!clearAction} padded="h" onClick={clearSelection}>Clear</Button>
-                    </Stack>
+                    <ButtonStack gaps="1" buttonProps={{padded: 'h'}} buttons={toolbarButtons} />
                 </Toolbar>
             }
             <Block full="h" scroll full padded={DIR.TOP}>
@@ -305,7 +307,7 @@ function TilesPicker({ tileIndex, editTile }) {
     )
 }
 
-function AliasPicker({ aliasIndex, animationIndex }) {
+function AliasPicker({ aliasIndex, animationIndex, editAlias }) {
     const eContext = useContext(EditorContext);
     const select = index => {
         const name = aliasIndex.getEntityValue(index);
@@ -318,13 +320,14 @@ function AliasPicker({ aliasIndex, animationIndex }) {
             filter
             entityIndex={aliasIndex}
             animationIndex={animationIndex}
+            doubleClick={index => editAlias(index)}
             controls
             text={120}
         />
     )
 }
 
-function BrushPicker({ brushIndex }) {
+function BrushPicker({ brushIndex, editBrush }) {
     const eContext = useContext(EditorContext);
     const select = index => {
         eContext.setSelection(new CellSelection('entity', {entityIndex: brushIndex, value: brushIndex.getEntityValue(index), cellsProp: 'tiles'}, CellValue.tile));
@@ -335,12 +338,13 @@ function BrushPicker({ brushIndex }) {
             select={select}
             filter
             entityIndex={brushIndex}
+            doubleClick={index => editBrush(index)}
             controls
         />
     )
 }
 
-function EventPicker({ eventIndex }) {
+function EventPicker({ eventIndex, editEvent }) {
     const eContext = useContext(EditorContext);
     const select = index => {
         const event = eventIndex.getEntityValue(index);
@@ -352,6 +356,7 @@ function EventPicker({ eventIndex }) {
             select={select}
             text={120}
             filter
+            doubleClick={index => editEvent(index)}
             entityIndex={eventIndex}
             controls
         />
@@ -387,7 +392,7 @@ function TilesManager({ tileIndex, animationIndex, editTile }) {
     const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
 
     const getColorIndexFromTiles = () => {
-        return new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)});
+        return new ColorIndex({colors: getColorsFromCanvas(tileIndex.img, false)});
     };
 
     const addTile = () => {
@@ -795,7 +800,7 @@ function TilesEditor({ tilesGrid, aliasIndex, animationIndex, tiles, save, close
                         </SideTab>
 
                         <SideTab name="Alias">
-                            <EntityTextPicker
+                            <EntityPicker
                                 entityIndex={aliasIndex}
                                 animationIndex={animationIndex}
                                 select={
@@ -1075,11 +1080,11 @@ function TilesPaneEditorInner({ tileIndex, tilesGrid, animationIndex, aliasIndex
                 eContext.doAction(
                     () => {
                         if (plan) aliasIndex.doRenamePlan(plan, eCtxRef.current.selection);
-                        lastIndex = aliasIndex.setEntityObject({...changedAlias, index: lastIndex}, true);
+                        lastIndex = aliasIndex.setEntityObject({ ...changedAlias, index: lastIndex }, true);
                     },
                     () => {
                         if (plan) aliasIndex.undoRenamePlan(plan, eCtxRef.current.selection);
-                        lastIndex = aliasIndex.setEntityObject({...alias, index: lastIndex}, true);
+                        lastIndex = aliasIndex.setEntityObject({ ...alias, index: lastIndex }, true);
                     }
                 );
                 EditAliasModal.close();
@@ -1178,7 +1183,7 @@ function TilesPaneEditorInner({ tileIndex, tilesGrid, animationIndex, aliasIndex
                     <SideTab name="Aliases">
                         <SideTabs>
                             <SideTab active name="Picker">
-                                <AliasPicker aliasIndex={aliasIndex} animationIndex={animationIndex} />
+                                <AliasPicker aliasIndex={aliasIndex} animationIndex={animationIndex} editAlias={editAlias} />
                             </SideTab>
                             <SideTab name="Manager">
                                 <AliasManager aliasIndex={aliasIndex} tileIndex={tileIndex} animationIndex={animationIndex} editAlias={editAlias} />
@@ -1268,8 +1273,13 @@ function TilesPaneEditor({ model, resource, }) {
     }, [model]);
 
     const models = { tileIndex, tilesGrid, animationIndex, aliasIndex, brushIndex, eventIndex };
+    const tree = getResourceTree();
+    const details = {
+        'From:': tree[0].source,
+        'Resources:': tree.length
+    };
     return (
-        <EditorSection id="tilesPaneEditor" full name="TilesPane" sub={model.id} confirm
+        <EditorSection id="tilesPaneEditor" full name="TilesPane" sub={model.id} details={details} confirm
            actions={
                eContextRef => {
                    return {

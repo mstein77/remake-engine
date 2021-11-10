@@ -1,6 +1,6 @@
-import React, {Fragment, useState, useRef, useEffect, useContext} from "react";
-import {d} from '../helper/helper';
-import {Portal, WindowContext} from "./BasicComponents"
+import React, { Fragment, useState, useRef, useEffect, useContext } from "react";
+import { d } from '../helper/helper';
+import { Portal, WindowContext } from "./BasicComponents"
 
 const DIR = {
     TOP: 1,
@@ -520,7 +520,7 @@ function getFlatChildren(children, result = []) {
  * @param {string|number} [props.minHeight] - A CSS min-height for this component
  * @param {string|number} [props.maxHeight] - A CSS max-height for this component
  */
-function Stack({ children, stackRef, vertical, wrap, gaps, indented, borders, scroll, full, hotKeys, area, link, center,centerItems, ...props}) {
+function Stack({ children, stackRef, vertical, wrap, gaps, indented, borders, scroll, full, hotKeys, area, link, center,centerItems, ...props }) {
     const parentCls = ['bounds'];
     const parentAttr = {};
     const ownParentRef = useRef(null);
@@ -818,6 +818,7 @@ export {
     OverlayContext,
     Tooltip,
     DIR,
+    useHotKeys,
     addBorderCls,
     addPaddedCls,
     handleLeftRightClick

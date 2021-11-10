@@ -100,10 +100,8 @@ function SpriteManager({ spriteIndex, editSprite }) {
             }
         })
     }
-
     const { defaultPaddingPx, fmMonoMedium } = useCssProps('defaultPaddingPx', 'fmMonoMedium');
     const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
-
     return (
         <>
             <EntityManager
@@ -199,8 +197,9 @@ function SpritePaneEditor({ model, resource }) {
     }, [model]);
 
     const tree = []; // getResourceTree();
+    // TODO:
     const details = {
-        'From:': 'Browser',
+        'From:': 'wherever', // tree[0].source,
         'Resources:': tree.length
     };
     return (

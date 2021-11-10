@@ -2,29 +2,9 @@ import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import {
-    EditorCtx,
-    useRefocusFirst,
-    useAnimationPlayers,
-    CenterInfo,
-    EditorContext,
-    Section,
-    Canvas,
-    Kbd,
-    AvailContextProvider,
-    useFocusKeyBindings,
-    Toolbar,
-    ToolGroup,
-    ScrollArea,
-    BackgroundControl,
-    useUpdateOnEntityIndexChanges,
-    useCallAfterwards,
-    useCachedState,
-    AvailContext,
-    WindowContext,
-    useCssProps,
-    UndoRedoButtons
-} from "./BasicComponents";
+import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, AvailContextProvider,
+    Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons,
+    useFocusElements, useComponentUpdate } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
@@ -43,7 +23,7 @@ function makeOp(customOp, defaultOp, defaultCan = true) {
 
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
-    const callAfterwards = useCallAfterwards();
+    const update = useComponentUpdate();
 
     const [ dropIndex, setDropIndex ] = useState(null);
     const [ dragging, setDragging ] = useState(false);
@@ -60,93 +40,23 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     useUpdateOnEntityIndexChanges(entityIndex);
 
-    let [ active, setActiveRaw ] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
+    let [ active, setActive ] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
     const entities = entityIndex.getEntityObjects();
     if (props.setActive !== undefined) {
-        setActiveRaw = props.setActive;
+        setActive = props.setActive;
         active = props.active;
     }
-    let [ shadow, setShadow ] = useState(active);
-
     const stackRef = useRef(null);
-    const { canRefocus, refocus } = useRefocusFirst(stackRef);
-
-    const setActive = (value, forceFocus = false) => {
-        const doRefocus = forceFocus || canRefocus();
-        if (value !== null) {
-            setShadow(value);
-        }
-        setActiveRaw(value);
-        if (doRefocus) {
-            refocus()
-        }
-    };
-    const stackAttr = useFocusKeyBindings({
-        keyHandlers: [
-            {
-                keys: ['ArrowDown', 'ArrowRight'],
-                handler:
-                    () => {
-                        let newIndex = (active === null ? shadow : active) + 1;
-                        if (newIndex >= entities.length) {
-                            newIndex = 0;
-                        }
-                        if (active === null) {
-                            setShadow(newIndex);
-                            refocus()
-                        } else {
-                            setActive(newIndex, true)
-                        }
-                    }
-            },
-            {
-                keys: ['ArrowUp', 'ArrowLeft'],
-                handler:
-                    () => {
-                        let newIndex = (active === null ? shadow : active) - 1;
-                        if (newIndex < 0) {
-                            newIndex = entities.length - 1;
-                        }
-                        if (active === null) {
-                            setShadow(newIndex);
-                            refocus()
-                        } else {
-                            setActive(newIndex, true);
-                        }
-                    }
-            },
-            {
-                keys: [' '],
-                handler:
-                    () => {
-                    if (entities.length === 0) {
-                            return
-                        }
-                        if (!deselect && active !== null) {
-                            return;
-                        }
-                        if (active === null) {
-                            setActive(shadow !== null ? shadow : 0);
-                        } else {
-                            setActive(null, true);
-                        }
-                    }
-            }
-        ]
-    });
-
     const indexSize = entityIndex.getLength();
-    if (active !== null && indexSize === 0) {
-        callAfterwards(setActiveRaw, null);
-    } else if (indexSize > 0 && active >= indexSize) {
-        const doRefocus = canRefocus();
-        callAfterwards(() => {
-            setActiveRaw(indexSize - 1);
-            if (doRefocus) {
-                refocus()
-            }
-        });
-    }
+    const { focusItem, attr, refocus, setActiveFocus, ...focus } = useFocusElements({
+        count: indexSize,
+        update,
+        reset: deselect === true,
+        divRef: stackRef,
+        handleSpace: true,
+        active,
+        setActive
+    });
     const dragLeave = index => e => {
         requestAnimationFrame(() => {
             if (dropRef.current.dropIndex === index) {
@@ -186,7 +96,8 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             }
         );
         dropRef.current.dragIndex = null;
-        setActive(index)
+        setActiveFocus(index);
+        refocus()
     }
     const items = [];
     let index = 0;
@@ -195,26 +106,27 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     for(let entity of entities) {
         const curr = index;
         const isActive = index === active;
-        const attr = {
-            onLeftClick: () => {
-                if (curr === active) {
-                    if (deselect) {
-                        setActive(null);
-                    }
-                } else {
-                    setActive(curr, true);
-                }
-            }
+        const elemAttr = {
+            onLeftClick: focus.leftClick(curr),
+            tab: focusItem === curr
         };
-        if (isActive || (index === shadow && active === null)) {
-            attr.tab = true;
-        }
         const itemCls = ['hover-change' + (isActive ? ' active-bg active-color' : ' ghost-bg')];
         if (index === dropIndex) {
-            itemCls.push('focus-outline');
+            itemCls.push('focus-outline')
         }
         items.push(
-            <Stack key={index} onDragOver={dragging ? e => e.preventDefault() : null} onDrop={dragging ? drop(index) : null} onDragLeave={dragging ? dragLeave(index) : null} onDragEnter={dragging ? dragEnter(index) : null} onDragStart={order ? dragStart(index) : null} border={DIR.BOTTOM} cursor="pointer" gaps className={itemCls.join(' ')} full="h" { ...attr }>
+            <Stack
+                key={index} full="h"
+                onDragOver={dragging ? e => e.preventDefault() : null}
+                onDrop={dragging ? drop(index) : null}
+                onDragLeave={dragging ? dragLeave(index) : null}
+                onDragEnter={dragging ? dragEnter(index) : null}
+                onDragStart={order ? dragStart(index) : null}
+                border={DIR.BOTTOM} cursor="pointer"
+                gaps
+                className={itemCls.join(' ')}
+                { ...elemAttr }
+            >
                 <Block width={numLen} className="less" padded>#{index + 1}</Block>
                 <Stack vertical full="h" padded gaps>
                     <Block shorten>{getName(entity)}</Block>
@@ -262,7 +174,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             () => entityIndex.setEntityObject(cloneEntity),
             () => entityIndex.deleteEntity(index + 1)
         );
-        setActive(cloneEntity.index);
+        setActiveFocus(cloneEntity.index);
     };
 
     const execUp = !order ? null : () => {
@@ -283,7 +195,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 entityIndex.setEntityObject({ ...old, index: isFirst ? 0 : index - 1 });
             }
         );
-        setActive(isFirst ? maxIndex : active - 1)
+        setActiveFocus(isFirst ? maxIndex : active - 1)
     };
     const execDown = !order ? null : () => {
         const index = active;
@@ -303,7 +215,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 entityIndex.setEntityObject({ ...old, index: isLast ? maxIndex : index + 1 });
             }
         );
-        setActive(isLast ? 0 : active + 1 )
+        setActiveFocus(isLast ? 0 : active + 1 )
     };
 
     const hotKeys = {
@@ -320,21 +232,23 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
             can: () => active !== null && entityIndex.getLength() > 1
         }
     };
+    const buttons = [];
+    if (add) buttons.push({icon: 'add', onClick: hotKeys.new});
+    if (edit) buttons.push({icon: 'edit', onClick: hotKeys.edit});
+    if (clone) buttons.push({icon: 'content_copy', onClick: hotKeys.clone});
+    if (del) buttons.push({icon: 'delete', onClick: hotKeys.delete});
+    if (order) buttons.push(
+        {icon: 'keyboard_arrow_up', onClick: hotKeys.up},
+        {icon: 'keyboard_arrow_down', onClick: hotKeys.down}
+    );
 
     let elem = (
         <Stack key="stack" vertical borders full area={area} hotKeys={hotKeys}>
             <Block full="h">
-                <Stack key="buttons" full wrap gaps className="secondary-bg">
-                    {add && <Button key="add" icon="add" onClick={hotKeys.new} />}
-                    {edit && <Button key="edit" icon="edit" onClick={hotKeys.edit} />}
-                    {clone && <Button key="clone" icon="content_copy" onClick={hotKeys.clone} />}
-                    {del && <Button key="del" icon="delete" onClick={hotKeys.delete} />}
-                    {order && <Button key="up" icon="keyboard_arrow_up" onClick={hotKeys.up} />}
-                    {order && <Button key="down" icon="keyboard_arrow_down" onClick={hotKeys.down} />}
-                </Stack>
+                <ButtonStack buttons={buttons} full wrap gaps className="secondary-bg" />
             </Block>
             <Block full ref={stackRef}>
-                <Stack vertical scroll full={isEmpty ? true : "h"} { ...stackAttr }>
+                <Stack key="stack" vertical scroll full={isEmpty ? true : "h"} { ...attr }>
                     {isEmpty ? <CenterInfo>{emptyText}</CenterInfo> : items}
                 </Stack>
             </Block>
@@ -352,7 +266,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 }
 
 function EntityStackSections({ id, sectionProps, detailProps, active, children, ...props}) {
-
     const items = [];
     items.push(
         <Section key={0} id={id} { ...sectionProps }>
@@ -370,7 +283,6 @@ function EntityStackSections({ id, sectionProps, detailProps, active, children, 
         </>
     )
 }
-
 
 function FlexStackInner({
         zoom, setZoom, minZoom, maxZoom, setMaxZoom,
@@ -601,31 +513,32 @@ function EntityManager({
             {filter && <Block center="v"><Kbd value={'' + entityIndex.getLength()} /></Block>}
         </Stack>
     );
+    const markerButtons = [
+        {icon: 'clear',  disabled: marked.length === 0, onClick: () => setMarked([])},
+        {icon: 'done_all',
+            onClick: () => setMarked(
+                marked.length < entityIndex.getLength() ?
+                    entityIndex.getAllIndices() : []
+            )
+        },
+        {icon: 'flaky', onClick: () => {
+                const newMarked = [];
+                for (let index of entityIndex.getAllIndices()) {
+                    if (!marked.includes(index)) {
+                        newMarked.push(index);
+                    }
+                }
+                setMarked(newMarked)
+        }}
+    ];
+
     bottomItems.selection = (
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
             <Block key="m" center="v" className={marked.length ? 'active-underlined' : ''}>Marked:</Block>
             <Block center="v">
                 <Kbd value={'' + marked.length} length={('' + view.count).length} />
             </Block>
-            <Stack gaps="1">
-                <Button icon="clear" disabled={marked.length === 0} onClick={() => setMarked([])} />
-                <Button icon="flaky" onClick={
-                    () => {
-                        const newMarked = [];
-                        for (let index of entityIndex.getAllIndices()) {
-                            if (!marked.includes(index)) {
-                                newMarked.push(index);
-                            }
-                        }
-                        setMarked(newMarked)
-                    }
-                } />
-                <Button icon="done_all" onClick={() => setMarked(
-                    marked.length < entityIndex.getLength() ?
-                        entityIndex.getAllIndices() : []
-                )} />
-            </Stack>
-
+            <ButtonStack gaps="1" buttons={markerButtons} />
         </Stack>
     );
 
@@ -654,7 +567,7 @@ function EntityManager({
 
     if (marked.length) {
         const execEdit = {
-            exec: () => editOp([ ...marked]),
+            exec: () => editOp([ ...marked ]),
             can: () => marked.length === 1
         };
         const deleteOp = () => {
@@ -670,7 +583,6 @@ function EntityManager({
             }
             setMarked([]);
         };
-
         const clearOp = () => {
             const indices = [ ...marked ];
             const emptyBitmap = getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY());
@@ -692,7 +604,6 @@ function EntityManager({
             );
             setMarked([]);
         };
-
         const applyOp = () => {
             const indices = [ ...marked ];
             const undoImages = [];
@@ -784,19 +695,20 @@ function EntityManager({
                 return (cell.width === entityIndex.getSizeX() && cell.height === entityIndex.getSizeY());
             }
         };
+        const actionButtons = [
+            {name: 'edit', onClick: execEdit},
+            {name: 'delete', onClick: deleteOp},
+            {name: 'clear', onClick: clearOp},
+            {name: 'apply...', onClick: applyOp},
+            {name: 'reassign', onClick: () => reassignOp([ ...marked ])},
+            {name: 'swap', onClick: swapOp},
+            {name: 'copy', onClick: copyOp},
+            {name: 'paste', onClick: pasteOp}
+        ];
         bottomItems.actions = (
             <Stack gaps key="actions">
                 <Block center="v" className="active-bg-text active-underlined">Actions:</Block>
-                <Stack gaps="1">
-                    <Button name="edit" padded="h" onClick={execEdit} />
-                    <Button name="delete" padded="h" onClick={deleteOp} />
-                    <Button name="clear" padded="h" onClick={clearOp} />
-                    <Button name="apply..." padded="h" onClick={applyOp} />
-                    <Button name="reassign" padded="h" onClick={() => reassignOp([ ...marked ])} />
-                    <Button name="swap" padded="h" onClick={swapOp} />
-                    <Button name="copy" padded="h" onClick={copyOp} />
-                    <Button name="paste" padded="h" onClick={pasteOp} />
-                </Stack>
+                <ButtonStack gaps="1" buttons={actionButtons} buttonProps={{padded: 'h'}} />
             </Stack>
         );
     }
@@ -804,15 +716,17 @@ function EntityManager({
     for(let [key, elem] of Object.entries(bottomItems)) {
         groups.push(<ToolGroup key={key}>{elem}</ToolGroup>);
     }
+    const sideButtons = [
+        {icon: 'add', onClick: addOp}
+    ];
+    if (importOp) sideButtons.push({icon: "playlist_add", onClick: importOp});
+
     return (
         <>
         <Stack full borders>
             {!readOnly &&
                 <Block full="v" className="secondary-bg">
-                    <Stack vertical gaps padded scroll>
-                        <Button icon="add" onClick={addOp} />
-                        {importOp && <Button icon="playlist_add" onClick={importOp} />}
-                    </Stack>
+                    <ButtonStack vertical gaps buttons={sideButtons} padded scroll />
                 </Block>
             }
             {
@@ -839,7 +753,7 @@ function EntityManager({
                         <Block full>
                             {
                                 view.count === 0 ?
-                                    <CenterInfo>{'No items found matching "' + filter + '"'}</CenterInfo> :
+                                    <CenterInfo>{'No items found matching "' + filter + '"!'}</CenterInfo> :
                                     <FlexStack
                                         auto={auto} scaling={scaling}
                                         render={render} items={view.matches} maxAvailZoom={props.maxZoom}
@@ -866,7 +780,9 @@ function EntityManager({
     )
 }
 
-function EntityPicker({ entityIndex, animationIndex, select, doubleClick, controls, empty = 'No items available!', base = null, centerItems = true, text, ...props }) {
+function EntityPicker({
+      entityIndex, animationIndex, select, doubleClick, controls, empty = 'No items available!',
+      base = null, centerItems = true, text, ...props }) {
 
     const callAfterwards = useCallAfterwards();
 
@@ -880,11 +796,9 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
     const [ markerX, setMarkerX ] = useState(null);
     const [ markerY, setMarkerY ] = useState(null);
     const [ filter, setFilterRaw ] = useState('');
-
     if (zoom > maxZoom) {
         callAfterwards(setZoom, maxZoom);
     }
-
     const players = useAnimationPlayers(entityIndex, animationIndex);
 
     const gridProvider = useMemo(() => {
@@ -918,13 +832,11 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
             </Stack>
         )
     }
-
     const setFilter = value => {
         gridProvider.setMatch(value === '' ? null : value);
         setFilterRaw(value);
         setPos(0);
     };
-
     gridProvider.setMatch(filter === '' ? null : filter);
     if (players) {
         gridProvider.updatePlayers(pos, width, height);
@@ -935,13 +847,11 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
             mode: 'pick',
             modeParams: {
                 onLeftClick: (e, x, y) => select(gridProvider.getCellValue(x, y)),
-                onDoubleClick: props.doubleClick ? e => d(e, 'TODO: Implement!') : null
+                onDoubleClick: doubleClick ? (e, x, y) => doubleClick(gridProvider.getCellValue(x, y)) : null
             }
         }
     }, []);
-
-    const hasItems = gridProvider.getWidth() > 0;
-
+    const hasItems = filter || gridProvider.getWidth() > 0;
     return (
         <EditorCtx>
             <Stack vertical full borders>
@@ -958,11 +868,10 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                 }
                 <Block full>
                     {gridProvider.getWidth() === 0 ?
-                        <CenterInfo>{empty}</CenterInfo> :
+                        <CenterInfo>{filter ? `No items found matching filter "${filter}"!` : empty}</CenterInfo> :
                         <Block full>
                             <FlexGrid
                                 { ...modeProps }
-
                                 gridProvider={gridProvider} cellType={cellType}
                                 zoom={zoom} setZoom={setZoom} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
                                 maxAvailZoom={props.maxZoom}
@@ -971,13 +880,11 @@ function EntityPicker({ entityIndex, animationIndex, select, doubleClick, contro
                                 posX={0} setPosX={noop} posY={pos} setPosY={setPos}
                                 width={width} setWidth={setWidth} height={height} setHeight={setHeight}
                                 render={render}
-
                                 markerType="rect" setMarkerType={noop}
                                 markerWidth={1} setMarkerWidth={noop}
                                 markerHeight={1} setMarkerHeight={noop}
                                 markerX={markerX} setMarkerX={setMarkerX}
                                 markerY={markerY} setMarkerY={setMarkerY}
-
                                 valid={(x, y) => gridProvider.getCellValue(x, y) !== null}
                             />
                         </Block>

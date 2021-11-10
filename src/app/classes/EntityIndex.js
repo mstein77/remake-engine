@@ -498,25 +498,31 @@ class AssignIndex extends EntityIndex {
         return {x: index * this.sizeX, y: 0};
     }
 
-    drawEntity(targetCtx, index, x, y, zoom = 1) {
-        const sizeX = this.getSizeX();
-        const sizeY = this.getSizeY();
-        targetCtx.clearRect(x, y, sizeX * zoom, sizeY * zoom);
-        if (index >= this.items.length || this.img.width === 0) {
-            return;
-        }
+    drawEntity(targetCtx, index, x, y, zoomOrAvail = 1) {
         const pos = this.getIndexPos(index);
-        targetCtx.drawImage(
-            this.img,
-            pos.x,
-            pos.y,
-            sizeX,
-            sizeY,
-            x,
-            y,
-            sizeX * zoom,
-            sizeY * zoom
-        );
+        if (typeof zoomOrAvail === 'object') {
+            targetCtx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
+            if (pos !== null) {
+                drawCanvasToAvail(this.img, targetCtx, x, y, zoomOrAvail, this.getIndexDim(), pos);
+            }
+        } else {
+            const targetWidth = this.sizeX * zoomOrAvail;
+            const targetHeight = this.sizeY * zoomOrAvail;
+            targetCtx.clearRect(x, y, targetWidth, targetHeight);
+            if (pos !== null) {
+                targetCtx.drawImage(
+                    this.img,
+                    pos.x,
+                    pos.y,
+                    this.getSizeX(),
+                    this.getSizeY(),
+                    x,
+                    y,
+                    targetWidth,
+                    targetHeight
+                );
+            }
+        }
     }
 }
 
