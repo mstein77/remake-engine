@@ -1134,8 +1134,8 @@ function FrameManager({ frameIndex, fixSize, width, height }) {
                 renderFooter={index => {
                     const frame = frameIndex.getEntityValue(index);
                     return (
-                        <Stack padded className="less small" full="h" gaps>
-                            <Block center="v">Duration: </Block>
+                        <Stack padded full="h" gaps>
+                            <Block center="v" className="small">Duration: </Block>
                             <Block center="v" full="h"><Number size={3} min={1} value={frame.duration} set={duration => {frame.duration = duration; frameIndex.notify()}} /></Block>
                         </Stack>
                     )

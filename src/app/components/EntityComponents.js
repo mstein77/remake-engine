@@ -2,9 +2,31 @@ import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, AvailContextProvider,
-    Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons,
-    useFocusElements, useComponentUpdate } from "./BasicComponents";
+import {
+    EditorCtx,
+    useAnimationPlayers,
+    CenterInfo,
+    EditorContext,
+    ButtonStack,
+    Section,
+    Canvas,
+    Kbd,
+    AvailContextProvider,
+    Toolbar,
+    ToolGroup,
+    ScrollArea,
+    BackgroundControl,
+    useUpdateOnEntityIndexChanges,
+    useCallAfterwards,
+    useCachedState,
+    AvailContext,
+    WindowContext,
+    useCssProps,
+    UndoRedoButtons,
+    useFocusElements,
+    useComponentUpdate,
+    Icon
+} from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
@@ -483,22 +505,24 @@ function EntityManager({
             entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players);
         };
         return (
-            <Stack
-                vertical
-                full
-                border="1"
-                className={cls.join(' ')}
-                cursor="pointer"
-                onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
-                onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
-                onLeftClick={readOnly ? null : () => toggleMarker(index)}>
-                {renderTitle(index)}
-                <Block className="overflow" full centerItems padded="h">
-                    {entityIndex.hasEntityImage(index) ?
-                        <Canvas render={itemRender} width={avail} height={avail} border="1" /> :
-                        <Block border="1"><Block width={avail} height={avail} /></Block>
-                    }
-                </Block>
+            <Stack vertical gaps full>
+                <Stack
+                    vertical
+                    full
+                    border="1"
+                    className={cls.join(' ')}
+                    cursor="pointer"
+                    onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
+                    onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
+                    onLeftClick={readOnly ? null : () => toggleMarker(index)}>
+                    {renderTitle(index)}
+                    <Block className="overflow" full centerItems padded={footerHeight !== undefined ? DIR.ALL_BUT_TOP : 'h'}>
+                        {entityIndex.hasEntityImage(index) ?
+                            <Canvas render={itemRender} width={avail} height={avail} border="1" /> :
+                            <Block border="1"><Block width={avail} height={avail} /></Block>
+                        }
+                    </Block>
+                </Stack>
                 <Block height={footerHeight || padding}>{renderFooter ? renderFooter(index) : ''}</Block>
             </Stack>
         )
@@ -759,7 +783,7 @@ function EntityManager({
                                         render={render} items={view.matches} maxAvailZoom={props.maxZoom}
                                         zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
                                         varWidth={sizeX} fixWidth={2 * padding + 2} minWidth={minWidth}
-                                        fixHeight={footerHeight + titleHeight + padding + 2} varHeight={sizeY}
+                                        fixHeight={footerHeight + titleHeight + 3 * padding + 4} varHeight={sizeY}
                                         page={page} maxPage={view.count} setPage={setPage}
                                         pos={pos} setPos={setPos}
                                         onDoubleClick={onDoubleClick}
@@ -895,9 +919,117 @@ function EntityPicker({
     )
 }
 
+function TreeStack({ tree, editOp, ...props }) {
+
+    let [ active, setActive ] = useState(props.active !== undefined ? props.active : null);
+    const stackRef = useRef(null);
+
+    if (props.setActive) {
+        active = props.active;
+        setActive = props.setActive
+    }
+
+    const { focusItem, attr, refocus, ...focus } = useFocusElements({
+        divRef: stackRef,
+        count: tree.length,
+        handleSpace: true,
+        reset: true,
+        active,
+        setActive
+    });
+
+    let lastLevel = null;
+    let minLevel = null;
+    const nodeEnd = [];
+    for (let i = tree.length - 1; i >= 0; i--) {
+        const node = tree[i];
+        const currLevel = node.level;
+        nodeEnd.unshift(
+            minLevel === null || currLevel < minLevel ||
+            (currLevel >= minLevel && currLevel > lastLevel)
+        );
+        lastLevel = currLevel;
+        minLevel = minLevel === null ? currLevel : Math.min(currLevel, minLevel);
+    }
+    const height = 45;
+
+    const nodes = [];
+    let i = 0;
+    const end = [false, false, false, false];
+    for (let node of tree) {
+        const indention = [];
+        const isEnd = nodeEnd[i];
+        if (isEnd) {
+            end[node.level] = true
+        }
+        for (let l = 0; l < node.level; l++) {
+            indention.push(
+                <Block key={l} width={18} full="v">
+                    {!end[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={height} />}
+                </Block>
+            );
+        }
+        const elem = node.leaf ?
+            <Icon size={12} className="border-color" name="square" /> :
+            <Block center="h" border="1"><Icon size={12} className="ghost-bg" name="remove" /></Block>;
+
+        indention.push(
+            <Block key="last" width={18} height={height} full="v">
+                <Block full className="relative">
+                    {i > 0 &&
+                    <div className="absolute pos-0 full-v full-h">
+                        <Block width={1} height={isEnd ? 10 : false} center="h" full="v" border={DIR.LEFT} />
+                    </div>
+                    }
+                    <Block full className="absolute pos-0">
+                        <Block padded={DIR.TOP} full="h">{elem}</Block>
+                    </Block>
+                </Block>
+            </Block>
+        );
+        const cls = ['hover-change'];
+        cls.push(i === active ? 'active-bg active-color' : 'ghost-bg');
+        nodes.push(
+            <Stack key={i} tab={i === focusItem} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
+                <Stack full="v" padded="h">
+                    {indention}
+                </Stack>
+                <Stack key={i} vertical padded={DIR.RIGHT|DIR.TOP} full="h">
+                    <Block key={i} full="h">
+                        <Stack full="h">
+                            <Block full="h" shorten>{node.type}</Block>
+                            <Block><Kbd className="less small" value="320x200" /></Block>
+                        </Stack>
+                    </Block>
+                    <Block className="big more" shorten>{node.name}</Block>
+                </Stack>
+            </Stack>
+        );
+        i++
+    }
+    const buttons = [
+        {icon: 'add', onClick: () => {}},
+        {icon: 'edit', onClick: () => {editOp(tree[active])}},
+        {icon: 'delete', onClick: () => {}}
+    ];
+    return (
+        <Stack borders vertical full>
+            <Toolbar>
+                <ButtonStack gaps buttons={buttons} />
+            </Toolbar>
+            <Block full>
+                <Stack scroll border={DIR.BOTTOM} full="h" stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
+                    {nodes}
+                </Stack>
+            </Block>
+        </Stack>
+    )
+}
+
 export {
     EntityStack,
     EntityStackSections,
     EntityManager,
-    EntityPicker
+    EntityPicker,
+    TreeStack
 }

@@ -313,6 +313,10 @@ div.boxed, div.thin-boxed {
     background-color: var(--box-border-rgb)
 }
 
+.border-color {
+    color: var(--box-border-rgb)
+}
+
 .stretch {
     align-self: stretch
 }

@@ -2617,6 +2617,7 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
 
     const modes = props.modes ? props.modes : (edit ? ['select', 'pick', 'drag', 'write', 'add'] : 'select');
     const startMode = (modes.length === 1) ? modes[0] : 'select';
+    const selectOnly = modes.length === 1 && startMode === 'select';
     const startModeParams = startMode === 'select' ? selection : props.modeParams;
     const hasMode = value => modes.includes(value);
     const modeParams = eContext.modeParams;
@@ -2627,36 +2628,36 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
     }
     const actions = eContext.getGridActions();
     const buttons = [];
-    for (let [name, action] of Object.entries(actions)) {
-        if (action.has && !action.has()) continue;
+    if (!selectOnly) {
+        for (let [name, action] of Object.entries(actions)) {
+            if (action.has && !action.has()) continue;
 
-        if (action.buttons) {
-            for (let button of action.buttons) {
-                const { params, ...buttonProps } = button;
+            if (action.buttons) {
+                for (let button of action.buttons) {
+                    const { params, ...buttonProps } = button;
+                    buttons.push(
+                        { ...buttonProps, onClick: () => eContext.doGridAction(name, button.params) }
+                    )
+                }
+            } else {
                 buttons.push(
-                    { ...buttonProps, onClick: () => eContext.doGridAction(name, button.params) }
+                    {name: name, onClick: action}
                 )
             }
-        } else {
-            buttons.push(
-                {name: name, onClick: action}
-            )
         }
     }
     let markerButtons = null;
     if (markerX !== null) {
         const mButtons = [];
-        if (edit) {
-            mButtons.push({
-                icon: 'clear',
-                onClick: () => {
-                    setMarkerX(null);
-                    setMarkerY(null);
-                    setMarkerWidth(null);
-                    setMarkerHeight(null)
-                }
-            })
-        }
+        mButtons.push({
+            icon: 'clear',
+            onClick: () => {
+                setMarkerX(null);
+                setMarkerY(null);
+                setMarkerWidth(null);
+                setMarkerHeight(null)
+            }
+        });
         if (!(isGap || modeParams.fixed)) {
             mButtons.push({
                 icon: "select_all",
@@ -2731,21 +2732,6 @@ function BaseGrid({ pageId, trackId, gridProvider, selection, onDoubleClick, tar
          }
          modeButtons = <ButtonStack gaps="1" active={currIndex} buttons={modeButtons} />;
     }
-
-    /*
-    modes.length > 1 &&
-                        <Stack gaps="1">
-                            {edit && hasMode('pick') && <Button icon="colorize" current={eContext.mode} value={'pick'} onClick={() => eContext.setMode('pick')} />}
-                            {edit && hasMode('write') && <Button icon="edit" current={eContext.mode} value={'write'} onClick={() => eContext.setMode('write')} />}
-                            {edit && hasMode('add') && <Button icon="exposure" iconProps={{rotate: 180}} current={eContext.mode} value={'add'} onClick={() => eContext.setMode('add')} />}
-                            {edit && hasMode('drag') && <Button icon="pan_tool" current={eContext.mode} value={'drag'} onClick={() => eContext.setMode('drag')} />}
-                            {hasMode('select') && <Button icon="highlight_alt" current={modeParams.type || (mode === 'select' && 'rect')} value={'rect'} onClick={() => eContext.setMode('select', selection)} />}
-                            {edit && hasMode('select')  && <Button icon="view_week" iconProps={{rotate: -90}} current={modeParams.type} value={'rows'} onClick={() => eContext.setMode('select', {type: 'rows'})} />}
-                            {edit && hasMode('select') && <Button icon="view_week" current={modeParams.type} value={'columns'} onClick={() => eContext.setMode('select', {type: 'columns'})} />}
-                            {resize && hasMode('select')  && <Button icon="border_horizontal" current={modeParams.type} value={'row-gap'} onClick={() => eContext.setMode('select', {type: 'row-gap'})} />}
-                            {resize && hasMode('select') && <Button icon="border_vertical" current={modeParams.type} value={'column-gap'} onClick={() => eContext.setMode('select', {type: 'column-gap'})} />}
-                        </Stack>
-     */
     return (
         <Stack vertical borders full>
             <Toolbar full="h">

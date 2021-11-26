@@ -2,7 +2,7 @@ import ReactDOM from "react-dom";
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
 import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents";
-import { Button, Color, OkCancelForm } from "./FormComponents";
+import { Button, Color, Submit, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
 import { CellSelection } from "../classes/CellProvider";
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
@@ -2606,32 +2606,38 @@ function ButtonStack({ buttons, buttonProps = {}, active, ...props }) {
     });
     const elems = [];
     let i = 0;
-    for (let button of buttons) {
+    for (let item of buttons) {
         const curr = i;
-        const elemProps = { ...buttonProps, ...button };
-        let onClick = null;
-        if (!elemProps.readOnly) {
-            const focusHandler = focus.leftClick(curr);
-            const oldHandler = elemProps.onClickEnd;
-            if (oldHandler) {
-                onClick = e => {
-                    oldHandler(e);
-                    focusHandler()
+        const { submit, ...button } = item;
+        if (submit) {
+            elems.push(<Submit key={i} tabControlled tab={focusItem === curr} { ...buttonProps } { ...button } />);
+        } else {
+            const elemProps = { ...buttonProps, ...button };
+            let onClick = null;
+            if (!elemProps.readOnly) {
+                const focusHandler = focus.leftClick(curr);
+                const oldHandler = elemProps.onClickEnd;
+                if (oldHandler) {
+                    onClick = e => {
+                        oldHandler(e);
+                        focusHandler()
+                    }
+                } else {
+                    onClick = focusHandler
                 }
-            } else {
-                onClick = focusHandler
             }
+            elems.push(
+                <Button
+                    key={i}
+                    { ...elemProps }
+                    tabControlled
+                    refocus={refocus}
+                    tab={focusItem === curr}
+                    onClickEnd={onClick}
+                />
+            );
+
         }
-        elems.push(
-            <Button
-                key={i}
-                { ...elemProps }
-                tabControlled
-                refocus={refocus}
-                tab={focusItem === curr}
-                onClickEnd={onClick}
-            />
-        )
         i++
     }
     return (
@@ -2668,7 +2674,6 @@ function Gradient({colors, vertical, plain}) {
         );
         let pos = 0;
         for(let color of stops) {
-            if (color.length > 9) d('FFF', colors);
             grd.addColorStop(pos, color);
             pos += dist
         }

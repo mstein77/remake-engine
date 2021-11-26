@@ -1925,6 +1925,7 @@ class Game {
         this.restartEditorWithId = null;
         this.lastState = null;
         this.editor = null;
+        this.keyHandling = true;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
@@ -2052,7 +2053,7 @@ class Game {
         RL.invalidatePermanentResources();
         this.globals = this.lastState;
         this.gotoScreen(this.currentScreen);
-        this.restart();
+        this.restart(restartEditorWithId !== null);
     }
 
     gotoScreen(screenId, params = {}) {
@@ -2115,6 +2116,7 @@ class Game {
         this.editorRun++;
 
         this.setRunning(false);
+        this.keyHandling = false;
         RL.loadPermanentResources().then(() => {
             this.getDomElem('game').style.display = 'none';
             this.getDomElem('editor').style.display = 'block';
@@ -2137,6 +2139,7 @@ class Game {
                                 {
                                     type: 'TilesMap',
                                     id: pane.tilesMap.id,
+                                    pane,
                                     config: TilesMapConfig,
                                     cls: TilesMap,
                                     data: pane.tilesMap.config,
@@ -2155,6 +2158,7 @@ class Game {
                                 {
                                     type: 'TextPane',
                                     id: pane.id,
+                                    pane,
                                     config: TextPaneConfig,
                                     cls: TextPane,
                                     elem: pane.getPreview(),
@@ -2166,6 +2170,7 @@ class Game {
                             resources.push({
                                 type: 'ColorPane',
                                 id: pane.id,
+                                pane,
                                 config: ColorPaneConfig,
                                 cls: ColorPane,
                                 elem: pane.getPreview(),
@@ -2178,6 +2183,7 @@ class Game {
                                 {
                                     elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim,
+                                    pane,
                                     type: 'spriteSheet',
                                     data: pane.spriteSheet
                                 }
@@ -2192,13 +2198,18 @@ class Game {
                 }
             }
         }
-        extractEditablesFromAreas(this.screens[this.currentScreen].areas);
+        extractEditablesFromAreas(this.getCurrentScreen().areas);
 
         resources.push({type: 'filters', data: filterer});
         return resources;
     }
 
-    restart() {
+    getCurrentScreen() {
+        return this.screens[this.currentScreen];
+    }
+
+    restart(enableKeys = false) {
+        this.keyHandling = enableKeys;
         if (this.running || gameEditor === null) {
             return;
         }
@@ -2238,6 +2249,8 @@ class Game {
     }
 
     handleKeys() {
+        if (!this.keyHandling) return;
+
         for (let handler of this.globalKeyHandlers) {
             const stop = handler();
             if (stop) {

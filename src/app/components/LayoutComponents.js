@@ -136,6 +136,9 @@ function useGetLayoutProps({className, padded, end, border, zIndex, cursor, tab,
     if (props.onDragStart) {
         dimAttr.draggable = true
     }
+    if (props.span && props.span > 1) {
+        dimStyle.gridColumn = 'span ' + props.span
+    }
 
     return {
         dimCls,

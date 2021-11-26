@@ -5630,6 +5630,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
     this.addScreen(moveScreen);
 
     this.addGlobalKeyHandler(() => {
+        if (!this.keyHandling) return;
+
         if (!this.running) {
             if (this.keys['Escape']) {
                 this.setRunning(true);

@@ -96,7 +96,7 @@ function PresetsManager({ id, set, config, ...props }) {
             </Stack>
 
             <NameModal.content name={'Store ' + id + ' as...'} width={200}>
-                <NameDialog { ...NameModal.props} />
+                <NameDialog { ...NameModal.props } />
             </NameModal.content>
         </Block>
     )
@@ -852,10 +852,10 @@ function Settings({ save, close, defaults }) {
         afterRef.current = null;
     };
     const leftButtons = [
-        <Button key="before" state={beforeState} icon="visibility" name="before" padded="h" onClick={showBefore} onClickEnd={restoreAfter} />
+        {state: beforeState, icon: "visibility", name: "before", onClick: showBefore, onClickEnd: restoreAfter}
     ];
     const rightButtons = [
-        <Button key="clear" icon="delete" name="Clear all settings" padded="h" onClick={() => {
+        {icon: "delete", name: "Clear all settings", padded: "h", onClick: () => {
             wContext.clearAllSettings();
             wContext.clearAllCaches();
 
@@ -867,7 +867,7 @@ function Settings({ save, close, defaults }) {
                 theme: defaults.theme,
                 mapping: defaults.mapping
             }, false);
-        }} />
+        }}
     ];
     return (
         <OkCancelForm full save={() => save({ config, theme, mapping })} cancel={close} left={leftButtons} right={rightButtons}>
@@ -916,9 +916,9 @@ function BaseAppInner({ back, children }) {
         const gameRef = wContext.game;
         ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
         if (wContext.isDirty()) {
-            gameRef.reloadScreen();
+            gameRef.reloadScreen(1);
         } else {
-            gameRef.restart();
+            gameRef.restart(true);
         }
     };
 
@@ -988,6 +988,10 @@ function BaseAppInner({ back, children }) {
                 }
                 e.stopPropagation();
                 e.preventDefault();
+            } else if (handler === null && actionKey === 'Escape') {
+                e.stopPropagation();
+                e.preventDefault();
+                confirm(play)
             }
         };
         const clickListener = e => {

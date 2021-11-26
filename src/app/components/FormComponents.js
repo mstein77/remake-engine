@@ -1,8 +1,9 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
 import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
-import { WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useRefocus, useAnimationPlayers, useMounted,
-    useFocusElements, useCssProps, useCachedState, useCallAfterwards,
+import {
+    WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useRefocus, useAnimationPlayers, useMounted,
+    useFocusElements, useCssProps, useCachedState, useCallAfterwards, ButtonStack,
     useComponentUpdate, AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
@@ -321,17 +322,30 @@ function Form({ children, submit, onKeyDown, ...props }) {
 }
 
 function OkCancelForm({ full, save, cancel, submit, left = [], right = [], children }) {
+    const buttons = [
+        {submit: submit === true, icon: 'done', modal: true, name: 'OK', onClick: save},
+        {icon: 'close', name: 'Cancel', onClick: cancel},
+        ...left
+    ];
+    /**
+     {submit ? <Submit padded="h" name="OK" modal onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
+     <Button padded="h" onClick={cancel} name="Cancel" icon="close" />
+     {left}
+     {right.length > 0 ? <Block full="h" /> : ''}
+     {right}
+     </ButtonStack>
+
+     * @type {JSX.Element}
+     */
     let elem = (
         <Stack vertical borders full={full}>
             <Block full={full} scroll>
                 {children}
             </Block>
             <Stack className="secondary-bg" full="h" gaps padded>
-                {submit ? <Submit padded="h" name="OK" modal onClick={save} /> : <Button padded="h" onClick={save} icon="done" name="OK" />}
-                <Button padded="h" onClick={cancel} name="Cancel" icon="close" />
-                {left}
-                {right.length > 0 ? <Block full="h" /> : ''}
-                {right}
+                <ButtonStack buttons={buttons} gaps buttonProps={{padded: 'h'}} />
+                {right && <Block full="h" />}
+                {right && <ButtonStack gaps buttons={right} buttonProps={{padded: 'h'}} />}
             </Stack>
         </Stack>
     );
@@ -2331,7 +2345,6 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, num
     const render = ctx => {
         entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, playerRef.current);
     };
-
     return (
         <>
             <Stack vertical gaps="1">
@@ -2425,16 +2438,25 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
     const setEmptyImage = () => {
         set(getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY()));
     }
+
+    const buttons = [
+        {name: 'edit', padded: 'h', onClick: editBitmap},
+        {name: 'import', padded: 'h', onClick: importBitmap}
+    ];
+    if (entityIndex)
+        buttons.push({
+            name: 'copy', padded: 'h', onClick: copy
+        });
+    if (empty)
+        buttons.push({
+            icon: 'clear', onClick: () => set(null)
+        });
+
     return (
         <>
             <Stack vertical>
                 {!readOnly && value &&
-                    <Stack gaps="1">
-                        <Button name="edit" padded="h" onClick={editBitmap} />
-                        <Button name="import" onClick={importBitmap} padded="h" />
-                        {entityIndex && <Button name="copy" onClick={copy} padded="h" />}
-                        {empty && <Button icon="clear" onClick={() => set(null)} />}
-                    </Stack>
+                    <ButtonStack buttons={buttons} gaps="1" />
                 }
                 {value &&
                     <Block padded onLeftClick={editBitmap}>

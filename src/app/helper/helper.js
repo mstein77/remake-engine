@@ -46,6 +46,16 @@ function hex2rgb(hex) {
     return color;
 }
 
+function hex2rgbaArray(hex) {
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null;
+    return [
+        parseInt(hex.substr(1, 2), 16)/255,
+        parseInt(hex.substr(3, 2), 16)/255,
+        parseInt(hex.substr(5, 2), 16)/255,
+        hex.length === 9 ? parseInt(hex.substr(7, 2), 16)/255 : 1.0
+    ];
+}
+
 function rgb2hex(rgb) {
     if (typeof rgb === 'string') {
         return rgb;
@@ -1340,6 +1350,7 @@ module.exports = {
     areDisjoint,
     cloneDeep,
     hex2rgb,
+    hex2rgbaArray,
     rgb2hex,
     isValidResourceId,
     getItemsCloneWithUpdatedItem,

@@ -13,6 +13,7 @@ import {
     PropertyGrid,
     Section,
     useCachedState,
+    ButtonStack,
     WindowContext
 } from "../components/BasicComponents";
 import { DIR, Block, Stack, Overlays, Overlay } from "../components/LayoutComponents";
@@ -68,6 +69,11 @@ function FontProperties({ font, reserved, save, close }) {
         })
     };
 
+    const buttons = [
+        {name: 'Select', onClick: selectSize},
+        {name: 'Import', onClick: importFont}
+    ];
+
     return (
         <OkCancelForm submit save={saveFont} cancel={close} full>
             <Block full="h" padded scroll>
@@ -82,10 +88,7 @@ function FontProperties({ font, reserved, save, close }) {
                                         <Block center="v" border="1" padded>{images.length} imported chars</Block>
                                         <Button icon="clear" onClick={() => setImages(null)} />
                                     </Stack> :
-                                    <Stack gaps="1">
-                                        <Button name="Select" padded="h" onClick={selectSize} />
-                                        <Button name="Import" padded="h" onClick={importFont} />
-                                    </Stack>
+                                    <ButtonStack gaps="1" buttons={buttons} buttonProps={{padded: 'h'}} />
                                 }
                             </Stack>
                         </LabelProp>

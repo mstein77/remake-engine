@@ -1,4 +1,4 @@
-import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
+import React, {Fragment, useState, useContext, useRef, useEffect, useMemo} from "react";
 import {
     Page,
     Stack,
@@ -21,19 +21,11 @@ import { SpritePaneEditor as SpritePaneEditorNew } from "./../editors/SpritePane
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
-import {
-    d,
-    getJsonModelOfInstance,
-    getRebuildJsonForModel,
-    getResourceTreeForJsonModel
-} from '../helper/helper';
+import { d, getJsonModelOfInstance, getRebuildJsonForModel, getResourceTreeForJsonModel } from '../helper/helper';
 import ReactDOM from "react-dom";
-import { Block, Grid } from "../components/LayoutComponents";
-import { Section as NewSection } from "./BasicComponents";
-import { Button } from "../components/FormComponents";
 import { MainEditor } from "../editors/MainEditor";
-import { DemoEditor } from "../editors/DemoEditor";
-import {PocEditor} from "../editors/PocEditor";
+import { ScreenEditor } from "../editors/ScreenEditor";
+import { PocEditor } from "../editors/PocEditor";
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
@@ -274,7 +266,7 @@ function PageSelector(props) {
                             {items}
                         </Content>
                         <Content padded>
-                            <Scene3d width={600} height={400} elems={sceneElems.reverse()} />
+                            <Scene3d width={600} height={400} elems={sceneElems} />
                         </Content>
                     </Stack>
                 </Section>
@@ -599,48 +591,12 @@ function EditorApp(props) {
         let editor = '';
         const resourceLoader = props.game.getResourceLoader();
         resources.push({type: 'poc'});
+
         if (selected === null) {
-            let i = 0;
-            const options = [];
-            while (i < resources.length) {
-                const option = i;
-                const resource = resources[i];
-                switch(resource.type) {
-                    case 'spriteSheet':
-                    case 'TilesMap':
-                    case 'TextPane':
-                        options.push(
-                            <Fragment key={option}>
-                                <Block center="v" padded className="big">{resource.type}</Block>
-                                <Block center="v" padded className="big more">{resource.id}</Block>
-                                <Block center="v" padded><Button padded="h" name="Edit" onClick={() => setSelected(option)} /></Block>
-                            </Fragment>
-                        );
-                        break;
-
-                    case 'poc':
-                        options.push(
-                            <Fragment key={option}>
-                                <Block></Block>
-                                <Block>POC</Block>
-                                <Block center="v" padded><Button padded="h" name="Edit" onClick={() => setSelected(option)} /></Block>
-                            </Fragment>
-                        );
-                        break;
-                }
-                i++;
-            }
-
             return (
                 <>
                     <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>
-                        <Block full border="1">
-                            <NewSection name="Resources" full inner>
-                                <Grid padded columns="+ + +">
-                                    {options}
-                                </Grid>
-                            </NewSection>
-                        </Block>
+                        <ScreenEditor setSelected={setSelected} resources={resources} game={props.game} />
                     </MainEditor>
                     <div id="modals-container" />
                 </>
@@ -694,10 +650,9 @@ function EditorApp(props) {
             </>
         )
     }
-
     return (
         <GlobalCtx game={props.game} filters={filters} imageResources={imageResources}>
-            <PageSelector {...props} resources={resources} />
+            <PageSelector { ...props } resources={resources} />
             <div id="modals-container"></div>
         </GlobalCtx>
     );
