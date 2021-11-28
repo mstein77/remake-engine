@@ -1338,11 +1338,26 @@ function getParsedCssValueRec(value, splitBy = false) {
     )
 }
 
+function getSinePath(start, end, steps) {
+    const path = [];
+    const radSteps = 0.5 * Math.PI / (steps - 1);
+    const dist = Math.abs(end - start);
+    for (let i = 0; i < steps; i++) {
+        path.push(Math.sin(radSteps * i) * dist + start);
+    }
+    return path;
+}
+
+function reverse(items) {
+    return [ ...items ].reverse()
+}
+
 const noop = () => {};
 
 module.exports = {
     d,
     noop,
+    reverse,
     round,
     ucfirst,
     copy2clipboard,
@@ -1354,6 +1369,7 @@ module.exports = {
     rgb2hex,
     isValidResourceId,
     getItemsCloneWithUpdatedItem,
+    getSinePath,
     Storage,
     ResourceDependencies,
     flattenResources,

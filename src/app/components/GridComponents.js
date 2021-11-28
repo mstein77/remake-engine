@@ -3084,6 +3084,7 @@ export {
     BaseGrid,
     useTracker,
     TrackingCtx,
+    TrackingContext,
     PictureCell,
     PictureAndTextCell
 }

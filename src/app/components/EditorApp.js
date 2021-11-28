@@ -395,7 +395,7 @@ function PageSelector(props) {
     const exportModel = (model, details = {}) => {
         const resources = getModelConfig(model).getResources();
         const lines = [];
-        for (let res of resources.resources.reverse()) {
+        for (let res of [ ...resources.resources ].reverse()) {
             const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
             lines.push(getResourceDef(res.type, res.id, data, details));
         }
@@ -604,6 +604,7 @@ function EditorApp(props) {
         }
 
         const resource = resources[selected];
+        d('SELECTED', selected, resource);
 
         editor = null;
         let model = null;

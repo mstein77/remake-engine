@@ -1,6 +1,6 @@
 import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, clamp, getEmptyImageData } from "../helper/helper";
+import {d, noop, clamp, getEmptyImageData, ucfirst} from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
 import {
     EditorCtx,
@@ -31,14 +31,14 @@ import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
 import { WrappingIndexGrid } from "../classes/Grid";
-import { PictureCell, PictureAndTextCell } from "./GridComponents";
+import { PictureCell, TrackingContext, PictureAndTextCell } from "./GridComponents";
 
-function makeOp(customOp, defaultOp, defaultCan = true) {
+function makeOp(customOp, defaultOp, defaultCan = true, params = []) {
     const isObj = typeof customOp === 'object';
     const hasCustomExec = isObj && customOp.exec;
     const canByDefault = typeof defaultCan === 'function' ? defaultCan() : defaultCan;
     return {
-        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp() : (hasCustomExec ? customOp.exec() : customOp()),
+        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp(...params) : (hasCustomExec ? customOp.exec(...params) : customOp(...params)),
         can: () => canByDefault && (!customOp || !isObj || !customOp.can || customOp.can())
     }
 }
@@ -242,7 +242,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
 
     const hotKeys = {
         new: makeOp(addOp, execAdd),
-        edit: makeOp(editOp, execEdit, active !== null),
+        edit: makeOp(editOp, execEdit, active !== null, [active]),
         delete: makeOp(deleteOp, execDelete, active !== null && items.length > 0),
         clone: makeOp(cloneOp, execClone, active !== null),
         up: {
@@ -919,25 +919,97 @@ function EntityPicker({
     )
 }
 
-function TreeStack({ tree, editOp, ...props }) {
+/*
+function getOp(op) {
+    if (op === undefined) return;
+
+    if (typeof op === 'function') {
+        op = {exec: op};
+    }
+    if (!op.has) {
+        op.has = () => true
+    }
+    return op
+}
+*/
+
+function getActionButtonsAndHotkeys(actions, props, paramsRef) {
+    const buttons = [];
+    const hotkeys = {};
+    for (let { id, name, icon, exec, can, required = false } of actions) {
+        let op = props[id + 'Op'];
+        if (op !== undefined) {
+            if (typeof op === 'function') {
+                op = {exec: op}
+            }
+        }
+        const has = props[id] === true || (op && !(op.has && !op.has(paramsRef.current)));
+        if (required && !exec && (!op || !op.exec)) {
+            throw Error(`Missing implementation of ${id}Op`);
+        }
+        if (has) {
+            const opExec = {
+                exec: op && op.exec ? () => op.exec(paramsRef.current) : () => exec(paramsRef.current),
+            };
+            if (can || op.can) {
+                opExec.can = () => {
+                    if (can && !can(paramsRef.current)) return false;
+                    if (op.can && !op.can(paramsRef.current)) return false;
+                    return true
+                }
+            }
+            buttons.push({ icon, name, onClick: opExec });
+            hotkeys[id] = opExec
+        }
+    }
+    return {
+        hotkeys,
+        buttons
+    }
+}
+
+function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
+    const tContext = useContext(TrackingContext);
+
+    const keyTrackRef = useRef(null);
+    const tracking = useMemo(() => {
+        if (!tContext || !trackId) return () => {};
+        return tContext.getTracking(trackId)
+    }, []);
 
     let [ active, setActive ] = useState(props.active !== undefined ? props.active : null);
     const stackRef = useRef(null);
+    const paramsRef = useRef(null);
 
     if (props.setActive) {
         active = props.active;
         setActive = props.setActive
     }
+    const keyTracking = !tracking ? () => {} : index => {
+        keyTrackRef.current = index;
+        if (index !== null) {
+            tracking(0, tree[index].plane)
+        }
+    };
+    paramsRef.current = { active, node: active === null ? null : tree[active] };
 
+    const actions = useMemo(() => {
+        return [
+            {id: 'edit', icon: 'edit', can: ({ active }) => active !== null},
+            {id: 'add', icon: 'add', can: () => false},
+            {id: 'delete', icon: 'delete', can: () => false}
+        ];
+    }, []);
+    const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
     const { focusItem, attr, refocus, ...focus } = useFocusElements({
         divRef: stackRef,
         count: tree.length,
+        keyTracking,
         handleSpace: true,
         reset: true,
         active,
         setActive
     });
-
     let lastLevel = null;
     let minLevel = null;
     const nodeEnd = [];
@@ -952,6 +1024,23 @@ function TreeStack({ tree, editOp, ...props }) {
         minLevel = minLevel === null ? currLevel : Math.min(currLevel, minLevel);
     }
     const height = 45;
+
+    const mouseEnter = index => {
+        return () => {
+            tracking(0, tree[index].plane)
+        }
+    }
+    const onDoubleClick = !doubleClickAction ? () => null : index => {
+        return () => {
+            requestAnimationFrame(() => {
+                setActive(index);
+                requestAnimationFrame(
+                    () => hotkeys[doubleClickAction].can() &&
+                                hotkeys[doubleClickAction].exec()
+                )
+            })
+        }
+    }
 
     const nodes = [];
     let i = 0;
@@ -990,7 +1079,7 @@ function TreeStack({ tree, editOp, ...props }) {
         const cls = ['hover-change'];
         cls.push(i === active ? 'active-bg active-color' : 'ghost-bg');
         nodes.push(
-            <Stack key={i} tab={i === focusItem} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
+            <Stack key={i} tab={i === focusItem} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
@@ -1007,18 +1096,13 @@ function TreeStack({ tree, editOp, ...props }) {
         );
         i++
     }
-    const buttons = [
-        {icon: 'add', onClick: () => {}},
-        {icon: 'edit', onClick: () => {editOp(tree[active])}},
-        {icon: 'delete', onClick: () => {}}
-    ];
     return (
-        <Stack borders vertical full>
+        <Stack borders vertical full  hotKeys={hotkeys}>
             <Toolbar>
                 <ButtonStack gaps buttons={buttons} />
             </Toolbar>
             <Block full>
-                <Stack scroll border={DIR.BOTTOM} full="h" stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
+                <Stack scroll border={DIR.BOTTOM} full="h" onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
                     {nodes}
                 </Stack>
             </Block>

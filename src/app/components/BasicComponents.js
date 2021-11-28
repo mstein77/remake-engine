@@ -3356,10 +3356,14 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
-function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, active, page, reset, update, ...props }) {
+function useFocusElements({ count, pos = 0, handleSpace, keyTracking = () => {}, setPos = () => null, active, page, reset, update, ...props }) {
     const wContext = useContext(WindowContext);
 
-    const [ focusItem, setFocusItem ] = useState(0);
+    const [ focusItem, setFocusItemRaw ] = useState(0);
+    const setFocusItem = (value, reset = false) => {
+        keyTracking(reset ? null : value);
+        setFocusItemRaw(value)
+    }
     const mounted = useMounted();
     const refocusRef = useRef(false);
     const levelRef = useRef(null);
@@ -3438,7 +3442,7 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
     const attr = {
         onBlur: e => {
             if (!refocusRef.current && wContext.getModalLevel() === levelRef.current) {
-                setFocusItem((isOutsideFocus || (reset && active === null)) ? pos : active);
+                setFocusItem((isOutsideFocus || (reset && active === null)) ? pos : active, true);
             }
         },
         onKeyDown
@@ -3450,7 +3454,8 @@ function useFocusElements({ count, pos = 0, handleSpace, setPos = () => null, ac
         attr,
         leftClick: curr => () => {
             if (!mounted.current) return;
-            setActive(reset && active === curr ? null : curr); refocus()},
+            setActive(reset && active === curr ? null : curr); refocus()
+        },
         focusItem,
         last,
         setActiveFocus: setActive,

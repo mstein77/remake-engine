@@ -11,7 +11,8 @@ import {Object3D, Scene, Scene3DCanvas} from "../components/WebGLComponents";
 import { Block, Grid, Overlay, Overlays, Stack } from "../components/LayoutComponents";
 import { Button, Number } from "../components/FormComponents";
 import { TreeStack } from "../components/EntityComponents";
-import { d } from "../helper/helper";
+import { d, reverse, getSinePath, hex2rgbaArray} from "../helper/helper";
+import { useTracker, TrackingCtx } from "../components/GridComponents";
 
 const OD = 1.1;
 const ID = 1.0;
@@ -20,12 +21,22 @@ const staticJobs = {};
 
 class Cursor3D extends Object3D {
 
-    setColor(color) {
-        this.color = color
+    setColor(color, key) {
+        const lastColor = this.color;
+        this.key = key;
+        this.color = color;
+        if (lastColor !== color) {
+            const store = this.getStaticStore();
+            store.length = 0;
+        }
+    }
+
+    getStorageKey() {
+        return 'cursor3D.' + this.key
     }
 
     getStaticStore() {
-        return this.getStore(staticJobs, 'cursor3D.' + this.color);
+        return this.getStore(staticJobs, this.getStorageKey());
     }
 
     buildProgramJobs(gl) {
@@ -170,7 +181,9 @@ function Panes3D(props) {
 
 function Panes3DInner({ elems, active }) {
     const aContext = useContext(AvailContext);
-    const cursorPos = 2;
+
+    const cursorRef = useRef(null);
+    useTracker('tree', pos => cursorRef.current = pos.y);
 
     const { activeBgRgb, cursorBgRgba } = useCssProps('activeBgRgb', 'cursorBgRgba');
 
@@ -178,9 +191,9 @@ function Panes3DInner({ elems, active }) {
     const start = -1.0;
     const end = 1.1;
     const delay = 0;
-    const zDistStart = 0.01;
-    const zDistEnd = 0.5;
-    const zStart = -1.5;
+    const zDistStart = 0.0001;
+    const zDistEnd = 0.1;
+    const zStart = -5.5;
 
     const [ posX, setPosX ] = useState(0.4);
     const [ posY, setPosY ] = useState(1.2);
@@ -192,23 +205,24 @@ function Panes3DInner({ elems, active }) {
     const [ wait4zSplit, setWait4zSplit ] = useState(-1);
     const [ zDist, setZDist ] = useState(zDistStart);
 
+    const alphaBlink = useMemo(() => {
+        return getSinePath(0.25, 1.0, 20);
+    }, []);
+    const alphaRef = useRef({up: true, pos: 0});
+
     const zPositions = useMemo(() => {
-        const positions = [];
-        const zSteps = 40;
-        const zRadSteps = 0.5 * Math.PI / (zSteps + 1);
-        const dist = Math.abs(zDistEnd - zDistStart);
-        for (let i = 0; i < zSteps; i++) {
-            positions.push(Math.sin(zRadSteps * i) * dist + zDistStart);
-        }
-        return positions
+        return getSinePath(zDistStart, zDistEnd, 40);
     }, []);
 
     const panesRef = useRef([]);
     const propsRef = useRef(null);
-    propsRef.current = { active, rotX, rotY, rotZ, posX, posY, posZ, scale, zDist, wait4zSplit };
+    propsRef.current = {
+        active, rotX, rotY, rotZ, posX, posY, posZ, scale, zDist, wait4zSplit,
+        activeBgRgb, cursorBgRgba
+    };
 
     const mirror = 0.8;
-    const aspect = 320 / 256;
+    const aspect = 300 / 200;
 
     const scene = useMemo(() => {
         const scene = new Scene();
@@ -299,7 +313,6 @@ function Panes3DInner({ elems, active }) {
                           discard;
                       } else {
                           gl_FragColor = texture2D(uSampler, vTextureCoord);
-//                          gl_FragColor = vec4(gl_FragColor.rgb, (${mirror} * gl_FragCoord.y/100.0) * gl_FragColor.a);
                           gl_FragColor = vec4(gl_FragColor.rgb, ${mirror} * gl_FragColor.a);
                       }
                   } else {
@@ -328,7 +341,6 @@ function Panes3DInner({ elems, active }) {
                       if (yDist > 0.0) {
                           discard;
                       } else {
-//                          gl_FragColor = vec4(vColor.rgb, (${mirror} * gl_FragCoord.y/100.0) * vColor.a);
                           gl_FragColor = vec4(vColor.rgb, ${mirror} * vColor.a);
                       }
                   } else {
@@ -350,12 +362,7 @@ function Panes3DInner({ elems, active }) {
         scene.setViewRotation([rotX, rotY, rotZ]);
         scene.setViewScale(scale);
 
-        const positions = [];
-        const radSteps = 0.5 * Math.PI / (steps + 1);
-        const dist = Math.abs(end - start);
-        for (let i = 0; i < steps; i++) {
-            positions.push(Math.sin(radSteps * i) * dist + start);
-        }
+        const positions = getSinePath(start, end, steps);
 
         const panes = [];
         for (let i = elems.length - 1; i >= 0; i--) {
@@ -388,16 +395,17 @@ function Panes3DInner({ elems, active }) {
         panes.reverse();
 
         const cursor = scene.addObject(new Cursor3D(), [0.0, -0.6, 0.0], [0, 45, 0], [0.8 * aspect, 0.8, 0]);
-        cursor.setColor(cursorBgRgba.substr(0, 7));
+        cursor.setColor(cursorBgRgba.substr(0, 7), 'cursor');
         const revCursor = scene.addObject(new Cursor3D({uMirror: 1}), [0.0, 0.6, 0.0], [180, -45, 0], [0.8 * aspect, 0.8, 0]);
-        revCursor.setColor(cursorBgRgba.substr(0, 7));
+        revCursor.setColor(cursorBgRgba.substr(0, 7), 'cursor');
         const marker = scene.addObject(new Cursor3D(), [0.0, -0.6, 0.0], [0, 45, 0], [0.8 * aspect, 0.8, 0]);
-        marker.setColor(activeBgRgb);
+        marker.setColor(activeBgRgb, 'marker');
         const revMarker = scene.addObject(new Cursor3D({uMirror: 1}), [0.0, -0.6, 0.0], [180, -45, 0], [0.8 * aspect, 0.8, 0]);
-        revMarker.setColor(activeBgRgb);
+        revMarker.setColor(activeBgRgb, 'marker');
 
         scene.animate((gl, frame) => {
-            const { active, rotX, rotY, rotZ, posX, posY, posZ, scale, zDist, wait4zSplit } = propsRef.current;
+            const { active, rotX, rotY, rotZ, posX, posY, posZ, scale,
+                activeBgRgb, cursorBgRgba, zDist, wait4zSplit } = propsRef.current;
 
             scene.setViewRotation([rotX, rotY, rotZ]);
             scene.setViewPosition([posX, posY, posZ]);
@@ -406,38 +414,57 @@ function Panes3DInner({ elems, active }) {
             if (frame % 2 !== 0) return false;
 
             if (frame % 2 === 0) {
-                if (cursorPos === null) {
+                const alpha = alphaRef.current;
+                if (cursorRef.current === null || cursorRef.current === active) {
                     cursor.disable();
                     revCursor.disable()
+                } else {
+                    const cursorColors = staticJobs[cursor.getStorageKey()][0].attribs.aVertexColor.data;
+                    for (let i = 3; i < cursorColors.length; i += 4) {
+                        let newAlpha = hex2rgbaArray(cursorBgRgba)[3] * alphaBlink[alpha.pos];
+                        cursorColors[i] = newAlpha
+                    }
                 }
                 if (active === null) {
                     marker.disable();
                     revMarker.disable()
                 } else {
-                    const cursorColors = staticJobs['cursor3D.' + cursorBgRgba.substr(0, 7)][0].attribs.aVertexColor.data;
-                    for (let i = 3; i < cursorColors.length; i += 4) {
-                        let newAlpha = cursorColors[i] - 0.05;
-                        cursorColors[i] = (newAlpha < 0) ? 1.0 : newAlpha
-                    }
-                    const markerColors = staticJobs['cursor3D.' + activeBgRgb][0].attribs.aVertexColor.data;
+                    const markerColors = staticJobs[marker.getStorageKey()][0].attribs.aVertexColor.data;
                     for (let i = 3; i < markerColors.length; i += 4) {
-                        let newAlpha = markerColors[i] - 0.05;
-                        markerColors[i] = (newAlpha < 0) ? 1.0 : newAlpha
+                        let newAlpha = alphaBlink[alpha.pos];
+                        markerColors[i] = newAlpha
                     }
                 }
+                if (alpha.up) {
+                    alpha.pos++;
+                    if (alpha.pos === alphaBlink.length) {
+                        alpha.pos--;
+                        alpha.up = false
+                    }
+                } else {
+                    alpha.pos--;
+                    if (alpha.pos < 0) {
+                        alpha.pos++;
+                        alpha.up = true
+                    }
+                }
+
             }
 
             let allUp = true;
             let i = -1;
             for(let item of panes) {
                 i++;
-                item.pane.setPositionZ(-1.5 - i * zDist);
-                item.revPane.setPositionZ(-1.5 - i * zDist);
+                item.pane.setPositionZ(zStart - i * zDist);
+                item.revPane.setPositionZ(zStart - i * zDist);
 
+                const cursorPos = cursorRef.current;
                 const pos = item.pane.getPosition();
                 if (i === cursorPos && i !== active) {
                     cursor.enable();
-                    revCursor.enable()
+                    revCursor.enable();
+                    cursor.setColor(cursorBgRgba, 'cursor');
+                    revCursor.setColor(cursorBgRgba, 'cursor');
                     cursor.setPosition([pos[0], pos[1], pos[2]]);
                     revCursor.setPosition([pos[0], -pos[1], pos[2]])
                 }
@@ -445,6 +472,8 @@ function Panes3DInner({ elems, active }) {
                 if (i === active) {
                     marker.enable();
                     revMarker.enable()
+                    marker.setColor(activeBgRgb, 'marker');
+                    revMarker.setColor(activeBgRgb, 'marker');
                     marker.setPosition([pos[0], pos[1], pos[2]]);
                     revMarker.setPosition([pos[0], -pos[1], pos[2]])
                 }
@@ -453,9 +482,9 @@ function Panes3DInner({ elems, active }) {
                     item.delay--;
                     continue;
                 }
-                if (active !== null && i < active && item.up) {
+                if (cursorPos !== null && i < cursorPos && item.up) {
                     item.up = false
-                } else if (item.up === false && (active === null || i >= active)) {
+                } else if (item.up === false && (cursorPos === null || i >= cursorPos)) {
                     item.up = true
                 }
                 if ((item.up && item.index >= steps) || (!item.up && item.index === -1)) {
@@ -503,7 +532,6 @@ function Panes3DInner({ elems, active }) {
             i++
         }
     }
-
     return (
         <Overlays width={width} height={height}>
             <Overlay width={width} height={height}>
@@ -535,7 +563,7 @@ function Panes3DInner({ elems, active }) {
 }
 
 function getAreaNodes(areas, level = 1, nodes = []) {
-    const revAreas = areas.reverse();
+    const revAreas = reverse(areas);
     for(let area of revAreas) {
         if (area.axis) {
             nodes.push({level, type: 'areas', name: area.axis.toUpperCase() + ' Split', axis: area.axis});
@@ -558,6 +586,7 @@ function getAreaNodes(areas, level = 1, nodes = []) {
 }
 
 function getResourceIndexByPane(resources, pane) {
+    if (pane === undefined) return null;
     let index = 0;
     while (index < resources.length && resources[index].pane !== pane) {
         index++;
@@ -566,19 +595,25 @@ function getResourceIndexByPane(resources, pane) {
 }
 
 function ScreenTree({ tree, setSelected, resources, active, setActive }) {
-    const editNode = node => {
-        const index = getResourceIndexByPane(resources, node.pane);
-        if (index === null) return d('NOT FOUND', node.pane, resources);
-        setSelected(index);
+    const editOp = {
+        exec: ({ node }) => {
+            const index = getResourceIndexByPane(resources, node.pane)
+            setSelected(index)
+        },
+        can: ({ node }) => {
+            if (node === null) return false;
+            const index = getResourceIndexByPane(resources, node.pane);
+            return index !== null
+        }
     };
 
     return (
-        <TreeStack editOp={editNode} active={active} setActive={setActive} tree={tree} />
+        <TreeStack trackId="tree" editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} />
     )
 }
 
 function ScreenEditor({ resources, setSelected, ...props }) {
-    const [ active, setActive ] = useState(null)
+    const [ active, setActive ] = useState(null);
     const planesRef = useRef([]);
 
     const tree = useMemo(() => {
@@ -603,17 +638,19 @@ function ScreenEditor({ resources, setSelected, ...props }) {
     }, []);
 
     return (
-        <Stack full border="1">
-            <Section id="screenTree" name="Screen" full="v" collapse="h" inner  size={250} maxWidth="33%">
-                <ScreenTree tree={tree} setSelected={setSelected} active={active} setActive={setActive} resources={resources} />
-            </Section>
+        <TrackingCtx object="tree">
+            <Stack full border="1">
+                <Section id="screenTree" name="Screen" full="v" collapse="h" inner area={1} size={250} maxWidth="33%">
+                    <ScreenTree tree={tree} setSelected={setSelected} active={active} setActive={setActive} resources={resources} />
+                </Section>
 
-            <Section name="Planes" full inner>
-                <Block full>
-                    <Panes3D active={active === null ? null : tree[active].plane} elems={planesRef.current} />
-                </Block>
-            </Section>
-        </Stack>
+                <Section name="Planes" full inner>
+                    <Block full>
+                        <Panes3D active={active === null ? null : tree[active].plane} elems={planesRef.current} />
+                    </Block>
+                </Section>
+            </Stack>
+        </TrackingCtx>
     )
 }
 

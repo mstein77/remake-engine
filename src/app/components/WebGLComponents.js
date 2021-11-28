@@ -91,10 +91,7 @@ class Object3D {
 
     getModelMatrix() {
         const modelMatrix = mat4.create();
-        mat4.translate(modelMatrix,     // destination matrix
-            modelMatrix,     // matrix to translate
-            this.position
-        );  // amount to translate
+        mat4.scale(modelMatrix, modelMatrix, this.scaling);
         mat4.rotate(modelMatrix,  // destination matrix
             modelMatrix,  // matrix to rotate
             glMatrix.toRadian(this.rotation[0]),     // amount to rotate in radians
@@ -107,7 +104,10 @@ class Object3D {
             modelMatrix,  // matrix to rotate
             glMatrix.toRadian(this.rotation[2]),     // amount to rotate in radians
             [0, 0, -1]);       // axis to rotate around (Z)
-        mat4.scale(modelMatrix, modelMatrix, this.scaling);
+        mat4.translate(modelMatrix,     // destination matrix
+            modelMatrix,     // matrix to translate
+            this.position
+        );  // amount to translate
 
         return modelMatrix
     }
@@ -175,8 +175,8 @@ class Scene {
         this.uniforms = {};
 
         this.fieldOfView = 25;
-        this.zNear = -100.0;
-        this.zFar = 100.0;
+        this.zNear = -10000.0;
+        this.zFar = 10000.0;
         this.ortho = false;
 
         this.viewRotation = [0, 0, 0];
@@ -493,6 +493,13 @@ class Scene {
     draw(gl) {
         const programJobs = {};
         const jobQueue = [];
+
+        this.objects.sort((a, b) => {
+            const aZ = a.getPositionZ();
+            const bZ = b.getPositionZ();
+            return (aZ === bZ ? 0 : (aZ < bZ ? -1 : 1))
+        });
+
         for (let object of this.objects) {
             const jobs = object.getProgramJobs(gl);
 
@@ -525,10 +532,11 @@ class Scene {
         // and we only want to see objects between 0.1 units
         // and 100 units away from the camera.
 
-        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        const minDim = Math.max(gl.canvas.width, gl.canvas.height);
+        gl.viewport(0, 0, minDim, minDim);
 
         const fieldOfView = this.fieldOfView * Math.PI / 180;   // in radians
-        const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+        const aspect = 1.0; //gl.canvas.clientWidth / gl.canvas.clientHeight;
         const zNear = this.zNear;
         const zFar = this.zFar;
         const projectionMatrix = mat4.create();

@@ -135,14 +135,18 @@ const divRef = useRef(null);
 ---------------------------
  Urlaubs-Fahrplan:
 ---------------------------
- 3D-Canvas:
-   - Parametrisierung
-   - Shapes: Rect
-   - Shapes: Line
-   - Shapes: Dynmische Hinzufügen/Löschen
-   - Marker
-   -
+ - BUG: outside-focus setzt cursor auf 1. plane
+* planes: aspect-ratio-bug
 
+ - tree: dimension richtig ermitteln und ausgeben
+ - planes: dynamische texture-generierung
+
+ - planes: auto-zoom auf erste plane
+ - tree: marker border benutzen
+ - tree: colapsing per action und click
+ - tree: left/right keys für level-navi
+ - planes: mirror-gradient
+ - cursor/marker-pane: seitbewegung
 
 ---------------------------
  DONE :)
