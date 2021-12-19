@@ -2,7 +2,17 @@ import React, { Fragment, useState, useContext, useRef, useEffect, useMemo } fro
 import { Stack, Block, DIR } from "../components/LayoutComponents";
 import { d, clamp, hex2rgb, hex2rgbaArray } from "../helper/helper";
 import { Button, OkCancelForm, Number } from "../components/FormComponents";
-import { useModal, Icon, useComponentUpdate, Kbd, ButtonStack, Canvas, useFocusElements, Toolbar } from "../components/BasicComponents";
+import {
+    useModal,
+    Icon,
+    useComponentUpdate,
+    Kbd,
+    ButtonStack,
+    Canvas,
+    useFocusElements,
+    Toolbar,
+    AvailContextProvider, AvailContext
+} from "../components/BasicComponents";
 import { ColorIndex } from "../classes/EntityIndex";
 import { EntityStack } from "../components/EntityComponents";
 import { Scene3DCanvas, Scene, Object3D } from "../components/WebGLComponents";
@@ -285,13 +295,18 @@ class Axis3D extends Object3D {
 }
 
 class AxisDir3D extends Object3D {
+    constructor(size) {
+        super();
+        this.size = size;
+    }
+
     buildProgramJobs(gl) {
         return [{
             program: 'coordColor|color',
             type: gl.LINES,
             attribs: {
                 aVertexPosition:
-                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [[0, 0, 0], [1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 0, 0], [0, 0, 1]]),
+                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [[0, 0, 0], [this.size, 0, 0], [0, 0, 0], [0, this.size, 0], [0, 0, 0], [0, 0, this.size]]),
                 aVertexColor:
                     this.getColorBuffer(gl.FLOAT,['#F00000', '#F00000', '#00F000', '#00F000', '#8080F0', '#8080F0']),
             },
@@ -300,10 +315,6 @@ class AxisDir3D extends Object3D {
     }
 }
 
-
-const OD = 1.1;
-const ID = 1.0;
-const COL = '#FF0000'; // '#35948e';
 
 const staticJobs = {};
 
@@ -331,23 +342,55 @@ class LineRect3D extends Object3D {
 
 class Cursor3D extends Object3D {
 
+    constructor( ...params ) {
+        super( ...params );
+        this.width = 1;
+        this.height = 1;
+        this.size = 10;
+    }
+
+    setColor(color, key) {
+        const lastColor = this.color;
+        this.key = key;
+        this.color = color;
+        if (lastColor !== color) {
+            const store = this.getStaticStore();
+            store.length = 0;
+        }
+    }
+
+    setDim(width, height) {
+        this.width = width;
+        this.height = height
+    }
+
+    getStorageKey() {
+        return 'cursor3D.' + this.key + '|' + this.width + ':' + this.height;
+    }
+
     getStaticStore() {
-        return this.getStore(staticJobs, 'cursor3D');
+        return this.getStore(staticJobs, this.getStorageKey());
     }
 
     buildProgramJobs(gl) {
+        const xo = this.width / 2 + this.size;
+        const xi = this.width / 2;
+        const yo = this.height / 2 + this.size;
+        const yi = this.height / 2;
+
         return [{
             program: 'coordColor|color',
             type: gl.TRIANGLES,
             attribs: {
                 aVertexPosition:
                     this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
-                        [-OD, OD], [-ID, ID], [ID, ID], [OD, OD],
-                        [-OD, -OD], [-ID, -ID], [ID, -ID], [OD, -OD]
+                        [-xo, yo], [-xi, yi], [xi, yi], [xo, yo],
+                        [-xo, -yo], [-xi, -yi], [xi, -yi], [xo, -yo]
                     ]),
                 aVertexColor:
                     this.getColorBuffer(gl.FLOAT,[
-                        COL, COL, COL, COL, COL, COL, COL, COL
+                        this.color, this.color, this.color, this.color,
+                        this.color, this.color, this.color, this.color
                     ]),
             },
             indices: this.getIndicesBuffer([
@@ -364,10 +407,131 @@ class Cursor3D extends Object3D {
     }
 }
 
+class Cursor3D2 extends Object3D {
+
+    setColor(color) {
+        this.color = color;
+    }
+
+    getStaticStore() {
+        return this.getStore(staticJobs, 'cursor3D');
+    }
+
+    buildProgramJobs(gl) {
+        return [{
+            program: 'coordColor|color',
+            type: gl.TRIANGLES,
+            attribs: {
+                aVertexPosition:
+                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
+                        [-OD, OD], [-ID, ID], [ID, ID], [OD, OD],
+                        [-OD, -OD], [-ID, -ID], [ID, -ID], [OD, -OD]
+                    ]),
+                aVertexColor:
+                    this.getColorBuffer(gl.FLOAT,[
+                        this.color, this.color, this.color, this.color, this.color, this.color, this.color, this.color
+                    ]),
+            },
+            indices: this.getIndicesBuffer([
+                0, 1, 3,
+                1, 2, 3,
+                0, 1, 5,
+                4, 5, 0,
+                2, 3, 6,
+                6, 7, 3,
+                4, 5, 6,
+                6, 7, 4
+            ])
+        }]
+    }
+}
+
+class Screen3D extends Object3D {
+
+    constructor(width, height, color = '#FFFFFF') {
+        super();
+        this.width = width;
+        this.height = height;
+        this.color = color;
+    }
+
+    setColor(color) {
+        this.color = color;
+    }
+
+    buildProgramJobs(gl) {
+        const hWidth = this.width / 2;
+        const hHeight = this.height / 2;
+        return [{
+            program: 'coordColor|color',
+            type: gl.TRIANGLES,
+            attribs: {
+                aVertexPosition:
+                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
+                        [-hWidth, hHeight],
+                        [ hWidth, hHeight],
+                        [ hWidth, -hHeight],
+                        [-hWidth, -hHeight]
+                    ]),
+                aVertexColor:
+                    this.getColorBuffer(gl.FLOAT, [this.color, this.color, this.color, this.color, this.color])
+            },
+            indices: this.getIndicesBuffer([0, 1, 2, 0, 2, 3])
+        }]
+    }
+}
+
+
 class Pane3D extends Object3D {
 
     constructor(uniforms = {}) {
         super({ ...uniforms, uSampler: 0 });
+        this.color = '#FFFFFF';
+    }
+
+    setColor(color) {
+        this.color = color;
+    }
+
+    getTextures() {
+        return [{id: this.textureId, data: this.texture}];
+    }
+
+    setTexture(id, image = null) {
+        this.textureId = id;
+        this.texture = image;
+    }
+
+    buildProgramJobs(gl) {
+        return [{
+            program: 'coordColor|color',
+            type: gl.LINES,
+            blend: this.blend,
+            attribs: {
+                aVertexPosition:
+                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
+                        [-1.0, 1.0],
+                        [ 1.0, 1.0],
+                        [ 1.0,-1.0],
+                        [-1.0,-1.0]
+                    ]),
+                aVertexColor:
+                    this.getColorBuffer(gl.FLOAT, ['#FFFFFF', this.color, this.color, this.color, this.color])
+            },
+            indices: this.getIndicesBuffer([0, 1, 1, 2, 2, 3, 3, 0])
+        }]
+    }
+}
+
+class RevPane3D extends Object3D {
+
+    constructor(uniforms = {}) {
+        super({ ...uniforms, uSampler: 0 });
+        this.color = '#FFFFFF';
+    }
+
+    setColor(color) {
+        this.color = color;
     }
 
     getTextures() {
@@ -386,60 +550,51 @@ class Pane3D extends Object3D {
             attribs: {
                 aVertexPosition:
                     this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
-                        [-1.0, 1.0],
-                        [ 1.0, 1.0],
                         [ 1.0,-1.0],
-                        [-1.0,-1.0]
+                        [-1.0,-1.0],
+                        [-1.0, 1.0],
+                        [ 1.0, 1.0]
                     ]),
                 aVertexColor:
-                    this.getColorBuffer(gl.FLOAT, ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFF88'])
+                    this.getColorBuffer(gl.FLOAT, ['#FFFFFF', this.color, this.color, this.color, this.color])
             },
             indices: this.getIndicesBuffer([0, 1, 1, 2, 2, 3, 3, 0])
-        }, {
-            program: 'coordTexture|texture',
-            type: gl.TRIANGLES,
-            textures: [
-                {id: this.textureId, wrap: gl.CLAMP_TO_EDGE, min_filter: gl.LINEAR}
-            ],
-            attribs: {
-                aVertexPosition:
-                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array, [
-                        [-1.0, 1.0],
-                        [ 1.0, 1.0],
-                        [ 1.0,-1.0],
-                        [-1.0,-1.0]
-                    ]),
-                aTextureCoord:
-                    this.getFlatArrayBuffer(gl.FLOAT, Float32Array,
-                        [
-                            [0.0,  0.0],
-                            [1.0,  0.0],
-                            [1.0,  1.0],
-                            [0.0,  1.0]
-                        ]
-                    )
-            },
-            indices: this.getIndicesBuffer([0, 1, 2, 0, 2, 3])
         }]
     }
 }
 
-function TestScene({  }) {
 
-    const [ rotX, setRotX ] = useState(320);
-    const [ rotY, setRotY ] = useState(50);
-    const [ rotZ, setRotZ ] = useState(30);
+function TestScene() {
+    return (
+        <AvailContextProvider>
+            <TestSceneInner />
+        </AvailContextProvider>
+    )
+}
+
+function TestSceneInner({  }) {
+    let { width, height } = useContext(AvailContext);
+
+    const mPerc = 25;
+
+    const [ rotX, setRotX ] = useState(347);
+    const [ rotY, setRotY ] = useState(48);
+    const [ rotZ, setRotZ ] = useState(0);
     const [ posX, setPosX ] = useState(0.0);
     const [ posY, setPosY ] = useState(0.0);
     const [ posZ, setPosZ ] = useState(0.0);
-    const [ scaleX, setScaleX ] = useState(0.8);
-    const [ scaleY, setScaleY ] = useState(0.8);
-    const [ scaleZ, setScaleZ ] = useState(0.8);
+    const [ scaleX, setScaleX ] = useState(1.0);
+    const [ scaleY, setScaleY ] = useState(1.0);
+    const [ scaleZ, setScaleZ ] = useState(1.0);
+    const [ objRotX, setObjRotX ] = useState(0);
+    const [ objRotY, setObjRotY ] = useState(0);
+    const [ objRotZ, setObjRotZ ] = useState(0);
+    const [ maxPixel, setMaxPixel ] = useState(500);
 
     const maxDist = 100.0;
 
     const propsRef = useRef(null);
-    propsRef.current = { rotX, rotY, rotZ, posX, posY, posZ, scaleX, scaleY, scaleZ };
+    propsRef.current = { height, maxPixel, objRotX, objRotY, objRotZ, rotX, rotY, rotZ, posX, posY, posZ, scaleX, scaleY, scaleZ };
 
     const scene = useMemo(() => {
         const scene = new Scene();
@@ -453,6 +608,7 @@ function TestScene({  }) {
                 uniform mat4 uModelMatrix;
                 uniform mat4 uViewMatrix;
                 uniform mat4 uProjectionMatrix;
+                uniform mat4 uOriginMatrix;
             
                 varying highp vec2 vTextureCoord;
                 varying highp float yDist;
@@ -463,7 +619,7 @@ function TestScene({  }) {
                   zeroVector = aVertexPosition;
                   zeroVector = uModelMatrix * zeroVector;
 
-                  gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
+                  gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
                   vTextureCoord = aTextureCoord;
                   yDist = zeroVector.y;
                 }
@@ -475,7 +631,8 @@ function TestScene({  }) {
             uniforms: [
                 {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
                 {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'}
+                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
+                {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
             ]
         });
         scene.addVertexShader({
@@ -487,23 +644,13 @@ function TestScene({  }) {
                 uniform mat4 uModelMatrix;
                 uniform mat4 uViewMatrix;
                 uniform mat4 uProjectionMatrix;
+                uniform mat4 uOriginMatrix;
             
-                varying highp float yDist;                
                 varying lowp vec4 vColor;
                              
-                highp vec4 zeroVector; 
-                highp vec4 compVector;
-
                 void main(void) {
-                  zeroVector = aVertexPosition;
-                  zeroVector = uModelMatrix * zeroVector;
-                
-                  compVector = uModelMatrix * 
-                    aVertexPosition;
-                  gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * 
-                    aVertexPosition;
-                  vColor = aVertexColor;
-                  yDist = zeroVector.y;
+                    gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
+                    vColor = aVertexColor;
                 }
               `,
             attribs: [
@@ -513,7 +660,8 @@ function TestScene({  }) {
             uniforms: [
                 {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
                 {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'}
+                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
+                {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
             ]
         });
         scene.addFragmentShader({
@@ -552,90 +700,54 @@ function TestScene({  }) {
             id: 'color',
             source: `
                 varying lowp vec4 vColor;
-                varying highp float yDist;
-                uniform int uMirror;
                               
                 void main(void) {
-                  if (uMirror > 0) {
-                      if (yDist > 0.0) {
-                          discard;
-                      } else {
-//                          gl_FragColor = vec4(vColor.rgb, (0.6 * gl_FragCoord.y/100.0) * vColor.a);
-                          gl_FragColor = vec4(vColor.rgb, 0.5 * vColor.a);
-                      }
-                  } else {
-                      if (yDist <= 0.0) {
-                          discard;
-                      } else {
-                          gl_FragColor = vColor;
-                      }
-                  }
+                  gl_FragColor = vColor;
                 }
             `,
             uniforms: [
                 {name: 'uMirror', func: 'uniform1i', default: 0},
             ]
         })
-//        scene.addObject(new Pane3D(), [0.0, 1.2, -3.1], [0, 45, 0], [1.5, 0.8, 0]);
-//        scene.addObject(new Pane3D({uMirror: 1}), [0.0, -1.2, -3.1], [180, -45, 0], [1.5, 0.8, 0]);
 
-        const dist = 1;
-        const pane = scene.addObject(new Pane3D(), [0, 0.2, 0], [0, 0, 0], [scaleX, scaleX, scaleX]);
-        const pane_m = scene.addObject(new Pane3D({uMirror: 1}), [0, -0.2, 0], [0, 180, 0], [scaleX, scaleX, scaleX]);
+        const markerSize = 10;
 
-        const axis = scene.addObject(new AxisDir3D(), [0, 0, 0], [0, 0, 0]);
-
-        /*
-        const pane = scene.addObject(new Pane3D(), [0.0, 1.2, -7.1], [0, 45, 0], [1.5, 0.8, 0]);
-        const pane2 = scene.addObject(new Pane3D({uMirror: 1}), [0.0, -1.2, -7.1],[180, -45, 0], [1.5, 0.8, 0]);
-
-        scene.addObject(new Pane3D(), [0.0, 1.2, -12.1], [0, 45, 0], [1.2, 0.8, 0]);
-        scene.addObject(new Pane3D({uMirror: 1}), [0.0, -1.2, -12.1],[180, -45, 0], [1.2, 0.8, 0]);
-
-        const cursor = scene.addObject(new Cursor3D(), [0.0, 1.2, -7.1], [0, 45, 0], [1.5, 0.8, 0]);
-        const cursor2 = scene.addObject(new Cursor3D({uMirror: 1}), [0.0, -1.2, -7.1], [180, -45, 0], [1.5, 0.8, 0]);
-
-        // scene.addObject(new Axis3D(), [0.0, 0.0, -6.1]);
-
-        /*
-        scene.addObject(new Cube3D(), [0.0, 0.5, -6], [40, 10, 5], [0.3, 0.3, 0.3]);
-
-        scene.addObject(new Cube3D(), [0.0, -0.5, -6], [40, -170, 5], [0.1, 0.1, 0.1]);
-
-        /*
-        scene.addObject(new Something3D(), [0.0, 0.0, -6.0])
-        scene.addObject(new Something3D(), [-0.5, 0.0, -6.0], [0.5, 0.0, 0,0])
-*/
+        const axis = scene.addObject(new AxisDir3D(100), [0, 0, 0], [0, 0, 0], [2, 2, 2]);
+        const screen = scene.addObject(new Screen3D(320, 100), [160, markerSize * 2 + 50, 0], [0, 0, 0,]);
+        screen.debugAs('screen');
+        scene.addObject(new Screen3D(320, 200, '#FF0044'), [160, markerSize * 2 + 50, 50], [0, 0, 0,]);
+        scene.debugAs('Scene!');
+        const cursor = scene.addObject(new Cursor3D());
+        cursor.setColor('#00FF00');
+        cursor.setDim(320, 100);
+        cursor.setPosition(screen.getPosition());
         let dirDown = true;
 
-        scene.animate((gl, frame) => {
-            const { rotX, rotY, rotZ, posX, posY, posZ, scaleX } = propsRef.current;
+        // scene.setViewScale(Math.min(width, height) / Math.max(width, height));
 
+
+        scene.animate((gl, frame) => {
+            const { height, maxPixel, objRotX, objRotY, objRotZ, rotX, rotY, rotZ, posX, posY, posZ, scaleX } = propsRef.current;
+
+            // const zoomPerPixel = 2 * scene.getBaseZoom() / height;
+            const moveY = (height / 2 - (height * mPerc / 100));
+
+            const space = height - (height * mPerc / 100);
+            const zoom = space / (250 + 2 * markerSize);
+
+            // ViewportPixel:
+            // x / height = 10 / 100 <=>
+            // x = height / 2 - p * height / 100
+            // height / 2 = 160 - 10
+            scene.setOriginY(-moveY);
+            scene.setOriginX(-150);
             scene.setViewPosition([posX, posY, posZ]);
             scene.setViewRotation([rotX, rotY, rotZ]);
-
+            scene.setViewScale(zoom);
 
             if (frame % 1) {
                 return false;
             }
-            /*
-            const colors = staticJobs['cursor3D'][0].attribs.aVertexColor.data;
-            for (let i = 3; i < colors.length; i += 4) {
-                let newAlpha = colors[i] - 0.05;
-//                colors[i] = (newAlpha < 0) ? 1.0 : newAlpha
-            }
-*/
-            const currY = pane.getPositionY();
-            if (dirDown) {
-                if (currY < -1.1) dirDown = false;
-            } else if (currY > 2.0) dirDown = true;
-
-            const transY = 0.01 * (dirDown ? -1 : 1);
-            pane.translate({y: transY});
-  //          cursor.translate({y: transY});
-            pane_m.translate({y: -transY});
-//            cursor2.translate({y: -transY})
-
             return true;
         });
 
@@ -646,33 +758,39 @@ function TestScene({  }) {
     const update = useComponentUpdate();
 
     return (
-        <Stack vertical full="h" height={700}>
-            <Block full>
-                <Block border="1">
-                    <Scene3DCanvas
-                        width={800} height={600}
-                        scene={scene}
-                    />
-                </Block>
+        <Stack full>
+            <Block border="1" full>
+                <Scene3DCanvas
+                    width={width} height={height}
+                    scene={scene}
+                />
             </Block>
-            <Toolbar>
-                <Number name="FoV" slider="h" min={0} max={359} value={fov} set={value => {scene.setFieldOfView(value); update()}} />
-                <Number name="zNear" slider="h" decimals={1} min={-100.0} max={999.0} value={scene.getZNear()} set={value => {scene.setZNear(value); update()}} />
-                <Number name="zFar" slider="h" decimals={1} min={0.0} max={999.0} value={scene.getZFar()} set={value => {scene.setZFar(value); update()}} />
-            </Toolbar>
-            <Toolbar>
-                <Number name="PosX" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posX} set={setPosX} />
-                <Number name="PosY" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posY} set={setPosY} />
-                <Number name="PosZ" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posZ} set={setPosZ} />
-            </Toolbar>
-            <Toolbar>
-                <Number name="RotX" slider="h" min={0} max={359} value={rotX} set={setRotX} />
-                <Number name="RotY" slider="h" min={0} max={359} value={rotY} set={setRotY} />
-                <Number name="RotZ" slider="h" min={0} max={359} value={rotZ} set={setRotZ} />
-            </Toolbar>
-            <Toolbar>
-                <Number name="ScaleX" slider="h" decimals={2} min={0.0} max={100.0} value={scaleX} set={setScaleX} />
-            </Toolbar>
+            <Stack vertical full="v" width={200}>
+                <Toolbar full="h">
+                    <Number name="FoV" slider="h" min={0} max={359} value={fov} set={value => {scene.setFieldOfView(value); update()}} />
+                    <Number name="zNear" slider="h" decimals={1} min={-1000.0} max={1000.0} value={scene.getZNear()} set={value => {scene.setZNear(value); update()}} />
+                    <Number name="zFar" slider="h" decimals={1} min={0.0} max={1000.0} value={scene.getZFar()} set={value => {scene.setZFar(value); update()}} />
+                </Toolbar>
+                <Toolbar>
+                    <Number name="PosX" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posX} set={setPosX} />
+                    <Number name="PosY" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posY} set={setPosY} />
+                    <Number name="PosZ" decimals={1} slider="h" min={-maxDist} max={maxDist} value={posZ} set={setPosZ} />
+                </Toolbar>
+                <Toolbar>
+                    <Number name="RotX" slider="h" min={0} max={359} value={rotX} set={setRotX} />
+                    <Number name="RotY" slider="h" min={0} max={359} value={rotY} set={setRotY} />
+                    <Number name="RotZ" slider="h" min={0} max={359} value={rotZ} set={setRotZ} />
+                </Toolbar>
+                <Toolbar>
+                    <Number name="MaxPixel" slider="h" min={10} max={999} set={setMaxPixel} value={maxPixel} />
+                    <Number name="ScaleX" slider="h" decimals={2} min={0.0} max={2.0} value={scaleX} set={setScaleX} />
+                </Toolbar>
+                <Toolbar>
+                    <Number name="ObjRotX" slider="h" min={0} max={359} value={objRotX} set={setObjRotX} />
+                    <Number name="ObjRotY" slider="h" min={0} max={359} value={objRotY} set={setObjRotY} />
+                    <Number name="ObjRotZ" slider="h" min={0} max={359} value={objRotZ} set={setObjRotZ} />
+                </Toolbar>
+            </Stack>
         </Stack>
     )
 }
@@ -723,15 +841,7 @@ function PocEditor() {
     }, [])
 
     /*
-        <TestScene />
-     */
-
-    return (
-        <Stack vertical gaps>
-
-            <TreeStack />
-
-            <Block full="h" border="1">
+                <Block full="h" border="1">
                 <EntityStack
                     entityIndex={colIndex}
                 />
@@ -750,6 +860,14 @@ function PocEditor() {
             <TestModal.content width={200} height={200}>
                 <TestForm { ...TestModal.props } />
             </TestModal.content>
+
+     */
+
+    return (
+        <Stack vertical gaps full>
+
+            <TestScene />
+
         </Stack>
     )
 }

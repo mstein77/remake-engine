@@ -5,15 +5,71 @@ import { Block, Stack } from "./LayoutComponents";
 import { AvailContext, AvailContextProvider, PropertyGrid } from "./BasicComponents";
 import { NumberProp } from "./FormComponents";
 
+function arraysNotEqual(a, b) {
+    if (a.length !== b.length) return true;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return true;
+    }
+    return false;
+}
+
+const lastDebugs = {};
+
+function debugMatrix(matrix) {
+    const sub = [];
+    let i = 0;
+    while (i < matrix.length) {
+        if (i % 4 === 0) {
+            sub.push([]);
+        }
+        sub[sub.length - 1].push(matrix[i]);
+        i++;
+    }
+    return sub
+}
+
+function debugModel(name, matrix, position, rotation, scaling) {
+    if (lastDebugs[name] && !arraysNotEqual(lastDebugs[name], matrix)) return false;
+
+    const sub = debugMatrix(matrix);
+    d(name, 'Scale', scaling, 'Rotate', rotation, 'Translate', position, 'Matrix', ...sub);
+    lastDebugs[name] = matrix;
+    return true
+}
+
 class Object3D {
 
     constructor(uniforms = {}) {
         this.position = [0, 0, 0];
         this.rotation = [0, 0, 0];
         this.scaling = [1, 1, 1];
+        this.blend = false;
+        this.blendFactors = [null, null];
         this.jobs = [];
         this.enabled = true;
         this.uniforms = uniforms;
+        this.debug = false;
+        this.lastModel = null;
+    }
+
+    setBlend(enable, sFactor = null, dFactor = null) {
+        this.blend = enable;
+        this.blendFactors = [sFactor, dFactor]
+    }
+
+    useBlend() {
+        return this.blend
+    }
+
+    getBlendFactors(gl) {
+        return [
+            this.blendFactors[0] === null ? gl.ONE : this.blendFactors[0],
+            this.blendFactors[1] === null ? gl.ZERO : this.blendFactors[1]
+        ]
+    }
+
+    debugAs(name) {
+        this.debug = name;
     }
 
     disable() {
@@ -109,6 +165,9 @@ class Object3D {
             this.position
         );  // amount to translate
 
+        if (this.debug) {
+            debugModel(this.debug, modelMatrix, this.position, this.rotation, this.scaling);
+        }
         return modelMatrix
     }
 
@@ -173,15 +232,22 @@ class Scene {
         this.frames = 0;
         this.requestId = null;
         this.uniforms = {};
+        this.baseZoom = 1.0;
+        this.origin = [0, 0]
 
         this.fieldOfView = 25;
-        this.zNear = -10000.0;
-        this.zFar = 10000.0;
+        this.zNear = -1000.0;
+        this.zFar = 1000.0;
         this.ortho = false;
 
         this.viewRotation = [0, 0, 0];
         this.viewPosition = [0, 0, 0];
-        this.viewScale = [1.0, 1.0, 1.0]
+        this.viewScale = [1.0, 1.0, 1.0];
+        this.debug = false;
+    }
+
+    getBaseZoom() {
+        return this.baseZoom
     }
 
     setFieldOfView(value) {
@@ -214,6 +280,22 @@ class Scene {
 
     getViewPosition() {
         return this.viewPosition
+    }
+
+    setOriginX(value) {
+        this.origin[0] = value
+    }
+
+    getOriginX() {
+        return this.origin[0]
+    }
+
+    setOriginY(value) {
+        this.origin[1] = value
+    }
+
+    getOriginY() {
+        return this.origin[1]
     }
 
     setZNear(value) {
@@ -298,7 +380,7 @@ class Scene {
     }
 
     getCompiledShader(type, shader) {
-        if (shader.compiled) return;
+        if (shader.compiled) return shader;
 
         const gl = this.gl;
         const glShader = gl.createShader(type);
@@ -418,15 +500,51 @@ class Scene {
         return object
     }
 
+    debugAs(name) {
+        this.debug = name;
+    }
+
     getViewMatrix() {
         const viewMatrix = mat4.create();
-        mat4.translate(viewMatrix, viewMatrix, this.viewPosition);
+
+        mat4.scale(viewMatrix, viewMatrix, [this.viewScale[0] * this.baseZoom, this.viewScale[1] * this.baseZoom, this.viewScale[2] * this.baseZoom]);
+        const params = [];
+        params.push(
+            'scaled ->',
+            debugMatrix([ ...viewMatrix ])
+        );
         mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(this.viewRotation[0]), [1, 0, 0]);
         mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(this.viewRotation[1]), [0, 1, 0]);
         mat4.rotate(viewMatrix, viewMatrix, glMatrix.toRadian(this.viewRotation[2]), [0, 0, 1]);
-        mat4.invert(viewMatrix, viewMatrix);
-        mat4.scale(viewMatrix, viewMatrix, this.viewScale)
+        params.push(
+            'rotated ->',
+            debugMatrix([ ...viewMatrix ])
+        );
+
+        mat4.translate(viewMatrix, viewMatrix, this.viewPosition);
+        params.push(
+            'translated ->',
+            debugMatrix([ ...viewMatrix ])
+        );
+
+//        mat4.invert(viewMatrix, viewMatrix);
+        params.push(
+            'inverted ->',
+            debugMatrix([ ...viewMatrix ])
+        );
+
+        if (this.debug) {
+            if (debugModel(this.debug, viewMatrix, this.viewPosition, this.viewRotation, this.viewScale)) {
+                d(...params);
+            }
+        }
         return viewMatrix
+    }
+
+    getOriginMatrix() {
+        const matrix = mat4.create();
+        mat4.translate(matrix, matrix, [this.origin[0], this.origin[1], 0]);
+        return matrix;
     }
 
     drawObject(model, job) {
@@ -434,11 +552,20 @@ class Scene {
         const gl = this.gl;
         const { attribs, uniforms, indices } = this.getShaderProgram(job.program);
 
+        const blend = model.useBlend();
+        if (blend) {
+            gl.blendFunc( ...model.getBlendFactors(gl) );
+        }
+
         uniforms.uViewMatrix(
             this.getViewMatrix()
         );
         uniforms.uModelMatrix(
             model.getModelMatrix()
+        );
+        if (uniforms.uOriginMatrix)
+        uniforms.uOriginMatrix(
+            this.getOriginMatrix()
         );
         const objUniforms = model.getUniforms();
         uniforms.uMirror(0);
@@ -488,6 +615,10 @@ class Scene {
             }
         }
         gl.drawElements(job.type, job.indices.count, gl.UNSIGNED_SHORT, 0);
+
+        if (blend) {
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        }
     }
 
     draw(gl) {
@@ -495,9 +626,9 @@ class Scene {
         const jobQueue = [];
 
         this.objects.sort((a, b) => {
-            const aZ = a.getPositionZ();
-            const bZ = b.getPositionZ();
-            return (aZ === bZ ? 0 : (aZ < bZ ? -1 : 1))
+            const aZ = Math.abs(a.getPositionZ());
+            const bZ = Math.abs(b.getPositionZ());
+            return (aZ === bZ ? 0 : (aZ > bZ ? -1 : 1))
         });
 
         for (let object of this.objects) {
@@ -517,7 +648,7 @@ class Scene {
 
         gl.clearColor(0.0, 0.0, 0.0, 0.0);
         gl.clearDepth(1.0);
-        gl.enable(gl.DEPTH_TEST);
+//        gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -525,25 +656,24 @@ class Scene {
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        // Create a perspective matrix, a special matrix that is
-        // used to simulate the distortion of perspective in a camera.
-        // Our field of view is 45 degrees, with a width/height
-        // ratio that matches the display size of the canvas
-        // and we only want to see objects between 0.1 units
-        // and 100 units away from the camera.
+        const maxDim = Math.max(gl.canvas.width, gl.canvas.height);
+        const minDim = Math.min(gl.canvas.width, gl.canvas.height);
+        gl.viewport((gl.canvas.width - maxDim)/2, (gl.canvas.height - maxDim)/2, maxDim, maxDim);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        // this.baseZoom = minDim/maxDim;
 
-        const minDim = Math.max(gl.canvas.width, gl.canvas.height);
-        gl.viewport(0, 0, minDim, minDim);
-
-        const fieldOfView = this.fieldOfView * Math.PI / 180;   // in radians
-        const aspect = 1.0; //gl.canvas.clientWidth / gl.canvas.clientHeight;
         const zNear = this.zNear;
         const zFar = this.zFar;
         const projectionMatrix = mat4.create();
 
         if (this.ortho) {
-            mat4.ortho(projectionMatrix, -1.0, 1.0, -1.0, 1.0, zNear, zFar);
+            const width = gl.canvas.width; // 2.0;
+            const height = gl.canvas.height;
+            mat4.ortho(projectionMatrix, -width / 2, width / 2, -height / 2, height / 2, zNear, zFar);
         } else {
+            const fieldOfView = this.fieldOfView * Math.PI / 180;   // in radians
+            const aspect = 1.0; //gl.canvas.clientWidth / gl.canvas.clientHeight;
+
             mat4.perspective(projectionMatrix,
                 fieldOfView,
                 aspect,

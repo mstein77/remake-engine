@@ -1342,8 +1342,9 @@ function getSinePath(start, end, steps) {
     const path = [];
     const radSteps = 0.5 * Math.PI / (steps - 1);
     const dist = Math.abs(end - start);
+    const sign = end < start ? -1 : 1;
     for (let i = 0; i < steps; i++) {
-        path.push(Math.sin(radSteps * i) * dist + start);
+        path.push(Math.sin(radSteps * i) * sign * dist + start);
     }
     return path;
 }

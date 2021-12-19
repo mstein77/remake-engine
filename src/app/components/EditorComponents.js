@@ -1,14 +1,6 @@
 import React, {useContext, useMemo, useState, useRef, useEffect} from "react";
 import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex";
-import {
-    EditorContext,
-    EditorCtx,
-    LoadingIndicator,
-    ButtonStack,
-    Canvas,
-    CenterInfo,
-    Kbd,
-    OkCancelForm,
+import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm,
     PropertyGrid,
     Section,
     Toolbar,
@@ -34,8 +26,8 @@ import {
     BitmapPlayer
 } from "../helper/helper";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
-import { Block, Stack } from "./LayoutComponents";
-import {EntityStack, EntityStackSections, EntityPicker, EntityManager} from "./EntityComponents";
+import { DIR, Block, Stack } from "./LayoutComponents";
+import { EntityStack, EntityStackSections, EntityPicker, EntityManager } from "./EntityComponents";
 import { FlexGrid, BaseGrid, PictureCell } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
@@ -290,7 +282,7 @@ function FiltersModal({ save, close, model, images, filters = '', type = 'canvas
                     sectionProps={{inner: true, name: 'Pipeline', size: 170, maxWidth: '33%', collapse: 'h', full: 'v'}}
                     detailProps={{inner: true, name: 'Filter Properties', size: 200, maxWidth: '33%', collapse: 'h', full: 'v'}}
                     entityIndex={filterIndex}
-                    clone del order
+                    clone delete order
                     emptyText="Add new filter from the left side"
                     active={activeFilter} setActive={setActiveFilter}
                 >
@@ -582,7 +574,7 @@ function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
                                 entityIndex={imageIndex}
                                 active={activeImage === tempIndex ? null : activeImage}
                                 setActive={setActiveImage}
-                                del
+                                delete
                                 deselect
                                 addOp={addImage}
                                 getInfo={item => <Kbd className="less" value={item.width + ' x ' + item.height} />}
@@ -1117,10 +1109,10 @@ function FrameManager({ frameIndex, fixSize, width, height }) {
                 titleHeight={titleHeight}
                 footerHeight={20 + 2 * defaultPaddingPx}
                 minWidth={150}
-                filter
-                auto
-                undo
-                addOp={addFrame}
+                filter auto undo
+
+                addOp={addFrame} delete
+
                 empty="No animations defined. Add new one"
                 renderTitle={index => {
                     const name = frameIndex.getEntityValue(index).id;
@@ -1285,12 +1277,15 @@ function AnimationManager({ animationIndex, spriteIndex }) {
                 entityIndex={animationIndex}
                 animationIndex={animationIndex}
                 titleHeight={titleHeight}
-                footerHeight={titleHeight}
+                footerHeight={defaultPaddingPx + fmMonoMedium}
                 minWidth={100}
                 filter
                 auto
+
                 addOp={addAnimation}
-                editOp={editAnimation}
+                editOp={({ marked }) => editAnimation(marked[0])}
+                delete
+
                 empty="No animations defined. Add new one"
                 onDoubleClick={editAnimation}
                 renderTitle={index => {
@@ -1300,7 +1295,7 @@ function AnimationManager({ animationIndex, spriteIndex }) {
                 renderFooter={index => {
                     const frames = animationIndex.getEntityPropValue(index, 'frames').length;
                     return (
-                        <Stack full="h" padded className="less small"><Block>Frames: </Block><Kbd value={frames} /></Stack>
+                        <Stack full="h" padded={DIR.ALL_BUT_BOTTOM} className="less small"><Block>Frames: </Block><Kbd value={frames} /></Stack>
                     )
                 }}
             />

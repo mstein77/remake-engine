@@ -100,19 +100,23 @@ function SpriteManager({ spriteIndex, editSprite }) {
             }
         })
     }
-    const { defaultPaddingPx, fmMonoMedium } = useCssProps('defaultPaddingPx', 'fmMonoMedium');
+    const { defaultPaddingPx, fmMonoMedium, fmMonoSmall } = useCssProps('defaultPaddingPx', 'fmMonoMedium', 'fmMonoSmall');
     const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
     return (
         <>
             <EntityManager
                 entityIndex={spriteIndex}
                 titleHeight={titleHeight}
-                footerHeight={titleHeight}
+                footerHeight={defaultPaddingPx + fmMonoSmall}
                 minWidth={100}
                 filter
                 auto
+
                 addOp={newSprite}
                 importOp={importSprites}
+                editOp={({ marked }) => editSprite(marked[0])}
+                delete clear copy apply
+
                 empty="No sprites defined. Add new one"
                 renderTitle={index => {
                     const name = spriteIndex.getEntityValue(index);

@@ -604,7 +604,6 @@ function EditorApp(props) {
         }
 
         const resource = resources[selected];
-        d('SELECTED', selected, resource);
 
         editor = null;
         let model = null;

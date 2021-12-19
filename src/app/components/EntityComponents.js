@@ -43,9 +43,9 @@ function makeOp(customOp, defaultOp, defaultCan = true, params = []) {
     }
 }
 
-function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, addOp, cloneOp, editOp, deleteOp, order, emptyText, deselect, children, ...props }) {
+function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
-    const update = useComponentUpdate();
+    const update = useUpdateOnEntityIndexChanges(entityIndex);
 
     const [ dropIndex, setDropIndex ] = useState(null);
     const [ dragging, setDragging ] = useState(false);
@@ -54,13 +54,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     dropRef.current.dropIndex = dropIndex;
 
     const doAction = undo && eContext ? eContext.doAction : action => action();
-
-    const add = props.add !== undefined ? props.add : !!addOp;
-    const edit = props.edit !== undefined ? props.edit : !!editOp;
-    const clone = props.clone !== undefined ? props.clone : !!cloneOp;
-    const del = props.del !== undefined ? props.del : !!deleteOp;
-
-    useUpdateOnEntityIndexChanges(entityIndex);
 
     let [ active, setActive ] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
     const entities = entityIndex.getEntityObjects();
@@ -79,6 +72,105 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
         active,
         setActive
     });
+
+    const paramsRef = useRef(null);
+    paramsRef.current = {
+        active, entityIndex, doAction, setActiveFocus
+    };
+    const actions = useMemo(() => {
+        const can = ({ active, entityIndex }) => active !== null && entityIndex.getLength();
+        return [
+            {id: 'add', icon: 'add'},
+            {id: 'edit', icon: 'edit', can},
+            {
+                id: 'clone', icon: 'content_copy', can,
+                exec: ({ active, entityIndex, doAction, setActiveFocus }) => {
+                    const index = active;
+                    const cloneEntity = { ...entityIndex.getEntityObject(index) };
+                    if (entityIndex.hasUniqueValues()) {
+                        let no = 2;
+                        let name = cloneEntity.value;
+                        const matches = name.match(/ #(\d)+$/);
+                        if (matches) {
+                            name = name.substr(0, matches.index + 2);
+                            no = parseInt(matches[1])
+                        } else {
+                            name += ' #';
+                        }
+                        while (entityIndex.hasPropValue('value', name + no)) {
+                            no++;
+                        }
+                        cloneEntity.value = name + no;
+                    }
+                    cloneEntity.index++;
+                    doAction(
+                        () => entityIndex.setEntityObject(cloneEntity),
+                        () => entityIndex.deleteEntity(index + 1)
+                    );
+                    setActiveFocus(cloneEntity.index)
+                }
+            },
+            {
+                id: 'delete', icon: 'delete', can,
+                exec: ({ entityIndex, active, doAction }) => {
+                    const oldEntity = entityIndex.getEntityObject(active);
+                    doAction(
+                        () => entityIndex.deleteEntity(oldEntity.index),
+                        () => entityIndex.setEntityObject(oldEntity)
+                    )
+                }
+            },
+            {
+                id: 'up', icon: 'keyboard_arrow_up', parent: 'order', can,
+                exec: ({ active, entityIndex, doAction, setActiveFocus }) => {
+                    const index = active;
+                    const isFirst = index === 0;
+                    const maxIndex = entityIndex.getLength() - 1;
+                    doAction(
+                        () => {
+                            const oldIndex = isFirst ? 0 : index - 1;
+                            const old = entityIndex.getEntityObject(oldIndex);
+                            entityIndex.deleteEntity(oldIndex);
+                            entityIndex.setEntityObject({ ...old, index: isFirst ? maxIndex : index });
+                        },
+                        () => {
+                            const oldIndex = isFirst ? maxIndex : index;
+                            const old = entityIndex.getEntityObject(oldIndex);
+                            entityIndex.deleteEntity(oldIndex);
+                            entityIndex.setEntityObject({ ...old, index: isFirst ? 0 : index - 1 });
+                        }
+                    );
+                    setActiveFocus(isFirst ? maxIndex : active - 1)
+                }
+            },
+            {
+                id: 'down', icon: 'keyboard_arrow_down', parent: 'order', can,
+                exec: ({ active, entityIndex, doAction, setActiveFocus }) => {
+                    const index = active;
+                    const maxIndex = entityIndex.getLength() - 1;
+                    const isLast = index === maxIndex;
+                    doAction(
+                        () => {
+                            const oldIndex = isLast ? maxIndex : index + 1;
+                            const old = entityIndex.getEntityObject(oldIndex);
+                            entityIndex.deleteEntity(oldIndex);
+                            entityIndex.setEntityObject({ ...old, index: isLast ? 0 : index });
+                        },
+                        () => {
+                            const oldIndex = isLast ? 0 : index;
+                            const old = entityIndex.getEntityObject(oldIndex);
+                            entityIndex.deleteEntity(oldIndex);
+                            entityIndex.setEntityObject({ ...old, index: isLast ? maxIndex : index + 1 });
+                        }
+                    );
+                    setActiveFocus(isLast ? 0 : active + 1 )
+                }
+            }
+        ];
+    }, []);
+
+    const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
+
     const dragLeave = index => e => {
         requestAnimationFrame(() => {
             if (dropRef.current.dropIndex === index) {
@@ -143,7 +235,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 onDrop={dragging ? drop(index) : null}
                 onDragLeave={dragging ? dragLeave(index) : null}
                 onDragEnter={dragging ? dragEnter(index) : null}
-                onDragStart={order ? dragStart(index) : null}
+                onDragStart={props.order ? dragStart(index) : null}
                 border={DIR.BOTTOM} cursor="pointer"
                 gaps
                 className={itemCls.join(' ')}
@@ -160,112 +252,8 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     }
     const isEmpty = items.length === 0;
 
-    const execAdd = () => {throw Error('Missing implementation of addOp!')};
-
-    const execEdit = () => {throw Error('Missing implementation of editOp!')};
-
-    const execDelete = () => {
-        const oldEntity = entityIndex.getEntityObject(active);
-        doAction(
-            () => entityIndex.deleteEntity(oldEntity.index),
-            () => entityIndex.setEntityObject(oldEntity)
-        )
-    };
-
-    const execClone = () => {
-        const index = active;
-        const cloneEntity = { ...entityIndex.getEntityObject(index) };
-
-        if (entityIndex.hasUniqueValues()) {
-            let no = 2;
-            let name = cloneEntity.value;
-            const matches = name.match(/ #(\d)+$/);
-            if (matches) {
-                name = name.substr(0, matches.index + 2);
-                no = parseInt(matches[1])
-            } else {
-                name += ' #';
-            }
-            while (entityIndex.hasPropValue('value', name + no)) {
-                no++;
-            }
-            cloneEntity.value = name + no;
-        }
-        cloneEntity.index++;
-        doAction(
-            () => entityIndex.setEntityObject(cloneEntity),
-            () => entityIndex.deleteEntity(index + 1)
-        );
-        setActiveFocus(cloneEntity.index);
-    };
-
-    const execUp = !order ? null : () => {
-        const index = active;
-        const isFirst = index === 0;
-        const maxIndex = entityIndex.getLength() - 1;
-        doAction(
-            () => {
-                const oldIndex = isFirst ? 0 : index - 1;
-                const old = entityIndex.getEntityObject(oldIndex);
-                entityIndex.deleteEntity(oldIndex);
-                entityIndex.setEntityObject({ ...old, index: isFirst ? maxIndex : index });
-            },
-            () => {
-                const oldIndex = isFirst ? maxIndex : index;
-                const old = entityIndex.getEntityObject(oldIndex);
-                entityIndex.deleteEntity(oldIndex);
-                entityIndex.setEntityObject({ ...old, index: isFirst ? 0 : index - 1 });
-            }
-        );
-        setActiveFocus(isFirst ? maxIndex : active - 1)
-    };
-    const execDown = !order ? null : () => {
-        const index = active;
-        const maxIndex = entityIndex.getLength() - 1;
-        const isLast = index === maxIndex;
-        doAction(
-            () => {
-                const oldIndex = isLast ? maxIndex : index + 1;
-                const old = entityIndex.getEntityObject(oldIndex);
-                entityIndex.deleteEntity(oldIndex);
-                entityIndex.setEntityObject({ ...old, index: isLast ? 0 : index });
-            },
-            () => {
-                const oldIndex = isLast ? 0 : index;
-                const old = entityIndex.getEntityObject(oldIndex);
-                entityIndex.deleteEntity(oldIndex);
-                entityIndex.setEntityObject({ ...old, index: isLast ? maxIndex : index + 1 });
-            }
-        );
-        setActiveFocus(isLast ? 0 : active + 1 )
-    };
-
-    const hotKeys = {
-        new: makeOp(addOp, execAdd),
-        edit: makeOp(editOp, execEdit, active !== null, [active]),
-        delete: makeOp(deleteOp, execDelete, active !== null && items.length > 0),
-        clone: makeOp(cloneOp, execClone, active !== null),
-        up: {
-            exec: () => execUp(),
-            can: () => active !== null && entityIndex.getLength() > 1
-        },
-        down: {
-            exec: () => execDown(),
-            can: () => active !== null && entityIndex.getLength() > 1
-        }
-    };
-    const buttons = [];
-    if (add) buttons.push({icon: 'add', onClick: hotKeys.new});
-    if (edit) buttons.push({icon: 'edit', onClick: hotKeys.edit});
-    if (clone) buttons.push({icon: 'content_copy', onClick: hotKeys.clone});
-    if (del) buttons.push({icon: 'delete', onClick: hotKeys.delete});
-    if (order) buttons.push(
-        {icon: 'keyboard_arrow_up', onClick: hotKeys.up},
-        {icon: 'keyboard_arrow_down', onClick: hotKeys.down}
-    );
-
     let elem = (
-        <Stack key="stack" vertical borders full area={area} hotKeys={hotKeys}>
+        <Stack key="stack" vertical borders full area={area} hotKeys={hotkeys}>
             <Block full="h">
                 <ButtonStack buttons={buttons} full wrap gaps className="secondary-bg" />
             </Block>
@@ -411,7 +399,7 @@ function FlexStack({ ...props }) {
 }
 
 function EntityManager({
-       addOp, editOp, importOp, reassignOp, readOnly, onDoubleClick, onRightClick, animationIndex,
+       readOnly, onDoubleClick, onRightClick, animationIndex,
        entityIndex, emptyText, auto, scaling, minWidth, undo,
        titleHeight, footerHeight = 0, renderTitle, renderFooter, ...props
     }) {
@@ -419,9 +407,7 @@ function EntityManager({
     const wContext = useContext(WindowContext);
     const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
     const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
-
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
-
     const doAction = eContext && undo !== false ? eContext.doAction : action => action();
 
     let [ posRaw, setPos ] = useState(props.pos !== undefined ? props.pos : 0);
@@ -496,6 +482,8 @@ function EntityManager({
         setMarked(newMarked);
     };
 
+    const bottomHeight = footerHeight ? footerHeight + padding : padding;
+
     const render = index => {
         const cls = [
             'hover-change',
@@ -505,25 +493,29 @@ function EntityManager({
             entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players);
         };
         return (
-            <Stack vertical gaps full>
+            <Stack vertical full>
                 <Stack
                     vertical
                     full
-                    border="1"
                     className={cls.join(' ')}
+                    border="1"
                     cursor="pointer"
                     onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                     onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
                     onLeftClick={readOnly ? null : () => toggleMarker(index)}>
-                    {renderTitle(index)}
-                    <Block className="overflow" full centerItems padded={footerHeight !== undefined ? DIR.ALL_BUT_TOP : 'h'}>
-                        {entityIndex.hasEntityImage(index) ?
-                            <Canvas render={itemRender} width={avail} height={avail} border="1" /> :
-                            <Block border="1"><Block width={avail} height={avail} /></Block>
-                        }
+                    <Block full="h">
+                        {renderTitle(index)}
+                    </Block>
+                    <Block full padded={DIR.ALL_BUT_TOP}>
+                        <Block border="1" center>
+                            {entityIndex.hasEntityImage(index) ?
+                                <Canvas render={itemRender} width={avail} height={avail} /> :
+                                <Block width={avail} height={avail} />
+                            }
+                        </Block>
                     </Block>
                 </Stack>
-                <Block height={footerHeight || padding}>{renderFooter ? renderFooter(index) : ''}</Block>
+                {renderFooter && <Block height={footerHeight}>{renderFooter(index)}</Block>}
             </Stack>
         )
     };
@@ -537,6 +529,154 @@ function EntityManager({
             {filter && <Block center="v"><Kbd value={'' + entityIndex.getLength()} /></Block>}
         </Stack>
     );
+
+    const exec = useMemo(() => {
+        return {
+            delete: ({ marked, doAction, entityIndex }) => {
+                const undoEntities = entityIndex.getEntityObjects(marked);
+                const doMarked = [ ...marked ];
+                doAction(
+                    () => entityIndex.deleteEntities(doMarked),
+                    () => entityIndex.setEntityObjects(undoEntities)
+                );
+                setMarked([])
+            },
+            clear: ({ marked, doAction, entityIndex }) => {
+                const indices = [ ...marked ];
+                const emptyBitmap = getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY());
+                const undoImages = {};
+                for (let index of indices) {
+                    undoImages[index] = entityIndex.getEntityPropValue(index, 'image');
+                }
+                doAction(
+                    () => {
+                        for (let index of indices) {
+                            entityIndex.setEntityPropValue(index, 'image', emptyBitmap);
+                        }
+                    },
+                    () => {
+                        for (let [index, bitmap] of Object.entries(undoImages)) {
+                            entityIndex.setEntityPropValue(index, 'image', bitmap);
+                        }
+                    }
+                );
+                setMarked([])
+            },
+            swap: ({ marked, doAction, entityIndex }) => {
+                const first = marked[0];
+                const second = marked[1];
+                const firstBitmap = entityIndex.getEntityPropValue(first, 'image');
+                const secondBitmap = entityIndex.getEntityPropValue(second, 'image');
+                doAction(
+                    () => {
+                        entityIndex.setEntityPropValue(first, 'image', secondBitmap);
+                        entityIndex.setEntityPropValue(second, 'image', firstBitmap);
+                    },
+                    () => {
+                        entityIndex.setEntityPropValue(first, 'image', firstBitmap);
+                        entityIndex.setEntityPropValue(second, 'image', secondBitmap);
+                    }
+                )
+            },
+            apply: ({ marked, entityIndex, doAction, wContext,
+                        openFilterPipelineModal, closeFilterPipelineModal }) => {
+                const indices = [ ...marked ];
+                const undoImages = [];
+                for (let index of indices) {
+                    undoImages.push(entityIndex.getEntityPropValue(index, 'image'));
+                }
+                openFilterPipelineModal({
+                    type: 'imageData',
+                    images: undoImages,
+                    save: filters => {
+                        if (filters) {
+                            const doImages = [];
+                            for (let image of undoImages) {
+                                doImages.push(wContext.getFilteredImageData(filters, image));
+                            }
+                            doAction(
+                                () => {
+                                    let i = 0;
+                                    while (i < doImages.length) {
+                                        entityIndex.setEntityPropValue(indices[i], 'image', doImages[i]);
+                                        i++;
+                                    }
+                                    entityIndex.notify();
+                                },
+                                () => {
+                                    let i = 0;
+                                    while (i < doImages.length) {
+                                        entityIndex.setEntityPropValue(indices[i], 'image', undoImages[i]);
+                                        i++;
+                                    }
+                                    entityIndex.notify();
+                                }
+                            )
+                        }
+                        closeFilterPipelineModal()
+                    }
+                });
+            },
+            copy: ({ marked, eContext, entityIndex }) => {
+                const bitmap = entityIndex.getEntityPropValue(marked[0], 'image');
+                const selection = new CellSelection('bitmap', [[bitmap]]);
+                eContext.setSelection(selection);
+                setMarked([])
+            },
+            paste: ({ marked, eContext, entityIndex }) => {
+                const indices = [ ...marked ];
+                const undoObjects = entityIndex.getEntityObjects(indices);
+                const pasteBitmap = eContext.selection.getCell();
+                doAction(
+                    () => {
+                        for (let index of indices) {
+                            entityIndex.setEntityPropValue(index, 'image', pasteBitmap);
+                        }
+                    },
+                    () => {
+                        entityIndex.setEntityObjects(undoObjects, true);
+                    }
+                );
+                setMarked([])
+            }
+        }
+    }, []);
+
+    const paramsRef = useRef(null);
+    paramsRef.current = {
+        eContext, wContext, marked, entityIndex, doAction, exec,
+        openFilterPipelineModal, closeFilterPipelineModal
+    };
+
+    const sideActions = useMemo(() => {
+        return [
+            {id: 'add', icon: 'add'},
+            {id: 'import', icon: 'playlist_add'}
+        ]
+    }, []);
+    const markedActions = useMemo(() => {
+        return [
+            {id: 'edit', name: 'edit', can: ({ marked }) => marked.length === 1},
+            {id: 'delete', name: 'delete', exec: exec.delete},
+            {id: 'clear', name: 'clear', exec: exec.clear},
+            {id: 'apply', name: 'apply', exec: exec.apply},
+            {id: 'assign', name: 'assign'},
+            {id: 'swap', name: 'swap', exec: exec.swap, can: ({ marked }) => marked.length === 2},
+            {id: 'copy', name: 'copy', exec: exec.copy, can: ({ marked }) => marked.length === 1},
+            {id: 'paste', parent: 'copy', name: 'paste', exec: exec.paste, can: ({ eContext, entityIndex }) => {
+                if (!(eContext.selection && eContext.selection.isBitmap())) {
+                    return false;
+                }
+                const cell = eContext.selection.getCell();
+                return (cell.width === entityIndex.getSizeX() && cell.height === entityIndex.getSizeY());
+            }}
+        ]
+    }, []);
+    const { buttons: sideButtons, hotkeys: sideHotkeys } = getActionButtonsAndHotkeys(sideActions, props, paramsRef);
+    const { buttons: actionButtons, hotkeys: markedHotkeys } = getActionButtonsAndHotkeys(markedActions, props, paramsRef);
+
+    const hotkeys = { ...sideHotkeys, ...markedHotkeys };
+
     const markerButtons = [
         {icon: 'clear',  disabled: marked.length === 0, onClick: () => setMarked([])},
         {icon: 'done_all',
@@ -555,7 +695,6 @@ function EntityManager({
                 setMarked(newMarked)
         }}
     ];
-
     bottomItems.selection = (
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
             <Block key="m" center="v" className={marked.length ? 'active-underlined' : ''}>Marked:</Block>
@@ -590,145 +729,6 @@ function EntityManager({
     }
 
     if (marked.length) {
-        const execEdit = {
-            exec: () => editOp([ ...marked ]),
-            can: () => marked.length === 1
-        };
-        const deleteOp = () => {
-            if (props.deleteOp) {
-                props.deleteOp([ ...marked ]);
-            } else {
-                const undoEntities = entityIndex.getEntityObjects(marked);
-                const doMarked = [ ...marked ];
-                doAction(
-                    () => entityIndex.deleteEntities(doMarked),
-                    () => entityIndex.setEntityObjects(undoEntities)
-                );
-            }
-            setMarked([]);
-        };
-        const clearOp = () => {
-            const indices = [ ...marked ];
-            const emptyBitmap = getEmptyImageData(entityIndex.getSizeX(), entityIndex.getSizeY());
-            const undoImages = {};
-            for (let index of indices) {
-                undoImages[index] = entityIndex.getEntityPropValue(index, 'image');
-            }
-            doAction(
-                () => {
-                    for (let index of indices) {
-                        entityIndex.setEntityPropValue(index, 'image', emptyBitmap);
-                    }
-                },
-                () => {
-                    for (let [index, bitmap] of Object.entries(undoImages)) {
-                        entityIndex.setEntityPropValue(index, 'image', bitmap);
-                    }
-                }
-            );
-            setMarked([]);
-        };
-        const applyOp = () => {
-            const indices = [ ...marked ];
-            const undoImages = [];
-            for (let index of indices) {
-                undoImages.push(entityIndex.getEntityPropValue(index, 'image'));
-            }
-            openFilterPipelineModal({
-                type: 'imageData',
-                images: undoImages,
-                save: filters => {
-                    if (filters) {
-                        const doImages = [];
-                        for (let image of undoImages) {
-                            doImages.push(wContext.getFilteredImageData(filters, image));
-                        }
-                        doAction(
-                            () => {
-                                let i = 0;
-                                while (i < doImages.length) {
-                                    entityIndex.setEntityPropValue(indices[i], 'image', doImages[i]);
-                                    i++;
-                                }
-                                entityIndex.notify();
-                            },
-                            () => {
-                                let i = 0;
-                                while (i < doImages.length) {
-                                    entityIndex.setEntityPropValue(indices[i], 'image', undoImages[i]);
-                                    i++;
-                                }
-                                entityIndex.notify();
-                            }
-                        )
-                    }
-                    closeFilterPipelineModal()
-                }
-            });
-        };
-        const swapOp = {
-            exec: () => {
-                const first = marked[0];
-                const second = marked[1];
-                const firstBitmap = entityIndex.getEntityPropValue(first, 'image');
-                const secondBitmap = entityIndex.getEntityPropValue(second, 'image');
-                doAction(
-                    () => {
-                        entityIndex.setEntityPropValue(first, 'image', secondBitmap);
-                        entityIndex.setEntityPropValue(second, 'image', firstBitmap);
-                    },
-                    () => {
-                        entityIndex.setEntityPropValue(first, 'image', firstBitmap);
-                        entityIndex.setEntityPropValue(second, 'image', secondBitmap);
-                    }
-                );
-            },
-            can: () => marked.length === 2
-        };
-        const copyOp = {
-            exec: () => {
-                const bitmap = entityIndex.getEntityPropValue(marked[0], 'image');
-                const selection = new CellSelection('bitmap', [[bitmap]]);
-                eContext.setSelection(selection);
-                setMarked([])
-            },
-            can: () => marked.length === 1
-        };
-        const pasteOp = {
-            exec: () => {
-                const indices = [ ...marked ];
-                const undoObjects = entityIndex.getEntityObjects(indices);
-                const pasteBitmap = eContext.selection.getCell();
-                doAction(
-                    () => {
-                        for (let index of indices) {
-                            entityIndex.setEntityPropValue(index, 'image', pasteBitmap);
-                        }
-                    },
-                    () => {
-                        entityIndex.setEntityObjects(undoObjects, true);
-                    }
-                );
-                setMarked([])
-            },
-            can: () => {
-                if (!(eContext.selection && eContext.selection.isBitmap())) {
-                    return false;
-                }
-                const cell = eContext.selection.getCell();
-                return (cell.width === entityIndex.getSizeX() && cell.height === entityIndex.getSizeY());
-            }
-        };
-        const actionButtons = [
-            {name: 'edit', onClick: execEdit},
-            {name: 'delete', onClick: deleteOp},
-            {name: 'clear', onClick: clearOp},
-            {name: 'apply...', onClick: applyOp},
-            {name: 'reassign', onClick: () => reassignOp([ ...marked ])},
-            {name: 'swap', onClick: swapOp},
-            {name: 'copy', onClick: copyOp},
-            {name: 'paste', onClick: pasteOp}
-        ];
         bottomItems.actions = (
             <Stack gaps key="actions">
                 <Block center="v" className="active-bg-text active-underlined">Actions:</Block>
@@ -740,14 +740,10 @@ function EntityManager({
     for(let [key, elem] of Object.entries(bottomItems)) {
         groups.push(<ToolGroup key={key}>{elem}</ToolGroup>);
     }
-    const sideButtons = [
-        {icon: 'add', onClick: addOp}
-    ];
-    if (importOp) sideButtons.push({icon: "playlist_add", onClick: importOp});
 
     return (
         <>
-        <Stack full borders>
+        <Stack full borders hotKeys={hotkeys}>
             {!readOnly &&
                 <Block full="v" className="secondary-bg">
                     <ButtonStack vertical gaps buttons={sideButtons} padded scroll />
@@ -782,8 +778,8 @@ function EntityManager({
                                         auto={auto} scaling={scaling}
                                         render={render} items={view.matches} maxAvailZoom={props.maxZoom}
                                         zoom={zoom} setZoom={setZoom} minZoom={1} maxZoom={maxZoom} setMaxZoom={setMaxZoom}
-                                        varWidth={sizeX} fixWidth={2 * padding + 2} minWidth={minWidth}
-                                        fixHeight={footerHeight + titleHeight + 3 * padding + 4} varHeight={sizeY}
+                                        varWidth={sizeX} fixWidth={2 * padding + 4} minWidth={minWidth}
+                                        fixHeight={bottomHeight + titleHeight + 4} varHeight={sizeY}
                                         page={page} maxPage={view.count} setPage={setPage}
                                         pos={pos} setPos={setPos}
                                         onDoubleClick={onDoubleClick}
@@ -919,31 +915,18 @@ function EntityPicker({
     )
 }
 
-/*
-function getOp(op) {
-    if (op === undefined) return;
-
-    if (typeof op === 'function') {
-        op = {exec: op};
-    }
-    if (!op.has) {
-        op.has = () => true
-    }
-    return op
-}
-*/
-
 function getActionButtonsAndHotkeys(actions, props, paramsRef) {
     const buttons = [];
     const hotkeys = {};
-    for (let { id, name, icon, exec, can, required = false } of actions) {
+    for (let { id, parent, name, icon, exec, can, required = false } of actions) {
         let op = props[id + 'Op'];
         if (op !== undefined) {
             if (typeof op === 'function') {
                 op = {exec: op}
             }
         }
-        const has = props[id] === true || (op && !(op.has && !op.has(paramsRef.current)));
+        const checkId = parent ? parent : id;
+        const has = props[checkId] === true || (op && !(op.has && !op.has(paramsRef.current)));
         if (required && !exec && (!op || !op.exec)) {
             throw Error(`Missing implementation of ${id}Op`);
         }
@@ -951,10 +934,11 @@ function getActionButtonsAndHotkeys(actions, props, paramsRef) {
             const opExec = {
                 exec: op && op.exec ? () => op.exec(paramsRef.current) : () => exec(paramsRef.current),
             };
-            if (can || op.can) {
+            const hasOpCan = op && op.can;
+            if (can || hasOpCan) {
                 opExec.can = () => {
                     if (can && !can(paramsRef.current)) return false;
-                    if (op.can && !op.can(paramsRef.current)) return false;
+                    if (hasOpCan && !op.can(paramsRef.current)) return false;
                     return true
                 }
             }
@@ -968,9 +952,10 @@ function getActionButtonsAndHotkeys(actions, props, paramsRef) {
     }
 }
 
-function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
+function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
     const tContext = useContext(TrackingContext);
 
+    const update = useComponentUpdate();
     const keyTrackRef = useRef(null);
     const tracking = useMemo(() => {
         if (!tContext || !trackId) return () => {};
@@ -993,11 +978,20 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
     };
     paramsRef.current = { active, node: active === null ? null : tree[active] };
 
+    if (toggleOp) {
+        props.toggleOp = (params) => {
+            const { active } = params;
+            toggleOp(params);
+            tree[active].closed = !tree[active].closed;
+            update()
+        };
+    }
     const actions = useMemo(() => {
         return [
             {id: 'edit', icon: 'edit', can: ({ active }) => active !== null},
             {id: 'add', icon: 'add', can: () => false},
-            {id: 'delete', icon: 'delete', can: () => false}
+            {id: 'delete', icon: 'delete', can: () => false},
+            {id: 'toggle', icon: 'account_tree', can: ({ active }) => active !== null && !tree[active].leaf}
         ];
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
@@ -1043,9 +1037,16 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
     }
 
     const nodes = [];
-    let i = 0;
+    let i = -1;
+    // TODO
     const end = [false, false, false, false];
+
+    let closedLevel = null;
     for (let node of tree) {
+        i++
+        if (node.level === closedLevel) {
+            closedLevel = null
+        }
         const indention = [];
         const isEnd = nodeEnd[i];
         if (isEnd) {
@@ -1058,17 +1059,18 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
                 </Block>
             );
         }
+        const curr = i;
         const elem = node.leaf ?
             <Icon size={12} className="border-color" name="square" /> :
-            <Block center="h" border="1"><Icon size={12} className="ghost-bg" name="remove" /></Block>;
+            <Block center="h" border="1" onClick={e => {props.toggleOp({ ...paramsRef.current, active: curr}); e.stopPropagation()}}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
 
         indention.push(
             <Block key="last" width={18} height={height} full="v">
                 <Block full className="relative">
                     {i > 0 &&
-                    <div className="absolute pos-0 full-v full-h">
-                        <Block width={1} height={isEnd ? 10 : false} center="h" full="v" border={DIR.LEFT} />
-                    </div>
+                        <div className="absolute pos-0 full-v full-h">
+                            <Block width={1} height={isEnd ? 10 : false} center="h" full="v" border={DIR.LEFT} />
+                        </div>
                     }
                     <Block full className="absolute pos-0">
                         <Block padded={DIR.TOP} full="h">{elem}</Block>
@@ -1076,8 +1078,17 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
                 </Block>
             </Block>
         );
+
         const cls = ['hover-change'];
         cls.push(i === active ? 'active-bg active-color' : 'ghost-bg');
+
+        if (closedLevel === null) {
+            if (node.closed) {
+                closedLevel = node.level
+            }
+        } else if (node.level > closedLevel) {
+            continue;
+        }
         nodes.push(
             <Stack key={i} tab={i === focusItem} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
                 <Stack full="v" padded="h">
@@ -1087,14 +1098,13 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
                     <Block key={i} full="h">
                         <Stack full="h">
                             <Block full="h" shorten>{node.type}</Block>
-                            <Block><Kbd className="less small" value="320x200" /></Block>
+                            <Block><Kbd className="less small" value={node.width + 'x' + node.height} /></Block>
                         </Stack>
                     </Block>
                     <Block className="big more" shorten>{node.name}</Block>
                 </Stack>
             </Stack>
         );
-        i++
     }
     return (
         <Stack borders vertical full  hotKeys={hotkeys}>
@@ -1102,7 +1112,7 @@ function TreeStack({ tree, trackId, doubleClickAction, ...props }) {
                 <ButtonStack gaps buttons={buttons} />
             </Toolbar>
             <Block full>
-                <Stack scroll border={DIR.BOTTOM} full="h" onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
+                <Stack cursor="pointer" scroll border={DIR.BOTTOM} full="h" onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
                     {nodes}
                 </Stack>
             </Block>

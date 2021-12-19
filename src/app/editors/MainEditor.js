@@ -717,8 +717,8 @@ function HotKeyRecorder({ action, save, close, mapping, ...props }) {
                 }
             </Stack>
             <Stack padded gaps>
-                <Button name="OK" onClick={okOp} />
-                <Button name="Cancel" onClick={close} />
+                <Button name="OK" padded="h" onClick={okOp} />
+                <Button name="Cancel" padded="h" onClick={close} />
             </Stack>
         </Stack>
     )

@@ -5678,5 +5678,5 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
         }
     });
 
-    return 'bootstrap'; // 'demo';
+    return 'bootstrap';
 });

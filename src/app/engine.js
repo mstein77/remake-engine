@@ -2188,6 +2188,42 @@ class Game {
                                     data: pane.spriteSheet
                                 }
                             );
+                        } else if (pane instanceof CanvasPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'canvasPane'
+                                }
+                            )
+                        } else if (pane instanceof LinearGradientPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'linearGradientPane'
+                                }
+                            )
+                        } else if (pane instanceof BitmapScrollPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'bitmapScrollPane'
+                                }
+                            )
+                        } else if (pane instanceof PatternPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'patternPane'
+                                }
+                            )
                         }
                     }
                 }
@@ -2523,7 +2559,8 @@ class Game {
 
                 '<div id="debugs" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0"><pre id="d" style="margin: 0"></pre>' +
                 '</div>' +
-            '</div></div>' +
+            '</div>' +
+            '</div>' +
             '<div id="offscreen" style="display: none"></div>' +
             '<div id="react-editor"></div>' +
             '<div id="editor" style="display: none">Editor</div>' + (this.hasTouch ?
@@ -3276,6 +3313,17 @@ class CanvasPane {
     getCtx() {
         return this.container.getCanvasCtx();
     }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.container.canvas.elem.toDataURL('image/png'),
+            color: null,
+            width: this.paneDim.x,
+            height: this.paneDim.y
+        }
+    }
+
 }
 
 class ColorPaneConfig extends Config {
@@ -3285,12 +3333,16 @@ class ColorPane {
         this.color = color;
         this.images = [];
         this.imgPos = [];
+        this.imgElems = [];
         this.dirty = true;
     }
 
     addImage(image, posX, posY) {
         this.images.push(image);
         this.imgPos.push({x: posX, y: posY});
+        const img = document.createElement('IMG');
+        img.src = image;
+        this.imgElems.push(img);
         this.dirty = false;
     }
 
@@ -3326,10 +3378,20 @@ class ColorPane {
     }
 
     getPreview() {
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = this.color;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < this.imgElems.length; i++) {
+            const img = this.imgElems[i];
+            const {x, y} = this.imgPos[i];
+            ctx.drawImage(img, x, y);
+        }
         return {
             type: 'plane',
-            texture: null,
-            color: this.color,
+            texture: canvas.toDataURL('image/png'),
+//            color: this.color,
             width: this.viewPortDim.x,
             height: this.viewPortDim.y
         }
@@ -3683,6 +3745,16 @@ class BitmapScrollPane {
             }
         }
         return scrolled;
+    }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.buffers.buffers[this.buffers.active].elem.toDataURL('image/png'),
+            color: null,
+            width: this.paneDim.x,
+            height: this.paneDim.y
+        }
     }
 }
 
@@ -5352,6 +5424,21 @@ class PatternPane {
             }
         };
     }
+
+    getPreview() {
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(this.container.getImageElem(), 0, 0);
+
+        return {
+            type: 'plane',
+            texture: canvas.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
 }
 
 
@@ -5522,7 +5609,7 @@ class LinearGradientPane {
         return this.container;
     }
 
-    render() {
+    getGradient() {
         let currPos = 0;
         let currColorIndex = 0;
 
@@ -5572,22 +5659,61 @@ class LinearGradientPane {
             }
             pos += stop[1];
         }
+        return {
+            top,
+            bottom,
+            css: gradient
+        }
+    }
 
+    getPreview() {
+        const gradient = this.getGradient();
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const grd = ctx.createLinearGradient(0, 0,
+            !this.isHorizontal ? 0 : canvas.width,
+            !this.isHorizontal ? canvas.height : 0
+        );
+        const parts = gradient.css.split(', ');
+        let pos = 0;
+        const maxPos = this.isHorizontal ? canvas.width : canvas.height;
+        for (let i = 1; i < parts.length; i++) {
+            const part = parts[i];
+            const subParts = part.split(' ');
+            pos = (subParts.length === 2) ? parseInt(subParts[1], 10) :
+                (i === 1 ? 0 : maxPos);
+            grd.addColorStop(pos / maxPos, subParts[0]);
+        }
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+        return {
+            type: 'plane',
+                texture: canvas.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
+
+    render() {
+        const gradient = this.getGradient();
         const div = this.container.getChild();
         Game.instance.addDomOp(
             div,
             'style.' + (this.isHorizontal ? 'width' : 'height'),
-            top + this.viewSize + bottom
+            gradient.top + this.viewSize + gradient.bottom
         );
         Game.instance.addDomOp(
             div,
             'style.' + (this.isHorizontal ? 'left' : 'top'),
-            -top
+            -gradient.top
         );
         Game.instance.addDomOp(
             div,
             'style.background',
-            'linear-gradient(' + gradient + ')'
+            'linear-gradient(' + gradient.css + ')'
         );
         this.dirty = false;
     }

@@ -288,7 +288,8 @@ function CharManager({ charIndex }) {
     const { openBitmapSelectionModal, closeBitmapSelectionModal, BitmapSelectionModal } = useBitmapSelectionModal();
     const { openEditBitmapModal, closeEditBitmapModal, EditBitmapModal } = useEditBitmapModal('Edit char');
 
-    const editChar = index => {
+    const editChar = ({ marked }) => {
+        const index = marked[0];
         const char = charIndex.getEntityObject(index);
         CharPropsModal.open({
             name: 'Edit char',
@@ -375,7 +376,7 @@ function CharManager({ charIndex }) {
         });
     };
 
-    const reassignOp = indices => {
+    const assignIndices = indices => {
         indices = indices.sort((a, b) => a === b ? 0 : (a < b) ? -1 : 1);
         const items = [];
         for (let index of indices) {
@@ -387,6 +388,10 @@ function CharManager({ charIndex }) {
             });
         }
         assignImagesToChars(items)
+    };
+
+    const assignOp = ({ marked }) => {
+        assignIndices([ ...marked ]);
     };
 
     const saveAssignments = items => {
@@ -478,10 +483,13 @@ function CharManager({ charIndex }) {
                 filter auto
                 emptyText="No chars yet, please add or import chars by clicking on the icons on the left side"
                 entityIndex={charIndex}
+
                 addOp={addChar}
                 editOp={editChar}
                 importOp={importChars}
-                reassignOp={reassignOp}
+                assignOp={assignOp}
+                copy swap clear delete apply
+
                 minWidth={90}
                 titleHeight={41}
                 onDoubleClick={editChar}
@@ -664,7 +672,7 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
     )
 }
 
-function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
+function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
 
@@ -675,8 +683,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
     const [ zoom, setZoom ] = useState(1);
     const [ marker, setMarker ] = useCachedState('page', 'previewMarker', true);
     const [ highlight, setHighlight ] = useState(false);
-    const [ width, setWidth ] = useState(320);
-    const [ height, setHeight ] = useState(200);
+    const [ width, setWidth ] = useState(props.dim.x);
+    const [ height, setHeight ] = useState(props.dim.y);
     const screenRef = useRef(null);
     const onMoveRef = useRef(null);
 
@@ -1055,7 +1063,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont }) {
                 sectionProps={{inner: true, name: 'Text Blocks', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 detailProps={{inner: true, name: 'Text Block Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 entityIndex={blockIndex}
-                deselect addOp={newBlock} del clone order undo
+                deselect addOp={newBlock} delete clone order undo
                 emptyText="Add new block"
                 active={activeBlock} setActive={setActiveBlock}
             >
@@ -1208,7 +1216,7 @@ function TextPaneEditor({ model, resource }) {
                         }
                     }
             }}>
-                <TextBlockEditor full blockIndex={blockIndex} fontIndex={fontIndex} activeFont={activeFont} />
+                <TextBlockEditor full blockIndex={blockIndex} fontIndex={fontIndex} activeFont={activeFont} dim={resource.dim} />
             </EditorSection>
 
             <Modals />

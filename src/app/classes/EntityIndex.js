@@ -928,6 +928,9 @@ function doPlanOnModel(model, plan, selection) {
                 for (let item of selectionChanges.changes) {
                     doEventChange(selection.cells, item, 4, true);
                 }
+                if (selection.cells[0][0].length === 0) {
+                    selection.cells = [[]];
+                }
             }
         }
         plan.selectionChanges = selectionChanges;

@@ -1,5 +1,22 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import { EditorSection, ButtonStack, CenterInfo, SideTabs, SideTab, EditorCtx, Kbd, EditorContext, Toolbar, useModal, PropertyGrid, Section, JsonView, useCssProps, useComponentUpdate } from "../components/BasicComponents";
+import {
+    EditorSection,
+    ButtonStack,
+    CenterInfo,
+    SideTabs,
+    SideTab,
+    EditorCtx,
+    Kbd,
+    EditorContext,
+    Toolbar,
+    useModal,
+    PropertyGrid,
+    Section,
+    JsonView,
+    useCssProps,
+    useComponentUpdate,
+    useUpdateOnEntityIndexChanges
+} from "../components/BasicComponents";
 import { DIR, Block, Stack, Grid } from "../components/LayoutComponents";
 import { d, getCanvasForDim, getColorsFromCanvas, getCanvasForEventMatrix, getCanvasForIndexMatrix, getEmptyImageData, cloneDeep } from "../helper/helper";
 import { useBitmapSelectionModal, AnimationManager, useExportModal } from "../components/EditorComponents";
@@ -29,6 +46,8 @@ function getEventsImage(tilesGrid, events, zoomOrAvail) {
 function EventStack({ events, eventIndex }) {
     const eContext = useContext(EditorContext);
     const AddEventModal = useModal();
+
+    useUpdateOnEntityIndexChanges(eventIndex);
 
     const stackIndex = useMemo(() => {
         const index = new SimpleIndex({items: events});
@@ -65,7 +84,7 @@ function EventStack({ events, eventIndex }) {
                 entityIndex={stackIndex}
                 order
                 addOp={addEvent}
-                del
+                delete
                 deselect
                 emptyText="No event"
             />
@@ -422,7 +441,8 @@ function TilesManager({ tileIndex, animationIndex, editTile }) {
         });
     };
 
-    const deleteTiles = indices => {
+    const deleteTiles = ({ marked }) => {
+        const indices = [ ...marked ];
         ConfirmDeleteModal.open({
             count: indices.length,
             save: safe => {
@@ -482,8 +502,12 @@ function TilesManager({ tileIndex, animationIndex, editTile }) {
                 renderTitle={
                     index => <Block padded><Kbd value={index} /></Block>
                 }
-                onDoubleClick={editTile} addOp={addTile} editOp={editTile}
+                onDoubleClick={editTile}
+
+                addOp={addTile} clear apply swap copy
+                editOp={({ marked }) => editTile(marked[0])}
                 importOp={importTiles} deleteOp={deleteTiles}
+
                 filter titleHeight={titleHeight} minWidth={60}
                 entityIndex={tileIndex} maxZoom={5} auto
             />
@@ -534,7 +558,8 @@ function AliasManager({ aliasIndex, tileIndex, animationIndex, editAlias }) {
             }
         })
     };
-    const deleteAlias = indices => {
+    const deleteAlias = ({ marked }) => {
+        const indices = [ ...marked ];
         const plan = aliasIndex.getDeletePlan(indices);
         eContext.doAction(
             () => {
@@ -551,8 +576,12 @@ function AliasManager({ aliasIndex, tileIndex, animationIndex, editAlias }) {
         <>
             <EntityManager
                 renderTitle={index => <Block padded shorten>{aliasIndex.getEntityValue(index)}</Block>}
-                onDoubleClick={editAlias} editOp={editAlias}
-                addOp={addAlias} deleteOp={deleteAlias} animationIndex={animationIndex}
+                onDoubleClick={editAlias}
+
+                editOp={({ marked }) => editAlias(marked[0])}
+                addOp={addAlias} deleteOp={deleteAlias}
+
+                animationIndex={animationIndex}
                 filter titleHeight={titleHeight} minWidth={100}
                 entityIndex={aliasIndex} maxZoom={5} auto
             />
@@ -603,7 +632,11 @@ function BrushManager({ brushIndex, tileIndex, aliasIndex, animationIndex, tiles
             <EntityManager
                 emptyText="No brushes defined. Add new one"
                 renderTitle={index => <Block padded shorten>{brushIndex.getEntityValue(index)}</Block>}
-                addOp={newBrush} editOp={editBrush} onDoubleClick={editBrush}
+
+                addOp={newBrush} delete
+                editOp={({ marked }) => editBrush(marked[0])}
+
+                onDoubleClick={editBrush}
                 filter titleHeight={titleHeight} minWidth={100}
                 entityIndex={brushIndex} maxZoom={5} auto
             />
@@ -650,14 +683,28 @@ function EventManager({ eventIndex, tileIndex, editEvent }) {
             }
         });
     }
+
+    const deleteEvents = ({ marked }) => {
+        const indices = [ ...marked ];
+        const plan = eventIndex.getDeletePlan(indices);
+        eContext.doAction(
+            () => {
+                eventIndex.doDeletePlan(plan, eCtxRef.current.selection);
+            },
+            () => {
+                eventIndex.undoDeletePlan(plan, eCtxRef.current.selection);
+            }
+        );
+    }
     return (
         <>
             <EntityManager
                 empty="No event defined. Add new one"
                 renderTitle={index => <Block padded shorten>{eventIndex.getEntityValue(index)}</Block>}
                 filter titleHeight={titleHeight} minWidth={100}
-                editOp={editEvent} onDoubleClick={editEvent}
-                addOp={addEvent}
+
+                editOp={({ marked }) => editEvent(marked[0])}
+                deleteOp={deleteEvents} addOp={addEvent} onDoubleClick={editEvent}
                 entityIndex={eventIndex} maxZoom={5} auto
             />
             <NewEventModal.content name="New Event">
