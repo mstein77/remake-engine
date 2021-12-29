@@ -3473,6 +3473,32 @@ function useDebugMount(name) {
     }, []);
 }
 
+function useWatcher(name) {
+    const watchRef = useRef(null);
+
+    return ( ...props ) => {
+        const watch = watchRef.current;
+        let changed = true;
+        if (!watch) {
+            watchRef.current = [ ...props ]
+        } else {
+            changed = false;
+            let i = 0;
+            while (i < props.length) {
+                if (watch[i] !== props[i]) {
+                    changed = true;
+                    break;
+                }
+                i++;
+            }
+        }
+        if (changed) {
+            d('WATCHER:', name, '->', ...props );
+            watchRef.current = props;
+        }
+    }
+}
+
 export {
     AvailContext,
     AvailContextProvider,
@@ -3529,5 +3555,6 @@ export {
     useCachedState,
     useDebugMount,
     useAnimationPlayers,
-    useFocusElements
+    useFocusElements,
+    useWatcher
 }

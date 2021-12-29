@@ -991,7 +991,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             {id: 'edit', icon: 'edit', can: ({ active }) => active !== null},
             {id: 'add', icon: 'add', can: () => false},
             {id: 'delete', icon: 'delete', can: () => false},
-            {id: 'toggle', icon: 'account_tree', can: ({ active }) => active !== null && !tree[active].leaf}
+            {id: 'toggle', icon: 'account_tree', can: ({ active }) => active !== null && tree[active].children > 0}
         ];
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
@@ -1004,18 +1004,13 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
         active,
         setActive
     });
-    let lastLevel = null;
     let minLevel = null;
-    const nodeEnd = [];
-    for (let i = tree.length - 1; i >= 0; i--) {
-        const node = tree[i];
-        const currLevel = node.level;
-        nodeEnd.unshift(
-            minLevel === null || currLevel < minLevel ||
-            (currLevel >= minLevel && currLevel > lastLevel)
-        );
-        lastLevel = currLevel;
-        minLevel = minLevel === null ? currLevel : Math.min(currLevel, minLevel);
+    const end = [];
+    for (let node of tree) {
+        minLevel = minLevel === null ? node.level : Math.min(node.level, minLevel);
+        if (node.level >= end.length) {
+            end.push(false)
+        }
     }
     const height = 45;
 
@@ -1038,19 +1033,21 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
 
     const nodes = [];
     let i = -1;
-    // TODO
-    const end = [false, false, false, false];
-
     let closedLevel = null;
     for (let node of tree) {
         i++
-        if (node.level === closedLevel) {
-            closedLevel = null
+        if (node.level <= closedLevel) {
+            closedLevel = null;
         }
         const indention = [];
-        const isEnd = nodeEnd[i];
+        const isEnd = node.last;
         if (isEnd) {
-            end[node.level] = true
+            end[node.level] = true;
+        }
+        let j = node.level + 1;
+        while (j < end.length) {
+            end[j] = false;
+            j++;
         }
         for (let l = 0; l < node.level; l++) {
             indention.push(
@@ -1060,7 +1057,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             );
         }
         const curr = i;
-        const elem = node.leaf ?
+        const elem = node.children === 0 ?
             <Icon size={12} className="border-color" name="square" /> :
             <Block center="h" border="1" onClick={e => {props.toggleOp({ ...paramsRef.current, active: curr}); e.stopPropagation()}}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
 

@@ -4,7 +4,8 @@ import {
     Icon,
     Kbd,
     Section,
-    Toolbar, useCssProps, WindowContext
+    Toolbar, useCssProps, WindowContext,
+    useWatcher
 } from "../components/BasicComponents";
 import React, { Fragment, useContext, useMemo, useRef, useState } from "react";
 import {Object3D, Scene, Scene3DCanvas} from "../components/WebGLComponents";
@@ -370,7 +371,7 @@ function Panes3D(props) {
     )
 }
 
-function Panes3DInner({ elemsRef, active, mode, game }) {
+function Panes3DInner({ elemsRef, active, mode }) {
     const aContext = useContext(AvailContext);
 
     const cursorRef = useRef(null);
@@ -380,7 +381,6 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
 
     const steps = 25;
     const start = -1.15;
-    const end = 1.15;
     const delay = 0;
 
     const zDistStart = -0.0001;
@@ -656,7 +656,6 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
             const revPane = scene.addObject(revObj, [startX, -target, zStart - (i * zDist)], revRotate);
             const yStart = target;
             const yEnd = -target;
-
             panes.push({
                 active: i === 0,
                 up: true,
@@ -684,9 +683,10 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
         const revMarker = scene.addObject(new Cursor3D({uMirror: 1}), [0.0, -target, 0.0], revRotate);
         revMarker.setColor(activeBgRgb, 'marker');
 
+        d('PANES...', panes);
         scene.animate((gl, frame) => {
             const { active, rotX, rotY, rotZ, posX, posY, posZ, scale, height, mPerc,
-                activeBgRgb, cursorBgRgba, zDist, wait4zSplit } = propsRef.current;
+                activeBgRgb, cursorBgRgba } = propsRef.current;
 
             const moveY = (height / 2 - (height * mPerc / 100));
 
@@ -746,11 +746,11 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
             for(let item of panes) {
                 i++;
                 if (allUpRef.current) {
-                    if (closedLevel !== null && item.level < closedLevel) {
+                    if (closedLevel !== null && item.level <= closedLevel) {
                         closedLevel = null
                     }
                     if (closedLevel === null) {
-                        if (!item.elem.closed) {
+                        if (!item.elem.closed || item.zPos === 0) {
                             if (item.zDir !== 1) {
                                 item.zDir = 1
                             }
@@ -808,31 +808,23 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
                 } else if (item.up === false && (cursorPos === null || i >= cursorPos)) {
                     item.up = true
                 }
-                if ((item.up && item.index >= steps) || (!item.up && item.index === -1)) {
+
+                if ((item.up && item.index >= steps - 1) || (!item.up && item.index === 0)) {
                     continue;
                 }
                 allUp = false;
 
-                const currY = item.index >= 0 ? item.yPositions[item.index] :  -1;
-                item.pane.setPositionY(currY);
-                item.revPane.setPositionY(-currY)
                 if (item.up) {
                     item.index++
                 } else {
                     item.index--
                 }
+                const currY = item.yPositions[item.index];
+                item.pane.setPositionY(currY);
+                item.revPane.setPositionY(-currY)
             }
             if (allUp) {
                 allUpRef.current = true
-/*
-                if (wait4zSplit === -1) {
-                    setWait4zSplit(0);
-                } else if (wait4zSplit < zPositions.length) {
-                    setZDist(zPositions[wait4zSplit]);
-                    setWait4zSplit(wait4zSplit + 1)
-                }
-
- */
             }
             return true;
         });
@@ -907,51 +899,75 @@ function Panes3DInner({ elemsRef, active, mode, game }) {
     );
 }
 
-function getAreaNodes(dim, areas, level = 1, nodes = [], offset = {x: 0, y: 0}) {
-    const revAreas = reverse(areas);
-    for(let area of revAreas) {
-        if (area.axis) {
-            nodes.push({level, type: 'areas', offX: offset.x, offY: offset.y, closed: false, width: dim.width, height: dim.height, name: area.axis.toUpperCase() + ' Split', axis: area.axis});
-            const subAreas = area.areas;
-            let newWidth = dim.width;
-            let newHeight = dim.height;
-            let i = 0;
-            let offX = offset.x;
-            let offY = offset.y;
-            for(let subArea of subAreas) {
-                if (area.axis === 'X') {
-                    newWidth = area.areaSizes[i]
-                } else {
-                    newHeight = area.areaSizes[i]
-                }
-                if (subArea.length === 0) {
-                    nodes.push({level: level + 1, leaf: true, type: 'pane', offX, offY, width: newWidth, height: newHeight, name: 'EmptyPane'});
-                } else {
-                    getAreaNodes({width: newWidth, height: newHeight}, subArea, level + 1, nodes, {x: offX, y: offY});
-                }
-                if (area.axis === 'X') {
-                    offX += newWidth
-                } else {
-                    offY += newHeight
-                }
-                i++
-            }
-        } else if (area.panes) {
-            const panes = area.panes;
-            for (let pane of panes) {
-                nodes.push({
-                    level: level, type: 'pane',
-                    name: Object.getPrototypeOf(pane).constructor.name,
-                    width: pane.viewPortDim.x,
-                    height: pane.viewPortDim.y,
-                    offX: offset.x,
-                    offY: offset.y,
-                    id: pane.id, leaf: true, pane: pane
-                })
+function getAreaNode(nodes, panes, items, props, level = 1) {
+    if (panes) {
+        for (let pane of items) {
+            nodes.push({
+                level,
+                type: 'pane',
+                name: Object.getPrototypeOf(pane).constructor.name,
+                width: pane.viewPortDim.x,
+                height: pane.viewPortDim.y,
+                offX: props.x,
+                offY: props.y,
+                children: 0,
+                last: true,
+                id: pane.id,
+                pane: pane
+            });
+        }
+        return items.length
+    }
+
+    // no panes we have areas
+    let added = 0;
+
+    let offX = props.x;
+    let offY = props.y;
+    let width = props.width;
+    let height = props.height;
+
+    let i = -1;
+    for(let item of items) {
+        i++;
+        if (props.sizes) {
+            if (props.axis === 'X') {
+                width = props.sizes[i]
+            } else {
+                height = props.sizes[i]
             }
         }
+        let subNodes = 0;
+        let parentNode = null;
+        let parent = { level, width, height, offX, offY, last: i === items.length - 1, closed: false };
+        let childProps = { width, height, x: offX, y: offY };
+        if (Array.isArray(item)) {
+            parentNode = { ...parent, type: 'area', name: 'Area' };
+            nodes.push(parentNode);
+            subNodes = getAreaNode(nodes,false, reverse(item), childProps, level + 1);
+        } else if (item.axis) {
+            parentNode = { ...parent, type: 'areas', name: item.axis + ' Split' };
+            nodes.push(parentNode);
+            subNodes = getAreaNode(nodes,false, item.areas, { ...childProps, axis: item.axis, sizes: item.areaSizes }, level + 1);
+        } else if (item.panes) {
+            parentNode = { ...parent, type: 'area', name: 'Area' };
+            nodes.push(parentNode);
+            subNodes = getAreaNode(nodes,true, reverse(item.panes), childProps, level + 1);
+        }
+        if (parentNode !== null) {
+            parentNode.children = subNodes;
+            subNodes++
+        }
+        if (props.sizes) {
+            if (props.axis === 'X') {
+                offX += width
+            } else {
+                offY += height
+            }
+        }
+        added += subNodes
     }
-    return nodes;
+    return added
 }
 
 function getResourceIndexByPane(resources, pane) {
@@ -993,9 +1009,13 @@ function ScreenEditor({ resources, setSelected, ...props }) {
         const screen = game.getCurrentScreen();
         const nodes = [];
 
-        nodes.push({type: 'Screen', name: screen.id, level: 0, leaf: false, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
-        nodes.push( ...getAreaNodes({width: game.width, height: game.height}, screen.areas) )
+        d('SCREEN-AREAS', screen.areas);
+        const innerNodes = [];
+        getAreaNode(innerNodes,false, reverse(screen.areas), {width: game.width, height: game.height, x: 0, y: 0});
+        nodes.push({type: 'Screen', name: screen.id, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
+        nodes.push( ...innerNodes );
 
+        d('TREE', nodes);
         // assign planes
         let plane = 0;
         for (let node of nodes) {
@@ -1014,7 +1034,7 @@ function ScreenEditor({ resources, setSelected, ...props }) {
                     elem
                 ) ;
                 plane++
-            } else if (node.type === 'areas') {
+            } else {
                 const elem = {texture: null};
                 elem.offX = node.offX;
                 elem.offY = node.offY;
@@ -1029,6 +1049,7 @@ function ScreenEditor({ resources, setSelected, ...props }) {
                 plane++
             }
         }
+        d('PLANES', planesRef.current);
         return nodes
     }, []);
 

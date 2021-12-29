@@ -4681,9 +4681,14 @@ class BufferedTilesPane {
     }
 
     getPreview() {
+        const preview = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = preview.getContext('2d');
+        const posLeft = this.scrollPosOffset.x + this.scrollPos.x;
+        const posTop = this.scrollPosOffset.y + this.scrollPos.y;
+        ctx.drawImage(this.buffers.buffers[this.buffers.active].elem, posLeft, posTop, preview.width, preview.height, 0, 0, preview.width, preview.height);
         return {
             type: 'plane',
-            texture: this.buffers.buffers[this.buffers.active].elem.toDataURL('image/png'),
+            texture: preview.toDataURL('image/png'),
             color: null,
             width: this.viewPortDim.x,
             height: this.viewPortDim.y
