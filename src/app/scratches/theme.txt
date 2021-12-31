@@ -132,26 +132,24 @@ const divRef = useRef(null);
 
    => reg:body
 ---------------------------
- * Z-Achsen-Focus immer auf erstes sichtbares Element
 
+---------------------------
+ * Focus-Items um Tree-Navi erweitern (collapsing)
+ - Focus-Items left/right-Arrow für Toggling
 
- - Knoten-Beschreibung überarbeiten
  - planes VS nodes überarbeiten
  - Tree Node-Rendering refactorn
+ - shift-space: toggle
+
+ - Knoten-Beschreibung überarbeiten
+
  - Collapser-Hover (Button?)
- - Focus-Items um Tree-Navi erweitern (collapsing)
- - Focus-Items left/right-Arrow für Toggling
- - Rahmen ausblenden falls collapsed item > 1
+ ? Rahmen ausblenden falls collapsed item > 1
  - ScrollArea-Offset berücksichtigen
- - 2D/3D-Persistierung
  - Collapse-Persistierung
- - Immer Schnell->Langsam für Collapse falls am Endpunkt
  - Zoom abhängig vom Darstellungs-Bereich
  - Collapse-Animation für Tree
- - 3D-Mouse-Rotation
- - RightClick: Toggle (ebenfalls shift-space)
  - Pane-Only-View
- - Mirror-Toggling
  - Cursor-Marker: Seitbewegung
 ---------------------------
  Urlaubs-Fahrplan:

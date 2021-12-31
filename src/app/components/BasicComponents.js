@@ -3541,6 +3541,7 @@ export {
     HotKeySkipValues,
     FontMetrics,
     JsonView,
+    Separator,
 
     useModal,
     useComponentUpdate,

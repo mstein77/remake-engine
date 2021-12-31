@@ -1,22 +1,187 @@
-import {
-    AvailContext,
-    AvailContextProvider,
-    Icon,
-    Kbd,
-    Section,
-    Toolbar, useCssProps, WindowContext,
-    useWatcher
-} from "../components/BasicComponents";
-import React, { Fragment, useContext, useMemo, useRef, useState } from "react";
-import {Object3D, Scene, Scene3DCanvas} from "../components/WebGLComponents";
-import { Block, Grid, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
-import { Button, Number, Radio } from "../components/FormComponents";
+import { AvailContext, EditorCtx, AvailContextProvider, Section, Toolbar, useCssProps, Separator, useWatcher, WindowContext, useCachedState } from "../components/BasicComponents";
+import React, { useContext, useMemo, useRef, useState } from "react";
+import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents";
+import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
+import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
 import { TreeStack } from "../components/EntityComponents";
-import { d, reverse, getSinePath, hex2rgbaArray} from "../helper/helper";
+import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper";
 import { useTracker, TrackingCtx } from "../components/GridComponents";
 
-const OD = 1.1;
-const ID = 1.0;
+const coordTextureShader = {
+    id: 'coordTexture',
+    source: `
+                attribute vec4 aVertexPosition;
+                attribute vec2 aTextureCoord;
+            
+                uniform mat4 uModelMatrix;
+                uniform mat4 uViewMatrix;
+                uniform mat4 uProjectionMatrix;
+                uniform mat4 uOriginMatrix;
+            
+                varying highp vec2 vTextureCoord;
+                varying highp float yDist;
+
+                highp vec4 zeroVector; 
+                             
+                void main(void) {
+                  zeroVector = aVertexPosition;
+                  zeroVector = uModelMatrix * zeroVector;
+
+                  gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
+                  vTextureCoord = aTextureCoord;
+                  yDist = zeroVector.y;
+                }
+              `,
+    attribs: [
+        {name: 'aVertexPosition', source: 'positions'},
+        {name: 'aTextureCoord', source: 'texture'}
+    ],
+    uniforms: [
+        {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
+    ]
+};
+
+const coordColorShader = {
+    id: 'coordColor',
+    source: `
+                attribute vec4 aVertexPosition;
+                attribute vec4 aVertexColor;
+            
+                uniform mat4 uModelMatrix;
+                uniform mat4 uViewMatrix;
+                uniform mat4 uProjectionMatrix;
+                uniform mat4 uOriginMatrix;
+           
+                varying highp float yDist;                
+                varying lowp vec4 vColor;
+                             
+                highp vec4 zeroVector; 
+                highp vec4 compVector;
+
+                void main(void) {
+                  zeroVector = aVertexPosition;
+                  zeroVector = uModelMatrix * zeroVector;
+                
+                  compVector = uModelMatrix * 
+                    aVertexPosition;
+                  gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * 
+                    aVertexPosition;
+                  vColor = aVertexColor;
+                  yDist = zeroVector.y;
+                }
+              `,
+    attribs: [
+        {name: 'aVertexPosition', source: 'positions'},
+        {name: 'aVertexColor', source: 'colors'}
+    ],
+    uniforms: [
+        {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
+        {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
+    ]
+};
+
+const textureShader = {
+    id: 'texture',
+    source: `
+                varying highp vec2 vTextureCoord;
+                varying highp float yDist;
+
+                uniform sampler2D uSampler;
+                uniform int uMirror;
+            
+                void main(void) {
+                  if (uMirror > 0) {
+                      if (yDist > 0.0) {
+                          discard;
+                      } else {
+                          gl_FragColor = texture2D(uSampler, vTextureCoord);
+                          gl_FragColor = vec4(gl_FragColor.rgb, 0.65 * gl_FragColor.a);
+                      }
+                  } else {
+                      if (yDist <= 0.0) {
+                          discard;
+                      } else {
+                          gl_FragColor = texture2D(uSampler, vTextureCoord);
+                      }
+                  }
+                }
+            `,
+    uniforms: [
+        {name: 'uMirror', func: 'uniform1i', default: 0},
+        {name: 'uSampler', func: 'uniform1i'},
+    ]
+};
+
+const colorShader = {
+    id: 'color',
+    source: `
+                varying lowp vec4 vColor;
+                varying highp float yDist;
+                uniform int uMirror;
+                              
+                void main(void) {
+                  if (uMirror > 0) {
+                      if (yDist > 0.0) {
+                          discard;
+                      } else {
+                          gl_FragColor = vec4(vColor.rgb, 0.65 * vColor.a);
+                      }
+                  } else {
+                      if (yDist <= 0.0) {
+                          discard;
+                      } else {
+                          gl_FragColor = vColor;
+                      }
+                  }
+                }
+            `,
+    uniforms: [
+        {name: 'uMirror', func: 'uniform1i', default: 0},
+    ]
+};
+
+const colorInvertShader = {
+    id: 'colorInvert',
+    source: `
+                varying lowp vec4 vColor;
+                varying highp float yDist;
+                uniform int uMirror;
+                
+                highp vec4 iVector; 
+                             
+                void main(void) {
+                  if (uMirror > 0) {
+                      if (yDist > 0.0) {
+                          discard;
+                      } else {
+                          iVector = vec4(vColor.rgb, 0.65 * vColor.a);
+                          iVector.r = iVector.r;
+                          iVector.g = 1.0 - iVector.g;
+                          iVector.b = 1.0 - iVector.b;
+                          gl_FragColor = iVector;
+                      }
+                  } else {
+                      if (yDist <= 0.0) {
+                          discard;
+                      } else {
+                          iVector = vColor;
+                          iVector.r = iVector.r;
+                          iVector.g = 1.0 - iVector.g;
+                          iVector.b = 1.0 - iVector.b;
+                          gl_FragColor = iVector;
+                      }
+                  }
+                }
+            `,
+    uniforms: [
+        {name: 'uMirror', func: 'uniform1i', default: 0},
+    ]
+};
 
 const staticJobs = {};
 
@@ -354,25 +519,31 @@ class ColorPlane3D extends Object3D {
     }
 }
 
+const MODE_2D = 0;
+const MODE_3D = 1;
 
 function Panes3D(props) {
-    const [ mode, setMode ] = useState('3d');
+    const [ mode, setMode ] = useCachedState('page', '3d', true, 'number');
+    const [ mirror, setMirror ] = useCachedState('page', 'mirror', MODE_3D, 'bool');
 
-    const options = [{id: '2d', name: '2D'}, {id: '3d', name: '3D'}];
+    const options = [{id: MODE_2D, name: '2D'}, {id: MODE_3D, name: '3D'}];
     return (
         <Stack full vertical borders>
             <Toolbar>
-                <Radio name="View:" options={options} value={mode} padded="h" set={setMode}></Radio>
+                <Radio name="View:" options={options} value={mode} padded="h" set={setMode} />
+                <Separator />
+                <Checkbox name="Mirror" value={mirror} set={setMirror} />
             </Toolbar>
             <AvailContextProvider>
-                <Panes3DInner mode={mode} { ...props } />
+                <Panes3DInner mode={mode} mirror={mirror} { ...props } />
             </AvailContextProvider>
         </Stack>
     )
 }
 
-function Panes3DInner({ elemsRef, active, mode }) {
+function Panes3DInner({ elemsRef, active, mode, mirror }) {
     const aContext = useContext(AvailContext);
+    const wContext = useContext(WindowContext);
 
     const cursorRef = useRef(null);
     useTracker('tree', pos => cursorRef.current = pos.y);
@@ -401,10 +572,16 @@ function Panes3DInner({ elemsRef, active, mode }) {
     const [ zDist, setZDist ] = useState(zDistStart);
     const [ controls, setControls ] = useState(false);
 
+    const zTargetRef = useRef({
+        index: null,
+        last: posZ,
+        points: []
+    });
+
     if (currMode !== mode) {
         setCurrMode(mode)
     }
-    if (currMode === '2d') {
+    if (currMode === MODE_2D) {
         posX = 0;
         posY = 0;
         posZ = 0;
@@ -419,9 +596,12 @@ function Panes3DInner({ elemsRef, active, mode }) {
     }, []);
     const alphaRef = useRef({up: true, pos: 0});
 
-    const maxPosZ = 40;
-    const zPositions = useMemo(() => {
-        return getSinePath(zDistStart, zDistEnd, maxPosZ);
+    const maxPosZ = 25;
+    const pushPositions = useMemo(() => {
+        return getSinePath(zDistStart, zDistEnd, maxPosZ)
+    }, []);
+    const pullPositions = useMemo(() => {
+        return getSinePath(zDistEnd, zDistStart, maxPosZ)
     }, []);
 
     const allUpRef = useRef(false);
@@ -430,184 +610,16 @@ function Panes3DInner({ elemsRef, active, mode }) {
     const propsRef = useRef(null);
     propsRef.current = {
         active, rotX, rotY, rotZ, posX, posY, posZ, scale, zDist, wait4zSplit,
-        activeBgRgb, cursorBgRgba, height: aContext.height, mPerc
+        activeBgRgb, cursorBgRgba, height: aContext.height, mPerc, mirror
     };
-    const mirror = 0.65;
-
     const scene = useMemo(() => {
         const scene = new Scene();
-        scene.addVertexShader({
-            id: 'coordTexture',
-            source: `
-                attribute vec4 aVertexPosition;
-                attribute vec2 aTextureCoord;
-            
-                uniform mat4 uModelMatrix;
-                uniform mat4 uViewMatrix;
-                uniform mat4 uProjectionMatrix;
-                uniform mat4 uOriginMatrix;
-            
-                varying highp vec2 vTextureCoord;
-                varying highp float yDist;
+        scene.addVertexShader(coordTextureShader);
+        scene.addVertexShader(coordColorShader);
+        scene.addFragmentShader(textureShader);
+        scene.addFragmentShader(colorShader);
 
-                highp vec4 zeroVector; 
-                             
-                void main(void) {
-                  zeroVector = aVertexPosition;
-                  zeroVector = uModelMatrix * zeroVector;
-
-                  gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
-                  vTextureCoord = aTextureCoord;
-                  yDist = zeroVector.y;
-                }
-              `,
-            attribs: [
-                {name: 'aVertexPosition', source: 'positions'},
-                {name: 'aTextureCoord', source: 'texture'}
-            ],
-            uniforms: [
-                {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
-            ]
-        });
-        scene.addVertexShader({
-            id: 'coordColor',
-            source: `
-                attribute vec4 aVertexPosition;
-                attribute vec4 aVertexColor;
-            
-                uniform mat4 uModelMatrix;
-                uniform mat4 uViewMatrix;
-                uniform mat4 uProjectionMatrix;
-                uniform mat4 uOriginMatrix;
-           
-                varying highp float yDist;                
-                varying lowp vec4 vColor;
-                             
-                highp vec4 zeroVector; 
-                highp vec4 compVector;
-
-                void main(void) {
-                  zeroVector = aVertexPosition;
-                  zeroVector = uModelMatrix * zeroVector;
-                
-                  compVector = uModelMatrix * 
-                    aVertexPosition;
-                  gl_Position = uProjectionMatrix * uOriginMatrix * uViewMatrix * uModelMatrix * 
-                    aVertexPosition;
-                  vColor = aVertexColor;
-                  yDist = zeroVector.y;
-                }
-              `,
-            attribs: [
-                {name: 'aVertexPosition', source: 'positions'},
-                {name: 'aVertexColor', source: 'colors'}
-            ],
-            uniforms: [
-                {name: 'uModelMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uViewMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uProjectionMatrix', func: 'uniformMatrix4fv'},
-                {name: 'uOriginMatrix', func: "uniformMatrix4fv"}
-            ]
-        });
-        scene.addFragmentShader({
-            id: 'texture',
-            source: `
-                varying highp vec2 vTextureCoord;
-                varying highp float yDist;
-
-                uniform sampler2D uSampler;
-                uniform int uMirror;
-            
-                void main(void) {
-                  if (uMirror > 0) {
-                      if (yDist > 0.0) {
-                          discard;
-                      } else {
-                          gl_FragColor = texture2D(uSampler, vTextureCoord);
-                          gl_FragColor = vec4(gl_FragColor.rgb, ${mirror} * gl_FragColor.a);
-                      }
-                  } else {
-                      if (yDist <= 0.0) {
-                          discard;
-                      } else {
-                          gl_FragColor = texture2D(uSampler, vTextureCoord);
-                      }
-                  }
-                }
-            `,
-            uniforms: [
-                {name: 'uMirror', func: 'uniform1i', default: 0},
-                {name: 'uSampler', func: 'uniform1i'},
-            ]
-        });
-        scene.addFragmentShader({
-            id: 'color',
-            source: `
-                varying lowp vec4 vColor;
-                varying highp float yDist;
-                uniform int uMirror;
-                              
-                void main(void) {
-                  if (uMirror > 0) {
-                      if (yDist > 0.0) {
-                          discard;
-                      } else {
-                          gl_FragColor = vec4(vColor.rgb, ${mirror} * vColor.a);
-                      }
-                  } else {
-                      if (yDist <= 0.0) {
-                          discard;
-                      } else {
-                          gl_FragColor = vColor;
-                      }
-                  }
-                }
-            `,
-            uniforms: [
-                {name: 'uMirror', func: 'uniform1i', default: 0},
-            ]
-        });
-
-        scene.addFragmentShader({
-            id: 'colorInvert',
-            source: `
-                varying lowp vec4 vColor;
-                varying highp float yDist;
-                uniform int uMirror;
-                
-                highp vec4 iVector; 
-                             
-                void main(void) {
-                  if (uMirror > 0) {
-                      if (yDist > 0.0) {
-                          discard;
-                      } else {
-                          iVector = vec4(vColor.rgb, ${mirror} * vColor.a);
-                          iVector.r = iVector.r;
-                          iVector.g = 1.0 - iVector.g;
-                          iVector.b = 1.0 - iVector.b;
-                          gl_FragColor = iVector;
-                      }
-                  } else {
-                      if (yDist <= 0.0) {
-                          discard;
-                      } else {
-                          iVector = vColor;
-                          iVector.r = iVector.r;
-                          iVector.g = 1.0 - iVector.g;
-                          iVector.b = 1.0 - iVector.b;
-                          gl_FragColor = iVector;
-                      }
-                  }
-                }
-            `,
-            uniforms: [
-                {name: 'uMirror', func: 'uniform1i', default: 0},
-            ]
-        });
+        scene.addFragmentShader(colorInvertShader);
         scene.setZNear(-10000);
         scene.setZFar(10000);
         scene.setOrthognal();
@@ -664,6 +676,11 @@ function Panes3DInner({ elemsRef, active, mode }) {
                 yPositions: getSinePath(yStart, yEnd, steps),
                 zPos: elem.closed ? maxPosZ - 1 : 0,
                 zDir: (i === 0 || elem.closed) ? 0 : 1,
+
+                action: 'push',
+                forward: true,
+                actionPos: 0,
+
                 level: elem.level,
                 delay: delay * i,
                 pane,
@@ -683,9 +700,8 @@ function Panes3DInner({ elemsRef, active, mode }) {
         const revMarker = scene.addObject(new Cursor3D({uMirror: 1}), [0.0, -target, 0.0], revRotate);
         revMarker.setColor(activeBgRgb, 'marker');
 
-        d('PANES...', panes);
         scene.animate((gl, frame) => {
-            const { active, rotX, rotY, rotZ, posX, posY, posZ, scale, height, mPerc,
+            const { active, rotX, rotY, rotZ, posX, posY, posZ, scale, height, mPerc, mirror,
                 activeBgRgb, cursorBgRgba } = propsRef.current;
 
             const moveY = (height / 2 - (height * mPerc / 100));
@@ -712,6 +728,7 @@ function Panes3DInner({ elemsRef, active, mode }) {
                         let newAlpha = hex2rgbaArray(cursorBgRgba)[3] * alphaBlink[alpha.pos];
                         cursorColors[i] = newAlpha
                     }
+                    revCursor.setEnabled(mirror)
                 }
                 if (active === null) {
                     marker.disable();
@@ -722,6 +739,7 @@ function Panes3DInner({ elemsRef, active, mode }) {
                         let newAlpha = alphaBlink[alpha.pos];
                         markerColors[i] = newAlpha
                     }
+                    revMarker.setEnabled(mirror)
                 }
                 if (alpha.up) {
                     alpha.pos++;
@@ -738,6 +756,9 @@ function Panes3DInner({ elemsRef, active, mode }) {
                 }
             }
 
+            const cursorPos = cursorRef.current;
+            let firstZ = null;
+
             let allUp = true;
             let i = -1;
             let lastZ = zStart;
@@ -745,43 +766,82 @@ function Panes3DInner({ elemsRef, active, mode }) {
 
             for(let item of panes) {
                 i++;
+                const actionPositions = item.action === 'push' ?
+                    pushPositions : pullPositions;
+                let zIndex = 0;
+
                 if (allUpRef.current) {
+
                     if (closedLevel !== null && item.level <= closedLevel) {
                         closedLevel = null
                     }
-                    if (closedLevel === null) {
-                        if (!item.elem.closed || item.zPos === 0) {
-                            if (item.zDir !== 1) {
-                                item.zDir = 1
+                    if (closedLevel === null && item.elem.closed) {
+                        closedLevel = item.level;
+                    }
+                    const closed = closedLevel !== null && item.level > closedLevel;
+
+                    if (closed && !(item.actionPos === null && item.action === 'push')) {
+                        if (item.actionPos === null) {
+                            item.actionPos = 0
+                        } else {
+                            if (item.action === 'push' && item.forward) {
+                                item.forward = false
+                            } else if (item.action === 'pull' && !item.forward) {
+                                item.forward = true
+                            }
+                        }
+                    }
+                    if (!closed && !(item.actionPos === null && item.action === 'pull')) {
+                        if (item.actionPos === null) {
+                            item.actionPos = 0
+                        } else {
+                            if (item.action === 'pull' && item.forward) {
+                                item.forward = false
+                            } else if (item.action === 'push' && !item.forward) {
+                                item.forward = true
+                            }
+                        }
+                    }
+                    if (item.actionPos !== null) {
+                        let newIndex = item.actionPos;
+                        let update = true;
+                        if (item.forward) {
+                            newIndex++;
+                            if (newIndex === actionPositions.length) {
+                                update = false;
+                                zIndex = item.actionPos;
+                                item.actionPos = null;
+                                item.action = item.action === 'push' ? 'pull' : 'push';
                             }
                         } else {
-                            closedLevel = item.level
-                        }
-                        if (item.zDir !== 0) {
-                            const newPosZ = item.zPos + item.zDir;
-                            if (newPosZ < 0 || newPosZ >= zPositions.length) {
-                                item.zDir = 0
-                            } else {
-                                item.zPos = newPosZ
+                            newIndex--;
+                            if (newIndex < 0) {
+                                update = false
+                                zIndex = item.actionPos;
+                                item.actionPos = null;
+                                item.forward = true;
                             }
                         }
-                    } else {
-                        if (item.zPos > 0) {
-                            item.zPos--;
+                        if (update) {
+                            zIndex = newIndex
+                            item.actionPos = newIndex
                         }
                     }
                 }
-                const posZ = lastZ - zPositions[item.zPos];
+                const posZ = lastZ - (i === 0 ? 0 : actionPositions[zIndex]);
+                if (firstZ === null && (i === cursorPos || cursorPos === null)) {
+                    firstZ = cursorPos === null ? 0.0 : posZ
+                }
                 lastZ = posZ;
                 item.pane.setPositionZ(posZ);
                 item.revPane.setPositionZ(posZ);
+                item.revPane.setEnabled(mirror);
 
                 const {width: pWidth, height: pHeight} = item.pane.getDim();
-                const cursorPos = cursorRef.current;
                 const pos = item.pane.getPosition();
                 if (i === cursorPos && i !== active) {
                     cursor.enable();
-                    revCursor.enable();
+                    revCursor.setEnabled(mirror);
                     cursor.setDim(pWidth, pHeight);
                     revCursor.setDim(pWidth, pHeight);
                     cursor.setColor(cursorBgRgba, 'cursor');
@@ -791,7 +851,7 @@ function Panes3DInner({ elemsRef, active, mode }) {
                 }
                 if (i === active) {
                     marker.enable();
-                    revMarker.enable();
+                    revMarker.setEnabled(mirror);
                     marker.setDim(pWidth, pHeight);
                     revMarker.setDim(pWidth, pHeight);
                     marker.setColor(activeBgRgb, 'marker');
@@ -823,6 +883,23 @@ function Panes3DInner({ elemsRef, active, mode }) {
                 item.pane.setPositionY(currY);
                 item.revPane.setPositionY(-currY)
             }
+
+            const targetZ = -1.15 - firstZ;
+
+            const target = zTargetRef.current;
+            if (target.last !== targetZ) {
+                target.index = 0;
+                target.points = getSinePath(posZ, targetZ, 15);
+                target.last = targetZ
+            }
+            if (target.index !== null) {
+                setPosZ(target.points[target.index]);
+                if (target.index < target.points.length - 1) {
+                    target.index++
+                }
+            }
+            scene.setViewPositionZ(posZ);
+
             if (allUp) {
                 allUpRef.current = true
             }
@@ -850,6 +927,23 @@ function Panes3DInner({ elemsRef, active, mode }) {
             i++
         }
     }
+
+    const rotateByMouseMove = e => {
+        wContext.startExclusiveMode('rotate3d', 'grabbing');
+        const anchor = {
+            x: e.clientX,
+            rotY: propsRef.current.rotY,
+            y: e.clientY,
+            rotX: propsRef.current.rotX
+        };
+        wContext.addEventListener('mousemove', e => {
+            setRotY(clamp(0, anchor.rotY - (anchor.x - e.clientX), 90));
+            setRotX(clamp(270, anchor.rotX - (anchor.y - e.clientY), 360))
+        });
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('rotate3d')
+        })
+    }
     return (
         <Overlays width={width} height={height}>
             <Overlay width={width} height={height}>
@@ -859,11 +953,12 @@ function Panes3DInner({ elemsRef, active, mode }) {
                 />
             </Overlay>
 
-            {mode === '3d' &&
+            {mode === MODE_3D &&
                 <Overlay width={width} height={height}>
+                    <Block full cursor="grab" onLeftClick={rotateByMouseMove}>
                     {controls ?
                         <Stack vertical full>
-                            <Block full="v"/>
+                            <Block full="v" />
                             <Block full="h">
                                 <Stack full="h" className="primary-bg primary-color" padded border={DIR.V}>
                                     <Block full centerItems="v" className="more">Controls</Block>
@@ -893,6 +988,7 @@ function Panes3DInner({ elemsRef, active, mode }) {
                             <Block padded><Button icon="3d_rotation" padded onClick={() => setControls(true)}/></Block>
                         </Stack>
                     }
+                    </Block>
                 </Overlay>
             }
         </Overlays>
@@ -1059,19 +1155,21 @@ function ScreenEditor({ resources, setSelected, ...props }) {
     };
 
     return (
-        <TrackingCtx object="tree">
-            <Stack full border="1">
-                <Section id="screenTree" name="Screen" full="v" collapse="h" inner area={1} size={250} maxWidth="33%">
-                    <ScreenTree tree={tree} setSelected={setSelected} toggle={toggleNode} active={active} setActive={setActive} resources={resources} />
-                </Section>
+        <EditorCtx id="screenEditor">
+            <TrackingCtx object="tree">
+                <Stack full border="1">
+                    <Section id="screenTree" name="Screen" full="v" collapse="h" inner area={1} size={250} maxWidth="33%">
+                        <ScreenTree tree={tree} setSelected={setSelected} toggle={toggleNode} active={active} setActive={setActive} resources={resources} />
+                    </Section>
 
-                <Section name="Planes" full inner>
-                    <Block full>
-                        <Panes3D active={active === null ? null : tree[active].plane} elemsRef={planesRef}  game={props.game} />
-                    </Block>
-                </Section>
-            </Stack>
-        </TrackingCtx>
+                    <Section name="Planes" full inner>
+                        <Block full>
+                            <Panes3D active={active === null ? null : tree[active].plane} elemsRef={planesRef}  game={props.game} />
+                        </Block>
+                    </Section>
+                </Stack>
+            </TrackingCtx>
+        </EditorCtx>
     )
 }
 

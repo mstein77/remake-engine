@@ -1,30 +1,9 @@
-import React, {useContext, useMemo, useState, useRef, useEffect} from "react";
+import React, { useContext, useMemo, useState, useRef, useEffect } from "react";
 import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex";
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm,
-    PropertyGrid,
-    Section,
-    Toolbar,
-    useModal,
-    useUpdateOnEntityIndexChanges,
-    WindowContext,
-    AvailContextProvider,
-    useMounted,
-    useCssProps,
-    useComponentUpdate, AvailContext
+    PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext
 } from "./BasicComponents";
-import {
-    d,
-    rgb2hex,
-    getEmptyImageData,
-    copy2clipboard,
-    drawCanvasToAvail,
-    getResourceTreeForJsonModel,
-    getRebuildJsonForModel,
-    getCanvasForBitmap,
-    getImageDataForImage,
-    getColorsFromImageData,
-    BitmapPlayer
-} from "../helper/helper";
+import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer } from "../helper/helper";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { DIR, Block, Stack } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker, EntityManager } from "./EntityComponents";

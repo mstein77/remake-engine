@@ -80,6 +80,10 @@ class Object3D {
         this.enabled = true
     }
 
+    setEnabled(value) {
+        this.enabled = value
+    }
+
     isDisabled() {
         return !this.enabled
     }
@@ -276,6 +280,10 @@ class Scene {
 
     setViewPosition(position) {
         this.viewPosition = position
+    }
+
+    setViewPositionZ(value) {
+        this.viewPosition[2] = value
     }
 
     getViewPosition() {

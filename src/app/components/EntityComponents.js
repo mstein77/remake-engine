@@ -1057,9 +1057,10 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             );
         }
         const curr = i;
+        const toggle = e => {props.toggleOp({ ...paramsRef.current, active: curr}); e.stopPropagation()};
         const elem = node.children === 0 ?
             <Icon size={12} className="border-color" name="square" /> :
-            <Block center="h" border="1" onClick={e => {props.toggleOp({ ...paramsRef.current, active: curr}); e.stopPropagation()}}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
+            <Block center="h" border="1" onClick={toggle}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
 
         indention.push(
             <Block key="last" width={18} height={height} full="v">
@@ -1087,7 +1088,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             continue;
         }
         nodes.push(
-            <Stack key={i} tab={i === focusItem} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
+            <Stack key={i} tab={i === focusItem} onRightClick={toggle} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
