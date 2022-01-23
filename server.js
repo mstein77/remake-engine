@@ -287,6 +287,14 @@ app.post('/store', (req, res) => {
     res.json({stored, failed, invalid});
 });
 
+app.post('/setExamples', (req, res) => {
+    let success = false;
+    if(req.body.code) {
+        fs.writeFileSync('./src/app/generated/LayoutExamples.js', req.body.code, 'utf8');
+    }
+    res.json({'done': success});
+});
+
 app.post('/resources', (req, res) => {
     const found = [];
     const notFound = [];

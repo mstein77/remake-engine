@@ -37,7 +37,7 @@ import {
     FiltersSelector,
     GlobalContext,
     useComponentUpdate,
-    EntityManager
+    EntityManager, useExportModal
 } from "./BaseComponents";
 
 import {
@@ -914,7 +914,7 @@ function FontPreview(props) {
                 eContext.addListener(
                     props.editorId,
                     'mouseup',
-                    (e) => {
+                    e => {
                         eContext.removeListener(props.editorId, 'mousemove', moveListener, {capture: false});
                         cContext.setFixCursor(null);
                         setHighlight(false);
@@ -944,7 +944,8 @@ function FontPreview(props) {
                 top={showMarker}
                 left={showMarker}
                 right={showMarker && (pos.x + pos.width < screenX)}
-                size={1}
+                sizeX={1}
+                sizeY={1}
                 width={Math.min(pos.width, screenX - pos.x)}
                 height={Math.min(pos.height, screenY - pos.y)}
                 highlight={highlight}
@@ -1162,8 +1163,6 @@ function ResizeFontForm(props) {
     const previewWidth = Math.max(width, props.font.width);
     const previewHeight = Math.max(height, props.font.height);
 
-
-
     const size = 4;
     const zoom = 4;
     const border = 1;
@@ -1229,6 +1228,7 @@ function ResizeFontForm(props) {
     return (
         <Stack vertical border>
             <Content padded>
+
                 <SelectDimModal.content closeable>
                     <EditorCtx>
                         <BitmapSelector
@@ -1241,6 +1241,7 @@ function ResizeFontForm(props) {
                         />
                     </EditorCtx>
                 </SelectDimModal.content>
+
                 <PropertyGrid>
                     <DimProp name="Old Size:" buttons readOnly
                              x={props.font.width}
@@ -1399,12 +1400,15 @@ function NewIdForm(props) {
 }
 
 function TextPaneEditor(props) {
+
     const context = useContext(GlobalContext);
     const eContext = useContext(EditorContext);
 
     const ResizeFontModal = useModal();
     const NewFontModal = useModal();
     const NewFontIdModal = useModal();
+
+    const ExportModal = useExportModal(props.resource);
 
     const [model, setModel] = useState(props.model);
     const [blocks, setBlocks] = useState(props.resource.blocks);
@@ -1514,12 +1518,13 @@ function TextPaneEditor(props) {
 
 
     const saveTextPane = () => {
-        props.save(model);
+        props.saveModel(model);
         eContext.updateRestorePos();
     };
 
     const exportTextPane = () => {
-        props.export(model);
+        ExportModal.open(model, {});
+//        props.export(model);
     };
 
     const deployTextPane = () => {
@@ -1644,6 +1649,8 @@ function TextPaneEditor(props) {
             <NewFontIdModal.content name="New Font Id" fit closeable>
                 <NewIdForm {...NewFontIdModal.props} />
             </NewFontIdModal.content>
+
+            {ExportModal.render}
         </Page>
     );
 }

@@ -1,4 +1,4 @@
-import React, {Fragment, useState, useContext, useRef, useEffect} from "react";
+import React, {Fragment, useState, useContext, useRef, useEffect, useMemo} from "react";
 import {
     Page,
     Stack,
@@ -15,16 +15,17 @@ import {
 } from "./BaseComponents";
 import TilesMapEditor from "./TilesMapEditor";
 import TextPaneEditor from "./TextPaneEditor";
+import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
+import { TilesPaneEditor as TilesPaneEditorNew } from "./../editors/TilesPaneEditor";
+import { SpritePaneEditor as SpritePaneEditorNew } from "./../editors/SpritePaneEditor";
 import SpriteSheetEditor from "./SpriteSheetEditor";
 import {EditorContext, EditorCtx} from "./Raster";
 import './EditorApp.css';
-import {
-    d,
-    getJsonModelOfInstance,
-    getRebuildJsonForModel,
-    getResourceTreeForJsonModel
-} from '../helper/helper';
+import { d, getJsonModelOfInstance, getRebuildJsonForModel, getResourceTreeForJsonModel } from '../helper/helper';
 import ReactDOM from "react-dom";
+import { MainEditor } from "../editors/MainEditor";
+import { ScreenEditor } from "../editors/ScreenEditor";
+import { PocEditor } from "../editors/PocEditor";
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);
@@ -209,6 +210,7 @@ function RevertSelector(props) {
 
 function PageSelector(props) {
     const context = useContext(GlobalContext);
+
     const [active, setActive] = useState(props.active === undefined ? null : props.active);
     const confirmRef = useRef(null);
     const updates = useUpdates();
@@ -264,7 +266,7 @@ function PageSelector(props) {
                             {items}
                         </Content>
                         <Content padded>
-                            <Scene3d width={600} height={400} elems={sceneElems.reverse()} />
+                            <Scene3d width={600} height={400} elems={sceneElems} />
                         </Content>
                     </Stack>
                 </Section>
@@ -334,22 +336,68 @@ function PageSelector(props) {
         );
     };
 
-    const getResourceDef = (type, id, value) => {
+    const getResourceDef = (type, id, value, details) => {
         if (type === 'image') {
             value = '"' + value + '"';
         } else if (type === 'json') {
             const lines = JSON.stringify(value, null, 4).split('\n');
-            value = lines.join('\n    ');
+            let jsonLines = [];
+            if (details.compact) {
+                let no = 0;
+                let trackLevel = -1;
+                let track;
+                let prefix;
+                for (let line of lines) {
+                    if (trackLevel < 0) {
+                        // TODO remove hardcoded key
+                        if (line.trim().startsWith('"map": [')) {
+                            trackLevel = 0;
+                            track = [];
+                        }
+                        jsonLines.push(line);
+                    } else {
+                        if (line.match(/\[$/)) {
+                            trackLevel++;
+                            if (trackLevel === 1) {
+                                prefix = line.substr(0, line.indexOf('['));
+                                track = [line.trim()];
+                            } else {
+                                track.push(line.trim());
+                            }
+                        } else if (line.match(/\],?$/)) {
+                            trackLevel--;
+                            if (trackLevel === 0) {
+                                track.push(line.trim());
+                                jsonLines.push(prefix + track.join(' '));
+                            } else if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        } else {
+                            if (trackLevel > 0) {
+                                track.push(line.trim());
+                            } else {
+                                jsonLines.push(line);
+                            }
+                        }
+                    }
+                    no++;
+                }
+            } else {
+                jsonLines = lines;
+            }
+            value = jsonLines.join('\n    ');
         }
         return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
     };
 
-    const exportModel = model => {
+    const exportModel = (model, details = {}) => {
         const resources = getModelConfig(model).getResources();
         const lines = [];
-        for (let res of resources.resources.reverse()) {
+        for (let res of [ ...resources.resources ].reverse()) {
             const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
-            lines.push(getResourceDef(res.type, res.id, data));
+            lines.push(getResourceDef(res.type, res.id, data, details));
         }
         ExportModal.open({
             code: lines.join('\n')
@@ -372,16 +420,16 @@ function PageSelector(props) {
     let model, tree;
 
     switch (resource.type) {
+
         case 'TilesMap':
             if (resource.data === null) {
                 resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
             }
             model = getJsonModelOfInstance(resource.data);
-
             tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <TilesMapEditor key={'tilesMap_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TilesMapEditor key={'tilesMap_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} { ...editorProps } />
                 </Restorable>
             );
             break;
@@ -395,13 +443,16 @@ function PageSelector(props) {
             tree = getResourceTreeForJsonModel(resource.cls, model);
             editor = (
                 <Restorable confirmRef={confirmRef}>
-                    <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} {...editorProps} />
+                    <TextPaneEditor key={'textPane_' + updates.count} tree={tree} model={model} resource={resource} info={resourcesInfo} { ...editorProps } />
                 </Restorable>
             );
             break;
 
         case 'spriteSheet':
-            editor = <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />;
+            editor =
+                <Restorable confirmRef={confirmRef}>
+                    <SpriteSheetEditor spriteSheet={resource.data} {...editorProps} />
+                </Restorable>;
             break;
     }
 
@@ -429,6 +480,57 @@ function PageSelector(props) {
 }
 
 function EditorApp(props) {
+    const isNew = 1;
+    const [ ready, setReady ] = useState(false);
+    const [ selected, setSelected ] = useState(null);
+
+    useEffect(() => {
+        const syncLinks = parts => {
+            const elems = document.querySelectorAll('link');
+            for (let elem of elems) {
+                const href = elem.href;
+                if (!parts.includes(href)) {
+                    const parent = elem.parentNode;
+                    parent.removeChild(elem);
+                }
+            }
+            const head = document.querySelector('head');
+            for (let part of parts) {
+                const linkNode = document.createElement('link');
+                linkNode.href = part;
+                linkNode.rel = 'stylesheet';
+                linkNode.type ='text/css';
+                linkNode.onload = function() { this.title = '1' };
+                requestAnimationFrame(
+                    () => {
+                        head.appendChild(
+                            linkNode
+                        )
+                    }
+                );
+            }
+        };
+        syncLinks(isNew ? ['css/layout.css', 'css/base.css'] : ['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
+        setTimeout(() => {
+            const elems = document.querySelectorAll('link');
+            let loaded = true;
+            for (let elem of elems) {
+                if (!(elem.title && elem.title === '1')) {
+                    loaded = false;
+                    break
+                }
+            }
+            setReady(true);
+        }, 200);
+
+        return () => {
+            syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
+        }
+    }, []);
+
+
+    if (!ready) return '';
+
     const resources = props.game.getEditableResources();
 
     let filters = null;
@@ -485,9 +587,72 @@ function EditorApp(props) {
         e.preventDefault();
     };
 
+    if (isNew) {
+        let editor = '';
+        const resourceLoader = props.game.getResourceLoader();
+        resources.push({type: 'poc'});
+
+        if (selected === null) {
+            return (
+                <>
+                    <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>
+                        <ScreenEditor setSelected={setSelected} resources={resources} game={props.game} />
+                    </MainEditor>
+                    <div id="modals-container" />
+                </>
+            )
+        }
+
+        const resource = resources[selected];
+
+        editor = null;
+        let model = null;
+        let tree = null;
+
+        switch (resource.type) {
+            case 'TilesMap':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <TilesPaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'TextPane':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                model.blocks = resource.blocks;
+                tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <TextPaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'spriteSheet':
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                model = getJsonModelOfInstance(resource.data);
+                model.blocks = resource.blocks;
+                // tree = getResourceTreeForJsonModel(resource.cls, model);
+                editor = <SpritePaneEditorNew resource={resource} model={model} />;
+                break;
+
+            case 'poc':
+                editor = <PocEditor />;
+                break;
+        }
+        return  (
+            <>
+                <MainEditor back={() => setSelected(null)} game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>{editor}</MainEditor>
+                <div id="modals-container"></div>
+            </>
+        )
+    }
     return (
         <GlobalCtx game={props.game} filters={filters} imageResources={imageResources}>
-            <PageSelector {...props} resources={resources} />
+            <PageSelector { ...props } resources={resources} />
             <div id="modals-container"></div>
         </GlobalCtx>
     );

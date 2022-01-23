@@ -1,0 +1,1013 @@
+Resource ids:
+====================
+a) Image:
+
+   Regexp:
+
+   [a-z_-0-9]+(/[a-z_-0-9]+)*.(png|jpg|jpeg)
+
+   Die Endung muss hier ein unterstütztes image-format sein.
+   Durch / kann ein Subfolder auf dem Server angesteuert werden
+
+   Beispiel:
+
+       "mario-running.jpg"
+       "sprites/plant_1.png"
+
+b) Audio:
+
+   Regexp:
+
+   [a-z_-0-9]+(/[a-z_-0-9]+)*.(wav|mp3|ogg)
+
+c) JSON:
+
+   [a-z_-0-9]+(/[a-z_-0-9]+)*(.json)?
+
+   Die Endung auf json ist hier optional
+
+=======================
+  Backup-Dateien:  <resource-id>.<time>.bak
+  Varianten: .<variant>/<resource-id>
+=======================
+
+
+
+
+
+
+Component-Analysis
+===============================
+ Input-Components
+ -----------------------------
+
+ # Color
+    - value
+    - set()
+
+    <div>
+        <input type="color"
+    <div>
+
+ # Switch-Button
+    - enabled
+    - switch()
+    - children
+
+    <div>
+       <div onClick>
+          {children}
+       </div>
+    </div>
+
+ # Checkbox
+    - name
+    - value
+    - set()
+
+    <div class="stack-h">
+       <div>{name}</div>
+       <div><input type="checkbox" /></div>
+    </div>
+
+ # IntField
+    - readOnly
+    - size
+    - value
+    - min
+    - max
+    - step
+    - buttons
+    - name
+
+    <Fragment>
+       <div>{name}</div>
+       <div class="stack-h items-centered">
+          {buttonPrev}
+          <input type="text">
+          {buttonNext}
+       </div>
+    </Fragment>
+
+ # Int
+    <Stack>
+        <IntField {...props} />
+    </Stack>
+
+ # Dim
+    <Stack>
+        <IntField {...xAttr} />
+        <IntField {...yAttr} />
+    </Stack>
+
+===============================
+ Layout-Components
+ ----------------------------
+
+ Section:
+   <Content boxed [dim|flex]>
+      <Stack vertical border>
+        <title>
+
+        <content flex>
+      </Stack>
+   </Content>
+
+   Eine Section
+     - kann nicht padded sein
+     - hat eine border und dementsprechend muss der vertical stack auf calc(100%-2*border) beschränkt
+       werden
+     - erlaubt keinen overflow
+     - die Höhe ist per default fit-content, kann aber per flex oder fullHeight auf volle Höhe gebracht
+     -
+
+
+
+
+
+
+
+
+ # Stack
+    - vertical
+    - fullHeight
+    - fit
+    - align
+    - alignItems
+    - height
+    - minHeight
+    - maxHeight
+    - width
+    - minWidth
+    - maxWidth
+    - wrap
+    - border
+    - children
+
+    <div class="stack-v|h ..." style="">
+       {children}
+    </div>
+
+ # Content
+    - flex
+    - padded
+    - scroll
+
+ # Toolbar
+    <div class="toolbar-div">
+       {children}
+    </div>
+
+ # Tabs
+    - active
+    - vertical
+    - reverse
+    - fromEnd
+    - maxTabs
+    - height
+
+    <div class="stack-h|v">
+        <div class="">
+            {navPre}
+            {tabs}
+            {navNext}
+        </div>
+        <div>
+            {contents}
+        </div>
+    </div>
+
+ # Tab
+    - name
+    - children
+
+    <Fragment>
+       {children}
+    </Fragment>
+
+ # TabAccordion
+    - active
+    - name
+    - children
+
+    <div class="stack-v inner-border-v boxed full-v">
+        {items}
+    </div>
+
+ # Portal
+    - id
+    - children
+
+    React.createPortal(
+       {children},
+       getElementById({id});
+    );
+
+ # Modal
+    - name
+    - closeable
+    - zIndex
+    - hide()
+    - children
+
+    <Portal "modals-container">
+        <div class="modal-overlay" style="zIndex: {zIndex}>
+           <div class="modal-centered .." style="zIndex: {zIndex + 4}">
+              <div class="title-area-active ..">...{name}...</div>
+              <div class="content-area flex">{children}</div>
+           </div>
+        </div>
+    </Portal>
+
+ # MouseOverlay
+    - active
+    - cursor
+
+    <div class="cursor-<cursor> fix-overlay"></div>
+
+ # Section
+    - name
+    - collapse
+    - flex
+    - raw
+    - children
+
+    <div class="section-div stack-v ...">
+        <div class="title-area-active stack-h...">
+            <div class="">{name}</div>
+            {actionsDiv}
+        </div>
+        {contentDiv}
+    </div>
+
+===============================
+ - Stack + Section Rework
+
+
+REFACTORING:
+  - CSS-Clean-Up + BaseComponents
+
+  - CellProvider (ImageHandling, Methods)
+  - Raster-Classes (Props & Defaults & sizes)
+  - CellSizeX/Y
+
+BUGS:
+  - Tabs don't show on Windows
+
+  - Modal: change auf GlobalContext resettet bitmap
+  - editorModus deaktiviert die keylistener nicht
+  - Ruler-Distances wrong
+
+FEATURES:
+  + Color-Replace-Input
+  + New Font->Select->Import
+  + Verbesserter Paste?
+  + resize-filters on all (rotate, scale)
+
+  - Save-Button active only when changed
+  + zoom-handling
+  + apply-color/multipreview?
+
+  + raster max-width/height solution
+
+  + Mouse-UpDown on IntField
+  + DragnDrop for Section-Order
+  + Theme-Selection-Drop-Down
+
+---------------------------------
+ C o r e - R e f a c t o r i n g
+---------------------------------
+ - Game-Instance refactorn bereinigen (HTML, Dump, Ablauf)
+ - Build-Process optimieren (envs, config, install)
+ - Resource-Dependencies (+multi-resource-fields) lösen
+ - Resource-Multi-Request-Load
+ - Loading-Phase
+ - System-FontMap
+ - Resource-Backups
+ - Konzept für Varianten
+ - Shared-State-Resourcen/functions
+ - Resource-Compare => Revert
+ - Undo/Redo bei Editor-Reload
+ - Image-Type-Problematik
+ - Session-Storage für Non-Resource-Modelle?
+ ----------------------------------
+
+######################################
+ Analyse: Editor Architecture
+######################################
+
+ 1.) RasterCanvas MEMO (CssContext + CanvasRef)
+
+     Redraw Canvas-BG + Raster falls Änderung an cellSize, border, width, height oder CssContext
+     Setzt CanvasRef initial oder wenn sich das Canvas-Elem geändert hat
+
+ 2.) CellRaster (CssContext)
+
+     Redraw der Cells mittels Renderer bei jeder Änderung an cells, render, cellSize, border oder
+     CssContext
+
+ 3.) CellProviderRaster MEMO (eContext)
+
+     ==> Registriert eine Update-Methode im eContext unter der editorId
+
+     Generiert ein CellRaster bei Änderungen an posX, posY, width, height, zoom, renderOptions,
+     wobei Änderungen innerhalb des CellProviders (Cell-Values, Dims) von Aussen über die update-
+     Methode getriggert werden müssen!
+
+ 4.) FlexCellProviderRaster
+
+     Berechnet die Width + Height für das CellProviderRaster anhand des verfügbaren Platzes,
+     Registriert einen Resize-Observer auf dem Parent-Node, der eine Neuberechnung triggert.
+     Redraw von Rulers und CellProviderRaster bei Änderungen an posX, posY, width, height, zoom,
+     rulers, renderOptions oder CHILDREN
+
+ 5.) FlexCellProviderScrollRaster (CssContext)
+
+     Erweitert ein Raster um H- und/oder V-Scrollbars falls die Breite/Höhe des Rasters nicht
+     komplett dargestellt werden kann.
+
+ 6.) RasterOverlays (EditorContext)
+
+     Erzeugt absolute positionierte Overlays für Cursor und Marker auf dem Raster und gibt über
+
+     ==> eine Overlay-Ref, die von Aussen reingegeben wird eine Control-Klasse nach draussen. Auf
+
+     dieser Klasse werden Basic-Modes und Actions registriert, die von Aussen noch um zusätzliche
+     erweitert werden können.
+     Enthält auch ein Mouse-Overlay und einen Window-Event-Manger
+
+  -------------------------------
+  A) BaseCellProviderIndexRaster
+  -------------------------------
+
+ 7.) RasterViewGrid (eContext)
+
+     Erweitert ein FlexCellProviderScrollRaster um ein Navigation/Resize/Shift-Controls-Grid und
+     RasterOverlays, die um entsprechende Dim- und Shift-Operations erweitert werden
+
+  -------------------------------
+  B) BasicRasterView
+  -------------------------------
+     Erweitert ein RasterViewGrid um eine top und bottom-Toolbar über welche die Overlay-Actions und
+     -modes getriggert werden können.
+
+  -------------------------------
+  C) BitmapEditor
+  -------------------------------
+     Erzeugt zu einem gegebenen Bitmap ein BasicRasterView um dieses zu editieren und ggf. zu
+     speichern.
+
+
+=========================================
+ Kontrolle über die Raster im eContext
+=========================================
+EditorContext:
+
+a) Selection
+ - selection
+ - setSelection
+
+b) Undo/Redo:
+ - past
+ - future
+ - hasPast()
+ - hasFuture()
+ - doAction(doAction, undoAction)
+ - undoAction()
+ - redoAction()
+
+c) Raster
+ - mountRaster(id)
+ - unmountRaster(id)
+ - setRasterUpdate(id, update)
+ - updateRaster(id|null)
+ - setRasterOverlay(id, overlay)
+ - getRasterOverlay(id)
+ - setRasterMode(id, mode, data)
+ - doRasterAction(id, action, data)
+ - canDoRasterAction(id, action)
+
+d) WindowEvents
+ - addListener(rasterId, event, handler, options)
+ - removeListener(rasterId, event)
+ - clearAll
+
+e) MousePointerLock
+ - setFixCursor(cursor)
+ - unsetFixCursor()
+
+f) Cursor-Tracking
+ - registerTracking(trackerRaster, trackedRaster)
+ - setTracker(id, tracker)
+
+g) Hotkeys
+
+ WHAT ABOUT updateState? im Overlay
+
+==================================
+ - cursorArea deaktivieren im display-mode
+
+ - Rows-Write scheint am Ende zu failen?
+ - SaveMarker bei Delete & Crop
+ - Double-Click nur wenn auf gleicher RasterCell (siehe Insert)
+ - Check: Row/Column-Selection after grow
+ - Insert triggert kein richtiges Update
+ - vRuler-width und font richtig berechnen
+
+=======================
++ fixed-dim für cursor
++ multi-select with gap
+
++ shift-key: square-selection/resize
++ select/pick-once
+
++ Render-Optimization for Bitmaps with size <= 4
++ Hotkeys
++ Scroll-Boundaries
++ Write-Origin
+=======================
+
++ AutoScroll while write
++ event-select
++ event-hide
++ mouse-listener-absicherung
+
+
+ - Cursor-Size
+ - Quick-Zoom-Modal
+
+ - Verhindern: Browser-Back/Forward + Textmarking
+
+=======================
+
+========================
+ idea: Cut-Marker
+========================
+
+Oversize:
+
+Verhalten von Marker-Bereich
+ a) Rect
+      markerX >= cellProvider.getWidth
+        => reset
+      markerY >= cellProvider.getHeight
+        => reset
+      markerX + markerWidth >= cellProvider.getWidth
+        => markerWidth = cellProvider.getWidth - markerX
+      markerY + markerHeight >= cellProvider.getHeight
+        => markerHeight = cellProvider.getHeight - markerY
+
+ b) Rows / Columns
+      markerY >= cellProvider.getHeight
+        => reset
+      markerY + markerHeight >= cellProvider.getHeight
+        => markerHeight = cellProvider.getHeight - markerY
+
+ c) Row-/Column-Gap
+      markerY > cellProvider.getHeight
+        => reset
+
+Verhalten von Selection:
+ a) Rect:
+      keine Änderungen aber Vorsicht bei Cursor-Matrix
+
+ b) Rows/Columns:
+      Kann alles bleiben, beim grow werden neue Zellen transparent
+
+ c) Gap:
+      Keine Änderungen
+
+-------------------
+ Revert-FLOWS
+-------------------
+
+Delete auf SM ist möglich über
+ - SM.deleteResources (->RL.clearBrowserResources)
+ - SM.deleteJson|Image|Audio (nicht verwendet)
+ - SM.deleteResource (Resource-Dependencies: ->deleteResource, ->deleteScreenResources)
+
+a) saveDelete: löscht ein Resource nur, wenn keine Dependency (screen, indirect-target) mehr auf diese existiert
+ - sollte von deleteScreenResource nach dem löschen aus <screen> auf sich selbst
+   und alle Deps (d.h. dadurch abgestorbene dependencies) aufgerufen werden
+
+b) delete Screen-Resource
+
+   1. ermittel alle Screen-resourcen zu x => dels
+   2. suche alle direct Einträge screen->id zu dels => directs
+   3. lösche alle Resourcen zu dels
+   4. sync dependencies
+   5. return directs
+
+   Wird im Editor ein Deploy ausgeführt, muss die Screen-Resource und ALLE ihre abhängigen Resourcen aus
+   SM gelöscht werden
+
+   Beispiel:
+     SM hat <screen1>: json:font1
+            <screen2>: json:textPane -> json:font1
+            <screen3>: json:textPane2 -> json:font1
+
+     User deployed <screen2>: json:textPane ...dadurch muss auch json:font1 aus SM deployed und gelöscht werden
+     Wenn die Dependency <screen1>: json:font1 nicht im Code vorhanden ist, würde diesen verschwinden, es sei
+     denn wir deployen die directen Abhängigkeiten mit
+     -> <screen3>: json:textPane2 verliert zwar die Dependency, aber die ID steht weiterhin im json:textPane2
+        und da diese über den Server aufgelöst ist, sollten wir hier keine Probleme haben
+
+     !!! Aber was ist, wenn wir diese wiederum vom server reverten? !!!
+
+c) truncate
+
+ - Wenn der User einen Clear-Browser-Resources triggert, dann müssen ALLE Resourcen und Dependencies aus SM
+   gelöscht werden und natürlich gehen dann auch alle hidden Dependencies flöten
+
+
+
+
+
+ Delete Screen-Resource (screen, type, id):
+   1. if (direct[screen][type].indexOf(id) === -1) return true
+   2. direct[screen][type].splice(index, 1);
+   3. for (screen in direct) {
+         if (this.getAllScreenResources(screen).indexOf(type + ':' + id) !== -1) {
+            return true;
+         }
+      }
+   4. delete indirect[type + ':' + id]
+   5. delete actual resource
+   6. sync tree to delete more orphans (?)
+
+
+ --- Revert auf Code:JSON ---
+ 1.) User legt auf screen "X" die Resourcen json:FontMap + image:font.png im Code an
+ 2.) User deployed für screen "X": json:FontMap + image.font.png
+     => direct.X.json = ['FontMap'], indirect['json:FontMap'] = ['image:font.png']
+ 3.) User reverted auf screen "X": json:FontMap auf Code
+     => Server delete: direct.X.json = []
+        ABER: indirect["json:FontMap"] = ['image:font.png']
+
+ Der LOAD vom Server erhält im resources: ['json:FontMap', 'image:font.png']
+ => found = image:font.png, notFound = json.FontMap
+   Prinzipiell hätten wir hier auch den indirect-Link löschen können
+   Einzige Ausnahme: "json:FontMap" ist noch in einem anderen Screen als "X" aktiv
+   Vorsicht: das könnte auch über eine indirekte Verlinkung der Fall sein
+
+
+ --- Revert auf Code:Image ---
+ 1.) User legt auf screen "X" die Resourcen json:FontMap + image:font.png im Code an
+ 2.) User deployed für screen "X": json:FontMap + image.font.png
+     => direct.X.json = ['FontMap'], indirect['json:FontMap'] = ['image:font.png']
+ 3.) User reverted auf screen "X": image:font.png auf Code
+     => Server: delete indirect['image:font.png'] + löschen aus allen indirect[x] arrays
+
+ Der LOAD vom Server erhält im resources: ['json:FontMap', 'image:font.png']
+ => found = json.FontMap, notFound = image:font.png,
+
+
+ --- Revert auf Code:Json, Browser:Image ---
+ 1.) User legt auf screen "X" die Resourcen json:FontMap + image:font.png im Code an
+ 2.) User deployed für screen "X": json:FontMap + image.font.png
+     => direct.X.json = ['FontMap'], indirect['json:FontMap'] = ['image:font.png']
+ 3.) User speichert auf screen "X" die Resourcen json:FontMap + image:font.png
+ 4.) User reverted auf screen "X": json:FontMap auf Code, image:font.png auf Browser
+     => Browser delete: direct.X.json = []
+     => Server delete: direct.X.json = []
+
+ Der LOAD vom Server erhält im resources: ['json:FontMap'] + resolved: ['image:font.png']
+   => found: [], notFound = ['json:FontMap']
+
+ --- Revert auf Browser:Json, Code:Image ---
+ 1.) User legt auf screen "X" die Resourcen json:FontMap + image:font.png im Code an
+ 2.) User deployed für screen "X": json:FontMap + image.font.png
+     => direct.X.json = ['FontMap'], indirect['json:FontMap'] = ['image:font.png']
+ 3.) User speichert auf screen "X" die Resourcen json:FontMap + image:font.png
+ 4.) User reverted auf screen "X": json:FontMap auf Browser, image:font.png auf Code
+     => Browser delete: direct.X.image = []
+     => Browser delete: indirect['json:FontMap'] = [];
+
+     => Server delete: direct.X.image = []
+     => Server delete: indirect['json:FontMap'] = [];
+
+
+ Der LOAD vom Server erhält im resources: ['json:FontMap'] + resolved: ['image:font.png']
+   => found: [], notFound = ['json:FontMap']
+
+
+
+
+
+
+===========================================
+  Simple (Load im Configurable)
+===========================================
+ a) myFont = new FontMap({id: 'xy'});               // json (ohne __resolved)
+     - !hasKey(__resolved, input)
+         => RL.hasJsonResource(input.id)
+            => input = RL.getJsonResource(input.id)
+     - conf = new self.Conf(input);
+
+     + Revert auf Code möglich
+     + keine Resource registrierung nötig
+       (wenn der Editor geöffnet wird, holt dieser sich das aktuelle Modell über getJson() und
+        kann dann unter der Resource-Id des Configurables sein Store-Modell speichern)
+
+
+
+ b) myFont = new FontMap(resource.json.myFontMap);  // json (mit __resolved)
+     - conf = input
+
+     + resource muss im Load vorher registriert worden sein
+     + Revert auf Code möglich
+
+
+ c) myFont = new FontMap('myFontMap');
+     - !RL.hasJsonResource(input) => Error()
+     - conf = new self.Conf(RL.getJsonResource(input));
+
+     + keine Resource Registrierung nötig
+     + Revert auf Code nur möglich, falls Registrierung der Resource im Code
+
+
+ d) conf = new FontMap.Config({id: 'xy'});
+    conf.setFoo('bar');
+    myFont = new FontMap(conf);                     // Config-Instance (ohne __resolved)
+
+    - RL.hasJsonResource(input.id);
+    -   => input = RL.getJsonResource(input.id);
+    - conf = input
+
+    + Keine Resource-Registrierung nötig
+    + Revert auf Code möglich
+    - Setter-Values werden beim Store immer überschrieben
+
+ e) conf = new FontMap.Config(resource.json.myFontMap);
+    conf.setFoo('bar');
+    myFont = new FontMap(conf);                     // Config-Instance (mit __resolved)
+
+    - conf = input
+
+    + Resource muss vorher im load registriert worden sein
+    + Revert auf Code möglich
+    + Setter-Value kann zwar im Editor überschrieben werden, ABER im Game bleibt der Setter-Value aktiv
+      (=> kaputtes Configureable möglich #Backup für repair?)
+
+    Wir könnten uns für den Fall input.__resolved ein Flag in der Config setzen, was sich nachträgliche
+    Änderungen merkt, so dass auf diese (im Editor) hingewiesen werden kann
+
+--------------------------------------
+ Constructor-Algorithm
+
+     constructor(input) {
+        let id = null;
+        let confJson = null;
+        let conf = input;
+
+        if (typeof input === 'string') {
+            id = input;
+        } else if (input instanceof FontMap.Config) {
+            if (!input.isResolved()) {
+                id = input.id;
+            }
+        } else {
+            confJson = input;
+            if (!input.__resolved) {
+                id = input.id;
+            }
+        }
+        if (id !== null && RL.hasJsonResource(id) {
+            confJson = RL.getJsonResource(id);
+        }
+        if (confJson !== null) {
+            conf = new FontMap.Config(confJson);
+        }
+        if (!(conf instanceof FontMap.Config)) {
+            throw Error('Invalid');
+        }
+     }
+
+===========================================
+  Image-Dependency
+===========================================
+
+Store-Algorithm:
+-----------------------
+
+    STORE:
+        Der Editor löscht alle Dependencies für "<screen>.FontMap"
+        Der Editor speichert
+          - FontMap.json mit image: "image.png"
+          - image.png
+          - Die Dependency "<screen>.FontMap" = ['image.png']
+          - Die Dependency "<screen>" += FontMap (sonst funzt der constructor(id)-Fall nicht?)
+    DELETE:
+        Der Editor löscht
+          - alle Dependencies für "<screen>.FontMap"
+          - die Dependency "<screen>" -= FontMap
+          - FontMap.json
+          - image.png
+
+
+Screen-Resource-Loading:
+--------------------------
+    FE requested Resourcen für "<screen>" mit <image1>,... und <json1>,...
+
+    1.) Der RL holt die Dependencies für "screen" aus dem SM und ergänzt die fehlenden
+        Resourcen
+
+    2.) Alle Resourcen die noch nicht geladen wurden, werden aus dem BE geholt, wobei
+        das BE seine Dependencies zum Screen in das Ergebnis packt, so dass der RL
+        diese vor den Code-Versionen (die evt. garnicht vorhanden sind) registrieren kann.
+
+
+
+ a) myFont = new FontMap({id: 'xy', image: RES});
+
+      - Die Resource muss die Image-Resource entweder als ImageResource aufgelöst enthalten,
+        oder aber als Ref auf eine Image-Resource aus dem Load
+
+
+
+
+
+ b) myFont = new FontMap(resource.json.myFontMap);
+
+      - Die Resource muss die Image-Resource entweder als ImageResource aufgelöst enthalten,
+        oder aber als Ref auf eine Image-Resource aus dem Load
+
+ c) myFont = new FontMap('myFontMap');
+
+      - Die Resource muss die Image-Resource entweder als ImageResource aufgelöst enthalten,
+        oder aber als Ref auf eine Image-Resource aus dem Load
+
+ d) conf = new FontMap.Config({id: 'xy'});
+    conf.setImage(RES);
+    myFont = new FontMap(conf);
+
+      - Die Resource im setImage() muss die Image-Resource entweder als ImageResource
+        aufgelöst enthalten, oder aber als Ref auf eine Image-Resource aus dem Load
+      - Die Image-Resource kann danach im Constructor noch mal überschrieben werden, wenn ein Store-Modell
+        vorliegt
+
+ e) conf = new FontMap.Config(resource.json.myFontMap);
+    conf.setImage('bar');
+    myFont = new FontMap(conf);                     // Config-Instance (mit __resolved)
+
+      - Die Resource im setImage() muss die Image-Resource entweder als ImageResource
+        aufgelöst enthalten, oder aber als Ref auf eine Image-Resource aus dem Load
+
+-------------------------------
+ setImage-Implementierung
+-------------------------------
+
+ if (typeof input === 'string') {
+    input = RL.getImageResource(input);
+ }
+ if (!input instanceof ImageResource) {
+    throw Error('Expected Image Resource');
+ }
+ if (!input.isResolved()) {
+    throw Error('ImageResource id must be registered');
+ }
+ this.image = input;
+
+--------------------------------
+ Problem A) JSON-Dependency
+--------------------------------
+
+ 1.) explizites JSON-Resource-Prop im Configurable
+
+ this.addJsonResource('bongo', {foo: 'bar'});
+ ---
+ const test = new Pane({id: 'myPane', bingo: resource.json.bongo});
+
+ => Pane.Conf.setBingo(resource.json.bongo);
+  // hier könnten wir auf einen String checken => RL.getJsonResource(id)
+  // ansonsten muss ein object mit einer ID vorliegen (! => error)
+  // ist das object __resolved nehmen wir was da ist
+  // ansonsten wird im RL probiert die Resource mit der ID zu laden
+
+ STORE:
+   - Es wird das JSON für "myPane" als Resource gespeichert mit String-Link "bongo"
+   - Es wird das JSON für "bongo" als Resource gespeichert
+   - Es werden die Dependencies für "<screen>.myPane" und "<screen>.bongo" gelöscht
+   - Es werden die Dependencies für "<screen>" += 'myPane' und "<screen>.myPane" = ['bongo']
+   - angelegt
+
+
+ 2.) JSON-Composition mit JSON-Resource im Configurable (direct)
+
+ this.addJsonResource('bongo', {foo: 'bar'});
+ ---
+ const test = new Pane({id: 'myPane', bingo: resource.json.bongo});
+
+ Bingo ist nicht als JSON-Resource deklariert, deswegen wird diese nicht per ID im RL requested
+ und wird einfach als JSON durchgereicht
+ Wenn der Benutzer im Editor das aktuelle Modell speichert, dann wird der key "bingo" im "myPane"
+ JSON überschrieben. Und da das JSON keinem Configureable entspricht, kann es auch nicht per
+ Editor überschrieben werden. Ausnahme: User legt JSON mit dieser ID händisch auf Server ab.
+
+
+ 3.) JSON-Composition mit JSON-Resource im Configurable (indirect)
+
+ this.addJsonResource('bongo', {foo: 'bar'});
+ ---
+ const conf = new Pane.Conf({id: 'myPane'});
+ conf.setBingo(resource.json.bongo);
+ const test = new Pane(conf);
+
+ Analog wie zuvor
+
+4.) JSON-Composition mit JSON-Resources
+
+ this.addJsonResource('myPane', {});
+ this.addJsonResource('bongo', {foo: 'bar'});
+ ---
+ const conf = new Pane.Conf(resources.json.myPane);
+ conf.setBingo(resource.json.bongo);
+ const test = new Pane(conf);
+
+Hier geschieht anders als zuvor keine Überschreibung durch ein STORED "myPane", weil resource __resolved
+der bingo-Value wird hier durch den Resource-Wert vorgegeben.
+Das Editor-Modell wird mit Resource-Wert gebildet, kann durch ein STORE aber nicht den Resource-Zuweisung
+überschreiben. Da der Editor den Wert im myPane-JSON speichert.
+Haken: die Dependency wird nicht gespeichert und hängt von der Registrierung im Load ab
+
+5.) Explizites Configureable Prop
+
+ this.addJsonResource('bongo', {foo: 'bar'});
+ ---
+ const test = new Pane({id: 'myPane', fontMap: RES});
+
+Die Methode setFontMap(RES) wird RES zunächst wie eine JSON-Resource auflösen, sofern RES keine Instanz
+des Configurables ist...ist es keine resolved-Instanz wird die ID über den RL versucht aufzulösen
+Ist ein JSON ermittelt muss das Configurable instantiiert werden. Am Ende steht dann im Configurable unter
+dem Key eine entsprechende Configurable-Instanz
+
+Wenn das Editor-Modell gebildet wird, muss die Instanz über ein getJSON() resolved werden
+Beim STORE muss das Configurable als Abhängigkeit von <screen>: ['myPane', ['bongo', b1...]] mit allen
+abhängigkeiten von bongo eingetragen werden (!!! vielleicht doch besser auf Top-Level? !!!)
+
+--------------------------------
+ Problem B) Array-Dependency
+--------------------------------
+
+ this.addJsonResource('font1');
+ this.addJsonResource('font2');
+ this.addJsonResource('TextPane', {
+     fonts: ['font1', 'font2']
+ });
+ ---
+ const myTextPane = new TextPane('TextPane');
+
+Hier wird setFonts() auf einen Array über Configurables vom Typ FontMap checken, indem die Methode
+addFont(Configurable) aufgerufen wird, die wie ein Explizites Configurable Prop arbeitet nur dass die Instanz
+am Ende in ein Array gepushed wird.
+
+Beim GetJSON wird hier analog auf jedem Item das getJSON aufgerufen und beim STORE werden die Items mitsamt
+deren Abhängigkeiten als Dependencies des Configurables gespeichert.
+
+Da im Editor neue Items hinzugefügt werden können sollen, muss entweder eine Auswahl von (Remote-)JSON-Resources
+für den neuen Eintrag kommen (mit __type-Check?), oder aber es wird ID-Prompt mit sinnvoller Vorbelegung ("<configureable>_<key>_<index>")
+kommen.
+
+Beim STORE oder DELETE muss für die abhängigen Resourcen die nicht mehr da sind, geschaut werden, ob diese noch
+woanders referenziert sind. Wenn nicht, muss die Resource gelöscht werden
+
+--------------------------------
+ Problem C) Nested-Dependencies
+--------------------------------
+
+ this.getJsonResource('spinat', {x: 1, y: 12});
+ this.getJsonResource('blupp', {ref: 'spinat'});
+
+ const myConf = new TextPane.Conf({
+    x: resource.json.blupp
+ });
+
+ Da blupp eine ResourceRef von TextPane.Conf ist, wird diese aufgelöst sobald der Wert in setBlupp
+
+
+
+
+
+
+
+=====================================
+ D e p e n d e n c i e s
+=====================================
+
+Der Resource-Loader, kennt die registrierten normalen und permanenten resource-ids.
+Nach der Registrierung wird der load von einem Screen getriggert.
+
+Vor dem Laden muss der RL
+ - Für den aktuellen screen die direkten Resource-Ids ergänzen aus screen-deps.json
+ - Für die resultierenden Resource-Ids die indirekten Resource-Ids ermitteln
+
+Falls in der screen-deps noch eine nicht weiter verwendete Resource-Id steht, würde der RL mit einem
+Fehler aussteigen, was schlecht wäre, diese ergänzten Resource-Ids müssten stattdessen als "optional"
+markiert werden und nur zu einem Fehler führen, falls tatsächlich später auf diese zugegriffen wird
+
+direct: {
+    '':      ['r1', ...],     // hier stehen die dependent ids für state-build,
+    'mario': ['r4', ...]
+}
+
+indirect: {
+    'r1': ['r2', 'r3'],
+    'r6': []
+}
+
+Verwaltung der direct-ids:
+
+ a) Resource x wird gespeichert:
+    -----------------------------
+      source = x permanent ? '' : curr.screen;
+      if (direct[source] === undefined) {
+         direct[source] = [];
+      }
+      if (!direct[source].includes(x) {
+        direct[source].push(x);
+      }
+
+      // overwrite indirect dependencies
+      indirect[x] = deps;
+
+
+ b) Resource x wird gelöscht
+    ------------------------
+      source = x permanent ? '' : curr.screen;
+      if (direct[source] === undefined) {
+        return
+      }
+      const pos = direct[source].indexOf(x);
+      if (pos === -1) {
+        return;
+      }
+      direct['source'].splice(pos, 1);
+
+      // delete indirect dependencies
+      delete indirect[x];
+
+
+ c) Sync Screen-Resources for screen y
+    ----------------------------------
+      if (!direct[y]) {
+        return;
+      }
+      const synced = [];
+      direct[y] = direct[y].filter(id => avail.includes(id));
+
+      // sync
+
+
+
+  indirect
+  -----------
+    json1 -> [json3]
+    json3 -> [img1]
+
+  screen A
+  -----------
+    -> json1
+    -> json2
+
+    LOAD => [json1, json2, json3, img1]
+
+  screen B
+  -----------
+    -> json3
+
+    LOAD => [json3, img1]
+
+
+
+Löschen von "json1":
+
+  indirect
+  -----------
+    json3 -> [img1]
+
+  screen A
+  -----------
+    -> json2
+
+    LOAD => [json2]
+
+  screen B
+  -----------
+    -> json3
+
+    LOAD => [json3, img1]
+
+
+Löschen von "json3":
+
+    indirect
+    -----------
+    json1 -> []
+
+    screen A
+    ----------
+     -> json1
+     -> json2
+
+    screen B
+    ----------

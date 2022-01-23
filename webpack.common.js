@@ -5,7 +5,9 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
     entry: {
         index: "./src/app/index.js",
-        editor: "./src/app/editor.js"
+        editor: "./src/app/editor.js",
+        base: "./src/app/base.js",
+        layout: "./src/app/layout.js"
     }, // webpack entry point. Module to start building dependency graph
     output: {
         path: path.resolve(__dirname, 'dist'), // Folder to store generated bundle

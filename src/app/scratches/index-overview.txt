@@ -1,0 +1,107 @@
+Cells:
+ a) col
+ b) index
+ c) [index, event1, ..., eventN]
+
+Writes:
+ a) raw-write: value (ersetzt Zelle mit neuem Wert)
+ b) index-write: value (ersetzt lediglich den index-Wert)
+ c) event-overwrite: [event1, ..., eventN] (ersetzt die Events im Array)
+
+Read:
+ a) raw-read: gibt den kompletten Zellenwert zurück
+ b) index-read: gibt nur den index-Wert der Zelle zurück
+ c) event-read: gibt einen Event-Array zurück
+
+
+
+
+
+
++ getEntityProps()
++ getEntityPropValue(index, prop)
++ getEntityObject(index)
++ getEntityValue(index)
++ getEntityByPropValue()
++ getPropValues(prop, indices)
++ getEntityObjects(indices)
++ getMatchingEntities(matchValue)
++ getView(start, length, match, sort)
++ getAutoProps();
+
+setEntityPropValue(index, prop, value)
+setEntityValue(index, value)
+setEntityObject(obj, overwrite = false)
+setEntityObjects(objects, overwrite = false)
+
+deleteEntityPropValues(index)
+deleteEntity(index)
+deleteEntities(indices)
+
+hasPropValueMatch(prop, matchFunction)
+hasPropValue(prop, value)
+
+assignAutoProps(updateIndices);
+
+
+
+
+setItems()
+
+
+
+
+
+
+       |         VALUE            | SEARCH            DRAG   CHANGE  PROPS
+Color:   unique  unsorted   color   prefix*  insert   yes    color
+Char:    unique  sorted     char    multim    -        -     image   image
+Tile:    unique  sorted     index   exact    insert    -     image   image, animation, props
+Alias:   unique  sorted     name    substr    -        -      -      tile
+Assign:   -      unsorted   char    -         -        -     image   image
+Brush:   unique  sorted     name    substr    -        -      -      tiles
+Sprite:  unique  sorted     name    substr    -        -     image   image, width, height
+Frame:    -      unsorted   index   -        insert   yes     -      duration
+
+
+ADD:
+----------------
+  DO:
+    undoIndices = setIndicesFromObjects([{value, ...props},...], false);
+  UNDO:
+    deleteIndices(undoIndices)
+
+INSERT:
+----------------
+  DO:
+    undoIndices = setIndicesFromObjects(index, [{value, ...props}], false);
+  UNDO:
+    deleteIndices(undoIndices)
+
+REPLACE:
+----------------
+    undoIndices = extractIndexFrom(replaceObjects);
+    undoObjects = getObjectsFromIndices(undoIndices)
+  DO:
+    deleteIndices(undoIndices);
+    setIndicesFromObjects(replaceObjects, true)
+  UNDO:
+    deleteIndices(undoIndices);
+    setIndicesFromObjects(undoObjects, true)
+
+CHANGE:
+----------------
+    changeProp = getChangeProp()
+    undoValue = getIndexProp(changeProp)
+  DO:
+    setPropValue(index, changeProp, value)
+  UNDO:
+    setPropValue(index, changeProp, undoValue)
+
+DELETE:
+----------------
+    undoObjects = getObjectsForIndices(indices)
+  DO:
+    deleteIndices(indices)
+  UNDO:
+    setIndicesFromObjects(undoObjects, false)

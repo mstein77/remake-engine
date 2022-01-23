@@ -17,6 +17,9 @@
     "type": "git",
     "url": "git+https://github.com/mstein77/2DFireEngine.git"
   },
+  "browserslist": [
+    "last 2 versions"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -31,6 +34,7 @@
     "copy-webpack-plugin": "^5.1.1",
     "css-loader": "^1.0.0",
     "html-webpack-plugin": "^3.2.0",
+    "jsdoc": "^3.6.6",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.4",
     "style-loader": "^0.23.0",

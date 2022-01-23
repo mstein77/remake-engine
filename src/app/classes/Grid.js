@@ -1,10 +1,204 @@
 import {CellSelection} from "./CellProvider";
 
-const {d} = require('../helper/helper');
+const {d, cloneDeep} = require('../helper/helper');
+
+class CellValue {
+    constructor() {
+    }
+
+    getName() {
+        return 'Raw';
+    }
+
+    getId() {
+        return 'raw'
+    }
+
+    add(base, add) {
+        return add;
+    }
+
+    getEmpty() {
+        return undefined;
+    }
+
+    sub(base, sub) {
+        return (base === sub) ? this.getEmpty() : base;
+    }
+}
+
+class CellRawValue extends CellValue {
+
+    constructor(id, empty = null) {
+        super();
+        this.id = id;
+        this.empty = empty;
+    }
+
+    getEmpty() {
+        return this.empty
+    }
+
+    get(curr) {
+        if (!Array.isArray(curr)) {
+            return curr;
+        }
+        return [...curr]
+    }
+
+    set(curr, value) {
+        return cloneDeep(value)
+    }
+
+    isEmpty(curr) {
+        return curr === this.empty;
+    }
+
+    getName() {
+        return 'Raw';
+    }
+
+    getId() {
+        return this.id
+    }
+}
+
+class CellTileValue extends CellValue {
+    constructor() {
+        super();
+    }
+
+    getEmpty() {
+        return 0
+    }
+
+    get(curr) {
+        if (Array.isArray(curr)) {
+            return curr[0]
+        }
+        return curr;
+    }
+
+    set(curr, value) {
+        if (Array.isArray(curr)) {
+            curr[0] = value;
+            return curr;
+        }
+        return value;
+    }
+
+    isEmpty(curr) {
+        return curr === 0
+    }
+
+    getName() {
+        return 'Tiles';
+    }
+
+    getId() {
+        return 'tile'
+    }
+}
+
+class CellEventsValue extends CellValue {
+    constructor() {
+        super();
+    }
+
+    getEmpty() {
+        return []
+    }
+
+    get(curr) {
+        if (Array.isArray(curr)) {
+            return curr.slice(1);
+        }
+        return [];
+    }
+
+    set(curr, value) {
+        if (Array.isArray(curr)) {
+            if (value.length === 0) {
+                return curr[0];
+            }
+            return [curr[0], ...value]
+        }
+        if (value.length === 0) {
+            return curr;
+        }
+        return [curr, ...value]
+    }
+
+    isEmpty(curr) {
+        return curr.length === 0
+    }
+
+    add(base, addItems) {
+        const result = [...base];
+        for (let item of addItems) {
+            if (!result.includes(item)) {
+                result.push(item);
+            }
+        }
+        return result
+    }
+
+    sub(base, subItems) {
+        const result = [];
+        for (let item of base) {
+            if (!subItems.includes(item)) {
+                result.push(item);
+            }
+        }
+        return result;
+    }
+
+    getName() {
+        return 'Events';
+    }
+
+    getId() {
+        return 'events'
+    }
+}
+
+CellValue.raw = new CellRawValue('raw');
+CellValue.color = new CellRawValue('color', '#00000000');
+CellValue.index = new CellRawValue('index', 0);
+CellValue.tile = new CellTileValue();
+CellValue.events = new CellEventsValue();
 
 class Grid {
 
-    constructor() {}
+    constructor() {
+        this.baseCellValue = CellValue.raw;
+        this.dimListeners = [];
+    }
+
+    addDimListener(listener) {
+        this.dimListeners.push(listener);
+    }
+
+    removeDimListener(listener) {
+        const index = this.dimListeners.indexOf(listener);
+        if (index !== -1) {
+            this.dimListeners.splice(index, 1)
+        }
+    }
+
+    notifyDimChange() {
+        for (let listener of this.dimListeners) {
+            listener();
+        }
+    }
+
+    hasEvents() {
+        return false;
+    }
+
+    getLength() {
+        return null
+    }
 
     getWidth() {
         return this.map.length === 0 ? 0 : this.map[0].length;
@@ -22,11 +216,6 @@ class Grid {
         return 1;
     }
 
-    getSize() {
-        // TODO: remove this
-        return Math.max(this.getCellSizeX(), this.getCellSizeY());
-    }
-
     getGridDim(width, height, grid, zoom) {
         const tileX = this.getCellSizeX() * zoom;
         const tileXPlusBorder = tileX + grid;
@@ -40,9 +229,13 @@ class Grid {
 
     drawCellValue(ctx, value, x, y, zoom) {};
 
-    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1) {
-        const viewX = Math.min(width, this.getWidth());
-        const viewY = Math.min(height, this.getHeight());
+    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1, players = null) {
+        const cellsX = this.getWidth();
+        const cellsY = this.getHeight();
+        if (posX + width > cellsX || posY + height > cellsY) return;
+
+        const viewX = width;
+        const viewY = height;
         const tileX = this.getCellSizeX() * zoom;
         const tileXPlusBorder = tileX + grid;
         const tileY = this.getCellSizeY() * zoom;
@@ -70,42 +263,41 @@ class Grid {
             let currX = grid;
             for (let x = 0; x < viewX; x++) {
                 const index = this.map[posY + y][posX + x];
-                this.drawCellValue(ctx, index, currX, currY, zoom);
+                this.drawCellValue(ctx, index, currX, currY, zoom, players);
                 currX += tileXPlusBorder;
             }
             currY += tileYPlusBorder;
         }
     }
 
-    getClonedValue(value, raw = false) {
-        return value;
-    }
-
     // cell methods
 
-    getEmptyCell() {
-        return null;
+    hasCell(x, y) {
+        return (y < this.getHeight() || x < this.getWidth());
     }
 
-    overwriteCell(x, y, value) {
-        this.map[y][x] = value;
+    getEmptyCell(cellValue = this.baseCellValue) {
+        return cellValue.getEmpty();
     }
 
-    getCellValue(posX, posY, raw = false) {
-        const rect = this.getRect(posX, posY, 1, 1, raw);
-        if (Array.isArray(rect) && rect.length > 0) {
-            return rect[0][0];
+    overwriteCell(x, y, value, cellValue = this.baseCellValue) {
+        this.map[y][x] = cellValue.set(this.map[y][x], value);
+    }
+
+    getCellValue(x, y, cellValue= this.baseCellValue) {
+        if (!this.hasCell(x, y)) {
+            return null;
         }
-        return null;
+        return cellValue.get(this.map[y][x]);
     }
 
     // row methods
 
-    getEmptyRow() {
+    getEmptyRow(cellValue= this.baseCellValue) {
         const row = [];
         let i = this.map[0].length;
         while (i > 0) {
-            row.push(this.getEmptyCell());
+            row.push(this.getEmptyCell(cellValue));
             i--;
         }
         return row;
@@ -125,6 +317,7 @@ class Grid {
                 }
                 no--;
             }
+            this.notifyDimChange();
             return added;
         } else {
             if (this.map.length + no < 1) {
@@ -135,6 +328,7 @@ class Grid {
             }
             const pos = start ? 0 : this.map.length + no;
             this.map.splice(pos, -no);
+            this.notifyDimChange();
             return -no;
         }
     }
@@ -146,16 +340,18 @@ class Grid {
             no--;
         }
         this.map.splice.call(this.map, index, 0, ...rows);
+        this.notifyDimChange()
     }
 
     deleteRows(index, no) {
         this.map.splice(index, no);
+        this.notifyDimChange()
     }
 
-    getClonedRow(row, raw = false) {
+    getClonedRow(row, cellValue= this.baseCellValue) {
         const result = [];
         for (let cell of row) {
-            result.push(this.getClonedValue(cell, raw));
+            result.push(cellValue.get(cell));
         }
         return result;
     }
@@ -177,6 +373,7 @@ class Grid {
                 }
                 no--;
             }
+            this.notifyDimChange();
             return added;
         } else {
             if (this.map[0].length + no < 1) {
@@ -189,6 +386,7 @@ class Grid {
             for (let i = 0, iMax = this.map.length; i < iMax; i++) {
                 this.map[i].splice(pos, -no);
             }
+            this.notifyDimChange();
             return -no;
         }
     }
@@ -202,59 +400,77 @@ class Grid {
         for (let column of this.map) {
             column.splice.call(column, index, 0, ...columns);
         }
+        this.notifyDimChange()
     }
 
     deleteColumns(index, no) {
         for (let row of this.map) {
             row.splice(index, no);
         }
+        this.notifyDimChange()
     }
 
     // rect methods
 
-    getRect(posX, posY, width, height, raw = false) {
+    getRect(posX, posY, width, height, cellValue= this.baseCellValue) {
         const slice = this.map.slice(posY, posY + height);
         const rowSlices = [];
         for (let row of slice) {
-            rowSlices.push(this.getClonedRow(row.slice(posX, posX + width), raw));
+            rowSlices.push(this.getClonedRow(row.slice(posX, posX + width), cellValue));
         }
         return rowSlices;
     }
 
-    fillRect(posX, posY, width, height, elem) {
+    fillRect(posX, posY, width, height, elem, cellValue= this.baseCellValue) {
         for (let y = posY, yMax = posY + height; y < yMax; y++) {
             for (let x = posX, xMax = posX + width; x < xMax; x++) {
-                this.overwriteCell(x, y, this.getClonedValue(elem))
+                this.overwriteCell(x, y, elem, cellValue)
             }
         }
     }
 
     reduceToRect(posX, posY, width, height) {
         // TODO also set in model.key
-        this.map = this.getRect(posX, posY, width, height, true);
+        this.map = this.getRect(posX, posY, width, height);
+        this.notifyDimChange()
     }
 
     // path methods
 
-    writePath(path) {
+    writePath(path, cellValue= this.baseCellValue) {
         for (let key in path) {
             const pos = key.split(' ');
-            this.overwriteCell(pos[0], pos[1], this.getClonedValue(path[key]));
+            this.overwriteCell(pos[0], pos[1], path[key], cellValue);
         }
     }
 
     // selection methods
 
-    getEmptySelection() {
-        return new CellSelection('rect', [[this.getEmptyCell()]]);
+    getEmptySelection(cellValue= this.baseCellValue) {
+        return new CellSelection('rect', [[this.getEmptyCell(cellValue)]], cellValue);
     }
 
-    getSelection(posX, posY, width, height, raw = false) {
-        return new CellSelection('rect', this.getRect(posX, posY, width, height, raw));
+    getSelection(posX, posY, width, height, cellValue= this.baseCellValue) {
+        return new CellSelection('rect', this.getRect(posX, posY, width, height, cellValue), cellValue);
     }
 
     getRawSelection(posX, posY, width, height) {
-        return this.getSelection(posX, posY, width, height, true);
+        return this.getSelection(posX, posY, width, height);
+    }
+
+    isCellValueSupported(cellValue) {
+        return (cellValue === this.baseCellValue)
+    }
+
+    getSelectionCellValue(selection, required = null) {
+        const cellValue = selection.getCellValue();
+        if (!this.isCellValueSupported(cellValue)) {
+            throw Error(`Grid does not support cell value ${cellValue.getName()} from selection!`);
+        }
+        if (required !== null && !required.includes(cellValue)) {
+            throw Error(`Got unexpected cell value ${cellValue.getName()}`);
+        }
+        return cellValue;
     }
 
     writeSelection(posX, posY, selection, overwrite = null, writeEmpty = true) {
@@ -266,18 +482,19 @@ class Grid {
             old: {},
             new: {}
         };
+        const cellValue = this.getSelectionCellValue(selection);
 
-        const empty = this.getEmptyCell();
         while (i < iMax) {
             row = selection.getRow(i);
             for (let x = 0; x < xMax; x++) {
                 const value = overwrite !== null ? overwrite : row[x];
-                if (writeEmpty || (!writeEmpty && value !== empty)) {
+                if (writeEmpty || (!writeEmpty && !cellValue.isEmpty(value))) {
                     const key = (posX + x) + ' ' + posY;
-                    result.old[key] = this.getClonedValue(this.map[posY][posX + x]);
-                    this.overwriteCell(posX + x, posY, this.getClonedValue(value));
-                    result.new[key] = this.getClonedValue(value);
+                    result.old[key] = cellValue.get(this.map[posY][posX + x]);
+                    this.overwriteCell(posX + x, posY, value, cellValue);
+                    result.new[key] = value;
                 }
+
             }
             posY++;
             i++;
@@ -285,31 +502,30 @@ class Grid {
         return result;
     }
 
-    fillRectWithSelection(posX, posY, width, height, selection, raw = false) {
+    fillRectWithSelection(posX, posY, width, height, selection) {
+        const cellValue = this.getSelectionCellValue(selection);
         for (let y = 0; y < height; y++) {
             const row = selection.getRow(y, width);
             for (let x = 0; x < width; x++) {
-                this.overwriteCell(posX + x, posY + y, this.getClonedValue(row[x], raw));
+                this.overwriteCell(posX + x, posY + y, row[x], cellValue);
             }
         }
     }
 
-    fillRectWithRawSelection(posX, posY, width, height, selection) {
-        this.fillRectWithSelection(posX, posY, width, height, selection, true);
-    }
-
-    importSelection(selection, raw = false) {
+    importSelection(selection) {
+        const cellValue = this.getSelectionCellValue(selection, [this.baseCellValue]);
         this.map = [];
         const iMax = selection.getHeight();
         let i = 0;
         while (i < iMax) {
-            this.map.push(this.getClonedRow(selection.getRow(i), raw));
+            this.map.push(this.getClonedRow(selection.getRow(i), cellValue));
             i++;
         }
+        this.notifyDimChange();
     }
 
     importRawSelection(selection) {
-        this.importSelection(selection, true);
+        this.importSelection(selection);
     }
 }
 
@@ -342,6 +558,10 @@ class EmptyGrid extends Grid {
         return this.cellSizeY;
     }
 
+    drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1, players = null) {
+        super.drawGrid(ctx, Math.max(posX, 0), Math.max(posY, 0), width, height, grid, zoom, players);
+    }
+
     drawCellValue(ctx, value, x, y, zoom) {
         if (this.opacity === '00') {
             return;
@@ -364,10 +584,6 @@ class IndexGrid extends Grid {
         this.map = model[key];
     }
 
-    getEmptyCell() {
-        return 0;
-    }
-
     getCellSizeX() {
         return this.index.getSizeX();
     }
@@ -376,14 +592,23 @@ class IndexGrid extends Grid {
         return this.index.getSizeY();
     }
 
-    drawCellValue(ctx, value, x, y, zoom) {
-        this.index.drawEntity(ctx, value, x, y, zoom);
+    drawCellValue(ctx, value, x, y, zoomOrAvail, players = null) {
+        this.index.drawEntity(ctx, value, x, y, zoomOrAvail, players);
     }
 }
 
 class TilesGrid extends IndexGrid {
     constructor(tilesIndex, model, key = 'map') {
         super(tilesIndex, model, key);
+        this.baseCellValue = CellValue.index;
+    }
+
+    isCellValueSupported(cellValue) {
+        return [CellValue.index, CellValue.tile, CellValue.events].includes(cellValue)
+    }
+
+    hasEvents() {
+        return true;
     }
 
     getAliases() {
@@ -404,27 +629,58 @@ class TilesGrid extends IndexGrid {
         return obj.index;
     }
 
-    drawCellValue(ctx, value, x, y, zoom) {
+    drawEvent(ctx, value, x, y, zoom) {
+        const event = this.index.model.events && this.index.model.events[value];
+        if (!event || !event.width) {
+            return false;
+        }
+        ctx.drawImage(this.index.model.eventsImg, event.x, event.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
+        return true;
+    }
+
+    updatePlayers(players, posX, posY, width, height) {
+        const animations = [];
+        const rect = this.getRect(posX, posY, width, height, CellValue.tile);
+        for (let row of rect) {
+            for (let tile of row) {
+                const obj = this.index.model.tiles[tile];
+                if (obj && obj.animation && !animations.includes(obj.animation)) {
+                    animations.push(obj.animation);
+                }
+            }
+        }
+        players.setAnimations(animations);
+    }
+
+    drawCellValue(ctx, value, x, y, zoom, players = null) {
         let events = [];
         if (Array.isArray(value)) {
             events = value.slice(1);
             value = value[0];
         }
         const alias = typeof(value) === 'string' ? value : null;
-        value = this.getIndexForTile(value);
         const obj = this.index.model.tiles[value];
-        if (obj && obj.animation) {
-            value = this.index.model.animations[obj.animation].frames[0].id;
+        if (obj) {
+            if (players && obj.animation) {
+                const frame = players.getCurrFrame(obj.animation);
+                if (frame) {
+                    value = frame.id;
+                }
+            } else {
+                value = this.getIndexForTile(value);
+            }
         }
         super.drawCellValue(ctx, value, x, y, zoom);
         if (events.length) {
-            ctx.fillStyle = '#00FF0088';
-            ctx.fillRect(x + 2, y + 2, 12, 12);
-            ctx.strokeStyle = '#000000';
-            ctx.strokeRect(x + 2, y + 2, 12, 12);
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '10px';
-            ctx.fillText('' + events.length, x + 6, y + 12, 12);
+            let hasNoImage = true;
+            if (this.index.model.events) {
+                for (let event of events) {
+                    if (this.index.model.events[event]) {
+                        hasNoImage = false;
+                        break;
+                    }
+                }
+            }
         }
         if (alias) {
             const size = this.getCellSizeX() * zoom;
@@ -439,9 +695,21 @@ class TilesGrid extends IndexGrid {
 
 class WrappingIndexGrid extends IndexGrid {
 
-    constructor(tilesIndex) {
+    constructor(tilesIndex, base = null, players = null) {
         super(tilesIndex, {map: []});
-        this.wrapWidth = tilesIndex.getLength();
+        this.base = base;
+        this.mapping = tilesIndex.getView(0, tilesIndex.getLength(), [null, base]);
+        this.wrapWidth = Math.max(this.mapping.count, 1);
+        this.players = players;
+        this.hasAnimationProp = players && tilesIndex.hasEntityProp('animation');
+    }
+
+    getLength() {
+        return this.index.getLength()
+    }
+
+    setMatch(match) {
+        this.mapping = this.index.getView(0, this.index.getLength(), [match, this.base]);
     }
 
     setWrapWidth(value) {
@@ -449,19 +717,49 @@ class WrappingIndexGrid extends IndexGrid {
     }
 
     getWidth() {
-        return Math.min(this.wrapWidth, this.index.getLength());
+        return Math.min(this.wrapWidth, this.mapping.count);
     }
 
     getHeight() {
-        return Math.ceil(this.index.getLength() / this.wrapWidth);
+        return Math.ceil(this.mapping.count / this.wrapWidth);
     }
 
     getCellValue(x, y, raw = false) {
         const index = y * this.wrapWidth + x;
-        if (index >= this.index.getLength()) {
+        if (index >= this.mapping.count) {
             return null;
         }
-        return index;
+        return this.mapping.matches[index];
+    }
+
+    updatePlayers(posY, width, height) {
+        if (!this.players) {
+            return;
+        }
+        const animations = [];
+        const viewX = Math.min(width, this.getWidth());
+        const viewY = Math.min(height, this.getHeight());
+        for (let y = 0; y < viewY; y++) {
+            let currIndex = (posY + y) * this.wrapWidth;
+            for (let x = 0; x < viewX; x++) {
+                const animation =
+                    this.hasAnimationProp ?
+                        this.index.getEntityPropValue(
+                            this.mapping.matches[currIndex],
+                            'animation'
+                        ) :
+                        this.index.getEntityValue(this.mapping.matches[currIndex]);
+                if (animation != '') {
+                    animations.push(animation);
+                }
+                currIndex++;
+            }
+        }
+        this.players.setAnimations(animations)
+    }
+
+    drawCellValue(ctx, value, x, y, zoomOrAvail) {
+        super.drawCellValue(ctx, this.mapping.matches[value], x, y, zoomOrAvail, this.players);
     }
 
     drawGrid(ctx, posX, posY, width, height, grid = 0, zoom = 1) {
@@ -494,7 +792,7 @@ class WrappingIndexGrid extends IndexGrid {
             let currX = grid;
             let currIndex = (posY + y) * this.wrapWidth;
             for (let x = 0; x < viewX; x++) {
-                this.drawCellValue(ctx, currIndex, currX, currY, zoom);
+                this.drawCellValue(ctx, currIndex, currX, currY, {width: tileX, height: tileY}, this.players);
                 currX += tileXPlusBorder;
                 currIndex++;
             }
@@ -510,18 +808,15 @@ class BitmapGrid extends Grid {
         this.model = model;
         this.key = key;
         this.map = this.getColorMapFromImageData(model[key]);
-    }
-
-    getEmptyCell() {
-        return '#00000000';
+        this.baseCellValue = CellValue.color;
     }
 
     getCellSizeX() {
-        return 10;
+        return 5;
     }
 
     getCellSizeY() {
-        return 10;
+        return 5;
     }
 
     drawCellValue(ctx, value, x, y, zoom) {
@@ -576,6 +871,7 @@ class BitmapGrid extends Grid {
 }
 
 export {
+    CellValue,
     EmptyGrid,
     IndexGrid,
     WrappingIndexGrid,

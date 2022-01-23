@@ -1,0 +1,485 @@
+REACT-HOOKS:
+
+a) Funktionale Komponente
+
+function({ name }) {
+    //
+
+    // return dom
+    return (
+        <div>
+          Hello {name}
+        </div>
+    )
+}
+
+b) Funktionale Komponente mit Hooks
+
+function({ name }) {
+   // hooks
+
+   //return dom
+   return (
+   )
+}
+
+
+// 1. state hook: useState
+const [counter, setCounter] = useState(3);
+
+// 2. lifecycle hook: useEffect
+useEffect(() => {
+    console.log('MOUNTED');
+    return () => {
+        console.log('UNMOUNTED');
+    }
+}, []);
+
+// 3. context hook: useContext
+function App() {
+  const myAppContext = {
+    x: y,
+
+  };
+  return (
+        <AppContext.provider value={myAppContext}>
+           <blah>
+              <Foo></Foo>
+           </blah>
+        </AppContext>
+  );
+}
+const appContext = useContext(AppContext);
+
+// 4. Reference-Hook: useRef
+const divRef = useRef(null);
+
+{current: null}
+
+
+--------------------------
+ PERSISTIERUNG:
+--------------------------
+ Caches:
+   - "global" (globale Ebene)
+       + Farb-Modell
+       + bitmapEditorBorders
+
+   - "game.<id>" (Game-Ebene)
+       + LastColors
+       + zoomPixelRatio
+       + defaultTransparencyColor (?)
+
+   - "game.<id>.<editorId>" (Editor-Ebene)
+       + sectionSize
+       + sectionCollapse
+
+   - "game.<id>.<resource>" (Resource-Ebene)
+
+--------------------------
+ Beispiel TextPane:
+   - Preview:
+      + BgColor wird durch Resource initialisiert (=> kein Caching)
+      + Zoom: aktueller Game-Zoom oder Preview-Pixel-Ratio auf Game-Ebene
+      + Show-Marker aus Globaler-Ebene
+
+   - Characters:
+      + BgColor:
+
+---------------------------
+
+---------------------------
+ CssCtx
+       getConstValues(source, target = null)
+         ...iteriert über alle source-key/values und falls für
+            den Key ein Typ feststeht und der key noch nicht im
+            target, dann übernehme diesen mit Wert und gebe
+            Ergebnis zurück
+
+       setStyleProp(style, key, value)
+         ...setzt auf dem style die CssConst zum key auf
+            den value
+
+
+   - init(config, theme)
+        baue values durch
+          1. getConstValues(config)
+          2. getConstValues(theme, values)
+        Speichere values in reg:values
+
+        // sichern
+        Iteriere über alle key2type:
+          prop = konstante zu key
+          value = doc.body.style.getPropertyValue(prop)
+          speichere value|null in reg:body[prop]
+
+        applyTo(doc.body)
+
+   - getValues() => reg:values
+   - getValue(name) => reg:values[name]
+   - setValue
+       setzt über setStyleProp den name auf den value
+       und speichert diesen auch in reg:values und wird
+       alle Watcher notifien
+
+   - setValues
+       ...analog wie zuvor nur für merhere keys und nur
+       einer Notification
+
+   - applyTo(node)
+        Iteriere über alle key/value in reg:values:
+          Setze StyleProp(node.style, key, value)
+
+   => reg:body
+---------------------------
+
+---------------------------
+ * Focus-Items um Tree-Navi erweitern (collapsing)
+ - Focus-Items left/right-Arrow für Toggling
+
+ - planes VS nodes überarbeiten
+ - Tree Node-Rendering refactorn
+ - shift-space: toggle
+
+ - Knoten-Beschreibung überarbeiten
+
+ - Collapser-Hover (Button?)
+ ? Rahmen ausblenden falls collapsed item > 1
+ - ScrollArea-Offset berücksichtigen
+ - Collapse-Persistierung
+ - Zoom abhängig vom Darstellungs-Bereich
+ - Collapse-Animation für Tree
+ - Pane-Only-View
+ - Cursor-Marker: Seitbewegung
+---------------------------
+ Urlaubs-Fahrplan:
+---------------------------
+ - BUG: outside-focus setzt cursor auf 1. plane
+
+ - tree: marker border benutzen
+
+---------------------------
+ DONE :)
+---------------------------
+ + TextPaneEditor: Preview-Markierung kaputt
+ + TilesMapEditor: Bitmap-Editor lädt doppelte Farben in Picker
+ + EntityPicker: leeres Filterergebnis macht Ansicht kaputt
+ + FocusElements: up & down-arrow behandeln
+ + From in EditorSection Header richtig befüllen
+ + tabSetting in Exports und JSON-View nutzen
+ + UndoRedo umstellen auf ButtonStack
+ + Modal: kein Submit bei Return
+ + TextPaneEditor: Reassign auf markierte Chars führt zu leeren images
+ + Sidebar: keine Scrollbar wenn Tabs overflowen
+ + Marker: Resize-Handles kaputt
+ + TextPaneEditor: Undo von Checkbox in BlockProps funzt nicht
+ + Picker: Ruler-Beschriftung in vertikaler Richtung falsch
+ + JsonView: default-Erkennung schlägt manchmal fehl
+ + GradientPicker: Overflow-Probleme
+ + Mode-Switching fixen
+ + EntityPicker: DoubleClick funktioniert nicht
+ + Grid: kein Marker/Cursor sichtbar beim Drag-Modus
+ + Modal: Button-Focus bei close in ButtonStack funktioniert nicht
+ + EntityStack: ButtonStack & Active auf Focus-Group-Logik umstellen
+ + Focus auf Button wird bei Klick nicht gesetzt
+ + Grid: marker-clear => mounting-problem
+ + Beim Verschieben auf dem EntityStack wird das falsche FocusItem reaktiviert
+ + Modal: quick-keys im modal-modus sperren
+ + Modal: Submit per Return funzt nicht, wenn focus verloren
+ + AnimationManager: Footer abkoppeln um Duration-Eingabe zu fixen
+ + ButtonStack: OkCancel: Buttons
+ + TextPaneEditor: Multi-Select aktiv => Actions werden angezeigt
+---------------------------
+ BUGS:
+---------------------------
+ - BUG: close per ESC führt zu Reset auf den Resourcen??
+ - OkCancel: Flexing des Mittelteils funktioniert nicht
+ - TextPaneEditor: Fehler in Undo/Redo-Logik auf Chars (Add Font -> Undo, Delete Font)
+
+ - Grid: Flex-Berechnung stimmt manchmal nicht (Scrollbars + Rulers)
+ - Tooltip: automatischer Hide funktioniert nicht
+ - Tooltip: Animation auf Tooltip => Endlosgenerierung :D
+ - Marker: Invert funktioniert nicht
+ - TileTracker: Rendering call error
+ - Marker: schnelles Resizing nach Rechts über Rand füllt manchmal nicht bis zum Ende
+---------------------------
+ REFACT:
+---------------------------
+ - Grid: ToolbarGroups fixen
+
+ ? ES2021 generieren
+ - Ruler: Berechnung und Farben umstellen auf Theme
+ - TextTuple
+ - ColorPicker: auf OkCancel umstellen
+ - JsonView: Default bei Eingabe
+ - UndoRedo sperren bis Ausführung fertig
+ - Event-Edit: Add falls kein image
+ - Button: tab bei deaktivierung immer drin lassen
+ - Bitmap: close-Button ausrichten und auf Stack-Group umstellen
+ - Bitmap-Editor: Farbe-Hexwert ausgeben
+ - Bitmap-Editor: Pixel/Position-Tracking
+ - Canvas: inaktiven Bereich dunkler ausgrauen
+ - Grid: Side-Buttons deaktivierbar machen
+ - Grid: Side-Buttons nur bei Hover/Focus einblenden
+ - SpriteEditor: Preview-Bereich aus TextEditor übernehmen
+ - TextEditor: Reassign Lösung zum deaktivieren und Umstellung auf Footer
+ - SpriteEditor: Sprites/Animations über SideTabs
+ - SpriteEditor: new Sprite über Form
+ - SpriteEditor: import über Multi-Select
+ - Sprite/TilesMap: Resize über ResizeProps
+ - Grid: umstellen der Border-Color
+ - Grid: Subgrid-Unterstützung
+ - BitmapEditor: Light-Table feature
+ - Context-Palette für ColorPicker (vor allem bei Theme)
+ - EntityStack: Drag & Drop (Animation Frames!)
+ - EntityStack: Multi/Range-Select via Key+Mouse inklusive Overscroll
+ - Zoom-Persistierung
+ - Bg-Persistierung
+ - EventOverlay: Count-Boxen Farbe und Font aus Theme
+ - BrushManager: Import from Bitmap
+ - Save-Settings => Editor-Reset bei Änderungen (zB. tabs im JsonView)
+
+---------------------------
+ - Font-Styling
+ - Sections
+     - shadow für button
+     - zentrale ColorPickerModals (?)
+ - gradient-input
+     - Scroll & Sizing issues
+     - Before/Cancel
+ - Persistierung
+     - Zoom
+     - Background
+---------------------------
+ - FOCUS-Handling
+    - BUG: space on toolbar action triggers selection
+       - BUG: Drag-Drop deaktiviert element
+
+ - Entity-Manager
+    - FixHeight im Font-Manager richtig berechnen
+    - marked-reset
+    - sorting
+    - area-selection & scroll
+    - focus-key-movement
+---------------------------
+ BUG: tooltip-mouseout wird manchmal nicht getriggert
+ - Tooltips zusammenfassen?
+ - Preview: Double-Click => New on position
+ - Preview: Auto-Scroll on Drag
+
+
+=======================================
+ TILES-PANE EDITOR
+=======================================
+ * Selected-Anzeige
+
+ - EntityPicker/Manager: TextAndPicture
+
+
+ /**
+
+ PREVIEW:
+
+   Der Background im Preview sollte
+    - per Default den BG aus der Reource nehmen, ABER den gibt es nicht :D
+        => man könnte diesen evt. aus einer BG-Pane ermitteln, die dahinter liegt
+
+    - wird dieser überschrieben, dann wird das auf Editor-Resourcen-Ebene gespeichert und
+      per X-Button zurücksetzbar gemacht (evt. reicht Cache-Clear?)
+
+   Für Dim und Zoom wird der Default ebenfalls aus Resource (Dim) bzw. Game (Zoom)
+   bestimmt.
+
+   Der FilterPipelineModal übernimmt die aktuelle BG-Color und Zoom
+   Änderungen an der BG-Color und am Zoom werden verworfen (bzw. man könnte sich beim
+   Zoom auch die Pixel-Ratio merken und als Minimum anwenden)
+
+ CHARACTERS:
+
+   Der Hintergrund wird hier per Default auf die Default-Transparenz gesetzt
+   Wird überschrieben, dann wird dies Resource-Abhängig gesetzt und in alle weiteren
+   Modale, die von hier getriggert werden genauso gehandhabt.
+
+ EDIT-Preivew:
+   Zoom Einpassung an Platzvorgabe, evt. mit Min-Pixel-Ratio?
+
+ COPY-ENTITY:
+
+   Ruler + Border werden global gepeichert
+   Zoom wird mit Picker-Pixel-Ratio ermittelt und bei Änderungen auf Resourcen-Ebene
+   gespeichert
+
+
+ EDIT-BITMAP:
+   Borders und Rulers kommen aus dem globalen Cache.
+   Der Zoom kann hier global gespeichert werden, oder auch per pixel-ratio vorbelegt
+   werden
+
+ BITMAP-Selection:
+   BG wird mit Default-BG belegt und bei Änderungen auf Globaler-Ebene gespeichert
+   (evt. sinnvoller: übernahme aus Resource?)
+   Zoom wird ebenfalls auf Globaler Ebene gespeichert
+
+ */
+
+
+
+
+
+--------------------------------
+ Property Grid
+--------------------------------
+ a) Modal mit Min-Width
+
+    Die width vom PropGrid ist dann, das Minimum aus
+     - max(cells-min-width, min-width auf PropGrid)
+     - max-width auf dem PropGrid
+     - max-width auf dem Modal
+
+   In den letzten beiden Fällen übersteigt die min-
+   width des PropGrids die Avail-Width deswegen muss
+   dann ein Scrollbar angezeigt werden
+
+   <Block>
+     <Grid maxWidth={400} columns="- -">
+        <Label>Name1</Label>
+        <Block full="h">...</Block>
+
+        <Label>Name2</Label>
+        <Block full="h">...</Block>
+
+     </Grid>
+   </Block>
+
+   Was wir hier nicht brauchen ist ein auffüllen auf
+   die volle Width des umgebenden Blocks falls dieser
+   eine avail-width > min-content hat.
+
+ b) Modal mit Min-Width und Flex-Cells
+
+    wie zuvor aber wenn der letzte fall eintritt dann
+    wird die avail-width statt des min-contents für
+    die width des grids genommen.
+
+
+
+
+
+
+ height: min-content (evt. auch Full, wenn GridProperty?)
+ width: full
+
+ Die Content-Cells richten sich nach längsten Content-Cell, wenn
+ diese kleiner gleich dem verfügbaren Platz ist => full
+ ansonsten hat jede Cell die gleiche Länge wie die Content-Cell
+ Bei Überlänge muss das Ganze Grid Scrollbar sein (in beide Richtungen)
+
+ Die Länge der Name-Cells ist entweder vorgegeben oder min-content,
+ wobei für den Name defaultmäßig ein Ellipsis genutzt wird, aber auch
+ ein Wrapping aktiviert werden kann.
+
+ Padding: das Property-Grid selber übernimmt nur ein vertikales padding
+ Die Name Cells sind bottom-left padded die content-cells bottom-left-right
+
+ Sind borders aktiviert dann gibt es
+
+
+ <Block full scroll>
+    <Grid columns={nameCellWidth + ' *'}>
+        <Block end shorten padded={BOTTOM|LEFT}>Test1:</Block>
+        <Block full="h" padded={BOTTOM|LEFT|RIGHT}>Fill me!</Block>
+
+        <Block end shorten padded={BOTTOM|LEFT}>Test2:</Block>
+        <Block full="h" padded={BOTTOM|LEFT|RIGHT}>Kill me!</Block>
+
+
+    </Grid>
+ </Block>
+
+
+
+
+BLUE:
+
+{
+    "defaultPadding": 9,
+    "boxBorderWidth": 1,
+    "maxWidth": 1200,
+    "maxHeight": 1200,
+    "buttonBorderRadius": 4,
+    "boxBorderColor": "#2b7797",
+    "toolbarBgColor": "#2f304b",
+    "inputBgColor": "#b0aec1",
+    "inputColor": "#29292e",
+    "inputBorderColor": "#a8a8a8",
+    "editorBgColor": "#080808",
+    "editorColor": "#9aa0a2",
+    "buttonBgColor": "#1e42ae",
+    "buttonColor": "#b0d5e8",
+    "buttonBorderColor": "#347f66",
+    "linkResources": "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
+    "buttonFontFamily": "Monospace",
+    "buttonBorderStyle": "solid",
+    "fontUrl": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
+}
+
+GRAY:
+
+{
+    "defaultPadding": 9,
+    "boxBorderWidth": 1,
+    "maxWidth": 1200,
+    "maxHeight": 1200,
+    "buttonBorderRadius": 4,
+    "boxBorderColor": "#000000",
+    "toolbarBgColor": "#606060",
+    "inputBgColor": "#c9d2c2",
+    "inputColor": "#4a6077",
+    "inputBorderColor": "#296064",
+    "editorBgColor": "#404040",
+    "editorColor": "#B0B0B0",
+    "buttonBgColor": "#6c83a0",
+    "buttonColor": "#303020",
+    "buttonBorderColor": "#606060",
+    "linkResources": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i https://fonts.googleapis.com/icon?family=Material+Icons",
+    "buttonFontFamily": "Arial",
+    "buttonBorderStyle": "inset"
+}
+
+LAST:
+
+{
+    "defaultPaddingPx": 7,
+    "boxBorderWidthPx": 1,
+    "maxWidthPx": 1200,
+    "maxHeightPx": 1200,
+    "boxBorderRgb": "#2b7797",
+    "toolbarBgRgb": "#13192b",
+    "inputBgRgb": "#b0aec1",
+    "inputRgb": "#29292e",
+    "inputBorderRgb": "#a8a8a8",
+    "inputBstyle": "solid",
+    "inputBorderWidthPx": 1,
+    "inputPaddingPx": 5,
+    "inputBorderRadiusPx": 4,
+    "checkBoxType": 1,
+    "editorBgRgb": "#080808",
+    "editorRgb": "#9aa0a2",
+    "buttonBgRgb": "#1e4274",
+    "buttonRgb": "#b0d5e8",
+    "buttonBorderRgb": "#536a91",
+    "buttonBstyle": "solid",
+    "buttonBorderWidthPx": 1,
+    "buttonMinPaddingPx": 1,
+    "buttonPaddingPx": 9,
+    "buttonBorderRadiusPx": 5,
+    "activeRgb": "#14240e",
+    "activeBgRgb": "#5b952b",
+    "activeBorderRgb": "#D0D0F0",
+    "errorBgRgb": "#AA0020",
+    "errorRgb": "#E0E0A0",
+    "focusRgba": "#FFFFDFCC",
+    "linkResourcesUrls": "https://fonts.googleapis.com/icon?family=Material+Icons https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i",
+    "buttonFont": "Monospace",
+    "fontUrl": "https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i"
+}

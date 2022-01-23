@@ -1,0 +1,119 @@
+Theme-Vars:
+--------------------------
+ Allgemein
+--------------------------
+1.) Editor
+
+  background-color
+  border-color
+
+2.) Main-Header
+
+  background-color
+  color
+  font-family
+  font-size
+
+3.) section-header
+
+  background-color
+  color
+  font-family
+  font-size
+
+4.) content
+
+  background-color
+  color
+  font-family
+  font-size
+
+5.) toolbar
+
+  background-color
+  color
+
+--------------------------
+ PropertyGrid
+--------------------------
+
+1.) normal
+
+  background-color (normal/alt)
+
+
+--------------------------
+ Raster
+--------------------------
+
+
+--------------------------
+ StackItems
+--------------------------
+1.) normal
+2.) hovered
+3.) clicked
+4.) focus
+
+--------------------------
+ Button
+--------------------------
+1.) normal
+
+  background-color
+  color
+  border-color
+  border-radius
+  font-family
+  font-size
+
+
+2.) active  (d.h. im radio-state aktiv)
+
+  background-color
+  color
+  border-color
+
+3.) hovering
+
+  +/- brightness auf normal/active background-color
+
+4.) clicked
+
+  +/- brightness auf normal/active background-color
+
+5.) disabled
+
+  opacity: 25%
+
+6.) focus
+
+  outline
+
+--------------------------
+ Input
+--------------------------
+1.) normal
+
+    background-color
+    color
+    border-color
+    (border-radius + -width?)
+    font-family
+    font-size
+
+2.) active (value)
+
+    border-color
+
+3.) invalid
+
+    background-color (animated)
+
+4.) disabled
+
+    opacity: 25%
+
+5.) focus
+
+    outline

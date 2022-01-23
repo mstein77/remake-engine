@@ -1,4 +1,4 @@
-const {isValidResourceId, ResourceDependencies, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, d} = require('./helper/helper');
+const {isValidResourceId, ResourceDependencies, BitmapPlayer, ANIMATION, cloneDeep, drawTextBlocks, getTextBlockImage, getInstanceFromInput, getRebuildJsonForModel, flattenResources, getDeflatedResources, getCanvasForDim, d} = require('./helper/helper');
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -877,7 +877,10 @@ class ResourceLoader {
             }).then(body => {
                 for (let resource of body.stored) {
                     const screen = this.getResourceScreen(resource.type + ':' + resource.id);
-                    this.storage.deleteScreenResource(screen, resource.type, resource.id);
+                    if (screen) {
+                        // TODO: check why global state resource fails here
+                        this.storage.deleteScreenResource(screen, resource.type, resource.id);
+                    }
                 }
                 return body;
             })
@@ -1211,6 +1214,9 @@ class Config {
     validateInt(value, props = {}) {
         if (value === undefined) {
             throw Error('Undefined value');
+        }
+        if (props.null && value === null) {
+            return null;
         }
         if (typeof value !== 'number') {
             throw Error('value must be an integer');
@@ -1633,6 +1639,15 @@ class TextBlockConfig extends Config {
         this.filters = this.validateString(value);
     }
 
+    addRebuildProps(obj, deep, base) {
+        const defaults = this.getDefaults();
+        for (let prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
+            if (defaults[prop] !== undefined && defaults[prop] === base[prop]) continue;
+            obj[prop] = base[prop];
+        }
+        return obj;
+    }
+
     applyTo(obj) {
         super.applyTo(obj);
         obj.x = this.x;
@@ -1880,6 +1895,7 @@ class Game {
         SM = new StorageManager(localStorage);
         RL = new ResourceLoader(new BackEndFetcher('http://localhost:8080/'), SM);
 
+        this.id = 'TODO';
         this.width = width;
         this.height = height;
         this.init = init.bind(this);
@@ -1908,10 +1924,16 @@ class Game {
         this.editorRun = 0;
         this.restartEditorWithId = null;
         this.lastState = null;
+        this.editor = null;
+        this.keyHandling = true;
 
         document.addEventListener('DOMContentLoaded', function(event) {
             Game.instance.boot();
         });
+    }
+
+    getId() {
+        return this.id
     }
 
     setStateInitHandler(handler) {
@@ -2031,7 +2053,7 @@ class Game {
         RL.invalidatePermanentResources();
         this.globals = this.lastState;
         this.gotoScreen(this.currentScreen);
-        this.restart();
+        this.restart(restartEditorWithId !== null);
     }
 
     gotoScreen(screenId, params = {}) {
@@ -2094,10 +2116,11 @@ class Game {
         this.editorRun++;
 
         this.setRunning(false);
+        this.keyHandling = false;
         RL.loadPermanentResources().then(() => {
             this.getDomElem('game').style.display = 'none';
             this.getDomElem('editor').style.display = 'block';
-            new gameEditor.GameEditor(this, this.activeResource);
+            this.editor = new gameEditor.GameEditor(this, this.activeResource)
         });
     }
 
@@ -2116,10 +2139,11 @@ class Game {
                                 {
                                     type: 'TilesMap',
                                     id: pane.tilesMap.id,
+                                    pane,
                                     config: TilesMapConfig,
                                     cls: TilesMap,
                                     data: pane.tilesMap.config,
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim
                                 }
                             );
@@ -2134,6 +2158,7 @@ class Game {
                                 {
                                     type: 'TextPane',
                                     id: pane.id,
+                                    pane,
                                     config: TextPaneConfig,
                                     cls: TextPane,
                                     elem: pane.getPreview(),
@@ -2145,6 +2170,7 @@ class Game {
                             resources.push({
                                 type: 'ColorPane',
                                 id: pane.id,
+                                pane,
                                 config: ColorPaneConfig,
                                 cls: ColorPane,
                                 elem: pane.getPreview(),
@@ -2152,15 +2178,52 @@ class Game {
                                 dim: pane.viewPortDim,
 
                             });
-                        } else if (pane.spriteSheet) {
+                        } else if (pane instanceof SpritePane) {
                             resources.push(
                                 {
-                                    elem: pane.getPreview(),
+                                    elem: pane.getPreview ? pane.getPreview() : null,
                                     dim: pane.viewPortDim,
+                                    pane,
                                     type: 'spriteSheet',
                                     data: pane.spriteSheet
                                 }
                             );
+                        } else if (pane instanceof CanvasPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'canvasPane'
+                                }
+                            )
+                        } else if (pane instanceof LinearGradientPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'linearGradientPane'
+                                }
+                            )
+                        } else if (pane instanceof BitmapScrollPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'bitmapScrollPane'
+                                }
+                            )
+                        } else if (pane instanceof PatternPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'patternPane'
+                                }
+                            )
                         }
                     }
                 }
@@ -2171,13 +2234,18 @@ class Game {
                 }
             }
         }
-        extractEditablesFromAreas(this.screens[this.currentScreen].areas);
+        extractEditablesFromAreas(this.getCurrentScreen().areas);
 
         resources.push({type: 'filters', data: filterer});
         return resources;
     }
 
-    restart() {
+    getCurrentScreen() {
+        return this.screens[this.currentScreen];
+    }
+
+    restart(enableKeys = false) {
+        this.keyHandling = enableKeys;
         if (this.running || gameEditor === null) {
             return;
         }
@@ -2217,6 +2285,8 @@ class Game {
     }
 
     handleKeys() {
+        if (!this.keyHandling) return;
+
         for (let handler of this.globalKeyHandlers) {
             const stop = handler();
             if (stop) {
@@ -2475,24 +2545,29 @@ class Game {
         window.addEventListener('gamepadconnected', gamepadConnectHandler);
 
         document.body.innerHTML =
+            '<div id="game">' +
 
-            '<div id="game"><div id="tmp-resources-warning" class="hidden stack-h inner-space-h"><div class="flex">Warning! The current screen is using resources from the local storage!</div>' +
-            '<div><button id="clear-tmp-resources">Clear</button></div></div>' +
-            '<div style="display: flex; justify-content: center; margin-top: 20px">' +
-
-                '<div id="log-div" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0">' +
-                    '<pre id="log" style="float: right; margin: 0">' + this.line() + " Log\n" + this.line() + '</pre>' +
+                '<div style="display: flex; justify-content: center; margin-top: 20px">' +
+                    '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
+            '           <div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
 
-                '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"><div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"></div>' +
+                '<div id="tmp-resources-warning" class="hidden stack-h inner-space-h">' +
+                    '<div class="flex">Warning! The current screen is using resources from the local storage!</div>' +
+                    '<div>' +
+                        '<button id="clear-tmp-resources">Clear</button>' +
+                    '</div>' +
                 '</div>' +
+            '</div>' +
 
-                '<div id="debugs" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0"><pre id="d" style="margin: 0"></pre>' +
-                '</div>' +
-            '</div></div>' +
             '<div id="offscreen" style="display: none"></div>' +
+
             '<div id="react-editor"></div>' +
-            '<div id="editor" style="display: none">Editor</div>' + (this.hasTouch ?
+
+            '<div id="editor" style="display: none">Editor</div>' +
+            (this.hasTouch ?
                 '<div id="touch-input-dir" style="display: none">' +
                     '<div id="touch_btn_left_up" class="touch-dir-cell"></div>' +
                     '<div id="touch_btn_up" class="touch-dir-cell"></div>' +
@@ -3242,6 +3317,17 @@ class CanvasPane {
     getCtx() {
         return this.container.getCanvasCtx();
     }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.container.canvas.elem.toDataURL('image/png'),
+            color: null,
+            width: this.paneDim.x,
+            height: this.paneDim.y
+        }
+    }
+
 }
 
 class ColorPaneConfig extends Config {
@@ -3251,12 +3337,16 @@ class ColorPane {
         this.color = color;
         this.images = [];
         this.imgPos = [];
+        this.imgElems = [];
         this.dirty = true;
     }
 
     addImage(image, posX, posY) {
         this.images.push(image);
         this.imgPos.push({x: posX, y: posY});
+        const img = document.createElement('IMG');
+        img.src = image;
+        this.imgElems.push(img);
         this.dirty = false;
     }
 
@@ -3292,10 +3382,20 @@ class ColorPane {
     }
 
     getPreview() {
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = this.color;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < this.imgElems.length; i++) {
+            const img = this.imgElems[i];
+            const {x, y} = this.imgPos[i];
+            ctx.drawImage(img, x, y);
+        }
         return {
             type: 'plane',
-            texture: null,
-            color: this.color,
+            texture: canvas.toDataURL('image/png'),
+//            color: this.color,
             width: this.viewPortDim.x,
             height: this.viewPortDim.y
         }
@@ -3649,6 +3749,16 @@ class BitmapScrollPane {
             }
         }
         return scrolled;
+    }
+
+    getPreview() {
+        return {
+            type: 'plane',
+            texture: this.buffers.buffers[this.buffers.active].elem.toDataURL('image/png'),
+            color: null,
+            width: this.paneDim.x,
+            height: this.paneDim.y
+        }
     }
 }
 
@@ -4575,9 +4685,14 @@ class BufferedTilesPane {
     }
 
     getPreview() {
+        const preview = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = preview.getContext('2d');
+        const posLeft = this.scrollPosOffset.x + this.scrollPos.x;
+        const posTop = this.scrollPosOffset.y + this.scrollPos.y;
+        ctx.drawImage(this.buffers.buffers[this.buffers.active].elem, posLeft, posTop, preview.width, preview.height, 0, 0, preview.width, preview.height);
         return {
             type: 'plane',
-            texture: this.buffers.buffers[this.buffers.active].elem.toDataURL('image/png'),
+            texture: preview.toDataURL('image/png'),
             color: null,
             width: this.viewPortDim.x,
             height: this.viewPortDim.y
@@ -5318,6 +5433,21 @@ class PatternPane {
             }
         };
     }
+
+    getPreview() {
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(this.container.getImageElem(), 0, 0);
+
+        return {
+            type: 'plane',
+            texture: canvas.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
 }
 
 
@@ -5488,7 +5618,7 @@ class LinearGradientPane {
         return this.container;
     }
 
-    render() {
+    getGradient() {
         let currPos = 0;
         let currColorIndex = 0;
 
@@ -5538,22 +5668,61 @@ class LinearGradientPane {
             }
             pos += stop[1];
         }
+        return {
+            top,
+            bottom,
+            css: gradient
+        }
+    }
 
+    getPreview() {
+        const gradient = this.getGradient();
+        const canvas = getCanvasForDim(this.viewPortDim.x, this.viewPortDim.y);
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const grd = ctx.createLinearGradient(0, 0,
+            !this.isHorizontal ? 0 : canvas.width,
+            !this.isHorizontal ? canvas.height : 0
+        );
+        const parts = gradient.css.split(', ');
+        let pos = 0;
+        const maxPos = this.isHorizontal ? canvas.width : canvas.height;
+        for (let i = 1; i < parts.length; i++) {
+            const part = parts[i];
+            const subParts = part.split(' ');
+            pos = (subParts.length === 2) ? parseInt(subParts[1], 10) :
+                (i === 1 ? 0 : maxPos);
+            grd.addColorStop(pos / maxPos, subParts[0]);
+        }
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+        return {
+            type: 'plane',
+                texture: canvas.toDataURL('image/png'),
+            color: null,
+            width: this.viewPortDim.x,
+            height: this.viewPortDim.y
+        }
+    }
+
+    render() {
+        const gradient = this.getGradient();
         const div = this.container.getChild();
         Game.instance.addDomOp(
             div,
             'style.' + (this.isHorizontal ? 'width' : 'height'),
-            top + this.viewSize + bottom
+            gradient.top + this.viewSize + gradient.bottom
         );
         Game.instance.addDomOp(
             div,
             'style.' + (this.isHorizontal ? 'left' : 'top'),
-            -top
+            -gradient.top
         );
         Game.instance.addDomOp(
             div,
             'style.background',
-            'linear-gradient(' + gradient + ')'
+            'linear-gradient(' + gradient.css + ')'
         );
         this.dirty = false;
     }
@@ -6120,7 +6289,7 @@ filterer.addFilter(
         return imageData;
     },
     [
-        {key: 'opacity', type: FILTER.PARAM.FLOAT, min: 0, max: 1, default: 1}
+        {key: 'opacity', type: FILTER.PARAM.FLOAT, min: 0, max: 1, step: 0.01, decimals: 2, default: 1}
     ]
 );
 
@@ -6206,7 +6375,7 @@ class SpriteSheet {
         }
     }
 
-    addTransformedAnimation(id, base, transformers, synchronous = false) {
+    addTransformedAnimation(id, base, transformers, synchronous = false, speed = 1) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -6222,13 +6391,14 @@ class SpriteSheet {
             synchronous,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
+            speed: speed,
             dir: baseAnimation.dir,
             end: baseAnimation.end
         };
         this.animations[id] = animation;
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.players[id] = player;
         }
     }
@@ -6265,7 +6435,7 @@ class SpriteSheet {
         }
     }
 
-    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false, speed = 1) {
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -6291,6 +6461,7 @@ class SpriteSheet {
             synchronous,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
+            speed,
             dir,
             end
         };
@@ -6311,7 +6482,7 @@ class SpriteSheet {
 
         if (synchronous) {
             const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, end, dir);
+            player.loadAnimation(animation.frames, end, dir, speed);
             this.players[name] = player;
         }
     }
@@ -6343,7 +6514,7 @@ class SpriteSheet {
             proxy.setPlayer(this.players[name]);
         } else {
             // creates a new player by lazy loading in the proxy
-            proxy.loadAnimation(animation.frames, animation.end, animation.dir);
+            proxy.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
         }
     }
 
@@ -6654,8 +6825,11 @@ class TilesMapConfig extends Config {
             tileBits: 5,
             defaultTile: {},
             tiles: {},
+            eventsImage: null,
             animations: {},
             brushes: {},
+            events: {},
+            count: null,
             map: [[]]
         }
     }
@@ -6666,12 +6840,40 @@ class TilesMapConfig extends Config {
         }
     }
 
+    setCount(value) {
+        this.count = this.validateInt(value, {min: 0, null: true});
+    }
+
     setTileBits(value) {
         this.tileBits = this.validateInt(value, this.getFieldProp('tileBits'))
     }
 
     setImage(value) {
         this.image = this.validateImageResource(value)
+    }
+
+    setEvents(value) {
+        this.events = {};
+        for (let [name, obj] of Object.entries(this.validateObject(value))) {
+            this.validateObject(obj, {});
+            this.addEvent(name, obj.x, obj.y, obj.width, obj.height, obj.offsetX, obj.offsetY);
+        }
+    }
+
+    addEvent(name, x = 0, y = 0, width = 0, height = 0, offsetX = 0, offsetY = 0) {
+        this.events[this.validateString(name)] =
+            {
+                x: this.validateInt(x, {min: 0, null: true}),
+                y: this.validateInt(y, {min: 0, null: true}),
+                width: this.validateInt(width, {min: 0}),
+                height: this.validateInt(height, {min: 0}),
+                offsetX: this.validateInt(offsetX),
+                offsetY: this.validateInt(offsetY)
+            };
+    }
+
+    setEventsImage(value) {
+        this.eventsImage = value === null ? null : this.validateImageResource(value)
     }
 
     setDefaultTile(value) {
@@ -6721,17 +6923,31 @@ class TilesMapConfig extends Config {
     }
 
     getSubResources() {
-        return [{id: this.image.id, type: 'image', data: this.image}];
+        const resources = [
+            {id: this.image.id, type: 'image', data: this.image}
+        ];
+        if (this.eventsImage) {
+            resources.push(
+                {id: this.eventsImage.id, type: 'image', data: this.eventsImage}
+            );
+        }
+        return resources;
     }
 
     addRebuildProps(obj, deep, base) {
         obj.tileBits = base.tileBits;
         obj.image = deep ? RL.makeImageResource(base.tilesImg.elem, base.tilesImgId) : base.tilesImgId;
+        if (base.eventsImg && base.eventsImg.width !== 0) {
+            const eventsImgId = base.eventsImgId ? base.eventsImgId : base.id + '_events.png';
+            obj.eventsImage = deep ? RL.makeImageResource(base.eventsImg, eventsImgId) : eventsImgId;
+        }
         obj.map = [...base.map];
         obj.defaultTile = base.defaultTile;
         obj.tiles = base.tiles;
         obj.animations = base.animations;
         obj.brushes = base.brushes;
+        obj.events = base.events;
+        obj.count = base.count;
         return obj;
     }
 
@@ -6741,27 +6957,22 @@ class TilesMapConfig extends Config {
         json.tileSize = 1 << this.tileBits;
         json.tilesImgId = this.image.id;
         let canvas = this.image.getCanvas();
-        if (canvas.height !== json.tileSize) {
-            const tilesPerLine = Math.floor(canvas.width / json.tileSize);
-            const lines = Math.floor(canvas.height / json.tileSize);
-            const flatCanvas = OCM.getNewOffscreenCanvas((tilesPerLine * lines) * json.tileSize, json.tileSize);
-            for (let i = 0; i < lines; i++) {
-                const width = tilesPerLine * json.tileSize;
-                flatCanvas.ctx.drawImage(canvas.elem, 0, i * json.tileSize, width, json.tileSize, i * width, 0, width, json.tileSize);
-            }
-            canvas = flatCanvas;
-        }
         json.tilesImg = canvas;
+        const maxTiles = Math.floor(canvas.elem.width/json.tileSize) * Math.floor(canvas.elem.height/json.tileSize);
+        json.count = this.count === null ? maxTiles : Math.min(this.count, maxTiles);
+        json.eventsImg = this.eventsImage ? this.eventsImage.getCanvas().elem : getCanvasForDim(0, 0);
+        json.eventsImgId = this.eventsImage ? this.eventsImage.id : null;
+        json.events = cloneDeep(this.events);
         json.map = cloneDeep(this.map);
-        json.defaultTile = this.defaultTile;
-        json.tiles  = this.tiles;
-        json.animations = this.animations;
-        json.brushes = this.brushes; // TODO only in editor mode
+        json.defaultTile = cloneDeep(this.defaultTile);
+        json.tiles = cloneDeep(this.tiles);
+        json.animations = cloneDeep(this.animations);
+        json.brushes = cloneDeep(this.brushes); // TODO only in editor mode
         json.mapTiles = {
             x: this.map[0].length,
             y: this.map.length
         };
-        return json;
+        return json
     }
 }
 
@@ -6774,7 +6985,7 @@ class TilesMap {
         for (let id in this.animations) {
             const player = new BitmapPlayer();
             const animation = this.animations[id];
-            player.loadAnimation(animation.frames, animation.end, animation.dir);
+            player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.player[id] = player;
         }
         this.animatedIndices = [];
@@ -6782,33 +6993,6 @@ class TilesMap {
 
     getAnimations() {
         return this.player;
-    }
-
-    getMap() {
-        return this.getMapClone(this.map);
-    }
-
-    getMapClone(map) {
-        const clone = [];
-        for (let row of map) {
-            const mapRow = [];
-            for (let item of row) {
-                if (Array.isArray(item)) {
-                    const eventItems = [];
-                    for (let event of item) {
-                        if (Array.isArray(event)) {
-                            throw 'Invalid event in map definition found!';
-                        }
-                        eventItems.push(event);
-                    }
-                    mapRow.push(eventItems);
-                } else {
-                    mapRow.push(item);
-                }
-            }
-            clone.push(mapRow);
-        }
-        return clone;
     }
 
     getTileObj(x, y) {
@@ -7002,6 +7186,8 @@ class TilesMap {
             yIndices.push(index);
         }
 
+        const maxTiles = Math.floor(this.tilesImg.elem.width/this.tileSize);
+
         for (let j = 0; j < yIndices.length; j++) {
             const y = yIndices[j];
             if (y === null) {
@@ -7016,10 +7202,11 @@ class TilesMap {
                 if (index === 0) {
                     continue;
                 }
+                const row = Math.floor(index/maxTiles);
                 target.drawImage(
                     this.tilesImg.elem,
-                    index << this.tileBits,
-                    0,
+                    (index - row * maxTiles) * this.tileSize,
+                    row * this.tileSize,
                     this.tileSize,
                     this.tileSize,
                     offset.x + (i << this.tileBits),
@@ -7043,39 +7230,6 @@ class FontMap {
 FontMap.Config = FontMapConfig;
 
 
-/**
- *  BitmapPlayer-Modes
- * ----------------------------
- *
- *   DIR: forward, backwards, forward-backward, backward-forward
- *   END: loop, stop, delete
- *
- * ----------------------------
- *
- */
-
-const ANIMATION = {
-    DIR: {
-        FORWARD: 0,
-        BACKWARD: 1,
-        FORWARD_BACKWARD: 2,
-        BACKWARD_FORWARD: 3
-    },
-    END: {
-        LOOP: 0,
-        STOP: 1,
-        DELETE: 2
-    },
-    STATE: {
-        EMPTY: -1,
-        WAITING: 0,
-        RUNNING: 1,
-        DONE: 2,
-        DESTROYED: 3,
-        PAUSED: 4
-    }
-};
-
 class PlayerProxy {
 
     constructor() {
@@ -7095,12 +7249,12 @@ class PlayerProxy {
         return this.active === 1;
     }
 
-    loadAnimation(frames, end, dir) {
+    loadAnimation(frames, end, dir, speed) {
         this.active = 0;
         if (this.players[0] === null) {
             this.players[0] = new BitmapPlayer();
         }
-        this.players[0].loadAnimation(frames, end, dir);
+        this.players[0].loadAnimation(frames, end, dir, speed);
         this.players[1] = null;
     }
 
@@ -7134,167 +7288,6 @@ class PlayerProxy {
 
     reverse() {
         this.players[this.active].reverse();
-    }
-}
-
-
-/**
- * TODO: setSync(null|frameState)
- *
- *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
- *   addStep(value) -> führt diesen auf frameState aus
- *
- */
-class BitmapPlayer {
-
-    constructor() {
-        this.speed = 1;
-        this.state = ANIMATION.STATE.EMPTY;
-        this.frameNo = null;
-        this.pauseState = null;
-        this.dirty = false;
-    }
-
-    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD) {
-        this.frames = frames;
-        this.direction = dir;
-        this.end = end;
-        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
-        this.step = 0;
-        this.frameNo = this.isForward ? 0 : frames.length - 1;
-        this.state = ANIMATION.STATE.WAITING;
-        this.dirty = true;
-    }
-
-    setSpeed(speed) {
-        this.speed = speed;
-    }
-
-    getState() {
-        return this.state;
-    }
-
-    handleForward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo++;
-            if (this.frameNo === this.frames.length) {
-                this.frameNo--;
-                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                    this.frameNo--;
-                    this.isForward = false;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else {
-                            this.frameNo = 0;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    handleBackward() {
-        let frame = this.getFrame();
-        while (this.step >= frame.duration) {
-            this.step -= frame.duration;
-            this.frameNo--;
-            if (this.frameNo < 0) {
-                this.frameNo = 0;
-                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                    this.frameNo++;
-                    this.isForward = true;
-                } else {
-                    if (this.end === ANIMATION.END.DELETE) {
-                        this.state = ANIMATION.STATE.DESTROYED;
-                        this.frameNo = null;
-                    } else if (this.end === ANIMATION.END.LOOP) {
-                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
-                            this.isForward = false;
-                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
-                            this.isForward = true;
-                            this.frameNo = 0;
-                        } else {
-                            this.frameNo =  this.frames.length - 1;
-                        }
-                    } else {
-                        this.state = ANIMATION.STATE.DONE;
-                    }
-                }
-                break;
-            }
-            frame = this.getFrame();
-        }
-    }
-
-    nextStep() {
-        if (this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
-            this.dirty = false;
-            return;
-        }
-        const oldFrameNo = this.frameNo;
-        this.state = ANIMATION.STATE.RUNNING;
-        this.step += this.speed;
-        if (this.isForward) {
-            this.handleForward();
-            if (!this.isForward) {
-                this.handleBackward();
-            }
-        } else {
-            this.handleBackward();
-            if (this.isForward) {
-                this.handleForward();
-            }
-        }
-        this.dirty = (oldFrameNo !== this.frameNo);
-    }
-
-    getFrame() {
-        if (this.frameNo === null) {
-            return null;
-        }
-        return this.frames[this.frameNo];
-    }
-
-    pause() {
-        this.pauseState = this.state;
-        this.state = ANIMATION.STATE.PAUSED;
-        this.dirty = false;
-    }
-
-    continue() {
-        if (this.state === ANIMATION.STATE.PAUSED) {
-            this.state = this.pauseState;
-        }
-    }
-
-    reverse() {
-        switch(this.dir) {
-            case ANIMATION.DIR.FORWARD:
-                this.dir = ANIMATION.DIR.BACKWARD;
-                break;
-            case ANIMATION.DIR.BACKWARD:
-                this.dir = ANIMATION.DIR.FORWARD;
-                break;
-        }
-        if (this.state === ANIMATION.STATE.DONE) {
-            this.state = ANIMATION.STATE.WAITING;
-        }
-        this.isForward = !this.isForward;
-    }
-
-    isDirty() {
-        return this.dirty;
     }
 }
 
@@ -8549,7 +8542,6 @@ module.exports = {
     DependencyManager,
     StorageManager,
     Position,
-    Animation: BitmapPlayer,
     d,
     FontMap,
     SpriteSheet,
@@ -8560,8 +8552,8 @@ module.exports = {
     Force,
     TILE,
     INPUT,
-    ANIMATION,
     OCM,
+    ANIMATION,
     COLLISION,
     PATH
 };

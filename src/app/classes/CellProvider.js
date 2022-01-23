@@ -1,17 +1,40 @@
-const {d, getCanvasForDim} = require('../helper/helper');
+const {d} = require('../helper/helper');
+import {CellValue} from '../classes/Grid';
 
 class CellSelection {
-    constructor(type = 'none', cells = [[]]) {
+
+    constructor(type = 'none', cells = [[]], cellValue = CellValue.raw) {
         this.type = type;
+        this.cellValue = cellValue;
+        this.entityIndex = null;
+        this.cellsProp = null;
         if (type === 'multi') {
             this.cells = cells.rect;
             this.gapX = cells.gapX;
             this.gapY = cells.gapY;
             this.baseX = cells.baseX;
             this.baseY = cells.baseY;
+        } else if (type === 'entity') {
+            this.entityIndex = cells.entityIndex;
+            this.cellsProp = cells.cellsProp;
+            this.value = cells.value;
+            this.setCellsFromEntity();
         } else {
             this.cells = type === 'none' ? [[]] : cells;
         }
+    }
+
+    setCellsFromEntity() {
+        if (this.type === 'entity') {
+            const index = this.entityIndex.getEntityByPropValue('value', this.value);
+            if (index !== null) {
+                this.cells = this.entityIndex.getEntityPropValue(index, this.cellsProp);
+            }
+        }
+    }
+
+    getCellValue() {
+        return this.cellValue
     }
 
     getWidth() {
@@ -43,7 +66,6 @@ class CellSelection {
 
     getBaseRect(x, y) {
         const cells = [];
-        const pos = y;
         while(cells.length < this.baseY) {
             cells.push(this.cells[y].slice(x, x + this.baseX));
             y++;
@@ -84,6 +106,12 @@ class CellSelection {
         return this.type;
     }
 
+    getName() {}
+
+    isCell() {
+        return (this.isRect() && this.getWidth() === 1 && this.getHeight() === 1)
+    }
+
     isRect() {
         return this.type === 'rect';
     }
@@ -96,11 +124,19 @@ class CellSelection {
         return this.type === 'columns';
     }
 
+    isEntity() {
+        return this.type === 'entity';
+    }
+
+    getEntityValue() {
+        return this.value;
+    }
+
     isBitmap() {
         return this.type === 'bitmap';
     }
 
-    getMatchMatrix(value, offset = null, length = null) {
+    getNotEmptyMatrix(offset = null, length = null) {
         const rows = [];
         const xMin = !this.isRows() || offset === null ? 0 : offset;
         const xMax = this.isRows() && length !== null ? xMin + length : this.cells[0].length;
@@ -110,270 +146,11 @@ class CellSelection {
         for (let y = yMin; y < yMax; y++) {
             const row = [];
             for (let x = xMin; x < xMax; x++) {
-                row.push(this.cells[y][x] === value);
+                row.push(this.cellValue.isEmpty(this.cells[y][x]));
             }
             rows.push(row);
         }
         return rows;
-    }
-}
-
-class MapCellProvider {
-
-    constructor(model, mapKey = 'map') {
-        this.model = model;
-        this.mapKey = mapKey;
-        this.map = this.model[mapKey];
-    }
-
-    // Props
-    getWidth() {
-        return this.map.length === 0 ? 0 : this.map[0].length;
-    }
-
-    getHeight() {
-        return this.map.length;
-    }
-
-    getCellDim() {
-        return {x: 1, y: 1}
-    }
-
-    // setter
-    setMap(map) {
-        this.model[this.mapKey] = map;
-        this.map = map;
-    }
-
-    // helper
-    getClonedValue(value, raw = false) {
-        return value;
-    }
-
-    // cell
-    getEmptyCell() {
-        throw Error('Implement');
-    }
-
-    getCellValue(posX, posY, raw = false) {
-        const rect = this.getRect(posX, posY, 1, 1, raw);
-        if (Array.isArray(rect) && rect.length > 0) {
-            return rect[0][0];
-        }
-        return null;
-    }
-
-    overwriteCell(x, y, value) {
-        this.map[y][x] = value;
-    }
-
-    // rows
-    getClonedRow(row, raw = false) {
-        const result = [];
-        for (let cell of row) {
-            result.push(this.getClonedValue(cell, raw));
-        }
-        return result;
-    }
-
-    getEmptyRow() {
-        const row = [];
-        let i = this.getWidth();
-        while (i > 0) {
-            row.push(this.getEmptyCell());
-            i--;
-        }
-        return row;
-    }
-
-    addRows(start, no) {
-        if (no == 0) {
-            return 0;
-        }
-        if (no > 0) {
-            const added = no;
-            while (no > 0) {
-                if (start) {
-                    this.map.unshift(this.getEmptyRow());
-                } else {
-                    this.map.push(this.getEmptyRow());
-                }
-                no--;
-            }
-            return added;
-        } else {
-            if (this.map.length + no < 1) {
-                no = -this.map.length + 1;
-                if (no === 0) {
-                    return 0;
-                }
-            }
-            const pos = start ? 0 : this.map.length + no;
-            this.map.splice(pos, -no);
-            return -no;
-        }
-    }
-
-    insertRowsAt(index, no) {
-        const rows = [];
-        while (no > 0) {
-            rows.push(this.getEmptyRow());
-            no--;
-        }
-        this.map.splice.call(this.map, index, 0, ...rows);
-    }
-
-    deleteRows(index, no) {
-        this.map.splice(index, no);
-    }
-
-    // columns
-    addColumns(start, no) {
-        if (no === 0) {
-            return 0;
-        }
-        if (no > 0) {
-            const added = no;
-            while (no > 0) {
-                for (let i = 0, iMax = this.map.length; i < iMax; i++) {
-                    if (start) {
-                        this.map[i].unshift(this.getEmptyCell());
-                    } else {
-                        this.map[i].push(this.getEmptyCell());
-                    }
-                }
-                no--;
-            }
-            return added;
-        } else {
-            if (this.map[0].length + no < 1) {
-                no = -this.map[0].length + 1;
-                if (no === 0) {
-                    return 0;
-                }
-            }
-            const pos = start ? 0 : this.map[0].length + no;
-            for (let i = 0, iMax = this.map.length; i < iMax; i++) {
-                this.map[i].splice(pos, -no);
-            }
-            return -no;
-        }
-    }
-
-    insertColumnsAt(index, no) {
-        const columns = [];
-        while (no > 0) {
-            columns.push(this.getEmptyCell());
-            no--;
-        }
-        for (let column of this.map) {
-            column.splice.call(column, index, 0, ...columns);
-        }
-    }
-
-    deleteColumns(index, no) {
-        for (let row of this.map) {
-            row.splice(index, no);
-        }
-    }
-
-    // rect
-    getRect(posX, posY, width, height, raw = false) {
-        const slice = this.map.slice(posY, posY + height);
-        const rowSlices = [];
-        for (let row of slice) {
-            rowSlices.push(this.getClonedRow(row.slice(posX, posX + width), raw));
-        }
-        return rowSlices;
-    }
-
-    fillRect(posX, posY, width, height, elem) {
-        for (let y = posY, yMax = posY + height; y < yMax; y++) {
-            for (let x = posX, xMax = posX + width; x < xMax; x++) {
-                this.overwriteCell(x, y, this.getClonedValue(elem))
-            }
-        }
-    }
-
-    reduceToRect(posX, posY, width, height) {
-        this.setMap(this.getRect(posX, posY, width, height, true));
-    }
-
-    // path
-    writePath(path) {
-        for (let key in path) {
-            const pos = key.split(' ');
-            this.overwriteCell(pos[0], pos[1], this.getClonedValue(path[key]));
-        }
-    }
-
-    // selection
-    getEmptySelection() {
-        return new CellSelection('rect', [[this.getEmptyCell()]]);
-    }
-
-    getSelection(posX, posY, width, height, raw = false) {
-        return new CellSelection('rect', this.getRect(posX, posY, width, height, raw));
-    }
-
-    getRawSelection(posX, posY, width, height) {
-        return this.getSelection(posX, posY, width, height, true);
-    }
-
-    writeSelection(posX, posY, selection, overwrite = null, writeEmpty = true) {
-        let i = 0;
-        let xMax = Math.min(selection.getWidth(), this.getWidth() - posX);
-        let iMax = Math.min(selection.getHeight(), this.getHeight() - posY);
-        let row;
-        const result = {
-            old: {},
-            new: {}
-        };
-
-        const empty = this.getEmptyCell();
-        while (i < iMax) {
-            row = selection.getRow(i);
-            for (let x = 0; x < xMax; x++) {
-                const value = overwrite !== null ? overwrite : row[x];
-                if (writeEmpty || (!writeEmpty && value !== empty)) {
-                    const key = (posX + x) + ' ' + posY;
-                    result.old[key] = this.getClonedValue(this.map[posY][posX + x]);
-                    this.overwriteCell(posX + x, posY, this.getClonedValue(value));
-                    result.new[key] = this.getClonedValue(value);
-                }
-            }
-            posY++;
-            i++;
-        }
-        return result;
-    }
-
-    fillRectWithSelection(posX, posY, width, height, selection, raw = false) {
-        for (let y = 0; y < height; y++) {
-            const row = selection.getRow(y, width);
-            for (let x = 0; x < width; x++) {
-                this.overwriteCell(posX + x, posY + y, this.getClonedValue(row[x], raw));
-            }
-        }
-    }
-
-    fillRectWithRawSelection(posX, posY, width, height, selection) {
-        this.fillRectWithSelection(posX, posY, width, height, selection, true);
-    }
-
-    importSelection(selection, raw = false) {
-        const map = [];
-        const iMax = selection.getHeight();
-        let i = 0;
-        while (i < iMax) {
-            map.push(this.getClonedRow(selection.getRow(i), raw));
-            i++;
-        }
-        this.setMap(map);
-    }
-
-    importRawSelection(selection) {
-        this.importSelection(selection, true);
     }
 }
 
@@ -584,6 +361,7 @@ class CellProvider {
         let xMax = Math.min(selection.getWidth(), this.getWidth() - posX);
         let iMax = Math.min(selection.getHeight(), this.getHeight() - posY);
         let row;
+        const cellValue = selection.getCellValue();
         const result = {
             old: {},
             new: {}
@@ -596,9 +374,9 @@ class CellProvider {
                 const value = overwrite !== null ? overwrite : row[x];
                 if (writeEmpty || (!writeEmpty && value !== empty)) {
                     const key = (posX + x) + ' ' + posY;
-                    result.old[key] = this.getClonedValue(this.map[posY][posX + x]);
-                    this.overwriteCell(posX + x, posY, this.getClonedValue(value));
-                    result.new[key] = this.getClonedValue(value);
+                    result.old[key] = cellValue.get(this.map[posY][posX + x]);
+                    this.overwriteCell(posX + x, posY, value, cellValue);
+                    result.new[key] = value;
                 }
             }
             posY++;
@@ -650,203 +428,6 @@ class CellProvider {
         return this.getSelection(posX, posY, width, height, true);
     }
 }
-
-class TilesMapCellProvider2 extends CellProvider {
-
-    constructor(size, tilesImage, tiles, animations, map) {
-        super(size);
-        this.data = tilesImage;
-        this.imgContext = null;
-        this.cellsPerLine = null;
-        this.cache = {};
-        this.cacheZoom = 0;
-        this.tiles = tiles;
-        this.animations = animations;
-        this.map = map;
-        this.maxIndex = null;
-    }
-
-    load(callback) {
-        if (this.hasData()) {
-            callback();
-            return;
-        }
-        this.convertURIToImageData(this.data).then(
-            (img) => {
-                this.data = null;
-                this.imgContext = img.context;
-                this.cellsPerLine = img.imgData.width / this.size;
-                this.maxIndex = (img.imgData.height / this.size) * this.cellsPerLine;
-                callback();
-            }
-        );
-    }
-
-    getImageContext() {
-        return this.imgContext;
-    }
-
-    getCellType() {
-        return 'bitmap';
-    }
-
-    getAliases() {
-        const aliases = [];
-        for (let alias in this.tiles) {
-            if (this.tiles[alias].index !== undefined && alias != this.tiles[alias].index) {
-                aliases.push(alias);
-            }
-        }
-        return aliases;
-    }
-
-    isResizeable() {
-        return true;
-    }
-
-    getEmptyCell() {
-        return 0;
-    }
-
-    hasData() {
-        return this.data === null;
-    }
-
-    overwriteCell(x, y, value) {
-        if (!Array.isArray(value) && Array.isArray(this.map[y][x])) {
-            this.map[y][x][0] = value;
-        } else {
-            this.map[y][x] = value;
-        }
-    }
-
-    getClonedValue(value, raw = false) {
-        if (Array.isArray(value)) {
-            return raw ? value.concat() : value[0];
-        }
-        return value;
-    }
-
-    getEventCount(value) {
-        if (!Array.isArray(value)) {
-            return null;
-        }
-        return value.length - 1;
-    }
-
-    getTileForValue(value) {
-        return Array.isArray(value) ? value[0] : value;
-    }
-
-    getIndexForValue(value) {
-        return this.getIndexForTile(this.getTileForValue(value));
-    }
-
-    getIndexForTile(value) {
-        let index = value;
-        if (typeof(index) === 'string') {
-            if (!this.tiles[index] === undefined) {
-                throw Error('No index found for tile alias "' + index + '"');
-            }
-            const tile = this.tiles[index];
-            if (tile.animation && this.animations[tile.animation] !== undefined) {
-                index = this.animations[tile.animation].frames[0].id;
-            } else if (tile.index !== undefined) {
-                index = this.tiles[index].index;
-            }
-        }
-        return index;
-    }
-
-    getMaxIndex() {
-        return this.maxIndex;
-    }
-
-    getPositionOfIndex(index) {
-        return {
-            x: index % this.cellsPerLine * this.size,
-            y: Math.floor(index / this.cellsPerLine) * this.size
-        }
-    }
-
-    setBitmapForValue(value, imageData) {
-        const index = this.getIndexForValue(value);
-        const pos = this.getPositionOfIndex(index);
-        this.getImageContext().putImageData(imageData, pos.x, pos.y);
-        this.cache = {};
-    }
-
-    getImageDataForValue(value) {
-        const index = this.getIndexForValue(value);
-        const pos = this.getPositionOfIndex(index);
-        return this.getImageContext().getImageData(pos.x, pos.y, this.size, this.size);
-    }
-
-    getBitmapForValue(value, zoom, writeCache = true, bgColor = null) {
-        if (!this.getImageContext()) {
-            return null;
-        }
-
-        if (writeCache && zoom !== this.cacheZoom) {
-            this.cacheZoom = zoom;
-            this.cache = {};
-        }
-
-        value = this.getTileForValue(value);
-        if (this.cache[value] !== undefined) {
-            if (writeCache || this.cacheZoom === zoom) {
-                return this.cache[value];
-            }
-        }
-
-        const index = this.getIndexForTile(value);
-        const start = this.getPositionOfIndex(index);
-        const img = this.getImageContext().getImageData(start.x, start.y, this.size, this.size);
-        const target = this.getImageContext().createImageData(img.width * zoom, img.height * zoom);
-        let targetPos = 0;
-        let sourceStart = 0;
-        for(let y = 0; y < img.height; y++) {
-
-            for (let w = 0; w < zoom; w++) {
-                let sourcePos = sourceStart;
-                let pos = targetPos;
-                for(let x = 0; x < img.width; x++) {
-                    for (let z = 0; z < zoom; z++) {
-                        target.data[pos] = img.data[sourcePos];
-                        target.data[pos + 1] = img.data[sourcePos + 1];
-                        target.data[pos + 2] = img.data[sourcePos + 2];
-                        target.data[pos + 3] = img.data[sourcePos + 3];
-                        pos += 4;
-                    }
-                    sourcePos += 4;
-                }
-                targetPos += target.width << 2;
-            }
-            sourceStart += img.width << 2;
-        }
-        let canvas = document.createElement('canvas');
-        canvas.width = target.width;
-        canvas.height = target.height;
-        const ctx = canvas.getContext('2d');
-        ctx.putImageData(target, 0, 0);
-        if (bgColor !== null) {
-            const canvas2 = document.createElement('canvas');
-            canvas2.width = target.width;
-            canvas2.height = target.height;
-            const ctx2 = canvas2.getContext('2d');
-            ctx2.fillStyle = bgColor;
-            ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
-            ctx2.drawImage(canvas, 0, 0);
-            canvas = canvas2;
-        }
-
-        if (writeCache) {
-            this.cache[value] = canvas;
-        }
-        return canvas;
-    }
-}
-
 
 class TilesMapCellProvider extends CellProvider {
 
@@ -1312,197 +893,8 @@ class TilesCellProvider extends CellProvider {
     }
 }
 
-class FontCharentityIndex extends CellProvider {
-
-    constructor(model) {
-        // TODO das macht echt keinen Sinn hier
-        const size = Math.max(model.width, model.height);
-        super(size);
-        this.data = true;
-        this.model = model;
-        const codes = Object.keys(this.model.map);
-        this.codes = codes;
-        this.codes.sort();
-        this.map = [];
-        this.map.push(codes);
-        this.width = codes.length;
-        this.height = 1;
-    }
-
-    hasData() {
-        return this.data;
-    }
-
-    load(callback) {
-        if (this.hasData()) {
-            callback(this.codes);
-            return;
-        }
-        this.generateFlatImage();
-        this.data = false;
-    }
-
-    generateFlatImage() {
-        let pos = 0;
-        const canvas = getCanvasForDim(this.codes.length * this.model.width, this.model.height);
-        const ctx = canvas.getContext('2d');
-        for(let code of this.codes) {
-            this.drawBitmapForValue(ctx, code, pos);
-            this.model.map[code] = {
-                x: pos,
-                y: 0
-            };
-            pos += this.model.width;
-        }
-        this.model.image = canvas;
-    }
-
-    addSpaceForChars(number) {
-        if (number <= 0) {
-            return;
-        }
-        const canvas = getCanvasForDim(this.model.image.width + number * this.model.width, this.model.image.height);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(this.model.image, 0, 0);
-        this.model.image = canvas;
-    }
-
-    getCharSize() {
-        return {x: this.model.width, y: this.model.height};
-    }
-
-    getWidth() {
-        return this.width;
-    }
-
-    getHeight() {
-        return this.height;
-    }
-
-    getMaxIndex() {
-        return this.codes.length;
-    }
-
-    getEventCount() {
-        return null;
-    }
-
-    getCellType() {
-        return 'pure-bitmap';
-    }
-
-    isResizeable() {
-        return false;
-    }
-
-    getEmptyCell() {
-        return ' ';
-    }
-
-    getCharAt(index) {
-        const value = this.codes[index];
-        return {
-            char: value,
-            code: value.charCodeAt(0)
-        };
-    }
-
-    getCharAtIndex(index) {
-        return this.getCharAt(index).char;
-    }
-
-    hasCode(code) {
-        return this.codes.indexOf(code) !== -1;
-    }
-
-    deleteEntity(index, regenerate = true) {
-        this.deleteChar(this.codes[index], regenerate);
-    }
-
-    deleteChar(code, regenerate = true) {
-        if (this.model.map[code] === undefined) {
-            return;
-        }
-        delete this.model.map[code];
-        this.codes.splice(this.codes.indexOf(code), 1);
-        this.map = [this.codes];
-        this.width--;
-        if (regenerate) {
-            this.generateFlatImage();
-        }
-    }
-
-    addCharCode(code, regenerate = true) {
-        if (this.codes.indexOf(code) !== -1) {
-            return;
-        }
-        const x = this.codes.length * this.model.width;
-        this.codes.push(code);
-        this.codes.sort();
-
-        this.map = [this.codes];
-        this.width++;
-
-        this.model.map[code] = {x, y: 0};
-        if (regenerate) {
-            this.generateFlatImage();
-        }
-    }
-
-    drawBitmapForIndex(target, index, x, y, zoom = 1) {
-        if (index > this.getMaxIndex()) {
-            return null;
-        }
-        const value = this.codes[index];
-        this.drawBitmapForValue(target, value, x, y, zoom)
-    }
-
-    drawBitmapForValue(target, value, x = 0, y = 0, zoom = 1) {
-        const width = this.model.width * zoom;
-        const height = this.model.height * zoom;
-        target.clearRect(x, y, width, height);
-        const pos = this.model.map[value];
-        if (!pos || pos.x === null || !this.model.image.width) {
-            return;
-        }
-        const smoothing = target.imageSmoothingEnabled;
-        if (smoothing) {
-            target.imageSmoothingEnabled = false;
-        }
-        target.drawImage(
-            this.model.image,
-            pos.x, pos.y, this.model.width, this.model.height,
-            x, y, width, height
-        );
-        if (smoothing) {
-            target.imageSmoothingEnabled = true;
-        }
-    }
-
-    setBitmapForIndex(index, bitmap) {
-        const value = this.codes[index];
-        this.setBitmapForValue(value, bitmap);
-    }
-
-    setBitmapForValue(value, bitmap) {
-        const pos = this.model.map[value];
-        const ctx = this.model.image.getContext('2d');
-        ctx.putImageData(bitmap, pos.x, pos.y);
-    }
-
-    getBitmapForIndex(index, zoom = 1) {
-        const value = this.codes[index];
-        return this.getBitmapForValue(value, zoom);
-    }
-
-    getBitmapForValue(value, zoom = 1) {
-        const canvas = getCanvasForDim(this.model.width * zoom, this.model.height * zoom);
-        this.drawBitmapForValue(canvas.getContext('2d'), value, 0, 0, zoom);
-        return canvas;
-    }
-}
-
 class FontIndexCellProvider extends CellProvider {
+
     constructor(provider, index) {
         super(provider.size);
         this.provider = provider;
@@ -1542,6 +934,5 @@ export {
     TilesMapCellProvider,
     MapSelectionCellProvider,
     MapValueCellProvider,
-    FontCharentityIndex,
     FontIndexCellProvider
 };
