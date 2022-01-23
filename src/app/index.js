@@ -540,8 +540,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             globals.spriteSheet = spriteSheet;
             this.gotoScreen(
-                'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
-//                'demo'
+//                'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
+                'demo'
             );
         }
     });

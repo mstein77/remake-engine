@@ -1,21 +1,6 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import {
-    EditorSection,
-    ButtonStack,
-    CenterInfo,
-    SideTabs,
-    SideTab,
-    EditorCtx,
-    Kbd,
-    EditorContext,
-    Toolbar,
-    useModal,
-    PropertyGrid,
-    Section,
-    JsonView,
-    useCssProps,
-    useComponentUpdate,
-    useUpdateOnEntityIndexChanges
+import {EditorSection, ButtonStack, CenterInfo, SideTabs, SideTab, EditorCtx, Kbd, EditorContext,
+    Toolbar, useModal, PropertyGrid, Section, JsonView, useCssProps, useComponentUpdate, useUpdateOnEntityIndexChanges
 } from "../components/BasicComponents";
 import { DIR, Block, Stack, Grid } from "../components/LayoutComponents";
 import { d, getCanvasForDim, getColorsFromCanvas, getCanvasForEventMatrix, getCanvasForIndexMatrix, getEmptyImageData, cloneDeep } from "../helper/helper";
@@ -1291,7 +1276,7 @@ function TilesPaneEditorInner({ tileIndex, tilesGrid, animationIndex, aliasIndex
     )
 }
 
-function TilesPaneEditor({ model, resource, }) {
+function TilesPaneEditor({ model, resource }) {
     const update = useComponentUpdate();
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TilesPane', model, resource, update });
 

@@ -841,7 +841,14 @@ function PocEditor() {
     }, [])
 
     /*
-                <Block full="h" border="1">
+            <TestScene />
+
+     */
+
+    return (
+        <Stack vertical gaps full>
+
+            <Block full="h" border="1">
                 <EntityStack
                     entityIndex={colIndex}
                 />
@@ -860,13 +867,6 @@ function PocEditor() {
             <TestModal.content width={200} height={200}>
                 <TestForm { ...TestModal.props } />
             </TestModal.content>
-
-     */
-
-    return (
-        <Stack vertical gaps full>
-
-            <TestScene />
 
         </Stack>
     )

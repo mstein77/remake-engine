@@ -2545,25 +2545,29 @@ class Game {
         window.addEventListener('gamepadconnected', gamepadConnectHandler);
 
         document.body.innerHTML =
+            '<div id="game">' +
 
-            '<div id="game"><div id="tmp-resources-warning" class="hidden stack-h inner-space-h"><div class="flex">Warning! The current screen is using resources from the local storage!</div>' +
-            '<div><button id="clear-tmp-resources">Clear</button></div></div>' +
-            '<div style="display: flex; justify-content: center; margin-top: 20px">' +
-
-                '<div id="log-div" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0">' +
-                    '<pre id="log" style="float: right; margin: 0">' + this.line() + " Log\n" + this.line() + '</pre>' +
+                '<div style="display: flex; justify-content: center; margin-top: 20px">' +
+                    '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
+            '           <div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
 
-                '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"><div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px"></div>' +
-                '</div>' +
-
-                '<div id="debugs" style="display: none; width: 400px; overflow: auto; flex-shrink: 1; color: #A0A0A0"><pre id="d" style="margin: 0"></pre>' +
+                '<div id="tmp-resources-warning" class="hidden stack-h inner-space-h">' +
+                    '<div class="flex">Warning! The current screen is using resources from the local storage!</div>' +
+                    '<div>' +
+                        '<button id="clear-tmp-resources">Clear</button>' +
+                    '</div>' +
                 '</div>' +
             '</div>' +
-            '</div>' +
+
             '<div id="offscreen" style="display: none"></div>' +
+
             '<div id="react-editor"></div>' +
-            '<div id="editor" style="display: none">Editor</div>' + (this.hasTouch ?
+
+            '<div id="editor" style="display: none">Editor</div>' +
+            (this.hasTouch ?
                 '<div id="touch-input-dir" style="display: none">' +
                     '<div id="touch_btn_left_up" class="touch-dir-cell"></div>' +
                     '<div id="touch_btn_up" class="touch-dir-cell"></div>' +

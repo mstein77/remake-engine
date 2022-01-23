@@ -1196,7 +1196,7 @@ function TextPaneEditor({ model, resource }) {
                                can: () => eContextRef.current.hasStorePos(),
                                exec: () => deployModel()
                            },
-                           export: () => openExportModal()
+                           export: () =>  openExportModal()
                        }
                    }
                }>

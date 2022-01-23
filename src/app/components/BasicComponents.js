@@ -3356,6 +3356,79 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
+function useFocusManagement({ count, page, pos, setPos, active, setActive, mapping = null }) {
+    const [ focusItem, setFocusItem ] = useState(null);
+    const getIndexValue = mapping === null ? i => i : i => mapping[i];
+
+    if (!page) {
+        page = count
+    }
+    const lastPos = Math.max(count - page, 0);
+    const lastIndex = count - 1;
+
+    const last = Math.min(lastIndex, lastPos + page - 1, pos + page - 1);
+    const nextPageStart = pos + page;
+
+    const hasPaging = page < count;
+
+    // get active index
+    let i = pos;
+    let activeIndex = null;
+    if (active !== null) {
+        while (i < count) {
+            if (getIndexValue(i) === active) {
+                activeIndex = i;
+                break;
+            }
+            i++
+        }
+    }
+
+    const isOutsideFocus = hasPaging && (activeIndex < pos || activeIndex >= nextPageStart);
+
+    // TODO
+    return {}
+}
+
+/**
+ * Workflow:
+ *   a) Focus-By-Click
+ *        Setzt active auf den Value
+ *        focusItem sucht den Index zum Value
+ *
+ *   b) Focus-By-Tab
+ *        Setzt focusItem auf active oder bestimmt das erste elemente der page
+ *        wobei natürlich zum active value der Index bestimmt werden muss
+ *
+ *   c) Focus-By-Modal-Close
+ *        Beim öffnen wurde das letzte focusItem weggespeichert, so dass dieses
+ *        wieder aktiviert werden kann und ein refocus stattfinden kann
+ *
+ *   d) Refocus-By-Arrow-Keys
+ *
+ *
+ *   e) Refocus-By-Change
+ *
+ *
+ *
+ * a) implicit mapping (no mapping at all)
+ *     [0, 1, 2, 3, ..n]
+ *     active => mapping[focusItem]
+ *     focusItem
+ *
+ * b) filter mapping
+ *     [1, 4, 5]
+ *     active => mapping[focusItem]
+ *
+ * c) hierarchical mapping
+ *     ['0|0', '0.1|1', '0.1.3|2', '0.1.4|3', '0.2|4']
+ *     active => mapping[focusItem][1]
+ *
+ *
+ * active = 0
+ * focusItem = 0   => active = mapped[0] = 0
+ *
+ */
 function useFocusElements({ count, pos = 0, handleSpace, keyTracking = () => {}, setPos = () => null, active, page, reset, update, ...props }) {
     const wContext = useContext(WindowContext);
 
