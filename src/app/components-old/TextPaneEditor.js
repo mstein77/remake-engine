@@ -38,7 +38,7 @@ import {
     GlobalContext,
     useComponentUpdate,
     EntityManager, useExportModal
-} from "./BaseComponents";
+} from "./../components-old/BaseComponents";
 
 import {
     d,

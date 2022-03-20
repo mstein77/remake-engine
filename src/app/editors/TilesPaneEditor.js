@@ -334,7 +334,9 @@ function AliasPicker({ aliasIndex, animationIndex, editAlias }) {
 function BrushPicker({ brushIndex, editBrush }) {
     const eContext = useContext(EditorContext);
     const select = index => {
-        eContext.setSelection(new CellSelection('entity', {entityIndex: brushIndex, value: brushIndex.getEntityValue(index), cellsProp: 'tiles'}, CellValue.tile));
+        const selection = new CellSelection('entity', {entityIndex: brushIndex, value: brushIndex.getEntityValue(index), cellsProp: 'tiles'}, CellValue.tile);
+        eContext.setSelection(selection);
+        selection.setCellsFromEntity();
         eContext.setMode('write')
     };
     return (

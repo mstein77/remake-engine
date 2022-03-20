@@ -1,31 +1,18 @@
-import React, {Fragment, useState, useContext, useRef, useEffect, useMemo} from "react";
-import {
-    Page,
-    Stack,
-    Scene3d,
-    Content,
-    Section,
-    PropertyGrid,
-    RadioProp,
-    useUpdates,
-    TextArea,
-    GlobalContext,
-    GlobalCtx,
-    useModal
-} from "./BaseComponents";
-import TilesMapEditor from "./TilesMapEditor";
-import TextPaneEditor from "./TextPaneEditor";
+import ReactDOM from "react-dom";
+import React, { Fragment, useState, useContext, useRef, useEffect } from "react";
+import { Page, Stack, Scene3d, Content, Section, PropertyGrid, RadioProp, useUpdates, TextArea, GlobalContext, GlobalCtx, useModal } from "./../components-old/BaseComponents";
+import TilesMapEditor from "./../components-old/TilesMapEditor";
+import TextPaneEditor from "./../components-old/TextPaneEditor";
 import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
 import { TilesPaneEditor as TilesPaneEditorNew } from "./../editors/TilesPaneEditor";
 import { SpritePaneEditor as SpritePaneEditorNew } from "./../editors/SpritePaneEditor";
-import SpriteSheetEditor from "./SpriteSheetEditor";
-import {EditorContext, EditorCtx} from "./Raster";
-import './EditorApp.css';
+import SpriteSheetEditor from "./../components-old/SpriteSheetEditor";
+import { EditorContext, EditorCtx } from "./../components-old/Raster";
 import { d, getJsonModelOfInstance, getRebuildJsonForModel, getResourceTreeForJsonModel } from '../helper/helper';
-import ReactDOM from "react-dom";
 import { MainEditor } from "../editors/MainEditor";
 import { ScreenEditor } from "../editors/ScreenEditor";
 import { PocEditor } from "../editors/PocEditor";
+import './../components-old/EditorApp.css';
 
 function RestorableContent(props) {
     const eContext = useContext(EditorContext);

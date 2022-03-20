@@ -492,7 +492,7 @@ function CharManager({ charIndex }) {
 
                 minWidth={90}
                 titleHeight={41}
-                onDoubleClick={editChar}
+                onDoubleClick={index => editChar({marked: [index]})}
                 onRightClick={editBitmap}
                 renderTitle={
                     index => {

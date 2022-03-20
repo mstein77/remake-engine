@@ -2,18 +2,106 @@ import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
 import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import {
-    WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useRefocus, useAnimationPlayers, useMounted,
-    useFocusElements, useCssProps, useCachedState, useCallAfterwards, ButtonStack,
+    WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys,
+    useFocusKeyBindings, useAnimationPlayers, useMounted, useFocusManager, useCssProps, useCachedState, useCallAfterwards, ButtonStack,
     useComponentUpdate, AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
+
+const FormContext = React.createContext();
 
 const STATE = {
     INACTIVE: 0,
     ACTIVE: 1,
     ERROR: 2,
     AWAITING: 3
+}
+
+const COLOR_MODEL = {
+    RGB: 'RGB',
+    HSV: 'HSV'
+}
+
+// ----------------------------
+//   HELPER
+// ----------------------------
+
+const MAX_H = 360;
+const MAX_S = 255;
+const MAX_V = 255;
+
+const H_SEG = MAX_H / 6;
+const H_FACTOR = 256 / H_SEG;
+
+const getHueRgb = h => {
+    const b = [{i: 0, v: 0}, {i: 1, v: 0}, {i: 2, v: 0}];
+    if (h < H_SEG) {
+        b[0].v = 255;
+        b[1].v = h * H_FACTOR
+    } else if (h < (2 * H_SEG)) {
+        b[1].v = 255;
+        b[0].v = 255 - (h - (H_SEG - 1)) * H_FACTOR
+    } else if (h < (3 * H_SEG)) {
+        b[1].v = 255;
+        b[2].v = (h - (2 * H_SEG - 1)) * H_FACTOR
+    } else if (h < (4 * H_SEG)) {
+        b[2].v = 255;
+        b[1].v = 255 - (h - (3 * H_SEG - 1)) * H_FACTOR
+    } else if (h < (5 * H_SEG)) {
+        b[2].v = 255;
+        b[0].v = (h - (4 * H_SEG - 1)) * H_FACTOR
+    } else {
+        b[0].v = 255;
+        b[2].v = 255 - (h - (5 * H_SEG - 1)) * H_FACTOR
+    }
+    return b;
+}
+
+const getHueIndex = (maxIndex, varIndex, diff) => {
+    let dist = Math.round(diff / H_FACTOR);
+    if (maxIndex === 0) {
+        return varIndex === 2 ? 5 * H_SEG - 1 + dist : H_SEG - dist;
+    } else if (maxIndex === 1) {
+        return varIndex === 0 ? H_SEG - 1 + dist : 2 * H_SEG - 1 + (H_SEG - dist);
+    }
+    return varIndex !== 0 ? 3 * H_SEG - 1 + dist : 4 * H_SEG - 1 + (H_SEG - dist);
+}
+
+const colSortValueDesc = (a, b) => a.v === b.v ? 0 : (a.v > b.v ? -1 : 1);
+const colSortIndexAsc = (a, b) => a.i === b.i ? 0 : (a.i < b.i ? -1 : 1);
+
+const hsv2rgb = (h, s, v) => {
+    const b = getHueRgb(h);
+    const sorted = [ ...b ].sort(colSortValueDesc);
+    const b2 = Math.round(sorted[1].v / 255 * s);
+
+    sorted[0].n = Math.round(s);
+    sorted[2].n = Math.round(s / 255 * v);
+    sorted[1].n = Math.round((s - b2) / 255 * v + b2);
+
+    sorted.sort(colSortIndexAsc);
+    //        ( S / 255 * V  ,   S,   (255 - B2) / 255 * V + B2 )
+    //        C3            C1            C2
+
+    let rgb = '#';
+    for (let item of sorted) {
+        rgb += (item.n).toString(16).padStart(2, '0')
+    }
+    return rgb;
+}
+
+const rgb2hsv = rgb => {
+    const sorted = [
+        {i: 0, v: parseInt(rgb.substr(1, 2), 16)},
+        {i: 1, v: parseInt(rgb.substr(3, 2), 16)},
+        {i: 2, v: parseInt(rgb.substr(5, 2), 16)}
+    ].sort(colSortValueDesc);
+    return {
+        s: sorted[0].v,
+        v: sorted[2].v,
+        h: getHueIndex(sorted[0].i, sorted[1].i, sorted[0].v - sorted[1].v)
+    };
 }
 
 function isValidNumber(value) {
@@ -93,84 +181,6 @@ function getStepHandler(min, max, decimals, step) {
     };
 }
 
-function useAutoFocus(inputRef, props) {
-    useEffect(
-        () => {
-            if (props.autoFocus && !(props.disabled || props.readOnly)) {
-                requestAnimationFrame(() => {
-                    if (inputRef.current) {
-                        inputRef.current.select();
-                        inputRef.current.focus()
-                    }
-                })
-            }
-        },
-        []
-    )
-}
-
-function useSet(value, { undo, set }) {
-    const eContext = useContext(EditorContext);
-    const eRef = useRef(null);
-    eRef.current = eContext;
-
-    return newValue => {
-        if (undo) {
-            const oldValue = value;
-            eRef.current.doAction(
-                () => set(newValue),
-                () => set(oldValue),
-                undo
-            );
-        } else {
-            set(newValue)
-        }
-    }
-}
-
-/**
- * Used to put a name in front of the input component (if available). Normally this only should be used
- * in a flow-context (=Toolbar)
- *
- * STRUCTURES
- * ----------------
- *  A) name given:
- *
- *     <Stack gaps *>
- *         <Block center="v" shorten>{name}</Block>
- *         {children}
- *     </Stack>
- *
- *  B) no name
- *
- *     {children}
- *
- * Behaviour:
- *   - name should not be centered vertically but should have enough padding that it seems as if it is
- *   - input element should have sizing priority and name should shorten if total width is too small
- *   - component width should be min-content by default
- *   - full width should be passed through to input elem
- *   - percentage and abs-widths are applied to stack
- *
- *   - full height should be ignored because in flow-context height should only be abs or min
- */
-function ComponentWithName({ name, center = 'v', className = '', labelCls = '', children, ...props }) {
-    if (name) {
-        const attr = getDimHAttr(props);
-        const labelAttr = {};
-        if (labelCls) {
-            labelAttr.className = labelCls
-        }
-        children = (
-            <Stack gaps { ...attr }>
-                <Block center={center} full={attr.full} { ...labelAttr } shorten>{name}</Block>
-                {children}
-            </Stack>
-        )
-    }
-    return children
-}
-
 function getStackAndDimHAttr(props, defaults = {}) {
     let { full, width, minWidth, maxWidth } = getDimHAttr(props);
 
@@ -246,19 +256,68 @@ function getDimStyle({ width, minWidth, maxWidth, height, minHeight, maxHeight }
     }
 }
 
-function useStatePrefix(state, def = null) {
-    if (state) {
-        if ([STATE.ACTIVE, STATE.AWAITING].includes(state)) {
-            return 'active'
+function addPaddingCls(cls, padded, type) {
+    if (padded) {
+        if (padded !== true) {
+            cls.push(type + '-padding');
         }
-        if (state === STATE.ERROR) {
-            return 'error'
+        if (padded !== '1') {
+            if (padded !== 'v') {
+                cls.push(type + '-padding-h');
+            }
+            if (padded !== 'h') {
+                cls.push(type + '-padding-v');
+            }
         }
     }
-    return def
 }
 
-const FormContext = React.createContext();
+// ---------------------------------
+//   COMPONENTS
+// ---------------------------------
+
+/**
+ * Used to put a name in front of the input component (if available). Normally this only should be used
+ * in a flow-context (=Toolbar)
+ *
+ * STRUCTURES
+ * ----------------
+ *  A) name given:
+ *
+ *     <Stack gaps *>
+ *         <Block center="v" shorten>{name}</Block>
+ *         {children}
+ *     </Stack>
+ *
+ *  B) no name
+ *
+ *     {children}
+ *
+ * Behaviour:
+ *   - name should not be centered vertically but should have enough padding that it seems as if it is
+ *   - input element should have sizing priority and name should shorten if total width is too small
+ *   - component width should be min-content by default
+ *   - full width should be passed through to input elem
+ *   - percentage and abs-widths are applied to stack
+ *
+ *   - full height should be ignored because in flow-context height should only be abs or min
+ */
+function ComponentWithName({ name, center = 'v', className = '', labelCls = '', children, ...props }) {
+    if (name) {
+        const attr = getDimHAttr(props);
+        const labelAttr = {};
+        if (labelCls) {
+            labelAttr.className = labelCls
+        }
+        children = (
+            <Stack gaps { ...attr }>
+                <Block center={center} full={attr.full} { ...labelAttr } shorten>{name}</Block>
+                {children}
+            </Stack>
+        )
+    }
+    return children
+}
 
 function Form({ children, submit, onKeyDown, ...props }) {
     const [invalid, setInvalid] = useState(false);
@@ -505,82 +564,6 @@ function FixTooltip({ title, hotKey, click, children, hostRef }) {
     )
 }
 
-function useTooltip({ title, hotKey, clicked, info, click, ref }) {
-    const wContext = useContext(WindowContext);
-
-    const divRef = useRef(null);
-    const mounted = useMounted();
-
-    const hostRef = ref ? ref : divRef;
-
-    const [ showTooltip, setShowTooltipRaw ] = useState(false);
-    const setShowTooltip = value => {
-        if (!mounted.current) return;
-        setShowTooltipRaw(value)
-    }
-    const propsRef = useRef();
-    propsRef.current = {
-        showTooltip,
-        setShowTooltip
-    };
-
-    if (!wContext.editorConfig.tooltips || !(title || info)) {
-        return {enabled: false}
-    }
-
-    const checkTooltip = () => {
-        wContext.clearTooltipTimer(propsRef);
-        if (wContext.isInExclusiveMode()) {
-            wContext.addEventListener(
-                'mouseup', e => {
-                    if (!isEventInRect(e, hostRef.current.getBoundingClientRect())) {
-                        setShowTooltip(false)
-                    }
-                },
-                {once: true}
-            );
-            setShowTooltip(null);
-            return;
-        }
-        setShowTooltip(false)
-    }
-
-    if (clicked && showTooltip !== null) {
-        checkTooltip()
-    }
-
-    const attr = {
-        onMouseOver: () => {
-            wContext.startTooltipTimer(propsRef);
-        },
-        onMouseOut: checkTooltip
-    };
-    if (!ref) {
-        attr.ref = hostRef
-    }
-    return {
-        enabled: true,
-        attr,
-        render: showTooltip && <FixTooltip title={title} hotKey={hotKey} click={click} hostRef={hostRef}>{info}</FixTooltip>
-    }
-}
-
-function addPaddingCls(cls, padded, type) {
-    if (padded) {
-        if (padded !== true) {
-            cls.push(type + '-padding');
-        }
-        if (padded !== '1') {
-            if (padded !== 'v') {
-                cls.push(type + '-padding-h');
-            }
-            if (padded !== 'h') {
-                cls.push(type + '-padding-v');
-            }
-        }
-    }
-}
-
 function Button({ tabControlled, icon, name, help, action, full, state, iconProps = {}, end, center, centerItems, value, current, rev, disabled, onClick, onClickEnd, click,
                    className,  tab = true, refocus = null, cursor = 'pointer', gaps = true, border = true, radius = true, padded, vertical, children, ...props }) {
     const wContext = useContext(WindowContext);
@@ -700,7 +683,10 @@ function Button({ tabControlled, icon, name, help, action, full, state, iconProp
     }
     const attr = getDimAttr(props);
     attr.ref = focusRef;
-    attr.onFocus = () => setFocused(true);
+    attr.onFocus = e => {
+        setFocused(true);
+        if (props.onFocus) props.onFocus(e)
+    }
     attr.onBlur = () => {
         requestAnimationFrame(() => {
             if (mounted.current) {
@@ -809,20 +795,21 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
         setActiveRaw(index)
         set(optionIndex[index])
     };
-    const { focusItem, attr, ...focus } = useFocusElements({count: optionIndex.length, active, setActive, divRef: stackRef });
+    const { focusItem, attr, ...focus } = useFocusManager({count: optionIndex.length, active, setActive, divRef: stackRef });
     const dimProps = getDimHAttr(props);
 
     const buttons = [];
     let i = 0;
     for (let { name, help } of options) {
         const curr = i;
+        const { onLeftClick, ...itemAttr } = focus.itemAttr(curr);
         buttons.push(
             <Button
-                key={optionIndex[i]} tab={focusItem === curr} help={help}
+                key={optionIndex[i]} { ...itemAttr } help={help}
                 tabControlled
                 padded={padded} disabled={disabled} name={icon ? null : name}
                 icon={icon ? name : null} value={i} current={active}
-                onClick={readOnly ? null : focus.leftClick(curr)}
+                onClick={readOnly ? null : onLeftClick}
             />
         );
         i++
@@ -1719,107 +1706,6 @@ function Color({ name, value, set, readOnly, disabled, alpha, tab = true, floatP
     )
 }
 
-const MAX_H = 360;
-const MAX_S = 255;
-const MAX_V = 255;
-
-const H_SEG = MAX_H / 6;
-const H_FACTOR = 256 / H_SEG;
-
-const getHueRgb = h => {
-    const b = [{i: 0, v: 0}, {i: 1, v: 0}, {i: 2, v: 0}];
-    if (h < H_SEG) {
-        b[0].v = 255;
-        b[1].v = h * H_FACTOR
-    } else if (h < (2 * H_SEG)) {
-        b[1].v = 255;
-        b[0].v = 255 - (h - (H_SEG - 1)) * H_FACTOR
-    } else if (h < (3 * H_SEG)) {
-        b[1].v = 255;
-        b[2].v = (h - (2 * H_SEG - 1)) * H_FACTOR
-    } else if (h < (4 * H_SEG)) {
-        b[2].v = 255;
-        b[1].v = 255 - (h - (3 * H_SEG - 1)) * H_FACTOR
-    } else if (h < (5 * H_SEG)) {
-        b[2].v = 255;
-        b[0].v = (h - (4 * H_SEG - 1)) * H_FACTOR
-    } else {
-        b[0].v = 255;
-        b[2].v = 255 - (h - (5 * H_SEG - 1)) * H_FACTOR
-    }
-    return b;
-}
-
-const getHueIndex = (maxIndex, varIndex, diff) => {
-    let dist = Math.round(diff / H_FACTOR);
-    if (maxIndex === 0) {
-        return varIndex === 2 ? 5 * H_SEG - 1 + dist : H_SEG - dist;
-    } else if (maxIndex === 1) {
-        return varIndex === 0 ? H_SEG - 1 + dist : 2 * H_SEG - 1 + (H_SEG - dist);
-    }
-    return varIndex !== 0 ? 3 * H_SEG - 1 + dist : 4 * H_SEG - 1 + (H_SEG - dist);
-}
-
-const colSortValueDesc = (a, b) => a.v === b.v ? 0 : (a.v > b.v ? -1 : 1);
-const colSortIndexAsc = (a, b) => a.i === b.i ? 0 : (a.i < b.i ? -1 : 1);
-
-const hsv2rgb = (h, s, v) => {
-    const b = getHueRgb(h);
-    const sorted = [ ...b ].sort(colSortValueDesc);
-    const b2 = Math.round(sorted[1].v / 255 * s);
-
-    sorted[0].n = Math.round(s);
-    sorted[2].n = Math.round(s / 255 * v);
-    sorted[1].n = Math.round((s - b2) / 255 * v + b2);
-
-    sorted.sort(colSortIndexAsc);
-    //        ( S / 255 * V  ,   S,   (255 - B2) / 255 * V + B2 )
-    //        C3            C1            C2
-
-    let rgb = '#';
-    for (let item of sorted) {
-        rgb += (item.n).toString(16).padStart(2, '0')
-    }
-    return rgb;
-}
-
-const rgb2hsv = rgb => {
-    const sorted = [
-        {i: 0, v: parseInt(rgb.substr(1, 2), 16)},
-        {i: 1, v: parseInt(rgb.substr(3, 2), 16)},
-        {i: 2, v: parseInt(rgb.substr(5, 2), 16)}
-    ].sort(colSortValueDesc);
-    return {
-        s: sorted[0].v,
-        v: sorted[2].v,
-        h: getHueIndex(sorted[0].i, sorted[1].i, sorted[0].v - sorted[1].v)
-    };
-}
-
-const COLOR_MODEL = {
-    RGB: 'RGB',
-    HSV: 'HSV'
-}
-
-function useGradientModal() {
-    const GradientModal = useModal();
-    return useMemo(
-        () => {
-            return {
-                openGradientModal: props => GradientModal.open({id: 'ColorPickerModal', close: GradientModal.close, ...props }),
-                GradientModal: <GradientModal.content name="Change gradient" drag transparent>
-                    <BackgroundCtx>
-                        <EditorCtx>
-                            <GradientPicker { ...GradientModal.props } />
-                        </EditorCtx>
-                    </BackgroundCtx>
-                </GradientModal.content>
-            }
-        },
-        [ GradientModal.props ]
-    )
-}
-
 function GradientPicker({ valueRef, set, save, close }) {
     const update = useComponentUpdate();
 
@@ -1935,25 +1821,6 @@ function GradientPicker({ valueRef, set, save, close }) {
                 </LabelProp>
             </PropertyGrid>
         </Stack>
-    )
-}
-
-function useColorPickerModal() {
-    const PickerModal = useModal();
-    return useMemo(
-        () => {
-            return {
-                openColorPickerModal: props => PickerModal.open({id: 'ColorPickerModal', close: PickerModal.close, ...props }),
-                ColorPickerModal: <PickerModal.content name="Change color" drag transparent>
-                    <BackgroundCtx>
-                        <EditorCtx>
-                            <ColorPicker { ...PickerModal.props } />
-                        </EditorCtx>
-                    </BackgroundCtx>
-                </PickerModal.content>
-            }
-        },
-        [ PickerModal.props ]
     )
 }
 
@@ -2201,97 +2068,97 @@ function ColorPicker({ value, set, alpha, close }) {
 
     return (
         <Form submit={close} onKeyDown={handleEsc}>
-        <Stack vertical borders height={260}>
-            <Stack borders full>
-                <Stack vertical borders width={310} full="v">
-                    <Stack gaps padded full="h">
-                        <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
-                        <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
-                        <Stack center="v" gaps>
-                            <Button icon="colorize" onClick={() => PickerModal.open({})} />
-                            <Button icon="invert_colors" onClick={invertColor} />
-                            <Button icon="undo" onClick={undoOp} />
-                            <Button icon="visibility" onClick={showBeforeOp} onClickEnd={showBeforeEnd} />
+            <Stack vertical borders height={260}>
+                <Stack borders full>
+                    <Stack vertical borders width={310} full="v">
+                        <Stack gaps padded full="h">
+                            <ColorBox className="thin-boxed" color={value.current} width={35} height={26} />
+                            <Block center="v"><Input name="#" match={isValid} force className="autofocus" value={value.current.substring(1)} set={value => {set('#' + value); requestAnimationFrame(() => update())}} max={len} /></Block>
+                            <Stack center="v" gaps>
+                                <Button icon="colorize" onClick={() => PickerModal.open({})} />
+                                <Button icon="invert_colors" onClick={invertColor} />
+                                <Button icon="undo" onClick={undoOp} />
+                                <Button icon="visibility" onClick={showBeforeOp} onClickEnd={showBeforeEnd} />
+                            </Stack>
+                            <ColorBox className="thin-boxed" color={hsv2rgb(h, s, v)} width={35} height={26} />
                         </Stack>
-                        <ColorBox className="thin-boxed" color={hsv2rgb(h, s, v)} width={35} height={26} />
-                    </Stack>
 
-                    <Block full>
-                        <SideTabs active={colorModel} setActive={setColorModel} icon={false} full>
-                            <SideTab full name="RGB">
-                                {colorModel === COLOR_MODEL.RGB &&
+                        <Block full>
+                            <SideTabs active={colorModel} setActive={setColorModel} icon={false} full>
+                                <SideTab full name="RGB">
+                                    {colorModel === COLOR_MODEL.RGB &&
                                     <Block full="h">
                                         <PropertyGrid>
                                             <NumberProp name="R" full="h" gradient={gradients.red} railProps={railProps} value={rgb.r} set={setByte(0)} min={0} max={255} slider="h" />
                                             <NumberProp name="G" full="h" gradient={gradients.green} railProps={railProps} value={rgb.g} set={setByte(1)} min={0} max={255} slider="h" />
                                             <NumberProp name="B" full="h" gradient={gradients.blue} railProps={railProps} value={rgb.b} set={setByte(2)} min={0} max={255} slider="h" />
                                             {alpha &&
-                                                <NumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
+                                            <NumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h" value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" />
                                             }
                                         </PropertyGrid>
                                     </Block>
-                                }
-                            </SideTab>
+                                    }
+                                </SideTab>
 
-                            <SideTab full name="HSV">
-                                {colorModel === COLOR_MODEL.HSV &&
+                                <SideTab full name="HSV">
+                                    {colorModel === COLOR_MODEL.HSV &&
                                     <Block full="h">
                                         <PropertyGrid>
                                             <VirtualNumberProp name="H" full="h" gradient={gradients.hue} virtualMax={359}
-                                                       railProps={railProps} value={h} set={setHsvH} min={0} max={MAX_H - 1}
-                                                       slider="h" size={4} />
+                                                               railProps={railProps} value={h} set={setHsvH} min={0} max={MAX_H - 1}
+                                                               slider="h" size={4} />
                                             <VirtualNumberProp name="S" full="h" gradient={gradients.s} railProps={railProps}
-                                                       value={s} rangeDecimals={1} set={setHsvS} min={0} max={255}
-                                                       slider="h" size={4} />
+                                                               value={s} rangeDecimals={1} set={setHsvS} min={0} max={255}
+                                                               slider="h" size={4} />
                                             <VirtualNumberProp name="V" full="h" gradient={gradients.v} railProps={railProps}
-                                                       value={v} rangeDecimals={1} set={setHsvV} min={0} max={255}
-                                                       slider="h" size={4} />
+                                                               value={v} rangeDecimals={1} set={setHsvV} min={0} max={255}
+                                                               slider="h" size={4} />
                                             {alpha &&
-                                                <VirtualNumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h"
-                                                           value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" size={4} />
+                                            <VirtualNumberProp name="A" gradient={gradients.alpha} railProps={railProps} full="h"
+                                                               value={rgb.a} set={setByte(3)} min={0} max={255} slider="h" size={4} />
                                             }
                                         </PropertyGrid>
                                     </Block>
-                                }
-                            </SideTab>
-                        </SideTabs>
+                                    }
+                                </SideTab>
+                            </SideTabs>
+                        </Block>
+                    </Stack>
+
+                    <Block padded>
+                        <Stack>
+                            <CanvasCircleMarker
+                                size={7} rangeX={256} rangeY={256}
+                                x={255 - v} setX={value => setHsvV(255 - value)}
+                                y={255 - s} setY={value => setHsvS(255 - value)}
+                                setXY={(newX, newY) => setHsvSV(255 - newY, 255 - newX)}
+                            >
+                                <Canvas width={192} height={192} render={renderSquare} plain />
+                            </CanvasCircleMarker>
+
+                            <Slider vertical tab
+                                    sledProps={{margin: 10, short: 10, long: 14, radius: true}}
+                                    railProps={{size: 192, oppSize: 12, center: false, radius: false}}
+                                    min={0} max={MAX_H - 1} value={h} set={setHsvH}
+                                    getIndicator={renderIndicator}
+                            >
+                                <Canvas width={12} height={192} render={renderHue} />
+                            </Slider>
+                        </Stack>
+                    </Block>
+
+                </Stack>
+
+                <Stack gaps full="h">
+                    <Block padded width={150}>
+                        <Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  />
+                    </Block>
+                    <Block full>
+                        <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} border={1} rulers={false} />
                     </Block>
                 </Stack>
 
-                <Block padded>
-                    <Stack>
-                        <CanvasCircleMarker
-                            size={7} rangeX={256} rangeY={256}
-                             x={255 - v} setX={value => setHsvV(255 - value)}
-                             y={255 - s} setY={value => setHsvS(255 - value)}
-                             setXY={(newX, newY) => setHsvSV(255 - newY, 255 - newX)}
-                        >
-                            <Canvas width={192} height={192} render={renderSquare} plain />
-                        </CanvasCircleMarker>
-
-                        <Slider vertical tab
-                                sledProps={{margin: 10, short: 10, long: 14, radius: true}}
-                                railProps={{size: 192, oppSize: 12, center: false, radius: false}}
-                                min={0} max={MAX_H - 1} value={h} set={setHsvH}
-                                getIndicator={renderIndicator}
-                        >
-                            <Canvas width={12} height={192} render={renderHue} />
-                        </Slider>
-                    </Stack>
-                </Block>
-
             </Stack>
-
-            <Stack gaps full="h">
-                <Block padded width={150}>
-                    <Select full="h" buttons tab options={[{id: 'last used', name: 'Last used'}]} value="last used"  />
-                </Block>
-                <Block full>
-                    <EntityPicker centerItems={false} entityIndex={wContext.lastColorsIndex} select={setColorFromEntityPicker} border={1} rulers={false} />
-                </Block>
-            </Stack>
-
-        </Stack>
             <PickerModal.content name="Pick a color..." full>
                 <BitmapSelector type={alpha ? 'rgba' : 'rgb'} save={setColorFromPicker} close={PickerModal.close} selection={{type: 'rect', width: 1, height: 1, fixed: true}} />
             </PickerModal.content>
@@ -2349,21 +2216,21 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, num
         <>
             <Stack vertical gaps="1">
                 {!readOnly &&
-                    <Stack gaps="1">
-                        <Block center="v">
-                            <Button name="Pick" padded="h" onClick={pick} />
-                        </Block>
-                        <Block center="v" onLeftClick={pick}>
-                            <Input value={value} number={number} readOnly />
-                        </Block>
-                        {reset && <Block center="v"><Button onClick={() => set('')} icon="delete" /></Block>}
-                    </Stack>
+                <Stack gaps="1">
+                    <Block center="v">
+                        <Button name="Pick" padded="h" onClick={pick} />
+                    </Block>
+                    <Block center="v" onLeftClick={pick}>
+                        <Input value={value} number={number} readOnly />
+                    </Block>
+                    {reset && <Block center="v"><Button onClick={() => set('')} icon="delete" /></Block>}
+                </Stack>
                 }
                 <Block>
                     {width !== null &&
-                        <Block onLeftClick={pick}>
-                            <Canvas border="1" width={width} height={height} render={render} />
-                        </Block>
+                    <Block onLeftClick={pick}>
+                        <Canvas border="1" width={width} height={height} render={render} />
+                    </Block>
                     }
                 </Block>
             </Stack>
@@ -2456,23 +2323,23 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
         <>
             <Stack vertical>
                 {!readOnly && value &&
-                    <ButtonStack buttons={buttons} gaps="1" />
+                <ButtonStack buttons={buttons} gaps="1" />
                 }
                 {value &&
-                    <Block padded onLeftClick={editBitmap}>
-                        <Canvas width={width} height={height} render={render} border="1" />
-                    </Block>
+                <Block padded onLeftClick={editBitmap}>
+                    <Canvas width={width} height={height} render={render} border="1" />
+                </Block>
                 }
                 {!readOnly && !value && empty &&
-                    <Button name="add" padded="h" onClick={setEmptyImage} />
+                <Button name="add" padded="h" onClick={setEmptyImage} />
                 }
             </Stack>
             {EditBitmapModal}
             {BitmapSelectionModal}
             {entityIndex &&
-                <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
-                    <EntityPicker {...CopyBitmapModal.props} />
-                </CopyBitmapModal.content>
+            <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
+                <EntityPicker {...CopyBitmapModal.props} />
+            </CopyBitmapModal.content>
             }
         </>
     )
@@ -2521,7 +2388,7 @@ function SliderInner({ vertical, sledProps, railProps, borders, end, center, ...
 }
 
 function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabled, decimals = 0,
-        railProps = {}, sledProps = {}, getIndicator, borders, focusRef, children }) {
+                         railProps = {}, sledProps = {}, getIndicator, borders, focusRef, children }) {
 
     const wContext = useContext(WindowContext);
 
@@ -2730,14 +2597,14 @@ function RailAndSled({ vertical, value, set, min = 0, max, tab, readOnly, disabl
             </Overlay>
             {
                 getIndicator && !invalid &&
-                    <Overlay className="no-events" { ...indicatorAttr }>
-                        {getIndicator()}
-                    </Overlay>
+                <Overlay className="no-events" { ...indicatorAttr }>
+                    {getIndicator()}
+                </Overlay>
             }
             {!invalid &&
-                <Overlay { ...sledOverlayAttr }>
-                    <Block ref={sledRef} cursor="grab" tab={tab} onLeftClick={startSliding} className={gripCls.join(' ')} { ...handleAttr } { ...focusAttr } />
-                </Overlay>
+            <Overlay { ...sledOverlayAttr }>
+                <Block ref={sledRef} cursor="grab" tab={tab} onLeftClick={startSliding} className={gripCls.join(' ')} { ...handleAttr } { ...focusAttr } />
+            </Overlay>
             }
         </Overlays>
     )
@@ -2956,7 +2823,7 @@ function PositionPicker({ entityIndex, position, entity, setPosition, setEntity,
                     <Button name="End" padded="h" current={position} value={'end'} onClick={() => setPosition('end')} />
                 </Stack>
                 {preserve !== undefined &&
-                    <Checkbox name="Preserve tiles" disabled={position === 'end'} value={preserve} set={setPreserve} />
+                <Checkbox name="Preserve tiles" disabled={position === 'end'} value={preserve} set={setPreserve} />
                 }
             </Stack>
 
@@ -3201,6 +3068,155 @@ function KeyInput({ value, set, onInput, className }) {
             </Block>
             <Block full="h"><Kbd value={value !== '' ? value.charCodeAt(0) : ''} length={4} /></Block>
         </Stack>
+    )
+}
+
+// ---------------------------------
+//   CUSTOM HOOKS
+// ---------------------------------
+
+function useAutoFocus(inputRef, props) {
+    useEffect(
+        () => {
+            if (props.autoFocus && !(props.disabled || props.readOnly)) {
+                requestAnimationFrame(() => {
+                    if (inputRef.current) {
+                        inputRef.current.select();
+                        inputRef.current.focus()
+                    }
+                })
+            }
+        },
+        []
+    )
+}
+
+function useSet(value, { undo, set }) {
+    const eContext = useContext(EditorContext);
+    const eRef = useRef(null);
+    eRef.current = eContext;
+
+    return newValue => {
+        if (undo) {
+            const oldValue = value;
+            eRef.current.doAction(
+                () => set(newValue),
+                () => set(oldValue),
+                undo
+            );
+        } else {
+            set(newValue)
+        }
+    }
+}
+
+function useStatePrefix(state, def = null) {
+    if (state) {
+        if ([STATE.ACTIVE, STATE.AWAITING].includes(state)) {
+            return 'active'
+        }
+        if (state === STATE.ERROR) {
+            return 'error'
+        }
+    }
+    return def
+}
+
+function useTooltip({ title, hotKey, clicked, info, click, ref }) {
+    const wContext = useContext(WindowContext);
+
+    const divRef = useRef(null);
+    const mounted = useMounted();
+
+    const hostRef = ref ? ref : divRef;
+
+    const [ showTooltip, setShowTooltipRaw ] = useState(false);
+    const setShowTooltip = value => {
+        if (!mounted.current) return;
+        setShowTooltipRaw(value)
+    }
+    const propsRef = useRef();
+    propsRef.current = {
+        showTooltip,
+        setShowTooltip
+    };
+
+    if (!wContext.editorConfig.tooltips || !(title || info)) {
+        return {enabled: false}
+    }
+
+    const checkTooltip = () => {
+        wContext.clearTooltipTimer(propsRef);
+        if (wContext.isInExclusiveMode()) {
+            wContext.addEventListener(
+                'mouseup', e => {
+                    if (!isEventInRect(e, hostRef.current.getBoundingClientRect())) {
+                        setShowTooltip(false)
+                    }
+                },
+                {once: true}
+            );
+            setShowTooltip(null);
+            return;
+        }
+        setShowTooltip(false)
+    }
+
+    if (clicked && showTooltip !== null) {
+        checkTooltip()
+    }
+
+    const attr = {
+        onMouseOver: () => {
+            wContext.startTooltipTimer(propsRef);
+        },
+        onMouseOut: checkTooltip
+    };
+    if (!ref) {
+        attr.ref = hostRef
+    }
+    return {
+        enabled: true,
+        attr,
+        render: showTooltip && <FixTooltip title={title} hotKey={hotKey} click={click} hostRef={hostRef}>{info}</FixTooltip>
+    }
+}
+
+function useGradientModal() {
+    const GradientModal = useModal();
+    return useMemo(
+        () => {
+            return {
+                openGradientModal: props => GradientModal.open({id: 'ColorPickerModal', close: GradientModal.close, ...props }),
+                GradientModal: <GradientModal.content name="Change gradient" drag transparent>
+                    <BackgroundCtx>
+                        <EditorCtx>
+                            <GradientPicker { ...GradientModal.props } />
+                        </EditorCtx>
+                    </BackgroundCtx>
+                </GradientModal.content>
+            }
+        },
+        [ GradientModal.props ]
+    )
+}
+
+function useColorPickerModal() {
+    const PickerModal = useModal();
+    return useMemo(
+        () => {
+            return {
+                openColorPickerModal: props => PickerModal.open({id: 'ColorPickerModal', close: PickerModal.close, ...props }),
+                ColorPickerModal: <PickerModal.content name="Change color" drag transparent>
+                    <BackgroundCtx>
+                        <EditorCtx>
+                            <ColorPicker { ...PickerModal.props } />
+                        </EditorCtx>
+                    </BackgroundCtx>
+                </PickerModal.content>
+            }
+        },
+        [ PickerModal.props ]
     )
 }
 

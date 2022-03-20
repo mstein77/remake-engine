@@ -1,26 +1,4 @@
 
-Checkbox
-  border=false, cls=transparent, iconCls=checkbox, padded=false
-  icon=value? check_box : check_box_outline_blank
-
---------------------------
- .button-bg     --button-bg-color + button-color
- .active-bg     --active-bg-color + active-color
- .error-bg      --error-bg-color  + error-color
- .input-bg      --input-bg-color  + input-color
- .cursor-bg     --
-
- .button-radius
- .button-padding
- .button-border (immer 1px)
- .button-border-style (fix bei active/error?)
- .button-border-color (abhängg von active/error/default?)
-
- .less
- .invalid
- .hover (:hover, +.clicking)
-
-
 -----------------------------------
   S O L V I N G - T I M E :
 -----------------------------------

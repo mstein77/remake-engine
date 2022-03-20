@@ -3,6 +3,7 @@ import { Stack, Block, DIR } from "../components/LayoutComponents";
 import { d, clamp, hex2rgb, hex2rgbaArray } from "../helper/helper";
 import { Button, OkCancelForm, Number } from "../components/FormComponents";
 import {
+    WindowContext,
     useModal,
     Icon,
     useComponentUpdate,
@@ -10,9 +11,11 @@ import {
     ButtonStack,
     Canvas,
     useFocusElements,
+    useFocusManager,
     Toolbar,
-    AvailContextProvider, AvailContext
+    AvailContextProvider, AvailContext, Ruler, useMounted, useCallAfterwards
 } from "../components/BasicComponents";
+import { useConfirmDialog } from "../components/EditorComponents";
 import { ColorIndex } from "../classes/EntityIndex";
 import { EntityStack } from "../components/EntityComponents";
 import { Scene3DCanvas, Scene, Object3D } from "../components/WebGLComponents";
@@ -22,14 +25,14 @@ function FocusMarker({ reset, items, page }) {
     const [ pos, setPos ] = useState(0);
     const [ active, setActive ] = useState(reset ? null : 0);
 
-    const fElems = useFocusElements({ count: items.length, pos, handleSpace: true, setPos, active, setActive, page, reset });
+    const fElems = useFocusManager({ count: items.length, pos, handleSpace: true, setPos, active, setActive, page, reset });
     const elems = [];
     let i = pos;
     while (i <= fElems.last) {
         const curr = i;
         elems.push(
             <Block
-                key={curr} onLeftClick={fElems.leftClick(curr)} tab={fElems.focusItem === curr}
+                key={curr} { ...fElems.itemAttr(curr) }
                 width={50} height={50} border="1" padded className={(active === curr ? 'active' : 'secondary') + '-bg'}>
                 {curr}
             </Block>
@@ -46,7 +49,7 @@ function FocusMarker({ reset, items, page }) {
 function FocusButtons({ items, reset }) {
     const [ active, setActive ] = useState(reset ? null : 0);
 
-    const fElems = useFocusElements({ count: items.length, active, setActive, reset });
+    const fElems = useFocusManager({ count: items.length, active, setActive, reset });
     const elems = [];
     let i = 0;
     while (i <= fElems.last) {
@@ -55,8 +58,7 @@ function FocusButtons({ items, reset }) {
         elems.push(
             <Button
                 key={curr} current={active} value={i}
-                onClick={fElems.leftClick(curr)}
-                tab={fElems.focusItem === curr}
+                { ...fElems.itemAttr(curr) }
                 padded="h"
                 tabControlled
                 { ...props }
@@ -65,8 +67,11 @@ function FocusButtons({ items, reset }) {
         i++
     }
     return (
-        <Block { ...fElems.attr } className="stack-h padded inner-space-h">
-            {elems}
+        <Block full>
+            {fElems.FocusCatcherElem} xxx
+            <Block { ...fElems.attr } className="stack-h full-v full-h padded inner-space-h">
+                {elems}
+            </Block>
         </Block>
     )
 }
@@ -795,6 +800,279 @@ function TestSceneInner({  }) {
     )
 }
 
+function NewFocusOld({ items, page, vertical = false, reset = false, ...props }) {
+
+    const wContext = useContext(WindowContext);
+    const callAfterwards = useCallAfterwards();
+
+    const [ catchFocus, setCatchFocus ] = useState(true);
+    const [ tabIndex, setTabIndex ] = useState(0);
+    const [ active, setActive ] = useState(null);
+    const [ pos, setPos ] = useState(0);
+
+    const autoRef = useRef(null);
+    const mounted = useMounted();
+    const levelRef = useRef(null);
+    if (levelRef.current === null) {
+        levelRef.current = wContext.getModalLevel()
+    }
+
+    const count = items ? items.length : props.count;
+    const getItem = items ? index => items[index] : index => index;
+    const getItemIndex = items ? item => items.indexOf(item) : item => item >= count || item < 0 ? -1 : item;
+
+    const lastPos = Math.max(count - page, 0);
+    let currPos = pos;
+    if (currPos > lastPos) {
+        callAfterwards(setPos, lastPos);
+        currPos = lastPos
+    }
+    const refocus = () => {
+        requestAnimationFrame(() => {
+            if (!mounted.current) return;
+            const elem  = autoRef.current.nextSibling.querySelector('.tabbed');
+            if (elem) elem.focus()
+        })
+    }
+    if (tabIndex !== null && count > 0 && tabIndex >= count) {
+        callAfterwards(setTabIndex, count - 1);
+        callAfterwards(refocus)
+    }
+    const lastIndex = count - 1;
+    const last = Math.min(lastIndex, lastPos + page - 1, currPos + page - 1);
+    const nextPageStart = currPos + page;
+
+    const hasPaging = page < count;
+    const activeIndex = getItemIndex(active);
+    const isOutsideFocus = hasPaging && (activeIndex < currPos || activeIndex >= nextPageStart);
+    const autoFocus = e => {
+        setCatchFocus(false);
+        const newTabIndex = activeIndex === -1 ? 0 : activeIndex;
+        setTabIndex(isOutsideFocus || newTabIndex === null ? currPos : newTabIndex);
+        refocus()
+    }
+    const handleLeave = e => {
+        if (wContext.getModalLevel() === levelRef.current) {
+            setCatchFocus(true)
+        }
+    }
+    const onKeyDown = e => {
+        if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
+            if (tabIndex === 0) {
+                setTabIndex(lastIndex);
+                setPos(lastPos)
+            } else if (!hasPaging) {
+                setTabIndex(
+                    e.shiftKey ? 0 : clamp(0, tabIndex - 1)
+                );
+            } else {
+                let newPos = clamp(0, tabIndex - (e.shiftKey ? page : 1));
+                if (newPos < currPos) {
+                    setPos(clamp(0,currPos - page))
+                }
+                setTabIndex(newPos)
+            }
+        } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
+            if (tabIndex === lastIndex) {
+                setTabIndex(0);
+                setPos(0)
+            } else if (!hasPaging) {
+                setTabIndex(
+                    e.shiftKey ? lastIndex : Math.min(lastIndex, tabIndex + 1)
+                )
+            } else {
+                const newPos = Math.min(tabIndex + (e.shiftKey ? page : 1), lastIndex);
+                if (newPos >= nextPageStart) {
+                    setPos(Math.min(nextPageStart, lastPos))
+                }
+                setTabIndex(newPos)
+            }
+        } else if (e.key === ' ') {
+            const newActive = getItem(tabIndex);
+            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+        } else {
+            return;
+        }
+        refocus()
+    }
+    const setFocus = index => () => {
+        setTabIndex(index);
+        const clickItem = getItem(index);
+        setActive(reset && active === clickItem ? null : clickItem);
+        setCatchFocus(false)
+    }
+    const elems = [];
+    const iMin = currPos;
+    const iMax = page ? Math.min(currPos + page, count) : count;
+    for (let index = iMin; index < iMax; index++) {
+        const item = getItem(index);
+        elems.push(
+            <Block
+                tab={!catchFocus && tabIndex === index} padded border="1"
+                onLeftClick={setFocus(index)}
+                key={index}
+                className={(active === item ? 'active' : 'secondary') + '-bg'}
+            >
+                {item}
+            </Block>
+        )
+    }
+    return (
+            <Stack full={vertical ? 'v' : 'h'} vertical={vertical} onBlur={handleLeave} onKeyDown={onKeyDown}>
+                <Block ref={autoRef} tab={catchFocus} onFocus={autoFocus} />
+                <Stack vertical={!vertical} gaps>
+                    {elems}
+                </Stack>
+            </Stack>
+    )
+}
+
+function NewFocus({ items, page, vertical = false, reset = false, ...props }) {
+
+    const wContext = useContext(WindowContext);
+    const callAfterwards = useCallAfterwards();
+
+    const [ catchFocus, setCatchFocus ] = useState(true);
+    const [ tabIndex, setTabIndex ] = useState(0);
+    const [ active, setActive ] = useState(null);
+    const [ pos, setPos ] = useState(0);
+
+
+    const autoRef = useRef(null);
+    const mounted = useMounted();
+    const levelRef = useRef(null);
+    if (levelRef.current === null) {
+        levelRef.current = wContext.getModalLevel()
+    }
+
+    const count = items ? items.length : props.count;
+    const getItem = items ? index => items[index] : index => index;
+    const getItemIndex = items ? item => items.indexOf(item) : item => item >= count || item < 0 ? -1 : item;
+
+    const lastPos = Math.max(count - page, 0);
+    let currPos = pos;
+    if (currPos > lastPos) {
+        callAfterwards(setPos, lastPos);
+        currPos = lastPos
+    }
+    const refocus = () => {
+        requestAnimationFrame(() => {
+            if (!mounted.current) return;
+            const elems  = autoRef.current.querySelectorAll('.tabbed');
+            if (elems.length) elems[elems.length - 1].focus()
+        })
+    }
+    if (tabIndex !== null && count > 0 && tabIndex >= count) {
+        callAfterwards(setTabIndex, count - 1);
+        callAfterwards(refocus)
+    }
+    const lastIndex = count - 1;
+    const last = Math.min(lastIndex, lastPos + page - 1, currPos + page - 1);
+    const nextPageStart = currPos + page;
+
+    const hasPaging = page < count;
+    const activeIndex = getItemIndex(active);
+    const isOutsideFocus = hasPaging && (activeIndex < currPos || activeIndex >= nextPageStart);
+
+    const autoFocus = e => {
+        setCatchFocus(false);
+        const newTabIndex = activeIndex === -1 ? 0 : activeIndex;
+        setTabIndex(isOutsideFocus || newTabIndex === null ? currPos : newTabIndex);
+        refocus()
+    }
+    const handleLeave = e => {
+        if (wContext.getModalLevel() === levelRef.current) {
+            setCatchFocus(true)
+        }
+    }
+    const onKeyDown = e => {
+        if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
+            if (tabIndex === 0) {
+                setTabIndex(lastIndex);
+                setPos(lastPos)
+            } else if (!hasPaging) {
+                setTabIndex(
+                    e.shiftKey ? 0 : clamp(0, tabIndex - 1)
+                );
+            } else {
+                let newPos = clamp(0, tabIndex - (e.shiftKey ? page : 1));
+                if (newPos < currPos) {
+                    setPos(clamp(0,currPos - page))
+                }
+                setTabIndex(newPos)
+            }
+        } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
+            if (tabIndex === lastIndex) {
+                setTabIndex(0);
+                setPos(0)
+            } else if (!hasPaging) {
+                setTabIndex(
+                    e.shiftKey ? lastIndex : Math.min(lastIndex, tabIndex + 1)
+                )
+            } else {
+                const newPos = Math.min(tabIndex + (e.shiftKey ? page : 1), lastIndex);
+                if (newPos >= nextPageStart) {
+                    setPos(Math.min(nextPageStart, lastPos))
+                }
+                setTabIndex(newPos)
+            }
+        } else if (e.key === ' ') {
+            const newActive = getItem(tabIndex);
+            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+        } else {
+            return;
+        }
+        refocus()
+    }
+    const setFocus = index => () => {
+        setTabIndex(index);
+        const clickItem = getItem(index);
+        setActive(reset && active === clickItem ? null : clickItem);
+        setCatchFocus(false)
+    }
+    const elems = [];
+    const iMin = currPos;
+    const iMax = page ? Math.min(currPos + page, count) : count;
+    for (let index = iMin; index < iMax; index++) {
+        const isCatcher = (catchFocus && index === pos);
+        const item = getItem(index);
+        elems.push(
+            <Block
+                key={index}
+                tab={(!catchFocus && tabIndex === index) || isCatcher} padded border="1"
+                onFocus={isCatcher ? autoFocus : null}
+                onLeftClick={setFocus(index)}
+                className={(active === item ? 'active' : 'secondary') + '-bg'}
+            >
+                {item}
+            </Block>
+        )
+    }
+    return (
+        <Stack onBlur={handleLeave} onKeyDown={onKeyDown}>
+            <Stack stackRef={autoRef} vertical={!vertical} gaps>
+                {elems}
+            </Stack>
+        </Stack>
+    )
+}
+
+function TestBlock() {
+    const onBlur = e => {
+        d('BLUR!')
+    }
+    const onFocus = e => {
+        d('FOCUS!')
+    }
+
+    return (
+        <Block border padded height={100} onBlur={onBlur}>
+            <Block onFocus={onFocus} border padded tab={true}>1</Block>
+            <Block onFocus={onFocus} border padded tab={true}>1</Block>
+        </Block>
+    )
+}
+
 /**
  * TODO:
  *
@@ -845,8 +1123,24 @@ function PocEditor() {
 
      */
 
+    const [ testItems, setTestItems ] = useState(['Hey', 'ho', 'lets', 'go', 'boys']);
+    const [ testCount, setTestCount ] = useState(8);
+
+    const hotKeys = {
+        delete: () => {
+            if (testCount === 0) return;
+            setTestCount(testCount - 1);
+        }
+    };
     return (
         <Stack vertical gaps full>
+            <TestBlock />
+
+            <NewFocus reset page={3} items={testItems} />
+
+            <Block hotKeys={hotKeys}>
+                <NewFocus reset={false} vertical page={3} count={testCount} />
+            </Block>
 
             <Block full="h" border="1">
                 <EntityStack
@@ -867,7 +1161,6 @@ function PocEditor() {
             <TestModal.content width={200} height={200}>
                 <TestForm { ...TestModal.props } />
             </TestModal.content>
-
         </Stack>
     )
 }

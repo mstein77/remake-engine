@@ -1,47 +1,16 @@
-import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
+import React, { useContext, useMemo, useRef, useState } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import {d, noop, clamp, getEmptyImageData, ucfirst} from "../helper/helper";
+import { d, noop, clamp, getEmptyImageData, ucfirst } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import {
-    EditorCtx,
-    useAnimationPlayers,
-    CenterInfo,
-    EditorContext,
-    ButtonStack,
-    Section,
-    Canvas,
-    Kbd,
-    AvailContextProvider,
-    Toolbar,
-    ToolGroup,
-    ScrollArea,
-    BackgroundControl,
-    useUpdateOnEntityIndexChanges,
-    useCallAfterwards,
-    useCachedState,
-    AvailContext,
-    WindowContext,
-    useCssProps,
-    UndoRedoButtons,
-    useFocusElements,
-    useComponentUpdate,
-    Icon
+import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon,
+    AvailContextProvider, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
+    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useComponentUpdate, useFocusManager
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
 import { WrappingIndexGrid } from "../classes/Grid";
 import { PictureCell, TrackingContext, PictureAndTextCell } from "./GridComponents";
-
-function makeOp(customOp, defaultOp, defaultCan = true, params = []) {
-    const isObj = typeof customOp === 'object';
-    const hasCustomExec = isObj && customOp.exec;
-    const canByDefault = typeof defaultCan === 'function' ? defaultCan() : defaultCan;
-    return {
-        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp(...params) : (hasCustomExec ? customOp.exec(...params) : customOp(...params)),
-        can: () => canByDefault && (!customOp || !isObj || !customOp.can || customOp.can())
-    }
-}
 
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
@@ -63,7 +32,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     }
     const stackRef = useRef(null);
     const indexSize = entityIndex.getLength();
-    const { focusItem, attr, refocus, setActiveFocus, ...focus } = useFocusElements({
+    const { focusItem, attr, refocus, setActiveFocus, ...focus } = useFocusManager({
         count: indexSize,
         update,
         reset: deselect === true,
@@ -220,10 +189,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     for(let entity of entities) {
         const curr = index;
         const isActive = index === active;
-        const elemAttr = {
-            onLeftClick: focus.leftClick(curr),
-            tab: focusItem === curr
-        };
         const itemCls = ['hover-change' + (isActive ? ' active-bg active-color' : ' ghost-bg')];
         if (index === dropIndex) {
             itemCls.push('focus-outline')
@@ -239,7 +204,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 border={DIR.BOTTOM} cursor="pointer"
                 gaps
                 className={itemCls.join(' ')}
-                { ...elemAttr }
+                { ...focus.itemAttr(curr) }
             >
                 <Block width={numLen} className="less" padded>#{index + 1}</Block>
                 <Stack vertical full="h" padded gaps>
@@ -995,7 +960,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
         ];
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
-    const { focusItem, attr, refocus, ...focus } = useFocusElements({
+    const { focusItem, attr, refocus, ...focus } = useFocusManager({
         divRef: stackRef,
         count: tree.length,
         keyTracking,
@@ -1088,14 +1053,14 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             continue;
         }
         nodes.push(
-            <Stack key={i} tab={i === focusItem} onRightClick={toggle} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
+            <Stack key={i} xtab={i === focusItem} onRightClick={toggle} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} { ...focus.itemAttr(i) } full="h" className={cls.join(' ')}>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
                 <Stack key={i} vertical padded={DIR.RIGHT|DIR.TOP} full="h">
                     <Block key={i} full="h">
                         <Stack full="h">
-                            <Block full="h" shorten>{node.type}</Block>
+                            <Block full="h" shorten>{ucfirst(node.type)}</Block>
                             <Block><Kbd className="less small" value={node.width + 'x' + node.height} /></Block>
                         </Stack>
                     </Block>

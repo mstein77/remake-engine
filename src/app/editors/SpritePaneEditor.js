@@ -171,11 +171,11 @@ function SpritePaneEditorInner({ spriteIndex, animationIndex }) {
     return (
         <>
             <Stack vertical full borders>
-                <Section name="Sprites" height={280} inner full="h">
+                <Section name="Sprites" height={340} inner full="h">
                     <SpriteManager animationIndex={animationIndex} spriteIndex={spriteIndex} editSprite={editSprite} />
                 </Section>
 
-                <Section name="Animations" height={300} inner full="h">
+                <Section name="Animations" height={320} inner full="h">
                     <AnimationManager animationIndex={animationIndex} spriteIndex={spriteIndex} />
                 </Section>
 

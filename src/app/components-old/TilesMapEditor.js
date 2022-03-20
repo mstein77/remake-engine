@@ -37,7 +37,7 @@ import {
     GlobalContext,
     useExportModal,
     useAddIndexActions
-} from './BaseComponents';
+} from './../components-old/BaseComponents';
 import {
     EditorCtx,
     BasicRasterView,

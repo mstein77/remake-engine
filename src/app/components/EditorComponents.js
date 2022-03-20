@@ -568,7 +568,7 @@ function BitmapSelectorInner({ save, close, selection, type = 'image' }) {
                                     <Button icon="delete" onClick={() => { setTempImage(null); setActiveImage(null) }} />
                                 </Stack>
                                 <Stack vertical gaps full="h" onClick={() => setActiveImage(activeImage === tempIndex ? null : tempIndex)} padded
-                                       className={'hover-change ' + (activeImage === tempIndex ? 'active-bg active-text' : 'control-bg')}>
+                                       className={'hover-change ' + (activeImage === tempIndex ? 'active-bg active-color' : 'control-bg')}>
                                     <Block shorten>{tempName ? tempName : 'No name'}</Block>
                                     <Block className="less"><Kbd value={tempImage.width + ' x ' + tempImage.height} /></Block>
                                 </Stack>
