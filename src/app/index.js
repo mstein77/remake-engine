@@ -4302,10 +4302,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 tilesPane.updateAnimatedTiles();
 
                 // TODO: remove!
-/*
+
                 this.activeResource = 0;
                 this.openEditorMode();
-*/
+
                 if (inputController.hasInput('back')) {
                     this.gotoScreen('demo');
                 }

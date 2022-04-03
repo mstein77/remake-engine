@@ -3352,7 +3352,7 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
-function useFocusManager({
+function useFocusManager({ name, treeView,
      active, items, pos = 0, setPos = () => null, page, reset, keyTracking = () => {}, handleSpace, update, ...props
     }) {
 
@@ -3365,16 +3365,18 @@ function useFocusManager({
         keyTracking(value);
         setTabIndexRaw(value)
     }
+    if (treeView) {
+        items = treeView.getIndices();
+    }
     const initCatchRef = useRef(false);
     const autoRef = useRef(null);
     const divRef = props.divRef ? props.divRef : autoRef;
     const setActive = value => {
         if (value !== null) {
-            setTabIndex(value);
+            setTabIndex(getItemIndex(value));
         }
         props.setActive(value)
     };
-
     const mounted = useMounted();
     const levelRef = useRef(null);
     if (levelRef.current === null) {
@@ -3435,6 +3437,11 @@ function useFocusManager({
     }
     const onKeyDown = e => {
         if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
+            const item = getItem(tabIndex);
+            if (treeView && e.key === 'ArrowLeft' && !treeView.isLeaf(tabIndex) &&  !treeView.isClosed(item)) {
+                treeView.toggleNode(item, true)
+                return;
+            }
             if (tabIndex === 0) {
                 setTabIndex(lastIndex);
                 setPos(lastPos)
@@ -3450,6 +3457,11 @@ function useFocusManager({
                 setTabIndex(newPos)
             }
         } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
+            const item = getItem(tabIndex);
+            if (treeView && e.key === 'ArrowRight' && !treeView.isLeaf(tabIndex) && treeView.isClosed(item)) {
+                treeView.toggleNode(item, false)
+                return;
+            }
             if (tabIndex === lastIndex) {
                 setTabIndex(0);
                 setPos(0)
