@@ -1,6 +1,8 @@
 import React, { Fragment, useState, useRef, useEffect, useContext } from "react";
-import { d } from '../helper/helper';
 import { Portal, WindowContext } from "./BasicComponents"
+import { d } from '../helper/helper';
+
+const OverlayContext = React.createContext();
 
 const DIR = {
     TOP: 1,
@@ -16,25 +18,9 @@ DIR.ALL_BUT_BOTTOM = DIR.H | DIR.TOP;
 DIR.ALL_BUT_LEFT = DIR.V | DIR.RIGHT;
 DIR.ALL_BUT_RIGHT = DIR.V | DIR.LEFT;
 
-/**
- * @module LayoutComponents
- */
-
-function useHotKeys(elemRef, hotKeys, area = null, link = null) {
-    const wContext = useContext(WindowContext);
-    const isHot = !!(area || (hotKeys && Object.keys(hotKeys).length > 0));
-    useEffect(
-    () => {
-        if (!isHot) {
-            return;
-        }
-        wContext.addElemKeyBinding(elemRef.current, hotKeys, area, link);
-        return () => {
-            wContext.deleteElemKeyBindings(elemRef.current)
-        }
-    });
-    return isHot
-}
+// ---------------------------
+//   HELPER
+// ---------------------------
 
 const handleLeftRightClick = (leftHandler, rightHandler) => {
     return e => {
@@ -83,141 +69,45 @@ function addPaddedCls(cls, padded) {
     } else {
         cls.push('padded' + (padded === 'v' ? '-v' : ''))
     }
-
 }
 
-function useGetLayoutProps({className, padded, end, border, zIndex, cursor, tab, onLeftClick, onRightClick,  ...props}) {
-    const dimCls = [];
-    if (className) {
-        dimCls.push(className);
-    }
-    addPaddedCls(dimCls, padded);
-    addBorderCls(dimCls, border);
-    const dimAttr = {};
-    if (onLeftClick || onRightClick) {
-        if (props.onMouseDown) {
-            throw Error('onMouseDown cannot be used with onLeftClick/onRightCLick at the same time!');
-        }
-        dimAttr.onMouseDown = handleLeftRightClick(onLeftClick, onRightClick);
-    }
+function getFlatChildren(children, result = []) {
+    if (children) {
+        for(let child of children) {
+            if (!child) continue; // TODO check === '' || child === null || child === undefined) continue;
 
-    for(let prop of Object.keys(props)) {
-        if (!prop.startsWith('on')) continue;
-        const handler = props[prop];
-        if (handler) {
-            dimAttr[prop] = handler;
+            if (typeof child.type === 'symbol' && child.type.description === 'react.fragment') {
+                getFlatChildren(child.props.children, result);
+            } else {
+                result.push(child);
+            }
         }
     }
-    const dimStyle = {};
-    for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
-        let value = props[prop];
-        if (!value) continue;
-
-        if (typeof value === 'string' && value.match(/^\d+$/)) {
-            value = parseInt(value, 10);
-        }
-        dimStyle[prop] = value;
-    }
-    if (zIndex !== undefined) {
-        dimStyle.zIndex = zIndex;
-    }
-    if (cursor) {
-        dimStyle.cursor = cursor;
-    }
-    if (tab) {
-        dimAttr.tabIndex = 0;
-        dimCls.push('tabbed');
-    } else if (tab === false) {
-        dimAttr.tabIndex = -1;
-    }
-    if (end) {
-        dimCls.push('align-end');
-    }
-    if (props.onDragStart) {
-        dimAttr.draggable = true
-    }
-    if (props.span && props.span > 1) {
-        dimStyle.gridColumn = 'span ' + props.span
-    }
-
-    return {
-        dimCls,
-        dimAttr,
-        dimStyle
-    }
+    return result;
 }
 
-
-/**
- *
- *
- * @param children
- * @returns {*}
- * @constructor
- */
-function Tooltip({ children }) {
-    const divRef = useRef(null);
-    const [ absLeft, setAbsLeft ] = useState(null);
-    const [ absTop, setAbsTop ] = useState(null);
-    const [ rect, setRect ] = useState(null);
-
-    useEffect(() => {
-        if (!divRef.current) return;
-
-        let span = divRef.current.previousSibling;
-        let baseRect = null;
-        if (!span || span.tagName !== 'SPAN') {
-            span = null;
-        } else {
-            baseRect = span.getBoundingClientRect()
+function getGridTemplateString(value) {
+    const parts = value.split(' ');
+    const newParts = [];
+    for(let part of parts) {
+        let elem = part;
+        if (part.length === 1) {
+            if (part === '*') {
+                elem = 'auto';
+            } else if (part === '-') {
+                elem = 'min-content';
+            } else if (part === '+') {
+                elem = 'max-content'
+            }
         }
-        const rect = divRef.current.getBoundingClientRect();
-        const out = {
-            top: rect.top < 0,
-            left: rect.left < 0,
-            bottom: rect.bottom > window.innerHeight,
-            right: rect.right > window.innerWidth
-        };
-        if (out.right) {
-            setAbsLeft(window.innerWidth - rect.right)
-        } else if (out.left) {
-            setAbsLeft(-rect.left)
-        }
-        if (out.bottom) {
-            setAbsTop(-(rect.height + (baseRect ? baseRect.height : 0)));
-        } else if (out.top) {
-            setAbsTop(-rect.top);
-        }
-        setRect(rect);
-    }, []);
-
-    const style = {
-        zIndex: 10000
-    };
-    if (absLeft) {
-        style.marginLeft = absLeft;
+        newParts.push(elem);
     }
-    if (absTop) {
-        style.marginTop = absTop;
-    }
-    const portalStyle = {};
-    if (rect) {
-        portalStyle.top = rect.top;
-        portalStyle.left = rect.left;
-    }
-
-    // TODO: find a better solution without 2 divs
-    return (
-        <>
-            <div ref={divRef} style={style} className="tooltip invisible small fixed padded thin-boxed wrap-normal">
-                {children}
-            </div>
-            <Portal id="modals-container">
-                <div style={portalStyle} className="fixed tooltip primary-bg primary-color small padded thin-boxed wrap-normal">{children}</div>
-            </Portal>
-        </>
-    );
+    return newParts.join(' ');
 }
+
+// ---------------------------
+//   COMPONENTS
+// ---------------------------
 
 /**
  * The basic layout component which can either hold text, a block element, or another layout component.
@@ -487,21 +377,6 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
     );
 });
 
-function getFlatChildren(children, result = []) {
-    if (children) {
-        for(let child of children) {
-            if (!child) continue; // TODO check === '' || child === null || child === undefined) continue;
-
-            if (typeof child.type === 'symbol' && child.type.description === 'react.fragment') {
-                getFlatChildren(child.props.children, result);
-            } else {
-                result.push(child);
-            }
-        }
-    }
-    return result;
-}
-
 /**
  * @function
  * @param {object} [props={}]
@@ -666,25 +541,6 @@ function Stack({ children, stackRef, vertical, wrap, gaps, indented, borders, sc
     )
 }
 
-function getGridTemplateString(value) {
-    const parts = value.split(' ');
-    const newParts = [];
-    for(let part of parts) {
-        let elem = part;
-        if (part.length === 1) {
-            if (part === '*') {
-                elem = 'auto';
-            } else if (part === '-') {
-                elem = 'min-content';
-            } else if (part === '+') {
-                elem = 'max-content'
-            }
-        }
-        newParts.push(elem);
-    }
-    return newParts.join(' ');
-}
-
 function Grid({children, columns, rows, padded, gaps, full, centerItems, scroll, className, ...props}) {
     const cls = ['grid'];
     const bCls = ['max-h block'];
@@ -740,8 +596,6 @@ function Grid({children, columns, rows, padded, gaps, full, centerItems, scroll,
         </div>
     )
 }
-
-const OverlayContext = React.createContext();
 
 function Overlays({ width, maxWidth, full, height, cursor, originX = 0, originY = 0, scroll, className, children }) {
     const cls = ['relative block'];
@@ -811,6 +665,158 @@ const Overlay = React.forwardRef(({ width, height, top = 0, left = 0, className,
         <div ref={forwardRef} style={style} className={cls.join(' ')} { ...props }>{children}</div>
     )
 });
+
+/**
+ *
+ *
+ * @param children
+ * @returns {*}
+ * @constructor
+ */
+function Tooltip({ children }) {
+    const divRef = useRef(null);
+    const [ absLeft, setAbsLeft ] = useState(null);
+    const [ absTop, setAbsTop ] = useState(null);
+    const [ rect, setRect ] = useState(null);
+
+    useEffect(() => {
+        if (!divRef.current) return;
+
+        let span = divRef.current.previousSibling;
+        let baseRect = null;
+        if (!span || span.tagName !== 'SPAN') {
+            span = null;
+        } else {
+            baseRect = span.getBoundingClientRect()
+        }
+        const rect = divRef.current.getBoundingClientRect();
+        const out = {
+            top: rect.top < 0,
+            left: rect.left < 0,
+            bottom: rect.bottom > window.innerHeight,
+            right: rect.right > window.innerWidth
+        };
+        if (out.right) {
+            setAbsLeft(window.innerWidth - rect.right)
+        } else if (out.left) {
+            setAbsLeft(-rect.left)
+        }
+        if (out.bottom) {
+            setAbsTop(-(rect.height + (baseRect ? baseRect.height : 0)));
+        } else if (out.top) {
+            setAbsTop(-rect.top);
+        }
+        setRect(rect);
+    }, []);
+
+    const style = {
+        zIndex: 10000
+    };
+    if (absLeft) {
+        style.marginLeft = absLeft;
+    }
+    if (absTop) {
+        style.marginTop = absTop;
+    }
+    const portalStyle = {};
+    if (rect) {
+        portalStyle.top = rect.top;
+        portalStyle.left = rect.left;
+    }
+
+    // TODO: find a better solution without 2 divs
+    return (
+        <>
+            <div ref={divRef} style={style} className="tooltip invisible small fixed padded thin-boxed wrap-normal">
+                {children}
+            </div>
+            <Portal id="modals-container">
+                <div style={portalStyle} className="fixed tooltip primary-bg primary-color small padded thin-boxed wrap-normal">{children}</div>
+            </Portal>
+        </>
+    );
+}
+
+// ---------------------------
+//   CUSTOM HOOKS
+// ---------------------------
+
+function useHotKeys(elemRef, hotKeys, area = null, link = null) {
+    const wContext = useContext(WindowContext);
+    const isHot = !!(area || (hotKeys && Object.keys(hotKeys).length > 0));
+    useEffect(
+        () => {
+            if (!isHot) {
+                return;
+            }
+            wContext.addElemKeyBinding(elemRef.current, hotKeys, area, link);
+            return () => {
+                wContext.deleteElemKeyBindings(elemRef.current)
+            }
+        });
+    return isHot
+}
+
+function useGetLayoutProps({ className, padded, end, border, zIndex, cursor, tab, onLeftClick, onRightClick, ...props }) {
+    const dimCls = [];
+    if (className) {
+        dimCls.push(className);
+    }
+    addPaddedCls(dimCls, padded);
+    addBorderCls(dimCls, border);
+    const dimAttr = {};
+    if (onLeftClick || onRightClick) {
+        if (props.onMouseDown) {
+            throw Error('onMouseDown cannot be used with onLeftClick/onRightCLick at the same time!');
+        }
+        dimAttr.onMouseDown = handleLeftRightClick(onLeftClick, onRightClick);
+    }
+
+    for(let prop of Object.keys(props)) {
+        if (!prop.startsWith('on')) continue;
+        const handler = props[prop];
+        if (handler) {
+            dimAttr[prop] = handler;
+        }
+    }
+    const dimStyle = {};
+    for (let prop of ['width', 'minWidth', 'maxWidth', 'height', 'minHeight', 'maxHeight']) {
+        let value = props[prop];
+        if (!value) continue;
+
+        if (typeof value === 'string' && value.match(/^\d+$/)) {
+            value = parseInt(value, 10);
+        }
+        dimStyle[prop] = value;
+    }
+    if (zIndex !== undefined) {
+        dimStyle.zIndex = zIndex;
+    }
+    if (cursor) {
+        dimStyle.cursor = cursor;
+    }
+    if (tab) {
+        dimAttr.tabIndex = 0;
+        dimCls.push('tabbed');
+    } else if (tab === false) {
+        dimAttr.tabIndex = -1;
+    }
+    if (end) {
+        dimCls.push('align-end');
+    }
+    if (props.onDragStart) {
+        dimAttr.draggable = true
+    }
+    if (props.span && props.span > 1) {
+        dimStyle.gridColumn = 'span ' + props.span
+    }
+
+    return {
+        dimCls,
+        dimAttr,
+        dimStyle
+    }
+}
 
 export {
     Block,

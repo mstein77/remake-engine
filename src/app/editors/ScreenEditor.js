@@ -6,6 +6,7 @@ import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
 import { TreeStack } from "../components/EntityComponents";
 import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper";
 import { useTracker, TrackingCtx } from "../components/GridComponents";
+import {PocEditor} from "./PocEditor";
 
 const coordTextureShader = {
     id: 'coordTexture',
@@ -1105,13 +1106,11 @@ function ScreenEditor({ resources, setSelected, ...props }) {
         const screen = game.getCurrentScreen();
         const nodes = [];
 
-        d('SCREEN-AREAS', screen.areas);
         const innerNodes = [];
         getAreaNode(innerNodes,false, reverse(screen.areas), {width: game.width, height: game.height, x: 0, y: 0});
         nodes.push({type: 'Screen', name: screen.id, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
         nodes.push( ...innerNodes );
 
-        d('TREE', nodes);
         // assign planes
         let plane = 0;
         for (let node of nodes) {

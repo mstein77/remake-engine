@@ -1,136 +1,3 @@
-REACT-HOOKS:
-
-a) Funktionale Komponente
-
-function({ name }) {
-    //
-
-    // return dom
-    return (
-        <div>
-          Hello {name}
-        </div>
-    )
-}
-
-b) Funktionale Komponente mit Hooks
-
-function({ name }) {
-   // hooks
-
-   //return dom
-   return (
-   )
-}
-
-
-// 1. state hook: useState
-const [counter, setCounter] = useState(3);
-
-// 2. lifecycle hook: useEffect
-useEffect(() => {
-    console.log('MOUNTED');
-    return () => {
-        console.log('UNMOUNTED');
-    }
-}, []);
-
-// 3. context hook: useContext
-function App() {
-  const myAppContext = {
-    x: y,
-
-  };
-  return (
-        <AppContext.provider value={myAppContext}>
-           <blah>
-              <Foo></Foo>
-           </blah>
-        </AppContext>
-  );
-}
-const appContext = useContext(AppContext);
-
-// 4. Reference-Hook: useRef
-const divRef = useRef(null);
-
-{current: null}
-
-
---------------------------
- PERSISTIERUNG:
---------------------------
- Caches:
-   - "global" (globale Ebene)
-       + Farb-Modell
-       + bitmapEditorBorders
-
-   - "game.<id>" (Game-Ebene)
-       + LastColors
-       + zoomPixelRatio
-       + defaultTransparencyColor (?)
-
-   - "game.<id>.<editorId>" (Editor-Ebene)
-       + sectionSize
-       + sectionCollapse
-
-   - "game.<id>.<resource>" (Resource-Ebene)
-
---------------------------
- Beispiel TextPane:
-   - Preview:
-      + BgColor wird durch Resource initialisiert (=> kein Caching)
-      + Zoom: aktueller Game-Zoom oder Preview-Pixel-Ratio auf Game-Ebene
-      + Show-Marker aus Globaler-Ebene
-
-   - Characters:
-      + BgColor:
-
----------------------------
-
----------------------------
- CssCtx
-       getConstValues(source, target = null)
-         ...iteriert über alle source-key/values und falls für
-            den Key ein Typ feststeht und der key noch nicht im
-            target, dann übernehme diesen mit Wert und gebe
-            Ergebnis zurück
-
-       setStyleProp(style, key, value)
-         ...setzt auf dem style die CssConst zum key auf
-            den value
-
-
-   - init(config, theme)
-        baue values durch
-          1. getConstValues(config)
-          2. getConstValues(theme, values)
-        Speichere values in reg:values
-
-        // sichern
-        Iteriere über alle key2type:
-          prop = konstante zu key
-          value = doc.body.style.getPropertyValue(prop)
-          speichere value|null in reg:body[prop]
-
-        applyTo(doc.body)
-
-   - getValues() => reg:values
-   - getValue(name) => reg:values[name]
-   - setValue
-       setzt über setStyleProp den name auf den value
-       und speichert diesen auch in reg:values und wird
-       alle Watcher notifien
-
-   - setValues
-       ...analog wie zuvor nur für merhere keys und nur
-       einer Notification
-
-   - applyTo(node)
-        Iteriere über alle key/value in reg:values:
-          Setze StyleProp(node.style, key, value)
-
-   => reg:body
 ---------------------------
 
 ---------------------------
@@ -266,6 +133,143 @@ const divRef = useRef(null);
  - Tooltips zusammenfassen?
  - Preview: Double-Click => New on position
  - Preview: Auto-Scroll on Drag
+
+---------------------------
+
+REACT-HOOKS:
+
+a) Funktionale Komponente
+
+function({ name }) {
+    //
+
+    // return dom
+    return (
+        <div>
+          Hello {name}
+        </div>
+    )
+}
+
+b) Funktionale Komponente mit Hooks
+
+function({ name }) {
+   // hooks
+
+   //return dom
+   return (
+   )
+}
+
+
+// 1. state hook: useState
+const [counter, setCounter] = useState(3);
+
+// 2. lifecycle hook: useEffect
+useEffect(() => {
+    console.log('MOUNTED');
+    return () => {
+        console.log('UNMOUNTED');
+    }
+}, []);
+
+// 3. context hook: useContext
+function App() {
+  const myAppContext = {
+    x: y,
+
+  };
+  return (
+        <AppContext.provider value={myAppContext}>
+           <blah>
+              <Foo></Foo>
+           </blah>
+        </AppContext>
+  );
+}
+const appContext = useContext(AppContext);
+
+// 4. Reference-Hook: useRef
+const divRef = useRef(null);
+
+{current: null}
+
+
+--------------------------
+ PERSISTIERUNG:
+--------------------------
+ Caches:
+   - "global" (globale Ebene)
+       + Farb-Modell
+       + bitmapEditorBorders
+
+   - "game.<id>" (Game-Ebene)
+       + LastColors
+       + zoomPixelRatio
+       + defaultTransparencyColor (?)
+
+   - "game.<id>.<editorId>" (Editor-Ebene)
+       + sectionSize
+       + sectionCollapse
+
+   - "game.<id>.<resource>" (Resource-Ebene)
+
+--------------------------
+ Beispiel TextPane:
+   - Preview:
+      + BgColor wird durch Resource initialisiert (=> kein Caching)
+      + Zoom: aktueller Game-Zoom oder Preview-Pixel-Ratio auf Game-Ebene
+      + Show-Marker aus Globaler-Ebene
+
+   - Characters:
+      + BgColor:
+
+---------------------------
+
+---------------------------
+ CssCtx
+       getConstValues(source, target = null)
+         ...iteriert über alle source-key/values und falls für
+            den Key ein Typ feststeht und der key noch nicht im
+            target, dann übernehme diesen mit Wert und gebe
+            Ergebnis zurück
+
+       setStyleProp(style, key, value)
+         ...setzt auf dem style die CssConst zum key auf
+            den value
+
+
+   - init(config, theme)
+        baue values durch
+          1. getConstValues(config)
+          2. getConstValues(theme, values)
+        Speichere values in reg:values
+
+        // sichern
+        Iteriere über alle key2type:
+          prop = konstante zu key
+          value = doc.body.style.getPropertyValue(prop)
+          speichere value|null in reg:body[prop]
+
+        applyTo(doc.body)
+
+   - getValues() => reg:values
+   - getValue(name) => reg:values[name]
+   - setValue
+       setzt über setStyleProp den name auf den value
+       und speichert diesen auch in reg:values und wird
+       alle Watcher notifien
+
+   - setValues
+       ...analog wie zuvor nur für merhere keys und nur
+       einer Notification
+
+   - applyTo(node)
+        Iteriere über alle key/value in reg:values:
+          Setze StyleProp(node.style, key, value)
+
+   => reg:body
+
 
 
 =======================================

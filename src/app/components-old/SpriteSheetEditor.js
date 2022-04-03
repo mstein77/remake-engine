@@ -14,7 +14,7 @@ import {
     ActionFrame,
     PropLabel,
     useAddIndexActions, GlobalContext
-} from "./BaseComponents";
+} from "./../components-old/BaseComponents";
 import {BitmapEditor, BitmapSelector, EditorContext, EditorCtx} from "./Raster";
 import {d, getColorsFromCanvas, BitmapPlayer, getCanvasForBitmap, drawCanvasToAvail, getEmptyImageData} from '../helper/helper';
 import {ColorIndex, SpriteIndex, AnimationIndex, FrameIndex} from "../classes/EntityIndex";

@@ -101,6 +101,7 @@ const defaultValues = {
         new: 'c n',
         select: null,
         delete: 'c d',
+        toggle: 'c t',
         quit: 'c q',
         edit: 'm e',
         all: 'c a',

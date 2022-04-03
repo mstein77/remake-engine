@@ -1,47 +1,16 @@
-import React, { useContext, useMemo, useRef, useState, useEffect } from "react";
+import React, { useContext, useMemo, useRef, useState } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import {d, noop, clamp, getEmptyImageData, ucfirst} from "../helper/helper";
+import { d, noop, clamp, getEmptyImageData, ucfirst } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import {
-    EditorCtx,
-    useAnimationPlayers,
-    CenterInfo,
-    EditorContext,
-    ButtonStack,
-    Section,
-    Canvas,
-    Kbd,
-    AvailContextProvider,
-    Toolbar,
-    ToolGroup,
-    ScrollArea,
-    BackgroundControl,
-    useUpdateOnEntityIndexChanges,
-    useCallAfterwards,
-    useCachedState,
-    AvailContext,
-    WindowContext,
-    useCssProps,
-    UndoRedoButtons,
-    useFocusElements,
-    useComponentUpdate,
-    Icon
+import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon,
+    AvailContextProvider, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
+    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useComponentUpdate, useFocusManager
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
 import { CellSelection } from "../classes/CellProvider";
 import { WrappingIndexGrid } from "../classes/Grid";
 import { PictureCell, TrackingContext, PictureAndTextCell } from "./GridComponents";
-
-function makeOp(customOp, defaultOp, defaultCan = true, params = []) {
-    const isObj = typeof customOp === 'object';
-    const hasCustomExec = isObj && customOp.exec;
-    const canByDefault = typeof defaultCan === 'function' ? defaultCan() : defaultCan;
-    return {
-        exec: () => !customOp || (isObj && !hasCustomExec) ? defaultOp(...params) : (hasCustomExec ? customOp.exec(...params) : customOp(...params)),
-        can: () => canByDefault && (!customOp || !isObj || !customOp.can || customOp.can())
-    }
-}
 
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);
@@ -63,7 +32,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     }
     const stackRef = useRef(null);
     const indexSize = entityIndex.getLength();
-    const { focusItem, attr, refocus, setActiveFocus, ...focus } = useFocusElements({
+    const { focusItem, attr, refocus, setActiveFocus, ...focus } = useFocusManager({
         count: indexSize,
         update,
         reset: deselect === true,
@@ -220,10 +189,6 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     for(let entity of entities) {
         const curr = index;
         const isActive = index === active;
-        const elemAttr = {
-            onLeftClick: focus.leftClick(curr),
-            tab: focusItem === curr
-        };
         const itemCls = ['hover-change' + (isActive ? ' active-bg active-color' : ' ghost-bg')];
         if (index === dropIndex) {
             itemCls.push('focus-outline')
@@ -239,7 +204,7 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                 border={DIR.BOTTOM} cursor="pointer"
                 gaps
                 className={itemCls.join(' ')}
-                { ...elemAttr }
+                { ...focus.itemAttr(curr) }
             >
                 <Block width={numLen} className="less" padded>#{index + 1}</Block>
                 <Stack vertical full="h" padded gaps>
@@ -952,11 +917,175 @@ function getActionButtonsAndHotkeys(actions, props, paramsRef) {
     }
 }
 
-function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
-    const tContext = useContext(TrackingContext);
 
-    const update = useComponentUpdate();
+/**
+ * Usage:
+ *     const [ treeState, setTreeState ] = useState(null);
+ *                                // or: = useCachedState('bla')
+ *
+ *     const tree = useMemo(() => new TreeView(nodes, setTreeState, treeState));
+ *
+ *  Wäre es vorteilhafter, wenn wir den state NUR initial in den TreeView geben und danach komplett
+ *  intern verwalten? Würde einen stateListener erfordern für updates:
+ *
+ *     const tree = useMemo(() => new TreeView(nodes, treeState));
+ *     tree.setUpdater(update)
+ *
+ *  PRO: der Tree-State bringt ausserhalb der Klasse rein garnichts
+ *
+ *  if (!tree.visible(active)) {
+ *      const newActive = tree.getFallbackNode(active);
+ *      callAfterwards(setActive, newActive);
+ *  }
+ *
+ *
+ *  Filter-Path:
+ *
+ *  Model-Changes:
+ *
+ *  Virtualisierung:
+ *
+ *  Selection:
+ *
+ *  Filterung:
+ *    const [ filterValue, setFilterValue ] = useState();
+ *    const filter = useMemo(node => {
+ *
+ *    });
+ *    tree.setFilter(filter, filterValue);
+ *--------------
+ *  Rendering:
+ */
+class TreeView {
+
+    constructor(model, setter) {
+        this.model = model;
+        this.setter = setter;
+        this.reset()
+    }
+
+    reset() {
+        this.view = null;
+        this.indices = [];
+    }
+
+    setState(state) {
+        this.state = state;
+        this.reset();
+    }
+
+    setNodeStateChangeListener(listener) {
+        this.nodeStateChangeListener = listener
+    }
+
+    notify() {
+        this.setter([ ...this.state ]);
+    }
+
+    toggleNode(index, force = null) {
+        this.state[index] = force === null ? !this.state[index] : force;
+        if (this.nodeStateChangeListener) {
+            this.nodeStateChangeListener(index, this.state[index]);
+        }
+        this.reset();
+        this.notify()
+    }
+
+    isClosed(index) {
+        return this.state[index]
+    }
+
+    isLeaf(pos) {
+        return this.view[pos].leaf;
+    }
+
+    getNodes() {
+        if (this.view === null) {
+            this.buildView()
+        }
+        return this.view
+    }
+
+    getIndices() {
+        if (this.view === null) {
+            this.buildView()
+        }
+        return this.indices
+    }
+
+    buildView() {
+        const view = [];
+        let curr = 0;
+        let level = 0;
+        let closedLevel = null;
+        const levels = [];
+        const lastIndex = this.model.length - 1;
+        while (curr <= lastIndex) {
+            const data = this.model[curr];
+            const index = curr;
+            curr++;
+            level = data.level;
+            if (closedLevel !== null) {
+                if (level > closedLevel) {
+                    continue
+                }
+                closedLevel = null
+            }
+            this.indices.push(index);
+            const closed = this.state[index];
+            if (closed) {
+                closedLevel = level
+            }
+            let startIndex = -1;
+            let i = levels.length - 1;
+            while (i >= 0) {
+                const currLevel = levels[i];
+                if (currLevel === level) {
+                    startIndex = i;
+                } else if (currLevel < level) {
+                    break;
+                }
+                i--
+            }
+            const connected = {};
+            const leaf = (index === lastIndex || this.model[curr].level <= level);
+            if (startIndex !== -1) {
+                for (let i = startIndex; i < view.length; i++) {
+                    view[i].connected[level] = true
+                }
+            }
+            levels.push(level);
+            view.push({
+                index,
+                data,
+                level,
+                connected,
+                closed,
+                leaf
+            })
+        }
+        for(let node of view) {
+            node.end = !node.connected[node.level];
+        }
+        this.view = view
+    }
+}
+
+
+function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props }) {
+
+    const tContext = useContext(TrackingContext);
     const keyTrackRef = useRef(null);
+
+    const [ state, setState ] = useState(() => {
+        return new Array(tree.length).fill(false);
+    });
+    const treeView = new TreeView(tree, setState);
+    treeView.setState(state);
+    treeView.setNodeStateChangeListener((index, state) => {
+        props.toggleOp({ active: index })
+    });
+
     const tracking = useMemo(() => {
         if (!tContext || !trackId) return () => {};
         return tContext.getTracking(trackId)
@@ -978,14 +1107,13 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
     };
     paramsRef.current = { active, node: active === null ? null : tree[active] };
 
-    if (toggleOp) {
-        props.toggleOp = (params) => {
-            const { active } = params;
-            toggleOp(params);
-            tree[active].closed = !tree[active].closed;
-            update()
-        };
+    const toggleNode = (index, force = null) => {
+        treeView.toggleNode(index, force);
     }
+    const toggleOp = params => {
+        const { active } = params;
+        toggleNode(active)
+    };
     const actions = useMemo(() => {
         return [
             {id: 'edit', icon: 'edit', can: ({ active }) => active !== null},
@@ -995,23 +1123,16 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
         ];
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
-    const { focusItem, attr, refocus, ...focus } = useFocusElements({
+    const { focusItem, attr, refocus, ...focus } = useFocusManager({
+        name: 'tree',
+        treeView,
         divRef: stackRef,
-        count: tree.length,
         keyTracking,
         handleSpace: true,
         reset: true,
         active,
         setActive
     });
-    let minLevel = null;
-    const end = [];
-    for (let node of tree) {
-        minLevel = minLevel === null ? node.level : Math.min(node.level, minLevel);
-        if (node.level >= end.length) {
-            end.push(false)
-        }
-    }
     const height = 45;
 
     const mouseEnter = index => {
@@ -1030,35 +1151,21 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             })
         }
     }
-
-    const nodes = [];
+    const elems = [];
+    const nodes = treeView.getNodes();
     let i = -1;
-    let closedLevel = null;
-    for (let node of tree) {
-        i++
-        if (node.level <= closedLevel) {
-            closedLevel = null;
-        }
+    for (let node of nodes) {
+        i++;
         const indention = [];
-        const isEnd = node.last;
-        if (isEnd) {
-            end[node.level] = true;
-        }
-        let j = node.level + 1;
-        while (j < end.length) {
-            end[j] = false;
-            j++;
-        }
         for (let l = 0; l < node.level; l++) {
             indention.push(
                 <Block key={l} width={18} full="v">
-                    {!end[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={height} />}
+                    {node.connected[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={height} />}
                 </Block>
             );
         }
-        const curr = i;
-        const toggle = e => {props.toggleOp({ ...paramsRef.current, active: curr}); e.stopPropagation()};
-        const elem = node.children === 0 ?
+        const toggle = e => {toggleOp({ ...paramsRef.current, active: node.index}); e.stopPropagation()};
+        const elem = node.leaf ?
             <Icon size={12} className="border-color" name="square" /> :
             <Block center="h" border="1" onClick={toggle}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
 
@@ -1067,7 +1174,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
                 <Block full className="relative">
                     {i > 0 &&
                         <div className="absolute pos-0 full-v full-h">
-                            <Block width={1} height={isEnd ? 10 : false} center="h" full="v" border={DIR.LEFT} />
+                            <Block width={1} height={node.end ? 10 : false} center="h" full="v" border={DIR.LEFT} />
                         </div>
                     }
                     <Block full className="absolute pos-0">
@@ -1078,28 +1185,21 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
         );
 
         const cls = ['hover-change'];
-        cls.push(i === active ? 'active-bg active-color' : 'ghost-bg');
-
-        if (closedLevel === null) {
-            if (node.closed) {
-                closedLevel = node.level
-            }
-        } else if (node.level > closedLevel) {
-            continue;
-        }
-        nodes.push(
-            <Stack key={i} tab={i === focusItem} onRightClick={toggle} onMouseEnter={mouseEnter(i)} onDoubleClick={onDoubleClick(i)} onClick={focus.leftClick(i)} full="h" className={cls.join(' ')}>
+        cls.push(node.index === active ? 'active-bg active-color' : 'ghost-bg');
+        const data = node.data;
+        elems.push(
+            <Stack key={node.index} onRightClick={toggle} onMouseEnter={mouseEnter(node.index)} onDoubleClick={onDoubleClick(node.index)} { ...focus.itemAttr(i) } full="h" className={cls.join(' ')}>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
                 <Stack key={i} vertical padded={DIR.RIGHT|DIR.TOP} full="h">
                     <Block key={i} full="h">
                         <Stack full="h">
-                            <Block full="h" shorten>{node.type}</Block>
-                            <Block><Kbd className="less small" value={node.width + 'x' + node.height} /></Block>
+                            <Block full="h" shorten>{ucfirst(data.type)}</Block>
+                            <Block><Kbd className="less small" value={data.width + 'x' + data.height} /></Block>
                         </Stack>
                     </Block>
-                    <Block className="big more" shorten>{node.name}</Block>
+                    <Block className="big more" shorten>{data.name}</Block>
                 </Stack>
             </Stack>
         );
@@ -1111,7 +1211,7 @@ function TreeStack({ tree, trackId, doubleClickAction, toggleOp, ...props }) {
             </Toolbar>
             <Block full>
                 <Stack cursor="pointer" scroll border={DIR.BOTTOM} full="h" onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
-                    {nodes}
+                    {elems}
                 </Stack>
             </Block>
         </Stack>

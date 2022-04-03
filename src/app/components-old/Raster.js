@@ -21,7 +21,7 @@ import {
     useMounted,
     Select,
     Canvas
-} from "./BaseComponents";
+} from "./../components-old/BaseComponents";
 import {CellValue} from "../classes/Grid";
 import {d, getItemsCloneWithUpdatedItem, getColorsFromImageData, drawEventsValue} from '../helper/helper';
 
