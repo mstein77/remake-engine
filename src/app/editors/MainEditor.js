@@ -270,6 +270,7 @@ const hoverChangeOptions = [
 ];
 
 function ThemeSettings({ theme, setTheme }) {
+    d('THEME', theme);
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
 
     const setTitleGrad = titleBgGrad => {
@@ -1008,7 +1009,7 @@ function BaseAppInner({ back, children }) {
     const rightButtons = useMemo(() => {
         return [
             {icon: "build", help: "Editor Settings", padded: "1", onClick: () => wContext.openSettings()},
-            {name: "Play", icon: "play_circle_outline", padded: "h"},
+//            {name: "Play", icon: "play_circle_outline", padded: "h"},
             {
                 name: "Exit", click: "double", help: {title: "Exit editor", hotKey: "c h", details: "Returns to the game, all changes will be lost"},
                 icon: "logout", padded: "h",  onClick: () => confirm(play)

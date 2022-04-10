@@ -3,10 +3,10 @@ import React, { useContext, useMemo, useRef, useState } from "react";
 import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents";
 import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
 import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
-import { TreeStack } from "../components/EntityComponents";
 import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper";
 import { useTracker, TrackingCtx } from "../components/GridComponents";
 import {PocEditor} from "./PocEditor";
+import { FullTree } from "../components/EditorComponents";
 
 const coordTextureShader = {
     id: 'coordTexture',
@@ -524,8 +524,8 @@ const MODE_2D = 0;
 const MODE_3D = 1;
 
 function Panes3D(props) {
-    const [ mode, setMode ] = useCachedState('page', '3d', true, 'number');
-    const [ mirror, setMirror ] = useCachedState('page', 'mirror', MODE_3D, 'bool');
+    const [ mode, setMode ] = useCachedState('page', '3d', MODE_3D, 'number');
+    const [ mirror, setMirror ] = useCachedState('page', 'mirror', true, 'bool');
 
     const options = [{id: MODE_2D, name: '2D'}, {id: MODE_3D, name: '3D'}];
     return (
@@ -1089,10 +1089,10 @@ function ScreenTree({ tree, setSelected, toggle, resources, active, setActive })
         }
     };
 
+    //             <Button name="POC" padded="h" onClick={() => setSelected(resources.length - 1)} />
     return (
         <Stack vertical full>
-            <TreeStack trackId="tree" toggleOp={toggle} editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} />
-            <Button name="POC" padded="h" onClick={() => setSelected(resources.length - 1)} />
+            <FullTree trackId="tree" toggleOp={toggle} editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} />
         </Stack>
     )
 }
@@ -1144,7 +1144,6 @@ function ScreenEditor({ resources, setSelected, ...props }) {
                 plane++
             }
         }
-        d('PLANES', planesRef.current);
         return nodes
     }, []);
 

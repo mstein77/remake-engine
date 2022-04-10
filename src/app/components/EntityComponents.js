@@ -2,9 +2,31 @@ import React, { useContext, useMemo, useRef, useState } from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData, ucfirst } from "../helper/helper";
 import { Button, Input, Number, Checkbox } from "./FormComponents";
-import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon,
-    AvailContextProvider, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
-    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useComponentUpdate, useFocusManager
+import {
+    EditorCtx,
+    useAnimationPlayers,
+    CenterInfo,
+    EditorContext,
+    ButtonStack,
+    Section,
+    Canvas,
+    Kbd,
+    Icon,
+    AvailContextProvider,
+    Toolbar,
+    ToolGroup,
+    ScrollArea,
+    BackgroundControl,
+    useUpdateOnEntityIndexChanges,
+    useCallAfterwards,
+    useCachedState,
+    AvailContext,
+    WindowContext,
+    useCssProps,
+    UndoRedoButtons,
+    useComponentUpdate,
+    useFocusManager,
+    useMultiSelector, useExclusiveSelector
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
@@ -370,6 +392,7 @@ function EntityManager({
     }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
+
     const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
     const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
@@ -390,7 +413,10 @@ function EntityManager({
         setPage = props.setPage;
         page = props.page
     }
-    const [ marked, setMarked ] = useState([]);
+    const selector = useMultiSelector({});
+    const marked = selector.selection;
+    const setMarked = selector.setSelection;
+
     const [ filter, setFilterRaw ] = useState('');
     const setFilter = value => {
         setPos(0);
@@ -434,19 +460,11 @@ function EntityManager({
     const avail = sizeY * zoom;
     const zoomOrAvail = auto ? {width: avail, height: avail} : zoom;
 
+    const { attr, itemAttr } = useFocusManager({name: 'HEY', selector, count: view.count, page, handleSpace: true, pos, setPos}
+    );
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
     }
-    const toggleMarker = index => {
-        const newMarked = [ ...marked ];
-        if (marked.includes(index)) {
-            newMarked.splice(marked.indexOf(index), 1);
-        } else {
-            newMarked.push(index);
-        }
-        setMarked(newMarked);
-    };
-
     const bottomHeight = footerHeight ? footerHeight + padding : padding;
 
     const render = index => {
@@ -457,6 +475,8 @@ function EntityManager({
         const itemRender = ctx => {
             entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players);
         };
+        const { onLeftClick, ...stackAttr } = itemAttr(index);
+
         return (
             <Stack vertical full>
                 <Stack
@@ -467,7 +487,9 @@ function EntityManager({
                     cursor="pointer"
                     onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                     onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
-                    onLeftClick={readOnly ? null : () => toggleMarker(index)}>
+                    onLeftClick={readOnly ? null : () => {selector.select(index); onLeftClick()}}
+                    { ...stackAttr }
+                >
                     <Block full="h">
                         {renderTitle(index)}
                     </Block>
@@ -504,7 +526,7 @@ function EntityManager({
                     () => entityIndex.deleteEntities(doMarked),
                     () => entityIndex.setEntityObjects(undoEntities)
                 );
-                setMarked([])
+                selector.clearSelection()
             },
             clear: ({ marked, doAction, entityIndex }) => {
                 const indices = [ ...marked ];
@@ -525,7 +547,7 @@ function EntityManager({
                         }
                     }
                 );
-                setMarked([])
+                selector.clearSelection()
             },
             swap: ({ marked, doAction, entityIndex }) => {
                 const first = marked[0];
@@ -586,7 +608,7 @@ function EntityManager({
                 const bitmap = entityIndex.getEntityPropValue(marked[0], 'image');
                 const selection = new CellSelection('bitmap', [[bitmap]]);
                 eContext.setSelection(selection);
-                setMarked([])
+                selector.clearSelection()
             },
             paste: ({ marked, eContext, entityIndex }) => {
                 const indices = [ ...marked ];
@@ -602,7 +624,7 @@ function EntityManager({
                         entityIndex.setEntityObjects(undoObjects, true);
                     }
                 );
-                setMarked([])
+                selector.clearSelection()
             }
         }
     }, []);
@@ -643,22 +665,14 @@ function EntityManager({
     const hotkeys = { ...sideHotkeys, ...markedHotkeys };
 
     const markerButtons = [
-        {icon: 'clear',  disabled: marked.length === 0, onClick: () => setMarked([])},
+        {icon: 'clear',  disabled: marked.length === 0, onClick: () => selector.clearSelection()},
         {icon: 'done_all',
             onClick: () => setMarked(
                 marked.length < entityIndex.getLength() ?
                     entityIndex.getAllIndices() : []
             )
         },
-        {icon: 'flaky', onClick: () => {
-                const newMarked = [];
-                for (let index of entityIndex.getAllIndices()) {
-                    if (!marked.includes(index)) {
-                        newMarked.push(index);
-                    }
-                }
-                setMarked(newMarked)
-        }}
+        {icon: 'flaky', onClick: () => selector.invertSelection(entityIndex.getAllIndices())}
     ];
     bottomItems.selection = (
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
@@ -735,7 +749,7 @@ function EntityManager({
                             </ToolGroup>
                             <BackgroundControl />
                         </Toolbar>
-                        <Block full>
+                        <Block full { ...attr }>
                             {
                                 view.count === 0 ?
                                     <CenterInfo>{'No items found matching "' + filter + '"!'}</CenterInfo> :
@@ -967,6 +981,7 @@ class TreeView {
     reset() {
         this.view = null;
         this.indices = [];
+        this.map = {};
     }
 
     setState(state) {
@@ -1006,6 +1021,31 @@ class TreeView {
         return this.view
     }
 
+    getParentIndex(index) {
+        const node = this.model[index];
+        const parentLevel = node.level - 1;
+        let curr = index - 1;
+        while (curr >= 0 && this.model[curr].level > parentLevel) {
+            curr--
+        }
+        return curr < 0 ? null : curr;
+    }
+
+    getViewAncestors(values) {
+        const ancestors = {};
+        if (!Array.isArray(values)) values = [values];
+        for (let value of values) {
+            if (this.map[value] !== null) continue;
+            let node = value;
+            do {
+                node = this.getParentIndex(node);
+            } while (node !== null && this.map[node] === null);
+
+            ancestors[value] = node;
+        }
+        return ancestors
+    }
+
     getIndices() {
         if (this.view === null) {
             this.buildView()
@@ -1027,10 +1067,12 @@ class TreeView {
             level = data.level;
             if (closedLevel !== null) {
                 if (level > closedLevel) {
+                    this.map[index] = null;
                     continue
                 }
                 closedLevel = null
             }
+            this.map[index] = this.indices.length;
             this.indices.push(index);
             const closed = this.state[index];
             if (closed) {
@@ -1071,8 +1113,17 @@ class TreeView {
     }
 }
 
-
-function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props }) {
+/**
+ * TODO
+ * ------
+ *   * multi-select && selector:max
+ *   - parent-activation
+ *   - filtering ?
+ *
+ *
+ *   Bug: height eliminieren
+ */
+function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, render, ...props }) {
 
     const tContext = useContext(TrackingContext);
     const keyTrackRef = useRef(null);
@@ -1091,14 +1142,16 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
         return tContext.getTracking(trackId)
     }, []);
 
-    let [ active, setActive ] = useState(props.active !== undefined ? props.active : null);
+    // const selector = useMultiSelector({});
+
+    const selector = useExclusiveSelector(
+        {reset: true, selection: props.active, setSelection: props.setActive, default: props.active}
+    );
+    const active = selector.selection;
+    const setActive = selector.setSelection;
+
     const stackRef = useRef(null);
     const paramsRef = useRef(null);
-
-    if (props.setActive) {
-        active = props.active;
-        setActive = props.setActive
-    }
     const keyTracking = !tracking ? () => {} : index => {
         keyTrackRef.current = index;
         if (index !== null) {
@@ -1125,16 +1178,15 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
     const { focusItem, attr, refocus, ...focus } = useFocusManager({
         name: 'tree',
+        selector,
         treeView,
-        divRef: stackRef,
         keyTracking,
+        divRef: stackRef,
         handleSpace: true,
-        reset: true,
-        active,
-        setActive
+        reset: true
+//        , active,
+//        setActive
     });
-    const height = 45;
-
     const mouseEnter = index => {
         return () => {
             tracking(0, tree[index].plane)
@@ -1153,9 +1205,15 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
     }
     const elems = [];
     const nodes = treeView.getNodes();
+    const height = 45;
     let i = -1;
     for (let node of nodes) {
         i++;
+        const toggle = e => {toggleOp({ ...paramsRef.current, active: node.index}); e.stopPropagation()};
+
+        const cls = ['hover-change'];
+        cls.push(node.index === active ? 'active-bg active-color' : 'ghost-bg');
+
         const indention = [];
         for (let l = 0; l < node.level; l++) {
             indention.push(
@@ -1164,7 +1222,6 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
                 </Block>
             );
         }
-        const toggle = e => {toggleOp({ ...paramsRef.current, active: node.index}); e.stopPropagation()};
         const elem = node.leaf ?
             <Icon size={12} className="border-color" name="square" /> :
             <Block center="h" border="1" onClick={toggle}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
@@ -1183,24 +1240,12 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
                 </Block>
             </Block>
         );
-
-        const cls = ['hover-change'];
-        cls.push(node.index === active ? 'active-bg active-color' : 'ghost-bg');
-        const data = node.data;
         elems.push(
-            <Stack key={node.index} onRightClick={toggle} onMouseEnter={mouseEnter(node.index)} onDoubleClick={onDoubleClick(node.index)} { ...focus.itemAttr(i) } full="h" className={cls.join(' ')}>
+            <Stack full="h" key={node.index}  onRightClick={toggle} onMouseEnter={mouseEnter(node.index)} onDoubleClick={onDoubleClick(node.index)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
-                <Stack key={i} vertical padded={DIR.RIGHT|DIR.TOP} full="h">
-                    <Block key={i} full="h">
-                        <Stack full="h">
-                            <Block full="h" shorten>{ucfirst(data.type)}</Block>
-                            <Block><Kbd className="less small" value={data.width + 'x' + data.height} /></Block>
-                        </Stack>
-                    </Block>
-                    <Block className="big more" shorten>{data.name}</Block>
-                </Stack>
+                {render({ node })}
             </Stack>
         );
     }

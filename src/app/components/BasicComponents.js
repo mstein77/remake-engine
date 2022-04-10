@@ -606,6 +606,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         };
         let lastPos = 0;
 
+        if (document.activeElement) document.activeElement.blur();
         wContext.startExclusiveMode('scroll-handle', cursor);
         wContext.addEventListener('mousemove', e => {
             const relPos = getOffset(e[client]);
@@ -3352,7 +3353,75 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
-function useFocusManager({ name, treeView,
+function useMultiSelector({ min = null, max = null, ...props }) {
+    const [ selectionRaw, setSelectionRaw ] = useState(() => {
+        return props.default ? props.default : []
+    });
+    const selection = props.selection !== undefined ? props.selection : selectionRaw;
+    const setSelection = props.selection !== undefined ? props.setSelection : setSelectionRaw;
+
+    const select = value => {
+        const index = selection.indexOf(value);
+        if (index === -1) {
+            if (max !== null && selection.length >= max) {
+                if (max === 1) setSelection([ value ]);
+                return;
+            }
+            setSelection([ ...selection, value ]);
+            return;
+        }
+        if (min !== null && selection.length <= min) return;
+        const newSelection = [ ...selection ];
+        newSelection.splice(index, 1);
+        setSelection(newSelection)
+    }
+    const isSelected = value => selection.includes(value);
+    return {
+        select,
+        isSelected,
+        selection,
+        setSelection,
+        invertSelection: values => {
+            const invSelection = [];
+            for (let value of values) {
+                if (!selection.includes(value)) {
+                    invSelection.push(value);
+                }
+            }
+            setSelection(invSelection)
+        },
+        clearSelection: () => setSelection([])
+    }
+}
+
+function useExclusiveSelector({ reset, ...props }) {
+    const [ selectionRaw, setSelectionRaw ] = useState(props.default !== undefined ? props.default : null);
+    const callAfterwards = useCallAfterwards();
+
+    const selection = props.selection !== undefined ? props.selection : selectionRaw;
+    const setSelection = props.selection !== undefined ? props.setSelection : setSelectionRaw;
+
+    const select = value => {
+        setSelection(reset && selection === value ? null : value)
+    }
+    const syncWithTreeView = (treeView, getItem) => {
+        const ancestors = treeView.getViewAncestors(selection);
+        const newIndex = ancestors[selection];
+        if (newIndex !== undefined) {
+            callAfterwards(setSelection, getItem(newIndex))
+        }
+    }
+    const isSelected = value => selection === value
+    return {
+        select,
+        isSelected,
+        syncWithTreeView,
+        selection,
+        setSelection
+    }
+}
+
+function useFocusManager({ name, treeView, selector,
      active, items, pos = 0, setPos = () => null, page, reset, keyTracking = () => {}, handleSpace, update, ...props
     }) {
 
@@ -3375,8 +3444,9 @@ function useFocusManager({ name, treeView,
         if (value !== null) {
             setTabIndex(getItemIndex(value));
         }
-        props.setActive(value)
+        selector ? selector.select(value) : props.setActive(value)
     };
+
     const mounted = useMounted();
     const levelRef = useRef(null);
     if (levelRef.current === null) {
@@ -3390,7 +3460,7 @@ function useFocusManager({ name, treeView,
     }
     const lastPos = Math.max(count - page, 0);
     let currPos = pos;
-    if (currPos > lastPos) {
+    if (lastPos > 0 && currPos > lastPos) {
         callAfterwards(setPos, lastPos);
         currPos = lastPos
     }
@@ -3413,7 +3483,22 @@ function useFocusManager({ name, treeView,
     const nextPageStart = currPos + page;
 
     const hasPaging = page < count;
-    const activeIndex = getItemIndex(active);
+    let activeIndex = -1;
+    if (selector) {
+        for (let i = pos; i < nextPageStart; i++) {
+            if (selector.isSelected(getItem(i))) {
+                activeIndex = i;
+                break;
+            }
+        }
+    } else {
+        activeIndex = getItemIndex(active);
+    }
+
+    if (treeView && selector && selector.selection) {
+        selector.syncWithTreeView(treeView, getItem);
+    }
+
     const isOutsideFocus = hasPaging && (activeIndex < currPos || activeIndex >= nextPageStart);
 
     const autoFocus = e => {
@@ -3478,7 +3563,11 @@ function useFocusManager({ name, treeView,
             }
         } else if (handleSpace && e.key === ' ') {
             const newActive = getItem(tabIndex);
-            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+            if (selector) {
+                selector.select(newActive)
+            } else {
+                setActive(reset && newActive !== null && newActive === active ? null : newActive);
+            }
         } else {
             return;
         }
@@ -3491,7 +3580,11 @@ function useFocusManager({ name, treeView,
             onLeftClick: () => {
                 setTabIndex(index);
                 const clickItem = getItem(index);
-                setActive(reset && active === clickItem ? null : clickItem);
+                if (selector) {
+                    selector.select(clickItem);
+                } else {
+                    setActive(reset && active === clickItem ? null : clickItem);
+                }
                 setCatchFocus(false)
             }
         }
@@ -3612,5 +3705,7 @@ export {
     useDebugMount,
     useAnimationPlayers,
     useFocusManager,
-    useWatcher
+    useWatcher,
+    useExclusiveSelector,
+    useMultiSelector
 }

@@ -3,10 +3,10 @@ import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm,
     PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext
 } from "./BasicComponents";
-import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer } from "../helper/helper";
+import { d, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer } from "../helper/helper";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { DIR, Block, Stack } from "./LayoutComponents";
-import { EntityStack, EntityStackSections, EntityPicker, EntityManager } from "./EntityComponents";
+import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents";
 import { FlexGrid, BaseGrid, PictureCell } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
@@ -1341,6 +1341,27 @@ function useFilterPipelineModal(name = 'Filter') {
     }, [FilterModal.props])
 }
 
+function FullTree({ ...props }) {
+
+    const render = ({ node }) => {
+        const data = node.data;
+        return (
+            <Stack vertical padded={DIR.RIGHT|DIR.TOP} full="h">
+                <Block full="h">
+                    <Stack full="h">
+                        <Block full="h" shorten>{ucfirst(data.type)}</Block>
+                        <Block><Kbd className="less small" value={data.width + 'x' + data.height} /></Block>
+                    </Stack>
+                </Block>
+                <Block className="big more" shorten>{data.name}</Block>
+            </Stack>
+        );
+    }
+    return (
+        <TreeStack render={render} { ...props } />
+    )
+}
+
 export {
     MarkerMoveGrid,
     ResizeProps,
@@ -1353,5 +1374,6 @@ export {
     useConfirmDialog,
     useFilterPipelineModal,
     useBitmapSelectionModal,
-    useEditBitmapModal
+    useEditBitmapModal,
+    FullTree
 }

@@ -10,13 +10,13 @@ const defaultValues = {
         tabSpaces: 2
     },
     theme: {
-        defaultPaddingPx: 9,
+        defaultPaddingPx: 7,
         boxBorderWidthPx: 1,
         maxWidthPx: 1200,
         maxHeightPx: 1200,
-        boxBorderRgb: "#2b7797",
-        lessPerc: 50,
-        morePerc: 150,
+        boxBorderRgb: "#2b7386",
+        lessPerc: 59,
+        morePerc: 170,
         disabledPerc: 45,
 
         inputBgRgb: "#b0aec1",
@@ -30,41 +30,41 @@ const defaultValues = {
 
         fontSizeSmallPx: 11,
         fontSizeMediumPx: 12,
-        fontSizeBigPx: 14,
+        fontSizeBigPx: 16,
 
         monoFont: '"Lucida Console", Courier, monospace',
 
-        checkBoxType: 0,
-        hoverChangeType: -1,
+        checkBoxType: 1,
+        hoverChangeType: 1,
         hoverIntensityFloat: 0.25,
 
-        editorBgRgb: "#080808",
-        editorRgb: "#9aa0a2",
+        editorBgRgb: "#3e215d",
+        editorRgb: "#99cda7",
 
         primaryBgRgb: "#080808",
         primaryRgb: "#9aa0a2",
         secondaryBgRgb: "#2f304b",
         secondaryRgb: "#9aa0a2",
-        ghostBgRgb: "#181818",
+        ghostBgRgb: "#07112c",
 
         // header
-        headerType: 0,  // window | floating
+        headerType: 1,  // window | floating
         headerBgType: 0, // primary | color | gradient
         headerBgRgb: "#86a096",
         headerBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
 
         // title
-        titleBgType: 0, // primary | color | gradient
+        titleBgType: 2, // primary | color | gradient
         titleBgRgb: "#662341",
         titleBgGrad: 'linear-gradient(90deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
         titleVertBgGrad: 'linear-gradient(180deg, #030024ff 0%, #080842ff 51%, #05d2feff 100%)',
 
         overlayBgRgba: "#000000a3",
 
-        focusBgRgba: '#FFFFDFCC',
-        focusWidthPx: 1,
+        focusBgRgba: '#febc05d4',
+        focusWidthPx: 2,
 
-        buttonBgRgb: "#1e42ae",
+        buttonBgRgb: "#3d4bba",
         buttonRgb: "#b0d5e8",
         buttonBorderRgb: "#347f66",
         buttonBstyle: "solid",
@@ -74,11 +74,11 @@ const defaultValues = {
         buttonBorderRadiusPx: 4,
 
         activeRgb: '#fafbff',
-        activeBgRgb: '#5baa2b',
+        activeBgRgb: '#35948e',
         activeBorderRgb: '#D0D0F0',
         warningBgRgb: '#987672',
         warningRgb: '#000000',
-        warningBorderRgb: '#000000',
+        warningBorderRgb: '#E0E0A0',
         errorBgRgb: '#AA0020',
         errorRgb: '#E0E0A0',
         cursorBgRgba: '#58585888',
