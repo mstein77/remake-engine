@@ -800,14 +800,15 @@ function Radio({ name, icon, options, gaps, value, readOnly, disabled, padded, w
 
     const buttons = [];
     let i = 0;
-    for (let { name, help } of options) {
+    for (let { name, help, ...optProps } of options) {
         const curr = i;
         const { onLeftClick, ...itemAttr } = focus.itemAttr(curr);
+        const optionDisabled = disabled || optProps.disabled;
         buttons.push(
             <Button
                 key={optionIndex[i]} { ...itemAttr } help={help}
                 tabControlled
-                padded={padded} disabled={disabled} name={icon ? null : name}
+                padded={padded} disabled={optionDisabled} name={icon ? null : name}
                 icon={icon ? name : null} value={i} current={active}
                 onClick={readOnly ? null : onLeftClick}
             />

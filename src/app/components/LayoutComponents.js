@@ -73,6 +73,10 @@ function addPaddedCls(cls, padded) {
 
 function getFlatChildren(children, result = []) {
     if (children) {
+        if (!Array.isArray(children)) {
+            result.push(children);
+            return result;
+        }
         for(let child of children) {
             if (!child) continue; // TODO check === '' || child === null || child === undefined) continue;
 

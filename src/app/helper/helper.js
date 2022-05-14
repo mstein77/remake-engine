@@ -1306,6 +1306,15 @@ const isEventInRect = (e, rect) => {
         rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
 }
 
+const without = (source, remove) => {
+    if (!Array.isArray(remove)) remove = [remove];
+    return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
+}
+
+const intersect = (a, b) => {
+    return a.filter(x => b.includes(x))
+}
+
 function getParsedCssValueRec(value, splitBy = false) {
     if (value === null) {
         return null;
@@ -1360,6 +1369,8 @@ module.exports = {
     noop,
     reverse,
     round,
+    without,
+    intersect,
     ucfirst,
     copy2clipboard,
     clamp,

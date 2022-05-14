@@ -1,12 +1,25 @@
-import { AvailContext, EditorCtx, AvailContextProvider, Section, Toolbar, useCssProps, Separator, useWatcher, WindowContext, useCachedState } from "../components/BasicComponents";
+import {
+    AvailContext,
+    EditorCtx,
+    AvailContextProvider,
+    Section,
+    Toolbar,
+    useCssProps,
+    Separator,
+    useWatcher,
+    WindowContext,
+    useCachedState,
+    useComponentUpdate
+} from "../components/BasicComponents";
 import React, { useContext, useMemo, useRef, useState } from "react";
 import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents";
 import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
 import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
 import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper";
 import { useTracker, TrackingCtx } from "../components/GridComponents";
-import {PocEditor} from "./PocEditor";
 import { FullTree } from "../components/EditorComponents";
+import {PocEditor} from "./PocEditor";
+import { ScreenTreeView } from "../classes/Tree";
 
 const coordTextureShader = {
     id: 'coordTexture',
@@ -1076,15 +1089,17 @@ function getResourceIndexByPane(resources, pane) {
     return index === resources.length ? null : index
 }
 
-function ScreenTree({ tree, setSelected, toggle, resources, active, setActive }) {
+function ScreenTree({ tree, setSelected, stateChanges, toggle, resources, active, setActive, groups }) {
     const editOp = {
-        exec: ({ node }) => {
-            const index = getResourceIndexByPane(resources, node.pane)
+        exec: ({ active }) => {
+            const model = tree.getModelNodeById(active[0])
+            const index = getResourceIndexByPane(resources, model.pane)
             setSelected(index)
         },
-        can: ({ node }) => {
-            if (node === null) return false;
-            const index = getResourceIndexByPane(resources, node.pane);
+        can: ({ active }) => {
+            if (active.length === 0) return false;
+            const model = tree.getModelNodeById(active[0])
+            const index = getResourceIndexByPane(resources, model.pane);
             return index !== null
         }
     };
@@ -1092,13 +1107,13 @@ function ScreenTree({ tree, setSelected, toggle, resources, active, setActive })
     //             <Button name="POC" padded="h" onClick={() => setSelected(resources.length - 1)} />
     return (
         <Stack vertical full>
-            <FullTree trackId="tree" toggleOp={toggle} editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} />
+            <FullTree trackId="tree" filter stateChanges={stateChanges} toggleOp={toggle} editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} groups={groups} />
         </Stack>
     )
 }
 
 function ScreenEditor({ resources, setSelected, ...props }) {
-    const [ active, setActive ] = useState(null);
+    const [ active, setActive ] = useState([]);
     const planesRef = useRef([]);
 
     const tree = useMemo(() => {
@@ -1144,7 +1159,7 @@ function ScreenEditor({ resources, setSelected, ...props }) {
                 plane++
             }
         }
-        return nodes
+        return new ScreenTreeView(nodes)
     }, []);
 
     const toggleNode = ({ active }) => {
@@ -1152,17 +1167,24 @@ function ScreenEditor({ resources, setSelected, ...props }) {
         plane.closed = !plane.closed;
     };
 
+    const stateChanges = changes => {
+        for (let [id, value] of Object.entries(changes)) {
+            const index = tree.getModelIndexById(id);
+            planesRef.current[index].closed = value
+        }
+    }
+
     return (
         <EditorCtx id="screenEditor">
             <TrackingCtx object="tree">
                 <Stack full border="1">
                     <Section id="screenTree" name="Screen" full="v" collapse="h" inner area={1} size={250} maxWidth="33%">
-                        <ScreenTree tree={tree} setSelected={setSelected} toggle={toggleNode} active={active} setActive={setActive} resources={resources} />
+                        <ScreenTree tree={tree} stateChanges={stateChanges} groups={['panes']} setSelected={setSelected} toggle={toggleNode} active={active} setActive={setActive} resources={resources} />
                     </Section>
 
                     <Section name="Planes" full inner>
                         <Block full>
-                            <Panes3D active={active === null ? null : tree[active].plane} elemsRef={planesRef}  game={props.game} />
+                            <Panes3D active={active.length === 0 ? null : tree.getModelNodeById(active[0]).plane} elemsRef={planesRef} game={props.game} />
                         </Block>
                     </Section>
                 </Stack>

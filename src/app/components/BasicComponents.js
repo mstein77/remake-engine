@@ -1,6 +1,6 @@
 import ReactDOM from "react-dom";
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
-import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
+import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents";
 import { Button, Color, Submit, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
@@ -3354,6 +3354,7 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
 }
 
 function useMultiSelector({ min = null, max = null, ...props }) {
+    const callAfterwards = useCallAfterwards();
     const [ selectionRaw, setSelectionRaw ] = useState(() => {
         return props.default ? props.default : []
     });
@@ -3376,11 +3377,37 @@ function useMultiSelector({ min = null, max = null, ...props }) {
         setSelection(newSelection)
     }
     const isSelected = value => selection.includes(value);
+    const syncWithTreeView = (treeView, getItem) => {
+        const ancestors = treeView.getViewAncestors(selection);
+        if (!ancestors) return;
+
+        const newSelection = [];
+        for (let item of selection) {
+            const newIndex = ancestors[item];
+            let newValue = item;
+            if (newIndex !== undefined) {
+                if (newIndex === null) continue;
+                newValue = getItem(newIndex);
+            }
+            if (!newSelection.includes(newValue)) newSelection.push(newValue)
+        }
+        callAfterwards(setSelection, newSelection)
+    }
+    const selectAsRoot = (tree, id) => {
+        if (selection.includes(id) || (max !== null && max > selection.length)) return;
+        setSelection([ ...without([ ...selection, id], tree.getAncestorIdsById(id))]);
+    }
+
     return {
         select,
+        selectAsRoot,
         isSelected,
         selection,
         setSelection,
+        hasMax: () => max !== null && max === selection.length,
+        isMulti: () => max === null || max > 1,
+        getMatchCount: values => intersect(selection, values).length,
+        syncWithTreeView,
         invertSelection: values => {
             const invSelection = [];
             for (let value of values) {
@@ -3390,7 +3417,9 @@ function useMultiSelector({ min = null, max = null, ...props }) {
             }
             setSelection(invSelection)
         },
-        clearSelection: () => setSelection([])
+        clearSelection: (values = null) => {
+            setSelection(values === null ? [] : without(selection, values))
+        }
     }
 }
 
@@ -3417,11 +3446,12 @@ function useExclusiveSelector({ reset, ...props }) {
         isSelected,
         syncWithTreeView,
         selection,
-        setSelection
+        setSelection,
+        isMulti: () => false
     }
 }
 
-function useFocusManager({ name, treeView, selector,
+function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
      active, items, pos = 0, setPos = () => null, page, reset, keyTracking = () => {}, handleSpace, update, ...props
     }) {
 
@@ -3430,13 +3460,11 @@ function useFocusManager({ name, treeView, selector,
 
     const [ catchFocus, setCatchFocus ] = useState(true);
     const [ tabIndex, setTabIndexRaw ] = useState(0);
-    const setTabIndex = (value) => {
+    const setTabIndex = value => {
         keyTracking(value);
         setTabIndexRaw(value)
     }
-    if (treeView) {
-        items = treeView.getIndices();
-    }
+    if (treeView) items = treeView.getViewIndices();
     const initCatchRef = useRef(false);
     const autoRef = useRef(null);
     const divRef = props.divRef ? props.divRef : autoRef;
@@ -3495,8 +3523,21 @@ function useFocusManager({ name, treeView, selector,
         activeIndex = getItemIndex(active);
     }
 
-    if (treeView && selector && selector.selection) {
+    if (syncSelection && treeView && selector && selector.selection) {
         selector.syncWithTreeView(treeView, getItem);
+    }
+
+    const activateIndex = index => {
+        const newActive = getItem(index);
+        if (selector) {
+            if (rootSelect && treeView && !selector.isSelected(newActive)) {
+                selector.selectAsRoot(treeView, newActive)
+            } else {
+                selector.select(newActive)
+            }
+        } else {
+            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+        }
     }
 
     const isOutsideFocus = hasPaging && (activeIndex < currPos || activeIndex >= nextPageStart);
@@ -3522,9 +3563,8 @@ function useFocusManager({ name, treeView, selector,
     }
     const onKeyDown = e => {
         if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
-            const item = getItem(tabIndex);
-            if (treeView && e.key === 'ArrowLeft' && !treeView.isLeaf(tabIndex) &&  !treeView.isClosed(item)) {
-                treeView.toggleNode(item, true)
+            if (treeView && e.key === 'ArrowLeft' && !treeView.isLeafByViewIndex(tabIndex) &&  !treeView.isClosedByViewIndex(tabIndex)) {
+                treeView.toggleNodeByViewIndex(tabIndex, true)
                 return;
             }
             if (tabIndex === 0) {
@@ -3542,9 +3582,8 @@ function useFocusManager({ name, treeView, selector,
                 setTabIndex(newPos)
             }
         } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
-            const item = getItem(tabIndex);
-            if (treeView && e.key === 'ArrowRight' && !treeView.isLeaf(tabIndex) && treeView.isClosed(item)) {
-                treeView.toggleNode(item, false)
+            if (treeView && e.key === 'ArrowRight' && !treeView.isLeafByViewIndex(tabIndex) && treeView.isClosedByViewIndex(tabIndex)) {
+                treeView.toggleNodeByViewIndex(tabIndex, false)
                 return;
             }
             if (tabIndex === lastIndex) {
@@ -3562,12 +3601,9 @@ function useFocusManager({ name, treeView, selector,
                 setTabIndex(newPos)
             }
         } else if (handleSpace && e.key === ' ') {
-            const newActive = getItem(tabIndex);
-            if (selector) {
-                selector.select(newActive)
-            } else {
-                setActive(reset && newActive !== null && newActive === active ? null : newActive);
-            }
+            activateIndex(tabIndex);
+            // prevent scrolling
+            e.preventDefault();
         } else {
             return;
         }
@@ -3579,12 +3615,7 @@ function useFocusManager({ name, treeView, selector,
             tab: ((tabIndex === index && !catchFocus) || isCatcher),
             onLeftClick: () => {
                 setTabIndex(index);
-                const clickItem = getItem(index);
-                if (selector) {
-                    selector.select(clickItem);
-                } else {
-                    setActive(reset && active === clickItem ? null : clickItem);
-                }
+                activateIndex(index)
                 setCatchFocus(false)
             }
         }

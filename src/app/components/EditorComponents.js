@@ -1344,16 +1344,19 @@ function useFilterPipelineModal(name = 'Filter') {
 function FullTree({ ...props }) {
 
     const render = ({ node }) => {
-        const data = node.data;
+        const model = node.model;
         return (
             <Stack vertical padded={DIR.RIGHT|DIR.TOP} full="h">
                 <Block full="h">
                     <Stack full="h">
-                        <Block full="h" shorten>{ucfirst(data.type)}</Block>
-                        <Block><Kbd className="less small" value={data.width + 'x' + data.height} /></Block>
+                        <Block full="h" shorten>{ucfirst(model.type)}</Block>
+                        <Block><Kbd className="less small" value={model.width + 'x' + model.height} /></Block>
                     </Stack>
                 </Block>
-                <Block className="big more" shorten>{data.name}</Block>
+                <Stack full="h" gaps className="big">
+                    {node.hidden > 0 && <Block padded="h" className="active-bg active-color button-border-radius">{node.hidden}</Block>}
+                    <Block className="big more" shorten>{model.name}</Block>
+                </Stack>
             </Stack>
         );
     }

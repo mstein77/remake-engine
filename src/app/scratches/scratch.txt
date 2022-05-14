@@ -2,6 +2,14 @@
 -----------------------------------
   S O L V I N G - T I M E :
 -----------------------------------
+ Tree
+ - tree-model changes
+ - double-click optimization
+ - height-calc (?)
+ - compact path
+ - toggle-click triggert auch activation
+
+
  Slider
  - key-actions (arrow + shift keys, über button)
  - plain slider handle

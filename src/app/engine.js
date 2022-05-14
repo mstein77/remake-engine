@@ -2057,7 +2057,6 @@ class Game {
     }
 
     gotoScreen(screenId, params = {}) {
-        d('GOTO', screenId, params);
         this.stopAllAudio();
         OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
         this.frameEvents = {};
