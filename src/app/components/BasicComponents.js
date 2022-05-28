@@ -926,7 +926,7 @@ function ButtonStack({ buttons, buttonProps = {}, active, ...props }) {
                     tabControlled
                     refocus={refocus}
                     tab={tab}
-                    onClickEnd={onClick}
+                    onClickEnd={e => {onClick(e); refocus()}}
                 />
             );
 
@@ -3502,7 +3502,7 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
             }
         })
     }
-    if (tabIndex !== null && count > 0 && tabIndex >= count) {
+    if (tabIndex !== null && count > 0 && tabIndex >= count && !catchFocus) {
         callAfterwards(setTabIndex, count - 1);
         callAfterwards(refocus)
     }
@@ -3638,6 +3638,7 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
         itemAttr,
         refocus,
         focusItem: tabIndex,
+        setTabIndex: index => {setCatchFocus(false); setTabIndex(index)},
         setActiveFocus: setActive
     }
 }

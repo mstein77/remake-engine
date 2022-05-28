@@ -1,4 +1,4 @@
-import { d } from "../helper/helper";
+import { d, without, union } from "../helper/helper";
 
 /**
  * Usage:
@@ -81,6 +81,10 @@ class AbstractTreeView {
         return []
     }
 
+    getTypeProps(type) {
+        return this.types.get(type)
+    }
+
     getMatchingGroups(matchGroups) {
         const result = [];
         for (let group of this.groups) {
@@ -125,11 +129,17 @@ class AbstractTreeView {
         return node
     }
 
+    hasGroupDeselect() {
+        return true
+    }
+
     toggleGroup(groups, toggledGroup) {
         const index = groups.indexOf(toggledGroup);
         const newGroups = index === -1 ? [] : [ ...groups ];
         if (index > -1) {
-            newGroups.splice(index, 1);
+            if (this.hasGroupDeselect()) {
+                newGroups.splice(index, 1);
+            }
             return newGroups
         }
         for (let group of this.groups) {
@@ -144,6 +154,66 @@ class AbstractTreeView {
     }
 
     // view and model relevant methods
+
+    getModelSubtreeIds(rootId) {
+        let index = this.getModelIndexById(rootId);
+        let node = this.model[index];
+        const result = [];
+        const rootLevel = this.extractLevel(node);
+        while (true) {
+            result.push(this.extractId(node, index))
+            index++;
+            if (index >= this.model.length) break;
+            node = this.model[index];
+            if (this.extractLevel(node) <= rootLevel) break;
+        }
+        return result;
+    }
+
+    getModelSubtreeLeafIds(rootId) {
+        let index = this.getModelIndexById(rootId);
+        let node = this.model[index];
+        const ids = [];
+        const levels = [];
+        const rootLevel = this.extractLevel(node);
+        let currLevel = rootLevel;
+        while (true) {
+            ids.push(this.extractId(node, index))
+            levels.push(currLevel);
+            index++;
+            if (index >= this.model.length) break;
+            node = this.model[index];
+            currLevel = this.extractLevel(node);
+            if (currLevel <= rootLevel) break;
+        }
+        const result = [];
+        for (index = ids.length - 1; index > 0; index--) {
+            if (levels[index - 1] + 1 === levels[index]) result.push(ids[index - 1])
+        }
+        return result;
+    }
+
+    openAllInView() {
+        if (!this.view.indirect) return;
+
+        const { setState, state } = this.context;
+        const nodes = [];
+        for (let node of this.view.nodes) {
+            if (node.level === 0) nodes.push( ...this.getModelSubtreeIds(node.id) );
+        }
+        setState(without(state, nodes))
+    }
+
+    closeAllInView() {
+        if (!this.view.indirect) return;
+
+        const { setState, state } = this.context;
+        const nodes = [];
+        for (let node of this.view.nodes) {
+            if (node.level === 0) nodes.push( ...this.getModelSubtreeLeafIds(node.id) );
+        }
+        setState(union(state, nodes))
+    }
 
     toggleNodeByModelIndex(index, force = null) {
         this.toggleNodeById(this.extractId(this.model[index], index), force)
@@ -224,7 +294,6 @@ class AbstractTreeView {
     }
 
     getPathNodeNames(path) {
-        d('path', path);
         const result = [];
         for(let index of path) {
             result.push(this.extractName(this.model[index]));
@@ -283,10 +352,11 @@ class AbstractTreeView {
     reduceToBaseByType(type) {
         const { selector } = this.context;
         const newSelection = [];
+
         for (let id of selector.selection) {
             const index = this.id2modelIndex.get(id);
-            if ((type === null || this.extractType(this.model[index]) !== type) || !this.hidden.has(index)) {
-                newSelection.push(index);
+            if ((type === null || this.extractType(this.model[index]) !== type) && !this.hidden.has(index)) {
+                newSelection.push(id);
             }
         }
         return newSelection
@@ -310,6 +380,14 @@ class AbstractTreeView {
             index++
         }
         return ancestors
+    }
+
+    setClickMode(node) {
+        node.clickMode = 1;
+    }
+
+    getViewNodes() {
+        return this.view.nodes
     }
 
     get view() {
@@ -373,6 +451,7 @@ class AbstractTreeView {
         let modelIndex = -1;
         let viewIndex = 0;
         let lastClosed = null;
+        let indirect = false;
         const currPath = [];
         for (let model of this.model) {
             modelIndex++;
@@ -380,17 +459,18 @@ class AbstractTreeView {
             id2viewIndex.set(node.id, null);
 
             const type = node.type;
-            // const statsType = type === undefined ? null : type2stats[type];
             while (currPath.length > node.level) currPath.pop();
 
-            let indirect = noGroups;
+            let addIndirect = noGroups;
             let found = noGroups;
             const skipLocked = locker.isLocked('skip');
             for (let group of activeGroups) {
                 if (!group.filter(node, i)) continue;
                 found = true;
-                if (!skipLocked && group.indirect) indirect = true
+                if (!skipLocked && group.indirect) addIndirect = true
             }
+            if (addIndirect) indirect = true;
+
             locker.update(node.level);
             let baseAdd = false;
             if (locker.isLocked('skip')) {
@@ -398,7 +478,7 @@ class AbstractTreeView {
                 baseAdd = true;
             } else if (found) {
                 node.level = 0;
-                if (indirect) locker.lock('skip');
+                if (addIndirect) locker.lock('skip');
                 baseAdd = true;
             }
             const isMarked = selector.isSelected(node.id);
@@ -434,6 +514,7 @@ class AbstractTreeView {
                         id2viewIndex.set(node.id, viewIndex);
                         viewIndex++;
                         indices.push(node.id);
+                        this.setClickMode(node);
                         connect(node.level);
                         levels.push(node.level);
                         if (node.isClosed) {
@@ -472,6 +553,7 @@ class AbstractTreeView {
         this._view = {
             nodes,
             indices,
+            indirect,
             stats
         }
     }
@@ -489,10 +571,14 @@ class ScreenTreeView extends AbstractTreeView {
 
     getTypes() {
         return [
-            {id: 'area', name: 'Areas'},
-            {id: 'pane', name: 'Panes'},
-            {id: null, name: 'Items'}
+            {id: 'area', name: 'Areas', match: 'areas'},
+            {id: 'pane', name: 'Panes', match: 'panes'},
+            {id: null, name: 'Items', match: null}
         ];
+    }
+
+    hasGroupDeselect() {
+        return false
     }
 
     getGroups() {
@@ -520,6 +606,10 @@ class ScreenTreeView extends AbstractTreeView {
                 }
             }
         ];
+    }
+
+    setClickMode(node) {
+        node.clickMode = node.type === null ? 0 : 1;
     }
 
     extractType(model) {

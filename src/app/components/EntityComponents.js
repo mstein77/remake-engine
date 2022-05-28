@@ -1374,7 +1374,7 @@ function StatsBlock({ name = '', first, length = null, value, text = null, class
             {!first && <Block className="less">|</Block>}
             {name && <Block className={className}>{name}:</Block>}
             <Stack>
-                <Block center="v" className="more"><Kbd value={value} length={length} /></Block>
+                <Block center="v" className={value || diff ? "more" : ""}><Kbd value={value} length={length} /></Block>
                 {diff > 0 && <Block center="v" padded="1"><Kbd value={'+' + diff} /></Block>}
             </Stack>
             {text && <Block>{text}</Block>}
@@ -1382,36 +1382,18 @@ function StatsBlock({ name = '', first, length = null, value, text = null, class
     )
 }
 
-/**
- * TODO
- * ------
- *   * multi-select && selector:max
- *   * parent-activation
- *   - filtering ?
- *
- *
- *   Bug: height eliminieren
- */
+function StatsTag({ type = 'primary', value, lessValue, className }) {
+    const cls = ['button-border-radius', type + '-bg', type + '-color', type + '-border-color'];
+    if (className) cls.push(className)
+    return (
+        <Stack padded="h" border="1" className={cls.join(' ')}>
+            <Block padded="1">{value}</Block>
+            {lessValue && <Block padded="1" className="less">{lessValue}</Block>}
+        </Stack>
+    )
+}
+
 function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...props }) {
-    /**
-        state: [ id1, ..., idN ]
-          => tree-context
-
-        arrow-toggling
-          => tree.toggleNode(id, force)
-               => setState([id1, .., idM])
-
-
-
-
-        hotkey-toggling
-          =>
-
-        click-toggling
-
-     */
-
-
 
     const tContext = useContext(TrackingContext);
     const keyTrackRef = useRef(null);
@@ -1459,7 +1441,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
     for (let index of active) {
         node.push(tree.getModelNodeById(index));
     }
-    paramsRef.current = { active, node };
+    paramsRef.current = { active, node, tree };
 
     const toggleNode = (id, force = null) => {
         tree.toggleNodeById(id, force);
@@ -1473,8 +1455,13 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
             {id: 'edit', icon: 'edit', can: ({ active }) => active.length === 1},
             {id: 'add', icon: 'add', can: () => false},
             {id: 'delete', icon: 'delete', can: () => false},
-            {id: 'toggle', icon: 'account_tree', can: ({ active }) => active.length === 1 && tree.isVisibleById(active[0]) && !tree.isLeafById(active[0])}
-        ];
+            {id: 'open_all', icon: 'unfold_more', parent: 'collapse', has: () => true,
+                exec: () => tree.openAllInView()
+            },
+            {id: 'close_all', icon: 'unfold_less', parent: 'collapse', has: () => true,
+                exec: () => tree.closeAllInView()
+            }
+        ]
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
     const { focusItem, attr, refocus, ...focus } = useFocusManager({
@@ -1493,11 +1480,9 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
             tracking(0, tree.getViewNodeByIndex(index).model.plane)
         }
     }
-
     const onDoubleClick = !doubleClickAction ? () => null : id => {
         return () => {
             requestAnimationFrame(() => {
-                // TODO check
                 setActive([id]);
                 requestAnimationFrame(
                     () => hotkeys[doubleClickAction].can() &&
@@ -1513,10 +1498,11 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
     let i = -1;
     for (let node of nodes) {
         i++;
-        if (filter && node.level === 0 && node.path.length) {
-            const pathNodeNames = tree.getPathNodeNames(node.path);
-            const path = pathNodeNames.join(' > ');
-            if (path !== lastPath) {
+        if (node.level === 0 && node.path.length) {
+            const idPath = node.path.join('.');
+            if (idPath !== lastPath) {
+                const pathNodeNames = tree.getPathNodeNames(node.path);
+                const path = pathNodeNames.join(' > ');
                 elems.push(
                     <Block padded="h" key={'h' + i} full="h">
                         <Block full="h" padded="v" shorten className="less small" border={DIR.BOTTOM}>
@@ -1524,7 +1510,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
                         </Block>
                     </Block>
                 );
-                lastPath = path;
+                lastPath = idPath;
             }
         }
         const toggle = e => {toggleOp({ ...paramsRef.current, active: [node.id]}); e.stopPropagation()};
@@ -1542,7 +1528,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
         }
         const elem = node.isLeaf ?
             <Icon size={12} className="border-color" name="square" /> :
-            <Block center="h" border="1" onClick={toggle}><Icon size={12} className="ghost-bg" name={node.isClosed ? 'add' : 'remove'} /></Block>;
+            <Block center="h" border="1" onMouseDown={e => {toggle(e); focus.setTabIndex(node.viewIndex); refocus()}}><Icon size={12} className="ghost-bg" name={node.isClosed ? 'add' : 'remove'} /></Block>;
 
         indention.push(
             <Block key="last" width={18} height={height} full="v">
@@ -1559,7 +1545,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
             </Block>
         );
         elems.push(
-            <Stack full="h" key={node.id} cursor="pointer" onRightClick={toggle} onMouseEnter={mouseEnter(node.viewIndex)} onDoubleClick={onDoubleClick(node.id)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
+            <Stack full="h" key={node.id} cursor={node.clickMode ? "pointer" : false} onRightClick={toggle} onMouseEnter={mouseEnter(node.viewIndex)} onDoubleClick={onDoubleClick(node.id)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
@@ -1579,6 +1565,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
             <StatsBlock key="t" first name="Total" value={typeStats.total} length={length} />
         );
         let markerButtons = '';
+        const tags = [];
         if (selector.isMulti()) {
             const typedIds = tree.getViewIdsByType(typeStats.id);
             const minIds = typedIds.length ? tree.getMinViewIdsByType(typeStats.id) : [];
@@ -1598,30 +1585,46 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
                 }
             ];
             const isMarked = typeStats.markedAll > 0;
-            bottomStats.push(
-                <StatsBlock key="m" name="Marked" className={isMarked ? 'active-underlined' : ''} value={typeStats.marked} length={length} diff={typeStats.markedAll - typeStats.marked} />
-            );
-            bottomStats.push(
-                <StatsBlock key="h" name="Hidden" className={typeStats.hiddenAll > 0 ? 'warning-underlined' : ''} value={typeStats.hidden} length={length} diff={typeStats.hiddenAll - typeStats.hidden} />
-            );
+            if (isMarked) {
+                const markedDiff = typeStats.markedAll - typeStats.marked;
+                tags.push(
+                    <Stack gaps key="m">
+                        <Block className="less">|</Block>
+                        <StatsTag type="active" value={typeStats.marked} lessValue={markedDiff ? '+' + markedDiff : false} />
+                    </Stack>
+                )
+            }
+            if (typeStats.hiddenAll) {
+                const hiddenDiff = typeStats.hiddenAll - typeStats.hidden;
+                tags.push(
+                    <StatsTag key="h" type="warning" value={typeStats.hidden} lessValue={'+' + hiddenDiff} />
+                )
+            }
         }
         bottomBlocks.push(
-            <Stack key={no} vertical gaps full="h" className="secondary-bg secondary-color-color">
-                <Stack full="h" padded={DIR.ALL_BUT_BOTTOM} gaps>
-                    <Block full="h" centerItems="v" className="more">{typeStats.name}:</Block>
-                    <ButtonStack gaps="1" buttons={markerButtons} />
+            <Stack key={no} full="h" className="secondary-bg secondary-color-color">
+                <Stack full="h">
+                    <Stack gaps wrap full="h">
+                        <Block shorten>{typeStats.name}: </Block>
+                        <Block><Kbd className={typeStats.total ? 'more' : ''} value={typeStats.total} /></Block>
+                        {tags}
+                    </Stack>
                 </Stack>
-                <Stack padded="h" full="h" gaps="1" wrap>{bottomStats}</Stack>
-
+                <Block padded={DIR.ALL_BUT_LEFT}>
+                    <ButtonStack gaps="1" buttons={markerButtons} />
+                </Block>
             </Stack>
         );
 
         if (typeStats.matches + typeStats.matchesAll) {
             const diff = typeStats.matchesAll - typeStats.matches;
-            matches.push(
-                <StatsBlock key={typeStats.name} first={firstMatch} value={typeStats.matches} diff={diff} text={typeStats.name.toLowerCase()} />
-            );
-            firstMatch = false
+            const typeProps = tree.getTypeProps(typeStats.id);
+            if (typeProps.match) {
+                matches.push(
+                    <StatsBlock key={typeStats.name} first={firstMatch} value={typeStats.matches} diff={diff} text={typeProps.match} />
+                );
+                firstMatch = false
+            }
         }
         no++;
     }
@@ -1629,7 +1632,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
     let matching = '';
     if (filter && matches.length) {
         matching =
-            <Stack gaps padded key="matching">
+            <Stack full="h" gaps wrap key="matching">
                 <Block>Matching:</Block>
                 {matches}
             </Stack>;

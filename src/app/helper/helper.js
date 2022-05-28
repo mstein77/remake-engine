@@ -1306,6 +1306,8 @@ const isEventInRect = (e, rect) => {
         rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
 }
 
+const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
+
 const without = (source, remove) => {
     if (!Array.isArray(remove)) remove = [remove];
     return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
@@ -1370,6 +1372,7 @@ module.exports = {
     reverse,
     round,
     without,
+    union,
     intersect,
     ucfirst,
     copy2clipboard,
