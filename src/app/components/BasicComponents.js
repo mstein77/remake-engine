@@ -849,7 +849,7 @@ function ActionBarContent({ children, scroll, ...props }) {
     )
 }
 
-function Icon({ name, width, height, center = 'h', className, rotate, size = 18 }) {
+function Icon({ name, width, height, center = 'h', flip, className, rotate, size = 18 }) {
     const style = {
         width: width || size,
         height: height || size
@@ -871,6 +871,11 @@ function Icon({ name, width, height, center = 'h', className, rotate, size = 18 
         if (center !== 'h') {
             cls.push('center-v');
         }
+    }
+    if (flip) {
+        let flipCls = 'flip';
+        if (flip !== true) flipCls += '-' + flip;
+        cls.push(flipCls)
     }
     if (className) {
         cls.push(className);

@@ -384,6 +384,18 @@ input:invalid {
     pointer-events: all;
 }
 
+.flip-v {
+    transform: scaleY(-1)
+}
+
+.flip-h {
+    transform: scaleX(-1)
+}
+
+.flip {
+    transform: scaleX(-1) scaleY(-1)
+}
+
 .area-flicker {
     -webkit-animation-duration: 0.1s !important;
     -webkit-animation-name: opacity-blinker;

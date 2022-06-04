@@ -66,6 +66,7 @@ class AbstractTreeView {
         this.context = {};
         this._view = null;
         this.hidden = new Set();
+        this.sortings = this.getSortings()
     }
 
     setContext(context) {
@@ -83,6 +84,18 @@ class AbstractTreeView {
 
     getTypeProps(type) {
         return this.types.get(type)
+    }
+
+    getSortings() {
+        return [];
+    }
+
+    getDefaultSortId() {
+        return this.sortings.length === 0 ? null : this.sortings[0].id
+    }
+
+    getSortOptions() {
+        return this.sortings
     }
 
     getMatchingGroups(matchGroups) {
@@ -395,6 +408,56 @@ class AbstractTreeView {
         return this._view;
     }
 
+    getSorting(nodes, model2viewIndex, indirect) {
+        const { sorting, asc } = this.context;
+        if (sorting) {
+            for (let sort of this.sortings) {
+                if (sort.id !== sorting) continue;
+
+                const dir = asc ? 1 : -1;
+                if (!indirect) {
+                    return (a, b) => dir * sort.sortAsc(a, b)
+                }
+                const getViewPath = node => {
+                    const path = viewPath.get(node.id);
+                    if (!path) {
+                        const modelPath = [];
+                        let i = node.offset;
+                        while (i <= (node.path.length - 1)) {
+                            modelPath.push(model2viewIndex.get(node.path[i]))
+                            i++
+                        }
+                        modelPath.push(node.viewIndex);
+                        viewPath.set(node.id, modelPath);
+                    }
+                    return viewPath.get(node.id)
+                }
+                const viewPath = new Map();
+                return (a, b) => {
+                    let i = 0;
+                    const pathA = getViewPath(a);
+                    const pathB = getViewPath(b);
+                    let iMin = Math.min(pathA.length, pathB.length);
+                    while (i < iMin) {
+                        const indexA = pathA[i];
+                        const indexB = pathB[i];
+                        if (indexA === indexB) {
+                            i++;
+                            continue;
+                        }
+                        const aNode = nodes[indexA];
+                        const bNode = nodes[indexB];
+                        const comp = sort.sortAsc(aNode, bNode);
+                        return dir * comp;
+                    }
+                    if (a.level === b.level) return 0;
+                    return (a.level < b.level ? -1 : 1)
+                }
+            }
+        }
+        return null;
+    }
+
     buildView() {
         if (!this.context) throw new Error('Cannot build tree view, because context was not set!');
         d('REBUILD...', this.context);
@@ -404,15 +467,19 @@ class AbstractTreeView {
         const nodes = [];
         const indices= [];
         const id2viewIndex = this.id2viewIndex;
+        const model2viewIndex = new Map();
         id2viewIndex.clear();
         this.id2modelIndex.clear();
         this.hidden.clear();
 
-        const connect = (connectLevel, offset = 0) => {
+        const connect = connectLevel => {
+            // no connection to predecessors for root nodes
             if (!connectLevel) return;
 
+            // levels contains the levels of all predecessors
+            // lets find the last predecessor who has the same level as our connect code
             let startIndex = -1;
-            let i = levels.length - 1 + offset;
+            let i = levels.length - 1;
             while (i >= 0) {
                 const currLevel = levels[i];
                 if (currLevel === connectLevel) {
@@ -422,10 +489,10 @@ class AbstractTreeView {
                 }
                 i--
             }
-            if (startIndex !== -1) {
-                for (let i = startIndex; i < (nodes.length + offset - 1); i++) {
-                    nodes[i].connected[connectLevel] = true
-                }
+            if (startIndex === -1) return;
+
+            for (let i = startIndex; i < levels.length; i++) {
+                nodes[i].connected[connectLevel] = true
             }
         }
         const directMatching = false;
@@ -473,6 +540,7 @@ class AbstractTreeView {
 
             locker.update(node.level);
             let baseAdd = false;
+            node.offset = node.level;
             if (locker.isLocked('skip')) {
                 node.level = locker.getLockDist('skip');
                 baseAdd = true;
@@ -511,12 +579,9 @@ class AbstractTreeView {
                     if (lastAdd && node.level === lastAdd.level + 1) lastAdd.isLeaf = false;
                     if (!locker.isLocked('state')) {
                         nodes.push(node);
-                        id2viewIndex.set(node.id, viewIndex);
+                        model2viewIndex.set(modelIndex, viewIndex);
                         viewIndex++;
-                        indices.push(node.id);
                         this.setClickMode(node);
-                        connect(node.level);
-                        levels.push(node.level);
                         if (node.isClosed) {
                             lastClosed = node;
                             locker.lock('state')
@@ -531,21 +596,26 @@ class AbstractTreeView {
             if (locker.isLocked('marked')) incStats(type, 'markedAll');
             if (locker.isLocked('hidden')) incStats(type, 'hiddenAll');
             if (locker.isLocked('match')) incStats(type, 'matchesAll');
+            node.offset -= node.level;
 
             currPath.push(node.modelIndex);
         }
         locker.clear();
 
+        const sorting = this.getSorting(nodes, model2viewIndex, indirect);
+        if (sorting) nodes.sort(sorting);
         let i = 0;
         for (let node of nodes) {
-            let connectLevel = node.level;
-            i++;
-            if (i === nodes.length) {
-                connect(connectLevel, -1);
-            }
-            node.end = !node.connected[node.level];
+            node.viewIndex = i;
+            id2viewIndex.set(node.id, i);
+            connect(node.level);
+            levels.push(node.level);
+            indices.push(node.id);
+            i++
         }
-
+        for (let node of nodes) {
+            node.end = !node.connected[node.level]
+        }
         const stats = [];
         for (let type of types) {
             stats.push(type2stats[type]);
@@ -574,6 +644,25 @@ class ScreenTreeView extends AbstractTreeView {
             {id: 'area', name: 'Areas', match: 'areas'},
             {id: 'pane', name: 'Panes', match: 'panes'},
             {id: null, name: 'Items', match: null}
+        ];
+    }
+
+    getSortings() {
+        return [
+            {
+                id: 'default', name: 'Default', sortAsc: (a, b) => {
+                    if (a.modelIndex === b.modelIndex) return 0;
+                    return a.modelIndex < b.modelIndex ? -1 : 1;
+                }
+            },
+            {
+                id: 'alpha', name: 'Alpha', sortAsc: (a, b) => {
+                    const nameA = a.name.toLowerCase();
+                    const nameB = b.name.toLowerCase();
+                    if (nameA === nameB) return 0;
+                    return nameA < nameB ? -1 : 1;
+                }
+            }
         ];
     }
 

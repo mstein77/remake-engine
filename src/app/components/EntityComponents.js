@@ -1,7 +1,7 @@
 import React, { Fragment, useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without } from "../helper/helper";
-import { Button, Input, Number, Checkbox, Radio } from "./FormComponents";
+import {Button, Input, Number, Checkbox, Radio, Select} from "./FormComponents";
 import {
     EditorCtx,
     useAnimationPlayers,
@@ -1409,6 +1409,8 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
         stateChanges(changes);
         setStateRaw(newState);
     }
+    const [ sorting, setSorting ] = useState(tree.getDefaultSortId());
+    const [ asc, setAsc ] = useState(true);
     const [ filter, setFilter ] = useState('');
     const [ groups, setGroups ] = useState(props.groups !== undefined ? [ ...props.groups ] : []);
 
@@ -1425,6 +1427,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
 
     tree.setContext({
         state, setState,
+        sorting, asc,
         filter: !filter ? null : node => node.name.toLowerCase().indexOf(filter.toLowerCase()) !== -1,
         selector,
         groups
@@ -1556,6 +1559,20 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
 
     let matches = [];
     const bottomBlocks = [];
+    const sortOptions = tree.getSortOptions();
+    const dirOptions = [
+        {id: true, name: 'sort', iconProps: {flip: 'v'}},
+        {id: false, name: 'sort'}
+    ];
+    if (sortOptions.length) {
+        bottomBlocks.push(
+            <Stack full="h" key="s" gaps padded>
+                <Block full="h" />
+                <Select options={sortOptions} value={sorting} set={setSorting} />
+                <Radio options={dirOptions} icon value={asc} set={setAsc} />
+            </Stack>
+        );
+    }
     let firstMatch = true;
     let no = 0;
     for (let typeStats of stats) {
