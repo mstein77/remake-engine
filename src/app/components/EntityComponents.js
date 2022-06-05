@@ -1393,7 +1393,32 @@ function StatsTag({ type = 'primary', value, lessValue, className }) {
     )
 }
 
-function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...props }) {
+function HoverIconButton({ onMouseDown, closed }) {
+    const wContext = useContext(WindowContext);
+
+    const [ clicked, setClicked ] = useState(false);
+    const cls = ['ghost-bg'];
+    if (clicked) {
+        cls.push('clicked hover-button-fix')
+    } else {
+        cls.push('hover-button')
+    }
+    const click = e => {
+        wContext.startExclusiveMode('toggle', 'pointer');
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('toggle');
+            setClicked(false)
+        });
+        onMouseDown(e);
+        setClicked(true)
+    }
+
+    return (
+        <Block center="h" className={cls.join(' ')} cursor="pointer" border="1" onMouseDown={click}><Icon size={12} name={closed ? 'add' : 'remove'} /></Block>
+    )
+}
+
+function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nodeHeight, ...props }) {
 
     const tContext = useContext(TrackingContext);
     const keyTrackRef = useRef(null);
@@ -1497,7 +1522,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
     const elems = [];
     let lastPath = null;
     const { nodes, stats } = tree.view;
-    const height = 45;
+
     let i = -1;
     for (let node of nodes) {
         i++;
@@ -1525,16 +1550,16 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
         for (let l = 0; l < node.level; l++) {
             indention.push(
                 <Block key={l} width={18} full="v">
-                    {node.connected[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={height} />}
+                    {node.connected[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={nodeHeight} />}
                 </Block>
             );
         }
         const elem = node.isLeaf ?
             <Icon size={12} className="border-color" name="square" /> :
-            <Block center="h" border="1" onMouseDown={e => {toggle(e); focus.setTabIndex(node.viewIndex); refocus()}}><Icon size={12} className="ghost-bg" name={node.isClosed ? 'add' : 'remove'} /></Block>;
+            <HoverIconButton closed={node.isClosed} onMouseDown={e => {toggle(e); focus.setTabIndex(node.viewIndex); refocus()}} />;
 
         indention.push(
-            <Block key="last" width={18} height={height} full="v">
+            <Block key="last" width={18} height={nodeHeight} full="v">
                 <Block full className="relative">
                     {node.level > 0 &&
                         <div className="absolute pos-0 full-v full-h">
@@ -1612,9 +1637,8 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, ...
                 )
             }
             if (typeStats.hiddenAll) {
-                const hiddenDiff = typeStats.hiddenAll - typeStats.hidden;
                 tags.push(
-                    <StatsTag key="h" type="warning" value={typeStats.hidden} lessValue={'+' + hiddenDiff} />
+                    <StatsTag key="h" type="warning" value={typeStats.hidden} lessValue={'+' + typeStats.hiddenAll} />
                 )
             }
         }

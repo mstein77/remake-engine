@@ -1343,6 +1343,9 @@ function useFilterPipelineModal(name = 'Filter') {
 
 function FullTree({ ...props }) {
 
+    const { defaultPaddingPx, fmDefaultMedium, fmDefaultSmall } = useCssProps('defaultPaddingPx', 'fmDefaultMedium', 'fmDefaultSmall');
+    const nodeHeight = 3 * defaultPaddingPx + fmDefaultMedium + fmDefaultSmall;
+
     const render = ({ node }) => {
         const model = node.model;
         return (
@@ -1361,7 +1364,7 @@ function FullTree({ ...props }) {
         );
     }
     return (
-        <TreeStack render={render} { ...props } />
+        <TreeStack render={render} nodeHeight={nodeHeight} { ...props } />
     )
 }
 

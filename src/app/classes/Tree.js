@@ -550,14 +550,10 @@ class AbstractTreeView {
                 baseAdd = true;
             }
             const isMarked = selector.isSelected(node.id);
+            let isInView = false;
             if (!locker.isLocked('marked') && isMarked) {
                 locker.lock('marked');
                 incStats(type, 'marked');
-                if (!baseAdd) {
-                    incStats(type, 'hidden');
-                    this.hidden.add(node.modelIndex);
-                    locker.lock('hidden');
-                }
             }
             if (baseAdd) {
                 let isMatching = true;
@@ -579,6 +575,7 @@ class AbstractTreeView {
                     if (lastAdd && node.level === lastAdd.level + 1) lastAdd.isLeaf = false;
                     if (!locker.isLocked('state')) {
                         nodes.push(node);
+                        isInView = true;
                         model2viewIndex.set(modelIndex, viewIndex);
                         viewIndex++;
                         this.setClickMode(node);
@@ -594,7 +591,16 @@ class AbstractTreeView {
                 incStats(type, 'total')
             }
             if (locker.isLocked('marked')) incStats(type, 'markedAll');
-            if (locker.isLocked('hidden')) incStats(type, 'hiddenAll');
+            if (isMarked && !isInView) {
+                incStats(type, 'hidden');
+                incStats(type, 'hiddenAll');
+                this.hidden.add(node.modelIndex);
+                locker.lock('hidden');
+            } else if (locker.isLocked('hidden') || locker.isLocked('marked')) {
+                if (!isInView) {
+                    incStats(type, 'hiddenAll');
+                }
+            }
             if (locker.isLocked('match')) incStats(type, 'matchesAll');
             node.offset -= node.level;
 

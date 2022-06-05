@@ -55,6 +55,14 @@ html, body {
     font-family: var(--button-font)
 }
 
+.hover-button-fix,
+.hover-button:hover {
+    background-color: var(--button-bg-rgb) !important;
+    color: var(--button-rgb) !important;
+    border-color: var(--button-border-rgb) !important;
+}
+
+
 /*
    Input styles
  */
