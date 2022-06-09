@@ -1107,7 +1107,12 @@ function ScreenTree({ tree, setSelected, stateChanges, toggle, resources, active
     //             <Button name="POC" padded="h" onClick={() => setSelected(resources.length - 1)} />
     return (
         <Stack vertical full>
-            <FullTree trackId="tree" filter stateChanges={stateChanges} toggleOp={toggle} collapse={true} editOp={editOp} doubleClickAction="edit" add delete active={active} setActive={setActive} tree={tree} groups={groups} />
+            <FullTree trackId="tree" filter
+              stateChanges={stateChanges} toggleOp={toggle} collapse={true}
+              editOp={editOp} doubleClickAction="edit" add delete active={active}
+              setActive={setActive} tree={tree} groups={groups}
+              cacheLevel="page" cacheId="screen_tree"
+            />
         </Stack>
     )
 }

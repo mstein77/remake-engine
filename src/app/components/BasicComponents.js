@@ -3258,6 +3258,13 @@ function usePageCache(id) {
     return cacheRef.current;
 }
 
+/**
+ * @param <null|string> level
+ *   Caching-Method (null = no caching, 'global' = , 'page')
+ * @param <string> id
+ *
+ *
+ */
 function useCachedState(level, id, value, type) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
@@ -3265,9 +3272,11 @@ function useCachedState(level, id, value, type) {
     let pre = value;
 
     if (level && id) {
+        // if type is given prepend to id
         if (id && type) {
             id += '_' + type
         }
+        // get cache for given level
         if (level === 'page') {
             if (wContext.getModalLevel() > 0) {
                 cache = wContext.getCurrModalCache()
@@ -3456,13 +3465,14 @@ function useExclusiveSelector({ reset, ...props }) {
     }
 }
 
-function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
+function useFocusManager({ name, treeView, selector, syncSelection, rootSelect, dblAction,
      active, items, pos = 0, setPos = () => null, page, reset, keyTracking = () => {}, handleSpace, update, ...props
     }) {
 
     const wContext = useContext(WindowContext);
     const callAfterwards = useCallAfterwards();
 
+    const doubleRef = useRef({});
     const [ catchFocus, setCatchFocus ] = useState(true);
     const [ tabIndex, setTabIndexRaw ] = useState(0);
     const setTabIndex = value => {
@@ -3532,13 +3542,48 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
         selector.syncWithTreeView(treeView, getItem);
     }
 
-    const activateIndex = index => {
+    const activateIndex = (index, e = null) => {
+        const curr = Date.now();
+        const hasEvent = e !== null;
+        const { last, hadEvent, lastX, lastY } = doubleRef.current;
+        let isDouble = false;
+        let newX = hasEvent ? e.clientX : null;
+        let newY = hasEvent ? e.clientY : null;
+        if (dblAction && last && hasEvent === hadEvent) {
+            if (wContext.editorConfig.doubleClickMs > (curr - last) && (!hasEvent || Math.abs(lastX - newX) < 10 &&
+                Math.abs(lastY - newY) < 10)) {
+                isDouble = true;
+            }
+        }
+        doubleRef.current = {
+            last: curr,
+            hadEvent: hasEvent,
+            lastX: newX,
+            lastY: newY
+        };
         const newActive = getItem(index);
         if (selector) {
-            if (rootSelect && treeView && !selector.isSelected(newActive)) {
-                selector.selectAsRoot(treeView, newActive)
+            const isSelected = selector.isSelected(newActive);
+            const handleClick = () => {
+                doubleRef.current.delayed = null;
+                if (rootSelect && treeView && !isSelected) {
+                    selector.selectAsRoot(treeView, newActive)
+                } else {
+                    selector.select(newActive)
+                }
+            }
+
+            if (dblAction && !isDouble && isSelected) {
+                doubleRef.current.delayed = handleClick;
+                setTimeout(() => {
+                    if (doubleRef.current.delayed) doubleRef.current.delayed();
+                }, wContext.editorConfig.doubleClickMs);
             } else {
-                selector.select(newActive)
+                if (isDouble) {
+                    doubleRef.current.delayed = null;
+                    dblAction(index)
+                } else
+                handleClick();
             }
         } else {
             setActive(reset && newActive !== null && newActive === active ? null : newActive);
@@ -3606,6 +3651,7 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
                 setTabIndex(newPos)
             }
         } else if (handleSpace && e.key === ' ') {
+            if (e.repeat) return;
             activateIndex(tabIndex);
             // prevent scrolling
             e.preventDefault();
@@ -3618,9 +3664,9 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect,
         const isCatcher = (catchFocus && index === pos);
         const params = {
             tab: ((tabIndex === index && !catchFocus) || isCatcher),
-            onLeftClick: () => {
+            onLeftClick: e => {
                 setTabIndex(index);
-                activateIndex(index)
+                activateIndex(index, e)
                 setCatchFocus(false)
             }
         }

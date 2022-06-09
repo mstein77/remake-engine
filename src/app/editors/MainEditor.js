@@ -140,7 +140,7 @@ function ConfigSettings({ config, setConfig }) {
 
     return (
         <Stack full borders>
-            <Block padded full="h">
+            <Block padded full="h" scroll>
                 <PropertyGrid padded>
                     <NumberOrNoneProp
                         name="Max Width"
@@ -156,6 +156,7 @@ function ConfigSettings({ config, setConfig }) {
                     <CheckboxProp name="UI Animations" value={config.uiAnimations} set={propSetter('uiAnimations')} />
                     <NumberProp name="History size" value={config.maxHistory} max={100} set={propSetter('maxHistory')} min={5} />
                     <NumberProp name="Tab spaces" value={config.tabSpaces} max={10} set={propSetter('tabSpaces')} min={1} />
+                    <NumberProp name="Double Click Ms" value={config.doubleClickMs} max={1000} set={propSetter('doubleClickMs')} min={0} />
                 </PropertyGrid>
             </Block>
 

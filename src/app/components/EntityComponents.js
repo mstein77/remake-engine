@@ -459,8 +459,10 @@ function EntityManager({
     const avail = sizeY * zoom;
     const zoomOrAvail = auto ? {width: avail, height: avail} : zoom;
 
-    const { attr, itemAttr } = useFocusManager({name: 'HEY', selector, count: view.count, page, handleSpace: true, pos, setPos}
-    );
+    const { attr, itemAttr } = useFocusManager({
+        selector, count: view.count, page, handleSpace: true, pos, setPos,
+        dblAction: readOnly || !onDoubleClick ? null : index => onDoubleClick(index)
+    });
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
     }
@@ -484,7 +486,7 @@ function EntityManager({
                     className={cls.join(' ')}
                     border="1"
                     cursor="pointer"
-                    onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
+                    xonDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                     onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
                     onLeftClick={readOnly ? null : () => {selector.select(index); onLeftClick()}}
                     { ...stackAttr }
@@ -1412,7 +1414,6 @@ function HoverIconButton({ onMouseDown, closed }) {
         onMouseDown(e);
         setClicked(true)
     }
-
     return (
         <Block center="h" className={cls.join(' ')} cursor="pointer" border="1" onMouseDown={click}><Icon size={12} name={closed ? 'add' : 'remove'} /></Block>
     )
@@ -1434,8 +1435,8 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
         stateChanges(changes);
         setStateRaw(newState);
     }
-    const [ sorting, setSorting ] = useState(tree.getDefaultSortId());
-    const [ asc, setAsc ] = useState(true);
+    const [ sorting, setSorting ] = useCachedState(props.cacheLevel, props.cacheId + '.sorting', tree.getDefaultSortId(), 'string');
+    const [ asc, setAsc ] = useCachedState(props.cacheLevel, props.cacheId + '.asc', true, 'bool');
     const [ filter, setFilter ] = useState('');
     const [ groups, setGroups ] = useState(props.groups !== undefined ? [ ...props.groups ] : []);
 
@@ -1495,6 +1496,15 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
     const { focusItem, attr, refocus, ...focus } = useFocusManager({
         name: 'tree',
         selector,
+        dblAction: !doubleClickAction ? () => null : index => {
+            setActive([nodes[index].id]);
+            return requestAnimationFrame(
+                () => {
+                    hotkeys[doubleClickAction].can() &&
+                    hotkeys[doubleClickAction].exec()
+                }
+            );
+        },
         treeView: tree,
         rootSelect: true,
         keyTracking,
@@ -1506,17 +1516,6 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
     const mouseEnter = index => {
         return () => {
             tracking(0, tree.getViewNodeByIndex(index).model.plane)
-        }
-    }
-    const onDoubleClick = !doubleClickAction ? () => null : id => {
-        return () => {
-            requestAnimationFrame(() => {
-                setActive([id]);
-                requestAnimationFrame(
-                    () => hotkeys[doubleClickAction].can() &&
-                                hotkeys[doubleClickAction].exec()
-                )
-            })
         }
     }
     const elems = [];
@@ -1573,7 +1572,7 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
             </Block>
         );
         elems.push(
-            <Stack full="h" key={node.id} cursor={node.clickMode ? "pointer" : false} onRightClick={toggle} onMouseEnter={mouseEnter(node.viewIndex)} onDoubleClick={onDoubleClick(node.id)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
+            <Stack full="h" key={node.id} cursor={node.clickMode ? "pointer" : false} onRightClick={toggle} onMouseEnter={mouseEnter(node.viewIndex)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
@@ -1669,7 +1668,6 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
         }
         no++;
     }
-
     let matching = '';
     if (filter && matches.length) {
         matching =
@@ -1678,7 +1676,6 @@ function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nod
                 {matches}
             </Stack>;
     }
-
     const groupButtons = [];
     const treeGroups = tree.getGroups();
     for(let treeGroup of treeGroups) {

@@ -7,7 +7,8 @@ const defaultValues = {
         tooltips: true,
         uiAnimations: true,
         maxHistory: 10,
-        tabSpaces: 2
+        tabSpaces: 2,
+        doubleClickMs: 250
     },
     theme: {
         defaultPaddingPx: 7,
