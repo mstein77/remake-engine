@@ -19,16 +19,22 @@ const CssContext = React.createContext();
 //   COMPONENTS
 // --------------------------------------------
 
-function CenterInfo({ icon, iconSize, children }) {
+function CenterInfo({ icon, iconSize, children, className }) {
+    const cls = [
+        !icon ? "less text-center" : ""
+    ];
+    if (className) {
+        cls.push(className)
+    }
     const elem = (
-        <Block padded center="v" full="h" wrap className="less text-center ">
+        <Block padded center="v" full="h" wrap className={cls.join(' ')}>
             {children}
         </Block>
     );
     if (!icon) return elem;
 
     return (
-        <Stack full>
+        <Stack full className={cls.join(' ')}>
             <Block padded center="v">
                 <Icon name={icon} size={iconSize} />
             </Block>
@@ -2201,6 +2207,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 page: {}
             },
 
+            isTransitioning: false,
             lastColorsIndex: new ColorIndex({colors: (gameCache.lastColors ? gameCache.lastColors.split(' ') : [])})
         };
 
@@ -2503,6 +2510,17 @@ function WindowCtx({ imageResources, filters, children, game }) {
                     }
                 }
             },
+
+            stateBack: () => {
+                const { stateBackMethod } = registry();
+                if (stateBackMethod) stateBackMethod();
+            },
+            stateForward: (key, params) => {
+                const { stateForwardMethod } = registry();
+                if (stateForwardMethod) stateForwardMethod(key, params);
+            },
+            setIsTransitioning: value => register('isTransitioning', value),
+            isTransitioning: () => registry('isTransitioning'),
 
             registerEditor: (id, clear) => registry('editors')[id] = clear,
             unregisterEditor: id => delete registry('editors')[id],
@@ -3349,7 +3367,7 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
                 if (!mounted.current) {
                     return;
                 }
-                if (level === wContext.getModalLevel()) {
+                if (level === wContext.getModalLevel() && !wContext.isTransitioning()) {
                     if (players.nextStep()) {
                         update();
                     }

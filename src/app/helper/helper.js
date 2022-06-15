@@ -1349,15 +1349,23 @@ function getParsedCssValueRec(value, splitBy = false) {
     )
 }
 
-function getSinePath(start, end, steps) {
+function getPathByFunc(func, start, end, steps) {
     const path = [];
     const radSteps = 0.5 * Math.PI / (steps - 1);
     const dist = Math.abs(end - start);
     const sign = end < start ? -1 : 1;
     for (let i = 0; i < steps; i++) {
-        path.push(Math.sin(radSteps * i) * sign * dist + start);
+        path.push(func(radSteps * i) * sign * dist + start);
     }
-    return path;
+    return path
+}
+
+function getSinePath(start, end, steps) {
+    return getPathByFunc(Math.sin, start, end, steps)
+}
+
+function getCosinePath(start, end, steps) {
+    return getPathByFunc(Math.cos, start, end, steps)
 }
 
 function reverse(items) {
@@ -1385,6 +1393,7 @@ module.exports = {
     isValidResourceId,
     getItemsCloneWithUpdatedItem,
     getSinePath,
+    getCosinePath,
     Storage,
     ResourceDependencies,
     flattenResources,

@@ -524,6 +524,7 @@ function EditorApp(props) {
     let imageResources = [];
     let tilesModel = null;
     let fontModel = null;
+    // extract all filters and image resources from the list of resources
     for (let resource of resources) {
         switch(resource.type) {
             case 'filters':
@@ -575,65 +576,64 @@ function EditorApp(props) {
     };
 
     if (isNew) {
-        let editor = '';
+
+        const contentProvider = {
+            'screen': {
+                getContent: params => {
+                    return <ScreenEditor setSelected={setSelected} resources={resources} game={props.game} />
+                }
+            },
+
+            'TilesMap': {
+                getContent: params => {
+                    const resource = resources[params.id];
+                    if (resource.data === null) {
+                        resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                    }
+                    const model = getJsonModelOfInstance(resource.data);
+                    const tree = getResourceTreeForJsonModel(resource.cls, model);
+                    return <TilesPaneEditorNew resource={resource} model={model}/>
+                }
+            },
+
+            'TextPane': {
+                getContent: params => {
+                    const resource = resources[params.id];
+                    if (resource.data === null) {
+                        resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                    }
+                    const model = getJsonModelOfInstance(resource.data);
+                    model.blocks = resource.blocks;
+                    const tree = getResourceTreeForJsonModel(resource.cls, model);
+                    return <TextPaneEditorNew resource={resource} model={model}/>
+                }
+            },
+
+            'spriteSheet': {
+                getContent: params => {
+                    const resource = resources[params.id];
+                    if (resource.data === null) {
+                        resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                    }
+                    const model = getJsonModelOfInstance(resource.data);
+                    model.blocks = resource.blocks;
+                    // tree = getResourceTreeForJsonModel(resource.cls, model);
+                    return <SpritePaneEditorNew resource={resource} model={model}/>;
+                }
+            },
+
+            'poc': {
+                getContent: params => <PocEditor />
+            }
+        };
+
         const resourceLoader = props.game.getResourceLoader();
         resources.push({type: 'poc'});
 
-        if (selected === null) {
-            return (
-                <>
-                    <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>
-                        <ScreenEditor setSelected={setSelected} resources={resources} game={props.game} />
-                    </MainEditor>
-                    <div id="modals-container" />
-                </>
-            )
-        }
-
-        const resource = resources[selected];
-
-        editor = null;
-        let model = null;
-        let tree = null;
-
-        switch (resource.type) {
-            case 'TilesMap':
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                model = getJsonModelOfInstance(resource.data);
-                tree = getResourceTreeForJsonModel(resource.cls, model);
-                editor = <TilesPaneEditorNew resource={resource} model={model} />;
-                break;
-
-            case 'TextPane':
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                model = getJsonModelOfInstance(resource.data);
-                model.blocks = resource.blocks;
-                tree = getResourceTreeForJsonModel(resource.cls, model);
-                editor = <TextPaneEditorNew resource={resource} model={model} />;
-                break;
-
-            case 'spriteSheet':
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                model = getJsonModelOfInstance(resource.data);
-                model.blocks = resource.blocks;
-                // tree = getResourceTreeForJsonModel(resource.cls, model);
-                editor = <SpritePaneEditorNew resource={resource} model={model} />;
-                break;
-
-            case 'poc':
-                editor = <PocEditor />;
-                break;
-        }
-        return  (
+        return (
             <>
-                <MainEditor back={() => setSelected(null)} game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props }>{editor}</MainEditor>
-                <div id="modals-container"></div>
+                <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props } contentProvider={contentProvider} />
+                <div id="modals-container" />
             </>
         )
     }

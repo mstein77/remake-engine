@@ -718,6 +718,8 @@ function Panes3DInner({ elemsRef, active, mode, mirror }) {
             const { active, rotX, rotY, rotZ, posX, posY, posZ, scale, height, mPerc, mirror,
                 activeBgRgb, cursorBgRgba } = propsRef.current;
 
+            if (wContext.isTransitioning()) return;
+
             const moveY = (height / 2 - (height * mPerc / 100));
 
             const space = height - (height * mPerc / 100);
@@ -1089,12 +1091,13 @@ function getResourceIndexByPane(resources, pane) {
     return index === resources.length ? null : index
 }
 
-function ScreenTree({ tree, setSelected, stateChanges, toggle, resources, active, setActive, groups }) {
+function ScreenTree({ tree, stateChanges, toggle, resources, active, setActive, groups }) {
+    const wContext = useContext(WindowContext);
     const editOp = {
         exec: ({ active }) => {
             const model = tree.getModelNodeById(active[0])
             const index = getResourceIndexByPane(resources, model.pane)
-            setSelected(index)
+            wContext.stateForward(resources[index].type, {id: index});
         },
         can: ({ active }) => {
             if (active.length === 0) return false;
@@ -1103,8 +1106,6 @@ function ScreenTree({ tree, setSelected, stateChanges, toggle, resources, active
             return index !== null
         }
     };
-
-    //             <Button name="POC" padded="h" onClick={() => setSelected(resources.length - 1)} />
     return (
         <Stack vertical full>
             <FullTree trackId="tree" filter

@@ -1,10 +1,8 @@
 import React, { Fragment, useState, useContext, useRef, useEffect, useMemo } from "react";
-import { Stack, Block, DIR } from "../components/LayoutComponents";
-import { d, clamp, hex2rgb, hex2rgbaArray } from "../helper/helper";
+import { Stack, Block, DIR, Overlay, Overlays } from "../components/LayoutComponents";
+import { d, clamp, hex2rgb, hex2rgbaArray, getSinePath, getCosinePath } from "../helper/helper";
 import { Button, OkCancelForm, Number } from "../components/FormComponents";
-import {
-    WindowContext,
-    useModal,
+import { WindowContext, useModal,
     Icon,
     useComponentUpdate,
     Kbd,
@@ -13,7 +11,14 @@ import {
     useFocusElements,
     useFocusManager,
     Toolbar,
-    AvailContextProvider, AvailContext, Ruler, useMounted, useCallAfterwards
+    AvailContextProvider,
+    AvailContext,
+    Ruler,
+    useMounted,
+    useCallAfterwards,
+    LoadingIndicator,
+    CenterInfo,
+    useDebugMount
 } from "../components/BasicComponents";
 import { useConfirmDialog } from "../components/EditorComponents";
 import { ColorIndex } from "../classes/EntityIndex";
@@ -1070,6 +1075,160 @@ function TestBlock() {
             <Block onFocus={onFocus} border padded tab={true}>1</Block>
             <Block onFocus={onFocus} border padded tab={true}>1</Block>
         </Block>
+    )
+}
+
+/*
+    ->toSubState(stateInfo, params);
+
+    states.push(stateInfo);
+    currIndex = 0
+    toIndex = 1
+
+    effect(
+        if (currIndex === toIndex) return;
+        if (transitionRef.current === null) {
+            // init transition
+            const animate = () => {
+                if (transitionRef.current.pos !== 0) animate();
+
+                setCurrIndex(toIndex);
+            }
+            transitionRef.current = {
+            }
+        }
+
+        requestAnimationFrame(
+            transitionRef.current.animate()
+        );
+    )
+
+
+
+    [currState, stateInfo]
+
+
+    ->toParentState();
+
+ */
+
+
+const contentProvider = {
+    'screen': {
+        hasChildren: true,
+        getContent: params => {
+            return <Block full className="warning-bg">Love love love</Block>
+        }
+    },
+    'hell': {
+        hasChildren: true,
+        getContent: params => {
+            return <Block full className="transparent button-color"><CenterInfo>Welcome in hell!</CenterInfo></Block>
+        }
+    },
+    'editor': {
+        getContent: params => {
+            return <LoadingIndicator />
+        }
+    }
+};
+
+function StateContentArea() {
+    const wContext = useContext(WindowContext);
+
+    const update = useComponentUpdate();
+    const divRef = useRef(null);
+    const registry = useRef(null);
+    if (registry.current === null) {
+        const callStack = [
+            {key: 'screen', params: {}}
+        ];
+        const getBlock = (level, item) => {
+            return (
+                <Block key={level + ' ' + item.key}  width="100%" height="100%">
+                    {contentProvider[item.key].getContent(item.params)}
+                </Block>
+            )
+        };
+        registry.current = {callStack, blocks: [getBlock(0, callStack[0])], getBlock, subDir: true};
+    }
+    registry.current.update = update;
+    const [ level, setLevel ] = useState(0);
+
+    wContext.register('stateBackMethod', () => {
+        const { callStack, update } = registry.current;
+        callStack.pop();
+        update();
+    });
+
+    wContext.register('stateForwardMethod', (key, params) => {
+        const { callStack, update } = registry.current;
+        callStack.push({key, params});
+        update();
+    });
+
+    let startTransition = false;
+    const { callStack, blocks, getBlock } = registry.current;
+    const lastLevel = callStack.length - 1;
+
+    if (level !== lastLevel) {
+        const lastItem = callStack[lastLevel];
+        const newBlock = getBlock(lastLevel, lastItem);
+        if (level > lastLevel) {
+            // we go back to the parent
+            // this means we slide the new block in from the left side
+            blocks.unshift(newBlock);
+            registry.current.subDir = false;
+        } else {
+            blocks.push(newBlock);
+            registry.current.subDir = true;
+        }
+        startTransition = true;
+    } else if (blocks.length > 1) {
+        if (registry.current.subDir) {
+            blocks.shift();
+        } else {
+            // remove last block
+            blocks.pop();
+        }
+    }
+
+    useEffect(() => {
+        if (level === lastLevel) return;
+
+        const elem = divRef.current;
+        const { subDir } = registry.current;
+        const path = !subDir ?
+            getCosinePath(elem.clientWidth, 0, transitionDurtation) :
+            getCosinePath(0, elem.clientWidth, transitionDurtation);
+        let pointer = wContext.editorConfig.uiAnimations ? path.length - 1 : 0;
+
+        const doTransition = () => {
+            elem.scrollTo(Math.round(path[pointer]), 0);
+            if (pointer > 0) {
+                pointer--;
+                requestAnimationFrame(doTransition)
+            } else {
+                setLevel(registry.current.callStack.length - 1);
+            }
+        }
+        requestAnimationFrame(doTransition);
+    }, [startTransition])
+
+    return (
+        <Block ref={divRef} full xwidth="100%" xheight="100%" className="stack-h transparent nowrap">
+            {[ ...blocks ]}
+        </Block>
+    );
+}
+
+function StateButtons() {
+    const wContext = useContext(WindowContext);
+    return (
+        <Stack gaps padded>
+            <Button padded="h" name="Prev" onClick={() => wContext.stateBack()} />
+            <Button padded="h" name="Next" onClick={() => wContext.stateForward('hell', {})} />
+        </Stack>
     )
 }
 

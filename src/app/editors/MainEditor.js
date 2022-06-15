@@ -3,7 +3,7 @@ import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, Ho
 import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
 import { ButtonStack } from "../components/BasicComponents";
 import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents";
-import { NameDialog, useConfirmDialog } from "../components/EditorComponents";
+import { NameDialog, useConfirmDialog, useContentSwitcher } from "../components/EditorComponents";
 import { d, getParsedCssValueRec } from "../helper/helper";
 import ReactDOM from "react-dom";
 
@@ -894,12 +894,14 @@ function Settings({ save, close, defaults }) {
     )
 }
 
-function BaseAppInner({ back, children }) {
+function BaseAppInner({ contentProvider }) {
     const wContext = useContext(WindowContext);
     const SettingsModal = useModal();
     const { openConfirmModal, Modals } = useConfirmDialog();
 
     wContext.register('settings', SettingsModal);
+
+    const { ContentSwitcher, hasTransitioned, isRoot } = useContentSwitcher(contentProvider);
 
     const confirm = callback => {
         if (wContext.needsConfirmation()) {
@@ -942,7 +944,7 @@ function BaseAppInner({ back, children }) {
 
     useEffect(() => {
         const hotkeyListener = e => {
-            if (wContext.isInExclusiveMode()) {
+            if (wContext.isInExclusiveMode() || wContext.isTransitioning()) {
                 // TODO allow certain hotkeys?
                 return;
             }
@@ -1009,6 +1011,7 @@ function BaseAppInner({ back, children }) {
 
     const rightButtons = useMemo(() => {
         return [
+            {name: 'PoC', padded: true, onClick: () => wContext.stateForward('poc', {})},
             {icon: "build", help: "Editor Settings", padded: "1", onClick: () => wContext.openSettings()},
 //            {name: "Play", icon: "play_circle_outline", padded: "h"},
             {
@@ -1017,18 +1020,18 @@ function BaseAppInner({ back, children }) {
             }
         ]
     }, []);
-
+    const back = () => wContext.stateBack();
     return (
         <Block onFocus={onFocus} center full padded className="editor-bounds">
             <Stack vertical gaps full>
                 <Block full="h">
                     <Stack full="h">
-                        {back && <Button icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />}
+                        <Button disabled={isRoot || !hasTransitioned} icon="keyboard_backspace" padded="h" name="Back" onClick={() => confirm(back)} />
                         <Block padded="h" center="v" full="h" shorten />
                         <ButtonStack gaps center="v" buttons={rightButtons} />
                     </Stack>
                 </Block>
-                {children}
+                {ContentSwitcher}
             </Stack>
 
             <SettingsModal.content name="Settings" height="50%" width="50%" minWidth={500} maxWidth={650} closeable={false} transparent drag>
