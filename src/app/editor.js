@@ -42,7 +42,6 @@ class GameEditor {
             ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
             game.restart();
         };
-
         ReactDOM.render(
             <EditorApp game={game} play={play} active={active} />,
             document.getElementById('editor')

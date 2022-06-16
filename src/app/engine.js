@@ -2120,7 +2120,10 @@ class Game {
         RL.loadPermanentResources().then(() => {
             this.getDomElem('game').style.display = 'none';
             this.getDomElem('editor').style.display = 'block';
-            this.editor = new gameEditor.GameEditor(this, this.activeResource)
+            // TODO crap
+            const stack = this.activeResource;
+            this.activeResource = undefined;
+            this.editor = new gameEditor.GameEditor(this, stack)
         });
     }
 

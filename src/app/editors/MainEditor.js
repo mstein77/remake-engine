@@ -894,14 +894,14 @@ function Settings({ save, close, defaults }) {
     )
 }
 
-function BaseAppInner({ contentProvider }) {
+function BaseAppInner({ contentProvider, active }) {
     const wContext = useContext(WindowContext);
     const SettingsModal = useModal();
     const { openConfirmModal, Modals } = useConfirmDialog();
 
     wContext.register('settings', SettingsModal);
 
-    const { ContentSwitcher, hasTransitioned, isRoot } = useContentSwitcher(contentProvider);
+    const { ContentSwitcher, hasTransitioned, isRoot } = useContentSwitcher(contentProvider, active);
 
     const confirm = callback => {
         if (wContext.needsConfirmation()) {
@@ -920,7 +920,10 @@ function BaseAppInner({ contentProvider }) {
         const gameRef = wContext.game;
         ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
         if (wContext.isDirty()) {
-            gameRef.reloadScreen(1);
+            // TODO: hier sollte eigentlich eher der Screen restartet werden?
+            // zumindest sollte der Editor nicht direkt wieder geöffnet werden
+            // man könnte sich aber den letzten Editor durchaus merken
+            gameRef.reloadScreen(wContext.registry('callStack'));
         } else {
             gameRef.restart(true);
         }

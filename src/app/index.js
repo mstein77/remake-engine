@@ -535,8 +535,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             globals.spriteSheet = spriteSheet;
             this.gotoScreen(
-                'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
-//                'demo'
+//                'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
+                'demo'
             );
         }
     });
@@ -4298,8 +4298,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 // TODO: remove!
 
-                this.activeResource = 0;
-                this.openEditorMode();
+                // this.activeResource = 0;
+                // this.openEditorMode();
 
                 if (inputController.hasInput('back')) {
                     this.gotoScreen('demo');

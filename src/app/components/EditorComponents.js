@@ -865,7 +865,7 @@ function useExportModal({ model, resource, update, name }) {
         ).then(
             response => {
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
-                gameRef.reloadScreen(1);
+                gameRef.reloadScreen(wContext.registry('callStack'));
             }
         ).catch(err => {
             console.error(err);
@@ -1370,16 +1370,18 @@ function FullTree({ ...props }) {
 
 const transitionDuration = 30;
 
-function useContentSwitcher(contentProvider) {
+function useContentSwitcher(contentProvider, defStack) {
     const wContext = useContext(WindowContext);
 
     const update = useComponentUpdate();
+    const [ level, setLevel ] = useState(defStack !== undefined ? defStack.length - 1 : 0);
     const divRef = useRef(null);
     const registry = useRef(null);
     if (registry.current === null) {
-        const callStack = [
+        const callStack = defStack === undefined ? [
             {key: 'screen', params: {}}
-        ];
+        ] : [ ...defStack ];
+
         const getBlock = (level, item) => {
             const obj = contentProvider[item.key];
             const content = obj ? obj.getContent(item.params) : <CenterInfo>Editor not yet available!</CenterInfo>;
@@ -1389,10 +1391,10 @@ function useContentSwitcher(contentProvider) {
                 </Block>
             )
         };
-        registry.current = {callStack, blocks: [getBlock(0, callStack[0])], getBlock, subDir: true};
+        const lastIndex = callStack.length - 1;
+        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true};
     }
     registry.current.update = update;
-    const [ level, setLevel ] = useState(0);
 
     wContext.register('stateBackMethod', () => {
         const { callStack, update } = registry.current;
@@ -1408,6 +1410,8 @@ function useContentSwitcher(contentProvider) {
 
     let startTransition = false;
     const { callStack, blocks, getBlock } = registry.current;
+    wContext.register('callStack', callStack);
+
     const lastLevel = callStack.length - 1;
     const cls = ['stack-h transparent nowrap'];
 
