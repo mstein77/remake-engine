@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { TextPaneEditor as TextPaneEditorNew } from "./../editors/TextPaneEditor";
-import { TilesPaneEditor as TilesPaneEditorNew } from "./../editors/TilesPaneEditor";
-import { SpritePaneEditor as SpritePaneEditorNew } from "./../editors/SpritePaneEditor";
+import { TextPaneEditor } from "./../editors/TextPaneEditor";
+import { TilesPaneEditor } from "./../editors/TilesPaneEditor";
+import { SpritePaneEditor } from "./../editors/SpritePaneEditor";
 import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../helper/helper';
 import { MainEditor } from "../editors/MainEditor";
 import { ScreenEditor } from "../editors/ScreenEditor";
 import { PocEditor } from "../editors/PocEditor";
-import './../components-old/EditorApp.css';
 
 function EditorApp(props) {
     const [ ready, setReady ] = useState(false);
@@ -130,7 +129,7 @@ function EditorApp(props) {
                 }
                 const model = getJsonModelOfInstance(resource.data);
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <TilesPaneEditorNew resource={resource} model={model}/>
+                return <TilesPaneEditor resource={resource} model={model}/>
             }
         },
 
@@ -143,7 +142,7 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 model.blocks = resource.blocks;
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <TextPaneEditorNew resource={resource} model={model}/>
+                return <TextPaneEditor resource={resource} model={model}/>
             }
         },
 
@@ -156,7 +155,7 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 model.blocks = resource.blocks;
                 // tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <SpritePaneEditorNew resource={resource} model={model}/>;
+                return <SpritePaneEditor resource={resource} model={model}/>;
             }
         },
 
