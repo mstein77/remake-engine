@@ -1846,18 +1846,20 @@ function EditorCtx({ id, children }) {
                         lastController.cleanUp()
                     }
                     lastController = null;
-                    if (mode !== null) {
-                        const modeController = modesContext.controller[mode];
-                        if (modeController) {
-                            modeController.init(
-                                modeController.defaults ?
-                                    { ...modeController.defaults, ...params  } : params
-                            );
+                    requestAnimationFrame(() => {
+                        if (mode !== null) {
+                            const modeController = modesContext.controller[mode];
+                            if (modeController) {
+                                modeController.init(
+                                    modeController.defaults ?
+                                        { ...modeController.defaults, ...params  } : params
+                                );
+                            }
+                            lastController = modeController
                         }
-                        lastController = modeController
-                    }
-                    setLastMode(mode);
-                    setLastModeParams(params);
+                        setLastMode(mode);
+                        setLastModeParams(params);
+                    });
                 },
                 getGridAction: name => {
                     return modesContext.actions[name];

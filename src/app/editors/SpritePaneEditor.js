@@ -108,10 +108,10 @@ function SpriteManager({ spriteIndex, editSprite }) {
                 entityIndex={spriteIndex}
                 titleHeight={titleHeight}
                 footerHeight={defaultPaddingPx + fmMonoSmall}
-                minWidth={100}
+                minWidth={150}
+                scaling
                 filter
                 auto
-
                 addOp={newSprite}
                 importOp={importSprites}
                 editOp={({ marked }) => editSprite(marked[0])}

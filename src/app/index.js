@@ -390,7 +390,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                         type.prefix + 'mario-swim1'], 'flip-x');
                 spriteSheet.addSpriteSeq(type.prefix + 'mario-run', 18, type.offY, 16, type.height, 3, 1);
                 spriteSheet.addSpriteSeq(type.prefix + 'mario-glide', 120, type.offY, 16, type.height, 2, 1);
-                spriteSheet.addAnimation(type.prefix + 'mario-glide', [type.prefix + 'mario-glide1', type.prefix + 'mario-glide2'], ANIMATION.END.LOOP)
+                spriteSheet.addAnimation(type.prefix + 'mario-glide', [type.prefix + 'mario-glide1', type.prefix + 'mario-glide2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.34)
                 spriteSheet.addTransformedSpritesFromObj('flip-x', {
                     [type.prefix + 'mario-run1-rev']: type.prefix + 'mario-run1',
                     [type.prefix + 'mario-run2-rev']: type.prefix + 'mario-run2',
@@ -434,28 +434,28 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSpriteSeq('fireflower', 0, 83, 16, 16, 4, 0);
             spriteSheet.addAnimation('fireflower', ['fireflower1', 'fireflower2', 'fireflower3', 'fireflower4'], ANIMATION.END.LOOP);
             spriteSheet.addSpriteSeq('star', 0, 99, 16, 16, 4);
-            spriteSheet.addAnimation('star', ['star1', 'star2', 'star3', 'star4'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('star', ['star1', 'star2', 'star3', 'star4'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.5);
             spriteSheet.addSprite('bar', 64, 179, 48, 8);
             spriteSheet.addSprite('bar-short', 64, 179, 32, 8);
             spriteSheet.addSprite('flag', 239, 34, 16, 16);
             spriteSheet.addSprite('flag-up', 256, 34, 16, 16);
             spriteSheet.addSprite('flag-up-fg', 273, 34, 16, 16);
             spriteSheet.addSpriteSeq('plant', 272, 51, 16, 24, 3);
-            spriteSheet.addAnimation('plant', ['plant1', 'plant2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('plant', ['plant1', 'plant2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.1);
             spriteSheet.addSpriteSeq('evilmush', 80, 59, 16, 16, 2);
-            spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('evilmush', ['evilmush1', 'evilmush2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.1);
             spriteSheet.addSpriteSeq('turtle', 176, 51, 16, 24, 2);
             spriteSheet.addSprite('turtle-shell', 240, 51, 16, 24);
             spriteSheet.addSpriteSeq('turtle-awake', 240, 51, 16, 24, 2);
             spriteSheet.addAnimation('turtle-awake', ['turtle-awake2', 'turtle-awake1', 'turtle-awake1',
                 'turtle-awake2', 'turtle-awake1', 'turtle-awake1', 'turtle-awake2', 'turtle-awake1', 'turtle-awake1',
-                'turtle-awake2', 'turtle-awake1', 'turtle-awake1', 'turtle-awake2']
+                'turtle-awake2', 'turtle-awake1', 'turtle-awake1', 'turtle-awake2'], ANIMATION.END.STOP, ANIMATION.DIR.FORWARD, false, 0.1
             );
             spriteSheet.addTransformedSprite('turtle-shell-rev', 'turtle-shell', 'flip-x');
             spriteSheet.addTransformedSprite('turtle-shell-flipped', 'turtle-shell', 'flip-y');
-            spriteSheet.addAnimation('turtle', ['turtle1', 'turtle2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('turtle', ['turtle1', 'turtle2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.1);
             spriteSheet.addSpriteSeq('flying-turtle', 208, 51, 16, 24, 2);
-            spriteSheet.addAnimation('flying-turtle', ['flying-turtle1', 'flying-turtle2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('flying-turtle', ['flying-turtle1', 'flying-turtle2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.1);
             spriteSheet.addTransformedAnimation('turtle-rev', 'turtle', 'flip-x');
             spriteSheet.addTransformedSprite('evilmush-flip', 'evilmush1', 'flip-y');
             spriteSheet.addSprite('evilmush-dead', 112, 59, 16, 16);
@@ -473,16 +473,16 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addSprite('firebreath0_2', 88, 123, 8, 8);
             spriteSheet.addSprite('firebreath1', 96, 115, 16, 8);
             spriteSheet.addSprite('firebreath2', 96, 123, 16, 8);
-            spriteSheet.addAnimation('firebreath', ['firebreath1', 'firebreath2'], ANIMATION.END.LOOP);
-            spriteSheet.addAnimation('firebreath0', ['firebreath0_1', 'firebreath0_2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('firebreath', ['firebreath1', 'firebreath2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.5);
+            spriteSheet.addAnimation('firebreath0', ['firebreath0_1', 'firebreath0_2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.5);
             spriteSheet.addSprite('bowser1', 144, 75, 32, 32);
             spriteSheet.addSprite('bowser2', 176, 75, 32, 32);
             spriteSheet.addSprite('bowser-fire1', 80, 75, 32, 32);
             spriteSheet.addSprite('bowser-fire2', 112, 75, 32, 32);
-            spriteSheet.addAnimation('bowser', ['bowser1', 'bowser2'], ANIMATION.END.LOOP);
-            spriteSheet.addAnimation('bowser-fire', ['bowser-fire1', 'bowser-fire2'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('bowser', ['bowser1', 'bowser2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.05);
+            spriteSheet.addAnimation('bowser-fire', ['bowser-fire1', 'bowser-fire2'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.05);
             spriteSheet.addSpriteSeq('explode', 307, 34, 16, 16, 3, 1);
-            spriteSheet.addAnimation('explode', ['explode1', 'explode2', 'explode3']);
+            spriteSheet.addAnimation('explode', ['explode1', 'explode2', 'explode3'], ANIMATION.END.STOP, ANIMATION.DIR.FORWARD, false, 0.5);
             spriteSheet.addAnimation('fireball', ['fireball1', 'fireball2', 'fireball3', 'fireball4'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.25);
             spriteSheet.addSprite('1up', 32, 219, 16, 7);
             spriteSheet.addSprite('num_0', 0, 219, 4, 8);
@@ -495,7 +495,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 ANIMATION.DIR.FORWARD_BACKWARD
             );
             spriteSheet.addSpriteSeq('coin-up', 0, 163, 16, 16, 4);
-            spriteSheet.addAnimation('coin-up', ['coin-up1', 'coin-up2', 'coin-up3', 'coin-up4'], ANIMATION.END.LOOP);
+            spriteSheet.addAnimation('coin-up', ['coin-up1', 'coin-up2', 'coin-up3', 'coin-up4'], ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.2);
             spriteSheet.build();
 
             spriteSheet.addAnimation(
@@ -506,7 +506,7 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             spriteSheet.addAnimation(
                 'fire-mario-glide',
                 ['fire-mario-glide1', 'fire-mario-glide2'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP, ANIMATION.DIR.FORWARD, false, 0.34
             );
             spriteSheet.addTransformedSprites('-rev',
                 ['fire-mario', 'fire-mario-jump', 'fire-mario-duck', 'fire-mario-run1', 'fire-mario-run2', 'fire-mario-run3'], 'flip-x');
@@ -850,7 +850,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             tfSpriteSheet.addAnimation(
                 'bladeshot',
                 ['bladeshot-1', 'bladeshot-2', 'bladeshot-3', 'bladeshot-4'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.5
             );
             tfSpriteSheet.addSprite('ship-up1', 75, 5, 32, 16);
             tfSpriteSheet.addSprite('ship-up2', 40, 5, 32, 16);
@@ -862,11 +865,19 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
             tfSpriteSheet.addAnimation(
                 'ship-down',
-                ['ship-down1', 'ship-down2', 'ship-down3']
+                ['ship-down1', 'ship-down2', 'ship-down3'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.15
             );
             tfSpriteSheet.addAnimation(
                 'ship-up',
-                ['ship-up1', 'ship-up2', 'ship-up3']
+                ['ship-up1', 'ship-up2', 'ship-up3'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.15
             );
 
             const SHIPSTATE = {
@@ -1271,20 +1282,30 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             beastSpriteSheet.addAnimation(
                 'bat',
                 ['bat1', 'bat2', 'bat3', 'bat4', 'bat5'],
-                ANIMATION.END.LOOP, ANIMATION.DIR.BACKWARD_FORWARD
+                ANIMATION.END.LOOP, ANIMATION.DIR.BACKWARD_FORWARD,
+                false,
+                0.34
             );
             beastSpriteSheet.addTransformedAnimation('bat-rev', 'bat', 'flip-x');
             beastSpriteSheet.addTransformedSprite('beast-down-fist-rev', 'beast-down-fist', 'flip-x');
 
             beastSpriteSheet.addAnimation(
                 'beast-punch',
-                ['beast-punch1', 'beast-punch2']
+                ['beast-punch1', 'beast-punch2'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.35
             );
             beastSpriteSheet.addTransformedAnimation('beast-punch-rev', 'beast-punch', 'flip-x');
             beastSpriteSheet.addTransformedSprite('beast-punch-hold-rev', 'beast-punch-hold', 'flip-x');
             beastSpriteSheet.addAnimation(
                 'beast-down-punch',
-                ['beast-down-punch1', 'beast-down-punch2']
+                ['beast-down-punch1', 'beast-down-punch2'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.25
             );
             beastSpriteSheet.addTransformedAnimation('beast-down-punch-rev', 'beast-down-punch', 'flip-x');
             beastSpriteSheet.addTransformedSprite('beast-down-punch-hold-rev', 'beast-down-punch-hold', 'flip-x');
@@ -1302,17 +1323,28 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             beastSpriteSheet.addAnimation(
                 'beast-run',
                 ['beast-run1', 'beast-run2', 'beast-run3', 'beast-run4', 'beast-run5', 'beast-run6'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.15
             );
             beastSpriteSheet.addTransformedAnimation('beast-run-rev', 'beast-run', 'flip-x');
             beastSpriteSheet.addAnimation(
                 'beast-down',
-                ['beast-down1', 'beast-down2']
+                ['beast-down1', 'beast-down2'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.25
             );
             beastSpriteSheet.addTransformedAnimation('beast-down-rev', 'beast-down', 'flip-x');
             beastSpriteSheet.addAnimation(
                 'beast-turn',
-                ['beast-turn1', 'beast-turn2']
+                ['beast-turn1', 'beast-turn2'],
+                ANIMATION.END.STOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.35
             );
             beastSpriteSheet.addAnimation(
                 'beast-turn2-rev',
@@ -1334,7 +1366,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             beastSpriteSheet.addAnimation(
                 'ekg',
                 ['ekg1', 'ekg2', 'ekg3', 'ekg4', 'ekg5', 'ekg6', 'ekg7', 'ekg8'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.12
             );
 
             beastSpriteSheet.addSprite('0', 0, 293, 16, 14);
@@ -1357,7 +1392,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             beastSpriteSheet.addAnimation(
                 'demon',
                 ['demon1', 'demon2', 'demon3', 'demon4', 'demon5', 'demon6'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.15
             );
             beastSpriteSheet.addTransformedAnimation('demon-rev', 'demon', 'flip-x');
 
@@ -1368,7 +1406,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             beastSpriteSheet.addAnimation(
                 'stone',
                 ['stone1', 'stone2', 'stone3', 'stone4'],
-                ANIMATION.END.LOOP
+                ANIMATION.END.LOOP,
+                ANIMATION.DIR.FORWARD,
+                false,
+                0.1
             );
 
             beastSpriteSheet.build();
@@ -1448,6 +1489,12 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             this.audio.loop('sotb', 'bgm');
 
             shadowScreen.setFrameHandler(function() {
+
+                // TODO: remove!
+
+//                this.activeResource = undefined;
+//                this.openEditorMode();
+
                 beastSpritePane.updateFrames();
 
                 let pos;
@@ -4655,8 +4702,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 // TODO: remove!
 
-                // this.activeResource = 0;
-                // this.openEditorMode();
+//                this.activeResource = undefined;
+//                this.openEditorMode();
 
                 if (inputController.hasInput('back')) {
                     this.gotoScreen('demo');

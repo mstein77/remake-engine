@@ -335,9 +335,10 @@ function BrushPicker({ brushIndex, editBrush }) {
     const eContext = useContext(EditorContext);
     const select = index => {
         const selection = new CellSelection('entity', {entityIndex: brushIndex, value: brushIndex.getEntityValue(index), cellsProp: 'tiles'}, CellValue.tile);
-        eContext.setSelection(selection);
         selection.setCellsFromEntity();
-        eContext.setMode('write')
+        eContext.setSelection(selection);
+        // requestAnimationFrame(() => eContext.setMode('write'));
+        eContext.setMode('write');
     };
     return (
         <EntityPicker
