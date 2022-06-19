@@ -2217,6 +2217,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             registryRef.current[key] = value
         };
 
+        const isInExclusiveMode = () => registry('mode') !== null;
         const endExclusiveMode = id => {
             const { mode, listeners, setFixCursor } = registry();
             if (!id || mode !== id) {
@@ -2413,8 +2414,18 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 register('mode', id);
                 setFixCursor(cursor)
             },
-            isInExclusiveMode: () => registry('mode') !== null,
+            isInExclusiveMode,
             endExclusiveMode,
+            onExclusiveModeEnd: callback => {
+                const check = () => {
+                    if (!isInExclusiveMode()) {
+                        callback();
+                    } else {
+                        requestAnimationFrame(check)
+                    }
+                };
+                check();
+            },
 
             addEventListener: (type, listener, options = false) => {
                 const { mode, listeners } = registry();
@@ -2664,6 +2675,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             focusStack: registry('focusStack'),
             imageIndex,
+
 
             getFilteredCanvasData,
             getFilteredImageData: (filter, imageData) => {

@@ -917,16 +917,20 @@ function BaseAppInner({ contentProvider, active }) {
     };
 
     const play = () => {
-        const gameRef = wContext.game;
-        ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
-        if (wContext.isDirty()) {
-            // TODO: hier sollte eigentlich eher der Screen restartet werden?
-            // zumindest sollte der Editor nicht direkt wieder geöffnet werden
-            // man könnte sich aber den letzten Editor durchaus merken
-            gameRef.reloadScreen(wContext.registry('callStack'));
-        } else {
-            gameRef.restart(true);
-        }
+        wContext.onExclusiveModeEnd(
+            () => {
+                const gameRef = wContext.game;
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                if (wContext.isDirty()) {
+                    // TODO: hier sollte eigentlich eher der Screen restartet werden?
+                    // zumindest sollte der Editor nicht direkt wieder geöffnet werden
+                    // man könnte sich aber den letzten Editor durchaus merken
+                    gameRef.reloadScreen(wContext.registry('callStack'));
+                } else {
+                    gameRef.restart(true);
+                }
+            }
+        );
     };
 
     const onFocus = e => {

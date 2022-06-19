@@ -2276,6 +2276,7 @@ class SpriteIndex extends EntityIndex {
     drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
         const sprite = this.model.sprites[this.getEntityValue(index)];
         if (!sprite) {
+            ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             return;
         }
         const pos = sprite.off;
