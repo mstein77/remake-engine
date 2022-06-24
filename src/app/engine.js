@@ -3487,8 +3487,8 @@ class BackgroundPane {
     render() {
         this.container.setBackgroundColor(this.color);
         if (this.rawImages.length > 0) {
-            this.container.setBackgroundImages(this.rawImages);
-            this.container.setBackgroundPositions(this.imgPos);
+            this.container.setBackgroundImages([ ...this.rawImages ].reverse());
+            this.container.setBackgroundPositions( [ ...this.imgPos ].reverse());
         }
         this.dirty = false;
     }

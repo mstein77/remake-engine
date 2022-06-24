@@ -2983,7 +2983,6 @@ class ImageBlockIndex extends EntityIndex {
     }
 
     drawEntity(ctx, pos, x, y, zoomOrAvail = 1) {
-        d('XY', x, y);
         const props = this.getEntityObject(pos);
         let width = props.width;
         let height = props.height;

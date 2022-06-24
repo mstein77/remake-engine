@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo, useState, useRef } from "react";
 import {
     Button,
     Color,
@@ -6,6 +6,7 @@ import {
     TupleProp,
     KeyInput,
     Number,
+    Checkbox,
     EntityProp,
     BitmapProp
 } from "../components/FormComponents";
@@ -22,41 +23,28 @@ import {
 } from "../components/BasicComponents";
 import { ImageBlockIndex } from "../classes/EntityIndex";
 import { useExportModal } from "../components/EditorComponents";
-import { Stack, Block } from '../components/LayoutComponents';
+import { Stack, Block, Overlays, Overlay, DIR } from '../components/LayoutComponents';
 import { d, drawCanvasToAvail } from "../helper/helper";
 import { EntityManager, EntityStack, EntityPicker } from "../components/EntityComponents";
+import { GridCellMarker } from "../components/GridComponents";
 
-function ImageManager({ imageIndex }) {
-    return (
-        <Block full>
-            <EntityManager
-                minWidth={100}
-                auto
-                entityIndex={imageIndex}
-                titleHeight={60}
-                renderTitle={index => {
-                    const name = imageIndex.getEntityValue(index);
-                    const width = imageIndex.getEntityPropValue(index, 'width');
-                    const height = imageIndex.getEntityPropValue(index, 'height');
-                    return (
-                        <Stack full="h" gaps vertical padded>
-                            <Block className="more">
-                                {name}
-                            </Block>
-                            <Block>{width + ' x' + height}</Block>
-                        </Stack>
-                    )}
-                }
-            />
-        </Block>
-    )
-}
+function BackgroundPreview({ model, imageIndex, width, height, active, setActive, fieldProps }) {
 
-function BackgroundPreview({ model, imageIndex, dim }) {
-    useUpdateOnEntityIndexChanges(imageIndex);
-    const [ zoom, setZoom ] = useState(2);
-
+    const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
+
+    const screenRef = useRef(null);
+    const onMoveRef = useRef(null);
+
+    const blockRef = useRef(null);
+
+    useUpdateOnEntityIndexChanges(imageIndex);
+    const [ marker, setMarker ] = useState(true);
+    const [ zoom, setZoom ] = useState(2);
+    const [ highlight, setHighlight ] = useState(false);
+
+    const currBlock = active === null ? null : imageIndex.getEntityObject(active);
+
     const update = useComponentUpdate();
     const getModelPropSetter = prop => {
         return newValue => {
@@ -75,39 +63,170 @@ function BackgroundPreview({ model, imageIndex, dim }) {
         }
     }
 
+    const onMove = e => {
+        const rect = screenRef.current.getBoundingClientRect();
+        const undoX = currBlock.x;
+        const undoY = currBlock.y;
+        let lastX = Math.floor((e.clientX - rect.x) / zoom);
+        let lastY = Math.floor((e.clientY - rect.y) / zoom);
+        const offsetX = blockRef.current.x - lastX;
+        const offsetY = blockRef.current.y - lastY;
+        lastX += offsetX;
+        lastY += offsetY;
+
+        wContext.startExclusiveMode('move-block', moveCursor);
+        wContext.addEventListener('mousemove', e => {
+            const currX = Math.floor((e.clientX - rect.x) / zoom);
+            const currY = Math.floor((e.clientY - rect.y) / zoom);
+
+            const cBlock = blockRef.current;
+            const deltaX = currX - lastX;
+            let changed = false;
+            if (deltaX !== 0) {
+                const newX = Math.max(fieldProps.x.min, Math.min(cBlock.x + deltaX, fieldProps.x.max)) + offsetX;
+                if (newX !== cBlock.x) {
+                    imageIndex.setEntityPropValue(active, 'x', newX);
+                    lastX = newX;
+                    changed = true;
+                }
+            }
+            const deltaY = currY - lastY;
+            if (deltaY !== 0) {
+                const newY = Math.max(fieldProps.y.min, Math.min(cBlock.y + deltaY, fieldProps.y.max)) + offsetY;
+                if (newY !== cBlock.y) {
+                    imageIndex.setEntityPropValue(active, 'y', newY);
+                    lastY = newY;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                imageIndex.notify();
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        });
+        wContext.addEventListener('mouseup', () => {
+            eContext.doAction(
+                () => {
+                    imageIndex.setEntityPropValue(active, 'x', lastX);
+                    imageIndex.setEntityPropValue(active, 'y', lastY);
+                    imageIndex.notify();
+                },
+                () => {
+                    imageIndex.setEntityPropValue(active, 'x', undoX);
+                    imageIndex.setEntityPropValue(active, 'y', undoY);
+                    imageIndex.notify();
+                }
+            );
+            setHighlight(false);
+            wContext.endExclusiveMode('move-block')
+        }, {once: true});
+
+        setHighlight(true);
+        if (e.stopPropagation) {
+            e.stopPropagation();
+            e.preventDefault()
+        }
+    };
+    onMoveRef.current = onMove;
+
+    const activateByClick = e => {
+        const rect = screenRef.current.getBoundingClientRect();
+        const clickX = Math.floor((e.clientX - rect.x) / zoom);
+        const clickY = Math.floor((e.clientY - rect.y) / zoom);
+        let i = imageIndex.getLength() - 1;
+        let found = false;
+        while(!found && i >= 0) {
+            const block = imageIndex.getEntityObject(i);
+            // const img = getBlockImage(block);
+            // if (img) {
+                const pos = {x: block.x, y: block.y};
+                if (pos.x <= clickX && clickX <= (pos.x + block.width - 1) &&
+                    pos.y <= clickY && clickY <= (pos.y + block.height - 1)) {
+                    found = true;
+                    break;
+                }
+            //}
+            i--;
+        }
+        if (found) {
+            setActive(i);
+            const startEvent = {
+                clientX: e.clientX, clientY: e.clientY
+            };
+            requestAnimationFrame(() => {
+                onMoveRef.current(startEvent);
+            });
+        } else {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    };
+
     const render = ctx => {
         ctx.fillStyle = model.color;
-        ctx.fillRect(0, 0, zoom * dim.x, zoom * dim.y);
+        ctx.fillRect(0, 0, zoom * width, zoom * height);
         const images = imageIndex.getEntityObjects();
         for (let obj of images) {
             ctx.drawImage(obj.image, 0, 0, obj.width, obj.height, obj.x * zoom, obj.y * zoom, obj.width * zoom, obj.height * zoom);
         }
     }
 
+    const moveCursor = 'grab';
+
+    const dim = !currBlock ? null : {width: currBlock.width, height: currBlock.height};
+
+    blockRef.current = active === null || !imageIndex.getLength() || !imageIndex.hasIndex(active) ? null : imageIndex.getEntityObject(active);
+
     return (
         <Stack vertical borders full>
             <Toolbar>
                 <Color name="Background color:" value={model.color} set={getModelPropSetter('color')} />
                 <Number name="Zoom:" set={setZoom} value={zoom} min={1} max={10} />
+                <Checkbox name="Marker" set={setMarker} value={marker} />
             </Toolbar>
 
-            <Block full padded>
-                <Block centerItems full>
-                    <Canvas width={dim.x * zoom} height={dim.y * zoom} render={render} />
-                </Block>
+            <Block full centerItems padded scroll>
+                <Overlays className="thin-boxed" width={width * zoom} height={height * zoom}>
+                    <Overlay>
+                        <Canvas render={render} width={width * zoom} height={height * zoom} />
+                    </Overlay>
+                    <Overlay width={width * zoom} height={width * zoom}>
+                        <Block ref={screenRef} full onMouseDown={activateByClick}>
+                            {marker && currBlock &&
+                                <GridCellMarker
+                                    blink
+                                    posX={currBlock.x * zoom}
+                                    posY={currBlock.y * zoom}
+                                    zoom={zoom}
+                                    cursor={moveCursor}
+                                    xdir={
+                                        (DIR.BOTTOM & (currBlock.y + dim.height < height)) |
+                                        DIR.TOP |
+                                        DIR.LEFT |
+                                        (DIR.RIGHT & (currBlock.x + dim.width < width))
+                                    }
+                                    width={Math.min(dim.width, width - currBlock.x) * zoom}
+                                    height={Math.min(dim.height, height - currBlock.y) * zoom}
+                                    onMove={onMove}
+                                    highlight={highlight}
+                                />
+                            }
+                        </Block>
+                    </Overlay>
+                </Overlays>
             </Block>
         </Stack>
     )
 }
 
-function ImageStack({ imageIndex, active, setActive, resource }) {
+function ImageStack({ imageIndex, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);
     useUpdateOnEntityIndexChanges(imageIndex);
 
     const editImage = () => {};
     const newImage = () => {};
     const deleteImage = () => {};
-    const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
 
     const currImage = active === null ? null : imageIndex.getEntityObject(active);
 
@@ -159,9 +278,9 @@ function ImageStack({ imageIndex, active, setActive, resource }) {
     )
 }
 
-function ImagePicker({ imageIndex, active, setActive }) {
+function ImagePicker({ imageIndex, setActive }) {
     return (
-        <EntityPicker entityIndex={imageIndex} select={() => d('sel')} select={index => setActive(index)} />
+        <EntityPicker entityIndex={imageIndex} select={index => setActive(index)} />
     )
 }
 
@@ -177,6 +296,8 @@ function BackgroundPaneEditor({ model, resource }) {
     };
 
     const imageIndex = useMemo(() => new ImageBlockIndex(model), [model])
+
+    const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
 
     const [ activeImage, setActiveImage ] = useState(null);
 
@@ -204,12 +325,12 @@ function BackgroundPaneEditor({ model, resource }) {
             }>
             <Stack full borders vertical>
                 <Section inner name="Background" full>
-                    <BackgroundPreview model={model} dim={resource.dim} imageIndex={imageIndex} />
+                    <BackgroundPreview model={model} width={resource.dim.x} height={resource.dim.y} imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} fieldProps={fieldProps} />
                 </Section>
 
                 <Section id="backgroundPane_imagesSection" inner name="Images" full="h" size={250} maxHeight="50%" rev collapse>
                     <Stack full borders>
-                        <ImageStack imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} resource={resource} />
+                        <ImageStack imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} resource={resource} fieldProps={fieldProps} />
                         <ImagePicker imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} />
                     </Stack>
                 </Section>

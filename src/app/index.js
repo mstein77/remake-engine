@@ -536,8 +536,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
             globals.spriteSheet = spriteSheet;
             this.gotoScreen(
 //                'mario', {world: '1-1', marioLevel: 0, worldPos: {x: 2, y: 0}}
-//                'demo'
-                'shadow-ingame'
+                'demo'
+//                'shadow-ingame'
             );
         }
     });
@@ -1217,11 +1217,10 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
                 MAX_POS
             );
 
-            // TODO: images
             const bgConfig = new BackgroundPane.Config({id: 'bgWithMoon', color: '#607080', images: [
+                    {image: resource.image['moon.png'], x: 220, y: 18},
                     {image: resource.image['beastShipSmall.png'], x: -10, y: 25},
-                    {image: resource.image['beastShipBig.png'], x: -10, y: 25},
-                    {image: resource.image['moon.png'], x: 220, y: 18}
+                    {image: resource.image['beastShipBig.png'], x: -10, y: 25}
             ]});
             const colorAndMoonPane = new BackgroundPane(bgConfig);
 
@@ -1496,29 +1495,29 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 // TODO: remove!
 
-                this.activeResource = undefined;
-                this.openEditorMode();
+                // this.activeResource = undefined;
+                // this.openEditorMode();
 
                 beastSpritePane.updateFrames();
 
                 let pos;
                 if (shipTimer % 4 === 0) {
-                    pos = colorAndMoonPane.getImagePosition(1);
+                    pos = colorAndMoonPane.getImagePosition(2);
                     if (pos.x === 320) {
                         pos.x = -150;
                     } else {
                         pos.x += 1;
                     }
-                    colorAndMoonPane.setImagePosition(1, pos.x, pos.y);
+                    colorAndMoonPane.setImagePosition(2, pos.x, pos.y);
                 }
                 if (shipTimer % 8 === 0) {
-                    pos = colorAndMoonPane.getImagePosition(0);
+                    pos = colorAndMoonPane.getImagePosition(1);
                     if (pos.x === -30) {
                         pos.x = 320;
                     } else {
                         pos.x -= 1;
                     }
-                    colorAndMoonPane.setImagePosition(0, pos.x, pos.y);
+                    colorAndMoonPane.setImagePosition(1, pos.x, pos.y);
                 }
                 shipTimer++;
             });
@@ -4706,8 +4705,8 @@ new Game(320, 224, {zoom: 2, debug: false}, function () {
 
                 // TODO: remove!
 
-               this.activeResource = undefined;
-                this.openEditorMode();
+                // this.activeResource = undefined;
+                // this.openEditorMode();
 
                 if (inputController.hasInput('back')) {
                     this.gotoScreen('demo');
