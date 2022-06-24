@@ -280,6 +280,12 @@ function EntityStackSections({ id, sectionProps, detailProps, active, children, 
     )
 }
 
+/*
+
+
+
+
+ */
 function FlexStackInner({
         zoom, setZoom, minZoom, maxZoom, setMaxZoom,
         varHeight, fixHeight = 0,
@@ -294,17 +300,25 @@ function FlexStackInner({
     const gap = defaultPaddingPx;
 
     const getFlexPropsForDim = (width, height) => {
+        // der maximal mögliche Zoom von varHeight, der in height möglich ist
         let maxAvailZoom = height / varHeight;
         if (!scaling) {
+            // kein scaling erlaubt? dann entferne nachkomma-stellen
             maxAvailZoom = Math.floor(maxAvailZoom);
         }
         if (props.maxAvailZoom) {
+            // wurde ein maximal möglicher Zoom vorgegeben? dann nutze diesen als obere schranke
             maxAvailZoom = Math.min(maxAvailZoom, props.maxAvailZoom);
         }
+        // falls ein minZoom gegeben ist und dieser unterschritten wurde, steige aus
         if (minZoom && maxAvailZoom < minZoom) return null;
 
+        // falls auto-modus: setze zoom auf berechneten maxAvailZoom, ansonsten schränke den
+        // aktuellen zoom ein durch minZoom und maxAvailZoom
         const newZoom = clamp(minZoom, auto ? maxAvailZoom : zoom, maxAvailZoom);
+        // berechne elemWidth auf Grundlage des neuen Zooms und der var- und fixWidth
         const elemWidth = clamp(minWidth, newZoom * varWidth + fixWidth);
+        // wieviele Elemente von diesen passen nun in die gegebene Breite (und ggf. Schranke)?
         const newPage = clamp(1, Math.floor( width / (elemWidth + gap)), maxPage);
 
         return {
@@ -392,9 +406,11 @@ function EntityManager({
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
 
-    const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
+    const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } =
+        useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
     const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
-    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
+    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } =
+        useFilterPipelineModal('Apply Filters...');
     const doAction = eContext && undo !== false ? eContext.doAction : action => action();
 
     let [ posRaw, setPos ] = useState(props.pos !== undefined ? props.pos : 0);

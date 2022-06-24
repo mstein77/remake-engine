@@ -2324,15 +2324,15 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
         <>
             <Stack vertical>
                 {!readOnly && value &&
-                <ButtonStack buttons={buttons} gaps="1" />
+                    <ButtonStack buttons={buttons} gaps="1" />
                 }
                 {value &&
-                <Block padded onLeftClick={editBitmap}>
-                    <Canvas width={width} height={height} render={render} border="1" />
-                </Block>
+                    <Block padded onLeftClick={editBitmap}>
+                        <Canvas width={width} height={height} render={render} border="1" />
+                    </Block>
                 }
                 {!readOnly && !value && empty &&
-                <Button name="add" padded="h" onClick={setEmptyImage} />
+                    <Button name="add" padded="h" onClick={setEmptyImage} />
                 }
             </Stack>
             {EditBitmapModal}

@@ -6,6 +6,7 @@ import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../helpe
 import { MainEditor } from "../editors/MainEditor";
 import { ScreenEditor } from "../editors/ScreenEditor";
 import { PocEditor } from "../editors/PocEditor";
+import {BackgroundPaneEditor} from "../editors/BackgroundPaneEditor";
 
 function EditorApp(props) {
     const [ ready, setReady ] = useState(false);
@@ -142,7 +143,20 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 model.blocks = resource.blocks;
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <TextPaneEditor resource={resource} model={model}/>
+                return <TextPaneEditor resource={resource} model={model} />
+            }
+        },
+
+        'BackgroundPane': {
+            getContent: params => {
+                const resource = resources[params.id];
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                const model = getJsonModelOfInstance(resource.data);
+                // model.blocks = resource.blocks;
+                const tree = getResourceTreeForJsonModel(resource.cls, model);
+                return <BackgroundPaneEditor resource={resource} model={model} />
             }
         },
 
