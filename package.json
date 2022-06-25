@@ -6,9 +6,9 @@
   "scripts": {
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
     "start": "node server.js",
-    "dev": "webpack -p --config webpack.dev.js && nodemon server.js",
+    "dev": "webpack --config webpack.dev.js && nodemon server.js",
     "dev-old": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
-    "build": "webpack -p --config webpack.prod.js",
+    "build": "webpack --config webpack.prod.js",
     "test": "mocha"
   },
   "engines": {
