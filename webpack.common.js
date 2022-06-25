@@ -1,4 +1,5 @@
 const path = require('path');
+const { DefinePlugin } = require('webpack');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
@@ -36,6 +37,9 @@ module.exports = {
             template: __dirname + "/src/public/index.html",
             inject: 'body',
             title: 'Production'
+        }),
+        new DefinePlugin({
+            BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
         })
     ]
 };

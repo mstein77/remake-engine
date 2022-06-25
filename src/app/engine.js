@@ -1901,7 +1901,7 @@ class Game {
         }
         Game.instance = this;
         SM = new StorageManager(localStorage);
-        RL = new ResourceLoader(new BackEndFetcher('http://localhost:8080/'), SM);
+        RL = new ResourceLoader(new BackEndFetcher(BASE_URL + '/'), SM);
 
         this.id = 'TODO';
         this.width = width;
