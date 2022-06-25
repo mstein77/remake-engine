@@ -3412,7 +3412,6 @@ class BackgroundPaneConfig extends Config {
     }
 
     addRebuildProps(obj, deep, base) {
-        d('REBUILD', deep);
         obj.color = base.color;
         const images = [];
         let i = 0;

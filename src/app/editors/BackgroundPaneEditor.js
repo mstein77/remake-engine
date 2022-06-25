@@ -1,31 +1,12 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import {
-    Button,
-    Color,
-    ImageProp,
-    TupleProp,
-    KeyInput,
-    Number,
-    Checkbox,
-    EntityProp,
-    BitmapProp
-} from "../components/FormComponents";
+import { Color, TupleProp, Number, Checkbox, BitmapProp } from "../components/FormComponents";
 import { EntityStackSections } from "../components/EntityComponents";
-import {
-    CenterInfo,
-    Section,
-    Canvas,
-    EditorSection,
-    PropertyGrid,
-    useComponentUpdate,
-    WindowContext,
-    EditorContext, Toolbar, useUpdateOnEntityIndexChanges
-} from "../components/BasicComponents";
+import { CenterInfo, Section, Canvas, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, Toolbar, useUpdateOnEntityIndexChanges } from "../components/BasicComponents";
 import { ImageBlockIndex } from "../classes/EntityIndex";
 import { useExportModal } from "../components/EditorComponents";
 import { Stack, Block, Overlays, Overlay, DIR } from '../components/LayoutComponents';
-import { d, drawCanvasToAvail } from "../helper/helper";
-import { EntityManager, EntityStack, EntityPicker } from "../components/EntityComponents";
+import { d } from "../helper/helper";
+import { EntityPicker } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 
 function BackgroundPreview({ model, imageIndex, width, height, active, setActive, fieldProps }) {
@@ -224,9 +205,22 @@ function ImageStack({ imageIndex, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);
     useUpdateOnEntityIndexChanges(imageIndex);
 
-    const editImage = () => {};
     const newImage = () => {};
-    const deleteImage = () => {};
+
+    const deleteImage = ({ active }) => {
+        const index = active;
+        const undoImage = imageIndex.getEntityObject(index);
+
+        eContext.doAction(
+            () => {
+                imageIndex.deleteEntity(index);
+            },
+            () => {
+                imageIndex.setEntityObject(undoImage);
+            }
+        );
+        imageIndex.notify()
+    };
 
     const currImage = active === null ? null : imageIndex.getEntityObject(active);
 
@@ -257,7 +251,6 @@ function ImageStack({ imageIndex, active, setActive, fieldProps }) {
             getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
             active={active} setActive={setActive}
             deselect
-            editOp={editImage}
             addOp={newImage} deleteOp={deleteImage} undo
             emptyText="Add new Image"
         >
