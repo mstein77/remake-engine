@@ -73,6 +73,10 @@ function addPaddedCls(cls, padded) {
 
 function getFlatChildren(children, result = []) {
     if (children) {
+        if (!Array.isArray(children)) {
+            result.push(children);
+            return result;
+        }
         for(let child of children) {
             if (!child) continue; // TODO check === '' || child === null || child === undefined) continue;
 
@@ -295,7 +299,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
     } else {
         dimCls.push('wrap-normal');
     }
-    let childText = '';
+    const childTextRef = useRef(null);
     if (doShorten) {
         const dimProp = verticalText ? 'Height' : 'Width';
         const mouseOver = () => {
@@ -315,12 +319,13 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
         };
 
         const mouseLeave = () => {
+            childTextRef.current = null;
             setShowTooltip(false);
             setStart(null);
         };
         children = <span onMouseOver={mouseOver} onMouseLeave={mouseLeave}>{children}</span>;
-        if (ref.current) {
-            childText = ref.current.textContent;
+        if (ref.current && !childTextRef.current) {
+            childTextRef.current = ref.current.textContent;
         }
     }
     if (showTooltip) {
@@ -355,7 +360,7 @@ const Block = React.forwardRef(({ children, center, centerItems, hotKeys, area, 
     const dimDiv = (
         <div { ...dimAttr }  className={dimCls.join(' ')} style={dimStyle}>
             {children}
-            {showTooltip && <Tooltip>{childText}</Tooltip>}
+            {showTooltip && <Tooltip>{childTextRef.current}</Tooltip>}
         </div>
     );
 

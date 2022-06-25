@@ -1357,6 +1357,14 @@ class Config {
         return value;
     }
 
+    validateColor(value) {
+        this.validateString(value);
+        if (value[0] !== '#') {
+            throw Error('Must start with #')
+        }
+        return value
+    }
+
     validateConfigs(config, values) {
         if (values === undefined) {
             throw Error('Undefined value');
@@ -1612,11 +1620,11 @@ class TextBlockConfig extends Config {
     }
 
     setX(value) {
-        this.x = this.validateInt(value);
+        this.x = this.validateInt(value, this.getFieldProp('x'));
     }
 
     setY(value) {
-        this.y = this.validateInt(value);
+        this.y = this.validateInt(value, this.getFieldProp('y'));
     }
 
     setLineSpacing(value) {
@@ -2120,7 +2128,10 @@ class Game {
         RL.loadPermanentResources().then(() => {
             this.getDomElem('game').style.display = 'none';
             this.getDomElem('editor').style.display = 'block';
-            this.editor = new gameEditor.GameEditor(this, this.activeResource)
+            // TODO crap
+            const stack = this.activeResource;
+            this.activeResource = undefined;
+            this.editor = new gameEditor.GameEditor(this, stack)
         });
     }
 
@@ -2166,13 +2177,13 @@ class Game {
                                     dim: pane.viewPortDim,
                                     blocks
                                 });
-                        } else if (pane instanceof ColorPane) {
+                        } else if (pane instanceof BackgroundPane) {
                             resources.push({
-                                type: 'ColorPane',
+                                type: 'BackgroundPane',
                                 id: pane.id,
                                 pane,
-                                config: ColorPaneConfig,
-                                cls: ColorPane,
+                                config: BackgroundPaneConfig,
+                                cls: BackgroundPane,
                                 elem: pane.getPreview(),
                                 data: pane.config,
                                 dim: pane.viewPortDim,
@@ -3330,10 +3341,110 @@ class CanvasPane {
 
 }
 
-class ColorPaneConfig extends Config {
+class BackgroundPaneConfig extends Config {
+
+    isEditable() {
+        return true;
+    }
+
+    getFieldProps() {
+        return {
+            x: {min: -9999, max: 9999},
+            y: {min: -9999, max: 9999}
+        };
+    }
+
+    getDefaults() {
+        return {
+            color: '#000000',
+            images: []
+        }
+    }
+
+    setColor(value) {
+        this.color = this.validateColor(value);
+    }
+
+    setImages(values) {
+        this.images = this.validateImgObjects(values)
+    }
+
+    validateImgObject(value) {
+        this.validateObject(value);
+        const {image, x, y} = value;
+        this.validateImageResource(image);
+        this.validateInt(x);
+        this.validateInt(y);
+        return {image, x, y}
+    }
+
+    validateImgObjects(values) {
+        this.validateArray(values);
+        for (let value of values) {
+            this.validateImgObject(value);
+        }
+        return values
+    }
+
+    addImage(image, x = 0, y = 0) {
+        this.images.push({image, x, y});
+    }
+
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.color = this.color;
+        const imgResources = [];
+        const rawImages = [];
+        const imgPos = [];
+        const imgElems = [];
+        for (let {image, x, y} of this.images) {
+            imgResources.push(image);
+            rawImages.push(image.getDataUrl());
+            imgPos.push({x, y});
+            imgElems.push(image.getImage());
+        }
+        obj.imgResources = imgResources;
+        obj.rawImages = rawImages;
+        obj.imgPos = imgPos;
+        obj.imgElems = imgElems;
+
+        return obj;
+    }
+
+    addRebuildProps(obj, deep, base) {
+        obj.color = base.color;
+        const images = [];
+        let i = 0;
+        while (i < base.imgResources.length) {
+            images.push({
+                image: deep ? RL.makeImageResource(base.imgResources[i].elem, base.imgResources[i].id) : base.imgResources[i].id,
+                x: base.imgPos[i].x,
+                y: base.imgPos[i].y
+            });
+            i++;
+        }
+        obj.images = images;
+        return obj
+    }
+
+    getSubResources() {
+        const result = [];
+        for (let item of this.images) {
+            result.push({id: item.image.id, type: 'image', data: item.image})
+        }
+        return result;
+    }
 }
-class ColorPane {
-    constructor(color) {
+
+class BackgroundPane {
+
+    constructor(input) {
+        const config = getConfigFromInput(BackgroundPane.Config, input);
+        config.applyTo(this);
+        this.config = config;
+    }
+
+    constructorOld(color) {
         this.color = color;
         this.images = [];
         this.imgPos = [];
@@ -3374,9 +3485,9 @@ class ColorPane {
 
     render() {
         this.container.setBackgroundColor(this.color);
-        if (this.images.length > 0) {
-            this.container.setBackgroundImages(this.images);
-            this.container.setBackgroundPositions(this.imgPos);
+        if (this.rawImages.length > 0) {
+            this.container.setBackgroundImages([ ...this.rawImages ].reverse());
+            this.container.setBackgroundPositions( [ ...this.imgPos ].reverse());
         }
         this.dirty = false;
     }
@@ -3387,9 +3498,9 @@ class ColorPane {
         ctx.fillStyle = this.color;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        for (let i = 0; i < this.imgElems.length; i++) {
+        for (let i = 0; i < this.rawImages.length; i++) {
             const img = this.imgElems[i];
-            const {x, y} = this.imgPos[i];
+            const { x, y } = this.imgPos[i];
             ctx.drawImage(img, x, y);
         }
         return {
@@ -3401,7 +3512,7 @@ class ColorPane {
         }
     }
 }
-ColorPane.Config = ColorPaneConfig;
+BackgroundPane.Config = BackgroundPaneConfig;
 
 class TextBlock {
     constructor(input) {
@@ -8524,7 +8635,7 @@ module.exports = {
     CanvasPane,
     BitmapScrollPane,
     SpritePane,
-    ColorPane,
+    BackgroundPane,
     TextPane,
     TextBlock,
     PatternPane,

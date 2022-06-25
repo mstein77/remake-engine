@@ -649,3 +649,15 @@ input:invalid {
     -webkit-animation-direction: alternate;
     color: black;
 }
+
+#tmp-resources-warning {
+    padding: 3px;
+    text-align: center;
+    background-color: #000000;
+    color: #d78282;
+    border: 2px solid #CC0000;
+    margin-top: 20px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 600px
+}

@@ -2276,6 +2276,7 @@ class SpriteIndex extends EntityIndex {
     drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
         const sprite = this.model.sprites[this.getEntityValue(index)];
         if (!sprite) {
+            ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             return;
         }
         const pos = sprite.off;
@@ -2932,6 +2933,75 @@ class ImageIndex extends EntityIndex {
     }
 }
 
+class ImageBlockIndex extends EntityIndex {
+
+    constructor(model) {
+        super();
+        this.model = model;
+        this.items = [];
+        for (let i = 0; i < model.imgPos.length; i++) {
+            this.items.push(model.imgResources[i].id);
+        }
+        this.setSizes()
+    }
+
+    getEntityProps() {
+        return [ ...super.getEntityProps(), 'width', 'height', 'x', 'y', 'image' ];
+    }
+
+    getEntityPropValue(index, prop) {
+        if (['width', 'height'].includes(prop)) {
+            const img = this.model.imgResources[index].canvas;
+            return img ? img[prop] : 0
+        }
+        if (['x', 'y'].includes(prop)) {
+            return this.model.imgPos[index][prop]
+        }
+        if (prop === 'image') {
+            return this.model.imgResources[index].canvas.elem
+        }
+        return super.getEntityPropValue(index, prop)
+    }
+
+    setEntityPropValue(index, prop, value) {
+        if (['x', 'y'].includes(prop)) {
+            this.model.imgPos[index][prop] = value;
+        }
+    }
+
+    getSizeX() {
+        return this.sizeX;
+    }
+
+    getSizeY() {
+        return this.sizeY;
+    }
+
+    setSizes() {
+        this.sizeX = 100;
+        this.sizeY = 100;
+    }
+
+    drawEntity(ctx, pos, x, y, zoomOrAvail = 1) {
+        const props = this.getEntityObject(pos);
+        let width = props.width;
+        let height = props.height;
+
+        if (typeof zoomOrAvail !== 'object') {
+            width *= zoomOrAvail;
+            height *= zoomOrAvail;
+        } else {
+            width = zoomOrAvail.width;
+            height = zoomOrAvail.height;
+        }
+        const dim = {x: width, y: height};
+        ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
+        x += Math.max((width >> 1) - (props.width >> 1), 0);
+        y += Math.max((height >> 1) - (props.height >> 1), 0);
+        drawCanvasToAvail(props.image, ctx, x, y, zoomOrAvail, dim, {x: 0, y: 0});
+    }
+}
+
 export {
     SimpleIndex,
     ColorIndex,
@@ -2947,5 +3017,6 @@ export {
     FilterIndex,
     TextBlockIndex,
     EventIndex,
-    ImageIndex
+    ImageIndex,
+    ImageBlockIndex
 };

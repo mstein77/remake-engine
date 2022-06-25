@@ -3,10 +3,10 @@ import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm,
     PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext
 } from "./BasicComponents";
-import { d, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer } from "../helper/helper";
+import { d, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath } from "../helper/helper";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { DIR, Block, Stack } from "./LayoutComponents";
-import { EntityStack, EntityStackSections, EntityPicker, EntityManager } from "./EntityComponents";
+import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents";
 import { FlexGrid, BaseGrid, PictureCell } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
@@ -865,7 +865,7 @@ function useExportModal({ model, resource, update, name }) {
         ).then(
             response => {
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
-                gameRef.reloadScreen(1);
+                gameRef.reloadScreen(wContext.registry('callStack'));
             }
         ).catch(err => {
             console.error(err);
@@ -1341,6 +1341,137 @@ function useFilterPipelineModal(name = 'Filter') {
     }, [FilterModal.props])
 }
 
+function FullTree({ ...props }) {
+
+    const { defaultPaddingPx, fmDefaultMedium, fmDefaultSmall } = useCssProps('defaultPaddingPx', 'fmDefaultMedium', 'fmDefaultSmall');
+    const nodeHeight = 3 * defaultPaddingPx + fmDefaultMedium + fmDefaultSmall;
+
+    const render = ({ node }) => {
+        const model = node.model;
+        return (
+            <Stack vertical padded={DIR.RIGHT|DIR.TOP} full="h">
+                <Block full="h">
+                    <Stack full="h">
+                        <Block full="h" shorten>{ucfirst(model.type)}</Block>
+                        <Block><Kbd className="less small" value={model.width + 'x' + model.height} /></Block>
+                    </Stack>
+                </Block>
+                <Stack full="h" gaps className="big">
+                    {node.hidden > 0 && <Block padded="h" className="active-bg active-color button-border-radius">{node.hidden}</Block>}
+                    <Block className="big more" shorten>{model.name}</Block>
+                </Stack>
+            </Stack>
+        );
+    }
+    return (
+        <TreeStack render={render} nodeHeight={nodeHeight} { ...props } />
+    )
+}
+
+const transitionDuration = 30;
+
+function useContentSwitcher(contentProvider, defStack) {
+    const wContext = useContext(WindowContext);
+
+    const update = useComponentUpdate();
+    const [ level, setLevel ] = useState(defStack !== undefined ? defStack.length - 1 : 0);
+    const divRef = useRef(null);
+    const registry = useRef(null);
+    if (registry.current === null) {
+        const callStack = defStack === undefined ? [
+            {key: 'screen', params: {}}
+        ] : [ ...defStack ];
+
+        const getBlock = (level, item) => {
+            const obj = contentProvider[item.key];
+            const content = obj ? obj.getContent(item.params) : <CenterInfo>Editor not yet available!</CenterInfo>;
+            return (
+                <Block key={level + ' ' + item.key}  width="100%" height="100%">
+                    {content}
+                </Block>
+            )
+        };
+        const lastIndex = callStack.length - 1;
+        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true};
+    }
+    registry.current.update = update;
+
+    wContext.register('stateBackMethod', () => {
+        const { callStack, update } = registry.current;
+        callStack.pop();
+        update();
+    });
+
+    wContext.register('stateForwardMethod', (key, params) => {
+        const { callStack, update } = registry.current;
+        callStack.push({key, params});
+        update();
+    });
+
+    let startTransition = false;
+    const { callStack, blocks, getBlock } = registry.current;
+    wContext.register('callStack', callStack);
+
+    const lastLevel = callStack.length - 1;
+    const cls = ['stack-h transparent nowrap'];
+
+    wContext.setIsTransitioning(level !== lastLevel);
+    if (level !== lastLevel) {
+        cls.push('no-events');
+        const lastItem = callStack[lastLevel];
+        const newBlock = getBlock(lastLevel, lastItem);
+        if (level > lastLevel) {
+            // we go back to the parent
+            // this means we slide the new block in from the left side
+            blocks.unshift(newBlock);
+            registry.current.subDir = false;
+        } else {
+            blocks.push(newBlock);
+            registry.current.subDir = true;
+        }
+        startTransition = true;
+    } else if (blocks.length > 1) {
+        if (registry.current.subDir) {
+            blocks.shift();
+        } else {
+            // remove last block
+            blocks.pop();
+        }
+    }
+
+    useEffect(() => {
+        if (level === lastLevel) return;
+
+        const elem = divRef.current;
+        const { subDir } = registry.current;
+        const path = !wContext.editorConfig.uiAnimations ? [0] : !subDir ?
+            getCosinePath(elem.clientWidth, 0, transitionDuration) :
+            getCosinePath(0, elem.clientWidth, transitionDuration);
+        let pointer = path.length - 1;
+
+        const doTransition = () => {
+            elem.scrollTo(Math.round(path[pointer]), 0);
+            if (pointer > 0) {
+                pointer--;
+                requestAnimationFrame(doTransition)
+            } else {
+                setLevel(registry.current.callStack.length - 1);
+            }
+        }
+        requestAnimationFrame(doTransition);
+    }, [startTransition]);
+
+    return {
+        isRoot: level === 0,
+        hasTransitioned: level === lastLevel,
+        ContentSwitcher: (
+            <Block ref={divRef} full className={cls.join(' ')}>
+                {[ ...blocks ]}
+            </Block>
+        )
+    }
+}
+
 export {
     MarkerMoveGrid,
     ResizeProps,
@@ -1349,9 +1480,11 @@ export {
     BitmapSelectionGrid,
     NameDialog,
     AnimationManager,
+    useContentSwitcher,
     useExportModal,
     useConfirmDialog,
     useFilterPipelineModal,
     useBitmapSelectionModal,
-    useEditBitmapModal
+    useEditBitmapModal,
+    FullTree
 }

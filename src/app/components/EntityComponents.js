@@ -1,10 +1,31 @@
-import React, { useContext, useMemo, useRef, useState } from "react";
+import React, { Fragment, useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, clamp, getEmptyImageData, ucfirst } from "../helper/helper";
-import { Button, Input, Number, Checkbox } from "./FormComponents";
-import { EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon,
-    AvailContextProvider, Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
-    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useComponentUpdate, useFocusManager
+import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without } from "../helper/helper";
+import {Button, Input, Number, Checkbox, Radio, Select} from "./FormComponents";
+import {
+    EditorCtx,
+    useAnimationPlayers,
+    CenterInfo,
+    EditorContext,
+    ButtonStack,
+    Section,
+    Canvas,
+    Kbd,
+    Icon,
+    AvailContextProvider,
+    Toolbar,
+    ToolGroup,
+    ScrollArea,
+    BackgroundControl,
+    useUpdateOnEntityIndexChanges,
+    useCallAfterwards,
+    useCachedState,
+    AvailContext,
+    WindowContext,
+    useCssProps,
+    UndoRedoButtons,
+    useFocusManager,
+    useMultiSelector, useExclusiveSelector, Separator
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
@@ -259,6 +280,12 @@ function EntityStackSections({ id, sectionProps, detailProps, active, children, 
     )
 }
 
+/*
+
+
+
+
+ */
 function FlexStackInner({
         zoom, setZoom, minZoom, maxZoom, setMaxZoom,
         varHeight, fixHeight = 0,
@@ -273,17 +300,25 @@ function FlexStackInner({
     const gap = defaultPaddingPx;
 
     const getFlexPropsForDim = (width, height) => {
+        // der maximal mögliche Zoom von varHeight, der in height möglich ist
         let maxAvailZoom = height / varHeight;
         if (!scaling) {
+            // kein scaling erlaubt? dann entferne nachkomma-stellen
             maxAvailZoom = Math.floor(maxAvailZoom);
         }
         if (props.maxAvailZoom) {
+            // wurde ein maximal möglicher Zoom vorgegeben? dann nutze diesen als obere schranke
             maxAvailZoom = Math.min(maxAvailZoom, props.maxAvailZoom);
         }
+        // falls ein minZoom gegeben ist und dieser unterschritten wurde, steige aus
         if (minZoom && maxAvailZoom < minZoom) return null;
 
+        // falls auto-modus: setze zoom auf berechneten maxAvailZoom, ansonsten schränke den
+        // aktuellen zoom ein durch minZoom und maxAvailZoom
         const newZoom = clamp(minZoom, auto ? maxAvailZoom : zoom, maxAvailZoom);
+        // berechne elemWidth auf Grundlage des neuen Zooms und der var- und fixWidth
         const elemWidth = clamp(minWidth, newZoom * varWidth + fixWidth);
+        // wieviele Elemente von diesen passen nun in die gegebene Breite (und ggf. Schranke)?
         const newPage = clamp(1, Math.floor( width / (elemWidth + gap)), maxPage);
 
         return {
@@ -370,9 +405,12 @@ function EntityManager({
     }) {
     const eContext = useContext(EditorContext);
     const wContext = useContext(WindowContext);
-    const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } = useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
+
+    const { defaultPaddingPx, buttonBorderWidthPx, buttonMinPaddingPx, fmButton } =
+        useCssProps('defaultPaddingPx', 'buttonBorderWidthPx', 'buttonMinPaddingPx', 'fmButton');
     const minHeightToolbar = 2 * (defaultPaddingPx + buttonBorderWidthPx + buttonMinPaddingPx) + fmButton;
-    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal('Apply Filters...');
+    const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } =
+        useFilterPipelineModal('Apply Filters...');
     const doAction = eContext && undo !== false ? eContext.doAction : action => action();
 
     let [ posRaw, setPos ] = useState(props.pos !== undefined ? props.pos : 0);
@@ -390,7 +428,10 @@ function EntityManager({
         setPage = props.setPage;
         page = props.page
     }
-    const [ marked, setMarked ] = useState([]);
+    const selector = useMultiSelector({});
+    const marked = selector.selection;
+    const setMarked = selector.setSelection;
+
     const [ filter, setFilterRaw ] = useState('');
     const setFilter = value => {
         setPos(0);
@@ -434,19 +475,13 @@ function EntityManager({
     const avail = sizeY * zoom;
     const zoomOrAvail = auto ? {width: avail, height: avail} : zoom;
 
+    const { attr, itemAttr } = useFocusManager({
+        selector, count: view.count, page, handleSpace: true, pos, setPos,
+        dblAction: readOnly || !onDoubleClick ? null : index => onDoubleClick(index)
+    });
     if (!renderTitle) {
         renderTitle = value => <Block shorten>{value}</Block>
     }
-    const toggleMarker = index => {
-        const newMarked = [ ...marked ];
-        if (marked.includes(index)) {
-            newMarked.splice(marked.indexOf(index), 1);
-        } else {
-            newMarked.push(index);
-        }
-        setMarked(newMarked);
-    };
-
     const bottomHeight = footerHeight ? footerHeight + padding : padding;
 
     const render = index => {
@@ -457,6 +492,8 @@ function EntityManager({
         const itemRender = ctx => {
             entityIndex.drawEntity(ctx, index, 0, 0, zoomOrAvail, players);
         };
+        const { onLeftClick, ...stackAttr } = itemAttr(index);
+
         return (
             <Stack vertical full>
                 <Stack
@@ -465,9 +502,11 @@ function EntityManager({
                     className={cls.join(' ')}
                     border="1"
                     cursor="pointer"
-                    onDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
+                    xonDoubleClick={readOnly || !onDoubleClick ? null : () => onDoubleClick(index)}
                     onRightClick={readOnly || !onRightClick ? null : () => onRightClick(index)}
-                    onLeftClick={readOnly ? null : () => toggleMarker(index)}>
+                    onLeftClick={readOnly ? null : () => {selector.select(index); onLeftClick()}}
+                    { ...stackAttr }
+                >
                     <Block full="h">
                         {renderTitle(index)}
                     </Block>
@@ -504,7 +543,7 @@ function EntityManager({
                     () => entityIndex.deleteEntities(doMarked),
                     () => entityIndex.setEntityObjects(undoEntities)
                 );
-                setMarked([])
+                selector.clearSelection()
             },
             clear: ({ marked, doAction, entityIndex }) => {
                 const indices = [ ...marked ];
@@ -525,7 +564,7 @@ function EntityManager({
                         }
                     }
                 );
-                setMarked([])
+                selector.clearSelection()
             },
             swap: ({ marked, doAction, entityIndex }) => {
                 const first = marked[0];
@@ -586,7 +625,7 @@ function EntityManager({
                 const bitmap = entityIndex.getEntityPropValue(marked[0], 'image');
                 const selection = new CellSelection('bitmap', [[bitmap]]);
                 eContext.setSelection(selection);
-                setMarked([])
+                selector.clearSelection()
             },
             paste: ({ marked, eContext, entityIndex }) => {
                 const indices = [ ...marked ];
@@ -602,7 +641,7 @@ function EntityManager({
                         entityIndex.setEntityObjects(undoObjects, true);
                     }
                 );
-                setMarked([])
+                selector.clearSelection()
             }
         }
     }, []);
@@ -643,22 +682,14 @@ function EntityManager({
     const hotkeys = { ...sideHotkeys, ...markedHotkeys };
 
     const markerButtons = [
-        {icon: 'clear',  disabled: marked.length === 0, onClick: () => setMarked([])},
+        {icon: 'clear',  disabled: marked.length === 0, onClick: () => selector.clearSelection()},
         {icon: 'done_all',
             onClick: () => setMarked(
                 marked.length < entityIndex.getLength() ?
                     entityIndex.getAllIndices() : []
             )
         },
-        {icon: 'flaky', onClick: () => {
-                const newMarked = [];
-                for (let index of entityIndex.getAllIndices()) {
-                    if (!marked.includes(index)) {
-                        newMarked.push(index);
-                    }
-                }
-                setMarked(newMarked)
-        }}
+        {icon: 'flaky', onClick: () => selector.invertSelection(entityIndex.getAllIndices())}
     ];
     bottomItems.selection = (
         <Stack gaps key="selection" className={marked.length ? 'active-bg-text' : ''}>
@@ -701,9 +732,9 @@ function EntityManager({
             </Stack>
         );
     }
-    const groups = [];
+    const toolGroups = [];
     for(let [key, elem] of Object.entries(bottomItems)) {
-        groups.push(<ToolGroup key={key}>{elem}</ToolGroup>);
+        toolGroups.push(<ToolGroup key={key}>{elem}</ToolGroup>);
     }
 
     return (
@@ -735,7 +766,7 @@ function EntityManager({
                             </ToolGroup>
                             <BackgroundControl />
                         </Toolbar>
-                        <Block full>
+                        <Block full { ...attr }>
                             {
                                 view.count === 0 ?
                                     <CenterInfo>{'No items found matching "' + filter + '"!'}</CenterInfo> :
@@ -753,7 +784,7 @@ function EntityManager({
                         </Block>
                         {!readOnly &&
                             <Toolbar minHeight={minHeightToolbar}>
-                                {groups}
+                                {toolGroups}
                             </Toolbar>
                         }
                     </Stack>
@@ -917,56 +948,50 @@ function getActionButtonsAndHotkeys(actions, props, paramsRef) {
     }
 }
 
-
-/**
- * Usage:
- *     const [ treeState, setTreeState ] = useState(null);
- *                                // or: = useCachedState('bla')
- *
- *     const tree = useMemo(() => new TreeView(nodes, setTreeState, treeState));
- *
- *  Wäre es vorteilhafter, wenn wir den state NUR initial in den TreeView geben und danach komplett
- *  intern verwalten? Würde einen stateListener erfordern für updates:
- *
- *     const tree = useMemo(() => new TreeView(nodes, treeState));
- *     tree.setUpdater(update)
- *
- *  PRO: der Tree-State bringt ausserhalb der Klasse rein garnichts
- *
- *  if (!tree.visible(active)) {
- *      const newActive = tree.getFallbackNode(active);
- *      callAfterwards(setActive, newActive);
- *  }
- *
- *
- *  Filter-Path:
- *
- *  Model-Changes:
- *
- *  Virtualisierung:
- *
- *  Selection:
- *
- *  Filterung:
- *    const [ filterValue, setFilterValue ] = useState();
- *    const filter = useMemo(node => {
- *
- *    });
- *    tree.setFilter(filter, filterValue);
- *--------------
- *  Rendering:
- */
 class TreeView {
 
     constructor(model, setter) {
         this.model = model;
         this.setter = setter;
-        this.reset()
+        this.filter = null;
+        this.showSubTree = true;
+        this.types = {};
+        this.groups = [];
+        this.id2index = new Map();
+
+        let currLevel = null;
+        const locked = new Map();
+        this.locker = {
+            update: level => {
+                currLevel = level;
+                for (let [key, keyLevel] of locked.entries()) {
+                    if (level <= keyLevel) locked.delete(key)
+                }
+            },
+            lock: key => {
+                locked.set(key, currLevel)
+            },
+            clear: () => locked.clear(),
+            getLockDist: key => currLevel - locked.get(key),
+            isLocked: key => locked.has(key)
+        };
+        this.reset();
+
+    }
+
+    getTypesInfo() {
+        return [
+//            {name: 'Screen', total: 5, marked: 2, markedAll: 5, hidden: 0, hiddenAll: 0},
+            {name: 'Areas', total: 5, marked: 2, markedAll: 5, hidden: 0, hiddenAll: 0},
+            {name: 'Panes', total: 5, marked: 2, markedAll: 5, hidden: 0, hiddenAll: 0},
+        ];
     }
 
     reset() {
         this.view = null;
+        this.levelZeros = null;
         this.indices = [];
+        this.map = {};
     }
 
     setState(state) {
@@ -974,8 +999,21 @@ class TreeView {
         this.reset();
     }
 
+    setGroups(groups) {
+        this.groups = groups;
+    }
+
+    setShowSubTree(value) {
+        this.showSubTree = value
+    }
+
     setNodeStateChangeListener(listener) {
         this.nodeStateChangeListener = listener
+    }
+
+    setFilter(value) {
+        this.reset();
+        this.filter = value
     }
 
     notify() {
@@ -1006,6 +1044,32 @@ class TreeView {
         return this.view
     }
 
+    getParentIndex(index) {
+        const node = this.model[index];
+        const parentLevel = node.level - 1;
+        let curr = index - 1;
+        while (curr >= 0 && this.model[curr].level > parentLevel) {
+            curr--
+        }
+        return curr < 0 ? null : curr;
+    }
+
+    getViewAncestors(values) {
+        const ancestors = {};
+        if (!Array.isArray(values)) values = [values];
+        let found = false;
+        for (let value of values) {
+            if (this.map[value] !== null) continue;
+            let node = value;
+            do {
+                node = this.getParentIndex(node);
+            } while (node !== null && this.map[node] === null);
+            found = true;
+            ancestors[value] = node;
+        }
+        return found ? ancestors : null;
+    }
+
     getIndices() {
         if (this.view === null) {
             this.buildView()
@@ -1013,166 +1077,506 @@ class TreeView {
         return this.indices
     }
 
+    getViewCount() {
+        if (this.levelZeros !== null) {
+            return this.levelZeros
+        }
+        return this.indices.length;
+    }
+
+    getPathNodesProp(path, prop) {
+        const result = [];
+        for(let index of path) {
+            result.push(this.model[index][prop]);
+        }
+        return result;
+    }
+
+    isGroupFiltered(value, index) {
+        if (!this.groups.length) return true;
+
+        for (let group of this.groups) {
+            if (group(value, index)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    getGroupings() {
+        return [
+            {
+                id: '', name: 'All', dynamic: true,
+                exclusive: true, indirect: true,
+                filter: (node, index) => true
+            },
+            {
+                id: 'panes', name: 'Pane', dynamic: true,
+                exclusive: true, indirect: true,
+                filter: node => node.type === 'pane'
+            },
+            {
+                id: 'marked', name: 'Marked', dynamic: true,
+                exclusive: true, indirect: false,
+                filter: () => true
+            }
+        ];
+    }
+
+    getActiveGroupings(activeGroups) {
+        const result = [];
+        const groups = this.getGroupings();
+        for (let group of groups) {
+            if (activeGroups.includes(group.id)) {
+                result.push(group);
+            }
+        }
+        return result;
+    }
+
+    getNodeProps(index, node) {
+        return {
+            id: index,
+            index,
+            type: node.type === 'areas' ? 'area' : node.type,
+            level: node.level,
+            hidden: 0,
+            children: false,
+            leaf: true,
+            connected: {},
+            data: node,
+            closed: this.state[index]
+        };
+    }
+
+    algo(selector, groups, filter) {
+        const locker = this.locker;
+        const levels = [];
+        const nodes = [];
+        const id2index = this.id2index;
+        id2index.clear();
+
+        const connect = (connectLevel, offset = 0) => {
+            if (!connectLevel) return;
+
+            let startIndex = -1;
+            let i = levels.length - 1 + offset;
+            while (i >= 0) {
+                const currLevel = levels[i];
+                if (currLevel === connectLevel) {
+                    startIndex = i;
+                } else if (currLevel < connectLevel) {
+                    break;
+                }
+                i--
+            }
+            if (startIndex !== -1) {
+                for (let i = startIndex; i < (nodes.length + offset - 1); i++) {
+                    nodes[i].connected[connectLevel] = true
+                }
+            }
+        }
+        const directMatching = false;
+
+        const types = ['', 'area', 'pane'];
+        const type2stats = {};
+        for (let type of types) {
+            type2stats[type] = {name: ucfirst(type), total: 0, marked: 0, markedAll: 0, hidden: 0, hiddenAll: 0, matches: 0, matchesAll: 0};
+        }
+        let lastAdd = null;
+        const activeGroups = this.getActiveGroupings(groups);
+        let i = -1;
+        let lastClosed = null;
+        const currPath = [];
+        for (let node of this.model) {
+            i++;
+            let found = false;
+            let indirect = false;
+            const props = this.getNodeProps(i, node);
+            id2index.set(node.id, i);
+
+            const type = (type2stats[props.type] !== undefined) ? props.type : '';
+            const statsType = type2stats[type];
+            while (currPath.length > props.level) currPath.pop();
+            const skipLocked = locker.isLocked('skip');
+            for (let group of activeGroups) {
+                if (!group.filter(node, i)) continue;
+                found = true;
+                if (!skipLocked && group.indirect) indirect = true
+            }
+            locker.update(props.level);
+            let baseAdd = false;
+            if (locker.isLocked('skip')) {
+                props.level = locker.getLockDist('skip');
+                baseAdd = true;
+            } else if (found) {
+                props.level = 0;
+                if (indirect) locker.lock('skip');
+                baseAdd = true;
+            }
+            const isMarked = selector.isSelected(props.id);
+            if (!locker.isLocked('marked') && isMarked) {
+                locker.lock('marked');
+                statsType.marked++;
+                if (!baseAdd) {
+                    statsType.hidden++;
+                    locker.lock('hidden');
+                }
+            }
+            if (baseAdd) {
+                let isMatching = true;
+                if (filter) {
+                    isMatching = filter(props, i);
+                    if (isMatching) statsType.matches++;
+                    if (!locker.isLocked('match')) {
+                        if (isMatching) {
+                            props.level = 0;
+                            locker.lock('match')
+                        }
+                    } else {
+                        props.level = locker.getLockDist('match');
+                        if (!directMatching) isMatching = true;
+                    }
+                }
+                props.path = [ ...currPath ];
+                if (isMatching) {
+                    if (lastAdd && props.level === lastAdd.level + 1) {
+                        lastAdd.children = true;
+                        lastAdd.leaf = false
+                    }
+                    if (!locker.isLocked('state')) {
+                        nodes.push(props);
+                        connect(props.level);
+                        levels.push(props.level);
+                        if (props.closed) {
+                            lastClosed = props;
+                            locker.lock('state')
+                        }
+                    } else {
+                        if (isMarked) lastClosed.hidden++;
+                    }
+                    lastAdd = props;
+                }
+                statsType.total++
+            }
+            if (locker.isLocked('marked')) statsType.markedAll++;
+            if (locker.isLocked('hidden')) statsType.hiddenAll++;
+            if (locker.isLocked('match')) statsType.matchesAll++;
+
+            currPath.push(props.id);
+        }
+        locker.clear();
+
+        i = 0;
+        for(let node of nodes) {
+            let connectLevel = node.level;
+            i++;
+            if (i === nodes.length) {
+                connect(connectLevel, -1);
+            }
+            node.end = !node.connected[node.level];
+        }
+
+        const stats = [];
+        for (let type of types) {
+            stats.push(type2stats[type]);
+        }
+        return {
+            nodes,
+            stats
+        }
+    }
+
+
     buildView() {
         const view = [];
         let curr = 0;
         let level = 0;
-        let closedLevel = null;
         const levels = [];
+        let closedLevel = null;
+        let filterLevel = null;
+        let currPath = [];
+        let levelZeros = 0;
+
+        const connect = (connectLevel, offset = 0) => {
+            if (!connectLevel) return;
+
+            let startIndex = -1;
+            let i = levels.length - 1 + offset;
+            while (i >= 0) {
+                const currLevel = levels[i];
+                if (currLevel === connectLevel) {
+                    startIndex = i;
+                } else if (currLevel < connectLevel) {
+                    break;
+                }
+                i--
+            }
+            if (startIndex !== -1) {
+                for (let i = startIndex; i < (view.length + offset); i++) {
+                    view[i].connected[connectLevel] = true
+                }
+            }
+        }
+        const isFiltered = !!this.filter || this.groups.length;
         const lastIndex = this.model.length - 1;
         while (curr <= lastIndex) {
             const data = this.model[curr];
             const index = curr;
             curr++;
             level = data.level;
-            if (closedLevel !== null) {
-                if (level > closedLevel) {
-                    continue
+            let path = [];
+            while(currPath.length - 1 > level) {
+                currPath.pop();
+            }
+            this.map[index] = null;
+            if (isFiltered && filterLevel !== null) {
+                if (level <= filterLevel) {
+                    filterLevel = null;
                 }
+            }
+            currPath.push(index);
+            if (closedLevel !== null) {
+                if (level > closedLevel) continue;
                 closedLevel = null
             }
+            if (isFiltered && filterLevel === null) {
+                if (!this.isGroupFiltered(data, index)) continue;
+                if (this.filter && !this.filter(data)) continue;
+                path = [ ...currPath ];
+                path.pop();
+                if (this.showSubTree) {
+                    filterLevel = level;
+                }
+            }
+            const relLevel = filterLevel !== null ? level - filterLevel : level;
+            this.map[index] = this.indices.length;
             this.indices.push(index);
             const closed = this.state[index];
             if (closed) {
                 closedLevel = level
             }
-            let startIndex = -1;
-            let i = levels.length - 1;
-            while (i >= 0) {
-                const currLevel = levels[i];
-                if (currLevel === level) {
-                    startIndex = i;
-                } else if (currLevel < level) {
-                    break;
-                }
-                i--
-            }
             const connected = {};
             const leaf = (index === lastIndex || this.model[curr].level <= level);
-            if (startIndex !== -1) {
-                for (let i = startIndex; i < view.length; i++) {
-                    view[i].connected[level] = true
-                }
-            }
-            levels.push(level);
+            if (relLevel === 0) levelZeros++;
+            connect(relLevel);
+            levels.push(relLevel);
             view.push({
                 index,
                 data,
-                level,
+                level: this.showSubTree ? relLevel : 0,
                 connected,
                 closed,
-                leaf
+                leaf,
+                path
             })
         }
+        let i = 0;
         for(let node of view) {
+            let connectLevel = node.level;
+            i++;
+            if (i === view.length) {
+                // node.leaf = true;
+                connect(connectLevel, -1);
+            }
             node.end = !node.connected[node.level];
         }
+        this.levelZeros = !!this.filter ? levelZeros : null;
         this.view = view
     }
 }
 
+function StatsBlock({ name = '', first, length = null, value, text = null, className = '', diff = 0 }) {
+    return (
+        <Stack gaps>
+            {!first && <Block className="less">|</Block>}
+            {name && <Block className={className}>{name}:</Block>}
+            <Stack>
+                <Block center="v" className={value || diff ? "more" : ""}><Kbd value={value} length={length} /></Block>
+                {diff > 0 && <Block center="v" padded="1"><Kbd value={'+' + diff} /></Block>}
+            </Stack>
+            {text && <Block>{text}</Block>}
+        </Stack>
+    )
+}
 
-function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props }) {
+function StatsTag({ type = 'primary', value, lessValue, className }) {
+    const cls = ['button-border-radius', type + '-bg', type + '-color', type + '-border-color'];
+    if (className) cls.push(className)
+    return (
+        <Stack padded="h" border="1" className={cls.join(' ')}>
+            <Block padded="1">{value}</Block>
+            {lessValue && <Block padded="1" className="less">{lessValue}</Block>}
+        </Stack>
+    )
+}
+
+function HoverIconButton({ onMouseDown, closed }) {
+    const wContext = useContext(WindowContext);
+
+    const [ clicked, setClicked ] = useState(false);
+    const cls = ['ghost-bg'];
+    if (clicked) {
+        cls.push('clicked hover-button-fix')
+    } else {
+        cls.push('hover-button')
+    }
+    const click = e => {
+        wContext.startExclusiveMode('toggle', 'pointer');
+        wContext.addEventListener('mouseup', () => {
+            wContext.endExclusiveMode('toggle');
+            setClicked(false)
+        });
+        onMouseDown(e);
+        setClicked(true)
+    }
+    return (
+        <Block center="h" className={cls.join(' ')} cursor="pointer" border="1" onMouseDown={click}><Icon size={12} name={closed ? 'add' : 'remove'} /></Block>
+    )
+}
+
+function TreeStack({ tree, trackId, doubleClickAction, stateChanges, render, nodeHeight, ...props }) {
 
     const tContext = useContext(TrackingContext);
     const keyTrackRef = useRef(null);
 
-    const [ state, setState ] = useState(() => {
-        return new Array(tree.length).fill(false);
-    });
-    const treeView = new TreeView(tree, setState);
-    treeView.setState(state);
-    treeView.setNodeStateChangeListener((index, state) => {
-        props.toggleOp({ active: index })
-    });
+    const [ state, setStateRaw ] = useState([]);
+    const setState = !stateChanges ? setStateRaw : newState => {
+        const changes = {};
+        const same = intersect(state, newState);
+        const toFalse = without(state, same);
+        for (let id of toFalse) changes[id] = false;
+        const toTrue = without(newState, same);
+        for (let id of toTrue) changes[id] = true;
+        stateChanges(changes);
+        setStateRaw(newState);
+    }
+    const [ sorting, setSorting ] = useCachedState(props.cacheLevel, props.cacheId + '.sorting', tree.getDefaultSortId(), 'string');
+    const [ asc, setAsc ] = useCachedState(props.cacheLevel, props.cacheId + '.asc', true, 'bool');
+    const [ filter, setFilter ] = useState('');
+    const [ groups, setGroups ] = useState(props.groups !== undefined ? [ ...props.groups ] : []);
 
     const tracking = useMemo(() => {
         if (!tContext || !trackId) return () => {};
         return tContext.getTracking(trackId)
     }, []);
 
-    let [ active, setActive ] = useState(props.active !== undefined ? props.active : null);
+    const selector = useMultiSelector(
+        {reset: true, selection: props.active, setSelection: props.setActive, default: props.active}
+    );
+    const active = selector.selection;
+    const setActive = selector.setSelection;
+
+    tree.setContext({
+        state, setState,
+        sorting, asc,
+        filter: !filter ? null : node => node.name.toLowerCase().indexOf(filter.toLowerCase()) !== -1,
+        selector,
+        groups
+    });
     const stackRef = useRef(null);
     const paramsRef = useRef(null);
-
-    if (props.setActive) {
-        active = props.active;
-        setActive = props.setActive
-    }
     const keyTracking = !tracking ? () => {} : index => {
         keyTrackRef.current = index;
         if (index !== null) {
-            tracking(0, tree[index].plane)
+            tracking(0, tree.getViewNodeByIndex(index).model.plane)
         }
     };
-    paramsRef.current = { active, node: active === null ? null : tree[active] };
+    const node = [];
+    for (let index of active) {
+        node.push(tree.getModelNodeById(index));
+    }
+    paramsRef.current = { active, node, tree };
 
-    const toggleNode = (index, force = null) => {
-        treeView.toggleNode(index, force);
+    const toggleNode = (id, force = null) => {
+        tree.toggleNodeById(id, force);
     }
     const toggleOp = params => {
         const { active } = params;
-        toggleNode(active)
+        toggleNode(active[0])
     };
     const actions = useMemo(() => {
         return [
-            {id: 'edit', icon: 'edit', can: ({ active }) => active !== null},
+            {id: 'edit', icon: 'edit', can: ({ active }) => active.length === 1},
             {id: 'add', icon: 'add', can: () => false},
             {id: 'delete', icon: 'delete', can: () => false},
-            {id: 'toggle', icon: 'account_tree', can: ({ active }) => active !== null && tree[active].children > 0}
-        ];
+            {id: 'open_all', icon: 'unfold_more', parent: 'collapse', has: () => true,
+                exec: () => tree.openAllInView()
+            },
+            {id: 'close_all', icon: 'unfold_less', parent: 'collapse', has: () => true,
+                exec: () => tree.closeAllInView()
+            }
+        ]
     }, []);
     const { buttons, hotkeys } = getActionButtonsAndHotkeys(actions, props, paramsRef);
     const { focusItem, attr, refocus, ...focus } = useFocusManager({
         name: 'tree',
-        treeView,
-        divRef: stackRef,
+        selector,
+        dblAction: !doubleClickAction ? () => null : index => {
+            setActive([nodes[index].id]);
+            return requestAnimationFrame(
+                () => {
+                    hotkeys[doubleClickAction].can() &&
+                    hotkeys[doubleClickAction].exec()
+                }
+            );
+        },
+        treeView: tree,
+        rootSelect: true,
         keyTracking,
+//        syncSelection: !filter,
+        divRef: stackRef,
         handleSpace: true,
         reset: true,
-        active,
-        setActive
     });
-    const height = 45;
-
     const mouseEnter = index => {
         return () => {
-            tracking(0, tree[index].plane)
-        }
-    }
-    const onDoubleClick = !doubleClickAction ? () => null : index => {
-        return () => {
-            requestAnimationFrame(() => {
-                setActive(index);
-                requestAnimationFrame(
-                    () => hotkeys[doubleClickAction].can() &&
-                                hotkeys[doubleClickAction].exec()
-                )
-            })
+            tracking(0, tree.getViewNodeByIndex(index).model.plane)
         }
     }
     const elems = [];
-    const nodes = treeView.getNodes();
+    let lastPath = null;
+    const { nodes, stats } = tree.view;
+
     let i = -1;
     for (let node of nodes) {
         i++;
+        if (node.level === 0 && node.path.length) {
+            const idPath = node.path.join('.');
+            if (idPath !== lastPath) {
+                const pathNodeNames = tree.getPathNodeNames(node.path);
+                const path = pathNodeNames.join(' > ');
+                elems.push(
+                    <Block padded="h" key={'h' + i} full="h">
+                        <Block full="h" padded="v" shorten className="less small" border={DIR.BOTTOM}>
+                            {'» ' + path}
+                        </Block>
+                    </Block>
+                );
+                lastPath = idPath;
+            }
+        }
+        const toggle = e => {toggleOp({ ...paramsRef.current, active: [node.id]}); e.stopPropagation()};
+
+        const cls = ['hover-change'];
+        cls.push(active.includes(node.id) ? 'active-bg active-color' : 'ghost-bg');
+
         const indention = [];
         for (let l = 0; l < node.level; l++) {
             indention.push(
                 <Block key={l} width={18} full="v">
-                    {node.connected[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={height} />}
+                    {node.connected[l] && <Block center="h" full="v" border={DIR.LEFT} width={1} height={nodeHeight} />}
                 </Block>
             );
         }
-        const toggle = e => {toggleOp({ ...paramsRef.current, active: node.index}); e.stopPropagation()};
-        const elem = node.leaf ?
+        const elem = node.isLeaf ?
             <Icon size={12} className="border-color" name="square" /> :
-            <Block center="h" border="1" onClick={toggle}><Icon size={12} className="ghost-bg" name={node.closed ? "add" : "remove"} /></Block>;
+            <HoverIconButton closed={node.isClosed} onMouseDown={e => {toggle(e); focus.setTabIndex(node.viewIndex); refocus()}} />;
 
         indention.push(
-            <Block key="last" width={18} height={height} full="v">
+            <Block key="last" width={18} height={nodeHeight} full="v">
                 <Block full className="relative">
-                    {i > 0 &&
+                    {node.level > 0 &&
                         <div className="absolute pos-0 full-v full-h">
                             <Block width={1} height={node.end ? 10 : false} center="h" full="v" border={DIR.LEFT} />
                         </div>
@@ -1183,37 +1587,154 @@ function TreeStack({ tree, trackId, nodeStateChange, doubleClickAction, ...props
                 </Block>
             </Block>
         );
-
-        const cls = ['hover-change'];
-        cls.push(node.index === active ? 'active-bg active-color' : 'ghost-bg');
-        const data = node.data;
         elems.push(
-            <Stack key={node.index} onRightClick={toggle} onMouseEnter={mouseEnter(node.index)} onDoubleClick={onDoubleClick(node.index)} { ...focus.itemAttr(i) } full="h" className={cls.join(' ')}>
+            <Stack full="h" key={node.id} cursor={node.clickMode ? "pointer" : false} onRightClick={toggle} onMouseEnter={mouseEnter(node.viewIndex)} className={cls.join(' ')} { ...focus.itemAttr(i) }>
                 <Stack full="v" padded="h">
                     {indention}
                 </Stack>
-                <Stack key={i} vertical padded={DIR.RIGHT|DIR.TOP} full="h">
-                    <Block key={i} full="h">
-                        <Stack full="h">
-                            <Block full="h" shorten>{ucfirst(data.type)}</Block>
-                            <Block><Kbd className="less small" value={data.width + 'x' + data.height} /></Block>
-                        </Stack>
-                    </Block>
-                    <Block className="big more" shorten>{data.name}</Block>
-                </Stack>
+                {render({ node })}
             </Stack>
         );
     }
-    return (
-        <Stack borders vertical full  hotKeys={hotkeys}>
-            <Toolbar>
-                <ButtonStack gaps buttons={buttons} />
-            </Toolbar>
-            <Block full>
-                <Stack cursor="pointer" scroll border={DIR.BOTTOM} full="h" onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical className="primary-color ghost-bg">
-                    {elems}
+
+    let matches = [];
+    const bottomBlocks = [];
+    const sortOptions = tree.getSortOptions();
+    const dirOptions = [
+        {id: true, name: 'sort', iconProps: {flip: 'v'}},
+        {id: false, name: 'sort'}
+    ];
+    if (sortOptions.length) {
+        bottomBlocks.push(
+            <Stack full="h" key="s" gaps padded>
+                <Block full="h" />
+                <Select options={sortOptions} value={sorting} set={setSorting} />
+                <Radio options={dirOptions} icon value={asc} set={setAsc} />
+            </Stack>
+        );
+    }
+    let firstMatch = true;
+    let no = 0;
+    for (let typeStats of stats) {
+        const bottomStats = [];
+        const length = 2;
+        bottomStats.push(
+            <StatsBlock key="t" first name="Total" value={typeStats.total} length={length} />
+        );
+        let markerButtons = '';
+        const tags = [];
+        if (selector.isMulti()) {
+            const typedIds = tree.getViewIdsByType(typeStats.id);
+            const minIds = typedIds.length ? tree.getMinViewIdsByType(typeStats.id) : [];
+            const count = selector.getMatchCount(minIds);
+            const typedCount = selector.getMatchCount(typedIds);
+            markerButtons = [
+                {icon: 'clear', disabled: typeStats.marked === 0, onClick: () => selector.clearSelection(typedIds)},
+                {icon: 'done_all',
+                    disabled: typedIds.length === 0,
+                    onClick:
+                        () => (active.length && count === minIds.length && count === typedCount) ?
+                            selector.clearSelection() : selector.setSelection(minIds),
+                },
+                {
+                    icon: 'content_cut', disabled: typeStats.hidden === 0,
+                    onClick: () => {selector.setSelection(tree.reduceToBaseByType(typeStats.id))}
+                }
+            ];
+            const isMarked = typeStats.markedAll > 0;
+            if (isMarked) {
+                const markedDiff = typeStats.markedAll - typeStats.marked;
+                tags.push(
+                    <Stack gaps key="m">
+                        <Block className="less">|</Block>
+                        <StatsTag type="active" value={typeStats.marked} lessValue={markedDiff ? '+' + markedDiff : false} />
+                    </Stack>
+                )
+            }
+            if (typeStats.hiddenAll) {
+                tags.push(
+                    <StatsTag key="h" type="warning" value={typeStats.hidden} lessValue={'+' + typeStats.hiddenAll} />
+                )
+            }
+        }
+        bottomBlocks.push(
+            <Stack key={no} full="h" className="secondary-bg secondary-color-color">
+                <Stack full="h">
+                    <Stack gaps wrap full="h">
+                        <Block shorten>{typeStats.name}: </Block>
+                        <Block><Kbd className={typeStats.total ? 'more' : ''} value={typeStats.total} /></Block>
+                        {tags}
+                    </Stack>
                 </Stack>
-            </Block>
+                <Block padded={DIR.ALL_BUT_LEFT}>
+                    <ButtonStack gaps="1" buttons={markerButtons} />
+                </Block>
+            </Stack>
+        );
+
+        if (typeStats.matches + typeStats.matchesAll) {
+            const diff = typeStats.matchesAll - typeStats.matches;
+            const typeProps = tree.getTypeProps(typeStats.id);
+            if (typeProps.match) {
+                matches.push(
+                    <StatsBlock key={typeStats.name} first={firstMatch} value={typeStats.matches} diff={diff} text={typeProps.match} />
+                );
+                firstMatch = false
+            }
+        }
+        no++;
+    }
+    let matching = '';
+    if (filter && matches.length) {
+        matching =
+            <Stack full="h" gaps wrap key="matching">
+                <Block>Matching:</Block>
+                {matches}
+            </Stack>;
+    }
+    const groupButtons = [];
+    const treeGroups = tree.getGroups();
+    for(let treeGroup of treeGroups) {
+        const { id, name, disabled = () => false } = treeGroup;
+        const onClick = () => setGroups(tree.toggleGroup(groups, treeGroup.id))
+        groupButtons.push(
+            { id, name, onClick, value: true, current: groups.includes(treeGroup.id), padded: "h", disabled: disabled() }
+        )
+    }
+    return (
+        <Stack borders vertical full hotKeys={hotkeys}>
+            <Stack borders vertical full>
+                {groupButtons.length &&
+                    <Block full="h" padded>
+                        <ButtonStack gaps buttons={groupButtons} />
+                    </Block>
+                }
+                <Toolbar>
+                    <ButtonStack gaps buttons={buttons} />
+                    {props.filter &&
+                        <Separator />
+                    }
+                    {props.filter &&
+                        <Stack gaps>
+                            <Input name="Filter:" clear size={6} active={!!filter} value={filter} set={setFilter} />
+                        </Stack>
+                    }
+                </Toolbar>
+                <Block full>
+                    {!elems.length ?
+                        <CenterInfo>{
+                            filter ? 'No item found matching "' + filter + '"' : 'Tree is empty!'
+                        }</CenterInfo> :
+                        <Stack scroll full="h"
+                               onMouseLeave={() => tracking(null, null)} stackRef={stackRef} { ...attr } vertical
+                               className="primary-color ghost-bg">
+                            {matching}
+                            {elems}
+                        </Stack>
+                    }
+                </Block>
+                <>{bottomBlocks}</>
+            </Stack>
         </Stack>
     )
 }

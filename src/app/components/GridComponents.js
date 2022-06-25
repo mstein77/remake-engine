@@ -981,7 +981,7 @@ function useGridModes({modes, propsRef, cursor, marker, setter}) {
             };
             const lastClick = lastClickRef.current;
             if (lastClick && lastClick.action === action) {
-                if (time - lastClick.time < 250 &&
+                if (time - lastClick.time < wContext.editorConfig.doubleClickMs &&
                     Math.abs(lastClick.x - newLastClick.x) < 10 &&
                     Math.abs(lastClick.y - newLastClick.y) < 10)
                 {

@@ -55,6 +55,14 @@ html, body {
     font-family: var(--button-font)
 }
 
+.hover-button-fix,
+.hover-button:hover {
+    background-color: var(--button-bg-rgb) !important;
+    color: var(--button-rgb) !important;
+    border-color: var(--button-border-rgb) !important;
+}
+
+
 /*
    Input styles
  */
@@ -382,6 +390,18 @@ input:invalid {
 
 .all-events {
     pointer-events: all;
+}
+
+.flip-v {
+    transform: scaleY(-1)
+}
+
+.flip-h {
+    transform: scaleX(-1)
+}
+
+.flip {
+    transform: scaleX(-1) scaleY(-1)
 }
 
 .area-flicker {

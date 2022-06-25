@@ -1,6 +1,6 @@
 import ReactDOM from "react-dom";
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
-import { d, Storage, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
+import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents";
 import { Button, Color, Submit, OkCancelForm } from "./FormComponents";
 import { CellValue } from "../classes/Grid";
@@ -19,16 +19,22 @@ const CssContext = React.createContext();
 //   COMPONENTS
 // --------------------------------------------
 
-function CenterInfo({ icon, iconSize, children }) {
+function CenterInfo({ icon, iconSize, children, className }) {
+    const cls = [
+        !icon ? "less text-center" : ""
+    ];
+    if (className) {
+        cls.push(className)
+    }
     const elem = (
-        <Block padded center="v" full="h" wrap className="less text-center ">
+        <Block padded center="v" full="h" wrap className={cls.join(' ')}>
             {children}
         </Block>
     );
     if (!icon) return elem;
 
     return (
-        <Stack full>
+        <Stack full className={cls.join(' ')}>
             <Block padded center="v">
                 <Icon name={icon} size={iconSize} />
             </Block>
@@ -606,6 +612,7 @@ function Scrollbar({ pos, page, max, auto, vertical, size, set }) {
         };
         let lastPos = 0;
 
+        if (document.activeElement) document.activeElement.blur();
         wContext.startExclusiveMode('scroll-handle', cursor);
         wContext.addEventListener('mousemove', e => {
             const relPos = getOffset(e[client]);
@@ -848,7 +855,7 @@ function ActionBarContent({ children, scroll, ...props }) {
     )
 }
 
-function Icon({ name, width, height, center = 'h', className, rotate, size = 18 }) {
+function Icon({ name, width, height, center = 'h', flip, className, rotate, size = 18 }) {
     const style = {
         width: width || size,
         height: height || size
@@ -870,6 +877,11 @@ function Icon({ name, width, height, center = 'h', className, rotate, size = 18 
         if (center !== 'h') {
             cls.push('center-v');
         }
+    }
+    if (flip) {
+        let flipCls = 'flip';
+        if (flip !== true) flipCls += '-' + flip;
+        cls.push(flipCls)
     }
     if (className) {
         cls.push(className);
@@ -925,7 +937,7 @@ function ButtonStack({ buttons, buttonProps = {}, active, ...props }) {
                     tabControlled
                     refocus={refocus}
                     tab={tab}
-                    onClickEnd={onClick}
+                    onClickEnd={e => {onClick(e); refocus()}}
                 />
             );
 
@@ -1834,18 +1846,20 @@ function EditorCtx({ id, children }) {
                         lastController.cleanUp()
                     }
                     lastController = null;
-                    if (mode !== null) {
-                        const modeController = modesContext.controller[mode];
-                        if (modeController) {
-                            modeController.init(
-                                modeController.defaults ?
-                                    { ...modeController.defaults, ...params  } : params
-                            );
+                    requestAnimationFrame(() => {
+                        if (mode !== null) {
+                            const modeController = modesContext.controller[mode];
+                            if (modeController) {
+                                modeController.init(
+                                    modeController.defaults ?
+                                        { ...modeController.defaults, ...params  } : params
+                                );
+                            }
+                            lastController = modeController
                         }
-                        lastController = modeController
-                    }
-                    setLastMode(mode);
-                    setLastModeParams(params);
+                        setLastMode(mode);
+                        setLastModeParams(params);
+                    });
                 },
                 getGridAction: name => {
                     return modesContext.actions[name];
@@ -2195,6 +2209,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 page: {}
             },
 
+            isTransitioning: false,
             lastColorsIndex: new ColorIndex({colors: (gameCache.lastColors ? gameCache.lastColors.split(' ') : [])})
         };
 
@@ -2202,6 +2217,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             registryRef.current[key] = value
         };
 
+        const isInExclusiveMode = () => registry('mode') !== null;
         const endExclusiveMode = id => {
             const { mode, listeners, setFixCursor } = registry();
             if (!id || mode !== id) {
@@ -2398,8 +2414,18 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 register('mode', id);
                 setFixCursor(cursor)
             },
-            isInExclusiveMode: () => registry('mode') !== null,
+            isInExclusiveMode,
             endExclusiveMode,
+            onExclusiveModeEnd: callback => {
+                const check = () => {
+                    if (!isInExclusiveMode()) {
+                        callback();
+                    } else {
+                        requestAnimationFrame(check)
+                    }
+                };
+                check();
+            },
 
             addEventListener: (type, listener, options = false) => {
                 const { mode, listeners } = registry();
@@ -2497,6 +2523,17 @@ function WindowCtx({ imageResources, filters, children, game }) {
                     }
                 }
             },
+
+            stateBack: () => {
+                const { stateBackMethod } = registry();
+                if (stateBackMethod) stateBackMethod();
+            },
+            stateForward: (key, params) => {
+                const { stateForwardMethod } = registry();
+                if (stateForwardMethod) stateForwardMethod(key, params);
+            },
+            setIsTransitioning: value => register('isTransitioning', value),
+            isTransitioning: () => registry('isTransitioning'),
 
             registerEditor: (id, clear) => registry('editors')[id] = clear,
             unregisterEditor: id => delete registry('editors')[id],
@@ -2638,6 +2675,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             focusStack: registry('focusStack'),
             imageIndex,
+
 
             getFilteredCanvasData,
             getFilteredImageData: (filter, imageData) => {
@@ -3252,6 +3290,13 @@ function usePageCache(id) {
     return cacheRef.current;
 }
 
+/**
+ * @param <null|string> level
+ *   Caching-Method (null = no caching, 'global' = , 'page')
+ * @param <string> id
+ *
+ *
+ */
 function useCachedState(level, id, value, type) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
@@ -3259,9 +3304,11 @@ function useCachedState(level, id, value, type) {
     let pre = value;
 
     if (level && id) {
+        // if type is given prepend to id
         if (id && type) {
             id += '_' + type
         }
+        // get cache for given level
         if (level === 'page') {
             if (wContext.getModalLevel() > 0) {
                 cache = wContext.getCurrModalCache()
@@ -3334,7 +3381,7 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
                 if (!mounted.current) {
                     return;
                 }
-                if (level === wContext.getModalLevel()) {
+                if (level === wContext.getModalLevel() && !wContext.isTransitioning()) {
                     if (players.nextStep()) {
                         update();
                     }
@@ -3352,22 +3399,119 @@ function useAnimationPlayers(entityIndex, animationIndex, prePlayers = null) {
     return players;
 }
 
-function useFocusManager({ name, treeView,
+function useMultiSelector({ min = null, max = null, ...props }) {
+    const callAfterwards = useCallAfterwards();
+    const [ selectionRaw, setSelectionRaw ] = useState(() => {
+        return props.default ? props.default : []
+    });
+    const selection = props.selection !== undefined ? props.selection : selectionRaw;
+    const setSelection = props.selection !== undefined ? props.setSelection : setSelectionRaw;
+
+    const select = value => {
+        const index = selection.indexOf(value);
+        if (index === -1) {
+            if (max !== null && selection.length >= max) {
+                if (max === 1) setSelection([ value ]);
+                return;
+            }
+            setSelection([ ...selection, value ]);
+            return;
+        }
+        if (min !== null && selection.length <= min) return;
+        const newSelection = [ ...selection ];
+        newSelection.splice(index, 1);
+        setSelection(newSelection)
+    }
+    const isSelected = value => selection.includes(value);
+    const syncWithTreeView = (treeView, getItem) => {
+        const ancestors = treeView.getViewAncestors(selection);
+        if (!ancestors) return;
+
+        const newSelection = [];
+        for (let item of selection) {
+            const newIndex = ancestors[item];
+            let newValue = item;
+            if (newIndex !== undefined) {
+                if (newIndex === null) continue;
+                newValue = getItem(newIndex);
+            }
+            if (!newSelection.includes(newValue)) newSelection.push(newValue)
+        }
+        callAfterwards(setSelection, newSelection)
+    }
+    const selectAsRoot = (tree, id) => {
+        if (selection.includes(id) || (max !== null && max > selection.length)) return;
+        setSelection([ ...without([ ...selection, id], tree.getAncestorIdsById(id))]);
+    }
+
+    return {
+        select,
+        selectAsRoot,
+        isSelected,
+        selection,
+        setSelection,
+        hasMax: () => max !== null && max === selection.length,
+        isMulti: () => max === null || max > 1,
+        getMatchCount: values => intersect(selection, values).length,
+        syncWithTreeView,
+        invertSelection: values => {
+            const invSelection = [];
+            for (let value of values) {
+                if (!selection.includes(value)) {
+                    invSelection.push(value);
+                }
+            }
+            setSelection(invSelection)
+        },
+        clearSelection: (values = null) => {
+            setSelection(values === null ? [] : without(selection, values))
+        }
+    }
+}
+
+function useExclusiveSelector({ reset, ...props }) {
+    const [ selectionRaw, setSelectionRaw ] = useState(props.default !== undefined ? props.default : null);
+    const callAfterwards = useCallAfterwards();
+
+    const selection = props.selection !== undefined ? props.selection : selectionRaw;
+    const setSelection = props.selection !== undefined ? props.setSelection : setSelectionRaw;
+
+    const select = value => {
+        setSelection(reset && selection === value ? null : value)
+    }
+    const syncWithTreeView = (treeView, getItem) => {
+        const ancestors = treeView.getViewAncestors(selection);
+        const newIndex = ancestors[selection];
+        if (newIndex !== undefined) {
+            callAfterwards(setSelection, getItem(newIndex))
+        }
+    }
+    const isSelected = value => selection === value
+    return {
+        select,
+        isSelected,
+        syncWithTreeView,
+        selection,
+        setSelection,
+        isMulti: () => false
+    }
+}
+
+function useFocusManager({ name, treeView, selector, syncSelection, rootSelect, dblAction,
      active, items, pos = 0, setPos = () => null, page, reset, keyTracking = () => {}, handleSpace, update, ...props
     }) {
 
     const wContext = useContext(WindowContext);
     const callAfterwards = useCallAfterwards();
 
+    const doubleRef = useRef({});
     const [ catchFocus, setCatchFocus ] = useState(true);
     const [ tabIndex, setTabIndexRaw ] = useState(0);
-    const setTabIndex = (value) => {
+    const setTabIndex = value => {
         keyTracking(value);
         setTabIndexRaw(value)
     }
-    if (treeView) {
-        items = treeView.getIndices();
-    }
+    if (treeView) items = treeView.getViewIndices();
     const initCatchRef = useRef(false);
     const autoRef = useRef(null);
     const divRef = props.divRef ? props.divRef : autoRef;
@@ -3375,8 +3519,9 @@ function useFocusManager({ name, treeView,
         if (value !== null) {
             setTabIndex(getItemIndex(value));
         }
-        props.setActive(value)
+        selector ? selector.select(value) : props.setActive(value)
     };
+
     const mounted = useMounted();
     const levelRef = useRef(null);
     if (levelRef.current === null) {
@@ -3390,7 +3535,7 @@ function useFocusManager({ name, treeView,
     }
     const lastPos = Math.max(count - page, 0);
     let currPos = pos;
-    if (currPos > lastPos) {
+    if (lastPos > 0 && currPos > lastPos) {
         callAfterwards(setPos, lastPos);
         currPos = lastPos
     }
@@ -3404,7 +3549,7 @@ function useFocusManager({ name, treeView,
             }
         })
     }
-    if (tabIndex !== null && count > 0 && tabIndex >= count) {
+    if (tabIndex !== null && count > 0 && tabIndex >= count && !catchFocus) {
         callAfterwards(setTabIndex, count - 1);
         callAfterwards(refocus)
     }
@@ -3413,7 +3558,70 @@ function useFocusManager({ name, treeView,
     const nextPageStart = currPos + page;
 
     const hasPaging = page < count;
-    const activeIndex = getItemIndex(active);
+    let activeIndex = -1;
+    if (selector) {
+        for (let i = pos; i < nextPageStart; i++) {
+            if (selector.isSelected(getItem(i))) {
+                activeIndex = i;
+                break;
+            }
+        }
+    } else {
+        activeIndex = getItemIndex(active);
+    }
+
+    if (syncSelection && treeView && selector && selector.selection) {
+        selector.syncWithTreeView(treeView, getItem);
+    }
+
+    const activateIndex = (index, e = null) => {
+        const curr = Date.now();
+        const hasEvent = e !== null;
+        const { last, hadEvent, lastX, lastY } = doubleRef.current;
+        let isDouble = false;
+        let newX = hasEvent ? e.clientX : null;
+        let newY = hasEvent ? e.clientY : null;
+        if (dblAction && last && hasEvent === hadEvent) {
+            if (wContext.editorConfig.doubleClickMs > (curr - last) && (!hasEvent || Math.abs(lastX - newX) < 10 &&
+                Math.abs(lastY - newY) < 10)) {
+                isDouble = true;
+            }
+        }
+        doubleRef.current = {
+            last: curr,
+            hadEvent: hasEvent,
+            lastX: newX,
+            lastY: newY
+        };
+        const newActive = getItem(index);
+        if (selector) {
+            const isSelected = selector.isSelected(newActive);
+            const handleClick = () => {
+                doubleRef.current.delayed = null;
+                if (rootSelect && treeView && !isSelected) {
+                    selector.selectAsRoot(treeView, newActive)
+                } else {
+                    selector.select(newActive)
+                }
+            }
+
+            if (dblAction && !isDouble && isSelected) {
+                doubleRef.current.delayed = handleClick;
+                setTimeout(() => {
+                    if (doubleRef.current.delayed) doubleRef.current.delayed();
+                }, wContext.editorConfig.doubleClickMs);
+            } else {
+                if (isDouble) {
+                    doubleRef.current.delayed = null;
+                    dblAction(index)
+                } else
+                handleClick();
+            }
+        } else {
+            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+        }
+    }
+
     const isOutsideFocus = hasPaging && (activeIndex < currPos || activeIndex >= nextPageStart);
 
     const autoFocus = e => {
@@ -3437,9 +3645,8 @@ function useFocusManager({ name, treeView,
     }
     const onKeyDown = e => {
         if (['ArrowLeft', 'ArrowUp'].includes(e.key)) {
-            const item = getItem(tabIndex);
-            if (treeView && e.key === 'ArrowLeft' && !treeView.isLeaf(tabIndex) &&  !treeView.isClosed(item)) {
-                treeView.toggleNode(item, true)
+            if (treeView && e.key === 'ArrowLeft' && !treeView.isLeafByViewIndex(tabIndex) &&  !treeView.isClosedByViewIndex(tabIndex)) {
+                treeView.toggleNodeByViewIndex(tabIndex, true)
                 return;
             }
             if (tabIndex === 0) {
@@ -3457,9 +3664,8 @@ function useFocusManager({ name, treeView,
                 setTabIndex(newPos)
             }
         } else if (['ArrowRight', 'ArrowDown'].includes(e.key)) {
-            const item = getItem(tabIndex);
-            if (treeView && e.key === 'ArrowRight' && !treeView.isLeaf(tabIndex) && treeView.isClosed(item)) {
-                treeView.toggleNode(item, false)
+            if (treeView && e.key === 'ArrowRight' && !treeView.isLeafByViewIndex(tabIndex) && treeView.isClosedByViewIndex(tabIndex)) {
+                treeView.toggleNodeByViewIndex(tabIndex, false)
                 return;
             }
             if (tabIndex === lastIndex) {
@@ -3477,8 +3683,10 @@ function useFocusManager({ name, treeView,
                 setTabIndex(newPos)
             }
         } else if (handleSpace && e.key === ' ') {
-            const newActive = getItem(tabIndex);
-            setActive(reset && newActive !== null && newActive === active ? null : newActive);
+            if (e.repeat) return;
+            activateIndex(tabIndex);
+            // prevent scrolling
+            e.preventDefault();
         } else {
             return;
         }
@@ -3488,10 +3696,9 @@ function useFocusManager({ name, treeView,
         const isCatcher = (catchFocus && index === pos);
         const params = {
             tab: ((tabIndex === index && !catchFocus) || isCatcher),
-            onLeftClick: () => {
+            onLeftClick: e => {
                 setTabIndex(index);
-                const clickItem = getItem(index);
-                setActive(reset && active === clickItem ? null : clickItem);
+                activateIndex(index, e)
                 setCatchFocus(false)
             }
         }
@@ -3514,6 +3721,7 @@ function useFocusManager({ name, treeView,
         itemAttr,
         refocus,
         focusItem: tabIndex,
+        setTabIndex: index => {setCatchFocus(false); setTabIndex(index)},
         setActiveFocus: setActive
     }
 }
@@ -3612,5 +3820,7 @@ export {
     useDebugMount,
     useAnimationPlayers,
     useFocusManager,
-    useWatcher
+    useWatcher,
+    useExclusiveSelector,
+    useMultiSelector
 }
