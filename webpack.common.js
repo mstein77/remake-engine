@@ -11,7 +11,7 @@ module.exports = {
     }, // webpack entry point. Module to start building dependency graph
     output: {
         path: path.resolve(__dirname, 'dist'), // Folder to store generated bundle
-        filename: '[name].bundle.js',  // Name of generated bundle after build
+        filename: 'js/[name].bundle.js',  // Name of generated bundle after build
         publicPath: '/' // public URL of the output directory when referenced in a browser
     },
     module: {
