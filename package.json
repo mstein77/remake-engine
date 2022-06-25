@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "webpack -p --config webpack.dev.js && nodemon server.js",
     "dev-old": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
-    "build": "webpack -p --config webpack.prod.js && node server.js",
+    "build": "webpack -p --config webpack.prod.js",
     "test": "mocha"
   },
   "engines": {
