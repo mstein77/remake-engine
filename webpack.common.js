@@ -3,8 +3,6 @@ const { DefinePlugin } = require('webpack');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
-console.log('---------------------', process.env);
-
 module.exports = {
     entry: {
         index: "./src/app/index.js",
