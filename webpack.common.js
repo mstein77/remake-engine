@@ -1,4 +1,5 @@
 const path = require('path');
+const TerserPlugin = require('terser-webpack-plugin');
 const { DefinePlugin } = require('webpack');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -29,6 +30,15 @@ module.exports = {
                 use: ["style-loader", "css-loader"]
             }
         ]
+    },
+    optimization: {
+        minimizer: [
+            new TerserPlugin({
+                terserOptions: {
+                    keep_fnames: true,
+                },
+            }),
+        ],
     },
     resolve: {extensions: ['*', '.js', '.jsx']},
     plugins: [  // Array of plugins to apply to build chunk
