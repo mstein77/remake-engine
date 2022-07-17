@@ -849,7 +849,7 @@ function useExportModal({ model, resource, update, name }) {
     const storeModel = eContextRef => {
         wContext.resourceLoader.storeScreenResource(wContext.game.currentScreen, getModelConfig());
         eContextRef.current.updateRestorePos();
-        wContext.markDirty()
+        wContext.markDirty();
         update();
     };
     const deployModel = () => {

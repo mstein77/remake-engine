@@ -1742,14 +1742,9 @@ function getConfigFromInput(configCls, input) {
     if (typeof input === 'string') {
         id = input;
     } else if (input instanceof configCls) {
-/*
-        TODO check if we need this
-
         if (!input.isResolved()) {
-            d('NOT RESOLVED', input.id, input);
             id = input.id;
         }
- */
     } else {
         confJson = input;
         if (!input.__resolved) {
@@ -3343,10 +3338,6 @@ class CanvasPane {
 
 class BackgroundPaneConfig extends Config {
 
-    isEditable() {
-        return true;
-    }
-
     getFieldProps() {
         return {
             x: {min: -9999, max: 9999},
@@ -3371,42 +3362,42 @@ class BackgroundPaneConfig extends Config {
 
     validateImgObject(value) {
         this.validateObject(value);
-        const {image, x, y} = value;
-        this.validateImageResource(image);
-        this.validateInt(x);
-        this.validateInt(y);
-        return {image, x, y}
+        const { image, x, y } = value;
+        return {
+            image: this.validateImageResource(image),
+            x: this.validateInt(x),
+            y: this.validateInt(y)
+        }
     }
 
     validateImgObjects(values) {
         this.validateArray(values);
+        const newValues = [];
         for (let value of values) {
-            this.validateImgObject(value);
+            newValues.push(this.validateImgObject(value));
         }
-        return values
+        return newValues;
     }
 
     addImage(image, x = 0, y = 0) {
-        this.images.push({image, x, y});
+        this.images.push({ image, x, y });
     }
 
     applyTo(obj) {
         super.applyTo(obj);
         obj.color = this.color;
-        const imgResources = [];
-        const rawImages = [];
+
+        const imgIds = [];
+        const imgCanvas = [];
         const imgPos = [];
-        const imgElems = [];
-        for (let {image, x, y} of this.images) {
-            imgResources.push(image);
-            rawImages.push(image.getDataUrl());
+        for (let { image, x, y } of this.images) {
+            imgIds.push(image.id);
+            imgCanvas.push(image.getCanvasElem());
             imgPos.push({x, y});
-            imgElems.push(image.getImage());
         }
-        obj.imgResources = imgResources;
-        obj.rawImages = rawImages;
+        obj.imgIds = imgIds;
+        obj.imgCanvas = imgCanvas;
         obj.imgPos = imgPos;
-        obj.imgElems = imgElems;
 
         return obj;
     }
@@ -3415,9 +3406,9 @@ class BackgroundPaneConfig extends Config {
         obj.color = base.color;
         const images = [];
         let i = 0;
-        while (i < base.imgResources.length) {
+        while (i < base.imgIds.length) {
             images.push({
-                image: deep ? RL.makeImageResource(base.imgResources[i].elem, base.imgResources[i].id) : base.imgResources[i].id,
+                image: deep ? RL.makeImageResource(base.imgCanvas[i], base.imgIds[i]) : base.imgIds[i],
                 x: base.imgPos[i].x,
                 y: base.imgPos[i].y
             });
@@ -3442,14 +3433,6 @@ class BackgroundPane {
         const config = getConfigFromInput(BackgroundPane.Config, input);
         config.applyTo(this);
         this.config = config;
-    }
-
-    constructorOld(color) {
-        this.color = color;
-        this.images = [];
-        this.imgPos = [];
-        this.imgElems = [];
-        this.dirty = true;
     }
 
     addImage(image, posX, posY) {
@@ -3485,8 +3468,12 @@ class BackgroundPane {
 
     render() {
         this.container.setBackgroundColor(this.color);
-        if (this.rawImages.length > 0) {
-            this.container.setBackgroundImages([ ...this.rawImages ].reverse());
+        if (this.imgCanvas.length > 0) {
+            const rawImg = [];
+            for (let img of this.imgCanvas) {
+                rawImg.push(img.toDataURL('image/png'));
+            }
+            this.container.setBackgroundImages([ ...rawImg ].reverse());
             this.container.setBackgroundPositions( [ ...this.imgPos ].reverse());
         }
         this.dirty = false;
@@ -3498,8 +3485,8 @@ class BackgroundPane {
         ctx.fillStyle = this.color;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        for (let i = 0; i < this.rawImages.length; i++) {
-            const img = this.imgElems[i];
+        for (let i = 0; i < this.imgCanvas.length; i++) {
+            const img = this.imgCanvas[i];
             const { x, y } = this.imgPos[i];
             ctx.drawImage(img, x, y);
         }

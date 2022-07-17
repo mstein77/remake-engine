@@ -1,11 +1,11 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import { Color, TupleProp, Number, Checkbox, BitmapProp } from "../components/FormComponents";
+import { Color, TupleProp, Number, Checkbox, BitmapProp, OkCancelForm, InputProp } from "../components/FormComponents";
 import { EntityStackSections } from "../components/EntityComponents";
-import { CenterInfo, Section, Canvas, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, Toolbar, useUpdateOnEntityIndexChanges } from "../components/BasicComponents";
+import { CenterInfo, Section, Canvas, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, Toolbar, useUpdateOnEntityIndexChanges, useModal } from "../components/BasicComponents";
 import { ImageBlockIndex } from "../classes/EntityIndex";
 import { useExportModal } from "../components/EditorComponents";
 import { Stack, Block, Overlays, Overlay, DIR } from '../components/LayoutComponents';
-import { d } from "../helper/helper";
+import { d, getCanvasForBitmap, getEmptyImageData } from "../helper/helper";
 import { EntityPicker } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 
@@ -149,14 +149,12 @@ function BackgroundPreview({ model, imageIndex, width, height, active, setActive
         ctx.fillRect(0, 0, zoom * width, zoom * height);
         const images = imageIndex.getEntityObjects();
         for (let obj of images) {
-            ctx.drawImage(obj.image, 0, 0, obj.width, obj.height, obj.x * zoom, obj.y * zoom, obj.width * zoom, obj.height * zoom);
+            const bitmapCanvas = getCanvasForBitmap(obj.image);
+            ctx.drawImage(bitmapCanvas, 0, 0, obj.width, obj.height, obj.x * zoom, obj.y * zoom, obj.width * zoom, obj.height * zoom);
         }
     }
-
     const moveCursor = 'grab';
-
     const dim = !currBlock ? null : {width: currBlock.width, height: currBlock.height};
-
     blockRef.current = active === null || !imageIndex.getLength() || !imageIndex.hasIndex(active) ? null : imageIndex.getEntityObject(active);
 
     return (
@@ -201,11 +199,49 @@ function BackgroundPreview({ model, imageIndex, width, height, active, setActive
     )
 }
 
+function ImageBlockProperties({ close, save, reserved = [], fieldProps, imageIndex, ...props }) {
+    const [ value, setValue ] = useState(props.value !== undefined ? props.value : 'test-bg.png');
+    const [ x, setX ] = useState(props.x !== undefined ? props.x : 0);
+    const [ y, setY ] = useState(props.y !== undefined ? props.y : 0);
+    const [ image, setImage ] = useState(() => getEmptyImageData(10, 10));
+    return (
+        <OkCancelForm cancel={close} submit save={() => save({value, x, y, image, width: image.width, height: image.height })}>
+            <PropertyGrid full="h">
+                <InputProp name="Id" value={value} set={setValue}
+                   full="h" maxWidth={250} required match={value => value.endsWith('.png') && !reserved.includes(value)}
+                />
+                <TupleProp name="Position" x={x} setX={setX} y={y} setY={setY}
+                    min={fieldProps.x.min} max={fieldProps.x.max}
+                />
+                <BitmapProp
+                    name="Bitmap:"
+                    value={image}
+                    set={setImage} resize entityIndex={imageIndex} zoomOrAvail={{width: 200, height: 200}}
+                />
+            </PropertyGrid>
+        </OkCancelForm>
+    )
+}
+
 function ImageStack({ imageIndex, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);
     useUpdateOnEntityIndexChanges(imageIndex);
+    const NewImageModal = useModal();
 
-    const newImage = () => {};
+    const newImage = props => NewImageModal.open({
+        ...props,
+        fieldProps,
+        imageIndex,
+        reserved: imageIndex.getPropValues('value'),
+        save: newImage => {
+            const index = imageIndex.getLength();
+            eContext.doAction(
+                () => imageIndex.setEntityObject({index, ...newImage }),
+                () => imageIndex.deleteEntity(index)
+            );
+            NewImageModal.close()
+        }
+    });
 
     const deleteImage = ({ active }) => {
         const index = active;
@@ -243,31 +279,39 @@ function ImageStack({ imageIndex, active, setActive, fieldProps }) {
     }
 
     return (
-        <EntityStackSections
-            id="backgroundPaneImages"
-            sectionProps={{inner: true, name: 'Images', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-            detailProps={{inner: true, name: 'Image Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-            entityIndex={imageIndex}
-            getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
-            active={active} setActive={setActive}
-            deselect
-            addOp={newImage} deleteOp={deleteImage} undo
-            emptyText="Add new Image"
-        >
-            {currImage !== null ?
-                <PropertyGrid full>
-                    <TupleProp
-                        name="Position:"
-                        x={currImage.x} y={currImage.y} setX={getModelPropSetter('x')} setY={getModelPropSetter('y')}
-                        min={fieldProps.x.min} max={fieldProps.x.max} />
-                    <BitmapProp
-                        name="Bitmap:"
-                        value={currImage.image.getContext('2d').getImageData(0, 0, currImage.width, currImage.height)} set={() => {}} resize entityIndex={imageIndex} zoomOrAvail={{width: 200, height: 200}}
-                    />
-                </PropertyGrid> :
-                <CenterInfo>No image selected</CenterInfo>
-            }
-        </EntityStackSections>
+        <>
+            <EntityStackSections
+                id="backgroundPaneImages"
+                sectionProps={{inner: true, name: 'Images', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                detailProps={{inner: true, name: 'Image Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
+                entityIndex={imageIndex}
+                getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
+                active={active} setActive={setActive}
+                deselect
+                addOp={newImage} deleteOp={deleteImage} undo
+                clone order
+                emptyText="Add new Image"
+            >
+                {currImage !== null ?
+                    <PropertyGrid full>
+                        <TupleProp
+                            name="Position:"
+                            x={currImage.x} y={currImage.y} setX={getModelPropSetter('x')} setY={getModelPropSetter('y')}
+                            min={fieldProps.x.min} max={fieldProps.x.max} />
+                        <BitmapProp
+                            name="Bitmap:"
+                            value={currImage.image}
+                            set={getModelPropSetter('image')} resize entityIndex={imageIndex} zoomOrAvail={{width: 200, height: 200}}
+                        />
+                    </PropertyGrid> :
+                    <CenterInfo>No image selected</CenterInfo>
+                }
+            </EntityStackSections>
+
+            <NewImageModal.content name="Add New Image">
+                <ImageBlockProperties { ...NewImageModal.props } />
+            </NewImageModal.content>
+        </>
     )
 }
 
@@ -287,12 +331,10 @@ function BackgroundPaneEditor({ model, resource }) {
         'From:': tree[0].source,
         'Resources:': tree.length
     };
+    const [ activeImage, setActiveImage ] = useState(null);
 
     const imageIndex = useMemo(() => new ImageBlockIndex(model), [model])
-
     const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
-
-    const [ activeImage, setActiveImage ] = useState(null);
 
     return (
         <EditorSection
