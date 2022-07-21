@@ -1265,8 +1265,22 @@ const copy2clipboard = content => {
     return navigator.clipboard.writeText(content)
 };
 
+const explode = (str, substr, limit) => {
+    const parts = str.split(substr);
+    if (!limit) return parts;
+    const result = [];
+    while (limit > 0 && parts.length) {
+        result.push(parts.shift());
+        limit--
+    }
+    if (parts.length) {
+        result.push(parts.join(substr));
+    }
+    return result;
+}
+
 const getUniqueName = (template, reserved = []) => {
-    const parts = template.split('$');
+    const parts = explode(template, '$', 2);
     const name = parts.join('');
     if (!reserved.includes(name)) return name;
 
@@ -1277,16 +1291,30 @@ const getUniqueName = (template, reserved = []) => {
         currName = currName.substr(0, matches.index + 1);
         no = parseInt(matches[1])
     } else {
-        currName += '_';
+        currName += '_'
     }
-    while (reserved.includes(currName + no)) {
+    const postFix = parts.length > 1 ? parts[1] : '';
+    while (reserved.includes(currName + no + postFix)) {
         no++;
     }
-    if (parts.length > 1) {
-        no = '' + no + parts[1];
-    }
-    return currName + no;
+    return currName + no + postFix;
 };
+
+const getNextUniqueName = (curr, endTemplate, reserved = []) => {
+    const lastIndex = endTemplate.lastIndexOf('$');
+    const rawCurr = curr;
+    if (lastIndex !== -1) {
+        endTemplate = endTemplate.substr(lastIndex + 1);
+    }
+    if (curr.endsWith(endTemplate)) {
+        curr = curr.substr(0, curr.length - endTemplate.length);
+        const matches = curr.match(/\_(\d+)$/);
+        if (matches !== null) {
+            curr = curr.substr(0, curr.length - matches[0].length);
+        }
+    }
+    return getUniqueName(curr + '$' + endTemplate, [ rawCurr, ...reserved ])
+}
 
 const round = (value, decimals = 0) => {
     let factor = 1;
@@ -1405,6 +1433,7 @@ module.exports = {
     getIdsFromObjects,
     getObjectWithId,
     getNextUid,
+    getNextUniqueName,
     getCanvasForDim,
     getCanvasForBitmap,
     getImageDataForImage,
@@ -1420,6 +1449,7 @@ module.exports = {
     getBlockPos,
     getParsedCssValueRec,
     cloneDeep,
+    explode,
     isEventInRect,
     drawCanvasToAvail,
     drawEventsValue,

@@ -5,11 +5,11 @@ import { CenterInfo, Section, Canvas, EditorSection, PropertyGrid, useComponentU
 import { ImageBlockIndex } from "../classes/EntityIndex";
 import { useExportModal } from "../components/EditorComponents";
 import { Stack, Block, Overlays, Overlay, DIR } from '../components/LayoutComponents';
-import { d, getCanvasForBitmap, getEmptyImageData } from "../helper/helper";
+import { d, getCanvasForBitmap, getEmptyImageData, getUniqueName } from "../helper/helper";
 import { EntityPicker } from "../components/EntityComponents";
 import { GridCellMarker } from "../components/GridComponents";
 
-function BackgroundPreview({ model, imageIndex, width, height, active, setActive, fieldProps }) {
+function BackgroundPreview({ model, imageIndex, newImage, width, height, active, setActive, fieldProps }) {
 
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
@@ -20,11 +20,12 @@ function BackgroundPreview({ model, imageIndex, width, height, active, setActive
     const blockRef = useRef(null);
 
     useUpdateOnEntityIndexChanges(imageIndex);
+
     const [ marker, setMarker ] = useState(true);
     const [ zoom, setZoom ] = useState(2);
     const [ highlight, setHighlight ] = useState(false);
 
-    const currBlock = active === null ? null : imageIndex.getEntityObject(active);
+    const currBlock = active === null || active >= imageIndex.getLength() ? null : imageIndex.getEntityObject(active);
 
     const update = useComponentUpdate();
     const getModelPropSetter = prop => {
@@ -139,6 +140,7 @@ function BackgroundPreview({ model, imageIndex, width, height, active, setActive
                 onMoveRef.current(startEvent);
             });
         } else {
+            newImage({x: clickX, y: clickY});
             e.stopPropagation();
             e.preventDefault();
         }
@@ -223,25 +225,11 @@ function ImageBlockProperties({ close, save, reserved = [], fieldProps, imageInd
     )
 }
 
-function ImageStack({ imageIndex, active, setActive, fieldProps }) {
+function ImageStack({ imageIndex, setActive, fieldProps, newImage, ...props }) {
     const eContext = useContext(EditorContext);
     useUpdateOnEntityIndexChanges(imageIndex);
-    const NewImageModal = useModal();
 
-    const newImage = props => NewImageModal.open({
-        ...props,
-        fieldProps,
-        imageIndex,
-        reserved: imageIndex.getPropValues('value'),
-        save: newImage => {
-            const index = imageIndex.getLength();
-            eContext.doAction(
-                () => imageIndex.setEntityObject({index, ...newImage }),
-                () => imageIndex.deleteEntity(index)
-            );
-            NewImageModal.close()
-        }
-    });
+    const active = props.active !== null && props.active < imageIndex.getLength() ? props.active : null;
 
     const deleteImage = ({ active }) => {
         const index = active;
@@ -284,7 +272,7 @@ function ImageStack({ imageIndex, active, setActive, fieldProps }) {
                 id="backgroundPaneImages"
                 sectionProps={{inner: true, name: 'Images', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 detailProps={{inner: true, name: 'Image Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
-                entityIndex={imageIndex}
+                entityIndex={imageIndex} getReservedValues={props.getReservedValues}
                 getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
                 active={active} setActive={setActive}
                 deselect
@@ -307,10 +295,6 @@ function ImageStack({ imageIndex, active, setActive, fieldProps }) {
                     <CenterInfo>No image selected</CenterInfo>
                 }
             </EntityStackSections>
-
-            <NewImageModal.content name="Add New Image">
-                <ImageBlockProperties { ...NewImageModal.props } />
-            </NewImageModal.content>
         </>
     )
 }
@@ -321,8 +305,61 @@ function ImagePicker({ imageIndex, setActive }) {
     )
 }
 
-function BackgroundPaneEditor({ model, resource }) {
+function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
     const wContext = useContext(WindowContext);
+    const eContext = useContext(EditorContext);
+    const NewImageModal = useModal();
+
+    const [ activeImage, setActiveImage ] = useState(null);
+
+    const getReservedIds = () => {
+        const reserved = [
+            ...imageIndex.getPropValues('value'),
+            ...wContext.resourceLoader.getAllResourceIds('image')
+        ];
+        return reserved
+    };
+
+    const newImage = props => {
+        const reserved = getReservedIds();
+        const value = getUniqueName(`bgpane_${resource.id}_img$.png`, reserved);
+        NewImageModal.open({
+            ...props,
+            value,
+            fieldProps,
+            imageIndex,
+            reserved,
+            save: newImage => {
+                const index = imageIndex.getLength();
+                eContext.doAction(
+                    () => imageIndex.setEntityObject({ index, ...newImage }),
+                    () => imageIndex.deleteEntity(index)
+                );
+                NewImageModal.close()
+            }
+        });
+    }
+    return (
+        <Stack full borders vertical>
+            <Section inner name="Background" full>
+                <BackgroundPreview model={model} width={resource.dim.x} height={resource.dim.y} imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} fieldProps={fieldProps} newImage={newImage} />
+            </Section>
+
+            <Section id="backgroundPane_imagesSection" inner name="Images" full="h" size={250} maxHeight="50%" rev collapse>
+                <Stack full borders>
+                    <ImageStack imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} resource={resource} fieldProps={fieldProps} newImage={newImage} getReservedValues={getReservedIds} />
+                    <ImagePicker imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} />
+                </Stack>
+            </Section>
+
+            <NewImageModal.content name="Add New Image">
+                <ImageBlockProperties { ...NewImageModal.props } />
+            </NewImageModal.content>
+        </Stack>
+    )
+}
+
+function BackgroundPaneEditor({ model, resource }) {
     const update = useComponentUpdate();
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'BackgroundPane', model, resource, update });
 
@@ -331,9 +368,9 @@ function BackgroundPaneEditor({ model, resource }) {
         'From:': tree[0].source,
         'Resources:': tree.length
     };
-    const [ activeImage, setActiveImage ] = useState(null);
-
-    const imageIndex = useMemo(() => new ImageBlockIndex(model), [model])
+    const imageIndex = useMemo(() => {
+        return new ImageBlockIndex(model)
+    }, [model])
     const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
 
     return (
@@ -358,19 +395,8 @@ function BackgroundPaneEditor({ model, resource }) {
                     }
                 }
             }>
-            <Stack full borders vertical>
-                <Section inner name="Background" full>
-                    <BackgroundPreview model={model} width={resource.dim.x} height={resource.dim.y} imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} fieldProps={fieldProps} />
-                </Section>
-
-                <Section id="backgroundPane_imagesSection" inner name="Images" full="h" size={250} maxHeight="50%" rev collapse>
-                    <Stack full borders>
-                        <ImageStack imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} resource={resource} fieldProps={fieldProps} />
-                        <ImagePicker imageIndex={imageIndex} active={activeImage} setActive={setActiveImage} />
-                    </Stack>
-                </Section>
-                <Modals />
-            </Stack>
+            <BackgroudPaneEditorInner model={model} imageIndex={imageIndex} fieldProps={fieldProps} resource={resource} />
+            <Modals />
         </EditorSection>
     )
 }

@@ -460,7 +460,7 @@ class AbstractTreeView {
 
     buildView() {
         if (!this.context) throw new Error('Cannot build tree view, because context was not set!');
-        d('REBUILD...', this.context);
+
         const { selector, groups, filter } = this.context;
         const locker = this.locker;
         const levels = [];

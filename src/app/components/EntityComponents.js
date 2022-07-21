@@ -1,31 +1,11 @@
 import React, { Fragment, useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without } from "../helper/helper";
-import {Button, Input, Number, Checkbox, Radio, Select} from "./FormComponents";
+import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../helper/helper";
+import { Button, Input, Number, Checkbox, Radio, Select } from "./FormComponents";
 import {
-    EditorCtx,
-    useAnimationPlayers,
-    CenterInfo,
-    EditorContext,
-    ButtonStack,
-    Section,
-    Canvas,
-    Kbd,
-    Icon,
-    AvailContextProvider,
-    Toolbar,
-    ToolGroup,
-    ScrollArea,
-    BackgroundControl,
-    useUpdateOnEntityIndexChanges,
-    useCallAfterwards,
-    useCachedState,
-    AvailContext,
-    WindowContext,
-    useCssProps,
-    UndoRedoButtons,
-    useFocusManager,
-    useMultiSelector, useExclusiveSelector, Separator
+    EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon, AvailContextProvider,
+    Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
+    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useFocusManager, useMultiSelector, Separator
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";
@@ -44,6 +24,8 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
     dropRef.current.dropIndex = dropIndex;
 
     const doAction = undo && eContext ? eContext.doAction : action => action();
+
+    const getReservedValues = props.getReservedValues !== undefined ? props.getReservedValues : () => entityIndex.getPropValues('value');
 
     let [ active, setActive ] = useState(props.active === undefined || entityIndex.getLength() === 0 ? null : props.active);
     const entities = entityIndex.getEntityObjects();
@@ -78,19 +60,8 @@ function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, 
                     const index = active;
                     const cloneEntity = { ...entityIndex.getEntityObject(index) };
                     if (entityIndex.hasUniqueValues()) {
-                        let no = 2;
-                        let name = cloneEntity.value;
-                        const matches = name.match(/ #(\d)+$/);
-                        if (matches) {
-                            name = name.substr(0, matches.index + 2);
-                            no = parseInt(matches[1])
-                        } else {
-                            name += ' #';
-                        }
-                        while (entityIndex.hasPropValue('value', name + no)) {
-                            no++;
-                        }
-                        cloneEntity.value = name + no;
+                        const value = getNextUniqueName(cloneEntity.value, entityIndex.getValueTemplate(), getReservedValues());
+                        cloneEntity.value = value;
                     }
                     cloneEntity.index++;
                     doAction(

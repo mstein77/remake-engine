@@ -7,6 +7,7 @@ class EntityIndex {
         this.allIndices = null;
         this.suspendNotifications = false;
         this.valueIndexing = false;
+        this.valueTemplate = '';
     }
 
     addListener(listener) {
@@ -141,6 +142,14 @@ class EntityIndex {
             i++;
         }
         return null;
+    }
+
+    getValueTemplate() {
+        return this.valueTemplate
+    }
+
+    setValueTemplate(value) {
+        this.valueTemplate = value
     }
 
     getPropValues(prop) {
@@ -2942,6 +2951,7 @@ class ImageBlockIndex extends EntityIndex {
         for (let i = 0; i < model.imgPos.length; i++) {
             this.items.push(model.imgIds[i]);
         }
+        this.valueTemplate = '$.png';
         this.setSizes()
     }
 

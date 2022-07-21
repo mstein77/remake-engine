@@ -320,7 +320,7 @@ function ComponentWithName({ name, center = 'v', className = '', labelCls = '', 
 }
 
 function Form({ children, submit, onKeyDown, ...props }) {
-    const [invalid, setInvalid] = useState(false);
+    const [ invalid, setInvalid ] = useState(false);
     const mounted = useMounted();
 
     const formRef = useRef(null);
@@ -373,7 +373,7 @@ function Form({ children, submit, onKeyDown, ...props }) {
 
     return (
         <FormContext.Provider value={value}>
-            <Block className="form" onKeyDown={submitOnReturn} ref={formRef} {...props}>
+            <Block className="form" onKeyDown={submitOnReturn} ref={formRef} { ...props }>
                 {children}
             </Block>
         </FormContext.Provider>

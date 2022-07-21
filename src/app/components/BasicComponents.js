@@ -3697,6 +3697,7 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect, 
         const params = {
             tab: ((tabIndex === index && !catchFocus) || isCatcher),
             onLeftClick: e => {
+                if (!mounted.current) return;
                 setTabIndex(index);
                 activateIndex(index, e)
                 setCatchFocus(false)
