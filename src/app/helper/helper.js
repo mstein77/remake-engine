@@ -1316,12 +1316,22 @@ const getNextUniqueName = (curr, endTemplate, reserved = []) => {
     return getUniqueName(curr + '$' + endTemplate, [ rawCurr, ...reserved ])
 }
 
-const round = (value, decimals = 0) => {
+const round = (value, decimals = 0, fill = false) => {
+    const reqDecimals = decimals;
     let factor = 1;
     while (decimals-- > 0) {
         factor *= 10;
     }
-    return Math.round(value * factor) / factor;
+    let rounded = Math.round(value * factor) / factor;
+    if (fill) {
+        const parts = ('' + rounded).split('.');
+        if (parts.length === 1) {
+            parts.push('');
+        }
+        parts[1] = parts[1].padEnd(reqDecimals, '0');
+        rounded = parts.join('.');
+    }
+    return rounded;
 };
 
 const ucfirst = (value) => {
@@ -1400,10 +1410,110 @@ function reverse(items) {
     return [ ...items ].reverse()
 }
 
+function sConsoleLog() {
+    var argArray = [];
+
+    if (arguments.length) {
+        var startTagRe = /<span\s+style=(['"])([^'"]*)\1\s*>/gi;
+        var endTagRe = /<\/span>/gi;
+
+        var reResultArray;
+        argArray.push(arguments[0].replace(startTagRe, '%c').replace(endTagRe, '%c'));
+        while (reResultArray = startTagRe.exec(arguments[0])) {
+            argArray.push(reResultArray[2]);
+            argArray.push('');
+        }
+
+        // pass through subsequent args since chrome dev tools does not (yet) support console.log styling of the following form: console.log('%cBlue!', 'color: blue;', '%cRed!', 'color: red;');
+        for (var j = 1; j < arguments.length; j++) {
+            argArray.push(arguments[j]);
+        }
+    }
+    console.log.apply(console, argArray);
+}
+
+const lastMarks = [];
+
+function ts(name) {
+    if (!name) name = 'timer' + (lastMarks.length + 1);
+    lastMarks.push(name);
+    performance.mark(name + '_start');
+}
+
+function td() {
+    if (lastMarks.length === 0) throw Error('No ts-call before td');
+    const lastMark = lastMarks.pop();
+    performance.mark(lastMark + '_end');
+    performance.measure(lastMark, lastMark + '_start', lastMark + '_end')
+    const entries = performance.getEntriesByName(lastMark);
+    let sum = 0;
+    for (let entry of entries) {
+        sum += entry.duration
+    }
+    sConsoleLog(
+        '<span style="background-color: darkgreen; color: antiquewhite"> Time </span>' +
+        '<span style="background-color: transparent; color: black"> ' + lastMark + ' </span>' +
+        '<span style="color: brown"> ' + round(entries[entries.length - 1].duration, 3, true) + ' ms</span> <span style="color: grey">| Ø: </span>' +
+        '<span style="color: green">' + round(sum/entries.length, 3, true) + ' ms </span>' +
+        '<span style="background-color: lightslategray; color: white"> ' + entries.length +  ' x </span>'
+    );
+}
+
 const noop = () => {};
+
+class RelativeBlock {
+    constructor(dim, block) {
+        this.dim = dim;
+        this.width = block.width;
+        this.height = block.height;
+        this.x = block.x;
+        this.y = block.y
+    }
+
+    centerX() {
+        this.x = Math.ceil(this.dim.width / 2) - Math.ceil(this.width / 2);
+        return this
+    }
+
+    centerY() {
+        this.y = Math.ceil(this.dim.height / 2) - Math.ceil(this.height / 2);
+        return this
+    }
+
+    center() {
+        this.centerX();
+        this.centerY();
+        return this
+    }
+
+    alignX(rasterWidth) {
+        this.x = Math.floor(this.x / rasterWidth) * rasterWidth;
+        return this
+    }
+
+    alignY(rasterHeight) {
+        this.y = Math.floor(this.y / rasterHeight) * rasterHeight;
+        return this
+    }
+
+    align(width, height) {
+        this.alignX(width);
+        this.alignY(height);
+        return this
+    }
+
+    getPos() {
+        return {
+            x: this.x,
+            y: this.y
+        }
+    }
+}
 
 module.exports = {
     d,
+    ts,
+    td,
     noop,
     reverse,
     round,
@@ -1457,5 +1567,6 @@ module.exports = {
     getCanvasForEventMatrix,
     BitmapPlayer,
     ANIMATION,
-    Players
+    Players,
+    RelativeBlock
 };

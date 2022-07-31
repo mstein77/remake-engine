@@ -1,11 +1,10 @@
-import React, { Fragment, useContext, useMemo, useRef, useState} from "react";
+import React, { useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
 import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../helper/helper";
 import { Button, Input, Number, Checkbox, Radio, Select } from "./FormComponents";
 import {
-    EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon, AvailContextProvider,
-    Toolbar, ToolGroup, ScrollArea, BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards,
-    useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useFocusManager, useMultiSelector, Separator
+    EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon, AvailContextProvider, Toolbar, ToolGroup, ScrollArea,
+    BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useFocusManager, useMultiSelector, Separator
 } from "./BasicComponents";
 import { FlexGrid } from "./GridComponents";
 import { useFilterPipelineModal } from "./EditorComponents";

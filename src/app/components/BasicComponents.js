@@ -3217,8 +3217,8 @@ function useUpdateOnEntityIndexChanges(entityIndex, callback) {
 
     useEffect(
         () => {
-            const callbackAndUpdate = !callback ? update : () => {
-                callback();
+            const callbackAndUpdate = !callback ? update : values => {
+                callback(values);
                 update()
             };
             entityIndex.addListener(callbackAndUpdate);

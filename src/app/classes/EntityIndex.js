@@ -4,6 +4,7 @@ const { CellValue } = require('../classes/Grid');
 class EntityIndex {
 
     constructor() {
+        this.updates = [];
         this.allIndices = null;
         this.suspendNotifications = false;
         this.valueIndexing = false;
@@ -35,8 +36,17 @@ class EntityIndex {
             return;
         }
         for (let listener of this.listeners) {
-            listener();
+            listener(this.updates);
         }
+        this.updates = [];
+    }
+
+    addPropUpdate(index) {
+        this.updates.push({type: 'update', index});
+    }
+
+    addDeleteUpdate(index) {
+        this.updates.push({type: 'delete', index, value: this.getEntityValue(index)});
     }
 
     hasIndex(index) {
@@ -119,10 +129,10 @@ class EntityIndex {
         }
     }
 
-    getEntityObject(index) {
+    getEntityObject(index, props = null) {
         const obj = {};
-        const props = this.getEntityProps();
-        for (let prop of props) {
+        const objProps = props ? props : this.getEntityProps();
+        for (let prop of objProps) {
             obj[prop] = this.getEntityPropValue(index, prop)
         }
         return obj;
@@ -345,6 +355,7 @@ class EntityIndex {
             if (!indices.includes(i)) {
                 newItems.push(this.getEntityValue(i));
             } else {
+                this.addDeleteUpdate(i);
                 this.deleteEntityPropValues(i);
             }
             i++;
@@ -671,6 +682,10 @@ class TextBlockIndex extends EntityIndex {
             const obj = this.model.blocks[index];
             if (obj) {
                 obj[prop] = value;
+                if (!['x', 'y'].includes(prop)) {
+                    this.addPropUpdate(index)
+                }
+                this.notify()
             }
         }
     }
@@ -2264,6 +2279,7 @@ class SpriteIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
         switch(prop) {
             case 'width':
                 this.model.sprites[this.getEntityValue(index)].dim.x = value;
@@ -2279,7 +2295,6 @@ class SpriteIndex extends EntityIndex {
                 ctx.putImageData(value, sprite.off.x, sprite.off.y);
                 break;
         }
-        super.setEntityPropValue(index, prop, value);
     }
 
     drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
@@ -2432,6 +2447,7 @@ class AnimationIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
         switch(prop) {
             case 'sizeX':
                 if (this.fixSize) return;
@@ -2461,9 +2477,6 @@ class AnimationIndex extends EntityIndex {
                     this.notify();
                 }
                 break;
-
-            default:
-                super.setEntityPropValue(index, prop, value)
         }
     }
 
@@ -2659,6 +2672,7 @@ class EventIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, name, value) {
+        super.setEntityPropValue(index, name, value)
         if (['offsetX', 'offsetY', 'width', 'height'].includes(name)) {
             const id = this.getEntityValue(index);
             this.model[this.key][id][name] = value;
@@ -2676,7 +2690,6 @@ class EventIndex extends EntityIndex {
             }
             this.notify()
         }
-        super.setEntityPropValue(index, name, value)
     }
 
     getEntityPropValue(index, name) {
@@ -2996,6 +3009,8 @@ class ImageBlockIndex extends EntityIndex {
             } else {
                 currCanvas.getContext('2d').putImageData(value, 0, 0);
             }
+            this.addPropUpdate(index);
+            this.notify()
         }
     }
 
@@ -3008,6 +3023,7 @@ class ImageBlockIndex extends EntityIndex {
     }
 
     setSizes() {
+        // TODO change
         this.sizeX = 100;
         this.sizeY = 100;
     }

@@ -1,17 +1,301 @@
 import React, { useContext, useMemo, useState, useRef, useEffect } from "react";
 import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex";
-import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm,
-    PropertyGrid, Section, Toolbar, useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext
+import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, ToolGroup,
+    useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext, useCachedState
 } from "./BasicComponents";
-import { d, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath } from "../helper/helper";
+import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
+    getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
+} from "../helper/helper";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
-import { DIR, Block, Stack } from "./LayoutComponents";
+import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents";
-import { FlexGrid, BaseGrid, PictureCell } from "./GridComponents";
+import { FlexGrid, BaseGrid, PictureCell, GridCellMarker } from "./GridComponents";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BackgroundControl, Icon } from "./BasicComponents";
 import ReactDOM from "react-dom";
+
+function useImageCache(blockIndex) {
+    const [ cache ] = useState(() => new Map());
+    const api = useMemo(() => {
+        return {
+            has: index => cache.has(blockIndex.getEntityValue(index)),
+            get: index => cache.get(blockIndex.getEntityValue(index)),
+            set: (index, image) => cache.set(blockIndex.getEntityValue(index), image),
+            delete: index => cache.delete(blockIndex.getEntityValue(index)),
+            deleteRaw: value => cache.delete(value),
+            clear: () => cache.clear()
+        };
+    }, []);
+
+    return api
+}
+
+function ScreenBlocksGrid({ blockIndex, active, setActive, width, setWidth, height, setHeight, newBlock, getAlignDim, apiRef, ...props }) {
+
+    const wContext = useContext(WindowContext);
+    const eContext = useContext(EditorContext);
+
+    const screenRef = useRef(null);
+    const onMoveRef = useRef(null);
+    const blockRef = useRef(null);
+
+    const [ marker, setMarker ] = useCachedState('page', 'screenBlocksMarker', props.marker !== undefined ? props.marker : true, 'bool');
+    const [ zoom, setZoom ] = useState(props.zoom ? props.zoom : 1);
+    const [ highlight, setHighlight ] = useState(false);
+    let [ color, setColor ] = useState(props.color ? props.color : '#000000');
+    if (props.setColor) {
+        color = props.color;
+        setColor = props.setColor
+    }
+
+    const minMax = useMemo(
+        () => {
+            let min = -999;
+            let max = 999;
+            if (props.fieldProps && props.fieldProps.x) {
+                const field = props.fieldProps.x;
+                if (field.max) max = field.max;
+                if (field.min) min = field.min
+            }
+            return {
+                min,
+                max
+            }
+        },
+        []
+    );
+
+    const cache = useImageCache(blockIndex);
+    useUpdateOnEntityIndexChanges(blockIndex);
+    useUpdateOnEntityIndexChanges(blockIndex, updates => {
+        for (let { type, index, value } of updates) {
+            if (type === 'update') {
+                cache.delete(index)
+            } else {
+                cache.deleteRaw(value)
+            }
+        }
+    });
+
+    const getBlockDim = props.getBlockDim ? props.getBlockDim : index => {
+        return {
+            width: blockIndex.getEntityPropValue(index, 'width'),
+            height: blockIndex.getEntityPropValue(index, 'height')
+        }
+    };
+
+    const drawBlockToCtx = props.drawBlockToCtx ? props.drawBlockToCtx : (ctx, index, dim) => {
+        ctx.putImageData(blockIndex.getEntityPropValue(index, 'image'), 0, 0);
+    }
+
+    const getBaseBlockImage = index => {
+        const dim = getBlockDim(index);
+        let canvas = null;
+        if (dim && dim.width && dim.height) {
+            canvas = getCanvasForDim(dim.width, dim.height);
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            drawBlockToCtx(ctx, index, dim);
+        }
+        return canvas;
+    }
+
+    const getBlockImage = index => {
+        if (!cache.has(index)) {
+            let canvas = getBaseBlockImage(index);
+            const filters = blockIndex.getEntityPropValue(index, 'filters');
+            if (filters) {
+                canvas = wContext.getFilteredCanvasData(filters, canvas);
+            }
+            cache.set(index, canvas)
+        }
+        return cache.get(index);
+    }
+
+    const moveRelativeBlock = props.moveRelativeBlock ? props.moveRelativeBlock : (relBlock, block) => relBlock;
+
+    const getActualBlockPos = (block, dim) => {
+        if (!block) return null;
+        const { x, y } = block;
+        const relBlock = new RelativeBlock({width, height}, {x, y, width: dim.width, height: dim.height});
+        return moveRelativeBlock(relBlock, block).getPos();
+    };
+
+    const currBlock = active === null || active >= blockIndex.getLength() ? null : blockIndex.getEntityObject(active);
+    let moveCursor = 'move';
+    if (currBlock && (currBlock.autoCenteringY || currBlock.autoCenteringX)) {
+        if (!currBlock.autoCenteringX) {
+            moveCursor = 'ew-resize'
+        } else if (!currBlock.autoCenteringY) {
+            moveCursor = 'ns-resize'
+        } else {
+            moveCursor = 'not-allowed'
+        }
+    }
+
+    const onMove = e => {
+        const rect = screenRef.current.getBoundingClientRect();
+        const undoX = currBlock.x;
+        const undoY = currBlock.y;
+        let lastX = Math.floor((e.clientX - rect.x) / zoom);
+        let lastY = Math.floor((e.clientY - rect.y) / zoom);
+        const offsetX = blockRef.current.x - lastX;
+        const offsetY = blockRef.current.y - lastY;
+        lastX += offsetX;
+        lastY += offsetY;
+
+        wContext.startExclusiveMode('move-block', moveCursor);
+        wContext.addEventListener('mousemove', e => {
+            const currX = Math.floor((e.clientX - rect.x) / zoom);
+            const currY = Math.floor((e.clientY - rect.y) / zoom);
+
+            const cBlock = blockRef.current;
+            const deltaX = currX - lastX;
+            let changed = false;
+            if (deltaX !== 0) {
+                const newX = Math.max(minMax.min, Math.min(cBlock.x + deltaX, minMax.max)) + offsetX;
+                if (newX !== cBlock.x) {
+                    blockIndex.setEntityPropValue(active, 'x', newX);
+                    lastX = newX;
+                    changed = true;
+                }
+            }
+            const deltaY = currY - lastY;
+            if (deltaY !== 0) {
+                const newY = Math.max(minMax.min, Math.min(cBlock.y + deltaY, minMax.max)) + offsetY;
+                if (newY !== cBlock.y) {
+                    blockIndex.setEntityPropValue(active, 'y', newY);
+                    lastY = newY;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                blockIndex.notify();
+            }
+            e.stopPropagation();
+            e.preventDefault();
+        });
+        wContext.addEventListener('mouseup', () => {
+            eContext.doAction(
+                () => {
+                    blockIndex.setEntityPropValue(active, 'x', lastX);
+                    blockIndex.setEntityPropValue(active, 'y', lastY);
+                    blockIndex.notify();
+                },
+                () => {
+                    blockIndex.setEntityPropValue(active, 'x', undoX);
+                    blockIndex.setEntityPropValue(active, 'y', undoY);
+                    blockIndex.notify();
+                }
+            );
+            setHighlight(false);
+            wContext.endExclusiveMode('move-block')
+        }, {once: true});
+
+        setHighlight(true);
+        if (e.stopPropagation) {
+            e.stopPropagation();
+            e.preventDefault()
+        }
+    };
+    onMoveRef.current = onMove;
+
+    const activateByClick = e => {
+        const rect = screenRef.current.getBoundingClientRect();
+        const clickX = Math.floor((e.clientX - rect.x) / zoom);
+        const clickY = Math.floor((e.clientY - rect.y) / zoom);
+        let i = blockIndex.getLength() - 1;
+        let found = false;
+        while(!found && i >= 0) {
+            const block = blockIndex.getEntityObject(i, ['index', 'x', 'y', 'width', 'height']);
+            const img = getBlockImage(i);
+            if (img) {
+                const pos = getActualBlockPos(block, img);
+                if (pos.x <= clickX && clickX <= (pos.x + img.width - 1) &&
+                    pos.y <= clickY && clickY <= (pos.y + img.height - 1)) {
+                    found = true;
+                    break;
+                }
+            }
+            i--;
+        }
+        if (found) {
+            setActive(i);
+            const startEvent = {
+                clientX: e.clientX, clientY: e.clientY
+            };
+            requestAnimationFrame(() => {
+                onMoveRef.current(startEvent);
+            });
+        } else {
+            newBlock && newBlock({x: clickX, y: clickY});
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    };
+    const dim = getBlockDim(active);
+    const actual = getActualBlockPos(currBlock, dim);
+    blockRef.current = active === null || !blockIndex.getLength() || !blockIndex.hasIndex(active) ? null : blockIndex.getEntityObject(active);
+
+    const render = ctx => {
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, zoom * width, zoom * height);
+        for (let index = 0; index < blockIndex.getLength(); index++) {
+            const image = getBlockImage(index);
+            if (!image) continue;
+            const block = blockIndex.getEntityObject(index,['index', 'x', 'y']);
+            const actual = getActualBlockPos(block, image);
+            ctx.drawImage(image, 0, 0, image.width, image.height, actual.x * zoom, actual.y * zoom, image.width * zoom, image.height * zoom)
+        }
+    }
+
+    if (apiRef) apiRef.current = { cache, getBaseBlockImage };
+
+    return (
+        <Stack vertical borders full>
+            <Toolbar>
+                <ToolGroup>
+                    {setWidth && <Tuple name="Size:" x={width} setX={setWidth} y={height} setY={setHeight} />}
+                    <Number name="Zoom:" set={setZoom} value={zoom} min={1} max={10} />
+                    <Color name="Background color:" value={color} set={setColor} />
+                </ToolGroup>
+                <Checkbox name="Marker" set={setMarker} value={marker} />
+            </Toolbar>
+
+            <Block full centerItems padded scroll>
+                <Overlays className="thin-boxed" width={width * zoom} height={height * zoom}>
+                    <Overlay>
+                        <Canvas render={render} width={width * zoom} height={height * zoom} />
+                    </Overlay>
+                    <Overlay width={width * zoom} height={width * zoom}>
+                        <Block ref={screenRef} full onMouseDown={activateByClick}>
+                            {marker && currBlock &&
+                                <GridCellMarker
+                                    blink
+                                    posX={actual.x * zoom}
+                                    posY={actual.y * zoom}
+                                    zoom={zoom}
+                                    cursor={moveCursor}
+                                    xdir={
+                                        (DIR.BOTTOM & (currBlock.y + dim.height < height)) |
+                                        DIR.TOP |
+                                        DIR.LEFT |
+                                        (DIR.RIGHT & (currBlock.x + dim.width < width))
+                                    }
+                                    width={Math.min(dim.width, width - currBlock.x) * zoom}
+                                    height={Math.min(dim.height, height - currBlock.y) * zoom}
+                                    onMove={onMove}
+                                    highlight={highlight}
+                                />
+                            }
+                        </Block>
+                    </Overlay>
+                </Overlays>
+            </Block>
+        </Stack>
+    )
+}
 
 function ConfirmDialog({ close, save, msg }) {
     return (
@@ -1476,6 +1760,7 @@ function useContentSwitcher(contentProvider, defStack) {
 }
 
 export {
+    ScreenBlocksGrid,
     MarkerMoveGrid,
     ResizeProps,
     BitmapEditor,

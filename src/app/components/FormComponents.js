@@ -2338,9 +2338,9 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
             {EditBitmapModal}
             {BitmapSelectionModal}
             {entityIndex &&
-            <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
-                <EntityPicker {...CopyBitmapModal.props} />
-            </CopyBitmapModal.content>
+                <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
+                    <EntityPicker {...CopyBitmapModal.props} />
+                </CopyBitmapModal.content>
             }
         </>
     )
