@@ -966,6 +966,20 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
+function Coords({x, y, length, xLength, yLength}) {
+    if (length) {
+        xLength = length;
+        yLength = length
+    }
+    return (
+        <Stack gaps="1">
+            <Kbd value={x} length={xLength} />
+            <Block className="less">x</Block>
+            <Kbd value={y} length={yLength} />
+        </Stack>
+    )
+}
+
 function Gradient({colors, vertical, plain}) {
     const aContext = useContext(AvailContext);
     const stops = colors.split(' ');
@@ -3806,6 +3820,7 @@ export {
     FontMetrics,
     JsonView,
     Separator,
+    Coords,
 
     useModal,
     useComponentUpdate,

@@ -2185,6 +2185,10 @@ class Game {
 
                             });
                         } else if (pane instanceof SpritePane) {
+                            const blocks = [];
+                            for (let { id, x, y } of Object.values(pane.sprites)) {
+                                blocks.push({ id, x, y });
+                            }
                             resources.push(
                                 {
                                     elem: pane.getPreview ? pane.getPreview() : null,

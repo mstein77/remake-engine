@@ -934,6 +934,7 @@ function TextPaneEditor({ model, resource }) {
         'From:': tree[0].source,
         'Resources:': tree.length
     };
+
     return (
         <Stack full vertical gaps>
             <EditorSection

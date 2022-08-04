@@ -1,10 +1,10 @@
 import React, { useContext, useMemo, useState } from "react";
 import { TupleProp, BitmapProp, OkCancelForm, InputProp } from "../components/FormComponents";
 import { EntityStackSections } from "../components/EntityComponents";
-import { CenterInfo, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "../components/BasicComponents";
+import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "../components/BasicComponents";
 import { ImageBlockIndex } from "../classes/EntityIndex";
-import { ScreenBlocksGrid, useEditBitmapModal, useExportModal} from "../components/EditorComponents";
-import { Stack, } from '../components/LayoutComponents';
+import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "../components/EditorComponents";
+import { Block, Stack } from '../components/LayoutComponents';
 import { d, getEmptyImageData, getUniqueName } from "../helper/helper";
 import { EntityPicker } from "../components/EntityComponents";
 
@@ -112,7 +112,14 @@ function ImageStack({ imageIndex, setActive, fieldProps, newImage, ...props }) {
                 sectionProps={{inner: true, name: 'Images', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 detailProps={{inner: true, name: 'Image Properties', size: 250, maxWidth: '33%', collapse: 'h', full: 'v'}}
                 entityIndex={imageIndex} getReservedValues={props.getReservedValues}
-                getInfo={obj => 'Size: ' + obj.width + 'x' + obj.height}
+                getInfo={obj => {
+                    return (
+                        <Stack gaps>
+                            <Block>Size:</Block>
+                            <Coords x={obj.width} y={obj.height} />
+                        </Stack>
+                    )}
+                }
                 active={active} setActive={setActive}
                 deselect
                 addOp={newImage} deleteOp={deleteImage} undo
@@ -161,10 +168,9 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
                     () => imageIndex.setEntityPropValue(index, 'image', newImage),
                     () => imageIndex.setEntityPropValue(index, 'image', image)
                 );
-                imageIndex.notify();
                 closeEditBitmapModal()
             }
-        });
+        })
     }
 
     const getReservedIds = () => {
@@ -177,7 +183,7 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
 
     const newImage = props => {
         const reserved = getReservedIds();
-        const value = getUniqueName(`bgpane_${resource.id}_img$.png`, reserved);
+        const value = getUniqueName(`${resource.id}_img$.png`, reserved);
         NewImageModal.open({
             ...props,
             value,
@@ -192,7 +198,7 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
                 );
                 NewImageModal.close()
             }
-        });
+        })
     }
     return (
         <>

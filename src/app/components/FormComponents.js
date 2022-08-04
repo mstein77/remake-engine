@@ -1,10 +1,10 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
 import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
-import {
-    WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox, GradientBox, Icon, SideTab, SideTabs, HotKeyKeys,
-    useFocusKeyBindings, useAnimationPlayers, useMounted, useFocusManager, useCssProps, useCachedState, useCallAfterwards, ButtonStack,
-    useComponentUpdate, AvailContext, MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx
+import { WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox,
+    GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useAnimationPlayers, useMounted,
+    useFocusManager, useCssProps, useCachedState, useCallAfterwards, ButtonStack, useComponentUpdate, AvailContext,
+    MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx, Coords
 } from "./BasicComponents";
 import { EntityPicker } from "./EntityComponents";
 import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
@@ -2327,9 +2327,16 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
                     <ButtonStack buttons={buttons} gaps="1" />
                 }
                 {value &&
-                    <Block padded onLeftClick={editBitmap}>
-                        <Canvas width={width} height={height} render={render} border="1" />
-                    </Block>
+                    <Stack vertical padded>
+                        <Block padded onLeftClick={editBitmap}>
+                            <Canvas width={width} height={height} render={render} border="1" />
+                        </Block>
+                        {resize &&
+                            <Stack full="h" gaps>
+                                <Block className="less">Size:</Block>
+                                <Coords x={value.width} y={value.height} />
+                            </Stack>}
+                    </Stack>
                 }
                 {!readOnly && !value && empty &&
                     <Button name="add" padded="h" onClick={setEmptyImage} />
