@@ -1,29 +1,11 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
-import {
-    EditorSection,
-    Kbd,
-    CenterInfo,
-    EditorContext,
-    Toolbar,
-    ToolGroup,
-    Canvas,
-    useModal,
-    useComponentUpdate,
-    useUpdateOnEntityIndexChanges,
-    PropertyGrid,
-    Section,
-    useCachedState,
-    ButtonStack,
-    WindowContext
-} from "../components/BasicComponents";
-import { DIR, Block, Stack, Overlays, Overlay } from "../components/LayoutComponents";
-import { d, getCanvasForDim, getEmptyImageData, getColorsFromCanvas } from "../helper/helper";
-import { useExportModal, NameDialog, FiltersModal, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal } from "../components/EditorComponents";
-import { Checkbox, Input, InputProp, KeyInput, NumberProp, Number, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Color, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "../components/FormComponents";
+import { EditorSection, Kbd, EditorContext, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, ButtonStack, WindowContext } from "../components/BasicComponents";
+import { DIR, Block, Stack } from "../components/LayoutComponents";
+import { d, RelativeBlock, getEmptyImageData, getColorsFromCanvas } from "../helper/helper";
+import { useExportModal, NameDialog, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal, ScreenBlocksGrid } from "../components/EditorComponents";
+import { Checkbox, Input, InputProp, KeyInput, NumberProp, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "../components/FormComponents";
 import { AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex } from "../classes/EntityIndex";
 import { EntityStack, EntityStackSections, EntityManager } from "../components/EntityComponents";
-import { GridCellMarker } from "../components/GridComponents";
-import ReactDOM from "react-dom";
 
 function FontProperties({ font, reserved, save, close }) {
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select Size');
@@ -579,7 +561,6 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
                         }
                     });
                 } else {
-
                     eContext.doAction(
                         () => {
                             index = fontIndex.setEntityObject(newFont);
@@ -673,28 +654,33 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
 }
 
 function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
-    const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
+
+    const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
+    const [ background, setBackground ] = useState('#000000');
+    const [ width, setWidth ] = useState(props.dim.x);
+    const [ height, setHeight ] = useState(props.dim.y);
+    const apiRef = useRef(null);
 
     const NewBlockModal = useModal();
     const { openFilterPipelineModal, closeFilterPipelineModal, FilterPipelineModal } = useFilterPipelineModal();
-    const [ activeBlock, setActiveBlock ] = useState(blockIndex.getLength() ? 0 : null);
-    const [ background, setBackground ] = useState('#000000');
-    const [ zoom, setZoom ] = useState(1);
-    const [ marker, setMarker ] = useCachedState('page', 'previewMarker', true);
-    const [ highlight, setHighlight ] = useState(false);
-    const [ width, setWidth ] = useState(props.dim.x);
-    const [ height, setHeight ] = useState(props.dim.y);
-    const screenRef = useRef(null);
-    const onMoveRef = useRef(null);
 
+    useUpdateOnEntityIndexChanges(fontIndex, () => apiRef.current.cache.clear());
     useUpdateOnEntityIndexChanges(blockIndex);
-    useUpdateOnEntityIndexChanges(fontIndex, () => imagesRef.current = {});
+
+    const fieldProps = {
+        x: {min: -1000, max: 1000},
+        y: {min: -1000, max: 1000}
+    };
+
+    const fontEntities = fontIndex.getEntityObjects();
+    const fonts = {};
+    for (let item of fontEntities) {
+        fonts[item.value] = item;
+    }
 
     const blockRef = useRef(null);
-
     blockRef.current = activeBlock === null || !blockIndex.getLength() || !blockIndex.hasIndex(activeBlock) ? null : blockIndex.getEntityObject(activeBlock);
-    const imagesRef = useRef({});
 
     const alignOptions = [
         {id: 'left', name: 'format_align_left', help: 'Align left'},
@@ -702,23 +688,6 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
         {id: 'right', name: 'format_align_right', help: 'Align right'}
     ];
 
-    // TODO use from config
-    const fieldProps = {
-        x: {min: -1000, max: 1000},
-        y: {min: -1000, max: 1000}
-    };
-    const invalidateBlockImage = index => {
-        delete imagesRef.current[blockIndex.getEntityValue(index)];
-    };
-    const setEntityProp = prop => {
-        return value => {
-            blockIndex.setEntityPropValue(activeBlock, prop, value);
-            if (['font', 'text', 'textAlign', 'lineSpacing', 'filters'].includes(prop)) {
-                invalidateBlockImage(activeBlock)
-            }
-            blockIndex.notify();
-        };
-    };
     const fontOptions = [];
     const values = fontIndex.getPropValues('value');
     for (let value of values) {
@@ -731,21 +700,13 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
         const index = currBlock.index;
 
         openFilterPipelineModal({
-            images: [getBaseBlockImage(currBlock)],
+            images: [ apiRef.current.getBaseBlockImage(currBlock.index) ],
             background,
             filters: undoFilters,
             save: newFilters => {
                 eContext.doAction(
-                    () => {
-                        blockIndex.setEntityPropValue(index, 'filters', newFilters);
-                        invalidateBlockImage(index);
-                        blockIndex.notify()
-                    },
-                    () => {
-                        blockIndex.setEntityPropValue(index, 'filters', undoFilters);
-                        invalidateBlockImage(index);
-                        blockIndex.notify()
-                    }
+                    () => blockIndex.setEntityPropValue(index, 'filters', newFilters),
+                    () => blockIndex.setEntityPropValue(index, 'filters', undoFilters)
                 );
                 closeFilterPipelineModal()
             }
@@ -756,20 +717,12 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
         const redoValue = currBlock.filters;
         const index = currBlock.index;
         eContext.doAction(
-            () => {
-                blockIndex.setEntityPropValue(index, 'filters', '');
-                invalidateBlockImage(index);
-                blockIndex.notify()
-            },
-            () => {
-                blockIndex.setEntityPropValue(index, 'filters', redoValue);
-                invalidateBlockImage(index);
-                blockIndex.notify()
-            }
+            () => blockIndex.setEntityPropValue(index, 'filters', ''),
+            () => blockIndex.setEntityPropValue(index, 'filters', redoValue)
         )
     };
 
-    const newBlock = () => {
+    const newBlock = ({ x = 0, y = 0 }) => {
         NewBlockModal.open({
             reserved: blockIndex.getPropValues('value'),
             save: value => {
@@ -786,27 +739,55 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
                         alignToGrid: false,
                         textAlign: 'left',
                         filters: '',
-                        x: 0,
-                        y: 0,
-
+                        x,
+                        y
                     }),
                     () => blockIndex.deleteEntity(index)
-                );
+                )
                 setActiveBlock(blockIndex.getLength() - 1);
                 NewBlockModal.close();
             }
         })
-    };
-
-    const fontEntities = fontIndex.getEntityObjects();
-    const fonts = {};
-    for (let item of fontEntities) {
-        fonts[item.value] = item;
     }
 
-    const getBlockDim = block => {
-        if (!block) return null;
+    const drawBlockToCtx = (ctx, index, dim) => {
+        const block = blockIndex.getEntityObject(index);
+        const font = fonts[block.font].chars.model;
+        const lines = block.text.split('\n');
+        // process lines
+        let posY = 0;
+        for (let y = 0; y < lines.length; y++) {
+            let line = lines[y];
+            // do text align on current line
+            if (block.textAlign !== 'left' && line.length < dim.maxLen) {
+                const pad = block.textAlign === 'right' ? dim.maxLen : (line.length + ((dim.maxLen - line.length) >> 1));
+                line = line.padStart(pad, ' ');
+            }
+            // draw each char in current line
+            for (let x = 0; x < line.length; x++) {
+                const char = font.map[line[x]];
+                if (char) {
+                    ctx.drawImage(
+                        font.image,
+                        char.x,
+                        char.y,
+                        font.width,
+                        font.height,
+                        x * font.width,
+                        posY,
+                        font.width,
+                        font.height
+                    );
+                }
+            }
+            posY += block.lineSpacing + font.height;
+        }
+    }
 
+    const getBlockDim = index => {
+        if (index === null || index >= blockIndex.getLength()) return null;
+
+        const block = blockIndex.getEntityObject(index);
         const font = fonts[block.font];
         const lines = block.text.split('\n');
         let maxLen = 0;
@@ -822,57 +803,25 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
         };
     };
 
-    const getBaseBlockImage = block => {
-        const dim = getBlockDim(block);
-        let canvas = null;
-        if (dim.maxLen > 0 && dim.lines.length > 0) {
-            canvas = getCanvasForDim(dim.width, dim.height);
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingEnabled = false;
-
-            const font = fonts[block.font].chars.model;
-            const lines = block.text.split('\n');
-            // process lines
-            let posY = 0;
-            for (let y = 0; y < lines.length; y++) {
-                let line = lines[y];
-                // do text align on current line
-                if (block.textAlign !== 'left' && line.length < dim.maxLen) {
-                    const pad = block.textAlign === 'right' ? dim.maxLen : (line.length + ((dim.maxLen - line.length) >> 1));
-                    line = line.padStart(pad, ' ');
-                }
-                // draw each char in current line
-                for (let x = 0; x < line.length; x++) {
-                    const char = font.map[line[x]];
-                    if (char) {
-                        ctx.drawImage(
-                            font.image,
-                            char.x,
-                            char.y,
-                            font.width,
-                            font.height,
-                            x * font.width,
-                            posY,
-                            font.width,
-                            font.height
-                        );
-                    }
-                }
-                posY += block.lineSpacing + font.height;
-            }
+    const moveRelativeBlock = (relBlock, block) => {
+        if (blockIndex.getEntityPropValue(block.index, 'autoCenteringX')) relBlock.centerX();
+        if (blockIndex.getEntityPropValue(block.index, 'autoCenteringY')) relBlock.centerY();
+        if (blockIndex.getEntityPropValue(block.index, 'alignToGrid')) {
+            const font = fonts[blockIndex.getEntityPropValue(block.index, 'font')];
+            relBlock.align(font.width, font.height);
         }
-        return canvas;
+        return relBlock;
+    }
+
+    const getActualBlockPos = (block, dim) => {
+        if (!block) return null;
+        const { x, y } = block;
+        const relBlock = new RelativeBlock({width, height}, {x, y, width: dim.width, height: dim.height});
+        return moveRelativeBlock(relBlock, block).getPos();
     };
 
-    const getBlockImage = block => {
-        if (!imagesRef.current[block.value]) {
-            let canvas = getBaseBlockImage(block);
-            if (block.filters) {
-                canvas = wContext.getFilteredCanvasData(block.filters, canvas)
-            }
-            imagesRef.current[block.value] = canvas
-        }
-        return imagesRef.current[block.value]
+    const setEntityProp = prop => {
+        return value => blockIndex.setEntityPropValue(activeBlock, prop, value)
     };
 
     const applyActual = () => {
@@ -884,175 +833,16 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
         eContext.doAction(
             () => {
                 blockIndex.setEntityPropValue(id, 'x', doX);
-                blockIndex.setEntityPropValue(id, 'y', doY);
-                blockIndex.notify();
+                blockIndex.setEntityPropValue(id, 'y', doY)
             },
             () => {
                 blockIndex.setEntityPropValue(id, 'x', undoX);
-                blockIndex.setEntityPropValue(id, 'y', undoY);
-                blockIndex.notify();
+                blockIndex.setEntityPropValue(id, 'y', undoY)
             }
-        );
-    };
-
-    const getActualBlockPos = (block, dim) => {
-        if (!block) return null;
-
-        let x = block.autoCenteringX ?
-            Math.ceil(width / 2) - Math.ceil(dim.width / 2) : block.x;
-
-        let y = block.autoCenteringY ?
-            Math.ceil(height / 2) - Math.ceil(dim.height / 2) : block.y;
-
-        if (block.alignToGrid) {
-            const font = fonts[block.font];
-            x = Math.floor(x / font.width) * font.width;
-            y = Math.floor(y / font.height) * font.height;
-        }
-        return {x, y}
-    };
-
-    const onMove = e => {
-        const rect = screenRef.current.getBoundingClientRect();
-        const undoX = currBlock.x;
-        const undoY = currBlock.y;
-        let lastX = Math.floor((e.clientX - rect.x) / zoom);
-        let lastY = Math.floor((e.clientY - rect.y) / zoom);
-        const offsetX = blockRef.current.x - lastX;
-        const offsetY = blockRef.current.y - lastY;
-        lastX += offsetX;
-        lastY += offsetY;
-
-        wContext.startExclusiveMode('move-block', moveCursor);
-        wContext.addEventListener('mousemove', e => {
-            const currX = Math.floor((e.clientX - rect.x) / zoom);
-            const currY = Math.floor((e.clientY - rect.y) / zoom);
-
-            const cBlock = blockRef.current;
-            const deltaX = currX - lastX;
-            let changed = false;
-            if (deltaX !== 0) {
-                const newX = Math.max(fieldProps.x.min, Math.min(cBlock.x + deltaX, fieldProps.x.max)) + offsetX;
-                if (newX !== cBlock.x) {
-                    blockIndex.setEntityPropValue(activeBlock, 'x', newX);
-                    lastX = newX;
-                    changed = true;
-                }
-            }
-            const deltaY = currY - lastY;
-            if (deltaY !== 0) {
-                const newY = Math.max(fieldProps.y.min, Math.min(cBlock.y + deltaY, fieldProps.y.max)) + offsetY;
-                if (newY !== cBlock.y) {
-                    blockIndex.setEntityPropValue(activeBlock, 'y', newY);
-                    lastY = newY;
-                    changed = true;
-                }
-            }
-            if (changed) {
-                blockIndex.notify();
-            }
-                e.stopPropagation();
-                e.preventDefault();
-        });
-        wContext.addEventListener('mouseup', () => {
-            eContext.doAction(
-                () => {
-                    blockIndex.setEntityPropValue(activeBlock, 'x', lastX);
-                    blockIndex.setEntityPropValue(activeBlock, 'y', lastY);
-                    blockIndex.notify();
-                },
-                () => {
-                    blockIndex.setEntityPropValue(activeBlock, 'x', undoX);
-                    blockIndex.setEntityPropValue(activeBlock, 'y', undoY);
-                    blockIndex.notify();
-                }
-            );
-            setHighlight(false);
-            wContext.endExclusiveMode('move-block')
-        }, {once: true});
-
-        setHighlight(true);
-        if (e.stopPropagation) {
-            e.stopPropagation();
-            e.preventDefault()
-        }
-    };
-    onMoveRef.current = onMove;
-
-    const activateByClick = e => {
-        const rect = screenRef.current.getBoundingClientRect();
-        const clickX = Math.floor((e.clientX - rect.x) / zoom);
-        const clickY = Math.floor((e.clientY - rect.y) / zoom);
-        let i = blockIndex.getLength() - 1;
-        let found = false;
-        while(!found && i >= 0) {
-            const block = blockIndex.getEntityObject(i);
-            const img = getBlockImage(block);
-            if (img) {
-                const pos = getActualBlockPos(block, img);
-                if (pos.x <= clickX && clickX <= (pos.x + img.width - 1) &&
-                    pos.y <= clickY && clickY <= (pos.y + img.height - 1)) {
-                    found = true;
-                    break;
-                }
-            }
-            i--;
-        }
-        if (found) {
-            setActiveBlock(i);
-            const startEvent = {
-                clientX: e.clientX, clientY: e.clientY
-            };
-            requestAnimationFrame(() => {
-                onMoveRef.current(startEvent);
-            });
-        } else {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-    };
-    let moveCursor = 'move';
-    if (currBlock && (currBlock.autoCenteringY || currBlock.autoCenteringX)) {
-        if (!currBlock.autoCenteringX) {
-            moveCursor = 'ew-resize'
-        } else if (!currBlock.autoCenteringY) {
-            moveCursor = 'ns-resize'
-        } else {
-            moveCursor = 'not-allowed'
-        }
-    }
-    const renderScreen = ctx => {
-        ctx.imageSmoothingEnabled = false;
-        ctx.fillStyle = background;
-        ctx.fillRect(0, 0, width * zoom, height * zoom);
-
-        const blocks = blockIndex.getEntityObjects();
-        for (let block of blocks) {
-            const image = getBlockImage(block);
-            if (!image) continue;
-
-            const actual = getActualBlockPos(block, image);
-            if (!actual) continue;
-            ctx.drawImage(
-                image,
-                0,
-                0,
-                image.width,
-                image.height,
-                actual.x * zoom,
-                actual.y * zoom,
-                image.width * zoom,
-                image.height * zoom
-            );
-        }
-    };
-    if (fontIndex.getLength() === 0) {
-        return (
-            <CenterInfo>Preview will be available once you add a font</CenterInfo>
         )
     }
-    const dim = getBlockDim(currBlock);
-    const actual = getActualBlockPos(currBlock, dim);
+
+    const actual = currBlock && getActualBlockPos(currBlock, getBlockDim(activeBlock));
     const font = currBlock && fonts[currBlock.font];
 
     return (
@@ -1073,8 +863,8 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
                         <PropertyGrid>
                             <SelectProp name="Font:" full="h" undo="font" options={fontOptions} value={currBlock.font} set={setEntityProp('font')} />
                             <TupleProp name="Position:" undo="position" wrap
-                               x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
-                               y={currBlock.y} setY={setEntityProp('y')} minY={fieldProps.y.min} maxY={fieldProps.y.max} stepY={currBlock.alignToGrid ? font.height : 1} disabledY={currBlock.autoCenteringY}
+                                       x={currBlock.x} setX={setEntityProp('x')} minX={fieldProps.x.min} maxX={fieldProps.x.max} stepX={currBlock.alignToGrid ? font.width : 1} disabledX={currBlock.autoCenteringX}
+                                       y={currBlock.y} setY={setEntityProp('y')} minY={fieldProps.y.min} maxY={fieldProps.y.max} stepY={currBlock.alignToGrid ? font.height : 1} disabledY={currBlock.autoCenteringY}
                             />
                             <LabelProp name="- actual:" bottomPadding={false}>
                                 <Stack gaps="1" wrap full="h">
@@ -1107,46 +897,13 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
             </EntityStackSections>
 
             <Section key="sc" name="Screen" full inner>
-                <Stack vertical full borders>
-                    <Toolbar>
-                        <ToolGroup>
-                            <Tuple name="Size:" x={width} setX={setWidth} y={height} setY={setHeight} />
-                            <Number name="Zoom:" value={zoom} set={setZoom} min={1} max={9} />
-                            <Color name="Background:" value={background} set={setBackground} />
-                        </ToolGroup>
-                        <Checkbox name="Show marker" value={marker} set={setMarker} />
-                    </Toolbar>
-                    <Block full centerItems padded scroll>
-                        <Overlays className="thin-boxed" width={width * zoom} height={height * zoom}>
-                            <Overlay>
-                                <Canvas render={renderScreen} width={width * zoom} height={height * zoom} />
-                            </Overlay>
-                            <Overlay width={width * zoom} height={width * zoom}>
-                                <Block ref={screenRef} full onMouseDown={activateByClick}>
-                                    {marker && actual &&
-                                        <GridCellMarker
-                                            blink
-                                            posX={actual.x * zoom}
-                                            posY={actual.y * zoom}
-                                            zoom={zoom}
-                                            cursor={moveCursor}
-                                            xdir={
-                                                (DIR.BOTTOM & (currBlock.y + dim.height < height)) |
-                                                DIR.TOP |
-                                                DIR.LEFT |
-                                                (DIR.RIGHT & (currBlock.x + dim.width < width))
-                                            }
-                                            width={Math.min(dim.width, width - currBlock.x) * zoom}
-                                            height={Math.min(dim.height, height - currBlock.y) * zoom}
-                                            onMove={onMove}
-                                            highlight={highlight}
-                                        />
-                                    }
-                                </Block>
-                            </Overlay>
-                        </Overlays>
-                    </Block>
-                </Stack>
+                <ScreenBlocksGrid
+                    blockIndex={blockIndex} active={activeBlock} setActive={setActiveBlock}
+                    color={background} setColor={setBackground}
+                    getBlockDim={getBlockDim} drawBlockToCtx={drawBlockToCtx}
+                    moveRelativeBlock={moveRelativeBlock} apiRef={apiRef} newBlock={newBlock}
+                    width={width} setWidth={setWidth} height={height} setHeight={setHeight}
+                />
             </Section>
 
             <NewBlockModal.content name="New Text Block">
@@ -1177,6 +934,7 @@ function TextPaneEditor({ model, resource }) {
         'From:': tree[0].source,
         'Resources:': tree.length
     };
+
     return (
         <Stack full vertical gaps>
             <EditorSection

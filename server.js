@@ -2,7 +2,7 @@ const path = require("path");
 const cors = require('cors')
 const express = require("express");
 const fs = require('fs');
-const {isValidResourceId, getRelevantResources, ResourceDependencies} = require('./src/app/helper/helper');
+const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('./src/app/helper/helper');
 
 const DIST_DIR = path.join(__dirname, "dist");
 const STATIC_DIR = path.join(__dirname, "src/public");
@@ -113,7 +113,11 @@ const dependencies = new ResourceDependencies(
 );
 
 app.use(cors());
-app.use('/', express.static(STATIC_DIR)); //DIST_DIR));
+// app.use('/resources', express.static(STATIC_DIR)); // STATIC_DIR)); //DIST_DIR));
+app.use('/js', express.static(DIST_DIR + '/js')); // STATIC_DIR)); //DIST_DIR));
+app.use('/audio', express.static(STATIC_DIR + '/audio')); // STATIC_DIR)); //DIST_DIR));
+app.use('/css', express.static(STATIC_DIR + '/css')); // STATIC_DIR)); //DIST_DIR));
+
 app.use(express.json());
 
 app.options('*', cors()); // include before other routes
@@ -357,10 +361,10 @@ app.post('/resources', (req, res) => {
     }
     res.json({found, notFound, invalid});
 });
-/*
-app.get("*", function(req, res) {
+
+app.get("/", function(req, res) {
     res.sendFile(
         path.join(DIST_DIR, "index.html"))
 });
-*/
+
 app.listen(process.env.PORT || PORT);

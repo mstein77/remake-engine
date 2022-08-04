@@ -966,6 +966,20 @@ function Kbd({ value = '', length = null, className }) {
     )
 }
 
+function Coords({x, y, length, xLength, yLength}) {
+    if (length) {
+        xLength = length;
+        yLength = length
+    }
+    return (
+        <Stack gaps="1">
+            <Kbd value={x} length={xLength} />
+            <Block className="less">x</Block>
+            <Kbd value={y} length={yLength} />
+        </Stack>
+    )
+}
+
 function Gradient({colors, vertical, plain}) {
     const aContext = useContext(AvailContext);
     const stops = colors.split(' ');
@@ -3217,8 +3231,8 @@ function useUpdateOnEntityIndexChanges(entityIndex, callback) {
 
     useEffect(
         () => {
-            const callbackAndUpdate = !callback ? update : () => {
-                callback();
+            const callbackAndUpdate = !callback ? update : values => {
+                callback(values);
                 update()
             };
             entityIndex.addListener(callbackAndUpdate);
@@ -3697,6 +3711,7 @@ function useFocusManager({ name, treeView, selector, syncSelection, rootSelect, 
         const params = {
             tab: ((tabIndex === index && !catchFocus) || isCatcher),
             onLeftClick: e => {
+                if (!mounted.current) return;
                 setTabIndex(index);
                 activateIndex(index, e)
                 setCatchFocus(false)
@@ -3805,6 +3820,7 @@ export {
     FontMetrics,
     JsonView,
     Separator,
+    Coords,
 
     useModal,
     useComponentUpdate,

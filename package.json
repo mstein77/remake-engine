@@ -5,10 +5,11 @@
   "main": "public/index.html",
   "scripts": {
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
-    "server": "nodemon server.js",
-    "start": "npm-run-all --parallel server dev",
-    "dev": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
-    "build": "webpack -p --config webpack.prod.js",
+    "start": "node server.js",
+    "dev-start": "nodemon server.js",
+    "dev-server": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
+    "dev": "npm-run-all --parallel dev-server dev-start",
+    "build": "webpack --config webpack.dev.js",
     "test": "mocha"
   },
   "engines": {
@@ -34,13 +35,14 @@
     "clean-webpack-plugin": "^3.0.0",
     "copy-webpack-plugin": "^5.1.1",
     "css-loader": "^1.0.0",
-    "html-webpack-plugin": "^3.2.0",
+    "html-webpack-plugin": "^5.5.0",
     "jsdoc": "^3.6.6",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.4",
     "npm-run-all": "^4.1.5",
     "style-loader": "^0.23.0",
-    "webpack": "^4.38.0",
+    "terser-webpack-plugin": "^5.3.3",
+    "webpack": "^5.73.0",
     "webpack-cli": "^3.3.6",
     "webpack-dev-server": "^3.7.2",
     "webpack-merge": "^4.2.2"

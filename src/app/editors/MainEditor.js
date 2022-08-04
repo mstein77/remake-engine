@@ -1018,7 +1018,7 @@ function BaseAppInner({ contentProvider, active }) {
 
     const rightButtons = useMemo(() => {
         return [
-            {name: 'PoC', padded: true, onClick: () => wContext.stateForward('poc', {})},
+//            {name: 'PoC', padded: true, onClick: () => wContext.stateForward('poc', {})},
             {icon: "build", help: "Editor Settings", padded: "1", onClick: () => wContext.openSettings()},
 //            {name: "Play", icon: "play_circle_outline", padded: "h"},
             {

@@ -1,4 +1,6 @@
 const path = require('path');
+const TerserPlugin = require('terser-webpack-plugin');
+const { DefinePlugin } = require('webpack');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
@@ -11,7 +13,7 @@ module.exports = {
     }, // webpack entry point. Module to start building dependency graph
     output: {
         path: path.resolve(__dirname, 'dist'), // Folder to store generated bundle
-        filename: '[name].bundle.js',  // Name of generated bundle after build
+        filename: 'js/[name].bundle.js',  // Name of generated bundle after build
         publicPath: '/' // public URL of the output directory when referenced in a browser
     },
     module: {
@@ -29,6 +31,15 @@ module.exports = {
             }
         ]
     },
+    optimization: {
+        minimizer: [
+            new TerserPlugin({
+                terserOptions: {
+                    keep_fnames: true,
+                },
+            }),
+        ],
+    },
     resolve: {extensions: ['*', '.js', '.jsx']},
     plugins: [  // Array of plugins to apply to build chunk
         new CleanWebpackPlugin(),
@@ -36,6 +47,9 @@ module.exports = {
             template: __dirname + "/src/public/index.html",
             inject: 'body',
             title: 'Production'
+        }),
+        new DefinePlugin({
+            BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
         })
     ]
 };

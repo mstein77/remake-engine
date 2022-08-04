@@ -1,12 +1,14 @@
-const { d, cloneDeep, getCanvasForDim, getCanvasForIndexMatrix, drawCanvasToAvail } = require('../helper/helper');
+const { d, cloneDeep, getCanvasForBitmap, getCanvasForIndexMatrix, drawCanvasToAvail } = require('../helper/helper');
 const { CellValue } = require('../classes/Grid');
 
 class EntityIndex {
 
     constructor() {
+        this.updates = [];
         this.allIndices = null;
         this.suspendNotifications = false;
         this.valueIndexing = false;
+        this.valueTemplate = '';
     }
 
     addListener(listener) {
@@ -34,8 +36,17 @@ class EntityIndex {
             return;
         }
         for (let listener of this.listeners) {
-            listener();
+            listener(this.updates);
         }
+        this.updates = [];
+    }
+
+    addPropUpdate(index) {
+        this.updates.push({type: 'update', index});
+    }
+
+    addDeleteUpdate(index) {
+        this.updates.push({type: 'delete', index, value: this.getEntityValue(index)});
     }
 
     hasIndex(index) {
@@ -118,10 +129,10 @@ class EntityIndex {
         }
     }
 
-    getEntityObject(index) {
+    getEntityObject(index, props = null) {
         const obj = {};
-        const props = this.getEntityProps();
-        for (let prop of props) {
+        const objProps = props ? props : this.getEntityProps();
+        for (let prop of objProps) {
             obj[prop] = this.getEntityPropValue(index, prop)
         }
         return obj;
@@ -141,6 +152,14 @@ class EntityIndex {
             i++;
         }
         return null;
+    }
+
+    getValueTemplate() {
+        return this.valueTemplate
+    }
+
+    setValueTemplate(value) {
+        this.valueTemplate = value
     }
 
     getPropValues(prop) {
@@ -336,6 +355,7 @@ class EntityIndex {
             if (!indices.includes(i)) {
                 newItems.push(this.getEntityValue(i));
             } else {
+                this.addDeleteUpdate(i);
                 this.deleteEntityPropValues(i);
             }
             i++;
@@ -662,6 +682,10 @@ class TextBlockIndex extends EntityIndex {
             const obj = this.model.blocks[index];
             if (obj) {
                 obj[prop] = value;
+                if (!['x', 'y'].includes(prop)) {
+                    this.addPropUpdate(index)
+                }
+                this.notify()
             }
         }
     }
@@ -2255,6 +2279,7 @@ class SpriteIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
         switch(prop) {
             case 'width':
                 this.model.sprites[this.getEntityValue(index)].dim.x = value;
@@ -2270,7 +2295,6 @@ class SpriteIndex extends EntityIndex {
                 ctx.putImageData(value, sprite.off.x, sprite.off.y);
                 break;
         }
-        super.setEntityPropValue(index, prop, value);
     }
 
     drawEntity(ctx, index, x, y, zoomOrAvail = 1) {
@@ -2423,6 +2447,7 @@ class AnimationIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
         switch(prop) {
             case 'sizeX':
                 if (this.fixSize) return;
@@ -2452,9 +2477,6 @@ class AnimationIndex extends EntityIndex {
                     this.notify();
                 }
                 break;
-
-            default:
-                super.setEntityPropValue(index, prop, value)
         }
     }
 
@@ -2650,6 +2672,7 @@ class EventIndex extends EntityIndex {
     }
 
     setEntityPropValue(index, name, value) {
+        super.setEntityPropValue(index, name, value)
         if (['offsetX', 'offsetY', 'width', 'height'].includes(name)) {
             const id = this.getEntityValue(index);
             this.model[this.key][id][name] = value;
@@ -2667,7 +2690,6 @@ class EventIndex extends EntityIndex {
             }
             this.notify()
         }
-        super.setEntityPropValue(index, name, value)
     }
 
     getEntityPropValue(index, name) {
@@ -2940,32 +2962,55 @@ class ImageBlockIndex extends EntityIndex {
         this.model = model;
         this.items = [];
         for (let i = 0; i < model.imgPos.length; i++) {
-            this.items.push(model.imgResources[i].id);
+            this.items.push(model.imgIds[i]);
         }
+        this.valueTemplate = '$.png';
         this.setSizes()
     }
 
     getEntityProps() {
-        return [ ...super.getEntityProps(), 'width', 'height', 'x', 'y', 'image' ];
+        return [ ...super.getEntityProps(), 'image', 'width', 'height', 'x', 'y' ];
     }
 
     getEntityPropValue(index, prop) {
         if (['width', 'height'].includes(prop)) {
-            const img = this.model.imgResources[index].canvas;
+            const img = this.model.imgCanvas[index];
             return img ? img[prop] : 0
         }
         if (['x', 'y'].includes(prop)) {
             return this.model.imgPos[index][prop]
         }
         if (prop === 'image') {
-            return this.model.imgResources[index].canvas.elem
+            const canvas = this.model.imgCanvas[index];
+            return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
         }
         return super.getEntityPropValue(index, prop)
     }
 
+    setEntityValue(index, value) {
+        if (index >= this.model.imgIds.length) {
+            this.model.imgIds.push(value);
+            this.model.imgPos.push({x: 0, y: 0});
+            this.model.imgCanvas.push(null);
+        }
+        this.items[index] = value;
+    }
+
     setEntityPropValue(index, prop, value) {
+        super.setEntityPropValue(index, prop, value);
         if (['x', 'y'].includes(prop)) {
             this.model.imgPos[index][prop] = value;
+        }
+        if (prop === 'image') {
+            let currCanvas = this.model.imgCanvas[index];
+            if (!currCanvas || currCanvas.width !== value.width || currCanvas.height !== value.height) {
+                currCanvas = getCanvasForBitmap(value);
+                this.model.imgCanvas[index] = currCanvas;
+            } else {
+                currCanvas.getContext('2d').putImageData(value, 0, 0);
+            }
+            this.addPropUpdate(index);
+            this.notify()
         }
     }
 
@@ -2978,6 +3023,7 @@ class ImageBlockIndex extends EntityIndex {
     }
 
     setSizes() {
+        // TODO change
         this.sizeX = 100;
         this.sizeY = 100;
     }
@@ -2998,7 +3044,13 @@ class ImageBlockIndex extends EntityIndex {
         ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
         x += Math.max((width >> 1) - (props.width >> 1), 0);
         y += Math.max((height >> 1) - (props.height >> 1), 0);
-        drawCanvasToAvail(props.image, ctx, x, y, zoomOrAvail, dim, {x: 0, y: 0});
+        drawCanvasToAvail(getCanvasForBitmap(props.image), ctx, x, y, zoomOrAvail, dim, {x: 0, y: 0});
+    }
+
+    deleteEntityPropValues(index) {
+        this.model.imgIds.splice(index, 1);
+        this.model.imgPos.splice(index, 1);
+        this.model.imgCanvas.splice(index, 1);
     }
 }
 
