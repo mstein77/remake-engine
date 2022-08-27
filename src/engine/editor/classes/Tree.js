@@ -1,4 +1,4 @@
-import { AbstractTreeView } from "../classes";
+import { AbstractTreeView } from "../classes.js";
 
 class ScreenTreeView extends AbstractTreeView {
 

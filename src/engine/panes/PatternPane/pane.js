@@ -1,4 +1,4 @@
-import { PatternPaneConfig } from "./config";
+import { PatternPaneConfig } from "./config.js";
 
 class PatternPane {
     constructor(config) {

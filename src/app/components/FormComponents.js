@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
-import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper"
+import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../helper/helper.js"
 import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
 import { WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox,
     GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useAnimationPlayers, useMounted,

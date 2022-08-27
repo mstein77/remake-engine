@@ -1,13 +1,13 @@
 import React, { useContext, useMemo, useEffect, useRef, useState } from "react";
-import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../../helper/helper"
-import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents";
+import { d, round, clamp, isEventInRect, drawCanvasToAvail, getCanvasForBitmap, copy2clipboard, hex2rgb, rgb2hex, getParsedCssValueRec, Players, getEmptyImageData } from "../../helper/helper.js"
+import { Block, Stack, Grid, Tooltip, Overlays, Overlay, DIR } from "./LayoutComponents.js";
 import { WindowContext, EditorContext, useModal, PropertyGrid, Kbd, Canvas, Gradient, ColorBox,
     GradientBox, Icon, SideTab, SideTabs, HotKeyKeys, useFocusKeyBindings, useAnimationPlayers, useMounted,
     useFocusManager, useCssProps, useCachedState, useCallAfterwards, ButtonStack, useComponentUpdate, AvailContext,
     MinMaxCtx, CanvasCircleMarker, Portal, BackgroundCtx, EditorCtx, Coords
-} from "./BasicComponents";
-import { EntityPicker } from "./EntityComponents";
-import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents";
+} from "./BasicComponents.js";
+import { EntityPicker } from "./EntityComponents.js";
+import { BitmapSelector, useBitmapSelectionModal, useEditBitmapModal } from "./EditorComponents.js";
 
 const FormContext = React.createContext();
 

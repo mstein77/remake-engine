@@ -1,11 +1,11 @@
 import ReactDOM from "react-dom";
 import React, { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, HotKeyKeys, HotKeySingleKeys, HotKeySkipValues, useComponentUpdate, useModal, WindowContext, CssContext, WindowCtx } from "../components/BasicComponents";
-import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
-import { ButtonStack } from "../components/BasicComponents";
-import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents";
-import { NameDialog, useConfirmDialog, useContentSwitcher } from "../components/EditorComponents";
-import { d, getParsedCssValueRec } from "../../helper/helper";
+import { BackgroundCtx, CssCtx, Icon, PropertyGrid, Ruler, SideTab, SideTabs, HotKeyKeys, HotKeySingleKeys, HotKeySkipValues, useComponentUpdate, useModal, WindowContext, CssContext, WindowCtx } from "../components/BasicComponents.js";
+import { Block, DIR, Grid, Stack } from "../components/LayoutComponents.js";
+import { ButtonStack } from "../components/BasicComponents.js";
+import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents.js";
+import { NameDialog, useConfirmDialog, useContentSwitcher } from "../components/EditorComponents.js";
+import { d, getParsedCssValueRec } from "../../helper/helper.js";
 
 function PresetsManager({ id, set, config, ...props }) {
     const wContext = useContext(WindowContext);

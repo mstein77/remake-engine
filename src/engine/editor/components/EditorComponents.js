@@ -1,20 +1,20 @@
 import ReactDOM from "react-dom";
 import React, { useContext, useMemo, useState, useRef, useEffect } from "react";
-import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex";
+import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex.js";
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, ToolGroup,
     useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext, useCachedState
-} from "./BasicComponents";
+} from "./BasicComponents.js";
 import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
     getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
-} from "../../helper/helper";
-import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
-import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents";
-import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents";
-import { FlexGrid, BaseGrid, PictureCell, GridCellMarker } from "./GridComponents";
-import { BitmapGrid } from "../classes/Grid";
-import { BitmapCellProvider } from "../classes/CellProvider";
-import { BackgroundControl, Icon } from "./BasicComponents";
-import { CellValue, CellSelection } from "../classes"
+} from "../../helper/helper.js";
+import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents.js";
+import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents.js";
+import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents.js";
+import { FlexGrid, BaseGrid, PictureCell, GridCellMarker } from "./GridComponents.js";
+import { BitmapGrid } from "../classes/Grid.js";
+import { BitmapCellProvider } from "../classes/CellProvider.js";
+import { BackgroundControl, Icon } from "./BasicComponents.js";
+import { CellValue, CellSelection } from "../classes.js"
 
 function useImageCache(blockIndex) {
     const [ cache ] = useState(() => new Map());

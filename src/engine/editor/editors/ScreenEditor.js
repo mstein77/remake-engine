@@ -1,13 +1,13 @@
 import React, { useContext, useMemo, useRef, useState } from "react";
-import { AvailContext, EditorCtx, AvailContextProvider, Section, Toolbar, useCssProps, Separator, WindowContext, useCachedState } from "../components/BasicComponents";
-import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents";
-import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
-import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
-import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../../helper/helper";
-import { useTracker, TrackingCtx } from "../components/GridComponents";
-import { FullTree } from "../components/EditorComponents";
-import { PocEditor } from "./PocEditor";
-import { ScreenTreeView } from "../classes/Tree";
+import { AvailContext, EditorCtx, AvailContextProvider, Section, Toolbar, useCssProps, Separator, WindowContext, useCachedState } from "../components/BasicComponents.js";
+import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents.js";
+import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents.js";
+import { Button, Number, Radio, Checkbox } from "../components/FormComponents.js";
+import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../../helper/helper.js";
+import { useTracker, TrackingCtx } from "../components/GridComponents.js";
+import { FullTree } from "../components/EditorComponents.js";
+import { PocEditor } from "./PocEditor.js";
+import { ScreenTreeView } from "../classes/Tree.js";
 
 const coordTextureShader = {
     id: 'coordTexture',

@@ -1,6 +1,6 @@
-import inst from "./instances";
-import { d, isValidResourceId } from "../helper/helper";
-import { BackgroundPane } from "../panes/BackgroundPane/pane";
+import inst from "./instances.js";
+import { d, isValidResourceId } from "../helper/helper.js";
+import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
 
 class Game {
 

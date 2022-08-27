@@ -1,6 +1,6 @@
-import { EntityIndex } from "../classes";
-import { d, cloneDeep, getCanvasForBitmap, getCanvasForIndexMatrix, drawCanvasToAvail } from "../../helper/helper";
-import { CellValue } from "../classes";
+import { EntityIndex } from "../classes.js";
+import { d, cloneDeep, getCanvasForBitmap, getCanvasForIndexMatrix, drawCanvasToAvail } from "../../helper/helper.js";
+import { CellValue } from "../classes.js";
 
 class SimpleIndex extends EntityIndex {
     constructor(model, key = 'items') {

@@ -1,5 +1,5 @@
 import React, {useContext, useEffect, useRef, useState} from "react";
-import { d, hex2rgb, hex2rgbaArray } from "../helper/helper";
+import { d, hex2rgb, hex2rgbaArray } from "../helper/helper.js";
 import { mat4, glMatrix } from "gl-matrix";
 import { Block, Stack } from "./LayoutComponents";
 import { AvailContext, AvailContextProvider, PropertyGrid } from "./BasicComponents";

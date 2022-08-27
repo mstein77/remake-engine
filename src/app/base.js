@@ -1,6 +1,6 @@
 import React, {useState, useContext, useMemo, useRef, useEffect, Fragment} from "react";
 import ReactDOM from "react-dom";
-import { d, getCanvasForDim } from "../app/helper/helper";
+import { d, getCanvasForDim } from "../app/helper/helper.js";
 import { useModal, useComponentUpdate, useRefocus, Ruler, OkCancelForm, UndoRedoButtons, EditorCtx, EditorSection, EditorContext, WindowContext, ActionBarContent, Section, EntityStack, EntityStackSections, Canvas, ScrollArea, CssCtx, BackgroundControl, ToolGroup, WindowCtx, BackgroundCtx, AvailContext, AvailContextProvider, PropertyGrid, ValueProp, SideTabs, SideTab } from "./components/BasicComponents"
 import { Form, Submit, Input, Select, CheckboxProp, Radio, LabelProp, NumberProp, ColorProp, Button, InputProp, RadioProp, Number, Checkbox, Tuple, TupleProp, SelectProp, TextArea } from "./components/FormComponents";
 import { DIR, Block, Stack, Grid, Overlays, Overlay, OverlayContext } from "./components/LayoutComponents";

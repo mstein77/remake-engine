@@ -1,11 +1,11 @@
 import ReactDOM from "react-dom";
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
-import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../../helper/helper"
-import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents";
-import { Button, Color, Submit, OkCancelForm } from "./FormComponents";
-import { ImageIndex, ColorIndex } from "../classes/EntityIndex";
-import { defaultValues } from "../settings";
-import { CellValue, CellSelection } from "../classes";
+import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../../helper/helper.js"
+import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents.js";
+import { Button, Color, Submit, OkCancelForm } from "./FormComponents.js";
+import { ImageIndex, ColorIndex } from "../classes/EntityIndex.js";
+import { defaultValues } from "../settings.js";
+import { CellValue, CellSelection } from "../classes.js";
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();

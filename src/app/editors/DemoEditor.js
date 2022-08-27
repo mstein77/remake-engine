@@ -2,7 +2,7 @@ import React, { useState } from "react"
 import {Stack, Block, DIR} from "../components/LayoutComponents"
 import { TextArea, Button, Radio, Checkbox, Slider, Input } from "../components/FormComponents"
 import {Kbd, Icon, Canvas, Gradient, PropertyGrid } from "../components/BasicComponents";
-import { d } from "../helper/helper"
+import { d } from "../helper/helper.js"
 
 function DemoEditor({}) {
     const onClick = value => d('CLICK', value);

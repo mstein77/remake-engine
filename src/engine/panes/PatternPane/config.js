@@ -1,4 +1,4 @@
-import { Config } from "../../core/config";
+import { Config } from "../../core/config.js";
 
 class PatternPaneConfig extends Config {
 }

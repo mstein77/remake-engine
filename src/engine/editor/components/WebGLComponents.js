@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { d, hex2rgb, hex2rgbaArray } from "../../helper/helper";
+import { d, hex2rgb, hex2rgbaArray } from "../../helper/helper.js";
 import { mat4, glMatrix } from "gl-matrix";
-import { Block, Stack } from "./LayoutComponents";
-import { AvailContext, AvailContextProvider, PropertyGrid } from "./BasicComponents";
-import { NumberProp } from "./FormComponents";
+import { Block, Stack } from "./LayoutComponents.js";
+import { AvailContext, AvailContextProvider, PropertyGrid } from "./BasicComponents.js";
+import { NumberProp } from "./FormComponents.js";
 
 function arraysNotEqual(a, b) {
     if (a.length !== b.length) return true;

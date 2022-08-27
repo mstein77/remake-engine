@@ -1,6 +1,6 @@
-import { d } from "./helper/helper";
-import { Game, Screen } from "./core/classes";
-import { BackgroundPane } from "./panes/BackgroundPane/pane";
+import { d } from "./helper/helper.js";
+import { Game, Screen } from "./core/classes.js";
+import { BackgroundPane } from "./panes/BackgroundPane/pane.js";
 import '../public/css/old.css';
 
 d('Let the build begin...');

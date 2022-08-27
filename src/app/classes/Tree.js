@@ -1,4 +1,4 @@
-import { d, without, union } from "../helper/helper";
+import { d, without, union } from "../helper/helper.js";
 
 /**
  * Usage:

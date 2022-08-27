@@ -1,16 +1,16 @@
 import React, { useContext, useMemo, useRef, useState } from "react";
-import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../../helper/helper";
-import { Button, Input, Number, Checkbox, Radio, Select } from "./FormComponents";
+import { Block, DIR, Stack } from "./LayoutComponents.js";
+import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../../helper/helper.js";
+import { Button, Input, Number, Checkbox, Radio, Select } from "./FormComponents.js";
 import {
     EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon, AvailContextProvider, Toolbar, ToolGroup, ScrollArea,
     BackgroundControl, useUpdateOnEntityIndexChanges, useCallAfterwards, useCachedState, AvailContext, WindowContext, useCssProps, UndoRedoButtons, useFocusManager, useMultiSelector, Separator
-} from "./BasicComponents";
-import { FlexGrid } from "./GridComponents";
-import { useFilterPipelineModal } from "./EditorComponents";
-import { CellSelection } from "../classes";
-import { WrappingIndexGrid } from "../classes/Grid";
-import { PictureCell, TrackingContext, PictureAndTextCell } from "./GridComponents";
+} from "./BasicComponents.js";
+import { FlexGrid } from "./GridComponents.js";
+import { useFilterPipelineModal } from "./EditorComponents.js";
+import { CellSelection } from "../classes.js";
+import { WrappingIndexGrid } from "../classes/Grid.js";
+import { PictureCell, TrackingContext, PictureAndTextCell } from "./GridComponents.js";
 
 function EntityStack({ entityIndex, set, getName = item => item.value, getInfo, undo, area, emptyText, deselect, children, ...props }) {
     const eContext = useContext(EditorContext);

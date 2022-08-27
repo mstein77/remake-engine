@@ -1,11 +1,19 @@
-const path = require("path");
-const cors = require('cors')
-const express = require("express");
-const fs = require('fs');
-const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('./src/app/helper/helper');
+import * as path from 'node:path';
+import * as fs from  'node:fs';
+import express from 'express';
+import cors from 'cors';
+import { isValidResourceId, ResourceDependencies } from '../engine/helper/helper.js';
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import * as dotenv from "dotenv";
+
+const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../../');
+dotenv.config({path: __dirname + '/.env'});
 
 const DIST_DIR = path.join(__dirname, "dist");
 const STATIC_DIR = path.join(__dirname, "src/public");
+const RESOURCE_DIR = path.join(__dirname, 'resources');
+
 const PORT = 8080;
 const app = express();
 
@@ -20,7 +28,7 @@ const removeEmptyResourceDirs = (type, id) => {
     }
     const parts = id.split('/');
     parts.pop();
-    const basePath = './resources/' + type + '/';
+    const basePath = DIST_DIR + '/' + type + '/';
     try {
         while(parts.length > 0) {
             const path = basePath + parts.join('/');
@@ -42,15 +50,15 @@ const getResourceFilePath = (type, id) => {
     let file;
     switch(type) {
         case 'json':
-            file = `./resources/json/${id}.json`;
+            file = RESOURCE_DIR + `/json/${id}.json`;
             break;
 
         case 'image':
-            file = `./resources/image/${id}`;
+            file = RESOURCE_DIR + `/image/${id}`;
             break;
 
         case 'audio':
-            file = `./resources/audio/${id}`;
+            file = RESOURCE_DIR + `/audio/${id}`;
             break;
     }
     return file;
@@ -75,8 +83,8 @@ const deleteResource = (type, id) => {
     return success;
 };
 
-const directFilePath = './resources/direct.json';
-const indirectFilePath = './resources/indirect.json';
+const directFilePath = RESOURCE_DIR + '/direct.json';
+const indirectFilePath = RESOURCE_DIR + '/indirect.json';
 
 const dependencies = new ResourceDependencies(
     () => {
@@ -186,7 +194,7 @@ app.post('/store', (req, res) => {
         }
         parts.pop();
 
-        const path = `./resources/${type}/` + parts.join('/');
+        const path = RESOURCE_DIR + `/${type}/` + parts.join('/');
         try {
             if (!fs.existsSync(path)) {
                 fs.mkdirSync(path, {recursive: true});
@@ -223,7 +231,7 @@ app.post('/store', (req, res) => {
             try {
                 switch(resource.type) {
                     case 'json':
-                        file = `./resources/json/${resource.id}.json`;
+                        file = RESOURCE_DIR + `/json/${resource.id}.json`;
                         if (resource.data !== null) {
                             const content = JSON.stringify(resource.data);
                             fs.writeFileSync(file, content);
@@ -232,7 +240,7 @@ app.post('/store', (req, res) => {
                         break;
 
                     case 'image':
-                        file = `./resources/image/${resource.id}`;
+                        file = RESOURCE_DIR + `/image/${resource.id}`;
                         if (resource.data !== null) {
                             const parts = resource.data.split('base64,', 2);
                             if (parts.length === 2) {
@@ -243,7 +251,7 @@ app.post('/store', (req, res) => {
                         break;
 
                     case 'audio':
-                        file = `./resources/audio/${resource.id}`;
+                        file = RESOURCE_DIR + `/audio/${resource.id}`;
                         if (resource.data !== null) {
                             const parts = resource.data.split('base64,', 2);
                             if (parts.length === 2) {

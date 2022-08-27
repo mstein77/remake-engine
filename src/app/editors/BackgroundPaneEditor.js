@@ -5,7 +5,7 @@ import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentU
 import { ImageBlockIndex } from "../classes/EntityIndex";
 import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "../components/EditorComponents";
 import { Block, Stack } from '../components/LayoutComponents';
-import { d, getEmptyImageData, getUniqueName } from "../helper/helper";
+import { d, getEmptyImageData, getUniqueName } from "../helper/helper.js";
 import { EntityPicker } from "../components/EntityComponents";
 
 function BackgroundPreview({ model, imageIndex, newImage, width, height, active, setActive, fieldProps }) {

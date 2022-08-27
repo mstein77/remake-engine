@@ -1,8 +1,8 @@
 import React, { Suspense, useState, useEffect } from "react";
-import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../../helper/helper';
-import { MainEditor } from "../editors/MainEditor";
-import { ScreenEditor } from "../editors/ScreenEditor";
-import { PocEditor } from "../editors/PocEditor";
+import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../../helper/helper.js';
+import { MainEditor } from "../editors/MainEditor.js";
+import { ScreenEditor } from "../editors/ScreenEditor.js";
+import { PocEditor } from "../editors/PocEditor.js";
 
 function EditorApp(props) {
     const [ ready, setReady ] = useState(false);
@@ -152,7 +152,7 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 // model.blocks = resource.blocks;
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                const Editor = React.lazy(() => import("../../panes/BackgroundPane/editor/component"));
+                const Editor = React.lazy(() => import("../../panes/BackgroundPane/editor/component.js"));
                 return <Suspense fallback={<div>Loading...</div>}><Editor resource={resource} model={model} /></Suspense>
             }
         },

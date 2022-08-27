@@ -1,4 +1,4 @@
-import { CellValue, Grid, CellRawValue } from "../classes";
+import { CellValue, Grid, CellRawValue } from "../classes.js";
 
 class CellTileValue extends CellValue {
     constructor() {

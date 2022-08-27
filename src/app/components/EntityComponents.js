@@ -1,6 +1,6 @@
 import React, { useContext, useMemo, useRef, useState} from "react";
 import { Block, DIR, Stack } from "./LayoutComponents";
-import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../helper/helper";
+import { d, noop, clamp, getEmptyImageData, ucfirst, intersect, without, getNextUniqueName } from "../helper/helper.js";
 import { Button, Input, Number, Checkbox, Radio, Select } from "./FormComponents";
 import {
     EditorCtx, useAnimationPlayers, CenterInfo, EditorContext, ButtonStack, Section, Canvas, Kbd, Icon, AvailContextProvider, Toolbar, ToolGroup, ScrollArea,

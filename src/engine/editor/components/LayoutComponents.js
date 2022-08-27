@@ -1,6 +1,6 @@
 import React, { Fragment, useState, useRef, useEffect, useContext } from "react";
-import { Portal, WindowContext } from "./BasicComponents"
-import { d } from '../../helper/helper';
+import { Portal, WindowContext } from "./BasicComponents.js"
+import { d } from '../../helper/helper.js';
 
 const OverlayContext = React.createContext();
 

@@ -1,7 +1,7 @@
 import React, { useState, useContext, useRef, useEffect, useMemo } from "react";
-import { Stack, Block, DIR, Overlay, Overlays } from "../components/LayoutComponents";
-import { d, clamp, hex2rgb, hex2rgbaArray, getSinePath, getCosinePath } from "../../helper/helper";
-import { Button, OkCancelForm, Number } from "../components/FormComponents";
+import { Stack, Block, DIR, Overlay, Overlays } from "../components/LayoutComponents.js";
+import { d, clamp, hex2rgb, hex2rgbaArray, getSinePath, getCosinePath } from "../../helper/helper.js";
+import { Button, OkCancelForm, Number } from "../components/FormComponents.js";
 import { WindowContext, useModal,
     Icon,
     useComponentUpdate,
@@ -19,11 +19,11 @@ import { WindowContext, useModal,
     LoadingIndicator,
     CenterInfo,
     useDebugMount
-} from "../components/BasicComponents";
-import { useConfirmDialog } from "../components/EditorComponents";
-import { ColorIndex } from "../classes/EntityIndex";
-import { EntityStack } from "../components/EntityComponents";
-import { Scene3DCanvas, Scene, Object3D } from "../components/WebGLComponents";
+} from "../components/BasicComponents.js";
+import { useConfirmDialog } from "../components/EditorComponents.js";
+import { ColorIndex } from "../classes/EntityIndex.js";
+import { EntityStack } from "../components/EntityComponents.js";
+import { Scene3DCanvas, Scene, Object3D } from "../components/WebGLComponents.js";
 import { mat4 } from "gl-matrix";
 
 function FocusMarker({ reset, items, page }) {

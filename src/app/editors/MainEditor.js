@@ -4,7 +4,7 @@ import { Block, DIR, Grid, Stack } from "../components/LayoutComponents";
 import { ButtonStack } from "../components/BasicComponents";
 import { PropSection, OkCancelForm, Button, Select, Input, CssGradient, CheckboxProp, Radio, LabelProp, Checkbox, Number, Color, NumberProp, VirtualNumber } from "../components/FormComponents";
 import { NameDialog, useConfirmDialog, useContentSwitcher } from "../components/EditorComponents";
-import { d, getParsedCssValueRec } from "../helper/helper";
+import { d, getParsedCssValueRec } from "../helper/helper.js";
 import ReactDOM from "react-dom";
 
 function PresetsManager({ id, set, config, ...props }) {

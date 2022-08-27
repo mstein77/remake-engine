@@ -1,6 +1,6 @@
 import React, { useState, useContext, useRef, useEffect, useMemo } from "react";
 import { Stack, Block } from "../components/LayoutComponents";
-import { d, drawCanvasToAvail, getColorsFromCanvas, getCanvasForBitmap, getEmptyImageData } from "../helper/helper";
+import { d, drawCanvasToAvail, getColorsFromCanvas, getCanvasForBitmap, getEmptyImageData } from "../helper/helper.js";
 import { InputProp, LabelProp, OkCancelForm } from "../components/FormComponents";
 import { Canvas, Section, EditorSection, Kbd, useModal, useComponentUpdate, EditorContext, useCssProps, PropertyGrid } from "../components/BasicComponents";
 import { useBitmapSelectionModal, useEditBitmapModal, useExportModal } from "../components/EditorComponents";

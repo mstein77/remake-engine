@@ -1,5 +1,5 @@
-import { d } from '../../helper/helper';
-import { CellSelection, CellProvider } from "../classes"
+import { d } from '../../helper/helper.js';
+import { CellSelection, CellProvider } from "../classes.js"
 
 class TilesMapCellProvider extends CellProvider {
 

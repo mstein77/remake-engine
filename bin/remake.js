@@ -62,7 +62,7 @@ try {
 
     const hasPackage = (packageJson.dependencies !== undefined && packageJson.dependencies[enginePackage] !== undefined);
     if (!hasPackage) {
-        const out = exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/deployment');
+        const out = exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild');
         console.log(out);
         packageJson = readJson(packageJsonPath)
     }

@@ -1,7 +1,7 @@
 import React, { useContext, useMemo, useState, useRef } from "react";
 import { EditorSection, Kbd, EditorContext, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, ButtonStack, WindowContext } from "../components/BasicComponents";
 import { DIR, Block, Stack } from "../components/LayoutComponents";
-import { d, RelativeBlock, getEmptyImageData, getColorsFromCanvas } from "../helper/helper";
+import { d, RelativeBlock, getEmptyImageData, getColorsFromCanvas } from "../helper/helper.js";
 import { useExportModal, NameDialog, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal, ScreenBlocksGrid } from "../components/EditorComponents";
 import { Checkbox, Input, InputProp, KeyInput, NumberProp, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "../components/FormComponents";
 import { AssignIndex, FontIndex, CharIndex, TextBlockIndex, ColorIndex } from "../classes/EntityIndex";

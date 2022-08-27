@@ -1,4 +1,4 @@
-import inst from "../core/instances";
+import inst from "../core/instances.js";
 
 function d(main, ...params) {
     let stack = null;

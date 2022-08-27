@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 
-import EditorApp from './components/EditorApp';
+import EditorApp from './components/EditorApp.js';
 import '../../public/css/base.css';
 import '../../public/css/layout.css';
 

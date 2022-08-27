@@ -5,7 +5,7 @@ import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, Center
 } from "./BasicComponents";
 import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
     getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
-} from "../helper/helper";
+} from "../helper/helper.js";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents";
 import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents";
 import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents";

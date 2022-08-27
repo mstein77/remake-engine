@@ -2,18 +2,20 @@
   "name": "2dfireengine",
   "version": "1.0.0",
   "description": "2D Game Engine",
-  "main": "public/index.html",
+  "mainx": "public/index.html",
+  "type": "module",
   "scripts": {
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
     "start": "node server.js",
     "dev-start": "nodemon server.js",
+    "dev-start2": "nodemon --es-module-specifier-resolution=node src/server/index.js",
     "dev-server": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
     "dev": "npm-run-all --parallel dev-server dev-start",
     "build": "webpack --config webpack.dev.js",
     "test": "mocha",
-    "dev2": "npm-run-all --parallel dev-start dev2-pack",
-    "dev2-pack": "webpack-dev-server --open --config webpack.engine.js --history-api-fallback --inline --progress ",
-    "build2": "webpack --config webpack.engine.js"
+    "dev2": "npm-run-all --parallel dev-start2 dev2-pack",
+    "dev2-pack": "webpack-dev-server --open --config webpack.engine.cjs --history-api-fallback --inline --progress ",
+    "build2": "webpack --config webpack.engine.cjs"
   },
   "engines": {
     "node": "12.13.1"

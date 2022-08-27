@@ -15,7 +15,7 @@ import React, { useContext, useMemo, useRef, useState } from "react";
 import { Object3D, Scene, Scene3DCanvas } from "../components/WebGLComponents";
 import { Block, Overlay, Overlays, Stack, DIR } from "../components/LayoutComponents";
 import { Button, Number, Radio, Checkbox } from "../components/FormComponents";
-import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper";
+import { d, reverse, clamp, getSinePath, hex2rgbaArray} from "../helper/helper.js";
 import { useTracker, TrackingCtx } from "../components/GridComponents";
 import { FullTree } from "../components/EditorComponents";
 import {PocEditor} from "./PocEditor";

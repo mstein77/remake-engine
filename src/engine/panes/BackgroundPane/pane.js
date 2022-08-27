@@ -1,6 +1,6 @@
-import { d, getCanvasForDim, getConfigFromInput } from "../../helper/helper"
-import { BackgroundPaneConfig } from "./config";
-import { DivContainer } from "../../core/classes";
+import { d, getCanvasForDim, getConfigFromInput } from "../../helper/helper.js"
+import { BackgroundPaneConfig } from "./config.js";
+import { DivContainer } from "../../core/classes.js";
 
 export class BackgroundPane {
 

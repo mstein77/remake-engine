@@ -2,7 +2,7 @@ import React, {useContext, useEffect, useMemo, useRef, useState} from "react";
 import { Block, DIR, Overlay, Overlays, Grid, Stack, handleLeftRightClick } from "./LayoutComponents";
 import { ButtonStack, useAnimationPlayers, AvailContext, AvailContextProvider, CssContext, Canvas, ScrollArea, WindowContext, EditorContext, useCallAfterwards, useCssProps, useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd } from "./BasicComponents";
 import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
-import { d, clamp, areDisjoint, getCanvasForBitmap, drawEventsValue } from "../helper/helper";
+import { d, clamp, areDisjoint, getCanvasForBitmap, drawEventsValue } from "../helper/helper.js";
 import { BitmapCellProvider, CellSelection } from "../classes/CellProvider";
 import { BitmapGrid, CellValue } from "../classes/Grid";
 import { useFilterPipelineModal } from "./EditorComponents";

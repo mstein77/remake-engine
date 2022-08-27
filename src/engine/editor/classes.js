@@ -1,4 +1,4 @@
-import { cloneDeep, union, without } from "../helper/helper";
+import { cloneDeep, union, without } from "../helper/helper.js";
 
 class CellSelection {
 

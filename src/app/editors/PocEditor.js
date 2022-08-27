@@ -1,6 +1,6 @@
 import React, { Fragment, useState, useContext, useRef, useEffect, useMemo } from "react";
 import { Stack, Block, DIR, Overlay, Overlays } from "../components/LayoutComponents";
-import { d, clamp, hex2rgb, hex2rgbaArray, getSinePath, getCosinePath } from "../helper/helper";
+import { d, clamp, hex2rgb, hex2rgbaArray, getSinePath, getCosinePath } from "../helper/helper.js";
 import { Button, OkCancelForm, Number } from "../components/FormComponents";
 import { WindowContext, useModal,
     Icon,

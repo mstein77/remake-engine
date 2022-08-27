@@ -3,7 +3,7 @@ import {EditorSection, ButtonStack, CenterInfo, SideTabs, SideTab, EditorCtx, Kb
     Toolbar, useModal, PropertyGrid, Section, JsonView, useCssProps, useComponentUpdate, useUpdateOnEntityIndexChanges
 } from "../components/BasicComponents";
 import { DIR, Block, Stack, Grid } from "../components/LayoutComponents";
-import { d, getCanvasForDim, getColorsFromCanvas, getCanvasForEventMatrix, getCanvasForIndexMatrix, getEmptyImageData, cloneDeep } from "../helper/helper";
+import { d, getCanvasForDim, getColorsFromCanvas, getCanvasForEventMatrix, getCanvasForIndexMatrix, getEmptyImageData, cloneDeep } from "../helper/helper.js";
 import { useBitmapSelectionModal, AnimationManager, useExportModal } from "../components/EditorComponents";
 import { Bitmap, Entity, InputProp, NumberProp, LabelProp, CheckboxProp, FullProp, Button, Tuple, TupleProp, BitmapProp, PositionPickerProp, OkCancelForm, TextAreaProp, EntityProp } from "../components/FormComponents";
 import { BaseGrid, TrackingCtx, useTracker } from "../components/GridComponents";

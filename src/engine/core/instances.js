@@ -1,5 +1,5 @@
-import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies } from "../helper/helper";
-import { ImageResource } from "./classes";
+import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies } from "../helper/helper.js";
+import { ImageResource } from "./classes.js";
 
 /**
  * @type {ResourceLoader}

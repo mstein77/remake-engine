@@ -1,6 +1,6 @@
 import React, {useMemo, useEffect, useState, Fragment} from "react";
 import ReactDOM from "react-dom";
-import {d} from "../app/helper/helper";
+import {d} from "../app/helper/helper.js";
 import {Block, Stack, Grid, Overlays, Overlay} from "./components/LayoutComponents";
 import {getExamples} from "./generated/LayoutExamples";
 

@@ -1,12 +1,12 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Block, DIR, Overlay, Overlays, Grid, Stack, handleLeftRightClick } from "./LayoutComponents";
-import { ButtonStack, useAnimationPlayers, AvailContext, AvailContextProvider, CssContext, Canvas, ScrollArea, WindowContext, EditorContext, useCallAfterwards, useCssProps, useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd } from "./BasicComponents";
-import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents";
-import { d, clamp, areDisjoint, getCanvasForBitmap, drawEventsValue } from "../../helper/helper";
-import { BitmapCellProvider } from "../classes/CellProvider";
-import { BitmapGrid } from "../classes/Grid";
-import { CellValue, CellSelection } from "../classes";
-import { useFilterPipelineModal } from "./EditorComponents";
+import { Block, DIR, Overlay, Overlays, Grid, Stack, handleLeftRightClick } from "./LayoutComponents.js";
+import { ButtonStack, useAnimationPlayers, AvailContext, AvailContextProvider, CssContext, Canvas, ScrollArea, WindowContext, EditorContext, useCallAfterwards, useCssProps, useCachedState, useComponentUpdate, useMounted, Toolbar, ToolGroup, UndoRedoButtons, BackgroundControl, Kbd } from "./BasicComponents.js";
+import { Button, Checkbox, Number, Select, Tuple } from "./FormComponents.js";
+import { d, clamp, areDisjoint, getCanvasForBitmap, drawEventsValue } from "../../helper/helper.js";
+import { BitmapCellProvider } from "../classes/CellProvider.js";
+import { BitmapGrid } from "../classes/Grid.js";
+import { CellValue, CellSelection } from "../classes.js";
+import { useFilterPipelineModal } from "./EditorComponents.js";
 
 function GridMarkerOverlay({ markerType, markerX, markerY, posX, posY, markerWidth, markerHeight, width, height, onDoubleClick, onRightClick, initMove, initResize, autoMatrix }) {
     const gContext = useContext(GridContext);
