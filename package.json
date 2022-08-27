@@ -15,7 +15,8 @@
     "test": "mocha",
     "dev2": "npm-run-all --parallel dev-start2 dev2-pack",
     "dev2-pack": "webpack-dev-server --open --config webpack.engine.cjs --history-api-fallback --inline --progress ",
-    "build2": "webpack --config webpack.engine.cjs"
+    "build2": "webpack --config webpack.engine.cjs",
+    "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
   "engines": {
     "node": "12.13.1"
@@ -55,14 +56,14 @@
     "mini-css-extract-plugin": "^2.6.1",
     "mocha": "^8.2.1",
     "nodemon": "^2.0.4",
-    "npm-run-all": "^4.1.5",
     "style-loader": "^0.23.0",
     "terser-webpack-plugin": "^5.3.3",
     "webpack": "^5.73.0",
     "webpack-bundle-analyzer": "^4.5.0",
     "webpack-cli": "^3.3.6",
     "webpack-dev-server": "^3.7.2",
-    "webpack-merge": "^4.2.2"
+    "webpack-merge": "^4.2.2",
+    "npm-run-all": "^4.1.5"
   },
   "dependencies": {
     "cors": "^2.8.5",
