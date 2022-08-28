@@ -1,13 +1,7 @@
-import { d } from "./helper/helper.js";
-import { Game, Screen } from "./core/classes.js";
-import { BackgroundPane } from "./panes/BackgroundPane/pane.js";
+export { Game, Screen } from "./core/classes.js";
+export { d } from "./helper/helper.js";
+export { BackgroundPane } from "./panes/BackgroundPane/pane.js";
 
-export {
-    Game,
-    BackgroundPane,
-    Screen,
-    d
-}
 // import '../public/css/old.css';
 
 /*
