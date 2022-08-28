@@ -11,11 +11,13 @@ const config = env => {
         output: {
             path: distPath,
             clean: true,
-            filename: '[name].js',  // Name of generated bundle after build
+            filename: 'engine.js',  // Name of generated bundle after build
             globalObject: 'this',
             library: {
                 name: '2dfireengine',
                 type: 'umd',
+                umdNamedDefine: true,
+                export: 'default'
             }
         },
         optimization: {
