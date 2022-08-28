@@ -16,8 +16,7 @@ const config = env => {
             library: {
                 name: '2dfireengine',
                 type: 'umd',
-                umdNamedDefine: true,
-                export: 'default'
+                umdNamedDefine: true
             }
         },
         optimization: {

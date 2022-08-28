@@ -2,7 +2,7 @@ import { d } from "./helper/helper.js";
 import { Game, Screen } from "./core/classes.js";
 import { BackgroundPane } from "./panes/BackgroundPane/pane.js";
 
-export default {
+export {
     Game,
     BackgroundPane,
     Screen,
