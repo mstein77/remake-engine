@@ -27,6 +27,7 @@ const config = env => {
         optimization: {
             // Instruct webpack not to obfuscate the resulting code
             minimize: false,
+/*
             splitChunks: {
                 chunks: 'all',
                 minSize: 0,
@@ -47,6 +48,7 @@ const config = env => {
                 }
             },
             runtimeChunk: "single"
+ */
         },
         module: {
             rules: [
