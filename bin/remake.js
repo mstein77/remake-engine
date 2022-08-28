@@ -8,12 +8,22 @@ import { fileURLToPath } from 'url';
 const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
 dotenv.config({path: __dirname + '/.env'});
 
-// Check if the file exists in the current directory.
+const pairs = Object.entries;
 
 function fileExists(path) {
     try {
-        const stat = fs.statSync('./package.json');
+        const stat = fs.statSync(path);
         if (!stat.isFile()) return false;
+        return true
+    } catch (err) {
+        return false
+    }
+}
+
+function dirExists(path) {
+    try {
+        const stat = fs.statSync(path);
+        if (!stat.isDirectory()) return false;
         return true
     } catch (err) {
         return false
@@ -28,7 +38,7 @@ function readJson(path) {
 }
 
 function writeJson(path, json) {
-    const data = JSON.stringify(json);
+    const data = JSON.stringify(json, undefined, 4);
     fs.writeFileSync(path, data);
 }
 
@@ -44,13 +54,36 @@ function exec(cmd, expectedStatus = 0) {
         console.error(err);
         throw err;
     }
-
 }
+
+function addMissingDirsAndFiles(missing, path = './') {
+    for (let [name, content] of pairs(missing)) {
+        const itemPath = path + name;
+        switch (typeof content) {
+            case 'string':
+                if (!fileExists(itemPath)) {
+                    fs.writeFileSync(itemPath, content)
+                }
+                break;
+
+            case 'object':
+                if (!dirExists(itemPath)) {
+                    fs.mkdirSync(itemPath)
+                }
+                addMissingDirsAndFiles(missing[name], itemPath + '/');
+                break;
+        }
+    }
+}
+
 
 const enginePackage = '2dfireengine';
 const packageJsonPath = './package.json';
 
 try {
+    if (!dirExists('.git')) {
+        exec('git init');
+    }
     if (!fileExists('./package.json')) {
         const out =  exec('npm init -y');
         console.log(out);
@@ -72,11 +105,37 @@ try {
             packageJson.scripts = {};
         }
         packageJson.scripts.game = 'echo "Running..."';
+        if (packageJson.type === undefined) {
+            packageJson.type = 'module';
+        }
         writeJson(packageJsonPath, packageJson);
         packageJson = readJson(packageJsonPath);
     }
-
-    // TODO: setup directory structure
+    const baseConfig = {
+        browsers: '>2.25%, not ie 11, not op_mini all',
+        editor: ['development'],
+        touch: true,
+        gzip: true,
+        port: 8080
+    };
+    addMissingDirsAndFiles({
+        resources: {
+            json: {},
+            image: {},
+            audio: {}
+        },
+        src: {
+            'index.js': [
+                'import * as config from "../config.js";',
+                '// your game starts here...',
+                'console.log(config);'
+            ].join("\n"),
+            screens: {}
+        },
+        dist: {},
+        '.gitignore': ["dist/", "node_modules/", ".env"].join("\n"),
+        'config.js': "export default " + JSON.stringify(baseConfig, null, 2)
+    });
 
     console.log(packageJson);
     process.exit(0)
