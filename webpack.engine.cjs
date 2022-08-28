@@ -60,7 +60,7 @@ const config = env => {
                     test: /\.(js|jsx)$/,
                     use: 'babel-loader',
                     exclude: [
-                        /node_modules/
+                        /2dfireengine\/node_modules/
                     ]
                 },
                 {

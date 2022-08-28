@@ -1,10 +1,16 @@
 import { d } from "./helper/helper.js";
 import { Game, Screen } from "./core/classes.js";
 import { BackgroundPane } from "./panes/BackgroundPane/pane.js";
-import '../public/css/old.css';
 
-d('Let the build begin...');
+export default {
+    Game,
+    BackgroundPane,
+    Screen,
+    d
+}
+// import '../public/css/old.css';
 
+/*
 new Game(320, 200, {zoom: 2}, function() {
 
     this.setStateInitHandler(function () {
@@ -52,7 +58,6 @@ new Game(320, 200, {zoom: 2}, function() {
                         this.setRunning(false);
                         console.log('Game stopped...');
 
-             */
             return true;
         } else if (this.keys['<']) {
             this.setDebug(!this.debug);
@@ -66,4 +71,5 @@ new Game(320, 200, {zoom: 2}, function() {
 
     return 'move-it'
 });
+*/
 

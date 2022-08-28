@@ -2,7 +2,7 @@
   "name": "2dfireengine",
   "version": "1.0.0",
   "description": "2D Game Engine",
-  "mainx": "public/index.html",
+  "main": "dist-engine/engine.js",
   "type": "module",
   "scripts": {
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",

@@ -144,7 +144,7 @@ try {
     }
 
     if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
-        exec('npm run engine-build --prefix=' + engineBasePath);
+        exec('npm run build-engine --prefix=' + engineBasePath);
     }
     process.exit(0)
 } catch (err) {
