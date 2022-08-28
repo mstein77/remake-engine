@@ -111,7 +111,7 @@ try {
         writeJson(packageJsonPath, packageJson);
         packageJson = readJson(packageJsonPath);
     }
-    const baseConfig = {
+    let baseConfig = {
         browsers: '>2.25%, not ie 11, not op_mini all',
         editor: ['development'],
         touch: true,
@@ -137,7 +137,15 @@ try {
         'config.js': "export default " + JSON.stringify(baseConfig, null, 2)
     });
 
-    console.log(packageJson);
+    // trigger install of engine dependencies
+    const engineBasePath = './node_modules/' + enginePackage;
+    if (!dirExists( + engineBasePath + '/node_modules')) {
+        exec('npm install --prefix=' + engineBasePath);
+    }
+
+    if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
+        exec('npm run engine-build --prefix=' + engineBasePath);
+    }
     process.exit(0)
 } catch (err) {
     console.error(err);
