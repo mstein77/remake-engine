@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "2D Game Engine",
   "main": "dist-engine/engine.js",
+  "module": "src/engine/index.js",
   "type": "module",
   "scripts": {
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
