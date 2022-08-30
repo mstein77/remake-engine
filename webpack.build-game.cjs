@@ -42,7 +42,7 @@ const config = env => {
                 BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
             }),
             new HtmlWebpackPlugin({
-                // template: __dirname + "/src/public/index.html",
+                template: __dirname + "/src/public/index.html",
                 inject: 'body',
                 title: 'Production'
             })

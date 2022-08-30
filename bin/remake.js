@@ -79,6 +79,7 @@ function addMissingDirsAndFiles(missing, path = './') {
 
 const enginePackage = '2dfireengine';
 const packageJsonPath = './package.json';
+const engineBasePath = './node_modules/' + enginePackage;
 
 try {
     if (!dirExists('.git')) {
@@ -104,7 +105,7 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.game = 'echo "Running..."';
+        packageJson.scripts.game = 'npm run build-game --prefix ' +  + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
@@ -128,6 +129,7 @@ try {
             'index.js': [
                 'import * as config from "../config.js";',
                 '// your game starts here...',
+                'console.log(\'Let the games begin...\')'
                 'console.log(config);'
             ].join("\n"),
             screens: {}
@@ -138,7 +140,6 @@ try {
     });
 
     // trigger install of engine dependencies
-    const engineBasePath = './node_modules/' + enginePackage;
     if (!dirExists( + engineBasePath + '/node_modules')) {
         console.log(exec('npm install --prefix=' + engineBasePath));
     }
@@ -146,6 +147,7 @@ try {
     if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
         console.log(exec('npm run build-engine --prefix=' + engineBasePath));
     }
+
     process.exit(0)
 } catch (err) {
     console.error(err);
