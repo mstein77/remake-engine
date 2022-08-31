@@ -34,6 +34,10 @@ const config = env => {
                     exclude: [
                         /2dfireengine\/node_modules/
                     ]
+                },
+                {
+                    test: /\.(css)$/,
+                    use: ['style-loader', 'css-loader']
                 }
             ]
         },
