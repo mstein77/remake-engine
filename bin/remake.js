@@ -105,7 +105,7 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.game = 'npm run build-game --prefix ' +  + engineBasePath;
+        packageJson.scripts.game = 'npm run build-game --prefix ' + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
@@ -129,7 +129,7 @@ try {
             'index.js': [
                 'import * as config from "../config.js";',
                 '// your game starts here...',
-                'console.log(\'Let the games begin...\')'
+                'console.log(\'Let the games begin...\')',
                 'console.log(config);'
             ].join("\n"),
             screens: {}
