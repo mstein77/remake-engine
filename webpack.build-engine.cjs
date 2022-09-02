@@ -24,8 +24,7 @@ const babelLoader =                 {
             ]
         }
     }
-};,
-
+};
 
 const config = env => {
     return [{
