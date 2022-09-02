@@ -63,7 +63,7 @@ const config = env => {
     },
     {
         entry: {
-            engine: './src/engine/editor/index.js'
+            editor: './src/engine/editor/index.js'
         },
         output: {
             path: distPath,
