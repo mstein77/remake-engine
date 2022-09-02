@@ -8,7 +8,6 @@ const distPath = path.resolve(basePath, 'dist');
 const devMode = process.env.NODE_ENV !== "production";
 
 const config = require(basePath + 'config.cjs');
-console.log('CONFIG', config);
 
 const entryParts = [basePath + 'src/index.js'];
 if (config.editor) {
@@ -38,10 +37,24 @@ const buildConfig = env => {
             rules: [
                 {
                     test: /\.(js|jsx)$/,
-                    use: 'babel-loader',
-                    exclude: [
-                        /2dfireengine\/node_modules/
-                    ]
+                    exclude: /2dfireengine\/node_modules/,
+                    use: {
+                        loader: 'babel-loader',
+                        options: {
+                            "presets": [
+                                [
+                                    "@babel/preset-env",
+                                    {
+                                        "targets": {
+                                            "browsers": [config.browsers]
+                                        },
+                                        "exclude": ["proposal-dynamic-import"]
+                                    }
+                                ],
+                                "@babel/preset-react"
+                            ]
+                        }
+                    }
                 },
                 {
                     test: /\.(css)$/,
@@ -56,7 +69,7 @@ const buildConfig = env => {
             new HtmlWebpackPlugin({
                 template: __dirname + "/src/public/index.html",
                 inject: 'body',
-                title: 'Production'
+                title: 'Remake Engine V0.1'
             })
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},

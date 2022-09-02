@@ -4,6 +4,29 @@ const webpack = require('webpack');
 const distPath = path.resolve(__dirname, 'dist-engine');
 const devMode = process.env.NODE_ENV !== "production";
 
+const babelLoader =                 {
+    test: /\.(js|jsx)$/,
+    exclude: /2dfireengine\/node_modules/,
+    use: {
+        loader: 'babel-loader',
+        options: {
+            "presets": [
+                [
+                    "@babel/preset-env",
+                    {
+                        "targets": {
+                            "browsers": ['>2.25%, not ie 11, not op_mini all']
+                        },
+                        "exclude": ["proposal-dynamic-import"]
+                    }
+                ],
+                "@babel/preset-react"
+            ]
+        }
+    }
+};,
+
+
 const config = env => {
     return [{
         entry: {
@@ -26,13 +49,7 @@ const config = env => {
         },
         module: {
             rules: [
-                {
-                    test: /\.(js|jsx)$/,
-                    use: 'babel-loader',
-                    exclude: [
-                        /2dfireengine\/node_modules/
-                    ]
-                },
+                babelLoader,
                 {
                     test: /\.(css)$/,
                     use: ['style-loader', 'css-loader']
@@ -59,13 +76,7 @@ const config = env => {
         },
         module: {
             rules: [
-                {
-                    test: /\.(js|jsx)$/,
-                    use: 'babel-loader',
-                    exclude: [
-                        /2dfireengine\/node_modules/
-                    ]
-                },
+                babelLoader,
                 {
                     test: /\.(css)$/,
                     use: ['style-loader', 'css-loader']
