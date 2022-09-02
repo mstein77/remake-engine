@@ -15,7 +15,7 @@ if (config.editor) {
     entryParts.push(__dirname + '/dist-engine/editor.js')
 }
 
-const config = env => {
+const buildConfig = env => {
     return {
         entry: {
             game: entryParts
@@ -64,4 +64,4 @@ const config = env => {
     }
 };
 
-module.exports = config;
+module.exports = buildConfig;
