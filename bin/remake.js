@@ -113,7 +113,7 @@ try {
     }
     let baseConfig = {
         browsers: '>2.25%, not ie 11, not op_mini all',
-        editor: ['development'],
+        editor: true,
         touch: true,
         gzip: true,
         port: 8080
