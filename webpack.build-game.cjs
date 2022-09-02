@@ -10,7 +10,7 @@ const devMode = process.env.NODE_ENV !== "production";
 const config = env => {
     return {
         entry: {
-            game: [ basePath + 'src/index.js', __dirname + 'dist-engine/editor.js' ]
+            game: [ basePath + 'src/index.js', __dirname + '/dist-engine/editor.js' ]
         },
         output: {
             path: distPath,
