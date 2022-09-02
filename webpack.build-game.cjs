@@ -30,11 +30,10 @@ const buildConfig = env => {
                 progress: true,
                 overlay: true,
             },
-            /*
+            open: true,
             devMiddleware: {
                 writeToDisk: true
             },
-             */
             contentBase: distPath,  //source of static assets
             port: 7700 // port to run dev-server
         },
