@@ -7,10 +7,18 @@ const basePath = __dirname + '/../../';
 const distPath = path.resolve(basePath, 'dist');
 const devMode = process.env.NODE_ENV !== "production";
 
+const config = require(basePath + 'config.cjs');
+console.log('CONFIG', config);
+
+const entryParts = [basePath + 'src/index.js'];
+if (config.editor) {
+    entryParts.push(__dirname + '/dist-engine/editor.js')
+}
+
 const config = env => {
     return {
         entry: {
-            game: [ basePath + 'src/index.js', __dirname + '/dist-engine/editor.js' ]
+            game: entryParts
         },
         output: {
             path: distPath,

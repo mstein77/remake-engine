@@ -76,7 +76,6 @@ function addMissingDirsAndFiles(missing, path = './') {
     }
 }
 
-
 const enginePackage = '2dfireengine';
 const packageJsonPath = './package.json';
 const engineBasePath = './node_modules/' + enginePackage;
@@ -136,7 +135,7 @@ try {
         },
         dist: {},
         '.gitignore': ["dist/", "node_modules/", ".env"].join("\n"),
-        'config.js': "export default " + JSON.stringify(baseConfig, null, 2)
+        'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2)
     });
 
     // trigger install of engine dependencies
