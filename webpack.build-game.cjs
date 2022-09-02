@@ -34,7 +34,7 @@ const buildConfig = env => {
             devMiddleware: {
                 writeToDisk: true
             },
-            contentBase: distPath,  //source of static assets
+            static: distPath,  //source of static assets
             port: 7700 // port to run dev-server
         },
         optimization: {
