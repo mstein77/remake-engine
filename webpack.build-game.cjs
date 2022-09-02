@@ -26,9 +26,15 @@ const buildConfig = env => {
             publicPath: '/' // public URL of the output directory when referenced in a browser
         },
         devServer: {
+            client: {
+                progress: true,
+                overlay: true,
+            },
+            /*
             devMiddleware: {
                 writeToDisk: true
             },
+             */
             contentBase: distPath,  //source of static assets
             port: 7700 // port to run dev-server
         },
