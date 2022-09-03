@@ -35,7 +35,7 @@
     "url": "https://github.com/mstein77/2DFireEngine/issues"
   },
   "bin": {
-    "remake-cli": "bin/remake.js"
+    "remake-engine-npcli": "bin/remake.js"
   },
   "homepage": "https://github.com/mstein77/2DFireEngine#readme",
   "devDependencies": {

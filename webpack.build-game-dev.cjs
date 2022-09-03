@@ -111,14 +111,12 @@ const buildConfig = env => {
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             }),
-            new CopyPlugin({
-                patterns: [
-                    {
-                        from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
-                        to: getPath(publicDistPath, 'js')
-                    }
-                ],
-            })
+            new CopyPlugin([
+                {
+                    from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
+                    to: getPath(publicDistPath, 'js')
+                }
+            ])
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
         mode: 'development'
