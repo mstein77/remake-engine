@@ -7,13 +7,21 @@ const gameDistPath = path.resolve(gamePath, 'dist');
 const publicDistPath = path.resolve(gameDistPath, 'public');
 const engineDistPath = path.resolve(__dirname, 'dist');
 
+function getPath(dir, rel) {
+    let path = dir;
+    if (!path.endsWith('/')) {
+        path += '/';
+    }
+    return path + rel;
+}
+
 const devMode = process.env.NODE_ENV !== "production";
 
-const config = require(gamePath + 'config.cjs');
+const config = require(getPath(gamePath, 'config.cjs'));
 
-const entryParts = [gamePath + 'src/index.js'];
+const entryParts = [getPath(gamePath, 'src/index.js')];
 if (config.editor) {
-    entryParts.push(engineDistPath + 'editor.js')
+    entryParts.push(getPath(engineDistPath, 'editor.js'))
 }
 
 const buildConfig = env => {
@@ -22,7 +30,7 @@ const buildConfig = env => {
             game: entryParts
         },
         output: {
-            path: path.resolve(publicDistPath, 'js'),
+            path: getPath(publicDistPath),
             clean: true,
             filename: 'js/[name].js',  // Name of generated bundle after build
             publicPath: '/' // public URL of the output directory when referenced in a browser
@@ -77,7 +85,7 @@ const buildConfig = env => {
                 BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
             }),
             new HtmlWebpackPlugin({
-                template: path.resolve(__dirname, "src/engine/index.html"),
+                template: getPath( "src/engine/index.html"),
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             })
