@@ -70,10 +70,9 @@ const buildConfig = env => {
                             const packageName = module.context.match(
                                 /[\\/]node_modules[\\/](.*?)([\\/]|$)/
                             )[1];
-                            const res = `${cacheGroupKey}.${packageName.replace("@", "")}`;
-                            console.log('---->', res);
-                            return res;
-                        }
+                            return `${cacheGroupKey}.${packageName.replace("@", "")}`
+                        },
+                        filename: 'js/[name].js'
                     },
                     common: {
                         minChunks: 2,
