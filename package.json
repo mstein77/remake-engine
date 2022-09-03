@@ -23,7 +23,7 @@
     "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
   "engines": {
-    "node": "12.13.1"
+    "node": "16.17.0"
   },
   "repository": {
     "type": "git",
@@ -48,7 +48,7 @@
     "babel-loader": "^8.0.6",
     "chai": "^4.2.0",
     "clean-webpack-plugin": "^3.0.0",
-    "copy-webpack-plugin": "^5.1.1",
+    "copy-webpack-plugin": "^5.1.2",
     "cors": "^2.8.5",
     "css-loader": "^1.0.0",
     "css-minimizer-webpack-plugin": "^4.0.0",

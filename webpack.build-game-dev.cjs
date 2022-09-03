@@ -1,6 +1,8 @@
 const path = require('path');
+
 const {DefinePlugin} = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -108,6 +110,14 @@ const buildConfig = env => {
                 template: getPath(__dirname, "src/engine/index.html"),
                 inject: 'body',
                 title: 'Remake Engine V0.1'
+            }),
+            new CopyPlugin({
+                patterns: [
+                    {
+                        from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
+                        to: getPath(publicDistPath, 'js')
+                    }
+                ],
             })
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
