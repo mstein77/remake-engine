@@ -76,6 +76,13 @@ const buildConfig = env => {
         module: {
             rules: [
                 {
+                    test: /panes_.+_editor_component\.js$/i,
+                    loader: 'file-loader',
+                    options: {
+                        name: 'js/[name].[ext]',
+                    }
+                },
+                {
                     test: /\.(js|jsx)$/,
                     exclude: /2dfireengine\/node_modules/,
                     use: {
