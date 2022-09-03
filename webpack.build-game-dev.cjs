@@ -29,7 +29,7 @@ if (config.editor) {
 const copyConfig = [
     {
         from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
-        to: getPath(publicDistPath, 'js')
+        to: getPath(publicDistPath, 'js/')
     }
 ];
 console.log('COPY', copyConfig);
