@@ -26,6 +26,14 @@ if (config.editor) {
     entryParts.push(getPath(engineDistPath, 'editor.js'))
 }
 
+const copyConfig = [
+    {
+        from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
+        to: getPath(publicDistPath, 'js')
+    }
+];
+console.log('COPY', copyConfig);
+
 const buildConfig = env => {
     return {
         entry: {
@@ -111,12 +119,7 @@ const buildConfig = env => {
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             }),
-            new CopyPlugin([
-                {
-                    from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
-                    to: getPath(publicDistPath, 'js')
-                }
-            ])
+            new CopyPlugin(copyConfig)
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
         mode: 'development'
