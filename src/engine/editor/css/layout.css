@@ -1,0 +1,354 @@
+/* Layout CSS */
+
+html, body, #app {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: "Roboto";
+    font-size: 12px;
+}
+
+.editor-bounds {
+    max-width: var(--max-width-px);
+    max-height: var(--max-height-px);
+}
+
+.wrap-normal.full-h {
+    max-width: 100%
+}
+
+.text-center {
+    text-align: center
+}
+
+.block {
+    overflow: hidden;
+    user-select: none
+}
+
+.bounds {
+    max-width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.scroll {
+    overflow: auto !important;
+}
+
+.stack-h {
+    display: inline-flex;
+}
+
+.no-inline,
+.stack-h.center-h {
+    display: flex !important;
+}
+
+.stack-h:not(.flow-padding):not(.flow-padding-1) {
+    align-items: start
+}
+
+.stack-h > .center-v,
+.stack-h > .full-v:not(.bounds) {
+    align-self: stretch;
+    height: auto;
+}
+
+.stack-v {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+}
+
+.stack-h > .fix-h,
+.stack-v > .fix-v,
+.stack-h > div:not(.flex):not(.full-h),
+.stack-v > div:not(.flex):not(.full-v):not(.scroll) {
+    flex-shrink: 0
+}
+
+.stack-v > .full-v:not(.fix-v),
+.stack-h > .full-h:not(.fix-h),
+.flex {
+    flex: 1
+}
+
+.wrap {
+    flex-wrap: wrap;
+}
+
+.center-child-h > div,
+.center-child-h > .parent > div,
+.center-h {
+    margin-left: auto;
+    margin-right: auto
+}
+
+.center-v {
+    display: flex;
+    flex-direction: column;
+    height: 100%
+}
+
+.center-v > div {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.grid:not(.grid-cells-centered) > .min-content-h
+{
+    width: 100% !important;
+}
+
+.min-content-h {
+    width: min-content
+}
+
+.flex-items-centered {
+    justify-content: center;
+}
+
+.flex-item-centered {
+    align-items: center;
+}
+
+.full-v {
+    height: 100%
+}
+
+.full-h {
+    width: 100%
+}
+
+.max-v {
+    max-height: 100%
+}
+
+.child-max-h > div,
+.max-h {
+    max-width: 100%
+}
+
+.nowrap {
+    white-space: nowrap
+}
+
+.wrap-normal {
+    white-space: normal
+}
+
+.nowrap-shorten {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex-shrink: 1 !important
+}
+
+.flow-padding > div {
+    margin-top: var(--default-padding-px);
+    margin-left: var(--default-padding-px)
+}
+
+.flow-padding-1 > div {
+    padding-right: var(--default-padding-px);
+    margin-bottom: var(--default-padding-px);
+}
+
+.flow-padding-1 {
+    box-sizing: border-box
+}
+
+.flow-padding {
+    padding-bottom: var(--default-padding-px);
+    padding-right: var(--default-padding-px);
+    box-sizing: border-box
+}
+
+.flow-padding-gaps > div {
+    margin-bottom: var(--default-padding-px);
+}
+
+.grid {
+    display: grid
+}
+
+.grid-gap {
+    grid-gap: var(--default-padding-px)
+}
+
+.grid-cells-centered {
+    justify-items: center;
+    align-items: center
+}
+
+input.full-h,
+textarea.full-h,
+textarea.full-v {
+    box-sizing: border-box
+}
+
+.indented {
+    padding: var(--default-padding-px);
+    box-sizing: border-box
+}
+
+.padded {
+    padding: var(--default-padding-px);
+    box-sizing: border-box
+}
+
+.padded-p {
+    padding: 1px;
+    box-sizing: border-box
+}
+
+.padded-h {
+    padding-left: var(--default-padding-px);
+    padding-right: var(--default-padding-px);
+    box-sizing: border-box
+}
+
+.padded-v {
+    padding-top: var(--default-padding-px);
+    padding-bottom: var(--default-padding-px);
+    box-sizing: border-box
+}
+
+.padded-1 {
+    padding-top: var(--default-padding-px)
+}
+.padded-2 {
+    padding-bottom: var(--default-padding-px)
+}
+.padded-4 {
+    padding-left: var(--default-padding-px)
+}
+.padded-8 {
+    padding-right: var(--default-padding-px)
+}
+.border-box {
+    box-sizing: border-box;
+}
+
+.center-items {
+    align-items: center;
+}
+
+.inner-space-v > div:not(:first-child) {
+    margin-top: var(--default-padding-px)
+}
+
+.inner-space-h > div:not(:first-child) {
+    margin-left: var(--default-padding-px)
+}
+
+.inner-space-v-1 > div:not(:first-child) {
+    margin-top: 1px
+}
+
+.inner-space-h-1 > div:not(:first-child) {
+    margin-left: 1px
+}
+
+.border-div-v {
+    background-color: var(--box-border-rgb);
+    height: var(--box-border-width-px);
+    align-self: stretch;
+}
+
+.inner-border-h > div:not(:first-child) {
+    border-left: var(--box-border-width-px) solid var(--box-border-rgb);
+    box-sizing: border-box;
+}
+
+.boxed {
+    border: var(--box-border-width-px) solid var(--box-border-rgb);
+}
+
+.no-border-1 {
+    border-top: none !important
+}
+.no-border-2 {
+    border-bottom: none !important
+}
+.no-border-4 {
+    border-left: none !important
+}
+.no-border-8 {
+    border-right: none !important
+}
+
+.boxed-1,
+.thin-boxed {
+    border: 1px solid var(--box-border-rgb);
+}
+
+div.boxed, div.thin-boxed {
+    box-sizing: border-box;
+}
+
+.border-bg {
+    background-color: var(--box-border-rgb)
+}
+
+.border-color {
+    color: var(--box-border-rgb)
+}
+
+.stretch {
+    align-self: stretch
+}
+
+.absolute {
+    position: absolute;
+}
+
+.relative {
+    position: relative
+}
+
+.fixed {
+    position: fixed;
+}
+
+.hidden {
+    display: none
+}
+
+.invisible {
+    opacity: 0
+}
+
+.borders-h {
+    align-self: stretch;
+    width: var(--box-border-width-px);
+    background-color: var(--box-border-rgb)
+}
+
+.borders-1-h {
+    align-self: stretch;
+    width: 1px;
+    background-color: var(--box-border-rgb)
+}
+
+.borders-v {
+    width: 100%;
+    height: var(--box-border-width-px);
+    background-color: var(--box-border-rgb)
+}
+
+.borders-1-v {
+    width: 100%;
+    height: 1px;
+    background-color: var(--box-border-rgb)
+}
+
+*:focus {
+    outline-offset: -1px;
+    outline-style: dot-dash;
+}
+
+.align-end {
+    margin-left: auto;
+}

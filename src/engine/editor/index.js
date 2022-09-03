@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom";
 
 import EditorApp from './components/EditorApp.js';
-import '../../public/css/base.css';
-import '../../public/css/layout.css';
+import './css/base.css';
+import './css/layout.css';
 
 class GameEditor {
 

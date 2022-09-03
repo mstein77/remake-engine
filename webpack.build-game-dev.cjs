@@ -2,16 +2,18 @@ const path = require('path');
 const {DefinePlugin} = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
-const basePath = __dirname + '/../../';
+const gamePath = path.resolve(__dirname, '../../');
+const gameDistPath = path.resolve(gamePath, 'dist');
+const publicDistPath = path.resolve(gameDistPath, 'public');
+const engineDistPath = path.resolve(__dirname, 'dist');
 
-const distPath = path.resolve(basePath, 'dist');
 const devMode = process.env.NODE_ENV !== "production";
 
-const config = require(basePath + 'config.cjs');
+const config = require(gamePath + 'config.cjs');
 
-const entryParts = [basePath + 'src/index.js'];
+const entryParts = [gamePath + 'src/index.js'];
 if (config.editor) {
-    entryParts.push(__dirname + '/dist-engine/editor.js')
+    entryParts.push(engineDistPath + 'editor.js')
 }
 
 const buildConfig = env => {
@@ -20,9 +22,9 @@ const buildConfig = env => {
             game: entryParts
         },
         output: {
-            path: distPath,
+            path: path.resolve(publicDistPath, 'js'),
             clean: true,
-            filename: '[name].js',  // Name of generated bundle after build
+            filename: 'js/[name].js',  // Name of generated bundle after build
             publicPath: '/' // public URL of the output directory when referenced in a browser
         },
         devServer: {
@@ -34,7 +36,7 @@ const buildConfig = env => {
             devMiddleware: {
                 writeToDisk: true
             },
-            static: distPath,  //source of static assets
+            static: publicDistPath,  //source of static assets
             port: 7700 // port to run dev-server
         },
         optimization: {
@@ -75,7 +77,7 @@ const buildConfig = env => {
                 BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
             }),
             new HtmlWebpackPlugin({
-                template: __dirname + "/src/public/index.html",
+                template: path.resolve(__dirname, "src/engine/index.html"),
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             })

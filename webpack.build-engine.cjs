@@ -1,7 +1,7 @@
 const path = require('path');
 
 const webpack = require('webpack');
-const distPath = path.resolve(__dirname, 'dist-engine');
+const distPath = path.resolve(__dirname, 'dist');
 const devMode = process.env.NODE_ENV !== "production";
 
 const babelLoader =                 {
@@ -85,8 +85,7 @@ const config = env => {
         plugins: [  // Array of plugins to apply to build chunk
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
-        mode:
-            'development'
+        mode: 'development'
     }]
 };
 
