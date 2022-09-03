@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
 dotenv.config({path: __dirname + '/.env'});
 
-
 const IN = {
     RED: '\x1b[31m',
     GREEN: '\x1b[32m',
@@ -100,6 +99,7 @@ function writeJson(path, json) {
 }
 
 function exec(cmd, expectedStatus = 0) {
+    log();
     log(IN.YELLOW + `Executing: ${IN.WHITE + cmd + IN.NO_COL}`);
     log();
     try {
