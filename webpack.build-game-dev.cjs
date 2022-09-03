@@ -50,6 +50,26 @@ const buildConfig = env => {
         optimization: {
             // Instruct webpack not to obfuscate the resulting code
             minimize: false,
+            splitChunks: {
+                chunks: 'all',
+                minSize: 0,
+                cacheGroups: {
+                    vendors: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name(module, chunks, cacheGroupKey) {
+                            const packageName = module.context.match(
+                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                            )[1];
+                            return `${cacheGroupKey}.${packageName.replace("@", "")}`;
+                        }
+                    },
+                    common: {
+                        minChunks: 2,
+                        priority: -10
+                    }
+                }
+            },
+            runtimeChunk: "single"
         },
         module: {
             rules: [
