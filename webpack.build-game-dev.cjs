@@ -70,7 +70,9 @@ const buildConfig = env => {
                             const packageName = module.context.match(
                                 /[\\/]node_modules[\\/](.*?)([\\/]|$)/
                             )[1];
-                            return `${cacheGroupKey}.${packageName.replace("@", "")}`;
+                            const res = `${cacheGroupKey}.${packageName.replace("@", "")}`;
+                            console.log('---->', res);
+                            return res;
                         }
                     },
                     common: {
