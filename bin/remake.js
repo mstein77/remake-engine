@@ -45,7 +45,7 @@ function writeJson(path, json) {
 function exec(cmd, expectedStatus = 0) {
     console.log('Executing: ' + cmd);
     try {
-        let stdout = execSync(cmd, {encoding: 'utf8'});
+        let stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'});
         return stdout.toString();
     } catch (err) {
         if (err.status === expectedStatus) {
