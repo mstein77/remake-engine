@@ -104,7 +104,7 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.game = 'npm run build-game-dev --prefix ' + engineBasePath;
+        packageJson.scripts.game = 'npm run build-game --prefix ' + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
