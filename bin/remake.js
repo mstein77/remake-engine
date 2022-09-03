@@ -8,6 +8,63 @@ import { fileURLToPath } from 'url';
 const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
 dotenv.config({path: __dirname + '/.env'});
 
+
+const IN = {
+    RED: '\x1b[31m',
+    GREEN: '\x1b[32m',
+    YELLOW: '\x1b[33m',
+    CYAN: '\x1b[36m',
+    GRAY: '\x1b[90m',
+    BLUE: '\x1b[34m',
+    MAGENTA: '\x1b[35m',
+    WHITE: '\x1b[97m',
+    NO_COL: '\x1b[0m'
+};
+
+function d(main, ...params) {
+    let stack = null;
+    try {
+        throw new Error('myError');
+    }
+    catch(e) {
+        stack = e.stack.split('\n');
+    }
+    const func = [];
+    let no = 0;
+    for (let line of stack) {
+        const pos = no;
+        no++;
+        if (pos <= 1) {
+            continue;
+        } else if (pos === 2) {
+            func.push(line.trim());
+            continue;
+        } else if (pos > 6) {
+            break;
+        }
+        line = line.split('(');
+        func.push(line[0].substr(6).trim());
+    }
+    console.group(IN.GRAY  + 'Debug ' + func.join(' <- ') + IN.NO_COL);
+    console.log(main, ...params);
+    console.groupEnd();
+    return main;
+}
+
+function log( ...logArgs ) {
+    let [ arg, ...args ] = logArgs;
+    if (!arg) {
+        console.log();
+        return
+    }
+    if (typeof arg === 'string') {
+        arg += IN.NO_COL
+    }
+    const newArgs = [ arg, ...args ];
+    console.log( ...newArgs );
+}
+
+
 const pairs = Object.entries;
 
 function fileExists(path) {
@@ -43,7 +100,8 @@ function writeJson(path, json) {
 }
 
 function exec(cmd, expectedStatus = 0) {
-    console.log('Executing: ' + cmd);
+    log(`Executing: ${IN.WHITE + cmd + IN.NO_COL}`);
+    log(IN.GRAY + '------------------------------------------------');
     try {
         let stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'});
         return stdout !== null ? stdout.toString() : null;
@@ -85,8 +143,7 @@ try {
         exec('git init');
     }
     if (!fileExists('./package.json')) {
-        const out =  exec('npm init -y');
-        console.log(out);
+        exec('npm init -y');
     }
     let packageJson = readJson(packageJsonPath);
     if (typeof packageJson !== 'object') throw Error(`Could not parse package.json!`);
@@ -95,8 +152,7 @@ try {
 
     const hasPackage = (packageJson.dependencies !== undefined && packageJson.dependencies[enginePackage] !== undefined);
     if (!hasPackage) {
-        const out = exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild');
-        console.log(out);
+        exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild');
         packageJson = readJson(packageJsonPath)
     }
     const hasScript = (packageJson.scripts !== undefined && packageJson.scripts.game !== undefined);
@@ -141,11 +197,11 @@ try {
 
     // trigger install of engine dependencies
     if (!dirExists( + engineBasePath + '/node_modules')) {
-        console.log(exec('npm install --prefix=' + engineBasePath));
+        exec('npm install --prefix=' + engineBasePath);
     }
 
     if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
-        console.log(exec('npm run build-engine --prefix=' + engineBasePath));
+        exec('npm run build-engine --prefix=' + engineBasePath);
     }
 
     process.exit(0)
