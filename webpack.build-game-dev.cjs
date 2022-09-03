@@ -119,7 +119,7 @@ const buildConfig = env => {
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             }),
-            new CopyPlugin(copyConfig)
+//            new CopyPlugin(copyConfig)
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
         mode: 'development'
