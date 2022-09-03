@@ -46,7 +46,7 @@ function exec(cmd, expectedStatus = 0) {
     console.log('Executing: ' + cmd);
     try {
         let stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'});
-        return stdout.toString();
+        return stdout !== null ? stdout.toString() : null;
     } catch (err) {
         if (err.status === expectedStatus) {
             return err.stdout;
