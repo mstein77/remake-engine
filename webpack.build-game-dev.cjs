@@ -85,7 +85,7 @@ const buildConfig = env => {
                 BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
             }),
             new HtmlWebpackPlugin({
-                template: getPath( "src/engine/index.html"),
+                template: getPath(__dirname, "src/engine/index.html"),
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             })
