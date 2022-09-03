@@ -2,7 +2,6 @@ const path = require('path');
 
 const {DefinePlugin} = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const CopyPlugin = require("copy-webpack-plugin");
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -25,14 +24,6 @@ const entryParts = [getPath(gamePath, 'src/index.js')];
 if (config.editor) {
     entryParts.push(getPath(engineDistPath, 'editor.js'))
 }
-
-const copyConfig = [
-    {
-        from: getPath(engineDistPath, "vendors-src_engine_panes*.js"),
-        to: getPath(publicDistPath, 'js/')
-    }
-];
-console.log('COPY', copyConfig);
 
 const buildConfig = env => {
     return {
@@ -120,7 +111,6 @@ const buildConfig = env => {
                 inject: 'body',
                 title: 'Remake Engine V0.1'
             }),
-//            new CopyPlugin(copyConfig)
         ],
         resolve: {extensions: ['*', '.js', '.jsx']},
         mode: 'development'
