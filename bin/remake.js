@@ -100,8 +100,8 @@ function writeJson(path, json) {
 }
 
 function exec(cmd, expectedStatus = 0) {
-    log(`Executing: ${IN.WHITE + cmd + IN.NO_COL}`);
-    log(IN.GRAY + '------------------------------------------------');
+    log(IN.YELLOW + `Executing: ${IN.WHITE + cmd + IN.NO_COL}`);
+    log();
     try {
         let stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'});
         return stdout !== null ? stdout.toString() : null;
