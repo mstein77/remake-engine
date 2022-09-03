@@ -30,7 +30,7 @@ const buildConfig = env => {
             game: entryParts
         },
         output: {
-            path: getPath(publicDistPath),
+            path: publicDistPath,
             clean: true,
             filename: 'js/[name].js',  // Name of generated bundle after build
             publicPath: '/' // public URL of the output directory when referenced in a browser
