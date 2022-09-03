@@ -111,6 +111,11 @@ function EditorApp(props) {
         e.preventDefault();
     };
 
+    const lazyLoadPaneEditor = (pane, params) => {
+        const Editor = React.lazy(() => import(`../../panes/${pane}/editor/component.js`));
+        return <Suspense fallback={<div>Loading...</div>}><Editor { ...params } /></Suspense>
+    };
+
     const contentProvider = {
         'screen': {
             getContent: params => {
@@ -152,8 +157,7 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 // model.blocks = resource.blocks;
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                const Editor = React.lazy(() => import("../../panes/BackgroundPane/editor/component.js"));
-                return <Suspense fallback={<div>Loading...</div>}><Editor resource={resource} model={model} /></Suspense>
+                return lazyLoadPaneEditor('BackgroundPane', {resource, model})
             }
         },
 
