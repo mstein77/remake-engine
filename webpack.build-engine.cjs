@@ -1,8 +1,5 @@
 const path = require('path');
-
-const webpack = require('webpack');
 const distPath = path.resolve(__dirname, 'dist');
-const devMode = process.env.NODE_ENV !== "production";
 
 const babelLoader =                 {
     test: /\.(js|jsx)$/,
@@ -48,6 +45,12 @@ const config = env => {
         },
         module: {
             rules: [
+                {
+                    test: /\.m?js$/,
+                    resolve: {
+                        fullySpecified: false
+                    }
+                },
                 babelLoader,
                 {
                     test: /\.(css)$/,
@@ -57,7 +60,15 @@ const config = env => {
         },
         plugins: [  // Array of plugins to apply to build chunk
         ],
-        resolve: {extensions: ['*', '.js', '.jsx']},
+        resolve: {
+            alias: {
+                helper: path.resolve(__dirname, 'src/engine/helper/'),
+                editor: path.resolve(__dirname, 'src/engine/editor/'),
+                core: path.resolve(__dirname, 'src/engine/core/'),
+                panes: path.resolve(__dirname, 'src/engine/panes/'),
+            },
+            extensions: ['*', '.js', '.jsx']
+        },
         mode:
             'development'
     },
@@ -75,6 +86,12 @@ const config = env => {
         },
         module: {
             rules: [
+                {
+                    test: /\.m?js$/,
+                    resolve: {
+                        fullySpecified: false
+                    }
+                },
                 babelLoader,
                 {
                     test: /\.(css)$/,
@@ -88,7 +105,15 @@ const config = env => {
         },
         plugins: [  // Array of plugins to apply to build chunk
         ],
-        resolve: {extensions: ['*', '.js', '.jsx']},
+        resolve: {
+            alias: {
+                helper: path.resolve(__dirname, 'src/engine/helper/'),
+                editor: path.resolve(__dirname, 'src/engine/editor/'),
+                core: path.resolve(__dirname, 'src/engine/core/'),
+                panes: path.resolve(__dirname, 'src/engine/panes/')
+            },
+            extensions: ['*', '.js', '.jsx']
+        },
         mode: 'development'
     }]
 };

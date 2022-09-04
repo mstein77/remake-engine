@@ -1,6 +1,6 @@
-import './core/core.css';
+import 'core/core.css';
 
-export { Game, Screen } from "./core/classes.js";
-export { d } from "./helper/helper.js";
-export { BackgroundPane } from "./panes/BackgroundPane/pane.js";
-export { PatternPane } from "./panes/PatternPane/pane.js";
+export { Game, Screen } from "core/classes";
+export { d } from "helper/helper";
+export { BackgroundPane } from "panes/BackgroundPane/pane";
+export { PatternPane } from "panes/PatternPane/pane";

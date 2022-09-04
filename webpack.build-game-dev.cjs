@@ -76,6 +76,12 @@ const buildConfig = env => {
         module: {
             rules: [
                 {
+                    test: /\.m?js$/,
+                    resolve: {
+                        fullySpecified: false
+                    }
+                },
+                {
                     test: /panes_.+_editor_component\.js$/i,
                     loader: 'file-loader',
                     options: {
