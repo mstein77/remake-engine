@@ -1,5 +1,5 @@
-import { EntityIndex } from "../../../editor/classes.js";
-import { getCanvasForBitmap, drawCanvasToAvail } from "../../..//helper/helper.js";
+import { EntityIndex } from "editor/classes";
+import { getCanvasForBitmap, drawCanvasToAvail } from "helper/helper";
 
 class ImageBlockIndex extends EntityIndex {
 

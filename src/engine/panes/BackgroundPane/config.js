@@ -1,5 +1,5 @@
-import { Config } from "../../core/config.js";
-import inst from "../../core/instances.js"
+import { Config } from "core/config";
+import inst from "core/instances"
 
 export class BackgroundPaneConfig extends Config {
 
