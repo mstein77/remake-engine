@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import * as fs from  'node:fs';
 import express from 'express';
 import cors from 'cors';
-import { isValidResourceId, ResourceDependencies } from '../engine/helper/helper.js';
+import { isValidResourceId, ResourceDependencies } from '../engine/helper/shared.js';
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import * as dotenv from "dotenv";
