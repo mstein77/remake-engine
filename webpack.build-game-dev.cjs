@@ -125,7 +125,15 @@ const buildConfig = env => {
                 title: 'Remake Engine V0.1'
             }),
         ],
-        resolve: {extensions: ['*', '.js', '.jsx']},
+        resolve: {
+            alias: {
+                helper: path.resolve(__dirname, 'src/engine/helper/'),
+                editor: path.resolve(__dirname, 'src/engine/editor/'),
+                core: path.resolve(__dirname, 'src/engine/core/'),
+                panes: path.resolve(__dirname, 'src/engine/panes/')
+            },
+            extensions: ['*', '.js', '.jsx']
+        },
         mode: 'development'
     }
 };
