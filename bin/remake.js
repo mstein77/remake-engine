@@ -200,9 +200,11 @@ try {
         exec('npm install --prefix=' + engineBasePath);
     }
 
+    /*
     if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
         exec('npm run build-engine --prefix=' + engineBasePath);
     }
+     */
 
     process.exit(0)
 } catch (err) {
