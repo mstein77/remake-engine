@@ -22,7 +22,7 @@ const config = require(getPath(gamePath, 'config.cjs'));
 
 const entryParts = [getPath(gamePath, 'src/index.js')];
 if (config.editor) {
-    entryParts.push(getPath(engineDistPath, 'editor.js'))
+    entryParts.push(getPath(__dirname, 'src/editor/index.js'))
 }
 
 const buildConfig = env => {
