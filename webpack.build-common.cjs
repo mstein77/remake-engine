@@ -1,29 +1,11 @@
-const merge = require('webpack-merge');
-const { common, publicDistPath } = require('./webpack.build-common.cjs');
-
-module.exports = merge(common, {
-    mode: 'development',
-    devServer: {
-        client: {
-            progress: true,
-            overlay: true,
-        },
-        open: true,
-        static: publicDistPath, //source of static assets
-        port: 7700 // port to run dev-server
-    }
-});
-
-/*
 const path = require('path');
 
-const {DefinePlugin} = require("webpack");
+const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
 const publicDistPath = path.resolve(gameDistPath, 'public');
-const engineDistPath = path.resolve(__dirname, 'dist');
 
 function getPath(dir, rel) {
     let path = dir;
@@ -32,9 +14,6 @@ function getPath(dir, rel) {
     }
     return path + rel;
 }
-
-const devMode = process.env.NODE_ENV !== "production";
-
 const config = require(getPath(gamePath, 'config.cjs'));
 
 const entryParts = [getPath(gamePath, 'src/index.js')];
@@ -42,8 +21,10 @@ if (config.editor) {
     entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))
 }
 
-const buildConfig = env => {
-    return {
+module.exports = {
+    publicDistPath,
+    getPath,
+    common: {
         entry: {
             game: entryParts
         },
@@ -52,18 +33,6 @@ const buildConfig = env => {
             clean: true,
             filename: 'js/[name].js',  // Name of generated bundle after build
             publicPath: '/' // public URL of the output directory when referenced in a browser
-        },
-        devServer: {
-            client: {
-                progress: true,
-                overlay: true,
-            },
-            open: true,
-            devMiddleware: {
-                writeToDisk: true
-            },
-            static: publicDistPath,  //source of static assets
-            port: 7700 // port to run dev-server
         },
         optimization: {
             // Instruct webpack not to obfuscate the resulting code
@@ -154,9 +123,6 @@ const buildConfig = env => {
                 panes: path.resolve(__dirname, 'src/engine/panes/')
             },
             extensions: ['*', '.js', '.jsx']
-        },
-        mode: 'development'
+        }
     }
 };
-module.exports = buildConfig;
-*/
