@@ -164,9 +164,12 @@ try {
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
+        packageJson.script.build = "npm run build-game-prod --prefix " + engineBasePath;
         writeJson(packageJsonPath, packageJson);
         packageJson = readJson(packageJsonPath);
     }
+
+
     let baseConfig = {
         browsers: '>2.25%, not ie 11, not op_mini all',
         editor: true,
