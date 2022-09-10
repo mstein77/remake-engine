@@ -8,6 +8,7 @@
     "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
     "start": "node server.js",
     "dev-start": "nodemon server.js",
+    "dist-start": "node ../../dist/server.js",
     "dev-start2": "nodemon --es-module-specifier-resolution=node src/server/index.js",
     "dev-server": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
     "dev": "npm-run-all --parallel dev-server dev-start",
