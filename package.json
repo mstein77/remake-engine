@@ -36,7 +36,7 @@
     "url": "https://github.com/mstein77/2DFireEngine/issues"
   },
   "bin": {
-    "remake-engine-npcli": "bin/remake.js"
+    "remake-engine-cli": "bin/remake.js"
   },
   "homepage": "https://github.com/mstein77/2DFireEngine#readme",
   "devDependencies": {
@@ -51,7 +51,7 @@
     "clean-webpack-plugin": "^3.0.0",
     "copy-webpack-plugin": "^5.1.2",
     "cors": "^2.8.5",
-    "css-loader": "^1.0.0",
+    "css-loader": "^6.7.1",
     "css-minimizer-webpack-plugin": "^4.0.0",
     "dotenv": "^16.0.1",
     "express": "^4.17.1",
@@ -73,6 +73,5 @@
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.10.1",
     "webpack-merge": "^4.2.2"
-  },
-  "dependencies": {}
+  }
 }
