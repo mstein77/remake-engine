@@ -1,12 +1,12 @@
 const merge = require('webpack-merge');
 const { getConfigForCtx, getCommonWebpackConfig } = require('./webpack.build-common.cjs');
 
-module.exports = (args, env) => {
-    const config = getConfigForCtx(args, env);
+module.exports = (env, args) => {
+    const config = getConfigForCtx(env, args);
     console.log(config);
     return (
         merge(
-            getCommonWebpackConfig(args, env),
+            getCommonWebpackConfig(env, args),
             {
                 mode: 'production'
             }

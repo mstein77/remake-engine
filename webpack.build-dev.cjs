@@ -1,11 +1,11 @@
 const merge = require('webpack-merge');
 const { getConfigForCtx, getCommonWebpackConfig, publicDistPath } = require('./webpack.build-common.cjs');
 
-module.exports = (ctx, ctx2) => {
-    const config = getConfigForCtx(ctx);
+module.exports = (env, args) => {
+    const config = getConfigForCtx(env, args);
     return (
         merge(
-            getCommonWebpackConfig(ctx, ctx2),
+            getCommonWebpackConfig(env, args),
             {
                 mode: 'development',
                 devServer: {
