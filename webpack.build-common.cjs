@@ -16,20 +16,35 @@ function getPath(dir, rel) {
 }
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
-function extractEnvValues(config) {
-
+function extractAppEnvOverwrites(config, env) {
+    const appEnvOverwrites = {};
+    const keys = Object.keys(config);
+    const appEnv = 'development';
+    for (let key of keys) {
+        const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i);
+        if (!match) continue;
+        const matchEnv = match[2];
+        const matchKey = match[1];
+        if (matchEnv === appEnv) {
+            appEnvOverwrites[matchKey] = config[matchKey];
+        }
+        delete config[key];
+    }
+    return appEnvOverwrites
 }
 
 function getConfigForCtx(env, args) {
     const configArg = args && args.config;
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
-    if (!isDistBuild || !configJson.dist) return configJson;
+    const baseConfig = { ...configJson };
+    const appEnvOverwrites = extractAppEnvOverwrites(baseConfig, env);
+    if (!isDistBuild || !baseConfig.dist) return { ...baseConfig, ...appEnvOverwrites };
 
     const { dist, ...config } = configJson;
     for (let [key, value] of Object.entries(dist)) {
         config[key] = value;
     }
-    return config;
+    return { ...config, ...appEnvOverwrites };
 }
 
 module.exports = {
