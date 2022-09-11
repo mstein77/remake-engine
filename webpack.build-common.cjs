@@ -24,7 +24,10 @@ if (config.editor) {
 module.exports = {
     publicDistPath,
     getPath,
+    config,
     common: {
+        context: __dirname,
+        devtool: config.sourceMaps && config.sourceMapType,
         entry: {
             game: entryParts
         },
@@ -35,17 +38,17 @@ module.exports = {
             publicPath: '/' // public URL of the output directory when referenced in a browser
         },
         optimization: {
-            // Instruct webpack not to obfuscate the resulting code
-            minimize: false,
+            minimize: config.minimize,
             splitChunks: {
                 chunks: 'all',
                 minSize: 0,
                 cacheGroups: {
                     vendors: {
                         test: /[\\/]node_modules[\\/]/,
+                        reuseExistingChunk: true,
                         name(module, chunks, cacheGroupKey) {
                             const packageName = module.context.match(
-                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                                /[\\/]2dfireengine[\\/]node_modules[\\/](.*?)([\\/]|$)/
                             )[1];
                             return `${cacheGroupKey}.${packageName.replace("@", "")}`
                         },
@@ -53,7 +56,8 @@ module.exports = {
                     },
                     common: {
                         minChunks: 2,
-                        priority: -10
+                        priority: -10,
+                        filename: 'js/[name].js'
                     }
                 }
             },
@@ -61,19 +65,6 @@ module.exports = {
         },
         module: {
             rules: [
-                {
-                    test: /\.m?js$/,
-                    resolve: {
-                        fullySpecified: false
-                    }
-                },
-                {
-                    test: /panes_.+_editor_component\.js$/i,
-                    loader: 'file-loader',
-                    options: {
-                        name: 'js/[name].[ext]',
-                    }
-                },
                 {
                     test: /\.(js|jsx)$/,
                     exclude: /2dfireengine\/node_modules/,
@@ -102,12 +93,18 @@ module.exports = {
                 {
                     test: /\.(woff|woff2|eot|ttf|otf)$/i,
                     type: 'asset/resource',
+                },
+                {
+                    test: /\.m?js$/,
+                    resolve: {
+                        fullySpecified: false
+                    }
                 }
             ]
         },
         plugins: [  // Array of plugins to apply to build chunk
             new DefinePlugin({
-                BASE_URL: JSON.stringify(process.env.BASE_URL ? process.env.BASE_URL : 'http://localhost:8080')
+                BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080')
             }),
             new HtmlWebpackPlugin({
                 template: getPath(__dirname, "src/engine/index.html"),

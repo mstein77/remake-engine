@@ -175,8 +175,18 @@ try {
         editor: true,
         touch: true,
         gzip: true,
+        minimize: false,
         server: true,
-        port: 8080
+        baseUrl: 'http://localhost:8080',
+        sourceMaps: true,
+        sourceMapType: 'eval-cheap-source-map',
+        port: 7700,
+        dist: {
+            editor: false,
+            minimize: true,
+            sourceMaps: false,
+            browsers: 'ie 11',
+        }
     };
     addMissingDirsAndFiles({
         resources: {
