@@ -44,11 +44,11 @@ module.exports = {
                 minSize: 0,
                 cacheGroups: {
                     vendors: {
-                        test: /[\\/]node_modules[\\/]/,
+                        test: /[\\/]2dfireengine[\\/]node_modules[\\/]/,
                         reuseExistingChunk: true,
                         name(module, chunks, cacheGroupKey) {
                             const packageName = module.context.match(
-                                /[\\/]2dfireengine\/node_modules[\\/](.*?)([\\/]|$)/
+                                /[\\/]2dfireengine[\\/]node_modules[\\/](.*?)([\\/]|$)/
                             )[1];
                             return `${cacheGroupKey}.${packageName.replace("@", "")}`
                         },
