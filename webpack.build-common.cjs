@@ -16,7 +16,11 @@ function getPath(dir, rel) {
 }
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
-const getConfigForCtx = (env, args) => {
+function extractEnvValues(config) {
+
+}
+
+function getConfigForCtx(env, args) {
     const configArg = args && args.config;
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
     if (!isDistBuild || !configJson.dist) return configJson;
