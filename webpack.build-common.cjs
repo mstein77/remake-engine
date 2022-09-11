@@ -14,13 +14,17 @@ function getPath(dir, rel) {
     }
     return path + rel;
 }
+
+require('dotenv').config(getPath(gamePath, '.env'));
+
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
 function extractAppEnvOverwrites(config, env) {
-    console.log(env, process.env);
+    const appEnv = process.env.APP_ENV;
+    if (!appEnv) return {};
+
     const appEnvOverwrites = {};
     const keys = Object.keys(config);
-    const appEnv = 'development';
     for (let key of keys) {
         const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i);
         if (!match) continue;
