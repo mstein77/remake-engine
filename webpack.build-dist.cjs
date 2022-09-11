@@ -3,7 +3,9 @@ const { getConfigForCtx, getCommonWebpackConfig } = require('./webpack.build-com
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(env, args);
-    console.log(config);
+    console.log();
+    console.log('Building game in dist folder with the following config following:', config);
+    console.log();
     return (
         merge(
             getCommonWebpackConfig(env, args),

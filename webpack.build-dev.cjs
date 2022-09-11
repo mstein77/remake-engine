@@ -3,6 +3,9 @@ const { getConfigForCtx, getCommonWebpackConfig, publicDistPath } = require('./w
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(env, args);
+    console.log();
+    console.log('Building game in develop mode with the following config following:', config);
+    console.log();
     return (
         merge(
             getCommonWebpackConfig(env, args),

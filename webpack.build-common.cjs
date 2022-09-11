@@ -21,8 +21,8 @@ const getConfigForCtx = (env, args) => {
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
     if (!isDistBuild || !configJson.dist) return configJson;
 
-    const config = { ...configJson };
-    for (let [key, value] of Object.entries(configJson.dist)) {
+    const { dist, ...config } = configJson;
+    for (let [key, value] of Object.entries(dist)) {
         config[key] = value;
     }
     return config;

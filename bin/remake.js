@@ -184,8 +184,7 @@ try {
         dist: {
             editor: false,
             minimize: true,
-            sourceMaps: false,
-            browsers: 'ie 11',
+            sourceMaps: false
         }
     };
     addMissingDirsAndFiles({
