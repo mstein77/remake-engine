@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url';
 const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
 dotenv.config({path: __dirname + '/.env'});
 
+const enginePackage = '2dfireengine';
+const packageJsonPath = './package.json';
+const engineBasePath = './node_modules/' + enginePackage;
+
 const IN = {
     RED: '\x1b[31m',
     GREEN: '\x1b[32m',
@@ -134,10 +138,6 @@ function addMissingDirsAndFiles(missing, path = './') {
     }
 }
 
-const enginePackage = '2dfireengine';
-const packageJsonPath = './package.json';
-const engineBasePath = './node_modules/' + enginePackage;
-
 try {
     if (!dirExists('.git')) {
         exec('git init');
@@ -171,6 +171,7 @@ try {
 
 
     let baseConfig = {
+        title: 'Remake Engine Game V0.1',
         browsers: '>2.25%, not ie 11, not op_mini all',
         editor: true,
         touch: true,
@@ -196,10 +197,9 @@ try {
         },
         src: {
             'index.js': [
-                'import * as config from "../config.js";',
+                'import { Game } from "' + enginePackage + '";',
                 '// your game starts here...',
                 'console.log(\'Let the games begin...\')',
-                'console.log(config);'
             ].join("\n"),
             screens: {}
         },
@@ -212,12 +212,6 @@ try {
     if (!dirExists( + engineBasePath + '/node_modules')) {
         exec('npm install --prefix=' + engineBasePath);
     }
-
-    /*
-    if (!fileExists(engineBasePath + '/dist-engine/engine.js')) {
-        exec('npm run build-engine --prefix=' + engineBasePath);
-    }
-     */
 
     process.exit(0)
 } catch (err) {
