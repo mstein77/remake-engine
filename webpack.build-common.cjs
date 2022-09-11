@@ -21,8 +21,7 @@ const configJson = require(getPath(gamePath, 'config.cjs'));
 
 function extractAppEnvOverwrites(config, env) {
     const appEnv = process.env.APP_ENV;
-    if (!appEnv) return {};
-
+    console.log('APP-ENV', appEnv);
     const appEnvOverwrites = {};
     const keys = Object.keys(config);
     for (let key of keys) {
@@ -30,7 +29,7 @@ function extractAppEnvOverwrites(config, env) {
         if (!match) continue;
         const matchEnv = match[2];
         const matchKey = match[1];
-        if (matchEnv === appEnv) {
+        if (appEnv && matchEnv === appEnv) {
             appEnvOverwrites[matchKey] = config[key];
         }
         delete config[key];
