@@ -169,7 +169,6 @@ try {
         packageJson = readJson(packageJsonPath);
     }
 
-
     let baseConfig = {
         title: 'Remake Engine Game V0.1',
         browsers: '>2.25%, not ie 11, not op_mini all',

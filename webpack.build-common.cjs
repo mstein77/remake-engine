@@ -16,17 +16,23 @@ function getPath(dir, rel) {
 }
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
-const getConfigForCtx = ctx => {
-    return configJson;
+const getConfigForCtx = (args, env) => {
+    const configArg = args.config;
+    const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
+    if (!isDistBuild || !configJson.dist) return configJson;
+
+    const config = { ...configJson };
+    for (let [key, value] of Object.entries(configJson.dist)) {
+        config[key] = value;
+    }
+    return config;
 }
 
 module.exports = {
     publicDistPath,
     getConfigForCtx,
-    getCommonWebpackConfig: (ctx, ctx2) => {
-        console.log('CTX', ctx, ctx2);
-
-        const config = getConfigForCtx(ctx);
+    getCommonWebpackConfig: (args, env) => {
+        const config = getConfigForCtx(args, env);
         const entryParts = [getPath(gamePath, 'src/index.js')];
         if (config.editor) {
             entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))
