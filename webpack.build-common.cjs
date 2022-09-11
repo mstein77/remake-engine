@@ -23,6 +23,7 @@ function extractAppEnvOverwrites(config, env) {
     for (let key of keys) {
         const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i);
         if (!match) continue;
+        console.log('match..', match);
         const matchEnv = match[2];
         const matchKey = match[1];
         if (matchEnv === appEnv) {
@@ -38,6 +39,7 @@ function getConfigForCtx(env, args) {
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
     const baseConfig = { ...configJson };
     const appEnvOverwrites = extractAppEnvOverwrites(baseConfig, env);
+    console.log('APP-ENV-OVERWRITES', appEnvOverwrites);
     if (!isDistBuild || !baseConfig.dist) return { ...baseConfig, ...appEnvOverwrites };
 
     const { dist, ...config } = configJson;
