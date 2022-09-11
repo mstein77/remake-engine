@@ -48,7 +48,7 @@ module.exports = {
                         reuseExistingChunk: true,
                         name(module, chunks, cacheGroupKey) {
                             const packageName = module.context.match(
-                                /[\\/]2dfireengine[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                                /[\\/]2dfireengine\/node_modules[\\/](.*?)([\\/]|$)/
                             )[1];
                             return `${cacheGroupKey}.${packageName.replace("@", "")}`
                         },
