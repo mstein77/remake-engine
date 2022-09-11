@@ -19,6 +19,7 @@ const configJson = require(getPath(gamePath, 'config.cjs'));
 const getConfigForCtx = (args, env) => {
     const configArg = args.config;
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
+    console.log(configArg, isDistBuild);
     if (!isDistBuild || !configJson.dist) return configJson;
 
     const config = { ...configJson };

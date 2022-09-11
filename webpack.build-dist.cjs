@@ -3,6 +3,7 @@ const { getConfigForCtx, getCommonWebpackConfig } = require('./webpack.build-com
 
 module.exports = (args, env) => {
     const config = getConfigForCtx(args, env);
+    console.log(config);
     return (
         merge(
             getCommonWebpackConfig(args, env),
