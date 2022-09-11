@@ -17,17 +17,17 @@ function getPath(dir, rel) {
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
 function extractAppEnvOverwrites(config, env) {
+    console.log(env, process.env);
     const appEnvOverwrites = {};
     const keys = Object.keys(config);
     const appEnv = 'development';
     for (let key of keys) {
         const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i);
         if (!match) continue;
-        console.log('match..', match);
         const matchEnv = match[2];
         const matchKey = match[1];
         if (matchEnv === appEnv) {
-            appEnvOverwrites[matchKey] = config[matchKey];
+            appEnvOverwrites[matchKey] = config[key];
         }
         delete config[key];
     }
@@ -37,12 +37,10 @@ function extractAppEnvOverwrites(config, env) {
 function getConfigForCtx(env, args) {
     const configArg = args && args.config;
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
-    const baseConfig = { ...configJson };
-    const appEnvOverwrites = extractAppEnvOverwrites(baseConfig, env);
-    console.log('APP-ENV-OVERWRITES', appEnvOverwrites);
-    if (!isDistBuild || !baseConfig.dist) return { ...baseConfig, ...appEnvOverwrites };
-
     const { dist, ...config } = configJson;
+    const appEnvOverwrites = extractAppEnvOverwrites(config, env);
+    if (!isDistBuild || !dist) return { ...config, ...appEnvOverwrites };
+
     for (let [key, value] of Object.entries(dist)) {
         config[key] = value;
     }
