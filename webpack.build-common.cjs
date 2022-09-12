@@ -15,7 +15,7 @@ function getPath(dir, rel) {
     return path + rel;
 }
 
-require('dotenv').config(getPath(gamePath, '.env'));
+require('dotenv').config({path: getPath(gamePath, '.env')});
 
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
