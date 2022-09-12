@@ -15,6 +15,21 @@ function getPath(dir, rel) {
     return path + rel;
 }
 
+const configParams = {
+    title: {type: 'string'},
+    browsers: {type: 'string'},
+    editor: {type: 'bool'},
+    touch: {type: 'bool'},
+    gzip: {type: 'bool'},
+    minimize: {type: 'bool'},
+    server: {type: 'bool'},
+    baseUrl: {type: 'string', key: 'baseUrl'},
+    sourcemaps: {type: 'bool', key: 'sourceMaps'},
+    sourcemaptype: {type: 'string', key: 'sourceMapType'},
+    port: {type: 'int'},
+    envprefix: {type: 'string', key: 'envPrefix'},
+}
+
 require('dotenv').config({path: getPath(gamePath, '.env')});
 
 const configJson = require(getPath(gamePath, 'config.cjs'));
@@ -28,7 +43,21 @@ function extractEnvOverwrites(config, env) {
     for (let [name, value] of Object.entries(env)) {
         name = name.toLowerCase();
         if (!name.startsWith(prefix) || name.length <= len) continue;
-        envOverwrites[name.substring(len)] = value
+        const lcKey = name.substring(len);
+        const configParam = configParams[lcKey];
+        if (!configParam) continue;
+        switch (configParam.type) {
+            case 'bool':
+                if (['true', 'false'].includes(value.toLowerCase())) {
+                    value = value[0].toLowerCase() === 't';
+                }
+                break;
+
+            case 'int':
+                value = parseInt(value, 10);
+                break;
+        }
+        envOverwrites[configParam.key ? configParam.key : lcKey] = value
     }
     return envOverwrites
 }
