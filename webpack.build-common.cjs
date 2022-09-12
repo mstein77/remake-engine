@@ -19,9 +19,22 @@ require('dotenv').config({path: getPath(gamePath, '.env')});
 
 const configJson = require(getPath(gamePath, 'config.cjs'));
 
+function extractEnvOverwrites(config, env) {
+    const prefix = config.envPrefix.toLowerCase();
+    if (!prefix || !env) return {};
+
+    const len = prefix.length;
+    const envOverwrites = {};
+    for (let [name, value] of Object.entries(env)) {
+        name = name.toLowerCase();
+        if (!name.startsWith(prefix) || name.length <= len) continue;
+        envOverwrites[name.substring(len)] = value
+    }
+    return envOverwrites
+}
+
 function extractAppEnvOverwrites(config, env) {
-    const appEnv = process.env.APP_ENV;
-    console.log('APP-ENV', appEnv);
+    const appEnv = env.APP_ENV;
     const appEnvOverwrites = {};
     const keys = Object.keys(config);
     for (let key of keys) {
@@ -37,24 +50,26 @@ function extractAppEnvOverwrites(config, env) {
     return appEnvOverwrites
 }
 
-function getConfigForCtx(env, args) {
+function getConfigForCtx(args) {
     const configArg = args && args.config;
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
     const { dist, ...config } = configJson;
-    const appEnvOverwrites = extractAppEnvOverwrites(config, env);
-    if (!isDistBuild || !dist) return { ...config, ...appEnvOverwrites };
+    const envOverwrites = extractEnvOverwrites(config, process.env);
+    const appEnvOverwrites = extractAppEnvOverwrites(config, process.env);
+    if (!isDistBuild || !dist) return { ...config, ...appEnvOverwrites, ...envOverwrites };
 
     for (let [key, value] of Object.entries(dist)) {
+        if (key === 'envPrefix') continue;
         config[key] = value;
     }
-    return { ...config, ...appEnvOverwrites };
+    return { ...config, ...appEnvOverwrites, ...envOverwrites };
 }
 
 module.exports = {
     publicDistPath,
     getConfigForCtx,
-    getCommonWebpackConfig: (env, args) => {
-        const config = getConfigForCtx(env, args);
+    getCommonWebpackConfig: args => {
+        const config = getConfigForCtx(args);
         const entryParts = [getPath(gamePath, 'src/index.js')];
         if (config.editor) {
             entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))

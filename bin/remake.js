@@ -180,6 +180,7 @@ try {
         baseUrl: 'http://localhost:8080',
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
+        envPrefix: 'RMK_',
         port: 7700,
         dist: {
             editor: false,
