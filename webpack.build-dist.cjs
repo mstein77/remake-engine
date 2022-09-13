@@ -13,6 +13,11 @@ module.exports = (env, args) => {
                 mode: 'production'
             }
         ),
-        getServerWebpackConfig(args)
+        merge(
+            getServerWebpackConfig(args),
+            {
+                mode: 'production'
+            }
+        )
     ]
 }

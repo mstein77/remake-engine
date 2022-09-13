@@ -102,6 +102,7 @@ module.exports = {
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args);
         return {
+            name: 'server',
             context: __dirname,
             dependencies: ['frontend'],
             target: 'node',
@@ -111,6 +112,9 @@ module.exports = {
                 filename: 'server.js'
             },
             module: {
+                exports: {
+                    externals: 'express'
+                },
                 rules: [
                     {
                         test: /\.(js)$/,
