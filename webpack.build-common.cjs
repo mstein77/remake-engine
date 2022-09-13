@@ -111,10 +111,8 @@ module.exports = {
                 path: publicDistPath,
                 filename: 'server.js'
             },
+            externals: 'express',
             module: {
-                exports: {
-                    externals: 'express'
-                },
                 rules: [
                     {
                         test: /\.(js)$/,
