@@ -1,17 +1,18 @@
 const merge = require('webpack-merge');
-const { getConfigForCtx, getCommonWebpackConfig } = require('./webpack.build-common.cjs');
+const { getConfigForCtx, getCommonWebpackConfig, getServerWebpackConfig } = require('./webpack.build-common.cjs');
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args);
     console.log();
     console.log('Building game in dist folder with the following config following:', config);
     console.log();
-    return (
+    return [
         merge(
             getCommonWebpackConfig(args),
             {
                 mode: 'production'
             }
-        )
-    )
+        ),
+        getServerWebpackConfig(args)
+    ]
 }

@@ -32,12 +32,13 @@ const configParams = {
 
 require('dotenv').config({path: getPath(gamePath, '.env')});
 
-const configJson = require(getPath(gamePath, 'config.cjs'));
+const configJson = true ? require(getPath(gamePath, 'config.cjs')) : {};
 
 function extractEnvOverwrites(config, env) {
-    const prefix = config.envPrefix.toLowerCase();
+    let prefix = config.envPrefix;
     if (!prefix || !env) return {};
 
+    prefix = prefix.toLowerCase();
     const len = prefix.length;
     const envOverwrites = {};
     for (let [name, value] of Object.entries(env)) {
@@ -97,6 +98,56 @@ function getConfigForCtx(args) {
 module.exports = {
     publicDistPath,
     getConfigForCtx,
+    extractEnvOverwrites,
+    getServerWebpackConfig: args => {
+        const config = getConfigForCtx(args);
+        return {
+            context: __dirname,
+            dependencies: ['frontend'],
+            target: 'node',
+            entry: getPath(__dirname, 'src/server/index.js'),
+            output: {
+                path: publicDistPath,
+                filename: 'server.js'
+            },
+            module: {
+                rules: [
+                    {
+                        test: /\.(js)$/,
+                        exclude: /2dfireengine\/node_modules/,
+                        use: {
+                            loader: 'babel-loader',
+                            options: {
+                                "presets": [
+                                    [
+                                        "@babel/preset-env",
+                                        {
+                                            "targets": {
+                                                "browsers": 'node 16'
+                                            },
+                                            "exclude": ["proposal-dynamic-import"]
+                                        }
+                                    ]
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            plugins: [  // Array of plugins to apply to build chunk
+                new DefinePlugin({
+                    BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
+                    PORT: JSON.stringify(config.port ? config.port : 8080)
+                })
+            ],
+            resolve: {
+                alias: {
+                    helper: path.resolve(__dirname, 'src/engine/helper/')
+                },
+                extensions: ['*', '.js']
+            }
+        }
+    },
     getCommonWebpackConfig: args => {
         const config = getConfigForCtx(args);
         const entryParts = [getPath(gamePath, 'src/index.js')];
@@ -105,6 +156,7 @@ module.exports = {
         }
 
         return {
+            name: 'frontend',
             context: __dirname,
             devtool: config.sourceMaps && config.sourceMapType,
             entry: {
