@@ -1,8 +1,7 @@
-import setupAppMiddlewares from './src/server/setupMiddlewares.js';
+const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs');
 
 const merge = require('webpack-merge');
 const { getConfigForCtx, getCommonWebpackConfig, publicDistPath } = require('./webpack.build-common.cjs');
-
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args);

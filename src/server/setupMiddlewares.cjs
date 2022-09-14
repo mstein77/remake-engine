@@ -1,12 +1,8 @@
-import fs from "node:fs";
-import { isValidResourceId, ResourceDependencies } from '../engine/helper/shared.js';
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import * as dotenv from "dotenv";
-import path from "node:path";
-
-const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../../');
-dotenv.config({path: __dirname + '/.env'});
+const path = require("path");
+const cors = require('cors')
+const express = require('express');
+const fs = require('fs');
+const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../app/helper/helper.js');
 
 const DIST_DIR = path.join(__dirname, "dist");
 const STATIC_DIR = path.join(__dirname, "src/public");
