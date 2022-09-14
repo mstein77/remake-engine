@@ -1,5 +1,8 @@
+import setupAppMiddlewares from './src/server/setupMiddlewares.js';
+
 const merge = require('webpack-merge');
 const { getConfigForCtx, getCommonWebpackConfig, publicDistPath } = require('./webpack.build-common.cjs');
+
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args);
@@ -17,6 +20,13 @@ module.exports = (env, args) => {
                         overlay: true,
                     },
                     open: true,
+                    setupMiddlewares: (middlewares, devServer) => {
+                        if (!devServer) {
+                            throw new Error('webpack-dev-server is not defined!');
+                        }
+                        setupAppMiddlewares(devServer.app);
+                        return middlewares;
+                    },
                     static: publicDistPath, //source of static assets
                     port: config.port // port to run dev-server
                 }
