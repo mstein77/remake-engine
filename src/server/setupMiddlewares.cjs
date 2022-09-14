@@ -2,7 +2,7 @@ const path = require("path");
 const cors = require('cors')
 const express = require('express');
 const fs = require('fs');
-const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../app/helper/helper.js');
+const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjss');
 
 const DIST_DIR = path.join(__dirname, "dist");
 const STATIC_DIR = path.join(__dirname, "src/public");
