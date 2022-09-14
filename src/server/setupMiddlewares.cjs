@@ -57,4 +57,4 @@ const setupAppMiddlewares = app => {
 }
 
 
-export default setupAppMiddlewares;
+module.exports = setupAppMiddlewares;
