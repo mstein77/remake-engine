@@ -1,135 +1,32 @@
-import * as path from 'node:path';
-import * as fs from  'node:fs';
-import express from 'express';
-import cors from 'cors';
-import { isValidResourceId, ResourceDependencies } from '../engine/helper/shared.js';
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import * as dotenv from "dotenv";
+const path = require('path');
+const express = require('express');
+const cors = require('cors');
+const setupAppMiddlewares = require('./setupMiddlewares.cjs');
 
-const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../../');
-dotenv.config({path: __dirname + '/.env'});
+const STATIC_DIR = path.resolve(__dirname, "public");
+const RESOURCE_DIR = path.join(__dirname, '../resources');
 
-const DIST_DIR = path.join(__dirname, "dist");
-const STATIC_DIR = path.join(__dirname, "src/public");
-const RESOURCE_DIR = path.join(__dirname, 'resources');
-
-const PORT = 8080;
 const app = express();
-
-const getFilesFromDir = (dir) => fs.readdirSync(dir, {withFileTypes: true})
-    .filter(item => !item.isDirectory())
-    .map(item => item.name);
-
-
-const removeEmptyResourceDirs = (type, id) => {
-    if (id.indexOf('/') === -1) {
-        return true;
-    }
-    const parts = id.split('/');
-    parts.pop();
-    const basePath = DIST_DIR + '/' + type + '/';
-    try {
-        while(parts.length > 0) {
-            const path = basePath + parts.join('/');
-            const files = getFilesFromDir(path);
-            if (files.length !== 0) {
-                break;
-            }
-            fs.rmdirSync(path);
-            parts.pop();
-        }
-    } catch (e) {
-        console.error(e);
-        return false;
-    }
-    return true;
-};
-
-const getResourceFilePath = (type, id) => {
-    let file;
-    switch(type) {
-        case 'json':
-            file = RESOURCE_DIR + `/json/${id}.json`;
-            break;
-
-        case 'image':
-            file = RESOURCE_DIR + `/image/${id}`;
-            break;
-
-        case 'audio':
-            file = RESOURCE_DIR + `/audio/${id}`;
-            break;
-    }
-    return file;
-}
-
-const deleteResource = (type, id) => {
-    const file = getResourceFilePath(type, id);
-    let success = false;
-    try {
-        if (fs.existsSync(file)) {
-            fs.unlinkSync(file);
-            success = !fs.existsSync(file);
-            if (success) {
-                removeEmptyResourceDirs(type, id);
-            }
-        } else {
-            success = true;
-        }
-    } catch(err) {
-        console.error(err)
-    }
-    return success;
-};
-
-const directFilePath = RESOURCE_DIR + '/direct.json';
-const indirectFilePath = RESOURCE_DIR + '/indirect.json';
-
-const dependencies = new ResourceDependencies(
-    () => {
-        if (!fs.existsSync(directFilePath)) {
-            return {}
-        }
-        const direct = JSON.parse(
-            fs.readFileSync(
-                directFilePath,
-                'utf8'
-            )
-        );
-        return direct;
-    },
-    content => {
-        fs.writeFileSync(directFilePath, JSON.stringify(content), 'utf8');
-    },
-    () => {
-        if (!fs.existsSync(indirectFilePath)) {
-            return {};
-        }
-        const indirect = JSON.parse(
-            fs.readFileSync(
-                indirectFilePath,
-                'utf8'
-            )
-        );
-        return indirect
-    },
-    content => {
-        fs.writeFileSync(indirectFilePath, JSON.stringify(content), 'utf8');
-    },
-    deleteResource
-);
 
 app.use(cors());
 // app.use('/resources', express.static(STATIC_DIR)); // STATIC_DIR)); //DIST_DIR));
-app.use('/js', express.static(DIST_DIR + '/js')); // STATIC_DIR)); //DIST_DIR));
+app.use('/js', express.static(STATIC_DIR + '/js')); // STATIC_DIR)); //DIST_DIR));
 app.use('/audio', express.static(STATIC_DIR + '/audio')); // STATIC_DIR)); //DIST_DIR));
 app.use('/css', express.static(STATIC_DIR + '/css')); // STATIC_DIR)); //DIST_DIR));
 
-app.use(express.json());
-
 app.options('*', cors()); // include before other routes
 
+app.get("/", function(req, res) {
+    res.sendFile(
+        path.join(STATIC_DIR, "index.html"))
+    }
+);
+
+setupAppMiddlewares(app);
+
+app.listen(process.env.PORT || PORT);
+
+/*
 app.post('/has', (req, res) => {
     const resources = req.body.resources ? req.body.resources : [];
     const found = [];
@@ -369,10 +266,4 @@ app.post('/resources', (req, res) => {
     }
     res.json({found, notFound, invalid});
 });
-
-app.get("/", function(req, res) {
-    res.sendFile(
-        path.join(DIST_DIR, "index.html"))
-});
-
-app.listen(process.env.PORT || PORT);
+*/

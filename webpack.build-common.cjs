@@ -101,14 +101,15 @@ module.exports = {
     extractEnvOverwrites,
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args);
+        const port = config.port ? config.port : 8080;
         return {
             name: 'server',
             context: __dirname,
             dependencies: ['frontend'],
             target: 'node',
-            entry: getPath(__dirname, 'src/server/index.js'),
+            entry: getPath(__dirname, 'src/server/index.cjs'),
             output: {
-                path: publicDistPath,
+                path: gameDistPath,
                 filename: 'server.js'
             },
             externals: 'express',
@@ -138,8 +139,8 @@ module.exports = {
             },
             plugins: [  // Array of plugins to apply to build chunk
                 new DefinePlugin({
-                    BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
-                    PORT: JSON.stringify(config.port ? config.port : 8080)
+                    BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
+                    PORT: JSON.stringify(port)
                 })
             ],
             resolve: {
