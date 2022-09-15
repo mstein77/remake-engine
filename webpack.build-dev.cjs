@@ -8,6 +8,15 @@ module.exports = (env, args) => {
     console.log();
     console.log('Building game in develop mode with the following config following:', config);
     console.log();
+
+    let open = false;
+    if (config.openBrowser) {
+        if (config.openBrowser === 'default') {
+            open = true;
+        } else {
+            open = {app: {name: config.openBrowser}}
+        }
+    }
     return (
         merge(
             getCommonWebpackConfig(args),
@@ -18,7 +27,7 @@ module.exports = (env, args) => {
                         progress: true,
                         overlay: true,
                     },
-                    open: true,
+                    open,
                     setupMiddlewares: (middlewares, devServer) => {
                         if (!devServer) {
                             throw new Error('webpack-dev-server is not defined!');

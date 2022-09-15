@@ -181,6 +181,7 @@ try {
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
         envPrefix: 'RMK_',
+        openBrowser: 'default',
         port: 8080,
         dist: {
             editor: false,
