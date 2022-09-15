@@ -26,6 +26,7 @@ module.exports = (env, args) => {
                     client: {
                         progress: true,
                         overlay: true,
+                        logging: config.logging,
                     },
                     open,
                     setupMiddlewares: (middlewares, devServer) => {
