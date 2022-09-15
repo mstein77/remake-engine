@@ -160,7 +160,7 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.game = 'npm run build-game --prefix ' + engineBasePath;
+        packageJson.scripts.game = 'npm run build-game-dev --prefix ' + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
@@ -181,7 +181,7 @@ try {
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
         envPrefix: 'RMK_',
-        port: 7700,
+        port: 8080,
         dist: {
             editor: false,
             minimize: true,
