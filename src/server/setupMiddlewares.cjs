@@ -1,3 +1,4 @@
+const bodyParser = require('body-parser');
 const path = require("path");
 const fs = require('fs');
 const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjs');
@@ -113,6 +114,9 @@ const dependencies = new ResourceDependencies(
 );
 
 const setupAppMiddlewares = app => {
+
+    app.use(bodyParser.json());
+
     app.post('/has', (req, res) => {
         const resources = req.body.resources ? req.body.resources : [];
         const found = [];
