@@ -115,7 +115,10 @@ module.exports = {
                 path: gameDistPath,
                 filename: 'server.cjs'
             },
-            stats: config.stats,
+            stats: {
+                preset: config.stats,
+                logging: config.logging,
+            },
             externals: {
                 express: 'commonjs express',
             },
@@ -176,6 +179,10 @@ module.exports = {
                 clean: true,
                 filename: 'js/[name].js',  // Name of generated bundle after build
                 publicPath: '/' // public URL of the output directory when referenced in a browser
+            },
+            stats: {
+                preset: config.stats,
+                logging: config.logging,
             },
             optimization: {
                 minimize: config.minimize,
