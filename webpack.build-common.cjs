@@ -118,6 +118,7 @@ module.exports = {
             stats: {
                 preset: config.stats,
                 logging: config.logging,
+                colors: true
             },
             externals: {
                 express: 'commonjs express',

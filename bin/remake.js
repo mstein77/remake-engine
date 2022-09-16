@@ -183,7 +183,7 @@ try {
         sourceMapType: 'eval-cheap-source-map',
         envPrefix: 'RMK_',
         openBrowser: 'default',
-        logging: 'verbose',
+        logging: 'info',
         stats: 'normal',
         port: 8080,
         dist: {
