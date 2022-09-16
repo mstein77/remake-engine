@@ -184,6 +184,7 @@ try {
         envPrefix: 'RMK_',
         openBrowser: 'default',
         logging: 'verbose',
+        stats: 'normal',
         port: 8080,
         dist: {
             editor: false,

@@ -26,7 +26,10 @@ const configParams = {
     baseUrl: {type: 'string', key: 'baseUrl'},
     sourcemaps: {type: 'bool', key: 'sourceMaps'},
     sourcemaptype: {type: 'string', key: 'sourceMapType'},
+    openbrowser: {type: 'string', key: 'openBrowser'},
     port: {type: 'int'},
+    logging: {type: 'string'},
+    stats: {type: 'string'},
     envprefix: {type: 'string', key: 'envPrefix'},
 }
 
@@ -110,8 +113,9 @@ module.exports = {
             entry: getPath(__dirname, 'src/server/index.cjs'),
             output: {
                 path: gameDistPath,
-                filename: 'server.js'
+                filename: 'server.cjs'
             },
+            stats: config.stats,
             externals: {
                 express: 'commonjs express',
             },
