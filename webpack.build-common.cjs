@@ -112,7 +112,9 @@ module.exports = {
                 path: gameDistPath,
                 filename: 'server.js'
             },
-            externals: 'express',
+            externals: {
+                express: 'commonjs express',
+            },
             module: {
                 rules: [
                     {
