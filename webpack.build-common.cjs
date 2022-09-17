@@ -116,10 +116,6 @@ module.exports = {
                 PORT: JSON.stringify(port)
             })
         ];
-        if (config.eslint) {
-
-        }
-
         return {
             name: 'server',
             context: __dirname,
@@ -173,6 +169,7 @@ module.exports = {
     },
     getCommonWebpackConfig: args => {
         const config = getConfigForCtx(args);
+        const configArg = args && args.config;
         const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
         const entryParts = [getPath(gamePath, 'src/index.js')];
         if (config.editor) {
