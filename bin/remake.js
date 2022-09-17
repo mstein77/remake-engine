@@ -181,10 +181,12 @@ try {
         baseUrl: 'http://localhost:8080',
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
+        eslint: true,
         envPrefix: 'RMK_',
         openBrowser: 'default',
         logging: 'info',
         stats: 'normal',
+        deployMethod: 'heroku:git',
         port: 8080,
         dist: {
             editor: false,

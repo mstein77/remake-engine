@@ -2,6 +2,7 @@ const path = require('path');
 
 const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const ESLintPlugin = require('eslint-webpack-plugin');
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -105,6 +106,16 @@ module.exports = {
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args);
         const port = config.port ? config.port : 8080;
+        const plugins = [
+            new DefinePlugin({
+                BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
+                PORT: JSON.stringify(port)
+            })
+        ];
+        if (config.eslint) {
+
+        }
+
         return {
             name: 'server',
             context: __dirname,
@@ -147,12 +158,7 @@ module.exports = {
                     }
                 ]
             },
-            plugins: [  // Array of plugins to apply to build chunk
-                new DefinePlugin({
-                    BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
-                    PORT: JSON.stringify(port)
-                })
-            ],
+            plugins,
             resolve: {
                 alias: {
                     helper: path.resolve(__dirname, 'src/engine/helper/')
@@ -167,7 +173,24 @@ module.exports = {
         if (config.editor) {
             entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))
         }
-
+        const plugins = [
+            new DefinePlugin({
+                BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080')
+            }),
+            new HtmlWebpackPlugin({
+                template: getPath(__dirname, "src/engine/index.html"),
+                inject: 'body',
+                title: config.title
+            })
+        ];
+        if (config.eslint) {
+            plugins.push(
+                new ESLintPlugin({
+                    context: path.join(gamePath, 'src'),
+                    overrideConfigFile: path.join(gamePath, '.eslintrc.cjs')
+                })
+            )
+        }
         return {
             name: 'frontend',
             context: __dirname,
@@ -250,16 +273,7 @@ module.exports = {
                     }
                 ]
             },
-            plugins: [  // Array of plugins to apply to build chunk
-                new DefinePlugin({
-                    BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080')
-                }),
-                new HtmlWebpackPlugin({
-                    template: getPath(__dirname, "src/engine/index.html"),
-                    inject: 'body',
-                    title: config.title
-                }),
-            ],
+            plugins,
             resolve: {
                 alias: {
                     helper: path.resolve(__dirname, 'src/engine/helper/'),
