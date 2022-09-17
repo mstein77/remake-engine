@@ -194,7 +194,10 @@ module.exports = {
             )
         }
         if (config.bundleAnalyser === 'statoscope') {
-            plugins.push(new StatoscopeWebpackPlugin())
+            plugins.push(new StatoscopeWebpackPlugin({
+                open: 'dir',
+                watchMode: true
+            }))
         }
         return {
             name: 'frontend',

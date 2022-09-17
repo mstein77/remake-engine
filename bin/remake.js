@@ -181,7 +181,7 @@ try {
         baseUrl: 'http://localhost:8080',
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
-        eslint: true,
+        eslint: false,
         envPrefix: 'RMK_',
         openBrowser: 'default',
         logging: 'info',
