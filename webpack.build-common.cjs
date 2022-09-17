@@ -300,7 +300,7 @@ module.exports = {
                     {
                         test: /\.(css)$/,
                         use: [
-                            isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
+                            true && isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
                             {loader: 'css-loader', options: {sourceMap: config.sourceMaps}}
                         ]
                     },
