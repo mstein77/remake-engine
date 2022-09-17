@@ -173,6 +173,7 @@ module.exports = {
     },
     getCommonWebpackConfig: args => {
         const config = getConfigForCtx(args);
+        const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
         const entryParts = [getPath(gamePath, 'src/index.js')];
         if (config.editor) {
             entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))
@@ -204,7 +205,7 @@ module.exports = {
             plugins.push(
                 new BundleAnalyzerPlugin()
             )
-    }
+        }
         return {
             name: 'frontend',
             context: __dirname,
@@ -215,7 +216,7 @@ module.exports = {
             output: {
                 path: publicDistPath,
                 clean: true,
-                filename: 'js/[name].js',  // Name of generated bundle after build
+                filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js',  // Name of generated bundle after build
                 publicPath: '/' // public URL of the output directory when referenced in a browser
             },
             stats: {
@@ -228,10 +229,10 @@ module.exports = {
                     new TerserPlugin({
                         terserOptions: {
                             format: {
-                                comments: false
+                                comments: /@license/i
                             }
                         },
-                        extractComments: false
+                        extractComments: true
                     })
                 ],
                 splitChunks: {
@@ -247,12 +248,12 @@ module.exports = {
                                 )[1];
                                 return `${cacheGroupKey}.${packageName.replace("@", "")}`
                             },
-                            filename: 'js/[name].js'
+                            filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js'
                         },
                         common: {
                             minChunks: 2,
                             priority: -10,
-                            filename: 'js/[name].js'
+                            filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js'
                         }
                     }
                 },
