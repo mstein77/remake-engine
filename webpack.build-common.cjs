@@ -4,6 +4,7 @@ const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const ESLintPlugin = require('eslint-webpack-plugin');
 const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -198,7 +199,11 @@ module.exports = {
                 open: 'dir',
                 watchMode: true
             }))
-        }
+        } else if (config.bundleAnalyser === 'bundle-analyser') {
+            plugins.push([
+                new BundleAnalyzerPlugin()
+            ])
+    }
         return {
             name: 'frontend',
             context: __dirname,
