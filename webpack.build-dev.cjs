@@ -1,7 +1,7 @@
 const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs');
 
 const merge = require('webpack-merge');
-const { getConfigForCtx, getCommonWebpackConfig, publicDistPath } = require('./webpack.build-common.cjs');
+const { getConfigForCtx, getCommonWebpackConfig, publicDistPath, gamePath } = require('./webpack.build-common.cjs');
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args);
@@ -36,6 +36,10 @@ module.exports = (env, args) => {
                         setupAppMiddlewares(devServer.app);
                         return middlewares;
                     },
+                    watchFiles: [
+                        gamePath + '/src/**/*.js',
+                        gamePath + '*.cjs'
+                    ],
                     static: publicDistPath, //source of static assets
                     port: config.port // port to run dev-server
                 }

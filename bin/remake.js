@@ -191,7 +191,8 @@ try {
         dist: {
             editor: false,
             minimize: true,
-            sourceMaps: false
+            sourceMaps: false,
+            eslint: false
         }
     };
     addMissingDirsAndFiles({

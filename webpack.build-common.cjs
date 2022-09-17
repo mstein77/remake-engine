@@ -100,6 +100,7 @@ function getConfigForCtx(args) {
 }
 
 module.exports = {
+    gamePath,
     publicDistPath,
     getConfigForCtx,
     extractEnvOverwrites,
