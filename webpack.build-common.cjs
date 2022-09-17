@@ -200,9 +200,9 @@ module.exports = {
                 watchMode: true
             }))
         } else if (config.bundleAnalyser === 'bundle-analyser') {
-            plugins.push([
+            plugins.push(
                 new BundleAnalyzerPlugin()
-            ])
+            )
     }
         return {
             name: 'frontend',
