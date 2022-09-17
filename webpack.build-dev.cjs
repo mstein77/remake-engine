@@ -36,10 +36,6 @@ module.exports = (env, args) => {
                         setupAppMiddlewares(devServer.app);
                         return middlewares;
                     },
-                    watchFiles: [
-                        gamePath + '/src/**/*.js',
-                        gamePath + '*.cjs'
-                    ],
                     static: publicDistPath, //source of static assets
                     port: config.port // port to run dev-server
                 }
