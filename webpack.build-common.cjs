@@ -3,6 +3,7 @@ const path = require('path');
 const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const ESLintPlugin = require('eslint-webpack-plugin');
+const TerserPlugin = require("terser-webpack-plugin");
 const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
@@ -223,6 +224,16 @@ module.exports = {
             },
             optimization: {
                 minimize: config.minimize,
+                minimizer: [
+                    new TerserPlugin({
+                        terserOptions: {
+                            format: {
+                                comments: /@license/i
+                            }
+                        },
+                        extractComments: true
+                    })
+                ],
                 splitChunks: {
                     chunks: 'all',
                     minSize: 0,
