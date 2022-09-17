@@ -228,10 +228,10 @@ module.exports = {
                     new TerserPlugin({
                         terserOptions: {
                             format: {
-                                comments: /@license/i
+                                comments: false
                             }
                         },
-                        extractComments: true
+                        extractComments: false
                     })
                 ],
                 splitChunks: {
