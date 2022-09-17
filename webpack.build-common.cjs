@@ -3,6 +3,7 @@ const path = require('path');
 const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const ESLintPlugin = require('eslint-webpack-plugin');
+const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -191,6 +192,9 @@ module.exports = {
                     overrideConfigFile: path.join(gamePath, '.eslintrc.cjs')
                 })
             )
+        }
+        if (config.bundleAnalyser === 'statoscope') {
+            plugins.push(new StatoscopeWebpackPlugin())
         }
         return {
             name: 'frontend',

@@ -187,6 +187,7 @@ try {
         logging: 'info',
         stats: 'normal',
         deployMethod: 'heroku:git',
+        bundleAnalyser: '',
         port: 8080,
         dist: {
             editor: false,
