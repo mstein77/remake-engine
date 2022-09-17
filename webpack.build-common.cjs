@@ -198,12 +198,15 @@ module.exports = {
                 })
             )
         }
+        /*
         if (config.bundleAnalyser === 'statoscope') {
             plugins.push(new StatoscopeWebpackPlugin({
                 open: 'dir',
                 watchMode: true
             }))
-        } else if (config.bundleAnalyser === 'bundle-analyser') {
+            
+         */
+        if (config.analyseBundle) {
             plugins.push(
                 new BundleAnalyzerPlugin()
             )
@@ -218,7 +221,7 @@ module.exports = {
                 extractComments: true
             })
         ];
-        if (isDistBuild) {
+        if (true && isDistBuild) {
             minimizer.push(new CssMinimizerPlugin({
                 minimizerOptions: {
                     preset: [

@@ -189,7 +189,7 @@ try {
         logging: 'info',
         stats: 'normal',
         deployMethod: 'ftp:manual',
-        bundleAnalyser: '',
+        analyseBundle: false,
         port: 8080,
         dist: {
             editor: false,
