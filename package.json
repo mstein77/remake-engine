@@ -16,7 +16,7 @@
     "test": "jest",
     "build-engine": "webpack --config webpack.build-engine.cjs",
     "build-game": "npm-run-all --parallel dev-start2 build-game-dev",
-    "build-game-dev": "nodemon -w '../../*.cjs' -e cjs -exec 'webpack-dev-server --config webpack.build-dev.cjs'",
+    "build-game-dev": "nodemon -w '../../*.cjs' -e cjs webpack-dev-server -- --config webpack.build-dev.cjs",
     "build-game-prod": "webpack --config webpack.build-dist.cjs",
     "dev2": "npm-run-all --parallel dev-start2 dev2-pack",
     "dev2-pack": "webpack-dev-server --open --config webpack.engine.cjs --history-api-fallback --inline --progress",
