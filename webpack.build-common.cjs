@@ -187,7 +187,7 @@ module.exports = {
                 title: config.title
             })
         ];
-        if (isDistBuild) {
+        if (true && isDistBuild) {
             plugins.push(new CssMinimizerPlugin())
         }
         if (config.eslint) {
@@ -204,7 +204,7 @@ module.exports = {
                 open: 'dir',
                 watchMode: true
             }))
-            
+
          */
         if (config.analyseBundle) {
             plugins.push(
