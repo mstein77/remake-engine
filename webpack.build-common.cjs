@@ -6,6 +6,8 @@ const ESLintPlugin = require('eslint-webpack-plugin');
 const TerserPlugin = require("terser-webpack-plugin");
 const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -185,6 +187,9 @@ module.exports = {
                 title: config.title
             })
         ];
+        if (isDistBuild) {
+            plugins.push(new CssMinimizerPlugin())
+        }
         if (config.eslint) {
             plugins.push(
                 new ESLintPlugin({
@@ -202,6 +207,28 @@ module.exports = {
             plugins.push(
                 new BundleAnalyzerPlugin()
             )
+        }
+        const minimizer = [
+            new TerserPlugin({
+                terserOptions: {
+                    format: {
+                        comments: /@license/i
+                    }
+                },
+                extractComments: true
+            })
+        ];
+        if (isDistBuild) {
+            minimizer.push(new CssMinimizerPlugin({
+                minimizerOptions: {
+                    preset: [
+                        "default",
+                        {
+                            discardComments: { removeAll: true },
+                        },
+                    ],
+                },
+            }));
         }
         return {
             name: 'frontend',
@@ -222,16 +249,7 @@ module.exports = {
             },
             optimization: {
                 minimize: config.minimize,
-                minimizer: [
-                    new TerserPlugin({
-                        terserOptions: {
-                            format: {
-                                comments: /@license/i
-                            }
-                        },
-                        extractComments: true
-                    })
-                ],
+                minimizer,
                 splitChunks: {
                     chunks: 'all',
                     minSize: 0,
@@ -281,7 +299,10 @@ module.exports = {
                     },
                     {
                         test: /\.(css)$/,
-                        use: ['style-loader', 'css-loader']
+                        use: [
+                            isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
+                            {loader: 'css-loader', sourceMap: config.sourceMaps}
+                        ]
                     },
                     {
                         test: /\.(woff|woff2|eot|ttf|otf)$/i,
