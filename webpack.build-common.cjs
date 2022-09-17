@@ -301,7 +301,7 @@ module.exports = {
                         test: /\.(css)$/,
                         use: [
                             isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
-                            {loader: 'css-loader', sourceMap: config.sourceMaps}
+                            {loader: 'css-loader', options: {sourceMap: config.sourceMaps}}
                         ]
                     },
                     {
