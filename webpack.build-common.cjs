@@ -187,7 +187,7 @@ module.exports = {
                 title: config.title
             })
         ];
-        if (true && isDistBuild) {
+        if (true || isDistBuild) {
             plugins.push(new CssMinimizerPlugin())
         }
         if (config.eslint) {
@@ -221,7 +221,7 @@ module.exports = {
                 extractComments: true
             })
         ];
-        if (true && isDistBuild) {
+        if (true || isDistBuild) {
             minimizer.push(new CssMinimizerPlugin({
                 minimizerOptions: {
                     preset: [
@@ -303,7 +303,7 @@ module.exports = {
                     {
                         test: /\.(css)$/,
                         use: [
-                            true && isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
+                            true || isDistBuild ? MiniCssExtractPlugin.loader : 'style-loader',
                             {loader: 'css-loader', options: {sourceMap: config.sourceMaps}}
                         ]
                     },
