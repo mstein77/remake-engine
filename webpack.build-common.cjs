@@ -8,7 +8,8 @@ const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-
+const debug = require('debug');
+debug.enable('express:*')
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -330,6 +331,10 @@ module.exports = {
                     panes: path.resolve(__dirname, 'src/engine/panes/')
                 },
                 extensions: ['*', '.js', '.jsx']
+            },
+            infrastructureLogging: {
+                level: config.logging,
+                debug: config.debugPlugins,
             }
         }
     }

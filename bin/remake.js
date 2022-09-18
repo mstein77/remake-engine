@@ -190,6 +190,7 @@ try {
         stats: 'normal',
         deployMethod: 'ftp:manual',
         analyseBundle: false,
+        debugPlugins: false,
         port: 8080,
         dist: {
             editor: false,
