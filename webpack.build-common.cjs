@@ -209,7 +209,7 @@ module.exports = {
             }))
 
          */
-        if (config.analyseBundle) {
+        if (config.analyseBundles) {
             plugins.push(
                 new BundleAnalyzerPlugin()
             )
