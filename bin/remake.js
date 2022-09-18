@@ -210,7 +210,8 @@ try {
                 '// your game starts here...',
                 'console.log(\'Let the games begin...\')',
             ].join("\n"),
-            screens: {}
+            screens: {},
+            panes: {}
         },
         dist: {},
         '.gitignore': ["dist/", "node_modules/", ".env"].join("\n"),

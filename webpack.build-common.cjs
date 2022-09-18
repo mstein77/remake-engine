@@ -8,6 +8,8 @@ const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -188,7 +190,8 @@ module.exports = {
             })
         ];
         if (true || isDistBuild) {
-            plugins.push(new CssMinimizerPlugin())
+            plugins.push(new CssMinimizerPlugin());
+            plugins.push(new MiniCssExtractPlugin())
         }
         if (config.eslint) {
             plugins.push(
