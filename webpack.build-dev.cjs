@@ -29,6 +29,7 @@ module.exports = (env, args) => {
                         logging: config.logging
                     },
                     open,
+                    compress: config.compress,
                     setupMiddlewares: (middlewares, devServer) => {
                         if (!devServer) {
                             throw new Error('webpack-dev-server is not defined!');

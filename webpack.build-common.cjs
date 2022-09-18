@@ -8,8 +8,6 @@ const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-const debug = require('debug');
-debug.enable('express:*')
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -252,6 +250,7 @@ module.exports = {
             stats: {
                 preset: config.stats,
                 logging: config.logging,
+                loggingDebug: config.debugPlugins
             },
             optimization: {
                 minimize: config.minimize,
