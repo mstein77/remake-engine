@@ -40,7 +40,9 @@
   },
   "homepage": "https://github.com/mstein77/2DFireEngine#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "express-winston": "^4.2.0",
+    "winston": "^3.8.2"
   },
   "devDependencies": {
     "@babel/cli": "^7.18.10",
