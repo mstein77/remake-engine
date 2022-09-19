@@ -26,7 +26,7 @@ module.exports = (env, args) => {
                     client: {
                         progress: true,
                         overlay: true,
-                        logging: config.logging
+                        logging: config.clientLogging
                     },
                     open,
                     compress: config.compress,
@@ -34,7 +34,7 @@ module.exports = (env, args) => {
                         if (!devServer) {
                             throw new Error('webpack-dev-server is not defined!');
                         }
-                        setupAppMiddlewares(devServer.app);
+                        setupAppMiddlewares(devServer.app, config);
                         return middlewares;
                     },
                     static: publicDistPath, //source of static assets
