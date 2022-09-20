@@ -115,10 +115,17 @@ const dependencies = new ResourceDependencies(
     deleteResource
 );
 
-const setupAppMiddlewares = app => {
+const setupAppMiddlewares = (app, config) => {
 
-    app.use(morgan('common'));
-
+    console.log('SETUP LOGGING', config.serverLogging);
+    if (config.serverLogging !== 'none') {
+        const options = {};
+        if (config.serverLogging === 'error') {
+            options.skip = (req, res) => res.statusCode < 400;
+        }
+        console.log('SETUP FORMAT', config.serverLoggingFormat);
+        app.use(morgan(config.serverLoggingFormat, options));
+    }
     app.use(bodyParser.json());
 
     app.post('/has', (req, res) => {
