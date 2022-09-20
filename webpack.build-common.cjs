@@ -191,7 +191,7 @@ module.exports = {
         ];
         if (true || isDistBuild) {
             plugins.push(new CssMinimizerPlugin());
-            plugins.push(new MiniCssExtractPlugin())
+            plugins.push(new MiniCssExtractPlugin({filename: 'css/[name].[contenthash].css'}))
         }
         if (config.eslint) {
             plugins.push(
