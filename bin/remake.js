@@ -188,7 +188,7 @@ try {
         openBrowser: 'default',
         clientLogging: 'info',
         serverLogging: 'info',
-        serverLoggingFormat: 'common',
+        serverLoggingFormat: 'dev',
         stats: 'normal',
         deployMethod: 'ftp:manual',
         analyseBundles: false,

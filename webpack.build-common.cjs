@@ -115,7 +115,9 @@ module.exports = {
         const plugins = [
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
-                PORT: JSON.stringify(port)
+                PORT: JSON.stringify(port),
+                LOGGING: JSON.stringify(config.serverLogging),
+                LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat)
             })
         ];
         return {

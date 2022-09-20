@@ -115,15 +115,19 @@ const dependencies = new ResourceDependencies(
     deleteResource
 );
 
-const setupAppMiddlewares = (app, config) => {
+const setupAppMiddlewares = (app, config = null) => {
 
-    console.log('SETUP LOGGING', config.serverLogging);
     if (config.serverLogging !== 'none') {
         const options = {};
+        let minCode = null;
         if (config.serverLogging === 'error') {
-            options.skip = (req, res) => res.statusCode < 400;
+            minCode = 500;
+        } else if (config.serverLogging === 'warning') {
+            minCode = 400;
         }
-        console.log('SETUP FORMAT', config.serverLoggingFormat);
+        if (minCode) {
+            options.skip = (req, res) => res.statusCode < minCode;
+        }
         app.use(morgan(config.serverLoggingFormat, options));
     }
     app.use(bodyParser.json());
