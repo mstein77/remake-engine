@@ -181,7 +181,8 @@ module.exports = {
         }
         const plugins = [
             new DefinePlugin({
-                BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080')
+                BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
+                EDITOR_KEY: JSON.stringify(config.editorKey)
             }),
             new HtmlWebpackPlugin({
                 template: getPath(__dirname, "src/engine/index.html"),
