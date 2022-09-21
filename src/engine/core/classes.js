@@ -2,6 +2,8 @@ import inst from "./instances.js";
 import { d, isValidResourceId } from "../helper/helper.js";
 import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
 
+console.log('WAIT 4', EDITOR_KEY);
+
 class Game {
 
     constructor(width, height, config, init) {
@@ -419,21 +421,24 @@ class Game {
     handleKeys() {
         if (!this.keyHandling) return;
 
-        for (let handler of this.globalKeyHandlers) {
-            const stop = handler();
-            if (stop) {
-                this.keys = {};
-                return;
+        if (this.keys[EDITOR_KEY]) {
+            this.openEditorMode();
+        } else {
+            for (let handler of this.globalKeyHandlers) {
+                const stop = handler();
+                if (stop) {
+                    this.keys = {};
+                    return;
+                }
+            }
+
+            if (this.running) {
+                const screen = this.screens[this.currentScreen];
+                if (screen.keyHandler !== null) {
+                    screen.keyHandler();
+                }
             }
         }
-
-        if (this.running) {
-            const screen = this.screens[this.currentScreen];
-            if (screen.keyHandler !== null) {
-                screen.keyHandler();
-            }
-        }
-
         this.keys = {};
     }
 
