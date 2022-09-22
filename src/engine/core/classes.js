@@ -2,8 +2,6 @@ import inst from "./instances.js";
 import { d, isValidResourceId } from "../helper/helper.js";
 import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
 
-console.log('WAIT 4', EDITOR_KEY);
-
 class Game {
 
     constructor(width, height, config, init) {

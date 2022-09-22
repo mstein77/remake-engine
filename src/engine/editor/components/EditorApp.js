@@ -33,7 +33,7 @@ function EditorApp(props) {
                 );
             }
         };
-        syncLinks(['css/layout.css', 'css/base.css']);
+        // syncLinks(['css/layout.css', 'css/base.css']);
         setTimeout(() => {
             const elems = document.querySelectorAll('link');
             let loaded = true;
@@ -47,7 +47,7 @@ function EditorApp(props) {
         }, 200);
 
         return () => {
-            syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
+//            syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
         }
     }, []);
 
