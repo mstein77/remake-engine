@@ -189,6 +189,7 @@ try {
         clientLogging: 'info',
         serverLogging: 'info',
         serverLoggingFormat: 'dev',
+        screenBgRgb: '#808080',
         stats: 'normal',
         deployMethod: 'ftp:manual',
         analyseBundles: false,

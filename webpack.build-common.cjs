@@ -182,6 +182,7 @@ module.exports = {
         const plugins = [
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
+                SCREEN_BG_RGB: JSON.stringify(config.screenBgRgb),
                 EDITOR_KEY: JSON.stringify(config.editorKey)
             }),
             new HtmlWebpackPlugin({

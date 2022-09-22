@@ -1,3 +1,7 @@
+.game-bg-rgb {
+    background-color: var(--game-bg-rgb);
+}
+
 #touch-input-dir {
     position: absolute;
     top: 50px;
@@ -26,6 +30,18 @@
     height: 80px;
 }
 
+#tmp-resources-warning {
+    padding: 3px;
+    text-align: center;
+    background-color: #000000;
+    color: #d78282;
+    border: 2px solid #CC0000;
+    margin-top: 20px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 600px
+}
+
 .touch-dir-cell {
     border: 2px outset #808080
 }
@@ -39,59 +55,48 @@
     background-color: #FF0000;
 }
 
+/*
 body {
-    --screen-bg-color: #303030;
+--box-border-width: 2px;
+--box-border-color: #FFFFFF;
+--box-border-style: solid;
 
-    --box-border-width: 2px;
-    --box-border-color: #FFFFFF;
-    --box-border-style: solid;
+--sub-box-border-width: 2px;
+--sub-box-border-color: #A0A0A0;
+--sub-box-border-style: solid;
 
-    --sub-box-border-width: 2px;
-    --sub-box-border-color: #A0A0A0;
-    --sub-box-border-style: solid;
+--title-bg-color-active: #F0D090;
+--title-text-color-active: #404040;
+--title-text-size: 1.2em;
 
-    --title-bg-color-active: #F0D090;
-    --title-text-color-active: #404040;
-    --title-text-size: 1.2em;
+--title-bg-color-inactive: #A09080;
+--title-text-color-inactive: #505050;
 
-    --title-bg-color-inactive: #A09080;
-    --title-text-color-inactive: #505050;
+--content-bg-color:  #5050A0;
+--content-text-color: #FFFF80;
 
-    --content-bg-color:  #5050A0;
-    --content-text-color: #FFFF80;
+--action-border-width: 2px;
+--action-border-style: solid;
+--action-border-color: #808080;
+--action-box-size: 18px;
+--action-box-bg-color: #C0C0E0;
+--action-box-text-color: #808080;
+--action-box-bg-color-hover: #FFFFFF;
 
-    --action-border-width: 2px;
-    --action-border-style: solid;
-    --action-border-color: #808080;
-    --action-box-size: 18px;
-    --action-box-bg-color: #C0C0E0;
-    --action-box-text-color: #808080;
-    --action-box-bg-color-hover: #FFFFFF;
+--toolbar-bg-color: #A09090;
+--toolbar-color: #303050;
 
-    --toolbar-bg-color: #A09090;
-    --toolbar-color: #303050;
+--modal-overlay-bg-color: #000000a3;
 
-    --modal-overlay-bg-color: #000000a3;
+--default-padding: 5px;
 
-    --default-padding: 5px;
+--marker-width: 8px;
+--marker-color-highlight: #FF474799;
+--marker-color: #FFFFFF77;
 
-    --marker-width: 8px;
-    --marker-color-highlight: #FF474799;
-    --marker-color: #FFFFFF77;
-
-    --small-font-size: 14px;
-    background-color: var(--screen-bg-color);
-    overflow: hidden;
+--small-font-size: 14px;
+overflow: hidden;
 }
+*/
 
-#tmp-resources-warning {
-    padding: 3px;
-    text-align: center;
-    background-color: #000000;
-    color: #d78282;
-    border: 2px solid #CC0000;
-    margin-top: 20px;
-    margin-left: auto;
-    margin-right: auto;
-    width: 600px
-}
+

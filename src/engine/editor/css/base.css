@@ -3,9 +3,12 @@
 html, body {
     cursor: auto;
     overscroll-behavior-x: contain;
-    background-color: var(--editor-bg-rgb);
     color: var(--editor-rgb);
     font-size: var(--font-size-medium-px)
+}
+
+.editor-bg-rgb {
+    background-color: var(--editor-bg-rgb) !important
 }
 
 @font-face {

@@ -681,6 +681,9 @@ class Game {
         };
         window.addEventListener('gamepadconnected', gamepadConnectHandler);
 
+        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
+        document.body.classList.add('game-bg-rgb');
+
         document.body.innerHTML =
             '<div id="game">' +
 
