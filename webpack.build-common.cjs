@@ -104,7 +104,28 @@ function getConfigForCtx(args) {
     return { ...config, ...appEnvOverwrites, ...envOverwrites };
 }
 
+function fileExists(path) {
+    try {
+        const stat = fs.statSync(path);
+        if (!stat.isFile()) return false;
+        return true
+    } catch (err) {
+        return false
+    }
+}
+
+function readJson(path) {
+    if (!fileExists(path)) throw Error(`File not found: ${path}`);
+    const rawdata = fs.readFileSync(path);
+    const json = JSON.parse(rawdata);
+    return json
+}
+
+const packageJson = readJson(path.join(gamePath, 'package.json'));
+const gameId = packageJson.name;
+
 module.exports = {
+    gameId,
     gamePath,
     publicDistPath,
     getConfigForCtx,
@@ -183,10 +204,10 @@ module.exports = {
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
                 SCREEN_BG_RGB: JSON.stringify(config.screenBgRgb),
-                EDITOR_KEY: JSON.stringify(config.editorKey)
+                EDITOR_KEY: JSON.stringify(config.editorKey),
+                GAME_ID: gameId,
             }),
             new HtmlWebpackPlugin({
-                template: getPath(__dirname, "src/engine/index.html"),
                 inject: 'body',
                 title: config.title
             })

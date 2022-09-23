@@ -1,12 +1,12 @@
 const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs');
 
 const merge = require('webpack-merge');
-const { getConfigForCtx, getCommonWebpackConfig, publicDistPath, gamePath } = require('./webpack.build-common.cjs');
+const { getConfigForCtx, getCommonWebpackConfig, publicDistPath, gameId } = require('./webpack.build-common.cjs');
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args);
     console.log();
-    console.log('Building game in develop mode with the following config following:', config);
+    console.log(`Building game "${gameId}" in develop mode with the following config following:`, config);
     console.log();
 
     let open = false;

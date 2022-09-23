@@ -13,13 +13,12 @@ class Game {
         inst.setSM(localStorage, 'demo2');
         inst.setRL(BASE_URL + '/', inst.SM);
 
-        this.id = 'TODO';
+        this.id = GAME_ID;
         this.width = width;
         this.height = height;
         this.init = init.bind(this);
         this.screens = {};
         this.currentScreen = null;
-        this.debug = config.debug === true;
         this.globalKeyHandlers = [];
         this.timers = {};
         this.frameEvents = {};
@@ -216,16 +215,6 @@ class Game {
         this.minFps = 100;
     }
 
-    setDebug(value) {
-        this.debug = (value === true);
-        this.getDomElem('log-div').style.display = this.debug ? 'block' : 'none';
-        this.getDomElem('debugs').style.display = this.debug ? 'block' : 'none';
-    }
-
-    line() {
-        return "=================================================\n";
-    }
-
     openEditorMode() {
         if (gameEditor === null) {
             console.log('NO GAME EDITOR found!');
@@ -387,35 +376,6 @@ class Game {
 //        this.gotoScreen(this.currentScreen);
     }
 
-    printDebugs() {
-        if (this.debug) {
-            const gameDuration = this.running ? this.addTimerDuration('game') : this.durations['game'];
-            const frameTime = this.getRounded(this.durations['render'] / this.frames, 2);
-            const fps = this.frames === 0 ? '-' : Math.round((1000 / (gameDuration / this.frames)));
-            this.minFps = Math.min(fps, this.minFps);
-            const perfKpis =
-                this.line() +
-                " Performance\n" +
-                this.line() +
-                "FPS: " + fps + " - Min: " + this.minFps + "\n" +
-                "Rendering: " + frameTime + "ms\n" +
-                "Boot-Time: " + this.getRounded(this.durations['boot'], 2) + "ms\n\n";
-            ;
-            const out = [];
-            out.push(this.line() + " Debug\n" + this.line());
-            for (let k in debugs) {
-                out.push(k + ': ' + debugs[k])
-            }
-            this.addDomOp(this.getDomElem('d'), 'innerHTML', perfKpis + out.join("\n"));
-
-            if (this.logs.length > 0) {
-//                this.getDomElem('log').innerHTML += this.logs.join("\n") + "\n";
-                this.logs = [];
-            }
-        }
-        debugs = [];
-    }
-
     handleKeys() {
         if (!this.keyHandling) return;
 
@@ -507,9 +467,6 @@ class Game {
         const screen = this.screens[this.currentScreen];
         if (screen.getState() === 'READY') {
             this.updateDom();
-            if (this.debug) {
-                this.printDebugs();
-            }
             this.handleKeys();
             if (this.running) {
                 this.startTimer('render');
@@ -649,7 +606,7 @@ class Game {
 
     boot() {
         this.startTimer('boot');
-        this.log('Boot game engine...');
+        this.log(`Boot game engine for "${this.id}"...`);
         this.keysDown = {};
         this.keys = {};
 
@@ -679,6 +636,7 @@ class Game {
         };
         window.addEventListener('gamepadconnected', gamepadConnectHandler);
 
+        // set screen background
         document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
         document.body.classList.add('game-bg-rgb');
 
@@ -741,14 +699,10 @@ class Game {
             this.reloadScreen();
         }, {capture: false});
 
-        const debugElem = document.getElementById('d');
         const startScreen = this.init();
         this.addTimerDuration('boot');
         this.gotoScreen(startScreen);
         this.setRunning(true);
-        if (this.debug) {
-            this.setDebug(true);
-        }
         this.log('...booting done');
         this.waitForNextFrame();
     }
