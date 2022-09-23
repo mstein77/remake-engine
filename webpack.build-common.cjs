@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 const { DefinePlugin } = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
