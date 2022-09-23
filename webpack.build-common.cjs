@@ -206,7 +206,7 @@ module.exports = {
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
                 SCREEN_BG_RGB: JSON.stringify(config.screenBgRgb),
                 EDITOR_KEY: JSON.stringify(config.editorKey),
-                GAME_ID: gameId,
+                GAME_ID: JSON.stringify(gameId)
             }),
             new HtmlWebpackPlugin({
                 inject: 'body',
