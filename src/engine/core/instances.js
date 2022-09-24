@@ -10,6 +10,8 @@ let RL = null;
  */
 let SM = null;
 
+let game = null;
+
 function each(obj, f) {
     if (Array.isArray(obj)) {
         for (let item of obj) {
@@ -960,15 +962,19 @@ class CanvasManager {
 }
 
 export default {
+    setGame: value => {
+        if (game !== null) throw Error('There is already a running game instance!')
+        game = value
+    },
     setRL: (baseUrl, storage) => RL = new ResourceLoader(new BackEndFetcher(baseUrl), storage),
     get RL() {
         if (RL) return RL;
-        throw new Error('Resource Loader not yet initialized!');
+        throw Error('Resource Loader not yet initialized!');
     },
     setSM: (storage, gameId) => SM = new StorageManager(storage, gameId),
     get SM() {
         if (SM) return SM;
-        throw new Error('Storage Manager not yet initialized!');
+        throw Error('Storage Manager not yet initialized!');
     },
     OCM: new CanvasManager()
 }

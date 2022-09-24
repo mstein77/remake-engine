@@ -10,7 +10,7 @@ class Config {
         }
         this.fieldProps = this.getFieldProps();
         this.resolved = false;
-        this.parse({...this.getDefaults(), ...json});
+        this.parse({ ...this.getDefaults(), ...json });
     }
 
     getFieldProps() {
@@ -95,6 +95,25 @@ class Config {
         }
         if (typeof value !== 'number') {
             throw Error('value must be an integer');
+        }
+        if (props.min && value < props.min) {
+            throw Error('value is less than ' + props.min);
+        }
+        if (props.max && value > props.max) {
+            throw Error('value is more than ' + props.max);
+        }
+        return value;
+    }
+
+    validateFloat(value, props = {}) {
+        if (value === undefined) {
+            throw Error('Undefined value');
+        }
+        if (props.null && value === null) {
+            return null;
+        }
+        if (typeof value !== 'number') {
+            throw Error('value must be a float');
         }
         if (props.min && value < props.min) {
             throw Error('value is less than ' + props.min);
@@ -305,9 +324,13 @@ class Config {
         for (let key in json) {
             const value = json[key];
             if (key !== '' && value !== undefined) {
-                const setKey = 'set' + key[0].toUpperCase() + key.substr(1);
+                const setKey = 'set' + key[0].toUpperCase() + key.substring(1);
                 if (this[setKey]) {
-                    this[setKey](value);
+                    try {
+                        this[setKey](value);
+                    } catch (e) {
+                        throw Error(`Error setting config key "${key}": ${e.message}`);
+                    }
                 }
             }
         }

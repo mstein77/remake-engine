@@ -1,8 +1,107 @@
 import inst from "./instances.js";
-import { d, isValidResourceId } from "../helper/helper.js";
+import { d, isValidResourceId, getConfigFromInput } from "../helper/helper.js";
 import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
+import { Config } from "./config.js";
+
+/**
+ * A config object for the game instance
+ */
+class GameConfig extends Config {
+
+    setId() {
+        this.id = 'game';
+    }
+
+    /**
+     * Sets a fix width of the game in pixel
+     *
+     * @param {number} value An integer value for the width
+     */
+    setWidth(value) {
+        this.width = this.validateInt(value, this.getFieldProp('dim'))
+    }
+
+    /**
+     * Sets a fix height of the game in pixel
+     *
+     * @param {number} value An integer value for the height
+     */
+    setHeight(value) {
+        this.height = this.validateInt(value, this.getFieldProp('dim'))
+    }
+
+    /**
+     * Sets a zoom factor for the game
+     *
+     * @param {number} value A float value for the zoom factor
+     */
+    setZoom(value) {
+        this.zoom = this.validateFloat(value, this.getFieldProp('zoom'))
+    }
+
+    /**
+     * @inheritDoc
+     */
+    getFieldProps() {
+        return {
+            dim: {min: 1, max: 9999},
+            zoom: {min: 1, max: 10}
+        };
+    }
+
+    /**
+     * @inheritDoc
+     */
+    getDefaults() {
+        return {
+            width: 320,
+            height: 200,
+            zoom: 2
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.width = this.width;
+        obj.height = this.height;
+        obj.zoom = this.zoom;
+        return obj
+    }
+}
 
 class Game {
+
+    constructor(input) {
+        inst.setGame(this)
+        inst.setSM(localStorage, GAME_ID)
+        inst.setRL(BASE_URL + '/', inst.SM)
+        // TODO init resource loader so that we get a possible game json, etc.
+
+        getConfigFromInput(GameConfig, input, 'game').applyTo(this);
+
+        document.addEventListener('DOMContentLoaded', event => this.boot())
+    }
+
+    log(msg) {
+        console.log(msg);
+    }
+
+    boot() {
+        this.log(`Booting game "${this.id}"...`);
+        // build game dom structure
+        document.body.innerHTML = `<div><h1>Hello!</h1><canvas id="game" width="${this.width}" height="${this.height}" /></div>`;
+        this.log(`...booting done!`);
+    }
+}
+/**
+ * @type {GameConfig}
+ */
+Game.Config = GameConfig;
+
+class Game2 {
 
     constructor(width, height, config, init) {
         // analyse the element?

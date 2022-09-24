@@ -1235,29 +1235,52 @@ class RelativeBlock {
     }
 }
 
-function getConfigFromInput(configCls, input) {
-    let id = null;
+/**
+ *
+ * @param configCls
+ * @param input
+ * @param forceId
+ *
+ * @returns {Config}
+ */
+function getConfigFromInput(configCls, input, forceId = null) {
+    let fetchId = null;
     let confJson = null;
     let conf = input;
 
     if (typeof input === 'string') {
-        id = input;
+        // string given means that we have to load the json resource
+        fetchId = input
     } else if (input instanceof configCls) {
+        // we got a config instance
+        // if the resource was already loaded by the resource load we are fine
         if (!input.isResolved()) {
-            id = input.id;
+            // otherwise we have to check if there is new resource with the same id
+            fetchId = input.id;
         }
     } else {
+        // we got a json config
         confJson = input;
         if (!input.__resolved) {
-            id = input.id;
+            // json was not fetched by the resource loader, so check for a new resource with this id
+            fetchId = input.id;
         }
     }
-    if (id && inst.RL.hasResource('json', id)) {
-        confJson = inst.RL.getJsonResource(id);
+    if (fetchId !== null) {
+        if (fetchId === undefined) throw Error('Could not extract id from config')
+        if (forceId) fetchId = forceId
+    }
+
+    // try to load config json with the id (if it could be extracted) from the resource loader
+    if (fetchId && inst.RL.hasResource('json', fetchId)) {
+        confJson = inst.RL.getJsonResource(fetchId)
     }
     if (confJson !== null) {
-        conf = new configCls(confJson);
+        // if we have a JSON config either from the param or the resource loader, instantiate config object
+        if (forceId) confJson.id = forceId
+        conf = new configCls(confJson)
     }
+    // at this point we should have a valid config instance
     if (!(conf instanceof configCls)) {
         throw Error('Invalid');
     }
