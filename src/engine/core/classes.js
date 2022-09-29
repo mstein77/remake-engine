@@ -2316,6 +2316,5 @@ export {
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,
-    DivContainer,
-    RenderPlugin
+    DivContainer
 }
