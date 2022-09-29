@@ -96,7 +96,7 @@ class DefaultRenderPlugin extends RenderPlugin {
     getSectionError({ error }) {
         const { div, button } = this;
 
-        const click = () => inst.game.initAndBoot()
+        const click = () => this.game.initAndBoot()
         return (
             div(
                 {class: 'center-v'},
@@ -160,11 +160,11 @@ class DefaultRenderPlugin extends RenderPlugin {
         const { div, button, input, icon } = this;
 
         const goFullScreen = () => console.log('GO FULL-SCREEN!');
-        const game = inst.game;
+        const game = this.game;
         const buttons = [
-            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => inst.game.openFullScreenMode()},
-            {name: 'Editor', sideIcon: 'build', click: () => inst.game.openEditorMode()},
-            {name: 'Reset', sideIcon: 'restart_alt', click: () => inst.game.initAndBoot()},
+            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => this.game.openFullScreenMode()},
+            {name: 'Editor', sideIcon: 'build', click: () => this.game.openEditorMode()},
+            {name: 'Reset', sideIcon: 'restart_alt', click: () => this.game.initAndBoot()},
         ];
 
         const buttonElems = [
