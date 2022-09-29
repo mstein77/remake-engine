@@ -1,4 +1,3 @@
-import inst from "../core/instances.js";
 import { RenderPlugin } from "../core/classes.js";
 
 class DefaultRenderPlugin extends RenderPlugin {
