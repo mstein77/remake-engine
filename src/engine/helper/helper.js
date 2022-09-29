@@ -1267,8 +1267,8 @@ function getConfigFromInput(configCls, input, forceId = null) {
         }
     }
     if (fetchId !== null) {
-        if (fetchId === undefined) throw Error('Could not extract id from config')
         if (forceId) fetchId = forceId
+        if (fetchId === undefined) throw Error('Could not extract id from config')
     }
 
     // try to load config json with the id (if it could be extracted) from the resource loader

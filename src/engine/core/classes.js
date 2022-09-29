@@ -1,8 +1,8 @@
 import inst from "./instances.js";
-import { d, isValidResourceId, getConfigFromInput } from "../helper/helper.js";
+import { d, isValidResourceId, getConfigFromInput, ucfirst } from "../helper/helper.js";
 import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
 import { Config } from "./config.js";
-
+import "../editor/css/base.css"
 /**
  * A config object for the game instance
  */
@@ -72,27 +72,320 @@ class GameConfig extends Config {
     }
 }
 
+class RenderPlugin {
+
+    constructor() {
+        this.watcher = {};
+
+        this.div = (...args) => this.createDomElem('div', ...args)
+        this.canvas = (...args) => this.createDomElem('canvas', ...args)
+        this.button = (...args) => this.createDomElem('button', ...args)
+        this.input = (...args) => this.createDomElem('input', ...args)
+        this.i = (...args) => this.createDomElem('i', ...args)
+        this.icon = name => this.i(
+            {
+                class: "material-icons center-h min-content-h big",
+                style: "display: block"
+            },
+            name
+        )
+    }
+
+    getCssConstantsValues() {
+        return {}
+    }
+
+    getParsed(expr) {
+        const substituted = [];
+        const matches = expr.matchAll(/<([a-z]+\.[a-zA-Z]+)(\,[a-z]+\.[a-zA-Z]+)*(\|[a-zA-Z]+)*>/g)
+        if (!matches) return { parsed: expr, substituted };
+
+        const game = inst.game;
+        let parsed = expr;
+        let typed = true;
+        for (let match of matches) {
+            let [ all, matchExpr, ...more ] = [ ...match ]
+            let replaceExpr = matchExpr;
+            const filters = [];
+            const substitutes = [matchExpr];
+            const args = [eval(matchExpr)];
+            for (let item of more) {
+                if (item === undefined) continue
+                replaceExpr += item;
+                const name = item.substring(1)
+                if (item.startsWith(',')) {
+                    substitutes.push(name);
+                    args.push(eval(name))
+                } else {
+                    filters.push(name)
+                }
+            }
+            let first = true;
+            let value = args[0];
+            while (filters.length) {
+                const filter = filters.shift()
+                const method = 'filter' + ucfirst(filter)
+                if (!this[method]) throw Error(`Cannot find filter method "${method}"`)
+                if (first) {
+                    value = this[method]( ...args )
+                } else {
+                    value = this[method](value)
+                }
+                first = false
+            }
+            const full = '<' + replaceExpr + '>'
+            if (!filters.length && typed && full === expr) {
+                parsed = value
+            } else {
+                typed = false
+                parsed = parsed.replaceAll(full, value)
+            }
+            for (let substitute of substitutes) {
+                if (!substituted.includes(substitute)) substituted.push(substitute)
+            }
+        }
+        return { parsed, substituted }
+    }
+
+    extractWatcher(expr, node, prop) {
+        if (typeof expr !== 'string') return expr;
+
+        const { parsed, substituted } = this.getParsed(expr)
+        if (!substituted.length) return parsed
+
+        for (let name of substituted) {
+            if (!this.watcher[name]) this.watcher[name] = []
+            const watch = this.watcher[name]
+            let found = false
+            for (let item of watch) {
+                if (item.node !== node || item.prop !== prop) continue
+                found = true
+            }
+            if (found) continue
+            watch.push({ node, expr, prop });
+        }
+        return parsed;
+    }
+
+    createDomElem(name, ...args) {
+        const elem = document.createElement(name)
+
+        const propsOrChildren = args.shift();
+        if (typeof propsOrChildren === 'string') {
+            elem.append(this.extractWatcher(propsOrChildren, elem))
+        } else if (typeof propsOrChildren === 'object') {
+            const pairs = Object.entries(propsOrChildren)
+            for (let [prop, value] of pairs) {
+                if (prop.startsWith('on')) {
+                    elem.addEventListener(prop.substring(2).toLowerCase(), value)
+                } else {
+                    const parsed = this.extractWatcher(value, elem, prop)
+                    if (typeof parsed === 'boolean') {
+                        elem[prop] = parsed
+                    } else {
+                        elem.setAttribute(prop, parsed)
+                    }
+                }
+            }
+        }
+        while (args.length) {
+            const item = args.shift()
+            elem.append(typeof item === 'string' ? this.extractWatcher(item, elem) : item)
+        }
+        return elem;
+    }
+
+    notify(action, props) {
+        switch(action) {
+            case 'change':
+                const watch = this.watcher['game.' + props.name];
+                if (!watch) break
+
+                const game = inst.game;
+                for (let { node, expr, prop } of watch) {
+                    const { parsed } = this.getParsed(expr);
+                    if (prop) {
+                        if (typeof parsed === 'boolean') {
+                            node[prop] = parsed
+                        } else {
+                            node.setAttribute(prop, parsed)
+                        }
+                    } else {
+                        node.innerText = parsed
+                    }
+                }
+                break
+        }
+    }
+}
+
+const key2type = {};
+const key2const = {};
+
+const setStyleProp = (style, key, value) => {
+    const type = key2type[key];
+    if (!type) return;
+
+    if (['type', 'perc'].includes(type) && typeof value === 'string') {
+        value = parseInt(value, 10);
+    }
+    let cssValue = value;
+    if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
+        cssValue += 'px';
+    } else if (type === 'perc') {
+        cssValue += '%';
+    }
+    style.setProperty(key2const[key], cssValue);
+    return value
+};
+
+const cssConstTypes = [
+    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'grad', 'type'
+];
+
+const extractKeys2types = obj => {
+    const regexpCamelCaseLast = /([A-Z][a-z]*)$/;
+
+    for (let key of Object.keys(obj)) {
+        const match = key.match(regexpCamelCaseLast);
+        if (match === null || match.length < 2) continue;
+
+        const type = match[1].toLowerCase();
+        if (!type || !cssConstTypes.includes(type)) continue;
+
+        key2type[key] = type;
+
+        const parts = [];
+        let i = 0;
+        let currPart = '';
+        while (i < key.length) {
+            let char = key[i];
+            if (char >= 'A' && char <= 'Z') {
+                parts.push(currPart);
+                currPart = '';
+                char = char.toLowerCase()
+            }
+            currPart += char;
+            i++
+        }
+        if (currPart !== '') {
+            parts.push(currPart)
+        }
+        const constName = '--' + parts.join('-');
+        key2const[key] = constName;
+    }
+}
+
 class Game {
 
     constructor(input) {
         inst.setGame(this)
         inst.setSM(localStorage, GAME_ID)
         inst.setRL(BASE_URL + '/', inst.SM)
-        // TODO init resource loader so that we get a possible game json, etc.
 
-        getConfigFromInput(GameConfig, input, 'game').applyTo(this);
+        this.renderPlugin = inst.renderPlugin;
 
-        document.addEventListener('DOMContentLoaded', event => this.boot())
+        document.body.id = 'body';
+
+        const cssConsts = this.renderPlugin.getCssConstantsValues()
+        extractKeys2types(cssConsts);
+        for (let [ key, value ] of Object.entries(cssConsts)) {
+            setStyleProp(document.body.style, key, value)
+        }
+
+        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
+        document.body.classList.add('game-bg-rgb');
+
+        this.masterVolume = 100;
+        this.muted = false;
+        this.running = true;
+
+        this.input = input;
+        document.addEventListener('DOMContentLoaded', () => this.initAndBoot())
+    }
+
+    initAndBoot() {
+        this.notify('init')
+        this.notify('loading')
+        setTimeout(() => {
+            try {
+                getConfigFromInput(GameConfig, this.input, 'game').applyTo(this);
+                this.boot()
+            } catch (e) {
+                this.notify('error', {error: e.message})
+            }
+        }, 2000);
+    }
+
+    notify(action, props) {
+        let changes = this.renderPlugin.notify(action, props)
+        if (!changes) return
+
+        if (!Array.isArray(changes)) changes = [changes]
+
+        for (let { id, content } of changes) {
+            if (!id || !content) continue;
+
+            const elem = document.getElementById(id)
+            if (!elem) return d('NOT FOUND:', id)
+
+            while (elem.firstChild) {
+                elem.firstChild.remove();
+            }
+            elem.append(content)
+        }
     }
 
     log(msg) {
         console.log(msg);
     }
 
+    setZoom(value, force = false) {
+        if (value < 1 || value > 4 || (!force && this.zoom === value)) {
+            return;
+        }
+        this.zoom = value;
+        const overlay = document.getElementById('overlay');
+        overlay.style.transform =  'scale(' + this.zoom +')';
+        overlay.style.transformOrigin = 'top left';
+        const elem = document.getElementById('screen-div');
+        elem.style.width = '' + (this.width * this.zoom) + 'px';
+        elem.style.height = '' + (this.height * this.zoom) + 'px';
+        this.notify('change', {name: 'zoom', value: this.zoom})
+    }
+
+    setMasterVolume(value) {
+        if (this.masterVolume === value) return;
+        this.masterVolume = value;
+        this.notify('change', {name: 'masterVolume', value: this.masterVolume})
+    }
+
+    toggleRunning() {
+        this.running = !this.running
+        this.notify('change', {name: 'running', value: this.running})
+    }
+
+    toggleMuted() {
+        this.muted = !this.muted;
+        this.notify('change', {name: 'muted', value: this.muted})
+    }
+
+    openEditorMode() {
+        this.log('EDITOR-MODE');
+    }
+
+    openFullScreenMode() {
+        this.log('FULL-SCREEN-MODE');
+    }
+
     boot() {
-        this.log(`Booting game "${this.id}"...`);
+        this.log(`Booting game "${GAME_ID}"...`);
         // build game dom structure
-        document.body.innerHTML = `<div><h1>Hello!</h1><canvas id="game" width="${this.width}" height="${this.height}" /></div>`;
+
+        const { width, height } = this;
+        this.notify('main',{width, height});
+        this.setZoom(this.zoom, true);
+
         this.log(`...booting done!`);
     }
 }
@@ -2018,5 +2311,6 @@ export {
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,
-    DivContainer
+    DivContainer,
+    RenderPlugin
 }

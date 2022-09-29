@@ -1,5 +1,6 @@
 import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies } from "../helper/helper.js";
 import { ImageResource } from "./classes.js";
+import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin.js";
 
 /**
  * @type {ResourceLoader}
@@ -961,20 +962,35 @@ class CanvasManager {
     }
 }
 
+let renderPlugin = null;
+
 export default {
     setGame: value => {
         if (game !== null) throw Error('There is already a running game instance!')
         game = value
     },
+    setRenderPlugin: value => {
+        renderPlugin = value
+    },
+    get renderPlugin() {
+        if (renderPlugin === null) {
+            renderPlugin = new DefaultRenderPlugin()
+        }
+        return renderPlugin
+    },
     setRL: (baseUrl, storage) => RL = new ResourceLoader(new BackEndFetcher(baseUrl), storage),
     get RL() {
-        if (RL) return RL;
-        throw Error('Resource Loader not yet initialized!');
+        if (RL) return RL
+        throw Error('Resource Loader not yet initialized!')
     },
     setSM: (storage, gameId) => SM = new StorageManager(storage, gameId),
     get SM() {
-        if (SM) return SM;
-        throw Error('Storage Manager not yet initialized!');
+        if (SM) return SM
+        throw Error('Storage Manager not yet initialized!')
+    },
+    get game() {
+        if (game) return game
+        throw Error('Game not yet instantiated!')
     },
     OCM: new CanvasManager()
 }
