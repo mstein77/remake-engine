@@ -1,4 +1,4 @@
-import { RenderPlugin } from "../core/classes.js";
+import { RenderPlugin } from "./RenderPlugin.js";
 
 class DefaultRenderPlugin extends RenderPlugin {
 
