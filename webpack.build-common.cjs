@@ -122,8 +122,10 @@ function readJson(path) {
     return json
 }
 
-const packageJson = readJson(path.join(gamePath, 'package.json'));
-const gameId = packageJson.name;
+const enginePackageJson = readJson(path.join(__dirname, 'package.json'));
+
+const gamePackageJson = readJson(path.join(gamePath, 'package.json'));
+const gameId = gamePackageJson.name;
 
 module.exports = {
     gameId,
@@ -138,6 +140,8 @@ module.exports = {
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
                 PORT: JSON.stringify(port),
+                VERSION_ENGINE: JSON.stringify(enginePackageJson.version),
+                VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 LOGGING: JSON.stringify(config.serverLogging),
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat)
             })
