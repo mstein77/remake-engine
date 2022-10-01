@@ -150,11 +150,12 @@ class Game {
         document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
         document.body.classList.add('game-bg-rgb');
 
-        this.masterVolume = 100;
-        this.muted = false;
-        this.running = true;
+        this.masterVolume = 100
+        this.muted = false
+        this.running = true
+        this.warnings = []
 
-        this.input = input;
+        this.input = input
         document.addEventListener('DOMContentLoaded', () => this.initAndBoot())
     }
 
@@ -177,21 +178,36 @@ class Game {
 
         if (!Array.isArray(changes)) changes = [changes]
 
-        for (let { id, content } of changes) {
-            if (!id || !content) continue;
+        for (let { id, nodes, html } of changes) {
+            if (!(nodes || html)) continue;
 
-            const elem = document.getElementById(id)
+            const elem = id ? document.getElementById(id) : document.body;
             if (!elem) return d('NOT FOUND:', id)
 
-            while (elem.firstChild) {
-                elem.firstChild.remove();
+            if (nodes) {
+                while (elem.firstChild) {
+                    elem.firstChild.remove();
+                }
+                elem.append(nodes)
+            } else {
+                elem.innerHTML = html
             }
-            elem.append(content)
         }
+        this.renderPlugin.cleanupWatchers()
     }
 
     log(msg) {
         console.log(msg);
+    }
+
+    addWarning(msg) {
+        this.warnings.push(msg)
+        this.notify('change', {name: 'warnings', value: this.warnings})
+    }
+
+    clearWarnings() {
+        if (this.warnings.length) this.warnings.shift()
+        this.notify('change', {name: 'warnings', value: this.warnings})
     }
 
     setZoom(value, force = false) {
@@ -237,7 +253,7 @@ class Game {
         // build game dom structure
 
         const { width, height } = this;
-        this.notify('main',{width, height});
+        this.notify('main',{ width, height });
         this.setZoom(this.zoom, true);
 
         this.log(`...booting done!`);

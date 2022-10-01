@@ -53,16 +53,16 @@ class DefaultRenderPlugin extends RenderPlugin {
 
         switch(action) {
             case 'init':
-                return {id: 'body', content: this.getBootSection()}
+                return {nodes: this.getBootSection()}
 
             case 'loading':
-                return {id: 'status', content: this.getSectionLoading()}
+                return {id: 'status', nodes: this.getSectionLoading()}
 
             case 'error':
-                return {id: 'status', content: this.getSectionError(props)}
+                return {id: 'status', nodes: this.getSectionError(props)}
 
             case 'main':
-                return {id: 'body', content: this.getMainSection(props)}
+                return {nodes: this.getMainSection(props)}
         }
     }
 
@@ -162,8 +162,9 @@ class DefaultRenderPlugin extends RenderPlugin {
         const goFullScreen = () => console.log('GO FULL-SCREEN!');
         const game = this.game;
         const buttons = [
-            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => this.game.openFullScreenMode()},
-            {name: 'Editor', sideIcon: 'build', click: () => this.game.openEditorMode()},
+            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => {this.game.addWarning('No fullscreen my friend!'); this.game.openFullScreenMode()}},
+            {name: 'Editor', sideIcon: 'build', click: () => {this.game.addWarning('No editor available!'); this.game.openEditorMode()}
+            },
             {name: 'Reset', sideIcon: 'restart_alt', click: () => this.game.initAndBoot()},
         ];
 
@@ -256,10 +257,37 @@ class DefaultRenderPlugin extends RenderPlugin {
                     )
                 ),
                 div(
+                    {id: 'warnings', watch: ['game.warnings'], style: 'background-color: #D0D0D0'},
+                    warnings => {
+                        if (!warnings.length) return div()
+
+                        const elems = []
+                        for (let warning of warnings) {
+                            elems.push(div(warning))
+                        }
+                        return div(
+                            {class: 'stack-h'},
+                            div(
+                                {class: 'padded'},
+                                icon('warning')
+                            ),
+                            div(
+                                {class: 'stack-v flex padded inner-space-v'},
+                                ...elems
+                            ),
+                            div(
+                                {class: 'padded', onclick: () => this.game.clearWarnings()},
+                                icon('close')
+                            )
+                        )
+                    }
+
+                ),
+                div(
                     {class: 'padded stack-h full-h', style: 'background-color: #494964'},
                     div(
                         {class: 'min-content-h no-wrap', style: 'white-space: nowrap; color: #9eaca9; font-family: Tahoma'},
-                        'Remake Engine V0.01 - © 2022 Binary Druidz'
+                        'Remake Engine V' + VERSION_ENGINE + ' - © 2022 Binary Druidz'
                     ),
                     div(
                         {class: 'flex'},

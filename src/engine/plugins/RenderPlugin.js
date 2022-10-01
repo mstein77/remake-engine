@@ -1,4 +1,4 @@
-import { ucfirst } from "../helper/helper.js";
+import { ucfirst, d } from "../helper/helper.js";
 
 class RenderPlugin {
 
@@ -79,6 +79,21 @@ class RenderPlugin {
         return { parsed, substituted }
     }
 
+    addWatcher(name, props) {
+        if (!this.watcher[name]) this.watcher[name] = []
+        const watch = this.watcher[name]
+        const { node, prop } = props;
+        let found = false
+        for (let item of watch) {
+            if (item.node !== node || item.prop !== prop) continue
+            found = true
+        }
+        if (found) return false
+        watch.push(props);
+        node.classList.toggle('watched', true)
+        return true
+    }
+
     extractWatcher(expr, node, prop) {
         if (typeof expr !== 'string') return expr;
 
@@ -86,15 +101,7 @@ class RenderPlugin {
         if (!substituted.length) return parsed
 
         for (let name of substituted) {
-            if (!this.watcher[name]) this.watcher[name] = []
-            const watch = this.watcher[name]
-            let found = false
-            for (let item of watch) {
-                if (item.node !== node || item.prop !== prop) continue
-                found = true
-            }
-            if (found) continue
-            watch.push({ node, expr, prop });
+            this.addWatcher(name, { node, expr, prop });
         }
         return parsed;
     }
@@ -102,6 +109,7 @@ class RenderPlugin {
     createDomElem(name, ...args) {
         const elem = document.createElement(name)
 
+        const game = this.game;
         const propsOrChildren = args.shift();
         if (typeof propsOrChildren === 'string') {
             elem.append(this.extractWatcher(propsOrChildren, elem))
@@ -110,6 +118,16 @@ class RenderPlugin {
             for (let [prop, value] of pairs) {
                 if (prop.startsWith('on')) {
                     elem.addEventListener(prop.substring(2).toLowerCase(), value)
+                } else if (prop === 'watch') {
+                    if (args.length !== 1) throw Error('Missing function parameter')
+                    if (!Array.isArray(value)) value = [value]
+                    const parsed = [];
+                    const callback = args.shift()
+                    for (let name of value) {
+                        parsed.push(eval(name))
+                        this.addWatcher(name, { node: elem, expr: value, prop, callback })
+                    }
+                    elem.append(callback( ...parsed ))
                 } else {
                     const parsed = this.extractWatcher(value, elem, prop)
                     if (typeof parsed === 'boolean') {
@@ -127,23 +145,52 @@ class RenderPlugin {
         return elem;
     }
 
+    cleanupWatchers() {
+        const elems = [ ...document.getElementsByClassName('watched') ]
+
+        const watcher = {}
+
+        for (let [ name, watch ] of Object.entries(this.watcher)) {
+            const newWatch = []
+            for (let props of watch) {
+                if (elems.includes(props.node)) {
+                    newWatch.push(props)
+                }
+            }
+            if (newWatch.length) watcher[name] = newWatch
+        }
+        this.watcher = watcher
+    }
+
     notify(action, props) {
         switch(action) {
             case 'change':
-                const watch = this.watcher['game.' + props.name];
+                const watch = this.watcher['game.' + props.name]
                 if (!watch) break
 
                 const game = this.game;
-                for (let { node, expr, prop } of watch) {
-                    const { parsed } = this.getParsed(expr);
-                    if (prop) {
-                        if (typeof parsed === 'boolean') {
-                            node[prop] = parsed
-                        } else {
-                            node.setAttribute(prop, parsed)
+                for (let { node, expr, prop, callback } of watch) {
+                    if (callback) {
+                        const args = [];
+                        for (let arg of expr) {
+                            args.push(eval(arg))
                         }
+                        const nodes = callback( ...args );
+                        while (node.firstChild) {
+                            node.firstChild.remove()
+                        }
+                        node.append(nodes)
                     } else {
-                        node.innerText = parsed
+                        const { parsed } = this.getParsed(expr)
+                        if (prop) {
+                            if (typeof parsed === 'boolean') {
+                                node[prop] = parsed
+                            } else {
+                                node.setAttribute(prop, parsed)
+                            }
+                        } else {
+                            node.innerText = parsed
+                        }
                     }
                 }
                 break
