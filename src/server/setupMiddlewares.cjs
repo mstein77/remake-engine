@@ -4,6 +4,7 @@ const fs = require('fs')
 const morgan = require('morgan')
 
 const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjs');
+const express = require("express");
 
 const gamePath = path.resolve(__dirname, '../../');
 const gameDistPath = path.resolve(gamePath, 'dist');
@@ -131,6 +132,10 @@ const setupAppMiddlewares = (app, config = null) => {
         app.use(morgan(config.serverLoggingFormat, options));
     }
     app.use(bodyParser.json());
+
+    app.use('/audio', express.static(
+        '/mnt/c/Users/Marc/www/turrican2/node_modules/2dfireengine/src/public' +
+        '/audio')); // STATIC_DIR)); //DIST_DIR));
 
     app.post('/has', (req, res) => {
         const resources = req.body.resources ? req.body.resources : [];

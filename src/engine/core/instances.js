@@ -1,5 +1,5 @@
 import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies } from "../helper/helper.js";
-import { ImageResource } from "./classes.js";
+import { ImageResource, AudioResource } from "./classes.js";
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin.js";
 
 /**

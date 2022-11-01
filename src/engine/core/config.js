@@ -1,4 +1,4 @@
-import { isValidResourceId } from "../helper/helper.js";
+import { isValidResourceId, d } from "../helper/helper.js";
 import inst from "./instances.js";
 import { ImageResource } from "./classes.js";
 
@@ -317,20 +317,25 @@ class Config {
         this.id = this.validateId(value);
     }
 
+    getJsonsToParse(json) {
+        return [json]
+    }
+
     parse(json) {
         if (json.id !== undefined) {
             this.setId(json.id);
         }
-        for (let key in json) {
-            const value = json[key];
-            if (key !== '' && value !== undefined) {
-                const setKey = 'set' + key[0].toUpperCase() + key.substring(1);
-                if (this[setKey]) {
-                    try {
-                        this[setKey](value);
-                    } catch (e) {
-                        throw Error(`Error setting config key "${key}": ${e.message}`);
-                    }
+        const jsons = this.getJsonsToParse(json);
+        d(jsons);
+        for (let json of jsons) {
+            for (let [ key, value ] of Object.entries(json)) {
+                if (value === undefined) continue
+                const setKey = 'set' + key[0].toUpperCase() + key.substring(1)
+                if (!this[setKey]) continue
+                try {
+                    this[setKey](value);
+                } catch (e) {
+                    throw Error(`Error setting config key "${key}": ${e.message}`);
                 }
             }
         }

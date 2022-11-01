@@ -97,6 +97,7 @@ const getFlatObjectResources = resources => {
 };
 
 class Storage {
+
     constructor(storage, prefix = '') {
         this.storage = storage;
         this.prefix = prefix;

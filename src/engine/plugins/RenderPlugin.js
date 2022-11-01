@@ -10,6 +10,7 @@ class RenderPlugin {
         this.button = (...args) => this.createDomElem('button', ...args)
         this.input = (...args) => this.createDomElem('input', ...args)
         this.i = (...args) => this.createDomElem('i', ...args)
+        this.pre = (...args) => this.createDomElem('pre', ...args)
         this.icon = name => this.i(
             {
                 class: "material-icons center-h min-content-h big",
@@ -140,6 +141,7 @@ class RenderPlugin {
         }
         while (args.length) {
             const item = args.shift()
+            if (!item) continue
             elem.append(typeof item === 'string' ? this.extractWatcher(item, elem) : item)
         }
         return elem;
@@ -162,8 +164,16 @@ class RenderPlugin {
         this.watcher = watcher
     }
 
+    handleError(err) {
+        console.log(err)
+        this.game.running = false
+    }
+
     notify(action, props) {
         switch(action) {
+            case 'error':
+                return this.handleError(props)
+
             case 'change':
                 const watch = this.watcher['game.' + props.name]
                 if (!watch) break

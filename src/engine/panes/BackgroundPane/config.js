@@ -18,11 +18,13 @@ export class BackgroundPaneConfig extends Config {
     }
 
     setColor(value) {
-        this.color = this.validateColor(value);
+        this.color = this.validateColor(value)
+        return this
     }
 
     setImages(values) {
         this.images = this.validateImgObjects(values)
+        return this
     }
 
     validateImgObject(value) {
@@ -45,7 +47,8 @@ export class BackgroundPaneConfig extends Config {
     }
 
     addImage(image, x = 0, y = 0) {
-        this.images.push({ image, x, y });
+        this.images.push({ image, x, y })
+        return this
     }
 
     applyTo(obj) {

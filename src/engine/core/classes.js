@@ -1,8 +1,8 @@
 import inst from "./instances.js";
-import { d, isValidResourceId, getConfigFromInput, ucfirst } from "../helper/helper.js";
+import { d, isValidResourceId, getConfigFromInput, ucfirst, clamp, Storage } from "helper/helper.js";
 import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
 import { Config } from "./config.js";
-import "../editor/css/base.css"
+
 /**
  * A config object for the game instance
  */
@@ -36,7 +36,52 @@ class GameConfig extends Config {
      * @param {number} value A float value for the zoom factor
      */
     setZoom(value) {
-        this.zoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        this.zoom = this.getValidatedZoom(value)
+    }
+
+    getValidatedZoom(value) {
+        const zoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        if (this.minZoom > zoom) throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
+        if (this.maxZoom < zoom) throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
+        return zoom
+    }
+
+    /**
+     * Sets a zoom factor for the game
+     *
+     * @param {number} value A float value for the zoom factor
+     */
+    setMinZoom(value) {
+        this.minZoom = this.validateFloat(value, this.getFieldProp('zoom'))
+    }
+
+    /**
+     * Sets a maximum zoom factor for the game
+     *
+     * @param {number} value A float value for the zoom factor
+     */
+    setMaxZoom(value) {
+        const maxZoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        if (this.minZoom > maxZoom) throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
+        this.maxZoom = maxZoom
+    }
+
+    /**
+     * Sets whether the zoom factor should be calculated automatically or not
+     *
+     * @param value
+     */
+    setAutoZoom(value) {
+        this.autoZoom = this.validateBool(value)
+    }
+
+    /**
+     * Sets whether the zoom factor should be integer steps or not
+     *
+     * @param {boolean} value
+     */
+    setStepZoom(value) {
+        this.stepZoom = this.validateBool(value)
     }
 
     /**
@@ -49,6 +94,15 @@ class GameConfig extends Config {
         };
     }
 
+    getJsonsToParse(json) {
+        const { minZoom, maxZoom, ...props } = json
+        return [
+            { minZoom },
+            { maxZoom },
+            props
+        ];
+    }
+
     /**
      * @inheritDoc
      */
@@ -56,7 +110,11 @@ class GameConfig extends Config {
         return {
             width: 320,
             height: 200,
-            zoom: 2
+            zoom: 2,
+            minZoom: 1,
+            maxZoom: 5,
+            stepZoom: true,
+            autoZoom: false
         }
     }
 
@@ -65,9 +123,13 @@ class GameConfig extends Config {
      */
     applyTo(obj) {
         super.applyTo(obj);
-        obj.width = this.width;
-        obj.height = this.height;
-        obj.zoom = this.zoom;
+        obj.width = this.width
+        obj.height = this.height
+        obj.zoom = this.zoom
+        obj.minZoom = this.minZoom
+        obj.maxZoom = this.maxZoom
+        obj.stepZoom = this.stepZoom
+        obj.autoZoom = this.autoZoom
         return obj
     }
 }
@@ -95,6 +157,47 @@ const setStyleProp = (style, key, value) => {
 const cssConstTypes = [
     'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'grad', 'type'
 ];
+
+const getConstValue = (key, value) => {
+    const keyType = key2type[key]
+    if (!keyType) return
+    let propValue = value;
+    switch(keyType) {
+        case 'perc':
+            if (typeof value === 'string') {
+                value = value.substr(0, value.length - 1);
+                propValue = parseInt(value, 10)
+            }
+            break;
+        case 'type':
+            propValue = parseInt(value, 10);
+            break
+    }
+
+}
+
+const getConstValues = (source, target = null) => {
+    const result = target ? target : {};
+    for (let [key, value] of Object.entries(source)) {
+        const keyType = key2type[key];
+        if (result[key] === undefined && keyType) {
+            let propValue = value;
+            switch(keyType) {
+                case 'perc':
+                    if (typeof value === 'string') {
+                        value = value.substr(0, value.length - 1);
+                        propValue = parseInt(value, 10)
+                    }
+                    break;
+                case 'type':
+                    propValue = parseInt(value, 10);
+                    break
+            }
+            result[key] = propValue
+        }
+    }
+    return result
+};
 
 const extractKeys2types = obj => {
     const regexpCamelCaseLast = /([A-Z][a-z]*)$/;
@@ -129,47 +232,438 @@ const extractKeys2types = obj => {
     }
 }
 
+/**
+
+ A: Localstorage -> Config -> Config.default
+ B: Config -> Localstorage -> Config.default
+
+ construct (initialized only once, not configurable, persisted on change)
+ -----------------------
+ masterVolume:
+   localstorage -> 100
+ muted:
+   localstorage -> false
+
+ configurable (non-persisted)
+ -----------------------
+ width:
+   config -> config.default
+ height:
+   config -> config.default
+ touch:
+   config -> config.default
+ min/maxZoom:
+   config -> config.default
+
+ configurable and persisted
+ -----------------------
+ zoom:
+   localstorage -> config -> config.default
+ autoZoom:
+   localstorage -> config -> config.default
+ ------------------------
+
+ 1. set construct props to their defaults
+
+    (re)boot
+    ---------------
+    disable persistance
+ 2. persisted = get persistedProps from localstorage
+ 3. applyConfig(this)
+ 4. for (let [ key, value ] of persisted) {
+       this[key] = value
+    }
+ 5. enable persistance
+
+
+
+ */
+const persistedProps2type = {
+    zoom: 'float',
+    autoZoom: 'bool',
+    stepZoom: 'bool',
+    masterVolume: 'int',
+    muted: 'bool'
+}
+
+const STATE = {
+    CONSTRUCT: 0,
+    INIT: 1,
+    CONNECT: 2,
+    PREBOOT_ERROR: 3,
+    BOOT: 4,
+    RUNNING: 5,
+    STOPPED: 6,
+    EDIT: 7
+}
+const state2name = [
+    'construct', 'init', 'connect', 'preboot_error', 'boot', 'running', 'stopped', 'edit'
+]
+
 class Game {
 
-    constructor(input) {
+    constructor(input, initHandler) {
+        this.states = STATE
+        this.currState = STATE.CONSTRUCT
+
         inst.setGame(this)
+        this.game = this
         inst.setSM(localStorage, GAME_ID)
         inst.setRL(BASE_URL + '/', inst.SM)
+        this.engineStorage = new Storage(localStorage, 'remake-engine.')
 
         this.renderPlugin = inst.renderPlugin
         this.renderPlugin.setGame(this)
 
-        document.body.id = 'body';
+        // overwrite body with essential parent div containers
+        document.body.innerHTML =
+            '<div class="full-v" id="body"></div>' +
+            '<div class="full-v full-h pos-0 fixed modal-overlay hidden" id="popup"></div>' +
+            '<div style="display: none" id="offscreen"></div>' +
+            '<div id="editor" class="full-v" style="display: none"></div>'
 
+        // background is set by build config independant from render plugin
+        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB)
+        document.body.classList.add('game-bg-rgb')
+
+        this.resizeObserver = new ResizeObserver(
+            entries => {
+                if (this.autoZoom) this.syncToZoom()
+            }
+        )
+
+        // apply constants assigned in render plugin
         const cssConsts = this.renderPlugin.getCssConstantsValues()
-        extractKeys2types(cssConsts);
+        extractKeys2types(cssConsts)
         for (let [ key, value ] of Object.entries(cssConsts)) {
             setStyleProp(document.body.style, key, value)
         }
-
-        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
-        document.body.classList.add('game-bg-rgb');
-
-        this.masterVolume = 100
-        this.muted = false
-        this.running = true
-        this.warnings = []
-
+        // registration (only construct)
         this.input = input
-        document.addEventListener('DOMContentLoaded', () => this.initAndBoot())
+        this.screens = {}
+        this.domLoaded = false
+        this.audio = new AudioPlayer()
+
+        this.registerListeners()
+
+        if (!initHandler) return
+
+        this.setInitHandler(initHandler)
+        this.init()
     }
 
-    initAndBoot() {
-        this.notify('init')
-        this.notify('loading')
+    init() {
+        this.setState(STATE.INIT);
+
+        this.warnings = []
+        this.currentScreen = null
+        this.elems = {}
+        this.props = {}
+        this.domQueue = []
+        this.audioPlaying = []
+        this.buildState = null
+        this.hasBuildState = true
+        this.running = false
+        this.before = {}
+
+        this.globals = getNewStateObj()
+
+        if (!this.initHandler) return
+
+        if (this.domLoaded) {
+            this.connectAndBoot()
+            return
+        }
+        document.addEventListener(
+            'DOMContentLoaded',
+            () => {
+                this.domLoaded = true
+                this.connectAndBoot()
+            },
+            {once: true}
+        )
+    }
+
+    connectAndBoot() {
+        this.setState(STATE.CONNECT)
+        // TODO: load game.json
         setTimeout(() => {
             try {
-                getConfigFromInput(GameConfig, this.input, 'game').applyTo(this);
+                // apply input to this
+                const config = getConfigFromInput(GameConfig, this.input, 'game')
+                config.applyTo(this.props)
+                // overwrite with persisted values
+                for (let [ prop, type ] of Object.entries(persistedProps2type)) {
+                    let value = this.engineStorage.getJson(prop)
+                    if (value === undefined || value === null) continue
+                    if (prop === 'muted') {
+                        this.audio.setMuted(value)
+                    } else if (prop === 'masterVolume') {
+                        this.audio.setMasterVolume(value)
+                    } else {
+                        try {
+                            let mismatch = false
+                            switch(type) {
+                                case 'bool':
+                                    mismatch = typeof value !== 'boolean'
+                                    break
+
+                                case 'float':
+                                    mismatch = typeof value !== 'number'
+                                    break
+                            }
+                            if (mismatch) throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
+                            const validator = 'getValidated' + ucfirst(prop);
+                            if (config[validator]) value = config[validator](value)
+                        } catch (e) {
+                            console.log(e)
+                            this.addWarning(`There was a problem with the persisted value for "${prop}", falling back to default value`)
+                            const defaults = config.getDefaults();
+                            value = defaults[prop]
+                            this.engineStorage.deleteJson(prop)
+                        }
+                        this.props[prop] = value
+                    }
+                }
                 this.boot()
             } catch (e) {
-                this.notify('error', {error: e.message})
+                console.error(e)
+                this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
             }
         }, 2000);
+    }
+
+    boot() {
+        this.setState(STATE.BOOT)
+        this.log(`Booting game "${GAME_ID}"...`)
+        // build game dom structure
+
+        const { game, globals } = this
+        let startScreen = this.initHandler({ game, globals })
+
+        try {
+            const { width, height } = this
+            this.notify('main',{ width, height })
+            this.syncToZoom()
+
+            if (!startScreen) {
+                // TODO add welcome screen
+            }
+            this.log(`...booting done!`)
+
+            this.running = true
+            this.gotoScreen(startScreen)
+            this.waitForNextFrame()
+        } catch (e) {
+            this.handleError(e)
+        }
+    }
+
+    reset() {
+        this.init()
+    }
+
+
+    registerListeners() {
+        this.resizeObserver.observe(document.body)
+    }
+
+    deregisterListeners() {
+        this.resizeObserver.disconnect()
+    }
+
+    // --------------------------------------------
+
+    handleError(err) {
+        this.notify('error', err)
+    }
+
+    setState(state, props = {}) {
+        this.log(`Setting state "${state2name[state]}" (${state})`)
+        this.notify('state:' + state, { from: this.currState, ...props })
+        this.currState = state
+    }
+
+    persistProp(name, value, notify = false) {
+        this.engineStorage.storeJson(name, value)
+        if (notify) this.notify('change', {name, value})
+    }
+
+    getId() {
+        return GAME_ID
+    }
+
+    // --------------------------------------------
+    //  Props
+    // --------------------------------------------
+
+    get running() {
+        return this.props.running
+    }
+
+    set running(value) {
+        if (value === this.running) return
+        this.props.running = value
+        if (value) {
+            this.audio.continueAll()
+            if (inst.RL.hasBrowserResources()) {
+                this.addWarning('Warning! The current screen is using resources from the local storage!')
+            }
+        } else {
+            this.audio.pauseAll()
+        }
+        this.notify('change', {name: 'running', value})
+    }
+
+    get masterVolume() {
+        return this.audio.masterVolume
+    }
+
+    set masterVolume(value) {
+        value = clamp(0, value, 100)
+        if (this.masterVolume === value) return
+
+        this.audio.setMasterVolume(value);
+        this.persistProp('masterVolume', value, true)
+    }
+
+    get muted() {
+        return this.audio.muted
+    }
+
+    set muted(value) {
+        if (this.audio.muted === value) return
+
+        this.audio.setMuted(value)
+        this.persistProp('muted', value, true)
+    }
+
+    get zoom() {
+        return this.props.zoom
+    }
+
+    set zoom(value) {
+        value = clamp(this.minZoom, value, this.maxZoom)
+        if (value === this.zoom) return
+
+        this.props.zoom = value
+        this.syncToZoom()
+        this.persistProp('zoom', value, true)
+    }
+
+    get minZoom() {
+        return this.props.minZoom
+    }
+
+    set minZoom(value) {
+        if (value === this.minZoom) return
+        this.props.minZoom = value
+        this.notfiy('change', {name: 'minZoom', value})
+    }
+
+    get maxZoom() {
+        return this.props.maxZoom
+    }
+
+    set maxZoom(value) {
+        if (value === this.maxZoom) return
+        this.props.maxZoom = value
+        this.notify('change', {name: 'maxZoom', value})
+    }
+
+    get stepZoom() {
+        return this.props.stepZoom
+    }
+
+    set stepZoom(value) {
+        if (value === this.stepZoom) return
+        this.props.stepZoom = value
+        this.syncToZoom()
+        this.persistProp('stepZoom', value, true)
+    }
+
+    get autoZoom() {
+        return this.props.autoZoom
+    }
+
+    set autoZoom(value) {
+        if (value === this.autoZoom) return
+        this.props.autoZoom = value
+        this.syncToZoom()
+        this.persistProp('autoZoom', value, true)
+    }
+
+    get width() {
+        return this.props.width
+    }
+
+    set width(value) {
+        value = clamp(1, value, 1000)
+
+        if (this.width === value) return
+        this.props.width = value
+    }
+
+    get height() {
+        return this.props.height
+    }
+
+    set height(value) {
+        value = clamp(1, value, 1000)
+
+        if (this.height === value) return
+        this.props.height = value
+    }
+
+    getMandatoryElem(id) {
+        const elem = document.getElementById(id)
+        if (elem) return elem
+        throw Error(`Required dom element with id "${id}" not found!`)
+    }
+
+    openPopup(id) {
+        const elem = this.getMandatoryElem(id)
+        elem.classList.toggle('hidden', false)
+        this.notify('open-popup', {id})
+    }
+
+    closePopup(id) {
+        const elem = this.getMandatoryElem(id)
+        elem.classList.toggle('hidden', true)
+        this.notify('close-popup', {id})
+    }
+
+    getAvailableViewport() {
+        // TODO find better solution
+        const { width, height } = this.getMandatoryElem('overlay').parentNode.parentNode.parentNode.getBoundingClientRect()
+        const paddingH = 2 * 10;
+        const paddingV = 2 * 10;
+        return {
+            width: width - paddingH,
+            height: height - paddingV
+        }
+    }
+
+    getResourceLoader() {
+        return inst.RL;
+    }
+
+    getStorageManager() {
+        return inst.SM;
+    }
+
+    setInitHandler(initHandler, autoInit = false) {
+        if (!initHandler) return
+        this.initHandler = initHandler
+        if (autoInit) this.init()
+    }
+
+    setMasterVolume(value) {
+        if (this.masterVolume === value) return;
+
+        this.audio.setMasterVolume(value);
+        this.engineStorage.storeJson('masterVolume', value)
+        this.notify('change', {name: 'masterVolume', value: this.masterVolume})
     }
 
     notify(action, props) {
@@ -178,7 +672,7 @@ class Game {
 
         if (!Array.isArray(changes)) changes = [changes]
 
-        for (let { id, nodes, html } of changes) {
+        for (let { id, nodes, html, nextFrame } of changes) {
             if (!(nodes || html)) continue;
 
             const elem = id ? document.getElementById(id) : document.body;
@@ -192,6 +686,7 @@ class Game {
             } else {
                 elem.innerHTML = html
             }
+            if (nextFrame) requestAnimationFrame(nextFrame)
         }
         this.renderPlugin.cleanupWatchers()
     }
@@ -200,7 +695,22 @@ class Game {
         console.log(msg);
     }
 
+    stopAllAudio() {
+        for (let audio of this.audioPlaying) {
+            audio.pause();
+        }
+        this.audioPlaying = [];
+    }
+
+    playAudio(audio) {
+        if (audio.readyState >= 2) {
+            this.audioPlaying.push(audio);
+            audio.play();
+        }
+    }
+
     addWarning(msg) {
+        if (this.warnings.includes(msg)) return
         this.warnings.push(msg)
         this.notify('change', {name: 'warnings', value: this.warnings})
     }
@@ -210,59 +720,362 @@ class Game {
         this.notify('change', {name: 'warnings', value: this.warnings})
     }
 
-    setZoom(value, force = false) {
-        if (value < 1 || value > 4 || (!force && this.zoom === value)) {
-            return;
-        }
-        this.zoom = value;
+    syncToZoom() {
+        // if (this.state === STATE.INIT) return
         const overlay = document.getElementById('overlay');
-        overlay.style.transform =  'scale(' + this.zoom +')';
+
+        let calcZoom = this.zoom
+        if (this.autoZoom) {
+            // TODO:
+            const { width, height } = this.getAvailableViewport()
+            calcZoom = Math.max(
+                Math.min(
+                    this.stepZoom ? Math.floor(width / this.width) : width / this.width,
+                    this.stepZoom ? Math.floor(height / this.height) : height / this.height,
+                    this.maxZoom
+                ),
+                this.minZoom
+            )
+        }
+        if (calcZoom !== this.zoom) {
+            this.zoom = calcZoom
+            return
+        }
+        overlay.style.transform =  'scale(' + calcZoom +')';
         overlay.style.transformOrigin = 'top left';
         const elem = document.getElementById('screen-div');
-        elem.style.width = '' + (this.width * this.zoom) + 'px';
-        elem.style.height = '' + (this.height * this.zoom) + 'px';
-        this.notify('change', {name: 'zoom', value: this.zoom})
+        elem.style.width = '' + (this.width * calcZoom) + 'px';
+        elem.style.height = '' + (this.height * calcZoom) + 'px';
     }
 
-    setMasterVolume(value) {
-        if (this.masterVolume === value) return;
-        this.masterVolume = value;
-        this.notify('change', {name: 'masterVolume', value: this.masterVolume})
+    restart(enableKeys = false) {
+        // this.keyHandling = enableKeys;
+        if (this.running || !this.hasEditor()) {
+            return;
+        }
+        this.getDomElem('editor').style.display = 'none'
+        this.getDomElem('body').style.display = 'inline'
+        this.running = this.before.running
+
+        this.registerListeners()
+//        this.gotoScreen(this.currentScreen);
     }
 
-    toggleRunning() {
-        this.running = !this.running
-        this.notify('change', {name: 'running', value: this.running})
-    }
-
-    toggleMuted() {
-        this.muted = !this.muted;
-        this.notify('change', {name: 'muted', value: this.muted})
+    hasEditor() {
+        return window.gameEditor !== undefined
     }
 
     openEditorMode() {
+        if (!this.hasEditor()) {
+            this.addWarning('NO GAME EDITOR found!')
+            return
+        }
+        this.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"')
+        // this.editorRun++;
+
+        this.before.running = this.running
+        this.running = false
+
+        this.deregisterListeners()
+        // this.keyHandling = false;
+        inst.RL.loadPermanentResources().then(() => {
+            this.getDomElem('body').style.display = 'none'
+            this.getDomElem('editor').style.display = 'block';
+            // TODO crap
+            const stack = this.activeResource
+            this.activeResource = undefined
+            this.editor = new gameEditor.GameEditor(this, stack)
+        });
+
         this.log('EDITOR-MODE');
+    }
+
+    getEditableResources() {
+        const resources = [];
+
+        function extractEditablesFromAreas(areas) {
+            if (!Array.isArray(areas)) {
+                return;
+            }
+            for (let area of areas) {
+                if (area.panes !== undefined) {
+                    for (let pane of area.panes) {
+                        /*
+                                                if (pane.tilesMap) {
+                                                    resources.push(
+                                                        {
+                                                            type: 'TilesMap',
+                                                            id: pane.tilesMap.id,
+                                                            pane,
+                                                            config: TilesMapConfig,
+                                                            cls: TilesMap,
+                                                            data: pane.tilesMap.config,
+                                                            elem: pane.getPreview ? pane.getPreview() : null,
+                                                            dim: pane.viewPortDim
+                                                        }
+                                                    );
+                                                } else if (pane instanceof TextPane) {
+                                                    const blocks = [];
+                                                    for (let id in pane.blocks) {
+                                                        blocks.push(
+                                                            {...pane.blocks[id].config.getJson()}
+                                                        );
+                                                    }
+                                                    resources.push(
+                                                        {
+                                                            type: 'TextPane',
+                                                            id: pane.id,
+                                                            pane,
+                                                            config: TextPaneConfig,
+                                                            cls: TextPane,
+                                                            elem: pane.getPreview(),
+                                                            data: pane.config,
+                                                            dim: pane.viewPortDim,
+                                                            blocks
+                                                        });
+                                                } else
+                         */
+                        if (pane instanceof BackgroundPane) {
+                            resources.push({
+                                type: 'BackgroundPane',
+                                id: pane.id,
+                                pane,
+                                config: BackgroundPane.Config,
+                                cls: BackgroundPane,
+                                elem: pane.getPreview(),
+                                data: pane.config,
+                                dim: pane.viewPortDim,
+
+                            });
+                        }
+                        /*
+                                                 else if (pane instanceof SpritePane) {
+                                                    const blocks = [];
+                                                    for (let { id, x, y } of Object.values(pane.sprites)) {
+                                                        blocks.push({ id, x, y });
+                                                    }
+                                                    resources.push(
+                                                        {
+                                                            elem: pane.getPreview ? pane.getPreview() : null,
+                                                            dim: pane.viewPortDim,
+                                                            pane,
+                                                            type: 'spriteSheet',
+                                                            data: pane.spriteSheet
+                                                        }
+                                                    );
+                                                } else if (pane instanceof CanvasPane) {
+                                                    resources.push(
+                                                        {
+                                                            elem: pane.getPreview(),
+                                                            dim: pane.viewPortDim,
+                                                            pane,
+                                                            type: 'canvasPane'
+                                                        }
+                                                    )
+                                                } else if (pane instanceof LinearGradientPane) {
+                                                    resources.push(
+                                                        {
+                                                            elem: pane.getPreview(),
+                                                            dim: pane.viewPortDim,
+                                                            pane,
+                                                            type: 'linearGradientPane'
+                                                        }
+                                                    )
+                                                } else if (pane instanceof BitmapScrollPane) {
+                                                    resources.push(
+                                                        {
+                                                            elem: pane.getPreview(),
+                                                            dim: pane.viewPortDim,
+                                                            pane,
+                                                            type: 'bitmapScrollPane'
+                                                        }
+                                                    )
+                                                } else if (pane instanceof PatternPane) {
+                                                    resources.push(
+                                                        {
+                                                            elem: pane.getPreview(),
+                                                            dim: pane.viewPortDim,
+                                                            pane,
+                                                            type: 'patternPane'
+                                                        }
+                                                    )
+                                                }
+                         */
+                    }
+                }
+                if (Array.isArray(area)) {
+                    extractEditablesFromAreas(area);
+                } else if (area.areas !== undefined) {
+                    extractEditablesFromAreas(area.areas);
+                }
+            }
+        }
+        extractEditablesFromAreas(this.getCurrentScreen().areas);
+
+        resources.push({type: 'filters', data: filterer});
+        return resources;
     }
 
     openFullScreenMode() {
         this.log('FULL-SCREEN-MODE');
     }
 
-    boot() {
-        this.log(`Booting game "${GAME_ID}"...`);
-        // build game dom structure
-
-        const { width, height } = this;
-        this.notify('main',{ width, height });
-        this.setZoom(this.zoom, true);
-
-        this.log(`...booting done!`);
+    getCurrentScreen() {
+        return this.screens[this.currentScreen];
     }
+
+    addScreen(screen) {
+        this.screens[screen.id] = screen;
+    }
+
+    gotoScreen(screenId, params = {}) {
+        this.log(`Goto screen "${screenId}"`);
+        // this.stopAllAudio();
+
+        inst.OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
+        this.frameEvents = {};
+
+        this.currentScreen = screenId;
+        const screen = this.screens[screenId];
+        this.globals = Object.assign(this.globals, params);
+
+        this.lastState = this.globals.getClone();
+        inst.RL.clearResources();
+
+        const { globals, game } = this;
+        this.build = screen.init({ globals, game, screen });
+    }
+
+    setStateInitHandler(handler) {
+        const game = this.game;
+        const globals = this.globals;
+        const loader = new ResourceRequest(true)
+        this.buildState = handler({ loader, game, globals })
+        this.hasBuildState = false;
+    }
+
+    render(force = false) {
+        if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
+            this.screens[this.currentScreen].render(force);
+        }
+    }
+
+    updateDom() {
+        while (this.domQueue.length > 0) {
+            const next = this.domQueue.shift();
+            switch(next.op) {
+                case 'set':
+                    const parts = next.key.split('.');
+                    let elem = next.elem;
+                    while (parts.length > 1) {
+                        elem = elem[parts.shift()];
+                    }
+                    elem[parts[0]] = next.value;
+                    break;
+
+                case 'add':
+                    next.target.appendChild(next.child);
+                    break;
+            }
+        }
+    }
+
+    addDomOp(elem, key, value) {
+        this.domQueue.push({op: 'set', elem, key, value});
+    }
+
+    addDomChild(target, child) {
+        this.domQueue.push({op: 'add', target, child});
+    }
+
+    getDomElem(id) {
+        if (this.elems[id] === undefined) {
+            const elem = document.getElementById(id);
+            if (elem === null) {
+                throw Error('Required element with ID "' + id + '" not found in DOM!');
+            }
+            this.elems[id] = elem;
+        }
+        return this.elems[id];
+    }
+
+    handleKeys() {}
+
+    updateGamepads() {}
+
+    updateFrame() {
+        if (!this.currentScreen) return
+
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() === 'READY') {
+            this.updateDom();
+            this.handleKeys();
+            if (this.running) {
+                this.render();
+                this.frames++;
+                if (screen.frameHandler !== null) {
+                    const { globals, game } = this
+                    screen.frameHandler({ screen, globals, game });
+                }
+            }
+            this.updateGamepads();
+            /*
+            if (this.restartEditorWithId !== null) {
+                this.activeResource = this.restartEditorWithId;
+                this.restartEditorWithId = null;
+                this.openEditorMode();
+            }
+             */
+        }
+        this.waitForNextFrame();
+    }
+
+    waitForNextFrame() {
+        const screen = this.screens[this.currentScreen];
+        if (screen.getState() !== 'READY') {
+            if (!screen.hasAllDependencies()) {
+                requestAnimationFrame(() => this.waitForNextFrame())
+                return
+            }
+            const { globals, game } = this;
+            const resources = inst.RL.getResources();
+            if (!this.hasBuildState) {
+                const state = this.globals;
+                state.unlock();
+                this.buildState({ resources, globals, game });
+                state.lock();
+                this.hasBuildState = true;
+            }
+            const { image, json, audio } = resources
+            const frameHandler = this.build({ image, audio, json, resources, globals, game, screen })
+            if (frameHandler) screen.setFrameHandler(frameHandler)
+            screen.setDimension(this.width, this.height)
+            screen.render(true)
+            /*
+            if (this.sound && screen.audio !== null) {
+                const audio = new Audio(screen.audio);
+                audio.addEventListener('canplaythrough', event => {
+                    this.playAudio(audio);
+                });
+                audio.addEventListener('ended', event => {
+                    for (let i = 0; i < this.audioPlaying.length; i++) {
+                        if (this.audioPlaying[i] === audio) {
+                            this.audioPlaying.splice(i, 1);
+                            break;
+                        }
+                    }
+                });
+            }
+             */
+        }
+        requestAnimationFrame(() => this.updateFrame());
+    }
+
 }
 /**
  * @type {GameConfig}
  */
-Game.Config = GameConfig;
+Game.Config = GameConfig
 
 class Game2 {
 
@@ -379,7 +1192,7 @@ class Game2 {
     }
 
     setZoom(value, force = false) {
-        if (value < 1 || value > 4 || (!force && this.zoom === value)) {
+        if (value < this.minZoom || value > this.maxZoom || (!force && this.zoom === value)) {
             return;
         }
         this.zoom = value;
@@ -1082,25 +1895,128 @@ class ResourceRequest {
     }
 }
 
+class AudioResource {
+
+    constructor(url, readyCallback = null) {
+        this.audio = null;
+        this.id = null;
+        this.volume = 1;
+        this.promise = new Promise((resolve) => {
+            if (typeof Audio == 'undefined') {
+                this.audio = {};
+                resolve();
+            } else {
+                this.audio = new Audio(url);
+                this.audio.oncanplaythrough = () => {
+                    resolve();
+                    if (readyCallback) {
+                        readyCallback();
+                    }
+                }
+            }
+        });
+        this.lastAction = null;
+    }
+
+    setId(id) {
+        this.id = id;
+    }
+
+    getId() {
+        return this.id;
+    }
+
+    setVolume(value) {
+        this.volume = value
+        this.updateVolume()
+    }
+
+    updateVolume() {
+        this.audio.volume = (inst.game.masterVolume / 100) * this.volume
+    }
+
+    play(volume = 1, restart = true) {
+        this.volume = 1
+        if (restart && this.isPlaying()) {
+            this.rewind()
+        }
+        this.updateVolume()
+        this.lastAction = 'load'
+        this.audio.play().then(() => {
+            if (this.lastAction === 'pause') {
+                this.audio.pause();
+            } else {
+                this.lastAction = 'play';
+            }
+        });
+    }
+
+    continue() {
+        if (this.lastAction === 'pause') {
+            this.lastAction = 'play';
+            this.play(1, false);
+        }
+    }
+
+    rewind() {
+        this.audio.currentTime = 0
+    }
+
+    setLoop(value) {
+        this.audio.loop = value
+    }
+
+    setMuted(value) {
+        this.audio.muted = value
+    }
+
+    pause() {
+        if (this.lastAction === 'play') {
+            this.audio.pause();
+        }
+        this.lastAction = 'pause';
+    }
+
+    reset() {
+        this.rewind();
+    }
+
+    isPlaying() {
+        return !(this.audio.ended || this.lastAction === 'pause');
+    }
+
+    isLooping() {
+        return this.audio.loop;
+    }
+
+    getNewLoadingPromise() {
+        return this.promise;
+    }
+}
+
 class AudioPlayer {
 
     constructor() {
-        this.audio = {};
-        this.channels = {};
-        this.masterVolume = 1;
-        this.paused = [];
+        this.audio = {}
+        this.channels = {}
+        this.paused = []
+        this.masterVolume = 100
+        this.muted = false
     }
 
     addChannel(id) {
-        this.channels[id] = null;
+        this.channels[id] = null
     }
 
     addAudioResources(obj) {
-        this.audio = Object.assign(this.audio, obj);
+        this.audio = Object.assign(this.audio, obj)
     }
 
-    setMasterVolume(volume) {
-        this.masterVolume = volume;
+    setMasterVolume(value) {
+        this.masterVolume = value
+        for (let audio of Object.values(this.audio)) {
+            audio.updateVolume()
+        }
     }
 
     play(id, channel = null) {
@@ -1119,6 +2035,8 @@ class AudioPlayer {
                 audio.reset();
             }
         }
+        audio.volume = 1 // this.masterVolume / 100
+        audio.setMuted(this.muted)
         audio.setLoop(false);
         audio.play();
 
@@ -1128,6 +2046,13 @@ class AudioPlayer {
     loop(id, channel = null) {
         const audio = this.play(id, channel);
         audio.setLoop(true);
+    }
+
+    setMuted(value) {
+        this.muted = value
+        for (let id in this.audio) {
+            this.audio[id].setMuted(this.muted)
+        }
     }
 
     pause() {
@@ -1285,7 +2210,7 @@ class SplitArea {
         }
         const unscrolled = old + move - this.scrollPos;
 
-        Game.instance.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos);
+        inst.game.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos);
         return {
             x: (this.axis === 'X') ? this.scrollPos - old : 0,
             y: (this.axis !== 'X') ? this.scrollPos - old : 0,
@@ -1384,7 +2309,7 @@ class SplitArea {
 
 class Screen {
 
-    constructor(id) {
+    constructor(id, initHandler = null) {
         this.id = id;
         this.areas = [];
         this.keyHandler = null;
@@ -1395,6 +2320,8 @@ class Screen {
         this.audio = null;
         this.hasDependencies = false;
         this.state = 'NEW';
+
+        if (initHandler) this.setInitHandler(initHandler)
     }
 
     getState() {
@@ -1438,10 +2365,10 @@ class Screen {
                 buildNodeDom(child, parent);
             }
             if (parent !== containerParent) {
-                Game.instance.addDomChild(containerParent, node.parents[0]);
+                inst.game.addDomChild(containerParent, node.parents[0]);
             }
         }
-        buildNodeDom(this.tree, Game.instance.getDomElem('overlay'));
+        buildNodeDom(this.tree, inst.game.getDomElem('overlay'));
     }
 
     hasAllDependencies() {
@@ -1485,11 +2412,11 @@ class Screen {
     }
 
     setKeyHandler(handler) {
-        this.keyHandler = handler.bind(Game.instance);
+        this.keyHandler = handler.bind(inst.game);
     }
 
     setFrameHandler(handler) {
-        this.frameHandler = handler.bind(Game.instance);
+        this.frameHandler = handler;
     }
 
     addImageResource(id, data) {
@@ -1531,7 +2458,10 @@ class Screen {
     }
 
     setInitHandler(handler) {
-        this.initHandler = handler.bind(new ResourceRequest());
+        const loader = new ResourceRequest()
+        const game = inst.game
+        const globals = game.globals
+        this.initHandler = () => handler({ loader, game, globals, screen: this });
     }
 
     addAudio(src) {
@@ -1564,7 +2494,7 @@ class DivContainer {
         if (this.child !== null) {
             this.containerElem.appendChild(this.child);
         }
-        Game.instance.addDomChild(parent, this.containerElem);
+        inst.game.addDomChild(parent, this.containerElem);
     }
 
     getChild() {
@@ -1572,7 +2502,7 @@ class DivContainer {
     }
 
     setBackgroundColor(color) {
-        Game.instance.addDomOp(this.containerElem, 'style.backgroundColor', color);
+        inst.game.addDomOp(this.containerElem, 'style.backgroundColor', color);
     }
 
     setBackgroundImages(dataElems, pos) {
@@ -1582,14 +2512,16 @@ class DivContainer {
             urls.push('url(' + data + ')');
             noRepeats.push('no-repeat');
         }
-        Game.instance.addDomOp(this.containerElem, 'style.background-image', urls.join(', '));
-        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', noRepeats.join(', '));
+        inst.game.addDomOp(this.containerElem, 'style.background-image', urls.join(', '))
+        inst.game.addDomOp(this.containerElem, 'style.background-repeat', noRepeats.join(', '))
+        inst.game.addDomOp(this.containerElem, 'style.image-rendering', 'pixelated')
     }
 
     setBackgroundImage(data, posX, posY) {
         this.setBackgroundImages([data]);
-        Game.instance.addDomOp(this.containerElem, 'style.background-image', 'url(' + data + ')' );
-        Game.instance.addDomOp(this.containerElem, 'style.background-repeat', 'no-repeat');
+        inst.game.addDomOp(this.containerElem, 'style.background-image', 'url(' + data + ')' )
+        inst.game.addDomOp(this.containerElem, 'style.background-repeat', 'no-repeat')
+        inst.game.addDomOp(this.containerElem, 'style.image-rendering', 'pixelated')
     }
 
     setBackgroundPositions(positions) {
@@ -1597,7 +2529,7 @@ class DivContainer {
         for (let position of positions) {
             pos.push(position.x + 'px ' + position.y + 'px');
         }
-        Game.instance.addDomOp(this.containerElem, 'style.background-position', pos.join(', '));
+        inst.game.addDomOp(this.containerElem, 'style.background-position', pos.join(', '));
     }
 
     setBackgroundPosition(posX, posY) {
@@ -1634,11 +2566,11 @@ class ImageContainer {
     buildDom(parent) {
         this.containerElem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
         this.containerElem.appendChild(this.image);
-        Game.instance.addDomChild(parent, this.containerElem);
+        inst.game.addDomChild(parent, this.containerElem);
     }
 
     setImageData(data) {
-        Game.instance.updateDom(this.image, 'src', data);
+        inst.game.updateDom(this.image, 'src', data);
     }
 
     getImageElem() {
@@ -1646,8 +2578,8 @@ class ImageContainer {
     }
 
     setViewPortOffset(x, y) {
-        Game.instance.addDomOp(this.image, 'style.left', x);
-        Game.instance.addDomOp(this.image, 'style.right', y);
+        inst.game.addDomOp(this.image, 'style.left', x);
+        inst.game.addDomOp(this.image, 'style.right', y);
     }
 }
 
@@ -1681,13 +2613,13 @@ class BufferedCanvasContainer {
         ];
         this.containerElem.appendChild(this.buffers[0].elem);
         this.containerElem.appendChild(this.buffers[1].elem);
-        Game.instance.addDomChild(parent, this.containerElem);
+        inst.game.addDomChild(parent, this.containerElem);
     }
 
     setViewPortOffset(x, y) {
         const activeElem = this.getActiveElem();
-        Game.instance.addDomOp(activeElem, 'style.left', x);
-        Game.instance.addDomOp(activeElem, 'style.right', y);
+        inst.game.addDomOp(activeElem, 'style.left', x);
+        inst.game.addDomOp(activeElem, 'style.right', y);
     }
 
     getBufferCtx() {
@@ -1711,9 +2643,9 @@ class BufferedCanvasContainer {
     }
 
     switchBuffer() {
-        Game.instance.addDomOp(this.getBufferElem(), 'style.display', 'block');
+        inst.game.addDomOp(this.getBufferElem(), 'style.display', 'block');
         this.active = this.active === 1 ? 0 : 1;
-        Game.instance.addDomOp(this.getBufferElem(), 'style.display', 'none');
+        inst.game.addDomOp(this.getBufferElem(), 'style.display', 'none');
     }
 }
 
@@ -1750,9 +2682,9 @@ class CanvasContainer {
     buildDom(parent) {
         if (this.elem) {
             this.elem.appendChild(this.canvas.elem);
-            Game.instance.addDomChild(parent, this.elem);
+            inst.game.addDomChild(parent, this.elem);
         } else {
-            Game.instance.addDomChild(parent, this.canvas.elem);
+            inst.game.addDomChild(parent, this.canvas.elem);
         }
     }
 
@@ -1788,6 +2720,18 @@ class ImageResource {
 
     getId() {
         return this.id;
+    }
+
+    get width() {
+        if (!this.resolved) return null
+        if (this.image)  return this.image.width
+        return this.canvas.width
+    }
+
+    get height() {
+        if (!this.resolved) return null
+        if (this.image)  return this.image.height
+        return this.canvas.height
     }
 
     getCanvas() {
@@ -2178,6 +3122,7 @@ export {
     Game,
     Screen,
     ImageResource,
+    AudioResource,
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,

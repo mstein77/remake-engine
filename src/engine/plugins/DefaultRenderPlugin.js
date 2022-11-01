@@ -1,9 +1,19 @@
 import { RenderPlugin } from "./RenderPlugin.js";
+import "../editor/css/layout.css"
+import "../editor/css/base.css"
+import { d } from "helper/helper.js"
+
+const IS_DIST = false // TODO replace by env var
 
 class DefaultRenderPlugin extends RenderPlugin {
 
     constructor(props) {
         super(props)
+    }
+
+    handleError(error) {
+        super.handleError(error)
+        return {id: 'popup', nodes: this.getSectionError({message: error.message, error}), nextFrame: () => this.game.openPopup('popup')}
     }
 
     getCssConstantsValues() {
@@ -15,6 +25,8 @@ class DefaultRenderPlugin extends RenderPlugin {
             lessPerc: 59,
             morePerc: 170,
             disabledPerc: 45,
+
+            overlayBgRgba: "#000000a3",
 
             inputBgRgb: "#b0aec1",
             inputRgb: "#29292e",
@@ -52,17 +64,17 @@ class DefaultRenderPlugin extends RenderPlugin {
         if (expr) return expr
 
         switch(action) {
-            case 'init':
-                return {nodes: this.getBootSection()}
+            case 'state:' + this.game.states.INIT:
+                return {id: 'body', nodes: this.getBootSection()}
 
-            case 'loading':
+            case 'state:' + this.game.states.CONNECT:
                 return {id: 'status', nodes: this.getSectionLoading()}
 
-            case 'error':
-                return {id: 'status', nodes: this.getSectionError(props)}
+            case 'state:' + this.game.states.PREBOOT_ERROR:
+                return {id: 'status', nodes: this.getSectionPreBootError(props)}
 
             case 'main':
-                return {nodes: this.getMainSection(props)}
+                return {id: 'body', nodes: this.getMainSection(props)}
         }
     }
 
@@ -93,10 +105,14 @@ class DefaultRenderPlugin extends RenderPlugin {
         )
     }
 
-    getSectionError({ error }) {
-        const { div, button } = this;
+    getErrorDiv({ message, error, click, buttonText }) {
+        const { div, button, pre } = this;
 
-        const click = () => this.game.initAndBoot()
+        let stack = !IS_DIST && error.stack;
+        if (stack) {
+            stack = JSON.stringify(stack).replaceAll('\\n', '\n').substring(1);
+            stack = stack.substring(0, stack.length - 1)
+        }
         return (
             div(
                 {class: 'center-v'},
@@ -109,13 +125,20 @@ class DefaultRenderPlugin extends RenderPlugin {
                         ),
                         div(
                             {class: 'padded', style: 'font-family: Monospace; color: #FFFFFF'},
-                            error
+                            message
                         ),
-                        div(
+                        stack && div(
+                            {class: 'min-content-h center-h', style: 'max-height: 150px; overflow-x: hidden; overflow-y: auto'},
+                            pre(
+                                {class: 'min-content-h boxed padded', style: 'background-color: #fafff5'},
+                                stack
+                            )
+                        ),
+                        buttonText && div(
                             {class: 'center-h padded'},
                             button(
                                 {style: 'width: 150px', onClick: click},
-                                'Retry'
+                                buttonText
                             )
                         )
                     )
@@ -124,16 +147,29 @@ class DefaultRenderPlugin extends RenderPlugin {
         )
     }
 
+    getSectionPreBootError(props) {
+        const click = () => this.game.reset()
+        return this.getErrorDiv({ ...props, click, buttonText: 'Retry' })
+    }
+
+    getSectionError(props) {
+        const click = () => {
+            this.game.closePopup('popup')
+            this.game.running = true
+        }
+        return this.getErrorDiv({ ...props, click, buttonText: 'Continue' })
+    }
+
     filterOnOff(value) {
         return value ? 'off' : 'up'
     }
 
     filterIsMinZoom(value) {
-        return value === 1
+        return value === this.game.minZoom
     }
 
     filterIsMaxZoom(value) {
-        return value === 4
+        return value === this.game.maxZoom
     }
 
     filterIsMinVolume(value) {
@@ -156,68 +192,92 @@ class DefaultRenderPlugin extends RenderPlugin {
         return value ? 'stop' : 'play_arrow'
     }
 
+    filterToZoomMode(value) {
+        return value ? 'Step Zoom' : 'Cont Zoom'
+    }
+
     getMainSection() {
         const { div, button, input, icon } = this;
 
         const goFullScreen = () => console.log('GO FULL-SCREEN!');
         const game = this.game;
+        const toggleAutoZoom = e => {
+            game.autoZoom = e.currentTarget.checked
+        }
         const buttons = [
-            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => {this.game.addWarning('No fullscreen my friend!'); this.game.openFullScreenMode()}},
-            {name: 'Editor', sideIcon: 'build', click: () => {this.game.addWarning('No editor available!'); this.game.openEditorMode()}
-            },
-            {name: 'Reset', sideIcon: 'restart_alt', click: () => this.game.initAndBoot()},
-        ];
-
-        const buttonElems = [
+            {name: 'Fullscreen', sideIcon: 'fullscreen', click: () => {game.openFullScreenMode()}}
+        ]
+        buttons.push(
+            {name: 'Reset', sideIcon: 'restart_alt', click: () => game.reset()}
+        )
+        const slider = input(
+            {disabled: '<game.muted>', min: 0, max: 100, type: 'range', onInput: e => game.masterVolume = parseInt(e.target.value, 10), value: game.masterVolume}
+        )
+        const toggleZoomMode = e => {
+            game.stepZoom = !game.stepZoom
+        }
+        const buttonElems = []
+        if (game.hasEditor()) {
+            buttonElems.push(
+                button(
+                    {onClick: () => game.openEditorMode()},
+                    div(
+                        {class: 'stack-h inner-space-h'},
+                        div(
+                            {class: 'min-content-h'},
+                            icon('build')
+                        ),
+                        div(
+                            {class: 'min-content-h'},
+                            'Editor'
+                        )
+                    )
+                ),
+            )
+        }
+        buttonElems.push(
             div(
                 {class: 'stack-h min-content-h padded-h'},
-                div(
-                    {class: 'padded-h mono', style: 'color: #FFFFFF'},
-                    'Zoom: '
+                button(
+                    {class: 'padded-h mono nowrap', onClick: toggleZoomMode},
+                    '<game.stepZoom|toZoomMode>: '
                 ),
                 button(
-                    {disabled: '<game.zoom|isMinZoom>', onClick: () => game.setZoom(Math.max(game.zoom - 1, 0))},
+                    {disabled: '<game.zoom|isMinZoom>', onClick: () => game.zoom = game.zoom - 1},
                     '-'
                 ),
                 input(
                     {readonly: true, size: 1, type: 'text', value: '<game.zoom>'}
                 ),
                 button(
-                    {disabled: '<game.zoom|isMaxZoom>', onClick: () => game.setZoom(Math.min(game.zoom + 1, 9))},
+                    {disabled: '<game.zoom|isMaxZoom>', onClick: () => game.zoom = game.zoom + 1},
                     '+'
-                )
-            ),
-            div(
-                {class: 'stack-h min-content-h padded-h'},
+                ),
                 div(
-                    {class: 'padded-h mono', style: 'color: #FFFFFF'},
-                    'Volume: '
-                ),
-                button(
-                    {disabled: '<game.muted,game.masterVolume|mutedOrMinVolume>', onClick: () => game.setMasterVolume(Math.max(game.masterVolume - 10, 0))},
-                    '-'
-                ),
-                input(
-                    {disabled: '<game.muted>', readonly: true, size: 4, type: 'text', value: '<game.masterVolume>%'}
-                ),
-                button(
-                    {disabled: '<game.muted,game.masterVolume|mutedOrMaxVolume>', onClick: () => game.setMasterVolume(Math.min(game.masterVolume + 10, 100))},
-                    '+'
+                    {class: 'stack-h padded-h'},
+                    div('Auto'),
+                    input(
+                        {type: 'checkbox', checked: game.autoZoom, onChange: toggleAutoZoom}
+                    )
                 )
             ),
             button(
-                {onClick: () => game.toggleMuted()},
+                {onClick: () => game.muted = !game.muted},
                 icon(
                     'volume_<game.muted|onOff>'
                 )
             ),
+            div(
+                {class: 'stack-h min-content-h padded-h'},
+                slider
+            ),
             button(
-                {onClick: () => game.toggleRunning()},
+                {onClick: () => game.running = !game.running},
                 icon(
                     '<game.running|pausePlay>'
                 )
             )
-        ];
+        );
         for (let { name, click, sideIcon } of buttons) {
             let inner = name;
             if (sideIcon) {
@@ -251,7 +311,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                     div(
                         {class: 'block min-content-h center-h', style: 'border: 1px solid #ffffff'},
                         div(
-                            {id: "screen-div", style: "flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: " + (game.width * game.zoom) + 'px; height: ' + (game.height * game.zoom) + 'px'},
+                            {id: "screen-div", style: "flex-shrink: 0; margin: 0 0 0 0; padding: 0; width: " + (game.width * game.zoom) + 'px; height: ' + (game.height * game.zoom) + 'px'},
                             div({id: "overlay", style: "position: relative; padding: 0px; margin: 0; width: " + game.width + 'px; height: ' + game.height + 'px'})
                         )
                     )
@@ -272,7 +332,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                                 icon('warning')
                             ),
                             div(
-                                {class: 'stack-v flex padded inner-space-v'},
+                                {class: 'stack-v flex padded inner-space-v mono medium'},
                                 ...elems
                             ),
                             div(
