@@ -6,6 +6,7 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
+console.log(__dirname + '/.env');
 dotenv.config({path: __dirname + '/.env'});
 
 const enginePackage = '2dfireengine';
