@@ -920,7 +920,7 @@ function BaseAppInner({ contentProvider, active }) {
         wContext.onExclusiveModeEnd(
             () => {
                 const gameRef = wContext.game;
-                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
                 if (wContext.isDirty()) {
                     // TODO: hier sollte eigentlich eher der Screen restartet werden?
                     // zumindest sollte der Editor nicht direkt wieder geöffnet werden

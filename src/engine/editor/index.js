@@ -10,7 +10,7 @@ class GameEditor {
     unmount() {
         requestAnimationFrame(
             () => {
-                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
             }
         );
     }
@@ -41,12 +41,12 @@ class GameEditor {
         this.oldStyle = JSON.stringify(document.body.style);
 
         const play = () => {
-            ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+            ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
             game.restart();
         };
         ReactDOM.render(
             <EditorApp game={game} play={play} active={active} />,
-            document.getElementById('editor')
+            document.getElementById('editor-div')
         );
     }
 }

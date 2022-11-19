@@ -1152,7 +1152,7 @@ function useExportModal({ model, resource, update, name }) {
             resourcesInfo.dependencies
         ).then(
             response => {
-                ReactDOM.unmountComponentAtNode(document.getElementById('editor'));
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
                 gameRef.reloadScreen(wContext.registry('callStack'));
             }
         ).catch(err => {

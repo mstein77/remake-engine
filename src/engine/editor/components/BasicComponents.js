@@ -2067,7 +2067,7 @@ function buildHueColorsCanvas() {
 function WindowCtx({ imageResources, filters, children, game }) {
     const cssContext = useContext(CssContext);
 
-    const gameId = game.getId();
+    const gameId = game.id;
     const [ storage ] = useState(() => {
         return new Storage(localStorage, 'remake-engine.editor.');
     });

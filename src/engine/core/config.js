@@ -326,7 +326,6 @@ class Config {
             this.setId(json.id);
         }
         const jsons = this.getJsonsToParse(json);
-        d(jsons);
         for (let json of jsons) {
             for (let [ key, value ] of Object.entries(json)) {
                 if (value === undefined) continue

@@ -5,13 +5,124 @@ import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin.js";
 /**
  * @type {ResourceLoader}
  */
-let RL = null;
+let RL = null
 /**
  * @type {StorageManager}
  */
-let SM = null;
+let SM = null
 
-let game = null;
+let game = null
+
+let system = null
+
+class System {
+
+    constructor() {
+        this.renderingEngine = this.extractRenderingEngine()
+        this.hasTouch = this.extractHasTouch()
+        this.isMobile = this.extractIsMobile()
+
+        this.setFullscreenApi()
+
+        console.log(
+            `System Information | Rendering Engine: ${this.renderingEngine} | Mobile: ${this.isMobile ? 'true' : 'false'} | Touch: ${this.hasTouch ? 'true' : 'false'} | UserAgent: ${navigator.userAgent}`
+        )
+    }
+
+    setFullscreenApi() {
+        // fullscreen api
+        this.supportsFullScreen = false
+        this.fullscreenChangeEvent = undefined
+        this.isFullScreen = () => false
+        this.requestFullScreen = () => Promise.reject('Fullscreen mode not supported!')
+        this.exitFullScreen = () => Promise.reject('Fullscreen Mode not supported')
+
+        const fullscreenEnabledKey = this.getExistingKey(
+            document, 'fullscreenEnabled', 'webkitFullscreenEnabled', 'mozFullScreenEnabled', 'msFullscreenEnabled'
+        )
+        if (fullscreenEnabledKey) this.supportsFullScreen = document[fullscreenEnabledKey]
+
+        if (!this.supportsFullScreen) return
+
+        const fullScreenElement = this.getExistingKey(
+            document, 'fullscreenElement', 'webkitCurrentFullScreenElement', 'msFullscreenElement'
+        )
+        if (!fullScreenElement) {
+            const fullScreen = this.getExistingKey(
+                document, 'fullscreen', 'webkitIsFullScreen', 'mozFullScreen', 'msFullscreen'
+            )
+            if (fullScreen) this.isFullScreen = () => document[fullScreen]
+        } else {
+            this.isFullScreen = () => document[fullScreenElement] !== null
+        }
+        this.fullscreenChangeEvent = this.getExistingEventType(
+            document, 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'
+        )
+        const requestFullscreenKey = this.getExistingKey(
+            document.body, 'requestFullscreen', 'webkitRequestFullscreen', 'mozRequestFullScreen', 'msRequestFullscreen'
+        )
+        if (requestFullscreenKey) this.requestFullScreen = elem => elem[requestFullscreenKey]()
+
+        const exitFullscreen = this.getExistingMethod(
+            document, 'exitFullscreen', 'webkitCancelFullScreen', 'mozCancelFullScreen', 'msExitFullscreen'
+        )
+        if (exitFullscreen) this.exitFullScreen = exitFullscreen
+    }
+
+    getExistingMethod(elem, ...keys) {
+        for (const key of keys) if (key in elem) return elem[key]
+    }
+
+    getExistingEventType(elem, ...keys) {
+        for (const key of keys) if ('on' + key in elem) return key
+    }
+
+    getExistingKey(elem, ...keys) {
+        for (const key of keys) if (key in elem) return key
+    }
+
+    extractRenderingEngine() {
+        const UA = navigator.userAgent.toLowerCase()
+        const match2engine = {
+            applewebkit: 'WebKit',
+            gecko: 'Gecko',
+            opera: 'Presto',
+            trident: 'Trident',
+            edge: 'EdgeHTML',
+            chrome: 'Blink'
+        }
+        for (const [ match, engine ] of Object.entries(match2engine)) {
+            if (UA.indexOf(match) !== -1) return engine
+        }
+    }
+
+    extractIsMobile() {
+        if (!this.renderingEngine) return false
+
+        return /mobi/i.test(navigator.userAgent.toLowerCase())
+    }
+
+    extractHasTouch() {
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Browser_detection_using_the_user_agent
+        let hasTouch = false
+        if ('maxTouchPoints' in navigator) {
+            return navigator.maxTouchPoints > 0
+        }
+        if ('msMaxTouchPoints' in navigator) {
+            return navigator.msMaxTouchPoints > 0
+        }
+        const mQ = matchMedia?.("(pointer:coarse)")
+        if (mQ?.media === "(pointer:coarse)") {
+            return !!mQ.matches
+        }
+        if ("orientation" in window) return true
+        const UA = navigator.userAgent
+        return (
+            /\b(BlackBerry|webOS|iPhone|IEMobile)\b/i.test(UA) ||
+            /\b(Android|Windows Phone|iPad|iPod)\b/i.test(UA)
+        )
+    }
+}
 
 function each(obj, f) {
     if (Array.isArray(obj)) {
@@ -899,14 +1010,14 @@ class CanvasManager {
 
     getOverlayElem() {
         if (this.overlayElem === null) {
-            this.overlayElem = document.getElementById('overlay');
+            this.overlayElem = document.getElementById('screen-overlay-div');
         }
         return this.overlayElem;
     }
 
     getOffscreenElem() {
         if (this.offscreenElem === null) {
-            this.offscreenElem = document.getElementById('offscreen');
+            this.offscreenElem = document.getElementById('offscreen-div');
         }
         return this.offscreenElem;
     }
@@ -991,6 +1102,12 @@ export default {
     get game() {
         if (game) return game
         throw Error('Game not yet instantiated!')
+    },
+    get system() {
+        if (!system) {
+            system = new System()
+        }
+        return system
     },
     OCM: new CanvasManager()
 }

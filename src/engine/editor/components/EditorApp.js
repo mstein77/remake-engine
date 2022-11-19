@@ -43,13 +43,11 @@ function EditorApp(props) {
                     break
                 }
             }
-            document.body.classList.toggle('editor-bg-rgb')
             setReady(true);
         }, 200);
 
         return () => {
 //            syncLinks(['css/old.css', 'https://fonts.googleapis.com/icon?family=Material+Icons']);
-            document.body.classList.toggle('editor-bg-rgb')
         }
     }, []);
 

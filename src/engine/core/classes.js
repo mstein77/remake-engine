@@ -1,7 +1,8 @@
-import inst from "./instances.js";
-import { d, isValidResourceId, getConfigFromInput, ucfirst, clamp, Storage } from "helper/helper.js";
-import { BackgroundPane } from "../panes/BackgroundPane/pane.js";
-import { Config } from "./config.js";
+import inst from "./instances.js"
+import { d, isValidResourceId, getConfigFromInput, ucfirst, clamp, Storage } from "helper/helper.js"
+import { BackgroundPane } from "../panes/BackgroundPane/pane.js"
+import { setStyleConstByKey, getCssPxValue } from "helper/css.js"
+import { Config } from "./config.js"
 
 /**
  * A config object for the game instance
@@ -67,12 +68,30 @@ class GameConfig extends Config {
     }
 
     /**
+     * Sets whether the maximum available zoom should be dependant on the current window size or not
+     *
+     * @param {boolean} value
+     */
+    setRestrictZoomByWindow(value) {
+        this.restrictZoomByWindow = this.validateBool(value)
+    }
+
+    /**
      * Sets whether the zoom factor should be calculated automatically or not
      *
      * @param value
      */
     setAutoZoom(value) {
         this.autoZoom = this.validateBool(value)
+    }
+
+    /**
+     * Sets whether the user should be able to change the auto zoom or not
+     *
+     * @param {boolean} value
+     */
+    setAutoZoomByUser(value) {
+        this.autoZoomByUser = this.validateBool(value)
     }
 
     /**
@@ -85,12 +104,39 @@ class GameConfig extends Config {
     }
 
     /**
+     * Sets whether the user should be able to change the auto zoom or not
+     *
+     * @param {boolean} value
+     */
+    setStepZoomByUser(value) {
+        this.stepZoomByUser = this.validateBool(value)
+    }
+
+    /**
+     * Indicates whether the Frame-Per-Second should be shown or not
+     *
+     * @param {boolean} value
+     */
+    setShowFps(value) {
+        this.showFps = this.validateBool(value)
+    }
+
+    /**
+     * Sets whether the user should be able to have FPS controls or not
+     *
+     * @param value
+     */
+    setShowFpsByUser(value) {
+        this.showFpsByUser = this.validateBool(value)
+    }
+
+    /**
      * @inheritDoc
      */
     getFieldProps() {
         return {
             dim: {min: 1, max: 9999},
-            zoom: {min: 1, max: 10}
+            zoom: {min: 0, max: 10}
         };
     }
 
@@ -113,8 +159,13 @@ class GameConfig extends Config {
             zoom: 2,
             minZoom: 1,
             maxZoom: 5,
+            restrictZoomByWindow: true,
             stepZoom: true,
-            autoZoom: false
+            stepZoomByUser: true,
+            autoZoom: false,
+            autoZoomByUser: true,
+            showFps: false,
+            showFpsByUser: true
         }
     }
 
@@ -128,162 +179,24 @@ class GameConfig extends Config {
         obj.zoom = this.zoom
         obj.minZoom = this.minZoom
         obj.maxZoom = this.maxZoom
+        obj.restrictZoomByWindow = this.restrictZoomByWindow
         obj.stepZoom = this.stepZoom
+        obj.stepZoomByUser = this.stepZoomByUser
         obj.autoZoom = this.autoZoom
+        obj.autoZoomByUser = this.autoZoomByUser
+        obj.showFps = this.showFps
+        obj.showFpsByUser = this.showFpsByUser
         return obj
     }
 }
 
-const key2type = {};
-const key2const = {};
-
-const setStyleProp = (style, key, value) => {
-    const type = key2type[key];
-    if (!type) return;
-
-    if (['type', 'perc'].includes(type) && typeof value === 'string') {
-        value = parseInt(value, 10);
-    }
-    let cssValue = value;
-    if (type === 'px' && !(value === 'none' && (key.startsWith('max') || key.startsWith('end')))) {
-        cssValue += 'px';
-    } else if (type === 'perc') {
-        cssValue += '%';
-    }
-    style.setProperty(key2const[key], cssValue);
-    return value
-};
-
-const cssConstTypes = [
-    'rgb', 'rgba', 'px', 'urls', 'url', 'font', 'bstyle', 'float', 'perc', 'grad', 'type'
-];
-
-const getConstValue = (key, value) => {
-    const keyType = key2type[key]
-    if (!keyType) return
-    let propValue = value;
-    switch(keyType) {
-        case 'perc':
-            if (typeof value === 'string') {
-                value = value.substr(0, value.length - 1);
-                propValue = parseInt(value, 10)
-            }
-            break;
-        case 'type':
-            propValue = parseInt(value, 10);
-            break
-    }
-
-}
-
-const getConstValues = (source, target = null) => {
-    const result = target ? target : {};
-    for (let [key, value] of Object.entries(source)) {
-        const keyType = key2type[key];
-        if (result[key] === undefined && keyType) {
-            let propValue = value;
-            switch(keyType) {
-                case 'perc':
-                    if (typeof value === 'string') {
-                        value = value.substr(0, value.length - 1);
-                        propValue = parseInt(value, 10)
-                    }
-                    break;
-                case 'type':
-                    propValue = parseInt(value, 10);
-                    break
-            }
-            result[key] = propValue
-        }
-    }
-    return result
-};
-
-const extractKeys2types = obj => {
-    const regexpCamelCaseLast = /([A-Z][a-z]*)$/;
-
-    for (let key of Object.keys(obj)) {
-        const match = key.match(regexpCamelCaseLast);
-        if (match === null || match.length < 2) continue;
-
-        const type = match[1].toLowerCase();
-        if (!type || !cssConstTypes.includes(type)) continue;
-
-        key2type[key] = type;
-
-        const parts = [];
-        let i = 0;
-        let currPart = '';
-        while (i < key.length) {
-            let char = key[i];
-            if (char >= 'A' && char <= 'Z') {
-                parts.push(currPart);
-                currPart = '';
-                char = char.toLowerCase()
-            }
-            currPart += char;
-            i++
-        }
-        if (currPart !== '') {
-            parts.push(currPart)
-        }
-        const constName = '--' + parts.join('-');
-        key2const[key] = constName;
-    }
-}
-
-/**
-
- A: Localstorage -> Config -> Config.default
- B: Config -> Localstorage -> Config.default
-
- construct (initialized only once, not configurable, persisted on change)
- -----------------------
- masterVolume:
-   localstorage -> 100
- muted:
-   localstorage -> false
-
- configurable (non-persisted)
- -----------------------
- width:
-   config -> config.default
- height:
-   config -> config.default
- touch:
-   config -> config.default
- min/maxZoom:
-   config -> config.default
-
- configurable and persisted
- -----------------------
- zoom:
-   localstorage -> config -> config.default
- autoZoom:
-   localstorage -> config -> config.default
- ------------------------
-
- 1. set construct props to their defaults
-
-    (re)boot
-    ---------------
-    disable persistance
- 2. persisted = get persistedProps from localstorage
- 3. applyConfig(this)
- 4. for (let [ key, value ] of persisted) {
-       this[key] = value
-    }
- 5. enable persistance
-
-
-
- */
 const persistedProps2type = {
     zoom: 'float',
     autoZoom: 'bool',
     stepZoom: 'bool',
     masterVolume: 'int',
-    muted: 'bool'
+    muted: 'bool',
+    showFps: 'bool'
 }
 
 const STATE = {
@@ -302,12 +215,22 @@ const state2name = [
 
 class Game {
 
+    /**
+     * Instantiates a new game instance (or throws an error if there is already a running instance) with the given
+     * config
+     *
+     * @param {object|GameConfig} input
+     * @param {function|undefined} initHandler
+     */
     constructor(input, initHandler) {
+
         this.states = STATE
         this.currState = STATE.CONSTRUCT
 
         inst.setGame(this)
         this.game = this
+        const system = inst.system
+        this.system = system
         inst.setSM(localStorage, GAME_ID)
         inst.setRL(BASE_URL + '/', inst.SM)
         this.engineStorage = new Storage(localStorage, 'remake-engine.')
@@ -316,35 +239,104 @@ class Game {
         this.renderPlugin.setGame(this)
 
         // overwrite body with essential parent div containers
-        document.body.innerHTML =
-            '<div class="full-v" id="body"></div>' +
-            '<div class="full-v full-h pos-0 fixed modal-overlay hidden" id="popup"></div>' +
-            '<div style="display: none" id="offscreen"></div>' +
-            '<div id="editor" class="full-v" style="display: none"></div>'
+        document.body.replaceChildren(
+            div({id: 'game-div', class: 'full-v'}),
+            div({id: 'game-overlay-div', class: 'full-v pos-0 fixed'}),
+            div({id: 'modals-div', class: 'transparent full-v full-h pos-0 fixed'}),
+            div({id: 'offscreen-div', class: 'hidden'}),
+            div({id: 'editor-div', class: 'full-v hidden'})
+        )
 
-        // background is set by build config independant from render plugin
-        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB)
-        document.body.classList.add('game-bg-rgb')
+        // registration (only construct)
+        this.input = input
+        this.keysDown = {}
+        this.keys = {}
+        this.gamepads = []
+        this.modals = []
+        this.touchInputs = []
+        this.screens = {}
+        this.listeners = []
+        this.domLoaded = false
+        this.deactivateAutoZoom = false
+        this.audio = new AudioPlayer()
+        this.fpsTracker = new FpsTracker()
+
+        this.cssConstants = {
+            editorBgRgb: SCREEN_BG_RGB,
+            ...this.renderPlugin.getCssConstantsValues()
+        }
+        const style = document.body.style;
+        for (let [ key, value ] of Object.entries(this.cssConstants)) {
+            setStyleConstByKey(style, key, value)
+        }
 
         this.resizeObserver = new ResizeObserver(
             entries => {
-                if (this.autoZoom) this.syncToZoom()
+                if (this.autoZoom || this.restrictZoomByWindow) this.syncScreen()
             }
         )
-
-        // apply constants assigned in render plugin
-        const cssConsts = this.renderPlugin.getCssConstantsValues()
-        extractKeys2types(cssConsts)
-        for (let [ key, value ] of Object.entries(cssConsts)) {
-            setStyleProp(document.body.style, key, value)
+        this.registerListeners([
+            {
+                type: 'visibilitychange',
+                handler: () => {
+                    if (document.hidden) {
+                        this.before.running = this.running
+                        if (!this.running) return
+                        this.running = false
+                        return
+                    }
+                    this.running = this.before.running
+                }
+            },
+            {
+                type: 'keydown',
+                handler: e => {
+                    const { key } = e
+                    this.keysDown[key] = key
+                }
+            },
+            {
+                type: 'keyup',
+                handler: e => {
+                    const { key } = e
+                    delete this.keysDown[key]
+                    this.keys[key] = key
+                }
+            },
+            {
+                type: 'gamepadconnected',
+                elem: window,
+                handler: e => {
+                    this.gamepads.push({
+                        index: e.gamepad.index,
+                        pressed: []
+                    })
+                }
+            }
+        ])
+        if (system.supportsFullScreen) {
+            this.registerListener({
+                type: system.fullscreenChangeEvent,
+                handler: () => {
+                    this.isFullscreen = system.isFullScreen()
+                }
+            })
         }
-        // registration (only construct)
-        this.input = input
-        this.screens = {}
-        this.domLoaded = false
-        this.audio = new AudioPlayer()
+        if (this.supportsTouch()) {
+            document.body.append(
+                div({id: 'touch-div', class: 'transparent full-v full-h pos-0 fixed no-events'})
+            )
+            this.registerListener({
+                elem: screen.orientation,
+                type: 'change',
+                handler: () => {
+                    d('orientation change...', this.orientation)
+                }
+            })
+        }
 
-        this.registerListeners()
+        // TODO register listeners from plugins
+        this.addListeners()
 
         if (!initHandler) return
 
@@ -352,21 +344,28 @@ class Game {
         this.init()
     }
 
+    /**
+     * Initializes a (re-)start of the game
+     */
     init() {
         this.setState(STATE.INIT);
 
         this.warnings = []
+        this.warningActions = []
         this.currentScreen = null
         this.elems = {}
         this.props = {}
         this.domQueue = []
-        this.audioPlaying = []
+        this.viewportBounds = null
         this.buildState = null
         this.hasBuildState = true
+        this.trackFps = true
         this.running = false
         this.before = {}
 
         this.globals = getNewStateObj()
+
+        this.hideElem('game-overlay-div', 'modals-div')
 
         if (!this.initHandler) return
 
@@ -384,6 +383,9 @@ class Game {
         )
     }
 
+    /**
+     * Tries to connect to the backend and boots the game if this was successful
+     */
     connectAndBoot() {
         this.setState(STATE.CONNECT)
         // TODO: load game.json
@@ -392,8 +394,19 @@ class Game {
                 // apply input to this
                 const config = getConfigFromInput(GameConfig, this.input, 'game')
                 config.applyTo(this.props)
+                this.props.audioBlocked = false
+                this.props.maxAvailZoom = this.maxZoom
+                this.props.isFullscreen = this.system.isFullScreen()
+                this.deactivateAutoZoom = true
+                this.trackFps = this.showFpsByUser || this.showFps
+                const skipChecks = {
+                    autoZoom: this.autoZoomByUser,
+                    stepZoom: this.stepZoomByUser,
+                    showFps: this.showFpsByUser
+                }
                 // overwrite with persisted values
                 for (let [ prop, type ] of Object.entries(persistedProps2type)) {
+                    if (prop in skipChecks && !skipChecks[prop]) continue
                     let value = this.engineStorage.getJson(prop)
                     if (value === undefined || value === null) continue
                     if (prop === 'muted') {
@@ -430,9 +443,12 @@ class Game {
                 console.error(e)
                 this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
             }
-        }, 2000);
+        }, 2000)
     }
 
+    /**
+     * Boots and starts the game
+     */
     boot() {
         this.setState(STATE.BOOT)
         this.log(`Booting game "${GAME_ID}"...`)
@@ -444,7 +460,8 @@ class Game {
         try {
             const { width, height } = this
             this.notify('main',{ width, height })
-            this.syncToZoom()
+            this.syncScreen()
+            this.showElem('game-overlay-div')
 
             if (!startScreen) {
                 // TODO add welcome screen
@@ -459,310 +476,37 @@ class Game {
         }
     }
 
-    reset() {
-        this.init()
-    }
-
-
-    registerListeners() {
-        this.resizeObserver.observe(document.body)
-    }
-
-    deregisterListeners() {
-        this.resizeObserver.disconnect()
-    }
-
-    // --------------------------------------------
-
-    handleError(err) {
-        this.notify('error', err)
-    }
-
-    setState(state, props = {}) {
-        this.log(`Setting state "${state2name[state]}" (${state})`)
-        this.notify('state:' + state, { from: this.currState, ...props })
-        this.currState = state
-    }
-
-    persistProp(name, value, notify = false) {
-        this.engineStorage.storeJson(name, value)
-        if (notify) this.notify('change', {name, value})
-    }
-
-    getId() {
-        return GAME_ID
-    }
-
-    // --------------------------------------------
-    //  Props
-    // --------------------------------------------
-
-    get running() {
-        return this.props.running
-    }
-
-    set running(value) {
-        if (value === this.running) return
-        this.props.running = value
-        if (value) {
-            this.audio.continueAll()
-            if (inst.RL.hasBrowserResources()) {
-                this.addWarning('Warning! The current screen is using resources from the local storage!')
-            }
-        } else {
-            this.audio.pauseAll()
-        }
-        this.notify('change', {name: 'running', value})
-    }
-
-    get masterVolume() {
-        return this.audio.masterVolume
-    }
-
-    set masterVolume(value) {
-        value = clamp(0, value, 100)
-        if (this.masterVolume === value) return
-
-        this.audio.setMasterVolume(value);
-        this.persistProp('masterVolume', value, true)
-    }
-
-    get muted() {
-        return this.audio.muted
-    }
-
-    set muted(value) {
-        if (this.audio.muted === value) return
-
-        this.audio.setMuted(value)
-        this.persistProp('muted', value, true)
-    }
-
-    get zoom() {
-        return this.props.zoom
-    }
-
-    set zoom(value) {
-        value = clamp(this.minZoom, value, this.maxZoom)
-        if (value === this.zoom) return
-
-        this.props.zoom = value
-        this.syncToZoom()
-        this.persistProp('zoom', value, true)
-    }
-
-    get minZoom() {
-        return this.props.minZoom
-    }
-
-    set minZoom(value) {
-        if (value === this.minZoom) return
-        this.props.minZoom = value
-        this.notfiy('change', {name: 'minZoom', value})
-    }
-
-    get maxZoom() {
-        return this.props.maxZoom
-    }
-
-    set maxZoom(value) {
-        if (value === this.maxZoom) return
-        this.props.maxZoom = value
-        this.notify('change', {name: 'maxZoom', value})
-    }
-
-    get stepZoom() {
-        return this.props.stepZoom
-    }
-
-    set stepZoom(value) {
-        if (value === this.stepZoom) return
-        this.props.stepZoom = value
-        this.syncToZoom()
-        this.persistProp('stepZoom', value, true)
-    }
-
-    get autoZoom() {
-        return this.props.autoZoom
-    }
-
-    set autoZoom(value) {
-        if (value === this.autoZoom) return
-        this.props.autoZoom = value
-        this.syncToZoom()
-        this.persistProp('autoZoom', value, true)
-    }
-
-    get width() {
-        return this.props.width
-    }
-
-    set width(value) {
-        value = clamp(1, value, 1000)
-
-        if (this.width === value) return
-        this.props.width = value
-    }
-
-    get height() {
-        return this.props.height
-    }
-
-    set height(value) {
-        value = clamp(1, value, 1000)
-
-        if (this.height === value) return
-        this.props.height = value
-    }
-
-    getMandatoryElem(id) {
-        const elem = document.getElementById(id)
-        if (elem) return elem
-        throw Error(`Required dom element with id "${id}" not found!`)
-    }
-
-    openPopup(id) {
-        const elem = this.getMandatoryElem(id)
-        elem.classList.toggle('hidden', false)
-        this.notify('open-popup', {id})
-    }
-
-    closePopup(id) {
-        const elem = this.getMandatoryElem(id)
-        elem.classList.toggle('hidden', true)
-        this.notify('close-popup', {id})
-    }
-
-    getAvailableViewport() {
-        // TODO find better solution
-        const { width, height } = this.getMandatoryElem('overlay').parentNode.parentNode.parentNode.getBoundingClientRect()
-        const paddingH = 2 * 10;
-        const paddingV = 2 * 10;
-        return {
-            width: width - paddingH,
-            height: height - paddingV
-        }
-    }
-
-    getResourceLoader() {
-        return inst.RL;
-    }
-
-    getStorageManager() {
-        return inst.SM;
-    }
-
-    setInitHandler(initHandler, autoInit = false) {
-        if (!initHandler) return
-        this.initHandler = initHandler
-        if (autoInit) this.init()
-    }
-
-    setMasterVolume(value) {
-        if (this.masterVolume === value) return;
-
-        this.audio.setMasterVolume(value);
-        this.engineStorage.storeJson('masterVolume', value)
-        this.notify('change', {name: 'masterVolume', value: this.masterVolume})
-    }
-
-    notify(action, props) {
-        let changes = this.renderPlugin.notify(action, props)
-        if (!changes) return
-
-        if (!Array.isArray(changes)) changes = [changes]
-
-        for (let { id, nodes, html, nextFrame } of changes) {
-            if (!(nodes || html)) continue;
-
-            const elem = id ? document.getElementById(id) : document.body;
-            if (!elem) return d('NOT FOUND:', id)
-
-            if (nodes) {
-                while (elem.firstChild) {
-                    elem.firstChild.remove();
-                }
-                elem.append(nodes)
-            } else {
-                elem.innerHTML = html
-            }
-            if (nextFrame) requestAnimationFrame(nextFrame)
-        }
-        this.renderPlugin.cleanupWatchers()
-    }
-
-    log(msg) {
-        console.log(msg);
-    }
-
-    stopAllAudio() {
-        for (let audio of this.audioPlaying) {
-            audio.pause();
-        }
-        this.audioPlaying = [];
-    }
-
-    playAudio(audio) {
-        if (audio.readyState >= 2) {
-            this.audioPlaying.push(audio);
-            audio.play();
-        }
-    }
-
-    addWarning(msg) {
-        if (this.warnings.includes(msg)) return
-        this.warnings.push(msg)
-        this.notify('change', {name: 'warnings', value: this.warnings})
-    }
-
-    clearWarnings() {
-        if (this.warnings.length) this.warnings.shift()
-        this.notify('change', {name: 'warnings', value: this.warnings})
-    }
-
-    syncToZoom() {
-        // if (this.state === STATE.INIT) return
-        const overlay = document.getElementById('overlay');
-
-        let calcZoom = this.zoom
-        if (this.autoZoom) {
-            // TODO:
-            const { width, height } = this.getAvailableViewport()
-            calcZoom = Math.max(
-                Math.min(
-                    this.stepZoom ? Math.floor(width / this.width) : width / this.width,
-                    this.stepZoom ? Math.floor(height / this.height) : height / this.height,
-                    this.maxZoom
-                ),
-                this.minZoom
-            )
-        }
-        if (calcZoom !== this.zoom) {
-            this.zoom = calcZoom
-            return
-        }
-        overlay.style.transform =  'scale(' + calcZoom +')';
-        overlay.style.transformOrigin = 'top left';
-        const elem = document.getElementById('screen-div');
-        elem.style.width = '' + (this.width * calcZoom) + 'px';
-        elem.style.height = '' + (this.height * calcZoom) + 'px';
-    }
+    // game control
 
     restart(enableKeys = false) {
         // this.keyHandling = enableKeys;
         if (this.running || !this.hasEditor()) {
             return;
         }
-        this.getDomElem('editor').style.display = 'none'
-        this.getDomElem('body').style.display = 'inline'
+        this.hideElem('editor-div')
+        this.showElem('game-overlay-div', 'game-div')
         this.running = this.before.running
 
-        this.registerListeners()
+        this.addListeners()
 //        this.gotoScreen(this.currentScreen);
     }
 
-    hasEditor() {
-        return window.gameEditor !== undefined
+    /**
+     * Resets the game
+     */
+    reset() {
+        this.running = false
+        this.init()
+    }
+
+    openFullScreenMode() {
+        this.system.requestFullScreen(document.body).catch(
+            e => this.addWarning('Browser denied fullscreen mode with message: ' + e.message)
+        )
+    }
+
+    exitFullScreenMode() {
+        this.system.exitFullScreen()
     }
 
     openEditorMode() {
@@ -776,11 +520,11 @@ class Game {
         this.before.running = this.running
         this.running = false
 
-        this.deregisterListeners()
+        this.removeListeners()
         // this.keyHandling = false;
         inst.RL.loadPermanentResources().then(() => {
-            this.getDomElem('body').style.display = 'none'
-            this.getDomElem('editor').style.display = 'block';
+            this.hideElem('game-div', 'game-overlay-div')
+            this.showElem('editor-div')
             // TODO crap
             const stack = this.activeResource
             this.activeResource = undefined
@@ -788,6 +532,174 @@ class Game {
         });
 
         this.log('EDITOR-MODE');
+    }
+
+    openModal(elem) {
+        const modalsDiv = this.getMandatoryElem('modals-div')
+        if (!modalsDiv.childElementCount) {
+            this.removeListeners()
+            this.showElem('modals-div')
+        }
+        modalsDiv.append(
+            div({class: 'full-v full-h pos-0 fixed modal-overlay'}, elem)
+        )
+    }
+
+    closeModal() {
+        const elem = this.getMandatoryElem('modals-div')
+        elem.lastElementChild.remove()
+        if (!elem.childElementCount) {
+            this.hideElem('modals-div')
+            this.addListeners()
+        }
+    }
+
+    gotoScreen(screenId, params = {}) {
+        this.log(`Goto screen "${screenId}"`)
+
+        inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
+        this.frameEvents = {}
+
+        this.currentScreen = screenId
+        const screen = this.screens[screenId]
+        this.globals = Object.assign(this.globals, params)
+
+        this.lastState = this.globals.getClone()
+        inst.RL.clearResources()
+
+        const { globals, game } = this
+        this.build = screen.init({ globals, game, screen })
+        this.resetFps()
+    }
+
+    // internal methods
+
+    setState(state, props = {}) {
+        this.log(`Setting state "${state2name[state]}" (${state})`)
+        this.notify('state:' + state, { from: this.currState, ...props })
+        this.currState = state
+    }
+
+    getMandatoryElem(id) {
+        const elem = document.getElementById(id)
+        if (elem) return elem
+        throw Error(`Required dom element with id "${id}" not found!`)
+    }
+
+    hideElem( ...ids ) {
+        for (const id of ids) this.getMandatoryElem(id).classList.toggle('hidden', true)
+    }
+
+    showElem( ...ids ) {
+        for (const id of ids) this.getMandatoryElem(id).classList.toggle('hidden', false)
+    }
+
+    resetFps() {
+        if (!this.trackFps) return
+
+        const names = this.fpsTracker.reset()
+        for (const name of names) {
+            this.notify('change', {name, value: this.fpsTracker[name]})
+        }
+    }
+
+    notify(action, props) {
+        let changes = this.renderPlugin.notify(action, props)
+        if (!changes) return
+
+        if (!Array.isArray(changes)) changes = [changes]
+
+        for (const { id, nodes, html, nextFrame, subId } of changes) {
+            if (!(nodes || html)) continue;
+
+            const elem = this.getMandatoryElem(id);
+            if (subId) {
+                let found = false
+                for (const child of elem.children) {
+                    if (child.id !== subId) continue
+                    child.replaceWith(nodes)
+                    found = true
+                }
+                if (!found) elem.append(nodes)
+            } else {
+                if (nodes) {
+                    while (elem.firstChild) {
+                        elem.firstChild.remove();
+                    }
+                    elem.append(nodes)
+                } else {
+                    elem.innerHTML = html
+                }
+            }
+            if (nextFrame) requestAnimationFrame(nextFrame)
+        }
+        this.renderPlugin.cleanupWatchers()
+    }
+
+    syncScreen() {
+        let calcZoom = this.zoom
+        const { width, height } = this.getAvailableViewport()
+        const availZoom =
+            clamp(
+                this.minZoom,
+                Math.min(
+                    this.stepZoom ? Math.floor(width / this.width) : width / this.width,
+                    this.stepZoom ? Math.floor(height / this.height) : height / this.height
+                ),
+                this.maxZoom
+            )
+        if (this.autoZoom) {
+            calcZoom = availZoom
+        } else if (this.stepZoom) {
+            calcZoom = Math.round(calcZoom)
+        }
+        this.maxAvailZoom = this.restrictZoomByWindow ? availZoom : this.maxZoom
+        calcZoom = clamp(this.minZoom, calcZoom, this.maxAvailZoom)
+
+        if (calcZoom !== this.zoom) {
+            this.deactivateAutoZoom = false
+            this.zoom = calcZoom
+            this.deactivateAutoZoom = true
+            return
+        }
+        this.screenOverlayDiv.style.transform =  'scale(' + calcZoom +')'
+        const style = this.screenDiv.style
+        style.width = '' + (this.width * calcZoom) + 'px'
+        style.height = '' + (this.height * calcZoom) + 'px'
+    }
+
+    persistProp(name, value, notify = false) {
+        this.engineStorage.storeJson(name, value)
+        if (notify) this.notify('change', {name, value})
+    }
+
+    getAvailableViewport() {
+        if (!this.viewportBounds) {
+            const gameDiv = this.getMandatoryElem('game-div')
+            let elem = this.getMandatoryElem('screen-div')
+            while (!elem.classList.contains('screen-bounds') && elem !== gameDiv) {
+                elem = elem.parentNode
+            }
+            const style = window.getComputedStyle(elem)
+            const paddings = []
+            for (const dir of ['Left', 'Right', 'Top', 'Bottom']) {
+                paddings.push(getCssPxValue(style['padding' + dir], 0))
+            }
+            const [ left, right, top, bottom ] = paddings
+            const paddingH = left + right
+            const paddingV = top + bottom
+
+            this.viewportBounds = {
+                elem,
+                paddingH,
+                paddingV
+            }
+        }
+        const { width, height } = this.viewportBounds.elem.getBoundingClientRect()
+        return {
+            width: width - this.viewportBounds.paddingH,
+            height: height - this.viewportBounds.paddingV
+        }
     }
 
     getEditableResources() {
@@ -846,7 +758,7 @@ class Game {
                                 data: pane.config,
                                 dim: pane.viewPortDim,
 
-                            });
+                            })
                         }
                         /*
                                                  else if (pane instanceof SpritePane) {
@@ -904,54 +816,20 @@ class Game {
                     }
                 }
                 if (Array.isArray(area)) {
-                    extractEditablesFromAreas(area);
+                    extractEditablesFromAreas(area)
                 } else if (area.areas !== undefined) {
-                    extractEditablesFromAreas(area.areas);
+                    extractEditablesFromAreas(area.areas)
                 }
             }
         }
-        extractEditablesFromAreas(this.getCurrentScreen().areas);
+        extractEditablesFromAreas(this.getCurrentScreen().areas)
 
-        resources.push({type: 'filters', data: filterer});
+        resources.push({type: 'filters', data: filterer})
         return resources;
     }
 
-    openFullScreenMode() {
-        this.log('FULL-SCREEN-MODE');
-    }
-
     getCurrentScreen() {
-        return this.screens[this.currentScreen];
-    }
-
-    addScreen(screen) {
-        this.screens[screen.id] = screen;
-    }
-
-    gotoScreen(screenId, params = {}) {
-        this.log(`Goto screen "${screenId}"`);
-        // this.stopAllAudio();
-
-        inst.OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
-        this.frameEvents = {};
-
-        this.currentScreen = screenId;
-        const screen = this.screens[screenId];
-        this.globals = Object.assign(this.globals, params);
-
-        this.lastState = this.globals.getClone();
-        inst.RL.clearResources();
-
-        const { globals, game } = this;
-        this.build = screen.init({ globals, game, screen });
-    }
-
-    setStateInitHandler(handler) {
-        const game = this.game;
-        const globals = this.globals;
-        const loader = new ResourceRequest(true)
-        this.buildState = handler({ loader, game, globals })
-        this.hasBuildState = false;
+        return this.screens[this.currentScreen]
     }
 
     render(force = false) {
@@ -962,63 +840,79 @@ class Game {
 
     updateDom() {
         while (this.domQueue.length > 0) {
-            const next = this.domQueue.shift();
+            const next = this.domQueue.shift()
             switch(next.op) {
                 case 'set':
-                    const parts = next.key.split('.');
+                    const parts = next.key.split('.')
                     let elem = next.elem;
                     while (parts.length > 1) {
-                        elem = elem[parts.shift()];
+                        elem = elem[parts.shift()]
                     }
-                    elem[parts[0]] = next.value;
-                    break;
+                    elem[parts[0]] = next.value
+                    break
 
                 case 'add':
-                    next.target.appendChild(next.child);
-                    break;
+                    next.target.appendChild(next.child)
+                    break
             }
         }
     }
 
     addDomOp(elem, key, value) {
-        this.domQueue.push({op: 'set', elem, key, value});
+        this.domQueue.push({op: 'set', elem, key, value})
     }
 
     addDomChild(target, child) {
-        this.domQueue.push({op: 'add', target, child});
-    }
-
-    getDomElem(id) {
-        if (this.elems[id] === undefined) {
-            const elem = document.getElementById(id);
-            if (elem === null) {
-                throw Error('Required element with ID "' + id + '" not found in DOM!');
-            }
-            this.elems[id] = elem;
-        }
-        return this.elems[id];
+        this.domQueue.push({op: 'add', target, child})
     }
 
     handleKeys() {}
 
-    updateGamepads() {}
+    updateGamepads() {
+        if (!this.gamepads.length) return
+
+        const buttonPressed = {}
+        const gamepads = navigator.getGamepads()
+        for (let gamepad of gamepads) {
+            if (gamepad === null) continue
+
+            const pressed = []
+            let i = 0
+            for (let button of gamepad.buttons) {
+                if (button.pressed) {
+                    pressed.push(i)
+                }
+                i++
+            }
+            buttonPressed[gamepad.index] = pressed
+        }
+        for (let gamepad of this.gamepads) {
+            gamepad.pressed =
+                buttonPressed[gamepad.index] !== undefined ? buttonPressed[gamepad.index] : []
+        }
+    }
 
     updateFrame() {
         if (!this.currentScreen) return
 
-        const screen = this.screens[this.currentScreen];
+        const screen = this.screens[this.currentScreen]
         if (screen.getState() === 'READY') {
             this.updateDom();
             this.handleKeys();
             if (this.running) {
-                this.render();
-                this.frames++;
+                if (this.showFps) {
+                    const changed = this.fpsTracker.track()
+                    for (const name of changed) {
+                        this.notify('change', {name, value: this.fpsTracker[name]})
+                    }
+                }
+                this.render()
                 if (screen.frameHandler !== null) {
                     const { globals, game } = this
-                    screen.frameHandler({ screen, globals, game });
+                    screen.frameHandler({ screen, globals, game })
                 }
             }
-            this.updateGamepads();
+            this.updateGamepads()
             /*
             if (this.restartEditorWithId !== null) {
                 this.activeResource = this.restartEditorWithId;
@@ -1027,7 +921,7 @@ class Game {
             }
              */
         }
-        this.waitForNextFrame();
+        this.waitForNextFrame()
     }
 
     waitForNextFrame() {
@@ -1051,31 +945,443 @@ class Game {
             if (frameHandler) screen.setFrameHandler(frameHandler)
             screen.setDimension(this.width, this.height)
             screen.render(true)
-            /*
-            if (this.sound && screen.audio !== null) {
-                const audio = new Audio(screen.audio);
-                audio.addEventListener('canplaythrough', event => {
-                    this.playAudio(audio);
-                });
-                audio.addEventListener('ended', event => {
-                    for (let i = 0; i < this.audioPlaying.length; i++) {
-                        if (this.audioPlaying[i] === audio) {
-                            this.audioPlaying.splice(i, 1);
-                            break;
-                        }
-                    }
-                });
-            }
-             */
         }
         requestAnimationFrame(() => this.updateFrame());
     }
 
+    // public methods
+
+    /**
+     * Sets the given initHandler and triggers an initialization when the autoInit-flag was set
+     *
+     * @param {function} initHandler
+     * @param {bool} autoInit
+     */
+    setInitHandler(initHandler, autoInit = false) {
+        if (!initHandler) return
+        this.initHandler = initHandler
+        if (autoInit) this.init()
+    }
+
+    setStateInitHandler(handler) {
+        const game = this.game;
+        const globals = this.globals;
+        const loader = new ResourceRequest(true)
+        this.buildState = handler({ loader, game, globals })
+        this.hasBuildState = false;
+    }
+
+    addScreen(screen) {
+        this.screens[screen.id] = screen;
+    }
+
+    /**
+     *
+     *
+     * @param elem
+     * @param type
+     * @param handler
+     * @param options
+     */
+    registerListener({ elem = document, type, handler, options = false }) {
+        this.listeners.push({
+            elem,
+            type,
+            handler: ( ...args ) => {
+                try {
+                    handler( ...args )
+                } catch (e) {
+                    e.message = `Event handler "${type}": ${e.message}`
+                    this.handleError(e)
+                }
+            },
+            options
+        })
+    }
+
+    registerListeners(listeners) {
+        for (let listener of listeners) {
+            this.registerListener(listener)
+        }
+    }
+
+    addListeners() {
+        this.resizeObserver.observe(document.body)
+        for (let { elem, type, handler, options } of this.listeners) {
+            elem.addEventListener(type, handler, options)
+        }
+    }
+
+    removeListeners() {
+        this.resizeObserver.disconnect()
+        for (let { elem, type, handler, options } of this.listeners) {
+            elem.removeEventListener(type, handler, options)
+        }
+    }
+
+    getGamepadPressed(no) {
+        if (no >= this.gamepads.length) return []
+
+        return this.gamepads[no].pressed;
+    }
+
+    log(msg) {
+        console.log(msg);
+    }
+
+    indexOfWarning(value) {
+        let index = 0
+        for (const { msg } of this.warnings) {
+            if (msg === value) return index
+            index++
+        }
+        return -1
+    }
+
+    addWarning(msgOrObject) {
+        if (typeof msgOrObject === 'string') {
+            msgOrObject = {msg: msgOrObject}
+        }
+        if (this.indexOfWarning(msgOrObject.msg) !== -1) return
+        this.warnings.push(msgOrObject)
+        this.notify('change', {name: 'warnings', value: this.warnings})
+    }
+
+    clearWarnings(msg = null) {
+        if (!this.warnings.length) return
+        if (msg) {
+            const index = this.indexOfWarning(msg)
+            if (index === -1) return
+            this.warnings.splice(index, 1)
+        } else {
+            this.warnings = []
+        }
+        this.notify('change', {name: 'warnings', value: this.warnings})
+    }
+
+    handleError(err) {
+        this.notify('error', err)
+    }
+
+    // check flags
+
+    hasEditor() {
+        return window.gameEditor !== undefined && !this.system.isMobile
+    }
+
+    supportsTouch() {
+        return true
+        return 'ontouchstart' in document.documentElement
+    }
+
+    // --------------------------------------------
+    //  Props
+    // --------------------------------------------
+
+    get id() {
+        return GAME_ID
+    }
+
+    get running() {
+        return this.props.running
+    }
+
+    set running(value) {
+        if (value === this.running) return
+        this.props.running = value
+        if (value) {
+            this.audio.continueAll()
+            if (inst.RL.hasBrowserResources()) {
+                this.addWarning('Warning! The current screen is using resources from the local storage!')
+            }
+        } else {
+            this.resetFps()
+            this.audio.pauseAll()
+        }
+        this.notify('change', {name: 'running', value})
+    }
+
+    get masterVolume() {
+        return this.audio.masterVolume
+    }
+
+    set masterVolume(value) {
+        value = clamp(0, value, 100)
+        if (this.masterVolume === value) return
+
+        this.audio.setMasterVolume(value);
+        this.persistProp('masterVolume', value, true)
+        this.muted = false
+    }
+
+    get muted() {
+        return this.audio.muted
+    }
+
+    set muted(value) {
+        if (this.audio.muted === value) return
+
+        this.audio.setMuted(value)
+        if (value && this.audioBlocked) {
+            this.audio.pauseAll()
+            this.audio.continueAll()
+        }
+        this.persistProp('muted', value, true)
+    }
+
+    get zoom() {
+        return this.props.zoom
+    }
+
+    set zoom(value) {
+        value = clamp(this.minZoom, value, this.maxZoom)
+        if (value === this.zoom) return
+
+        if (this.deactivateAutoZoom && this.autoZoomByUser) this.autoZoom = false
+
+        this.props.zoom = value
+        this.syncScreen()
+        this.persistProp('zoom', value, true)
+        this.resetFps()
+    }
+
+    get minZoom() {
+        return this.props.minZoom
+    }
+
+    set minZoom(value) {
+        if (value === this.minZoom) return
+        this.props.minZoom = value
+        this.notfiy('change', {name: 'minZoom', value})
+    }
+
+    get maxZoom() {
+        return this.props.maxZoom
+    }
+
+    set maxZoom(value) {
+        if (value === this.maxZoom) return
+        this.props.maxZoom = value
+        this.notify('change', {name: 'maxZoom', value})
+    }
+
+    get restrictZoomByWindow() {
+        return this.props.restrictZoomByWindow
+    }
+
+    get maxAvailZoom() {
+        return this.props.maxAvailZoom
+    }
+
+    set maxAvailZoom(value) {
+        if (value === this.maxAvailZoom) return
+        this.props.maxAvailZoom = value
+        this.notify('change', {name: 'maxAvailZoom', value})
+    }
+
+    get stepZoom() {
+        return this.props.stepZoom
+    }
+
+    set stepZoom(value) {
+        if (value === this.stepZoom) return
+        this.props.stepZoom = value
+        this.syncScreen()
+        this.persistProp('stepZoom', value, true)
+    }
+
+    get stepZoomByUser() {
+        return this.props.stepZoomByUser
+    }
+
+    get autoZoom() {
+        return this.props.autoZoom
+    }
+
+    set autoZoom(value) {
+        if (value === this.autoZoom) return
+        this.props.autoZoom = value
+        this.syncScreen()
+        this.persistProp('autoZoom', value, true)
+    }
+
+    get autoZoomByUser() {
+        return this.props.autoZoomByUser
+    }
+
+    get width() {
+        return this.props.width
+    }
+
+    set width(value) {
+        value = clamp(1, value, 1000)
+
+        if (this.width === value) return
+        this.props.width = value
+    }
+
+    get height() {
+        return this.props.height
+    }
+
+    set height(value) {
+        value = clamp(1, value, 1000)
+
+        if (this.height === value) return
+        this.props.height = value
+    }
+
+    get fps() {
+        return this.fpsTracker.fps
+    }
+
+    get minFps() {
+        return this.fpsTracker.minFps
+    }
+
+    get maxFps() {
+        return this.fpsTracker.maxFps
+    }
+
+    get avgFps() {
+        return this.fpsTracker.avgFps
+    }
+
+    get showFps() {
+        return this.props.showFps
+    }
+
+    set showFps(value) {
+        if (value === this.showFps) return
+
+        this.props.showFps = value
+        this.persistProp('showFps', value, true)
+
+        this.resetFps()
+    }
+
+    get showFpsByUser() {
+        return this.props.showFpsByUser
+    }
+
+    get isFullscreen() {
+        return this.props.isFullscreen
+    }
+
+    set isFullscreen(value) {
+        if (value === this.isFullscreen) return
+
+        this.props.isFullscreen = value
+        this.notify('change', {name: 'isFullscreen', value})
+    }
+
+    get screenDiv() {
+        if (!this.elems.screenDiv) {
+            this.elems.screenDiv = div(
+                {
+                    id: "screen-div",
+                    style: "width: " + (this.width * this.zoom) + 'px; height: ' + (this.height * this.zoom) + 'px'
+                },
+                this.screenOverlayDiv
+            )
+        }
+        return this.elems.screenDiv
+    }
+
+    get screenOverlayDiv() {
+        if (!this.elems.screenOverlayDiv) {
+            this.elems.screenOverlayDiv = div(
+                {
+                    id: "screen-overlay-div",
+                    style: "width: " + this.width + 'px; height: ' + this.height + 'px'
+                }
+            )
+        }
+        return this.elems.screenOverlayDiv
+    }
+
+    get audioBlocked() {
+        return this.props.audioBlocked
+    }
+
+    set audioBlocked(value) {
+        if (value === this.audioBlocked) return
+
+        this.props.audioBlocked = value
+        const msg = 'Audio playback is blocked by your browser. Click here to retry:'
+        if (value) {
+            this.addWarning(
+                {
+                    msg,
+                    actions: [{
+                        action: 'Unblock',
+                        click: () => {
+                            this.audio.pauseAll()
+                            this.audio.continueAll()
+                        }
+                    }]
+                }
+            )
+        } else {
+            this.clearWarnings(msg)
+        }
+    }
+
+    get orientation() {
+        if (screen.orientation && screen.orientation.type) {
+            return screen.orientation.type.split('-')[0]
+        } else if (window.orientation !== undefined) {
+            return [0, 180].includes(window.orientation) ? 'landscape' : 'portrait'
+        }
+        return
+    }
+
+    // TODO make real getters
+
+    getResourceLoader() {
+        return inst.RL;
+    }
+
+    getStorageManager() {
+        return inst.SM;
+    }
 }
 /**
  * @type {GameConfig}
  */
 Game.Config = GameConfig
+
+
+const div = ( ...args ) => {
+    const elem = document.createElement('div')
+    const propsOrChildren = args.shift();
+    if (typeof propsOrChildren === 'string') {
+        elem.append(propsOrChildren)
+    } else if (typeof propsOrChildren === 'object') {
+        if (propsOrChildren instanceof Node) {
+            elem.append(propsOrChildren)
+        } else {
+            const pairs = Object.entries(propsOrChildren)
+            for (let [prop, value] of pairs) {
+                    const parsed = value
+                    if (typeof parsed === 'boolean') {
+                        elem[prop] = parsed
+                    } else {
+                        elem.setAttribute(prop, parsed)
+                    }
+            }
+        }
+    }
+    while (args.length) {
+        const item = args.shift()
+        if (!item) continue
+        elem.append(item)
+    }
+    return elem;
+}
+
+
+// CSS helper
 
 class Game2 {
 
@@ -1267,13 +1573,6 @@ class Game2 {
             audio.pause();
         }
         this.audioPlaying = [];
-    }
-
-    playAudio(audio) {
-        if (audio.readyState >= 2) {
-            this.audioPlaying.push(audio);
-            audio.play();
-        }
     }
 
     getGamepadPressed(no) {
@@ -1783,6 +2082,362 @@ class Game2 {
     }
 }
 
+class FpsTracker {
+
+    constructor() {
+        this.fpsSet = new Set()
+        this.reset()
+    }
+
+    reset() {
+        const { fps, minFps, maxFps, avgFps } = this
+
+        this.frames = 0
+        this.lastStart = null
+
+        this.fps = null
+        this.minFps = null
+        this.maxFps = null
+        this.avgFps = null
+        this.fpsSet.clear()
+        this.totalFrames = 0
+        this.totalSeconds = 0
+
+        const changed = [];
+        if (fps !== this.fps) changed.push('fps')
+        if (minFps !== this.minFps) changed.push('minFps')
+        if (maxFps !== this.maxFps) changed.push('maxFps')
+        if (avgFps !== this.avgFps) changed.push('avgFps')
+
+        return changed
+    }
+
+    track() {
+        const now = performance.now()
+        if (!this.lastStart) {
+            this.lastStart = now
+            this.frames++;
+            return []
+        }
+        const time = now - this.lastStart;
+        if (time >= 1000) {
+            const currFps = this.frames
+            const { fps, minFps, maxFps, avgFps } = this
+            this.fps = currFps
+            if (!this.fpsSet.has(currFps)) {
+                this.fpsSet.add(currFps)
+                const setItems = [ ...this.fpsSet.keys() ]
+                this.minFps = setItems.length ? Math.min( ...setItems ) : null
+                this.maxFps = setItems.length ? Math.max( ...setItems ) : null
+            }
+            this.totalFrames += currFps
+            this.totalSeconds++
+            this.avgFps = this.totalFrames / this.totalSeconds
+            this.frames = 0
+            this.lastStart = now
+            const changed = [];
+            if (fps !== this.fps) changed.push('fps')
+            if (minFps !== this.minFps) changed.push('minFps')
+            if (maxFps !== this.maxFps) changed.push('maxFps')
+            if (avgFps !== this.avgFps) changed.push('avgFps')
+            return changed
+        }
+        this.frames++
+        return []
+    }
+}
+
+const INPUT = {
+    TYPE: {
+        PRESSED_DOWN: 0,
+        PRESS_AND_RELEASE: 1
+    },
+    STATE: {
+        NOTPRESSED: 0,
+        PRESSED: 1,
+        AWAIT_NOTPRESSED: 2,
+        AWAIT_PRESSED: 3
+    }
+};
+
+class InputController {
+
+    constructor() {
+        this.xDir = 0;
+        this.yDir = 0;
+        this.inputs = {};
+        this.forced = null;
+        this.dirInputsKeyboard = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
+        this.dirInputsGamepad = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
+        this.dirInputsTouch = {
+            up: null,
+            down: null,
+            left: null,
+            right: null
+        };
+        this.touchPressed = [];
+        this.gamepadNo = 0;
+    }
+
+    assignGamepadNo(value) {
+        this.gamepadNo = value;
+    }
+
+    setDirInputsKeyboard(up, down, left, right) {
+        this.dirInputsKeyboard['up'] = (up !== undefined) ? up : null;
+        this.dirInputsKeyboard['down'] = (down !== undefined) ? down : null;
+        this.dirInputsKeyboard['left'] = (left !== undefined) ? left : null;
+        this.dirInputsKeyboard['right'] = (right !== undefined) ? right : null;
+    }
+
+    setDirInputsGamepad(up, down, left, right) {
+        this.dirInputsGamepad['up'] = (up !== undefined) ? up : null;
+        this.dirInputsGamepad['down'] = (down !== undefined) ? down : null;
+        this.dirInputsGamepad['left'] = (left !== undefined) ? left : null;
+        this.dirInputsGamepad['right'] = (right !== undefined) ? right : null;
+    }
+
+    setDirInputsTouch(up, down, left, right) {
+        this.dirInputsTouch['up'] = (up !== undefined) ? up : null;
+        this.dirInputsTouch['down'] = (down !== undefined) ? down : null;
+        this.dirInputsTouch['left'] = (left !== undefined) ? left : null;
+        this.dirInputsTouch['right'] = (right !== undefined) ? right : null;
+    }
+
+    isForced() {
+        return this.forced !== null;
+    }
+
+    getDirKeys() {
+        return this.dirInputsKeyboard;
+    }
+
+    setForcedInputs(keysDown) {
+        if (keysDown === null) {
+            this.forced = null;
+        } else {
+            this.forced = {};
+            for (let key of keysDown) {
+                this.forced[key] = key;
+            }
+        }
+    }
+
+    getKeysDown() {
+        if (this.forced !== null) {
+            return this.forced;
+        }
+        return inst.game.keysDown;
+    }
+
+    getGamepadPressed() {
+        if (this.forced !== null) {
+            return [];
+        }
+        return inst.game.getGamepadPressed(this.gamepadNo);
+    }
+
+    getTouchPressed() {
+        if (this.forced !== null) {
+            return [];
+        }
+        return this.touchPressed;
+    }
+
+    hasDirInput(dir) {
+        const keysDown = this.getKeysDown();
+        let key = this.dirInputsKeyboard[dir];
+        if (key !== null && keysDown[key]) {
+            return true;
+        }
+        const gamepadPressed = this.getGamepadPressed();
+        let button = this.dirInputsGamepad[dir];
+        if (button !== null && gamepadPressed.indexOf(button) !== -1) {
+            return true;
+        }
+        const touchId = this.dirInputsTouch[dir];
+        const touchPressed = this.getTouchPressed();
+        if (touchId !== null && touchPressed.indexOf(touchId) !== -1) {
+            return true;
+        }
+        return false;
+    }
+
+    getDirVector() {
+        return {x: this.xDir, y: this.yDir};
+    }
+
+    updateTouchInputs() {
+        const touchPressed = [];
+        for (let touchId of inst.game.touchInputs) {
+            if (touchPressed.indexOf(touchId) === -1) {
+                touchPressed.push(touchId);
+            }
+        }
+        this.touchPressed = touchPressed;
+    }
+
+    update() {
+        this.updateTouchInputs();
+
+        this.yDir = 0;
+        if (this.hasDirInput('up')) {
+            this.yDir--;
+        }
+        if (this.hasDirInput('down')) {
+            this.yDir++;
+        }
+        this.xDir = 0;
+        if (this.hasDirInput('left')) {
+            this.xDir--;
+        }
+        if (this.hasDirInput('right')) {
+            this.xDir++;
+        }
+
+        for (let name in this.inputs) {
+            const input = this.inputs[name];
+            const keyDown = this.isPressed(name);
+
+            switch(input.type) {
+                case INPUT.TYPE.PRESSED_DOWN:
+                    input.state = keyDown ? INPUT.STATE.PRESSED : INPUT.STATE.NOTPRESSED;
+                    break;
+
+                case INPUT.TYPE.PRESS_AND_RELEASE:
+                    switch(input.state) {
+                        case INPUT.STATE.AWAIT_NOTPRESSED:
+                            if (!keyDown) {
+                                input.state = INPUT.STATE.AWAIT_PRESSED;
+                            }
+                            break;
+
+                        case INPUT.STATE.AWAIT_PRESSED:
+                            if (keyDown) {
+                                input.state = INPUT.STATE.PRESSED;
+                            }
+                            break;
+
+                        case INPUT.STATE.PRESSED:
+                            if (!keyDown) {
+                                input.state = INPUT.STATE.NOTPRESSED;
+                            }
+                    }
+                    break;
+            }
+        }
+    }
+
+    isPressed(name) {
+        const input = this.inputs[name];
+        const keysDown = this.getKeysDown();
+        if (input.map.key !== null && keysDown[input.map.key] === input.map.key) {
+            return true;
+        }
+        const buttonPressed = this.getGamepadPressed();
+        if (input.map.button !== null && buttonPressed.indexOf(input.map.button) !== -1) {
+            return true;
+        }
+
+        const touchPressed = this.getTouchPressed();
+        if (input.map.touch !== null && touchPressed.indexOf(input.map.touch) !== -1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    hasInput(name) {
+        return this.inputs[name].state === INPUT.STATE.PRESSED;
+    }
+
+    awaitInput(name) {
+        const input = this.inputs[name];
+        if (input.type === INPUT.TYPE.PRESS_AND_RELEASE) {
+            if (input.state === INPUT.STATE.NOTPRESSED || input.state === INPUT.STATE.PRESSED) {
+                input.state = INPUT.STATE.AWAIT_NOTPRESSED;
+            }
+        }
+    }
+
+    addInput(name, type = INPUT.TYPE.PRESSED_DOWN) {
+        this.inputs[name] =
+            {
+                map:
+                    {'key': null, 'button': null, 'touch': null},
+                type,
+                state:
+                INPUT.STATE.NOTPRESSED
+            };
+    }
+
+    assignKeyToInput(name, key) {
+        this.inputs[name].map.key = key;
+    }
+
+    assignButtonToInput(name, button) {
+        this.inputs[name].map.button = button;
+    }
+
+    assignTouchToInput(name, touchId) {
+        this.inputs[name].map.touch = touchId;
+    }
+
+    noXDir() {
+        return this.xDir === 0
+    }
+
+    noYDir() {
+        return this.yDir === 0
+    }
+
+    noDir() {
+        return this.xDir === 0 && this.yDir === 0;
+    }
+
+    isDownDir() {
+        return this.yDir === 1;
+    }
+
+    isUpDir() {
+        return this.yDir === -1;
+    }
+
+    isRightDir() {
+        return this.xDir === 1;
+    }
+
+    isLeftDir() {
+        return this.xDir === -1;
+    }
+
+    isDown() {
+        return this.yDir === 1 && this.xDir === 0;
+    }
+
+    isUp() {
+        return this.yDir === -1 && this.xDir === 0;
+    }
+
+    isLeft() {
+        return this.yDir === 0 && this.xDir === -1;
+    }
+
+    isRight() {
+        return this.yDir === 0 && this.xDir === 1;
+    }
+}
+
 class stateProxyHandler {
     constructor() {
         this.lazyKeys = [];
@@ -1898,24 +2553,28 @@ class ResourceRequest {
 class AudioResource {
 
     constructor(url, readyCallback = null) {
-        this.audio = null;
-        this.id = null;
-        this.volume = 1;
-        this.promise = new Promise((resolve) => {
+        this.audio = null
+        this.id = null
+        this.volume = 1
+        this.promise = new Promise(resolve => {
             if (typeof Audio == 'undefined') {
-                this.audio = {};
-                resolve();
+                this.audio = {}
+                resolve()
             } else {
-                this.audio = new Audio(url);
+                this.audio = new Audio(url)
                 this.audio.oncanplaythrough = () => {
-                    resolve();
+                    resolve()
                     if (readyCallback) {
-                        readyCallback();
+                        readyCallback()
                     }
                 }
+                this.audio.onplaying = () => {
+                    if (!inst.game.audioBlocked) return
+                    inst.game.audioBlocked = false
+                }
             }
-        });
-        this.lastAction = null;
+        })
+        this.lastAction = null
     }
 
     setId(id) {
@@ -1942,13 +2601,13 @@ class AudioResource {
         }
         this.updateVolume()
         this.lastAction = 'load'
-        this.audio.play().then(() => {
+        return this.audio.play().then(() => {
             if (this.lastAction === 'pause') {
                 this.audio.pause();
             } else {
                 this.lastAction = 'play';
             }
-        });
+        })
     }
 
     continue() {
@@ -2035,11 +2694,20 @@ class AudioPlayer {
                 audio.reset();
             }
         }
-        audio.volume = 1 // this.masterVolume / 100
+        audio.volume = 1
         audio.setMuted(this.muted)
         audio.setLoop(false);
-        audio.play();
-
+        audio.play().then(
+            () => {
+                if (inst.game.audioBlocked) {
+                    inst.game.audioBlocked = false
+                }
+            }
+        ).catch(
+            e => {
+                inst.game.audioBlocked = true
+            }
+        )
         return audio;
     }
 
@@ -2368,7 +3036,7 @@ class Screen {
                 inst.game.addDomChild(containerParent, node.parents[0]);
             }
         }
-        buildNodeDom(this.tree, inst.game.getDomElem('overlay'));
+        buildNodeDom(this.tree, inst.game.getMandatoryElem('screen-overlay-div'));
     }
 
     hasAllDependencies() {
@@ -3119,10 +3787,13 @@ filterer.addFilter(
 );
 
 export {
+    inst,
     Game,
     Screen,
     ImageResource,
     AudioResource,
+    InputController,
+    INPUT,
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,

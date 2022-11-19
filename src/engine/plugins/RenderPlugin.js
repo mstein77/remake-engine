@@ -2,8 +2,12 @@ import { ucfirst, d } from "../helper/helper.js";
 
 class RenderPlugin {
 
-    constructor() {
+    constructor(options = {}) {
         this.watcher = {};
+
+        this.options = options
+
+        this.filters = {}
 
         this.div = (...args) => this.createDomElem('div', ...args)
         this.canvas = (...args) => this.createDomElem('canvas', ...args)
@@ -11,6 +15,7 @@ class RenderPlugin {
         this.input = (...args) => this.createDomElem('input', ...args)
         this.i = (...args) => this.createDomElem('i', ...args)
         this.pre = (...args) => this.createDomElem('pre', ...args)
+        this.kbd = (...args) => this.createDomElem('kbd', ...args)
         this.icon = name => this.i(
             {
                 class: "material-icons center-h min-content-h big",
@@ -22,6 +27,23 @@ class RenderPlugin {
 
     setGame(value) {
         this.game = value
+    }
+
+    setOptions(options) {
+        this.options = options
+    }
+
+    getOption(key, defValue) {
+        if (key in this.options) return this.options[key]
+        return defValue
+    }
+
+    addFilter(name, filter) {
+        this.filters[name] = filter
+    }
+
+    addFilters(filters) {
+        for (const [ name, filter ] of Object.entries(filters)) this.addFilter(name, filter)
     }
 
     getCssConstantsValues() {
@@ -57,12 +79,11 @@ class RenderPlugin {
             let value = args[0];
             while (filters.length) {
                 const filter = filters.shift()
-                const method = 'filter' + ucfirst(filter)
-                if (!this[method]) throw Error(`Cannot find filter method "${method}"`)
+                if (!this.filters[filter]) throw Error(`Cannot find filter "${method}"`)
                 if (first) {
-                    value = this[method]( ...args )
+                    value = this.filters[filter]( ...args )
                 } else {
-                    value = this[method](value)
+                    value = this.filters[filter](value)
                 }
                 first = false
             }
@@ -115,35 +136,52 @@ class RenderPlugin {
         if (typeof propsOrChildren === 'string') {
             elem.append(this.extractWatcher(propsOrChildren, elem))
         } else if (typeof propsOrChildren === 'object') {
-            const pairs = Object.entries(propsOrChildren)
-            for (let [prop, value] of pairs) {
-                if (prop.startsWith('on')) {
-                    elem.addEventListener(prop.substring(2).toLowerCase(), value)
-                } else if (prop === 'watch') {
+            if (propsOrChildren instanceof Node) {
+                elem.append(propsOrChildren)
+            } else {
+                const pairs = Object.entries(propsOrChildren)
+                let watch = null;
+                for (let [prop, value] of pairs) {
+                    if (prop === 'watch') continue;
+
+                    if (prop.startsWith('on')) {
+                        elem.addEventListener(prop.substring(2).toLowerCase(), value)
+                    } else {
+                        const parsed = this.extractWatcher(value, elem, prop)
+                        if (typeof parsed === 'boolean') {
+                            elem[prop] = parsed
+                        } else {
+                            const postfix = prop === 'class' && parsed.indexOf('watched') === -1 ? ' watched' : ''
+                            elem.setAttribute(prop, parsed + postfix)
+                        }
+                    }
+                }
+                if ('watch' in propsOrChildren) {
                     if (args.length !== 1) throw Error('Missing function parameter')
+
+                    let value = propsOrChildren.watch
                     if (!Array.isArray(value)) value = [value]
                     const parsed = [];
                     const callback = args.shift()
                     for (let name of value) {
                         parsed.push(eval(name))
-                        this.addWatcher(name, { node: elem, expr: value, prop, callback })
+                        this.addWatcher(name, { node: elem, expr: value, prop: 'watch', callback })
                     }
-                    elem.append(callback( ...parsed ))
-                } else {
-                    const parsed = this.extractWatcher(value, elem, prop)
-                    if (typeof parsed === 'boolean') {
-                        elem[prop] = parsed
-                    } else {
-                        elem.setAttribute(prop, parsed)
+                    let addElems = callback( ...parsed )
+                    if (!Array.isArray(addElems)) addElems = [addElems]
+                    for (const addElem of addElems) {
+                        elem.append(addElem)
                     }
                 }
             }
         }
+
         while (args.length) {
             const item = args.shift()
             if (!item) continue
             elem.append(typeof item === 'string' ? this.extractWatcher(item, elem) : item)
         }
+
         return elem;
     }
 
@@ -159,7 +197,9 @@ class RenderPlugin {
                     newWatch.push(props)
                 }
             }
-            if (newWatch.length) watcher[name] = newWatch
+            if (newWatch.length) {
+                watcher[name] = newWatch
+            }
         }
         this.watcher = watcher
     }
@@ -185,18 +225,22 @@ class RenderPlugin {
                         for (let arg of expr) {
                             args.push(eval(arg))
                         }
-                        const nodes = callback( ...args );
+                        let nodes = callback( ...args );
+                        if (!Array.isArray(nodes)) nodes = [nodes]
                         while (node.firstChild) {
                             node.firstChild.remove()
                         }
-                        node.append(nodes)
+                        for (const addElem of nodes) {
+                            node.append(addElem)
+                        }
                     } else {
                         const { parsed } = this.getParsed(expr)
                         if (prop) {
                             if (typeof parsed === 'boolean') {
                                 node[prop] = parsed
                             } else {
-                                node.setAttribute(prop, parsed)
+                                const postfix = (prop === 'class' && parsed.indexOf('watched') === -1) ? ' watched' : ''
+                                node.setAttribute(prop, parsed + postfix)
                             }
                         } else {
                             node.innerText = parsed
