@@ -1,4 +1,5 @@
-import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies } from "../helper/helper.js";
+import { FILTER } from "core/const";
+import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper.js";
 import { ImageResource, AudioResource } from "./classes.js";
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin.js";
 
@@ -10,50 +11,51 @@ let RL = null
  * @type {StorageManager}
  */
 let SM = null
-
+let OCM = null
 let game = null
-
 let system = null
+let filterer = null
 
 class System {
 
     constructor() {
         this.renderingEngine = this.extractRenderingEngine()
-        this.hasTouch = this.extractHasTouch()
         this.isMobile = this.extractIsMobile()
-
-        this.setFullscreenApi()
+        this.supportsTouch = this.extractHasTouch()
+        this.supportsFullscreen = this.setFullscreenApi()
+        this.supportsOrientation = this.setScreenOrientationApi()
 
         console.log(
-            `System Information | Rendering Engine: ${this.renderingEngine} | Mobile: ${this.isMobile ? 'true' : 'false'} | Touch: ${this.hasTouch ? 'true' : 'false'} | UserAgent: ${navigator.userAgent}`
+            `System Information | ` +
+            `Rendering Engine: ${this.renderingEngine} | `+
+            `Mobile: ${this.isMobile ? 'true' : 'false'} | ` +
+            `Touch: ${this.supportsTouch ? 'true' : 'false'} | ` +
+            `Orientation: ${this.supportsOrientation ? this.getScreenOrientation() : 'false'} | ` +
+            `UserAgent: ${navigator.userAgent}`
         )
     }
 
     setFullscreenApi() {
-        // fullscreen api
-        this.supportsFullScreen = false
         this.fullscreenChangeEvent = undefined
-        this.isFullScreen = () => false
-        this.requestFullScreen = () => Promise.reject('Fullscreen mode not supported!')
-        this.exitFullScreen = () => Promise.reject('Fullscreen Mode not supported')
+        this.isFullscreen = () => false
+        this.requestFullscreen = () => Promise.reject('Fullscreen mode not supported!')
+        this.exitFullscreen = () => Promise.reject('Fullscreen Mode not supported')
 
         const fullscreenEnabledKey = this.getExistingKey(
             document, 'fullscreenEnabled', 'webkitFullscreenEnabled', 'mozFullScreenEnabled', 'msFullscreenEnabled'
         )
-        if (fullscreenEnabledKey) this.supportsFullScreen = document[fullscreenEnabledKey]
+        if (fullscreenEnabledKey & !document[fullscreenEnabledKey]) return false
 
-        if (!this.supportsFullScreen) return
-
-        const fullScreenElement = this.getExistingKey(
+        const fullscreenElementKey = this.getExistingKey(
             document, 'fullscreenElement', 'webkitCurrentFullScreenElement', 'msFullscreenElement'
         )
-        if (!fullScreenElement) {
-            const fullScreen = this.getExistingKey(
+        if (!fullscreenElementKey) {
+            const fullscreenKey = this.getExistingKey(
                 document, 'fullscreen', 'webkitIsFullScreen', 'mozFullScreen', 'msFullscreen'
             )
-            if (fullScreen) this.isFullScreen = () => document[fullScreen]
+            if (fullscreenKey) this.isFullscreen = () => document[fullscreenKey]
         } else {
-            this.isFullScreen = () => document[fullScreenElement] !== null
+            this.isFullscreen = () => document[fullscreenElementKey] !== null
         }
         this.fullscreenChangeEvent = this.getExistingEventType(
             document, 'fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'
@@ -61,12 +63,49 @@ class System {
         const requestFullscreenKey = this.getExistingKey(
             document.body, 'requestFullscreen', 'webkitRequestFullscreen', 'mozRequestFullScreen', 'msRequestFullscreen'
         )
-        if (requestFullscreenKey) this.requestFullScreen = elem => elem[requestFullscreenKey]()
+        if (requestFullscreenKey) this.requestFullscreen = elem => elem[requestFullscreenKey]()
 
-        const exitFullscreen = this.getExistingMethod(
+        const exitFullscreenKey = this.getExistingKey(
             document, 'exitFullscreen', 'webkitCancelFullScreen', 'mozCancelFullScreen', 'msExitFullscreen'
         )
-        if (exitFullscreen) this.exitFullScreen = exitFullscreen
+        if (exitFullscreenKey) this.exitFullscreen = elem => document[exitFullscreenKey]()
+
+        return true
+    }
+
+    setScreenOrientationApi() {
+        this.getScreenOrientation = () => undefined
+        this.orientationChangeEvent = undefined
+        this.lockOrientation = () => Promise.reject('No orientation locking supported')
+        this.unlockOrientation = () => Promise.reject('No orientation unlocking supported')
+        this.supportsOrientationLock = false
+        const orientationKey = this.getExistingKey(
+            screen, 'orientation', 'mozOrientation', 'msOrientation'
+        )
+        if (orientationKey) {
+            this.getScreenOrientation = () => screen[orientationKey].type
+            this.orientationChangeEvent = 'change'
+            this.orientationEventElem = screen[orientationKey]
+            this.lockOrientation = orientation => screen[orientationKey].lock(orientation)
+            this.unlockOrientation = () => screen[orientationKey].unlock()
+            this.supportsOrientationLock = true
+        } else if ('orientation' in window) {
+            const value2name = {
+                '0': 'landscape-primary',
+                '90': 'portrait-primary',
+                '180': 'landscape-secondary',
+                '-90': 'portrait-secondary'
+            }
+            this.getScreenOrientation = () => {
+                if (window.orientation in value2name) return value2name[value2name]
+            }
+            this.orientationChangeEvent = this.getExistingEventType(window, 'orientationchange')
+            this.orientationEventElem = window
+            // TODO: https://stackoverflow.com/questions/5298467/prevent-orientation-change-in-ios-safari
+            this.lockOrientation = orientation => Promise.reject('TODO...')
+            this.unlockOrientation = () => Promise.reject('TODO...')
+        }
+        return !!this.orientationChangeEvent
     }
 
     getExistingMethod(elem, ...keys) {
@@ -121,6 +160,173 @@ class System {
             /\b(BlackBerry|webOS|iPhone|IEMobile)\b/i.test(UA) ||
             /\b(Android|Windows Phone|iPad|iPod)\b/i.test(UA)
         )
+    }
+}
+
+class BitmapFilterer {
+
+    constructor() {
+        this.filters = {};
+    }
+
+    getFilters() {
+        return this.filters;
+    }
+
+    addFilter(id, type, callback, params = []) {
+        const paramClosures = [];
+        let minParams = 0;
+        let isMandatory = true;
+        for (let index = 0; index < params.length; index++) {
+            if (isMandatory) {
+                if (params.default === undefined) {
+                    minParams++;
+                } else {
+                    isMandatory = false;
+                }
+            }
+            const param = params[index];
+            let parser = null;
+            switch(param.type) {
+
+                case FILTER.PARAM.COLOR:
+                    parser = function(rawValue) {
+                        const color = {};
+                        // TODO use helper function
+                        if (rawValue[0] === '#') {
+                            if (rawValue.length === 7) {
+                                color.r = parseInt(rawValue.substr(1, 2), 16);
+                                color.g = parseInt(rawValue.substr(3, 2), 16);
+                                color.b = parseInt(rawValue.substr(5, 2), 16);
+                                return color;
+                            }
+                        }
+                        return null;
+                    };
+                    break;
+
+                case FILTER.PARAM.INT:
+                    parser = function(rawValue) {
+                        return parseInt(rawValue, 10);
+                    };
+                    break;
+
+                case FILTER.PARAM.FLOAT:
+                    parser = function(rawValue) {
+                        return parseFloat(rawValue);
+                    };
+                    break;
+
+                case FILTER.PARAM.STRING:
+                    parser = function(rawValue) {
+                        return rawValue;
+                    };
+                    break;
+
+                case FILTER.PARAM.MAPPING:
+                    parser = function(rawValue) {
+                        const result = {};
+                        const assigns = rawValue.split(';');
+                        for(let assign of assigns) {
+                            const parts = assign.split(':', 2);
+                            result[parts[0]] = parts[1];
+                        }
+                        return result;
+                    };
+                    break;
+
+            }
+
+            paramClosures.push(
+                function(rawValue, params) {
+                    params[param.key] = (rawValue === '') ? param.default : parser(rawValue);
+                }
+            );
+        }
+
+        this.filters[id] = {
+            type,
+            callback,
+            minParams,
+            paramDefs: params,
+            params: paramClosures
+        }
+    }
+
+    /**
+     * Returns either the original canvas or a new one with the filters applied on the original one
+     *
+     * @param filters
+     * @param canvas
+     * @param offX
+     * @param offY
+     * @param width
+     * @param height
+     * @return {*[]}
+     */
+    getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
+        let data = [canvas, offX, offY, width, height];
+        let lastType = FILTER.TYPE.CANVAS;
+        let imageData = null;
+        let isSourceCanvas = true;
+
+        const filterParts = filters.split('|');
+        for (let filterPart of filterParts) {
+            let rawParams = [];
+            if (filterPart[filterPart.length - 1] === ')') {
+                const subExpr = filterPart.slice(0, -1).split('(', 2);
+                filterPart = subExpr[0];
+                rawParams = subExpr[1].split(',');
+            }
+            if (filterPart === '') {
+                continue;
+            }
+            const filter = this.filters[filterPart];
+            const filterParams = {};
+            if (rawParams.length < filter.minParams) {
+                throw Error(`Filter "${filterPart}" requires ${filter.minParams} parameters but got ${rawParams.length}!`);
+            }
+            for (let i = 0; i < filter.params.length; i++) {
+                if (i < rawParams.length) {
+                    filter.params[i](rawParams[i], filterParams);
+                } else {
+                    filterParams[filter.key] = filter.default;
+                }
+            }
+
+            switch(filter.type) {
+
+                case FILTER.TYPE.CANVAS:
+                    if (lastType === FILTER.TYPE.IMAGEDATA) {
+                        if (isSourceCanvas) {
+                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                            isSourceCanvas = false;
+                        }
+                        data[0].ctx.putImageData(imageData, 0, 0);
+                    }
+                    data = filter.callback(data, filterParams);
+                    break;
+
+                case FILTER.TYPE.IMAGEDATA:
+                    if (lastType === FILTER.TYPE.CANVAS) {
+                        imageData = data[0].ctx.getImageData(data[1], data[2], data[3], data[4]);
+                    }
+                    imageData = filter.callback(imageData, filterParams);
+                    break;
+
+                default:
+                    throw Error(`Unknown filter type ${filter.type} given!`);
+            }
+            lastType = filter.type;
+        }
+
+        if (lastType === FILTER.TYPE.IMAGEDATA) {
+            if (isSourceCanvas) {
+                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+            }
+            data[0].ctx.putImageData(imageData, 0, 0);
+        }
+        return data;
     }
 }
 
@@ -437,6 +643,11 @@ class ResourceLoader {
     constructor(fetcher, storage) {
         this.fetcher = fetcher;
         this.storage = storage;
+        this.clear()
+    }
+
+    clear() {
+        this.disabled = false
         this.resources = {};
         this.image = {};
         this.json = {};
@@ -449,6 +660,10 @@ class ResourceLoader {
         this.screen = new Map();
         this.hasLocal = new Set();
         this.hasExternal = new Set();
+    }
+
+    setDisabled(value) {
+        this.disabled = value
     }
 
     invalidatePermanentResources() {
@@ -583,6 +798,7 @@ class ResourceLoader {
     }
 
     hasResource(type, id) {
+        if (this.disabled) return false
         return this.resources[type] !== undefined && this.resources[type][id] !== undefined
     }
 
@@ -966,7 +1182,7 @@ class ResourceLoader {
         //       }
 
         return Promise.all(promises).then(() => {
-            return this.resources;
+            return this.resources
         });
     }
 
@@ -1061,6 +1277,7 @@ class CanvasManager {
     }
 
     removeChildren(node) {
+        if (!node) return
         while (node.firstChild) {
             node.removeChild(node.firstChild);
         }
@@ -1109,5 +1326,16 @@ export default {
         }
         return system
     },
-    OCM: new CanvasManager()
+    get filterer() {
+        if (!filterer) {
+            filterer = new BitmapFilterer()
+        }
+        return filterer
+    },
+    get OCM() {
+        if (!OCM) {
+            OCM = new CanvasManager()
+        }
+        return OCM
+    }
 }

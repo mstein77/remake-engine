@@ -1,4 +1,7 @@
 /* Base CSS */
+.touching {
+    background-color: #FF0000 !important;
+}
 
 html, body {
     cursor: auto;
@@ -413,7 +416,11 @@ input:invalid {
 }
 
 .no-events {
-    pointer-events: none;
+    pointer-events: none
+}
+
+.no-touch-actions {
+    touch-action: none
 }
 
 .all-events {

@@ -271,7 +271,6 @@ const hoverChangeOptions = [
 ];
 
 function ThemeSettings({ theme, setTheme }) {
-    d('THEME', theme);
     const propSetter = prop => value => setTheme({ ...theme, [prop]: value});
 
     const setTitleGrad = titleBgGrad => {
@@ -1019,11 +1018,18 @@ function BaseAppInner({ contentProvider, active }) {
     const rightButtons = useMemo(() => {
         return [
 //            {name: 'PoC', padded: true, onClick: () => wContext.stateForward('poc', {})},
-            {icon: "build", help: "Editor Settings", padded: "1", onClick: () => wContext.openSettings()},
-//            {name: "Play", icon: "play_circle_outline", padded: "h"},
             {
-                name: "Exit", click: "double", help: {title: "Exit editor", hotKey: "c h", details: "Returns to the game, all changes will be lost"},
-                icon: "logout", padded: "h",  onClick: () => confirm(play)
+                icon: "build", help: "Editor Settings", padded: "1",
+                onClick: () => wContext.openSettings()
+            },
+            {
+                name: "Play", icon: "play_circle_outline", padded: "h", help: {title: "Play a preview of the current changes"},
+                onClick: () => d('PLAY!')
+            },
+            {
+                name: "Exit", icon: "logout", click: "double", help: {title: "Exit editor", hotKey: "c h"},
+                padded: "h", details: "Returns to the game, all changes will be lost",
+                onClick: () => confirm(play)
             }
         ]
     }, []);

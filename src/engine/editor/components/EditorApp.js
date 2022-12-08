@@ -131,7 +131,7 @@ function EditorApp(props) {
                 }
                 const model = getJsonModelOfInstance(resource.data);
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <TilesPaneEditor resource={resource} model={model}/>
+                return lazyLoadPaneEditor('BufferedTilesPane', {resource, model})
             }
         },
 
@@ -144,7 +144,7 @@ function EditorApp(props) {
                 const model = getJsonModelOfInstance(resource.data);
                 model.blocks = resource.blocks;
                 const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <TextPaneEditor resource={resource} model={model} />
+                return lazyLoadPaneEditor('TextPane', {resource, model})
             }
         },
 
@@ -168,9 +168,11 @@ function EditorApp(props) {
                     resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
                 }
                 const model = getJsonModelOfInstance(resource.data);
-                model.blocks = resource.blocks;
+                // model.blocks = resource.blocks;
+                model.sprites = resource.data.sprites
+                model.animations = resource.data.animations
                 // tree = getResourceTreeForJsonModel(resource.cls, model);
-                return <SpritePaneEditor resource={resource} model={model}/>;
+                return lazyLoadPaneEditor('SpritePane', {resource, model})
             }
         },
 

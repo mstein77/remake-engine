@@ -128,6 +128,9 @@ class Config {
         if (value === undefined) {
             throw Error('Undefined value');
         }
+        if (props.null && value === null) {
+            return null;
+        }
         if (typeof value !== 'string') {
             throw Error('value must be a string');
         }
@@ -149,6 +152,9 @@ class Config {
     validateArray(value, props = {}) {
         if (value === undefined) {
             throw Error('Undefined value');
+        }
+        if (props.null && value === null) {
+            return null;
         }
         if (!Array.isArray(value)) {
             throw Error('value must be an array');

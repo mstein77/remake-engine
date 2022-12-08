@@ -1,8 +1,16 @@
-import inst from "./instances.js"
-import { d, isValidResourceId, getConfigFromInput, ucfirst, clamp, Storage } from "helper/helper.js"
-import { BackgroundPane } from "../panes/BackgroundPane/pane.js"
-import { setStyleConstByKey, getCssPxValue } from "helper/css.js"
-import { Config } from "./config.js"
+import inst from "./instances"
+import { FILTER, INPUT, PATH, DEGREE_90 } from "core/const"
+import { d, isValidResourceId, getConfigFromInput, ucfirst, clamp, Storage, BitmapPlayer } from "helper/helper"
+import { BackgroundPane } from "../panes/BackgroundPane/pane"
+import { TextPane } from "../panes/TextPane/pane"
+import { CanvasPane } from "../panes/CanvasPane/pane"
+import { SpritePane } from "../panes/SpritePane/pane"
+import { LinearGradientPane } from "../panes/LinearGradientPane/pane"
+import { setStyleConstByKey, getCssPxValue } from "helper/css"
+import { TilesMap } from "../panes/BufferedTilesPane/classes"
+import { BitmapScrollPane } from "../panes/BitmapScrollPane/pane"
+import { PatternPane } from "../panes/PatternPane/pane"
+import { Config } from "./config"
 
 /**
  * A config object for the game instance
@@ -130,13 +138,22 @@ class GameConfig extends Config {
         this.showFpsByUser = this.validateBool(value)
     }
 
+    setScreenOrientation(value) {
+        this.screenOrientation = this.validateString(value, this.getFieldProp('screenOrientation'))
+    }
+
+    setMobile(value) {
+        this.mobile = this.validateConfig(MobileGameConfig, value)
+    }
+
     /**
      * @inheritDoc
      */
     getFieldProps() {
         return {
             dim: {min: 1, max: 9999},
-            zoom: {min: 0, max: 10}
+            zoom: {min: 0, max: 10},
+            screenOrientation: {values: ['free', 'max', 'landscape', 'portrait']}
         };
     }
 
@@ -154,6 +171,7 @@ class GameConfig extends Config {
      */
     getDefaults() {
         return {
+            mobile: {},
             width: 320,
             height: 200,
             zoom: 2,
@@ -165,7 +183,9 @@ class GameConfig extends Config {
             autoZoom: false,
             autoZoomByUser: true,
             showFps: false,
-            showFpsByUser: true
+            showFpsByUser: true,
+            screenOrientation: 'max'
+
         }
     }
 
@@ -186,9 +206,48 @@ class GameConfig extends Config {
         obj.autoZoomByUser = this.autoZoomByUser
         obj.showFps = this.showFps
         obj.showFpsByUser = this.showFpsByUser
+        obj.screenOrientation = this.screenOrientation
+        obj.mobile = this.mobile
         return obj
     }
 }
+
+class MobileGameConfig extends GameConfig {
+
+    getDefaults() {
+        return {
+            id: 'mobile-game-config',
+            zoom: 2,
+            minZoom: 0,
+            maxZoom: 5,
+            restrictZoomByWindow: true,
+            stepZoom: false,
+            stepZoomByUser: false,
+            autoZoom: true,
+            autoZoomByUser: false,
+            screenOrientation: 'max'
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    applyTo(obj) {
+        obj.zoom = this.zoom
+        obj.minZoom = this.minZoom
+        obj.maxZoom = this.maxZoom
+        obj.restrictZoomByWindow = this.restrictZoomByWindow
+        obj.stepZoom = this.stepZoom
+        obj.stepZoomByUser = this.stepZoomByUser
+        obj.autoZoom = this.autoZoom
+        obj.autoZoomByUser = this.autoZoomByUser
+        obj.screenOrientation = this.screenOrientation
+        if (this.showFps !== undefined) obj.showFps = this.showFps
+        if (this.showFpsByUser !== undefined) obj.showFpsByUser = this.showFpsByUser
+        return obj
+    }
+}
+MobileGameConfig.Config = MobileGameConfig
 
 const persistedProps2type = {
     zoom: 'float',
@@ -237,14 +296,12 @@ class Game {
 
         this.renderPlugin = inst.renderPlugin
         this.renderPlugin.setGame(this)
+        this.renderPlugin.setSystem(system)
 
         // overwrite body with essential parent div containers
         document.body.replaceChildren(
-            div({id: 'game-div', class: 'full-v'}),
-            div({id: 'game-overlay-div', class: 'full-v pos-0 fixed'}),
-            div({id: 'modals-div', class: 'transparent full-v full-h pos-0 fixed'}),
-            div({id: 'offscreen-div', class: 'hidden'}),
-            div({id: 'editor-div', class: 'full-v hidden'})
+            div({id: 'game-div', class: 'full-v no-touch-actions'}),
+            div({id: 'game-overlay-div', class: 'full-v pos-0 fixed'})
         )
 
         // registration (only construct)
@@ -254,6 +311,7 @@ class Game {
         this.gamepads = []
         this.modals = []
         this.touchInputs = []
+        this.lastTouches = {}
         this.screens = {}
         this.listeners = []
         this.domLoaded = false
@@ -285,13 +343,28 @@ class Game {
                         this.running = false
                         return
                     }
-                    this.running = this.before.running
+                    this.running = this.before.running === undefined || this.before.running
                 }
             },
             {
                 type: 'keydown',
                 handler: e => {
                     const { key } = e
+                    if (this.tempKeyActions) {
+                        if (Object.keys(this.tempKeyActions).includes(key)) {
+                            if (this.tempKeyActions[key](e)) return
+                        }
+                    }
+                    if (this.keyActions) {
+                        if (Object.keys(this.keyActions).includes(key)) {
+                            if (this.keyActions[key](e)) return
+                        }
+                    }
+                    if (key === EDITOR_KEY && this.hasEditor) {
+                        e.preventDefault()
+                        this.openEditorMode()
+                        return
+                    }
                     this.keysDown[key] = key
                 }
             },
@@ -299,8 +372,10 @@ class Game {
                 type: 'keyup',
                 handler: e => {
                     const { key } = e
-                    delete this.keysDown[key]
-                    this.keys[key] = key
+                    if (key in this.keysDown) {
+                        delete this.keysDown[key]
+                        this.keys[key] = key
+                    }
                 }
             },
             {
@@ -314,29 +389,70 @@ class Game {
                 }
             }
         ])
-        if (system.supportsFullScreen) {
+        if (system.supportsFullscreen) {
             this.registerListener({
                 type: system.fullscreenChangeEvent,
                 handler: () => {
-                    this.isFullscreen = system.isFullScreen()
+                    this.isFullscreen = system.isFullscreen()
                 }
             })
         }
-        if (this.supportsTouch()) {
-            document.body.append(
-                div({id: 'touch-div', class: 'transparent full-v full-h pos-0 fixed no-events'})
-            )
+        if (system.supportsOrientation) {
             this.registerListener({
-                elem: screen.orientation,
-                type: 'change',
+                elem: system.orientationEventElem,
+                type: system.orientationChangeEvent,
                 handler: () => {
-                    d('orientation change...', this.orientation)
+                    this.syncOrientation()
                 }
             })
         }
-
+        if (system.supportsTouch) {
+            document.body.append(
+                div({id: 'touch-div', class: 'transparent full-v full-h pos-0 fixed no-touch-actions no-events'})
+            )
+            const elem = this.getMandatoryElem('touch-div')
+            this.registerListeners([
+                {
+                    elem,
+                    type: 'touchstart',
+                    handler: e => {
+                        this.syncEventTouches(e.touches)
+                        e.preventDefault()
+                    }
+                },
+                {
+                    elem,
+                    type: 'touchmove',
+                    handler: e => {
+                        this.syncEventTouches(e.changedTouches)
+                        e.preventDefault()
+                    }
+                },
+                {
+                    elem,
+                    type: 'touchcancel',
+                    handler: e => {
+                        this.syncEventTouches(e.changedTouches, true)
+                        e.preventDefault()
+                    }
+                },
+                {
+                    elem,
+                    type: 'touchend',
+                    handler: e => {
+                        this.syncEventTouches(e.changedTouches, true)
+                        e.preventDefault()
+                    }
+                }
+            ])
+        }
         // TODO register listeners from plugins
         this.addListeners()
+        document.body.append(
+            div({id: 'modals-div', class: 'transparent full-v full-h pos-0 fixed'}),
+            div({id: 'offscreen-div', class: 'hidden'}),
+            div({id: 'editor-div', class: 'full-v hidden'})
+        )
 
         if (!initHandler) return
 
@@ -357,12 +473,17 @@ class Game {
         this.props = {}
         this.domQueue = []
         this.viewportBounds = null
-        this.buildState = null
-        this.hasBuildState = true
+        this.globalsResolver = null
+        this.areGlobalsResolved = true
         this.trackFps = true
+        this.tempKeyActions = null
+        this.keyActions = null
+        this.frameEvents = {}
         this.running = false
         this.before = {}
 
+        inst.RL.clear()
+        inst.OCM.clear()
         this.globals = getNewStateObj()
 
         this.hideElem('game-overlay-div', 'modals-div')
@@ -394,9 +515,25 @@ class Game {
                 // apply input to this
                 const config = getConfigFromInput(GameConfig, this.input, 'game')
                 config.applyTo(this.props)
+                this.fixOrientation = null
+                const system = this.system
+
+                if (system.isMobile) {
+                    config.mobile.applyTo(this.props)
+
+                    if (system.supportsOrientation) {
+                        if (this.props.screenOrientation === 'max') {
+                            this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
+                        } else if (this.props.screenOrientation !== 'free') {
+                            this.fixOrientation = this.props.screenOrientation
+                        }
+                    }
+                }
                 this.props.audioBlocked = false
                 this.props.maxAvailZoom = this.maxZoom
-                this.props.isFullscreen = this.system.isFullScreen()
+                this.props.isFullscreen = this.system.isFullscreen()
+
+                this.syncOrientation()
                 this.deactivateAutoZoom = true
                 this.trackFps = this.showFpsByUser || this.showFps
                 const skipChecks = {
@@ -458,8 +595,7 @@ class Game {
         let startScreen = this.initHandler({ game, globals })
 
         try {
-            const { width, height } = this
-            this.notify('main',{ width, height })
+            this.notify('main')
             this.syncScreen()
             this.showElem('game-overlay-div')
 
@@ -468,7 +604,10 @@ class Game {
             }
             this.log(`...booting done!`)
 
-            this.running = true
+            this.running = document.hidden !== true
+            if (!this.running) {
+                this.before.running = true
+            }
             this.gotoScreen(startScreen)
             this.waitForNextFrame()
         } catch (e) {
@@ -480,10 +619,10 @@ class Game {
 
     restart(enableKeys = false) {
         // this.keyHandling = enableKeys;
-        if (this.running || !this.hasEditor()) {
+        if (this.running || !this.hasEditor) {
             return;
         }
-        this.hideElem('editor-div')
+        if (this.hasEditor) this.hideElem('editor-div')
         this.showElem('game-overlay-div', 'game-div')
         this.running = this.before.running
 
@@ -496,21 +635,43 @@ class Game {
      */
     reset() {
         this.running = false
+        const clearElemIds = ['screen-overlay-div', 'game-div', 'game-overlay-div'];
+        if (this.system.supportsTouch) clearElemIds.push('touch-div')
+        for (let id of clearElemIds) this.getMandatoryElem(id).replaceChildren()
         this.init()
     }
 
-    openFullScreenMode() {
-        this.system.requestFullScreen(document.body).catch(
-            e => this.addWarning('Browser denied fullscreen mode with message: ' + e.message)
+    reloadScreen(restartEditorWithId = null) {
+        if (this.globalsResolver) {
+            this.areGlobalsResolved = false
+            inst.RL.invalidatePermanentResources()
+        }
+        this.globals = this.lastGlobals
+        this.gotoScreen(this.currentScreen, true)
+        this.restart()
+    }
+
+    openFullscreenMode() {
+        this.system.requestFullscreen(document.body)
+            .then(
+                () => {
+                    if (this.fixOrientation) {
+                        return this.system.lockOrientation(this.fixOrientation)
+                    }
+                }
+            ).catch(
+                e => this.addWarning('Browser denied fullscreen mode with message: ' + e.message)
+            )
+    }
+
+    exitFullscreenMode() {
+        this.system.exitFullscreen(document).then(
+            () => this.system.unlockOrientation()
         )
     }
 
-    exitFullScreenMode() {
-        this.system.exitFullScreen()
-    }
-
     openEditorMode() {
-        if (!this.hasEditor()) {
+        if (!this.hasEditor) {
             this.addWarning('NO GAME EDITOR found!')
             return
         }
@@ -519,8 +680,8 @@ class Game {
 
         this.before.running = this.running
         this.running = false
-
         this.removeListeners()
+
         // this.keyHandling = false;
         inst.RL.loadPermanentResources().then(() => {
             this.hideElem('game-div', 'game-overlay-div')
@@ -554,22 +715,74 @@ class Game {
         }
     }
 
+    addTouchDiv(elem) {
+        this.getMandatoryElem('touch-div').append(elem)
+    }
+
+    syncEventTouches(touches, del = false) {
+        const id2elems = {}
+        for (let touch of touches) {
+            const id = touch.identifier
+            let lastElem = this.lastTouches[id];
+            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (!del && elem !== null && elem.classList.contains('touch-dir-cell')) {
+                elem.classList.toggle('touching', true);
+                elem.classList.toggle('transparent', false)
+                const parts = elem.id.substr(10).split('_');
+                for (let part of parts) {
+                    if (this.touchInputs.indexOf(part) === -1) {
+                        this.touchInputs.push(part);
+                    }
+                }
+                lastElem = this.lastTouches[id]
+                this.lastTouches[id] = elem;
+
+                if (!lastElem || lastElem === elem) continue
+            }
+
+            if (lastElem !== undefined) {
+                lastElem.classList.toggle('touching', false);
+                lastElem.classList.toggle('transparent', true)
+                const parts = lastElem.id.substr(10).split('_');
+                for (let part of parts) {
+                    this.touchInputs.splice(this.touchInputs.indexOf(part), 1);
+                }
+                delete this.lastTouches[touch.id];
+            }
+        }
+    };
+
+    syncOrientation() {
+        if (this.fixOrientation === null) return
+
+        const system = this.system
+        const fixOrientation = system.getScreenOrientation().split('-')[0] !== this.fixOrientation
+        const doFix = !(this.isFullscreen && system.supportsOrientationLock) && fixOrientation
+        document.documentElement.classList.toggle('fix-orientation', doFix)
+    }
+
     gotoScreen(screenId, params = {}) {
         this.log(`Goto screen "${screenId}"`)
 
         inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
+        this.getMandatoryElem('screen-overlay-div').replaceChildren()
         this.frameEvents = {}
-
-        this.currentScreen = screenId
         const screen = this.screens[screenId]
-        this.globals = Object.assign(this.globals, params)
 
-        this.lastState = this.globals.getClone()
-        inst.RL.clearResources()
+        try {
+            if (!screen) throw Error(`Unknown screen id "${screenId}" given in gotoScreen!`)
+            this.currentScreen = screenId
+            this.globals = Object.assign(this.globals, params)
+            this.lastGlobals = this.hasEditor ? this.globals.getClone() : null
+            // inst.RL.clearResources()
 
-        const { globals, game } = this
-        this.build = screen.init({ globals, game, screen })
-        this.resetFps()
+            const { globals, game } = this
+            this.build = screen.init({ globals, game, screen })
+            this.resetFps()
+        } catch (e) {
+            this.handleError(e)
+            throw e
+        }
     }
 
     // internal methods
@@ -696,9 +909,10 @@ class Game {
             }
         }
         const { width, height } = this.viewportBounds.elem.getBoundingClientRect()
+        const fix = document.documentElement.classList.contains('fix-orientation')
         return {
-            width: width - this.viewportBounds.paddingH,
-            height: height - this.viewportBounds.paddingV
+            width: (fix ? height : width) - this.viewportBounds.paddingH,
+            height: (fix ? width: height) - this.viewportBounds.paddingV
         }
     }
 
@@ -712,42 +926,39 @@ class Game {
             for (let area of areas) {
                 if (area.panes !== undefined) {
                     for (let pane of area.panes) {
-                        /*
-                                                if (pane.tilesMap) {
-                                                    resources.push(
-                                                        {
-                                                            type: 'TilesMap',
-                                                            id: pane.tilesMap.id,
-                                                            pane,
-                                                            config: TilesMapConfig,
-                                                            cls: TilesMap,
-                                                            data: pane.tilesMap.config,
-                                                            elem: pane.getPreview ? pane.getPreview() : null,
-                                                            dim: pane.viewPortDim
-                                                        }
-                                                    );
-                                                } else if (pane instanceof TextPane) {
-                                                    const blocks = [];
-                                                    for (let id in pane.blocks) {
-                                                        blocks.push(
-                                                            {...pane.blocks[id].config.getJson()}
-                                                        );
-                                                    }
-                                                    resources.push(
-                                                        {
-                                                            type: 'TextPane',
-                                                            id: pane.id,
-                                                            pane,
-                                                            config: TextPaneConfig,
-                                                            cls: TextPane,
-                                                            elem: pane.getPreview(),
-                                                            data: pane.config,
-                                                            dim: pane.viewPortDim,
-                                                            blocks
-                                                        });
-                                                } else
-                         */
-                        if (pane instanceof BackgroundPane) {
+                        if (pane.tilesMap) {
+                            resources.push(
+                                {
+                                    type: 'TilesMap',
+                                    id: pane.tilesMap.id,
+                                    pane,
+                                    config: TilesMap.Config,
+                                    cls: TilesMap,
+                                    data: pane.tilesMap.config,
+                                    elem: pane.getPreview ? pane.getPreview() : null,
+                                    dim: pane.viewPortDim
+                                }
+                            )
+                        } else if (pane instanceof TextPane) {
+                            const blocks = [];
+                            for (let id in pane.blocks) {
+                                blocks.push(
+                                    {...pane.blocks[id].config.getJson()}
+                                );
+                            }
+                            resources.push(
+                                {
+                                    type: 'TextPane',
+                                    id: pane.id,
+                                    pane,
+                                    config: TextPane.Config,
+                                    cls: TextPane,
+                                    elem: pane.getPreview(),
+                                    data: pane.config,
+                                    dim: pane.viewPortDim,
+                                    blocks
+                                });
+                        } else if (pane instanceof BackgroundPane) {
                             resources.push({
                                 type: 'BackgroundPane',
                                 id: pane.id,
@@ -759,60 +970,57 @@ class Game {
                                 dim: pane.viewPortDim,
 
                             })
+                        } else if (pane instanceof CanvasPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'canvasPane'
+                                }
+                            )
+                        } else if (pane instanceof LinearGradientPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'linearGradientPane'
+                                }
+                            )
+                        } else if (pane instanceof SpritePane) {
+                            const blocks = [];
+                            for (let { id, x, y } of Object.values(pane.sprites)) {
+                                blocks.push({ id, x, y });
+                            }
+                            resources.push(
+                                {
+                                    elem: pane.getPreview ? pane.getPreview() : null,
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'spriteSheet',
+                                    data: pane.spriteSheet
+                                }
+                            );
+                        } else if (pane instanceof BitmapScrollPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'bitmapScrollPane'
+                                }
+                            )
+                        } else if (pane instanceof PatternPane) {
+                            resources.push(
+                                {
+                                    elem: pane.getPreview(),
+                                    dim: pane.viewPortDim,
+                                    pane,
+                                    type: 'patternPane'
+                                }
+                            )
                         }
-                        /*
-                                                 else if (pane instanceof SpritePane) {
-                                                    const blocks = [];
-                                                    for (let { id, x, y } of Object.values(pane.sprites)) {
-                                                        blocks.push({ id, x, y });
-                                                    }
-                                                    resources.push(
-                                                        {
-                                                            elem: pane.getPreview ? pane.getPreview() : null,
-                                                            dim: pane.viewPortDim,
-                                                            pane,
-                                                            type: 'spriteSheet',
-                                                            data: pane.spriteSheet
-                                                        }
-                                                    );
-                                                } else if (pane instanceof CanvasPane) {
-                                                    resources.push(
-                                                        {
-                                                            elem: pane.getPreview(),
-                                                            dim: pane.viewPortDim,
-                                                            pane,
-                                                            type: 'canvasPane'
-                                                        }
-                                                    )
-                                                } else if (pane instanceof LinearGradientPane) {
-                                                    resources.push(
-                                                        {
-                                                            elem: pane.getPreview(),
-                                                            dim: pane.viewPortDim,
-                                                            pane,
-                                                            type: 'linearGradientPane'
-                                                        }
-                                                    )
-                                                } else if (pane instanceof BitmapScrollPane) {
-                                                    resources.push(
-                                                        {
-                                                            elem: pane.getPreview(),
-                                                            dim: pane.viewPortDim,
-                                                            pane,
-                                                            type: 'bitmapScrollPane'
-                                                        }
-                                                    )
-                                                } else if (pane instanceof PatternPane) {
-                                                    resources.push(
-                                                        {
-                                                            elem: pane.getPreview(),
-                                                            dim: pane.viewPortDim,
-                                                            pane,
-                                                            type: 'patternPane'
-                                                        }
-                                                    )
-                                                }
-                         */
                     }
                 }
                 if (Array.isArray(area)) {
@@ -833,8 +1041,12 @@ class Game {
     }
 
     render(force = false) {
-        if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
-            this.screens[this.currentScreen].render(force);
+        try {
+            if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
+                this.screens[this.currentScreen].render(force);
+            }
+        } catch (e) {
+            this.handleError(e)
         }
     }
 
@@ -866,8 +1078,6 @@ class Game {
         this.domQueue.push({op: 'add', target, child})
     }
 
-    handleKeys() {}
-
     updateGamepads() {
         if (!this.gamepads.length) return
 
@@ -898,7 +1108,7 @@ class Game {
         const screen = this.screens[this.currentScreen]
         if (screen.getState() === 'READY') {
             this.updateDom();
-            this.handleKeys();
+            this.keys = {};
             if (this.running) {
                 if (this.showFps) {
                     const changed = this.fpsTracker.track()
@@ -908,9 +1118,10 @@ class Game {
                 }
                 this.render()
                 if (screen.frameHandler !== null) {
-                    const { globals, game } = this
-                    screen.frameHandler({ screen, globals, game })
+                    const { globals, game, frames } = this
+                    screen.frameHandler({ screen, globals, game, frames })
                 }
+                this.frames++
             }
             this.updateGamepads()
             /*
@@ -933,18 +1144,22 @@ class Game {
             }
             const { globals, game } = this;
             const resources = inst.RL.getResources();
-            if (!this.hasBuildState) {
-                const state = this.globals;
-                state.unlock();
-                this.buildState({ resources, globals, game });
-                state.lock();
-                this.hasBuildState = true;
+            if (!this.areGlobalsResolved) {
+                globals.unlock();
+                this.globalsResolver({ ...resources, globals, game });
+                globals.lock();
+                this.areGlobalsResolved = true;
             }
-            const { image, json, audio } = resources
-            const frameHandler = this.build({ image, audio, json, resources, globals, game, screen })
-            if (frameHandler) screen.setFrameHandler(frameHandler)
-            screen.setDimension(this.width, this.height)
-            screen.render(true)
+            try {
+                this.tempKeyActions = null
+                const frameHandler = this.build({ ...resources, globals, game, screen })
+                if (frameHandler) screen.setFrameHandler(frameHandler)
+                screen.setDimension(this.width, this.height)
+                screen.render(true)
+                this.frames = 0
+            } catch (e) {
+                this.handleError(e)
+            }
         }
         requestAnimationFrame(() => this.updateFrame());
     }
@@ -963,16 +1178,26 @@ class Game {
         if (autoInit) this.init()
     }
 
-    setStateInitHandler(handler) {
-        const game = this.game;
-        const globals = this.globals;
+    setGlobalsResolver(resolver) {
+        const game = this.game
+        const globals = this.globals
         const loader = new ResourceRequest(true)
-        this.buildState = handler({ loader, game, globals })
-        this.hasBuildState = false;
+        this.globalsResolver = resolver({ loader, game, globals })
+        this.areGlobalsResolved = false
     }
 
     addScreen(screen) {
         this.screens[screen.id] = screen;
+    }
+
+    addKeyDownAction(key, handler) {
+        if (!this.keyActions) this.keyActions = {}
+        this.keyActions[key] = handler
+    }
+
+    addTempKeyDownAction(key, handler) {
+        if (!this.tempKeyActions) this.tempKeyActions = {}
+        this.tempKeyActions[key] = handler
     }
 
     /**
@@ -1063,14 +1288,41 @@ class Game {
         this.notify('error', err)
     }
 
+    addFrameEvent(type, event) {
+        if (this.frameEvents[type] === undefined) {
+            this.frameEvents[type] = [];
+        }
+        this.frameEvents[type].push(event);
+    }
+
+    getEvents(type) {
+        if (this.frameEvents[type] === undefined) {
+            return [];
+        }
+        const events = this.frameEvents[type];
+        delete this.frameEvents[type];
+        return events;
+    }
+
+    getNextEvent(type) {
+        const events = this.frameEvents[type];
+        if (events === undefined) {
+            return null;
+        }
+        const event = events.shift();
+        if (events.length === 0) {
+            delete this.frameEvents[type];
+        }
+        return event;
+    }
+
     // check flags
 
-    hasEditor() {
+    get hasEditor() {
         return window.gameEditor !== undefined && !this.system.isMobile
     }
 
     supportsTouch() {
-        return true
         return 'ontouchstart' in document.documentElement
     }
 
@@ -1090,9 +1342,26 @@ class Game {
         if (value === this.running) return
         this.props.running = value
         if (value) {
+            this.keys = {}
+            this.keysDown = {}
+            this.touchInputs = []
+            this.lastTouches = {}
             this.audio.continueAll()
+            const msg = 'Warning! The current screen is using resources from the local storage!'
             if (inst.RL.hasBrowserResources()) {
-                this.addWarning('Warning! The current screen is using resources from the local storage!')
+                this.addWarning({
+                    msg,
+                    actions: [
+                        {
+                            action: 'Clear local storage',
+                            click: () => {
+                                this.getResourceLoader().clearBrowserResources()
+                                if (!inst.RL.hasBrowserResources()) this.clearWarnings(msg)
+                                this.reloadScreen()
+                            }
+                        }
+                    ]
+                })
             }
         } else {
             this.resetFps()
@@ -1327,15 +1596,6 @@ class Game {
         }
     }
 
-    get orientation() {
-        if (screen.orientation && screen.orientation.type) {
-            return screen.orientation.type.split('-')[0]
-        } else if (window.orientation !== undefined) {
-            return [0, 180].includes(window.orientation) ? 'landscape' : 'portrait'
-        }
-        return
-    }
-
     // TODO make real getters
 
     getResourceLoader() {
@@ -1378,708 +1638,6 @@ const div = ( ...args ) => {
         elem.append(item)
     }
     return elem;
-}
-
-
-// CSS helper
-
-class Game2 {
-
-    constructor(width, height, config, init) {
-        // analyse the element?
-        if (Game.instance) {
-            throw new Error('There is already a running game instance!');
-        }
-        Game.instance = this;
-        inst.setSM(localStorage, 'demo2');
-        inst.setRL(BASE_URL + '/', inst.SM);
-
-        this.id = GAME_ID;
-        this.width = width;
-        this.height = height;
-        this.init = init.bind(this);
-        this.screens = {};
-        this.currentScreen = null;
-        this.globalKeyHandlers = [];
-        this.timers = {};
-        this.frameEvents = {};
-        this.durations = {};
-        this.frames = 0;
-        this.zoom = config.zoom;
-        this.elems = {};
-        this.minFps = 100;
-        this.logs = [];
-        this.domQueue = [];
-        this.audioPlaying = [];
-        this.globals = getNewStateObj();
-        this.touchInputs = [];
-        this.gamepads = [];
-        this.audio = new AudioPlayer();
-        this.lastTouches = {};
-        this.hasTouch = false;
-        this.buildState = null;
-        this.hasBuildState = true;
-        this.editorRun = 0;
-        this.restartEditorWithId = null;
-        this.lastState = null;
-        this.editor = null;
-        this.keyHandling = true;
-
-        document.addEventListener('DOMContentLoaded', function(event) {
-            Game.instance.boot();
-        });
-    }
-
-    getId() {
-        return this.id
-    }
-
-    setStateInitHandler(handler) {
-        this.buildState = handler.bind(new ResourceRequest(true))();
-        this.hasBuildState = false;
-    }
-
-    getResourceLoader() {
-        return inst.RL;
-    }
-
-    getStorageManager() {
-        return inst.SM;
-    }
-
-    updateDom() {
-        while (this.domQueue.length > 0) {
-            const next = this.domQueue.shift();
-            switch(next.op) {
-                case 'set':
-                    const parts = next.key.split('.');
-                    let elem = next.elem;
-                    while (parts.length > 1) {
-                        elem = elem[parts.shift()];
-                    }
-                    elem[parts[0]] = next.value;
-                    break;
-
-                case 'add':
-                    next.target.appendChild(next.child);
-                    break;
-            }
-        }
-    }
-
-    addDomOp(elem, key, value) {
-        this.domQueue.push({op: 'set', elem, key, value});
-    }
-
-    addDomChild(target, child) {
-        this.domQueue.push({op: 'add', target, child});
-    }
-
-    getDomElem(id) {
-        if (this.elems[id] === undefined) {
-            const elem = document.getElementById(id);
-            if (elem === null) {
-                throw Error('Required element with ID "' + id + '" not found in DOM!');
-            }
-            this.elems[id] = elem;
-        }
-        return this.elems[id];
-    }
-
-    log() {
-        if (arguments.length === 0) {
-            return;
-        }
-        const values = [];
-        for (let i = 0; i < arguments.length; i++) {
-            values.push('' + arguments[i]);
-        }
-        this.logs.push(values.join(' '));
-    }
-
-    setZoom(value, force = false) {
-        if (value < this.minZoom || value > this.maxZoom || (!force && this.zoom === value)) {
-            return;
-        }
-        this.zoom = value;
-        const overlay = this.getDomElem('overlay');
-        overlay.style.transform =  'scale(' + this.zoom +')';
-        overlay.style.transformOrigin = 'top left';
-        const elem = this.getDomElem('screen-div');
-        elem.style.width = '' + this.width * this.zoom;
-        elem.style.height = '' + this.height * this.zoom;
-        this.resetFps();
-    }
-
-    addGlobalKeyHandler(handler) {
-        this.globalKeyHandlers.push(handler.bind(this));
-    }
-
-    render(force = false) {
-        if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
-            this.screens[this.currentScreen].render(force);
-        }
-    }
-
-    startTimer(name) {
-        this.timers[name] = performance.now();
-    }
-
-    addTimerDuration(name) {
-        const delta = performance.now() - this.timers[name];
-        if (this.durations[name] === undefined) {
-            this.durations[name] = 0;
-        }
-        this.durations[name] += delta;
-        return delta;
-    }
-
-    resetTimers(names) {
-        for (let name of names) {
-            this.timers[name] = 0;
-            this.durations[name] = 0;
-        }
-    }
-
-    addScreen(screen) {
-        this.screens[screen.id] = screen;
-    }
-
-    reloadScreen(restartEditorWithId = null) {
-        this.restartEditorWithId = restartEditorWithId;
-        this.hasBuildState = false;
-        inst.RL.invalidatePermanentResources();
-        this.globals = this.lastState;
-        this.gotoScreen(this.currentScreen);
-        this.restart(restartEditorWithId !== null);
-    }
-
-    gotoScreen(screenId, params = {}) {
-        d('GOTO', screenId, params);
-        this.stopAllAudio();
-        inst.OCM.clear(); // TODO: clear should remove all children of overlay via DomOp
-        this.frameEvents = {};
-        this.currentScreen = screenId;
-        const screen = this.screens[screenId];
-        this.globals = Object.assign(this.globals, params);
-        this.lastState = this.globals.getClone();
-        inst.RL.clearResources();
-        const callback = screen.init(this.globals);
-        this.build = callback.bind(this);
-    }
-
-    stopAllAudio() {
-        for (let audio of this.audioPlaying) {
-            audio.pause();
-        }
-        this.audioPlaying = [];
-    }
-
-    getGamepadPressed(no) {
-        if (no >= this.gamepads.length) {
-            return [];
-        }
-        return this.gamepads[no].pressed;
-    }
-
-    resetFps() {
-        this.resetTimers(['game', 'render']);
-        this.startTimer('game');
-        this.frames = 0;
-        this.minFps = 100;
-    }
-
-    openEditorMode() {
-        if (gameEditor === null) {
-            console.log('NO GAME EDITOR found!');
-            return;
-        }
-        console.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"');
-        this.editorRun++;
-
-        this.setRunning(false);
-        this.keyHandling = false;
-        inst.RL.loadPermanentResources().then(() => {
-            this.getDomElem('game').style.display = 'none';
-            this.getDomElem('editor').style.display = 'block';
-            // TODO crap
-            const stack = this.activeResource;
-            this.activeResource = undefined;
-            this.editor = new gameEditor.GameEditor(this, stack)
-        });
-    }
-
-    getEditableResources() {
-        const resources = [];
-
-        function extractEditablesFromAreas(areas) {
-            if (!Array.isArray(areas)) {
-                return;
-            }
-            for (let area of areas) {
-                if (area.panes !== undefined) {
-                    for (let pane of area.panes) {
-/*
-                        if (pane.tilesMap) {
-                            resources.push(
-                                {
-                                    type: 'TilesMap',
-                                    id: pane.tilesMap.id,
-                                    pane,
-                                    config: TilesMapConfig,
-                                    cls: TilesMap,
-                                    data: pane.tilesMap.config,
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim
-                                }
-                            );
-                        } else if (pane instanceof TextPane) {
-                            const blocks = [];
-                            for (let id in pane.blocks) {
-                                blocks.push(
-                                    {...pane.blocks[id].config.getJson()}
-                                );
-                            }
-                            resources.push(
-                                {
-                                    type: 'TextPane',
-                                    id: pane.id,
-                                    pane,
-                                    config: TextPaneConfig,
-                                    cls: TextPane,
-                                    elem: pane.getPreview(),
-                                    data: pane.config,
-                                    dim: pane.viewPortDim,
-                                    blocks
-                                });
-                        } else
- */
-                         if (pane instanceof BackgroundPane) {
-                            resources.push({
-                                type: 'BackgroundPane',
-                                id: pane.id,
-                                pane,
-                                config: BackgroundPane.Config,
-                                cls: BackgroundPane,
-                                elem: pane.getPreview(),
-                                data: pane.config,
-                                dim: pane.viewPortDim,
-
-                            });
-                        }
-/*
-                         else if (pane instanceof SpritePane) {
-                            const blocks = [];
-                            for (let { id, x, y } of Object.values(pane.sprites)) {
-                                blocks.push({ id, x, y });
-                            }
-                            resources.push(
-                                {
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'spriteSheet',
-                                    data: pane.spriteSheet
-                                }
-                            );
-                        } else if (pane instanceof CanvasPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'canvasPane'
-                                }
-                            )
-                        } else if (pane instanceof LinearGradientPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'linearGradientPane'
-                                }
-                            )
-                        } else if (pane instanceof BitmapScrollPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'bitmapScrollPane'
-                                }
-                            )
-                        } else if (pane instanceof PatternPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'patternPane'
-                                }
-                            )
-                        }
- */
-                    }
-                }
-                if (Array.isArray(area)) {
-                    extractEditablesFromAreas(area);
-                } else if (area.areas !== undefined) {
-                    extractEditablesFromAreas(area.areas);
-                }
-            }
-        }
-        extractEditablesFromAreas(this.getCurrentScreen().areas);
-
-        resources.push({type: 'filters', data: filterer});
-        return resources;
-    }
-
-    getCurrentScreen() {
-        return this.screens[this.currentScreen];
-    }
-
-    restart(enableKeys = false) {
-        this.keyHandling = enableKeys;
-        if (this.running || gameEditor === null) {
-            return;
-        }
-        this.getDomElem('editor').style.display = 'none';
-        this.getDomElem('game').style.display = 'inline';
-        this.setRunning(true);
-//        this.gotoScreen(this.currentScreen);
-    }
-
-    handleKeys() {
-        if (!this.keyHandling) return;
-
-        if (this.keys[EDITOR_KEY]) {
-            this.openEditorMode();
-        } else {
-            for (let handler of this.globalKeyHandlers) {
-                const stop = handler();
-                if (stop) {
-                    this.keys = {};
-                    return;
-                }
-            }
-
-            if (this.running) {
-                const screen = this.screens[this.currentScreen];
-                if (screen.keyHandler !== null) {
-                    screen.keyHandler();
-                }
-            }
-        }
-        this.keys = {};
-    }
-
-    getRounded(value, decimals) {
-        let f = 1;
-        while(decimals > 0) {
-            f *= 10;
-            decimals--;
-        }
-        return Math.round(value * f) / f;
-    }
-
-    addFrameEvent(type, event) {
-        if (this.frameEvents[type] === undefined) {
-            this.frameEvents[type] = [];
-        }
-        this.frameEvents[type].push(event);
-    }
-
-    getEvents(type) {
-        if (this.frameEvents[type] === undefined) {
-            return [];
-        }
-        const events = this.frameEvents[type];
-        delete this.frameEvents[type];
-        return events;
-    }
-
-    getNextEvent(type) {
-        const events = this.frameEvents[type];
-        if (events === undefined) {
-            return null;
-        }
-        const event = events.shift();
-        if (events.length === 0) {
-            delete this.frameEvents[type];
-        }
-        return event;
-    }
-
-    updateGamepads() {
-        if (this.gamepads.length === 0) {
-            return;
-        }
-        const buttonPressed = {};
-        const gamepads = navigator.getGamepads();
-        for (let gamepad of gamepads) {
-            if (gamepad !== null) {
-                const pressed = [];
-                let i = 0;
-                for (let button of gamepad.buttons) {
-                    if (button.pressed) {
-                        pressed.push(i);
-                    }
-                    i++;
-                }
-                buttonPressed[gamepad.index] = pressed;
-            }
-        }
-
-        for (let gamepad of this.gamepads) {
-            gamepad.pressed =
-                buttonPressed[gamepad.index] !== undefined ? buttonPressed[gamepad.index] : [];
-        }
-    }
-
-    updateFrame() {
-        const screen = this.screens[this.currentScreen];
-        if (screen.getState() === 'READY') {
-            this.updateDom();
-            this.handleKeys();
-            if (this.running) {
-                this.startTimer('render');
-                this.render();
-                this.addTimerDuration('render');
-                this.frames++;
-                if (screen.frameHandler !== null) {
-                    screen.frameHandler();
-                }
-            }
-            this.updateGamepads();
-            if (this.restartEditorWithId !== null) {
-                this.activeResource = this.restartEditorWithId;
-                this.restartEditorWithId = null;
-                this.openEditorMode();
-            }
-        }
-        this.waitForNextFrame();
-    }
-
-    waitForNextFrame() {
-        const screen = this.screens[this.currentScreen];
-        if (screen.getState() !== 'READY') {
-            if (!screen.hasAllDependencies()) {
-                requestAnimationFrame(this.waitForNextFrame.bind(this));
-                return;
-            }
-            document.getElementById('tmp-resources-warning').classList.toggle('hidden', !inst.RL.hasBrowserResources())
-            const resources = inst.RL.getResources();
-            if (!this.hasBuildState) {
-                const state = Game.instance.globals;
-                state.unlock();
-                this.buildState(resources, state);
-                state.lock();
-                this.hasBuildState = true;
-            }
-            this.build(resources, Game.instance.globals);
-            screen.setDimension(this.width, this.height);
-            screen.render(true);
-            /*
-            if (this.sound && screen.audio !== null) {
-                const audio = new Audio(screen.audio);
-                audio.addEventListener('canplaythrough', event => {
-                    this.playAudio(audio);
-                });
-                audio.addEventListener('ended', event => {
-                    for (let i = 0; i < this.audioPlaying.length; i++) {
-                        if (this.audioPlaying[i] === audio) {
-                            this.audioPlaying.splice(i, 1);
-                            break;
-                        }
-                    }
-                });
-            }
-             */
-        }
-        requestAnimationFrame(this.updateFrame.bind(this));
-    }
-
-    setRunning(value) {
-        this.log('setRunning', value);
-        this.running = value;
-        if (value) {
-            this.resetFps();
-            this.audio.continueAll();
-        } else {
-            this.audio.pauseAll();
-            this.addTimerDuration('game');
-        }
-    }
-
-    enableTouchInputs() {
-        const touchDirs = document.getElementById('touch-input-dir');
-        touchDirs.style.display = 'grid';
-
-        const syncEventTouches = (touches, del = false) => {
-            for(let touch of touches) {
-                const elem = document.elementFromPoint(touch.clientX, touch.clientY);
-                if (!del && elem !== null && elem.classList.contains('touch-dir-cell') && !elem.classList.contains('touch-dir-middle')) {
-                    elem.classList.toggle('touching', true);
-                    const parts = elem.id.substr(10).split('_');
-                    for (let part of parts) {
-                        if (this.touchInputs.indexOf(part) === -1) {
-                            this.touchInputs.push(part);
-                        }
-                    }
-                    this.lastTouches[touch.identifier] = elem;
-                } else {
-                    const lastElem = this.lastTouches[touch.identifier];
-                    if (lastElem !== undefined) {
-                        lastElem.classList.toggle('touching', false);
-                        const parts = lastElem.id.substr(10).split('_');
-                        for (let part of parts) {
-                            this.touchInputs.splice(this.touchInputs.indexOf(part), 1);
-                        }
-                        delete this.lastTouches[touch.identifier];
-                    }
-                }
-            }
-        };
-
-        const onTouchStartHandler = (e) => {
-            syncEventTouches(e.touches);
-            e.preventDefault();
-        };
-
-        const onTouchMoveHandler = (e) => {
-            syncEventTouches(e.changedTouches);
-            e.preventDefault();
-        };
-
-        const onTouchCancelHandler = (e) => {
-            syncEventTouches(e.changedTouches, true);
-            e.preventDefault();
-        };
-
-        const onTouchEndHandler = (e) => {
-            syncEventTouches(e.changedTouches, true);
-            e.preventDefault();
-        };
-
-        let dirElem = touchDirs;
-        dirElem.ontouchstart = onTouchStartHandler;
-        dirElem.ontouchmove = onTouchMoveHandler;
-        dirElem.ontouchcancel = onTouchCancelHandler;
-        dirElem.ontouchend = onTouchEndHandler;
-
-        const touchButtons = document.getElementById('touch-input-buttons');
-        touchButtons.style.display = 'grid';
-
-        let buttonElem = touchButtons;
-        buttonElem.ontouchstart = onTouchStartHandler;
-        buttonElem.ontouchmove = onTouchMoveHandler;
-        buttonElem.ontouchcancel = onTouchCancelHandler;
-        buttonElem.ontouchend = onTouchEndHandler;
-    }
-
-    boot() {
-        this.startTimer('boot');
-        this.log(`Boot game engine for "${this.id}"...`);
-        this.keysDown = {};
-        this.keys = {};
-
-        if (window.gameEditor !== undefined) {
-            gameEditor = window.gameEditor;
-        }
-
-        this.hasTouch = ('ontouchstart' in document.documentElement);
-
-        // register key handlers
-        const keyDownHandler = (e) => {
-            this.keysDown[e.key] = e.key;
-        };
-        document.onkeydown = keyDownHandler;
-
-        const keyUpHandler = (e) => {
-            delete this.keysDown[e.key];
-            this.keys[e.key] = e.key;
-        };
-        document.onkeyup = keyUpHandler;
-
-        const gamepadConnectHandler = (e) => {
-            this.gamepads.push({
-                index: e.gamepad.index,
-                pressed: []
-            });
-        };
-        window.addEventListener('gamepadconnected', gamepadConnectHandler);
-
-        // set screen background
-        document.body.style.setProperty('--game-bg-rgb', SCREEN_BG_RGB);
-        document.body.classList.add('game-bg-rgb');
-
-        document.body.innerHTML =
-            '<div id="game">' +
-
-            '<div style="display: flex; justify-content: center; margin-top: 20px">' +
-            '<div id="screen-div" style="flex-shrink: 0; margin: 0 15px 0px 15px; padding: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
-            '           <div id="overlay" style="position: relative; padding: 0px; margin: 0; width: ' + this.width + 'px; height: ' + this.height + 'px">' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-
-            '<div id="tmp-resources-warning" class="hidden stack-h inner-space-h">' +
-            '<div class="flex">Warning! The current screen is using resources from the local storage!</div>' +
-            '<div>' +
-            '<button id="clear-tmp-resources">Clear</button>' +
-            '</div>' +
-            '</div>' +
-            '</div>' +
-
-            '<div id="offscreen" style="display: none"></div>' +
-
-            '<div id="react-editor"></div>' +
-
-            '<div id="editor" class="full-v" style="display: none">Editor</div>' +
-            (this.hasTouch ?
-                    '<div id="touch-input-dir" style="display: none">' +
-                    '<div id="touch_btn_left_up" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_up" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_right_up" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_left" class="touch-dir-cell"></div>' +
-                    '<div class="touch-dir-cell touch-dir-middle"></div>' +
-                    '<div id="touch_btn_right" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_left_down" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_down" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_right_down" class="touch-dir-cell"></div>' +
-                    '</div>' +
-                    '<div id="touch-input-buttons" style="display: none">' +
-                    '<div id="touch_btn_1" class="touch-dir-cell"></div>' +
-                    '<div id="touch_btn_2" class="touch-dir-cell"></div>' +
-                    '<div class="touch-dir-cell touch-dir-middle"></div>' +
-                    '<div id="touch_btn_3" class="touch-dir-cell"></div>' +
-                    '</div>'
-                    : ''
-            )
-        ;
-
-        if (this.zoom !== 1) {
-            this.setZoom(this.zoom, true);
-        }
-
-        if (this.hasTouch) {
-            this.enableTouchInputs();
-        }
-
-        const clearBtn = document.getElementById('clear-tmp-resources');
-        clearBtn.addEventListener('click', () => {
-            this.getResourceLoader().clearBrowserResources();
-            this.reloadScreen();
-        }, {capture: false});
-
-        const startScreen = this.init();
-        this.addTimerDuration('boot');
-        this.gotoScreen(startScreen);
-        this.setRunning(true);
-        this.log('...booting done');
-        this.waitForNextFrame();
-    }
 }
 
 class FpsTracker {
@@ -2146,19 +1704,6 @@ class FpsTracker {
         return []
     }
 }
-
-const INPUT = {
-    TYPE: {
-        PRESSED_DOWN: 0,
-        PRESS_AND_RELEASE: 1
-    },
-    STATE: {
-        NOTPRESSED: 0,
-        PRESSED: 1,
-        AWAIT_NOTPRESSED: 2,
-        AWAIT_PRESSED: 3
-    }
-};
 
 class InputController {
 
@@ -2237,7 +1782,7 @@ class InputController {
         if (this.forced !== null) {
             return this.forced;
         }
-        return inst.game.keysDown;
+        return inst.game.keysDown
     }
 
     getGamepadPressed() {
@@ -2438,7 +1983,21 @@ class InputController {
     }
 }
 
+/**
+ * This handler allows to lock the target object, which prevents that configureable objects
+ * (=objects wich store a config instance under the key "config") are stored somewhere in
+ * the value of a key.
+ *
+ * Configureable objects would allow a JSON-Resource "id" in the constructor and thus require
+ * an asynchronous request to the backend, if the Resource-Loader has not resolved the resource id yet.
+ *
+ * We cannot allow configureables in the loader-phase, only in the init-phase of a state-build.
+ *
+ *   globalsBuild: -> resourceRegistration => initialization
+ *
+ */
 class stateProxyHandler {
+
     constructor() {
         this.lazyKeys = [];
         this.locked = false;
@@ -2488,8 +2047,10 @@ class stateProxyHandler {
             this.locked = false;
             return () => null
         } else if (prop === 'getClone') {
+            // TODO welchen Sinn haben die lazy keys, wenn diese nirgendwo gesetzt werden?
+            // als lazy festgelegte keys werden nicht in den clone geschrieben
             const lazyKeys = Object.keys(this.lazyKeys);
-            const keys = Object.keys(target).filter(x => lazyKeys.indexOf(x) === -1);
+            const keys = Object.keys(target).filter(key => !lazyKeys.includes(key));
             const clone = getNewStateObj();
             for (let key of keys) {
                 clone[key] = target[key];
@@ -2502,7 +2063,7 @@ class stateProxyHandler {
 
 function getNewStateObj() {
     const globState = {
-        getClone: () => {}
+//        getClone: () => {}
     };
     const stateProxy = new Proxy(globState, new stateProxyHandler());
     stateProxy.self = stateProxy;
@@ -2702,6 +2263,7 @@ class AudioPlayer {
                 if (inst.game.audioBlocked) {
                     inst.game.audioBlocked = false
                 }
+                audio.updateVolume()
             }
         ).catch(
             e => {
@@ -2769,6 +2331,11 @@ class AudioPlayer {
         if (channel !== null && !channel.isPlaying()) {
             channel.continue();
         }
+    }
+
+    reset() {
+        this.audio = {}
+        this.resetChannels()
     }
 
     resetChannel(id) {
@@ -2878,7 +2445,7 @@ class SplitArea {
         }
         const unscrolled = old + move - this.scrollPos;
 
-        inst.game.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos);
+        inst.game.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos + 'px');
         return {
             x: (this.axis === 'X') ? this.scrollPos - old : 0,
             y: (this.axis !== 'X') ? this.scrollPos - old : 0,
@@ -3053,12 +2620,18 @@ class Screen {
         this.resources = {};
         this.areas = [];
         if (this.initHandler !== null) {
+
+            const loader = new ResourceRequest()
+            const game = inst.game
+            const globals = game.globals
+            const initHandler = () => this.initHandler({ loader, game, globals, screen: this });
+
             this.state = 'INIT';
-            const build = this.initHandler(params);
-            inst.RL.load(this.id).then((res) => {
-                this.hasDependencies = true;
-            });
-            return build;
+            const build = initHandler(params);
+            inst.RL.load(this.id).then(res => {
+                this.hasDependencies = true
+            })
+            return build
         }
         this.hasDependencies = true;
         this.state = 'READY';
@@ -3126,10 +2699,7 @@ class Screen {
     }
 
     setInitHandler(handler) {
-        const loader = new ResourceRequest()
-        const game = inst.game
-        const globals = game.globals
-        this.initHandler = () => handler({ loader, game, globals, screen: this });
+        this.initHandler = handler
     }
 
     addAudio(src) {
@@ -3246,8 +2816,8 @@ class ImageContainer {
     }
 
     setViewPortOffset(x, y) {
-        inst.game.addDomOp(this.image, 'style.left', x);
-        inst.game.addDomOp(this.image, 'style.right', y);
+        inst.game.addDomOp(this.image, 'style.left', x + 'px');
+        inst.game.addDomOp(this.image, 'style.right', y + 'px');
     }
 }
 
@@ -3286,8 +2856,8 @@ class BufferedCanvasContainer {
 
     setViewPortOffset(x, y) {
         const activeElem = this.getActiveElem();
-        inst.game.addDomOp(activeElem, 'style.left', x);
-        inst.game.addDomOp(activeElem, 'style.right', y);
+        inst.game.addDomOp(activeElem, 'style.left', x + 'px');
+        inst.game.addDomOp(activeElem, 'style.right', y + 'px');
     }
 
     getBufferCtx() {
@@ -3342,8 +2912,8 @@ class CanvasContainer {
         if ((this.dim.x !== this.viewPortDim.x) || (this.dim.y !== this.viewPortDim.y)) {
             this.elem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, offsetX, offsetY);
         } else {
-            this.canvas.elem.style.left = offsetX;
-            this.canvas.elem.style.top = offsetY;
+            this.canvas.elem.style.left = offsetX + 'px';
+            this.canvas.elem.style.top = offsetY + 'px';
         }
     }
 
@@ -3402,16 +2972,21 @@ class ImageResource {
         return this.canvas.height
     }
 
-    getCanvas() {
+    getCanvas(asClone = false) {
         if (this.canvas === null) {
             this.canvas = inst.OCM.getNewOffscreenCanvas(this.image.width, this.image.height);
             this.canvas.ctx.drawImage(this.image, 0, 0);
         }
+        if (asClone) {
+            const canvas = inst.OCM.getNewOffscreenCanvas(this.image.width, this.image.height)
+            canvas.ctx.drawImage(this.image, 0, 0)
+            return canvas
+        }
         return this.canvas;
     }
 
-    getCanvasElem() {
-        return this.getCanvas().elem;
+    getCanvasElem(asClone = false) {
+        return this.getCanvas(asClone).elem;
     }
 
     getNewDecodePromise() {
@@ -3435,194 +3010,13 @@ class ImageResource {
 //    Bitmap Filter
 // ####################################
 
-const FILTER = {
-    TYPE: {
-        CANVAS: 0,
-        IMAGEDATA: 1
-    },
-    PARAM: {
-        STRING: 0,
-        FLOAT: 1,
-        COLOR: 2,
-        MAPPING: 3,
-        INT: 4
-    }
-};
-
-class BitmapFilterer {
-
-    constructor() {
-        this.filters = {};
-    }
-
-    getFilters() {
-        return this.filters;
-    }
-
-    addFilter(id, type, callback, params = []) {
-        const paramClosures = [];
-        let minParams = 0;
-        let isMandatory = true;
-        for (let index = 0; index < params.length; index++) {
-            if (isMandatory) {
-                if (params.default === undefined) {
-                    minParams++;
-                } else {
-                    isMandatory = false;
-                }
-            }
-            const param = params[index];
-            let parser = null;
-            switch(param.type) {
-
-                case FILTER.PARAM.COLOR:
-                    parser = function(rawValue) {
-                        const color = {};
-                        // TODO use helper function
-                        if (rawValue[0] === '#') {
-                            if (rawValue.length === 7) {
-                                color.r = parseInt(rawValue.substr(1, 2), 16);
-                                color.g = parseInt(rawValue.substr(3, 2), 16);
-                                color.b = parseInt(rawValue.substr(5, 2), 16);
-                                return color;
-                            }
-                        }
-                        return null;
-                    };
-                    break;
-
-                case FILTER.PARAM.INT:
-                    parser = function(rawValue) {
-                        return parseInt(rawValue, 10);
-                    };
-                    break;
-
-                case FILTER.PARAM.FLOAT:
-                    parser = function(rawValue) {
-                        return parseFloat(rawValue);
-                    };
-                    break;
-
-                case FILTER.PARAM.STRING:
-                    parser = function(rawValue) {
-                        return rawValue;
-                    };
-                    break;
-
-                case FILTER.PARAM.MAPPING:
-                    parser = function(rawValue) {
-                        const result = {};
-                        const assigns = rawValue.split(';');
-                        for(let assign of assigns) {
-                            const parts = assign.split(':', 2);
-                            result[parts[0]] = parts[1];
-                        }
-                        return result;
-                    };
-                    break;
-
-            }
-
-            paramClosures.push(
-                function(rawValue, params) {
-                    params[param.key] = (rawValue === '') ? param.default : parser(rawValue);
-                }
-            );
-        }
-
-        this.filters[id] = {
-            type,
-            callback,
-            minParams,
-            paramDefs: params,
-            params: paramClosures
-        }
-    }
-
-    /**
-     * Returns either the original canvas or a new one with the filters applied on the original one
-     *
-     * @param filters
-     * @param canvas
-     * @param offX
-     * @param offY
-     * @param width
-     * @param height
-     * @return {*[]}
-     */
-    getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
-        let data = [canvas, offX, offY, width, height];
-        let lastType = FILTER.TYPE.CANVAS;
-        let imageData = null;
-        let isSourceCanvas = true;
-
-        const filterParts = filters.split('|');
-        for (let filterPart of filterParts) {
-            let rawParams = [];
-            if (filterPart[filterPart.length - 1] === ')') {
-                const subExpr = filterPart.slice(0, -1).split('(', 2);
-                filterPart = subExpr[0];
-                rawParams = subExpr[1].split(',');
-            }
-            if (filterPart === '') {
-                continue;
-            }
-            const filter = this.filters[filterPart];
-            const filterParams = {};
-            if (rawParams.length < filter.minParams) {
-                throw Error(`Filter "${filterPart}" requires ${filter.minParams} parameters but got ${rawParams.length}!`);
-            }
-            for (let i = 0; i < filter.params.length; i++) {
-                if (i < rawParams.length) {
-                    filter.params[i](rawParams[i], filterParams);
-                } else {
-                    filterParams[filter.key] = filter.default;
-                }
-            }
-
-            switch(filter.type) {
-
-                case FILTER.TYPE.CANVAS:
-                    if (lastType === FILTER.TYPE.IMAGEDATA) {
-                        if (isSourceCanvas) {
-                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
-                            isSourceCanvas = false;
-                        }
-                        data[0].ctx.putImageData(imageData, 0, 0);
-                    }
-                    data = filter.callback(data, filterParams);
-                    break;
-
-                case FILTER.TYPE.IMAGEDATA:
-                    if (lastType === FILTER.TYPE.CANVAS) {
-                        imageData = data[0].ctx.getImageData(data[1], data[2], data[3], data[4]);
-                    }
-                    imageData = filter.callback(imageData, filterParams);
-                    break;
-
-                default:
-                    throw Error(`Unknown filter type ${filter.type} given!`);
-            }
-            lastType = filter.type;
-        }
-
-        if (lastType === FILTER.TYPE.IMAGEDATA) {
-            if (isSourceCanvas) {
-                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
-            }
-            data[0].ctx.putImageData(imageData, 0, 0);
-        }
-        return data;
-    }
-}
-
-const filterer = new BitmapFilterer();
+const filterer = inst.filterer
 
 filterer.addFilter(
     'clear-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
         if (params.pixels > 0) {
             newCanvas.ctx.clearRect(0, 0, data[3], params.pixels);
@@ -3641,7 +3035,7 @@ filterer.addFilter(
     'flip-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         newCanvas.ctx.translate(data[3], 0);
         newCanvas.ctx.scale(-1, 1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -3654,7 +3048,7 @@ filterer.addFilter(
     'flip-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         newCanvas.ctx.translate(0, data[4]);
         newCanvas.ctx.scale(1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -3667,7 +3061,7 @@ filterer.addFilter(
     'flip-xy',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         newCanvas.ctx.translate(data[3], data[4]);
         newCanvas.ctx.scale(-1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -3680,7 +3074,7 @@ filterer.addFilter(
     'shift-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         const shiftedSize = data[4] - Math.abs(params.pixels);
         let sourceY = data[2];
         if (params.pixels < 0) {
@@ -3700,7 +3094,7 @@ filterer.addFilter(
     'shift-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
         const shiftedSize = data[3] - Math.abs(params.pixels);
         let sourceX = data[1];
         if (params.pixels < 0) {
@@ -3786,6 +3180,1294 @@ filterer.addFilter(
     ]
 );
 
+class AxisPath {
+
+    constructor(start = 0) {
+        this.points = [start];
+        this.position = 0;
+        return this;
+    }
+
+    static new(start = 0) {
+        const path = new AxisPath(start);
+        return path;
+    }
+
+    getLastPoint() {
+        return this.points[this.points.length - 1];
+    }
+
+    addAbsolutePoint(point) {
+        this.points.push(point);
+        return this;
+    }
+
+    addRelativePoint(point) {
+        const lastPoint = this.getLastPoint();
+        this.points.push(lastPoint + point);
+        return this;
+    }
+
+    addRelativePoints(points) {
+        for (let point of points) {
+            this.addRelativePoint(point);
+        }
+        return this;
+    }
+
+    round() {
+        const rounded = [];
+        for (let point of this.points) {
+            rounded.push(Math.round(point));
+        }
+        this.points = rounded;
+        return this;
+    }
+
+    getPoints() {
+        return this.points;
+    }
+
+    throw(v0, maxHeight) {
+        const gravity = v0 * v0 / (2 * maxHeight);
+        let v = v0;
+        let i = 0;
+        let iMax = Math.round(v0 / gravity);
+        while (i !== (iMax * 2 + 1)) {
+            v = v0 - gravity * i;
+            i++;
+            this.addRelativePoint(v);
+        }
+        return this;
+    }
+
+    fall(v0, maxHeight) {
+        const gravity = v0 * v0 / (2 * maxHeight);
+        let v = v0;
+        let i = 0;
+        let iMax = Math.round(v0 / gravity);
+        while (i !== (iMax * 2)) {
+            v = v0 - gravity * (iMax - i);
+            i++;
+            this.addRelativePoint(v);
+        }
+        return this;
+    }
+
+    addTarget(target, steps, type = PATH.TYPE.STRAIGHT) {
+        let point = this.getLastPoint();
+        const dist = target - point;
+        const size = dist / steps;
+        let rad, start;
+
+        switch(type) {
+            case PATH.TYPE.STRAIGHT:
+                for (let i = 1; i <= steps; i++) {
+                    point += size;
+                    this.points.push(point);
+                }
+                break;
+
+            case PATH.TYPE.DAMPED:
+                start = point;
+                rad = DEGREE_90 / steps;
+                for (let i = 1; i <= steps; i++) {
+                    point = start + Math.sin(rad * i) * dist;
+                    this.points.push(point);
+                }
+                break;
+
+            case PATH.TYPE.ACCELERATED:
+                start = point;
+                rad = DEGREE_90 / steps;
+                for (let i = 1; i <= steps; i++) {
+                    point = start + (1 - Math.cos(rad * i)) * dist;
+                    this.points.push(point);
+                }
+                break;
+
+            default:
+                throw Error('Unknown type ' + type + ' given!');
+        }
+        return this;
+    }
+
+    applyFactor(factor) {
+        const points = [];
+        for (let point of this.points) {
+            points.push(point * factor);
+        }
+        this.points = points;
+        return this;
+    }
+
+    getCount() {
+        return this.points.length;
+    }
+
+    isStart() {
+        return this.position === 0;
+    }
+
+    isEnd() {
+        return this.position === this.points.length - 1;
+    }
+
+    getCurrentPoint() {
+        return this.points[this.position];
+    }
+
+    forward(points = 1) {
+        let startPos = this.getCurrentPoint();
+        while (points > 0) {
+            if (!this.isEnd()) {
+                this.position++;
+            }
+            points--;
+        }
+        return this.getCurrentPoint() - startPos;
+    }
+
+    forwardFrom(from, steps = 1) {
+        const lastIndex = this.getCount() - 1;
+        if (from >= lastIndex) {
+            return null;
+        }
+        const fromPos = this.points[from];
+        while (steps > 0) {
+            if (from < lastIndex) {
+                from++;
+            } else {
+                return null;
+            }
+            steps--;
+        }
+        return this.points[from] - fromPos;
+    }
+
+    backward(points = 1) {
+        let startPos = this.getCurrentPoint();
+        while (points > 0) {
+            if (!this.isStart()) {
+                this.position--;
+            }
+            points--;
+        }
+        return this.getCurrentPoint() - startPos;
+    }
+
+    backwardFrom(from, steps = 1) {
+        if (from <= 0) {
+            return null;
+        }
+        const fromPos = this.points[from];
+        while (steps > 0) {
+            if (from > 0) {
+                from--;
+            } else {
+                return null;
+            }
+            steps--;
+        }
+        return this.points[from] - fromPos;
+    }
+
+    rewind() {
+        this.position = 0;
+    }
+
+    getDist(from, to) {
+        const max = this.getCount() - 1;
+        if (from > max || to > max) {
+            return null;
+        }
+        return this.points[to] - this.points[from];
+    }
+
+    getMaxDist(from = 0, to = null) {
+        let max = this.getCount() - 1;
+        if (to === null) {
+            to = max;
+        }
+        if (from > max || to > max) {
+            return null;
+        }
+        let min = this.points[from];
+        max = this.points[from];
+        for (let i = from; i <= to; i++) {
+            min = Math.min(min, this.points[i]);
+            max = Math.max(max, this.points[i]);
+        }
+        return max - min;
+    }
+
+    getRelativePath(offset = 0) {
+        this.rewind();
+        const relPath = [];
+        while (!this.isEnd()) {
+            let value = 0;
+            if (this.isStart()) {
+                value = offset;
+            }
+            value += this.forward();
+            relPath.push(value);
+        }
+        this.rewind();
+        return relPath;
+    }
+
+    limitToFirst(num) {
+        const points = [];
+        for(let i = 1; i <= num; i++) {
+            points.push(this.points[i]);
+        }
+        this.points = points;
+    }
+}
+
+class EmptyPane {
+    constructor() {}
+
+    init(viewPortDimX, viewPortDimY) {
+        this.viewPortDim = {
+            x: viewPortDimX,
+            y: viewPortDimY
+        };
+        this.paneDim = this.viewPortDim;
+    }
+
+    render() {
+        this.dirty = false;
+    }
+}
+
+class BoundsScrollHandler {
+
+    constructor(spritePane, scroller, boundsSize, maxOut = {}) {
+        this.spritePane = spritePane;
+        this.scroller = scroller;
+        this.usePushback = false;
+        const bounds = {
+            left: null,
+            right: null,
+            top: null,
+            bottom: null
+        };
+        this.maxOut = Object.assign({top: 0, bottom: 0, left: 0, right: 0}, maxOut);
+        if (boundsSize.x !== undefined) {
+            bounds.left = boundsSize.x;
+            bounds.right = boundsSize.x;
+        }
+        if (boundsSize.y !== undefined) {
+            bounds.top = boundsSize.y;
+            bounds.bottom = boundsSize.y;
+        }
+        if (boundsSize.left !== undefined) {
+            bounds.left = boundsSize.left;
+        }
+        if (boundsSize.right !== undefined) {
+            bounds.right = boundsSize.right;
+        }
+        if (boundsSize.top !== undefined) {
+            bounds.top = boundsSize.top;
+        }
+        if (boundsSize.bottom !== undefined) {
+            bounds.bottom = boundsSize.bottom;
+        }
+        this.bounds = bounds;
+    }
+
+    setUsePushback(value) {
+        this.usePushback = value === true;
+    }
+
+    setMaxOut(maxOut) {
+        this.maxOut = Object.assign(this.maxOut, maxOut);
+    }
+
+    moveActor(moveX = 0, moveY = 0, forceScrollX = false, forceScrollY = false) {
+        const actor = this.spritePane.getActorId();
+        if (actor === null) {
+            return;
+        }
+        const sprite = this.spritePane.getSpritePos(actor);
+
+        let move = false;
+        let scrollX = 0;
+        if (moveX !== 0) {
+            // let's assume there is no scroll problem
+            let pos = sprite.x + moveX;
+            // the minimal position of the player sprite on the left
+            const min = -this.maxOut.left;
+            if (this.bounds.left === null) {
+                // no scrollbound on left side
+                if (pos < min) {
+                    // player pos below allowed minimum => set to minimum
+                    pos = min;
+                }
+            } else if (pos < this.bounds.left) {
+                if (this.usePushback) {
+                    if (pos < min) {
+                        pos = min;
+                    }
+                    scrollX = -Math.abs(Math.min(this.bounds.left, sprite.x) - pos);
+                } else {
+                    // new position is left of scrollbounds
+                    if (sprite.x >= this.bounds.left) {
+                        scrollX = -Math.abs(this.bounds.left - pos);
+                        pos = this.bounds.left;
+                    } else if (pos < min) {
+                        // player pos below allowed minimum => set to minimum
+                        pos = min;
+                    }
+
+                }
+            }
+
+            const max = this.spritePane.viewPortDim.x - 1 - sprite.dim.x + this.maxOut.right;
+            const rightScrollBound = (this.bounds.right === null) ? null : max - this.bounds.right;
+
+            if (rightScrollBound === null) {
+                if (pos > max) {
+                    pos = max;
+                }
+            } else if (forceScrollX) {
+                pos = sprite.x;
+                if (pos > max) {
+                    pos = max;
+                }
+                scrollX = moveX;
+            } else if (pos > rightScrollBound) {
+                if (this.usePushback) {
+                    if (pos > max) {
+                        pos = max;
+                    }
+                    scrollX = Math.abs(pos - rightScrollBound);
+                } else {
+                    if (sprite.x <= rightScrollBound) {
+                        scrollX = Math.abs(pos - rightScrollBound);
+                        pos = rightScrollBound;
+                    } else if (pos > max) {
+                        pos = max;
+                    }
+                }
+            }
+            sprite.x = pos;
+            move = true;
+        }
+
+        let scrollY = 0;
+        if (moveY !== 0) {
+            let pos = sprite.y + moveY;
+            const min = -this.maxOut.top;
+            if (this.bounds.top === null) {
+                if (pos < min) {
+                    pos = min;
+                }
+            } else if (pos < this.bounds.top) {
+                if (sprite.y >= this.bounds.top) {
+                    scrollY = -Math.abs(this.bounds.top - pos);
+                    pos = this.bounds.top;
+                } else if (pos < min) {
+                    pos = min;
+                }
+            }
+            const max = this.spritePane.viewPortDim.y - 1 - sprite.dim.y + this.maxOut.bottom;
+            const bottomScrollBound = (this.bounds.bottom === null) ? null : max - this.bounds.bottom;
+            if (bottomScrollBound === null) {
+                if (pos > max) {
+                    pos = max;
+                }
+            } else if (pos > bottomScrollBound) {
+                if (sprite.y <= bottomScrollBound) {
+                    scrollY = Math.abs(pos - bottomScrollBound);
+                    pos = bottomScrollBound;
+                } else if (pos > max) {
+                    pos = max;
+                }
+            }
+            sprite.y = pos;
+            move = true;
+        }
+
+        const scrolled = this.scroller.scrollBy(scrollX, scrollY);
+        if (this.usePushback) {
+            move = true;
+            if (scrollX < 0) {
+                sprite.x += scrolled.x;
+            } else if (scrollX > 0) {
+                sprite.x -= scrolled.x;
+            }
+
+            if (scrollY < 0) {
+                sprite.y += scrolled.y;
+            } else if (scrollY > 0) {
+                sprite.y -= scrolled.y;
+            }
+
+            //move = (scrollY !== 0 || scrollX !== 0);
+        } else {
+            const unscrolled = scrolled.unscrolled;
+            if (unscrolled.x !== 0) {
+                sprite.x += unscrolled.x;
+                move = true;
+            }
+            if (unscrolled.y !== 0) {
+                sprite.y += unscrolled.y;
+                move = true;
+            }
+        }
+
+        if (move) {
+            this.spritePane.setSpritePos(actor, sprite.x, sprite.y);
+        }
+    }
+}
+
+class MasterSlavesScrollHandler {
+
+    constructor(master) {
+        this.master = master;
+        this.slaves = [];
+        this.spriteSlaves = [];
+    }
+
+    addSlave(slave, factorX = 0, factorY = 0) {
+        this.slaves.push([slave, factorX, factorY]);
+    }
+
+    addSpriteSlave(slave, factorX = 0, factorY = 0) {
+        this.spriteSlaves.push([slave, factorX, factorY]);
+    }
+
+    scrollBy(sx, sy) {
+        const scrolled = this.master.scrollBy(sx, sy);
+        if (scrolled.x !== 0 || scrolled.y !== 0) {
+            for (let slave of this.slaves) {
+                slave[0].scrollBy(scrolled.x * slave[1], scrolled.y * slave[2]);
+            }
+            for (let slave of this.spriteSlaves) {
+                slave[0].moveSpritesAttachedTo(this.master, scrolled.x * slave[1], scrolled.y * slave[2]);
+            }
+
+        }
+        return scrolled;
+    }
+}
+
+/**
+ * TODO:
+ *   - MasterStates (?)
+ */
+class States {
+
+    constructor(states) {
+        if (states.length === 0) {
+            throw Error("No states given!");
+        }
+        this.states = {};
+        this.transitions = [];
+        this.currState = states[0];
+        this.eventPrios = [];
+        this.possibleEvents = null;
+        for (let state of states) {
+            this.states[state] = {};
+        }
+    }
+
+    assertExists(state) {
+        if (this.states[state] === undefined) {
+            throw Error('State "' + state + '" does not exist in machine!');
+        }
+    }
+
+    getPossibleEvents() {
+        if (this.possibleEvents === null) {
+            const keys = Object.keys(this.states[this.currState]);
+            const events = [];
+            for (let event of this.eventPrios) {
+                if (keys.indexOf(event) !== -1) {
+                    events.push(event);
+                }
+            }
+            this.possibleEvents = events;
+        }
+        return this.possibleEvents;
+    }
+
+    hasPossibleEvent() {
+        const events = this.getPossibleEvents();
+        for(let event of arguments) {
+            if (events.indexOf(event) !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    addTransition(from, events, to) {
+        this.assertExists(from);
+        this.assertExists(to);
+        if (!Array.isArray(events)) {
+            events = [events];
+        }
+        for (let event of events) {
+            this.states[from][event] = to;
+        }
+    }
+
+    cloneStatesAndTransitions(postfix, states) {
+        for (let state of states) {
+            const newState = state + '_' + postfix;
+            this.states[newState] = {};
+            const transitions = this.states[state];
+            for (let event in transitions) {
+                const targetState = transitions[event];
+                if (states.indexOf(targetState) !== -1) {
+                    this.states[newState][event] = targetState + '_' + postfix;
+                }
+            }
+        }
+    }
+
+    replaceEventForStates(states, event, newEvent) {
+        if (!Array.isArray(states)) {
+            states = [states];
+        }
+        for (let state of states) {
+            const target = this.states[state][event];
+            if (target !== undefined) {
+                this.states[state][newEvent] = target;
+                delete this.states[state][event];
+            }
+        }
+    }
+
+    setEventPrios(events) {
+        this.eventPrios = events;
+    }
+
+    doEvent(event) {
+        const newState = this.states[this.currState][event];
+        if (newState === undefined || newState === null) {
+            return;
+        }
+        this.possibleEvents = null;
+        this.transitions.push({event, from: this.currState, to: newState});
+        this.currState = newState;
+    }
+
+    popTransitions() {
+        const popped = this.transitions;
+        this.transitions = [];
+        return popped;
+    }
+
+    getState() {
+        return this.currState;
+    }
+
+    setState(state) {
+        this.assertExists(state);
+        this.popTransitions();
+        this.possibleEvents = null;
+        this.currState = state;
+    }
+}
+
+class PlayerProxy {
+
+    constructor() {
+        this.players = [
+            null, // non-synchronous player
+            null  // synchronous player
+        ];
+        this.active = 0;
+    }
+
+    setPlayer(player) {
+        this.active = 1;
+        this.players[1] = player;
+    }
+
+    isSynchronous() {
+        return this.active === 1;
+    }
+
+    loadAnimation(frames, end, dir, speed) {
+        this.active = 0;
+        if (this.players[0] === null) {
+            this.players[0] = new BitmapPlayer();
+        }
+        this.players[0].loadAnimation(frames, end, dir, speed);
+        this.players[1] = null;
+    }
+
+    getFrame() {
+        return this.players[this.active].getFrame();
+    }
+
+    setSpeed(speed) {
+        this.players[this.active].setSpeed(speed);
+    }
+
+    getState() {
+        return this.players[this.active].getState();
+    }
+
+    nextStep() {
+        this.players[this.active].nextStep();
+    }
+
+    isDirty() {
+        return this.players[this.active].isDirty();
+    }
+
+    pause() {
+        this.players[this.active].pause();
+    }
+
+    continue() {
+        this.players[this.active].continue();
+    }
+
+    reverse() {
+        this.players[this.active].reverse();
+    }
+}
+
+class Position {
+
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    setMaxDist(xMin = null, xMax = null, yMin = null, yMax = null) {
+        const pos = this.getRounded();
+        this.xMin = xMin !== null ? pos - xMin : null;
+        this.xMax = xMax !== null ? pos + xMax : null;
+        this.yMin = yMin !== null ? pos - yMin : null;
+        this.yMax = yMax !== null ? pos + yMax : null;
+    }
+
+    move(x, y) {
+        const oldX = this.x;
+        this.x += x;
+        if (this.xMin !== null && this.x < this.xMin) {
+            this.x = this.xMin;
+        }
+        if (this.xMax !== null && this.x > this.xMax) {
+            this.x = this.xMax;
+        }
+        const oldY = this.y;
+        this.y += y;
+        if (this.yMin !== null && this.y < this.yMin) {
+            this.y = this.yMin;
+        }
+        if (this.yMax !== null && this.y > this.yMax) {
+            this.y = this.yMax;
+        }
+
+        return {x: Math.round(this.x) - Math.round(oldX), y: Math.round(this.y) - Math.round(oldY)};
+    }
+
+    setFrom(obj) {
+        this.x = obj.x;
+        this.y = obj.y;
+    }
+
+    getX() {
+        return this.x;
+    }
+
+    getY() {
+        return this.y;
+    }
+
+    set(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    getRounded() {
+        return {x: Math.round(this.x), y: Math.round(this.y)}
+    }
+}
+
+class Force {
+
+    constructor(v0, height, drag = 0) {
+        this.v0 = v0;
+        this.drag = drag;
+        this.gravity = Math.abs(v0 * v0 / (2 * height));
+        this.peakTime = Math.round(Math.abs(v0 / this.gravity));
+    }
+
+    getMoveForTimeVector(vector, lowerBound = null, upperBound = null) {
+        if (vector[0] === null) {
+            return 0;
+        }
+        let move = this.v0 + (this.v0 < 0 ? 1 : -1) * (this.gravity * vector[0]);
+        if (vector[1] !== null) {
+            move -= vector[1] * this.drag;
+        }
+        if (lowerBound !== null && move < 0) {
+            return -Math.min(-move, lowerBound);
+        } else if (upperBound !== null && move >= 0) {
+            return Math.min(move, upperBound);
+        }
+        return move;
+    }
+
+    incVector(vector) {
+        if (vector[0] !== null) {
+            vector[0]++;
+            if (vector[1] !== null) {
+                vector[1]++;
+            }
+        }
+    }
+
+    isTimeVectorAtPeak(vector) {
+        return vector[0] === this.peakTime;
+    }
+
+    getPeakTime() {
+        return this.peakTime;
+    }
+}
+
+class SpriteAndTilesCollider {
+
+    static defaultCheck(tile) {
+        return (tile.obj !== null && tile.obj.block);
+    }
+
+    constructor(spriteId, spritePane, tilesPane, collides) {
+        this.spriteId = spriteId;
+        this.spritePane = spritePane;
+        this.tilesPane = tilesPane;
+        this.collides = {};
+        for (let id in collides) {
+            this.addCollide(id, collides[id]);
+        }
+        this.spriteOffset = {x: 0, y: 0};
+        this.tileSize = tilesPane.tilesMap.tileSize;
+    }
+
+    addCollide(id, collide) {
+        if (collide.dir === undefined || ['up', 'down', 'left', 'right', 'center'].indexOf(collide.dir) === -1) {
+            throw Error(`Collide "${id}" must have dir property with an allowed value!`)
+        }
+        const margin = collide.dir === 'center' ?
+            {
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0
+            } :
+            {
+                dir: 0,
+                start: 0,
+                end: 0
+            };
+        if (collide.margin) {
+            Object.assign(margin, collide.margin);
+        }
+        collide.margin = margin;
+        if (collide.check === undefined) {
+            collide.check = SpriteAndTilesCollider.defaultCheck
+        }
+        this.collides[id] = collide;
+    }
+
+    setSpriteOffset(x, y) {
+        this.spriteOffset = {x, y};
+    }
+
+    getCollideLines() {
+        const pos = this.spritePane.getSpritePos(this.spriteId);
+        pos.x += this.spriteOffset.x;
+        pos.y += this.spriteOffset.y;
+
+        const lines = {};
+        for (let collideId in this.collides) {
+            const collide = this.collides[collideId];
+            if (collide.dir === 'center') {
+                /*
+                                const xStart = pos.x + collide.margin.left;
+                                const yStart = pos.y + collide.margin.top;
+                                lines[collideId] = [
+                                    xStart,
+                                    yStart,
+                                    pos.x + pos.dim.x - 1 - collide.margin.right - xStart,
+                                    pos.y + pos.dim.y - 1 - collide.margin.bottom - yStart
+                                ];
+
+                 */
+            } else {
+                let first = 0;
+                let dir = 1;
+                let axis = 'x';
+                switch (collide.dir) {
+                    case 'down':
+                        dir = -1;
+                        first = pos.dim.y - 1;
+                    case 'up':
+                        break;
+
+                    case 'right':
+                        dir = -1;
+                        first = pos.dim.x - 1;
+                    case 'left':
+                        axis = 'y';
+                        break;
+                }
+                const oppAxis = axis === 'x' ? 'y' : 'x';
+                first += pos[oppAxis] + dir * collide.margin.dir;
+                const dStart = pos[axis] + collide.margin.start;
+                const dEnd = pos[axis] + pos.dim[axis] - collide.margin.end - 1;
+
+                lines[collideId] = (axis === 'x' ?
+                        [dStart, first, dEnd - dStart, 1] :
+                        [first, dStart, 1, dEnd - dStart]
+                );
+            }
+        }
+        return lines;
+    }
+
+    getCollides(collideIds, obstacleSprites = []) {
+        const result = {};
+        const pos = this.spritePane.getSpritePos(this.spriteId);
+
+        pos.x += this.spriteOffset.x;
+        pos.y += this.spriteOffset.y;
+
+        // pos hat die gerundete Position des Sprites inklusive eines möglichen Offsets
+
+        for (let collideId of collideIds) {
+            const collide = this.collides[collideId];
+            const obj = {};
+
+            if (collide.dir !== 'center') {
+                let dist = collide.lookahead;
+                let first = 0; //
+                let dir = 1;
+                let axis = 'x';
+                switch(collide.dir) {
+                    case 'down':
+                        dir  = -1;
+                        first = pos.dim.y - 1;
+                    case 'up':
+                        break;
+
+                    case 'right':
+                        dir = -1;
+                        first = pos.dim.x - 1;
+                    case 'left':
+                        axis = 'y';
+                        break;
+                }
+                const oppAxis = axis === 'x' ? 'y' : 'x';
+                first += pos[oppAxis] + dir * collide.margin.dir;
+                const dStart = pos[axis] + collide.margin.start;
+                const dEnd = pos[axis] + pos.dim[axis] - 1 - collide.margin.end - 1;
+
+                let tiles = axis === 'x' ?
+                    this.tilesPane.getTilesInXLine(first, dStart, dEnd) :
+                    this.tilesPane.getTilesInYLine(first, dStart, dEnd);
+                let obstDist = collide.lookahead;
+                obj.obstacles = [];
+                for (let sprite of obstacleSprites) {
+                    const obstPos = this.spritePane.getSpritePos(sprite);
+                    obstPos.x += this.spriteOffset.x;
+                    obstPos.y += this.spriteOffset.y;
+
+                    if (this.spritePane.isAxisCollide(dStart, dEnd, obstPos[axis], obstPos[axis] + obstPos.dim[axis] - 1)) {
+                        let dist = collide.lookahead;
+                        switch (collide.dir) {
+                            case 'down':
+                            case 'right':
+                                dist = obstPos[oppAxis] - first;
+                                break;
+
+                            case 'up':
+                            case 'left':
+                                dist = first - (obstPos[oppAxis] + obstPos.dim[oppAxis] - 1);
+                                break;
+
+                        }
+                        if (dist > -collide.lookahead && dist <= obstDist) {
+                            if (dist <= 0 && obstDist >= dist) {
+                                obj.obstacles.push(sprite);
+                            } else {
+                                obj.obstacles = [];
+                            }
+                            obstDist = dist;
+                        }
+                    }
+                }
+
+                for(let tile of tiles) {
+                    // auf der line liegen block-tiles, d.h. wir haben hier ein Collision und damit
+                    // ist die distance hier gleich 0
+                    if (collide.check(tile)) {
+                        dist = 0;
+                        break;
+                    }
+                }
+                if (dist > 0) {
+                    const pos = first + this.tilesPane.scrollPos[oppAxis];
+                    let blockDist;
+                    if (dir === -1) {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                this.tileSize - 1 - (pos % this.tileSize) + 1 :
+                                Math.min(Math.abs(pos) - 1 + 1)
+                        );
+                    } else {
+                        blockDist = Math.min(
+                            collide.lookahead,
+                            pos >= 0 ?
+                                pos % this.tileSize + 1:
+                                this.tileSize - Math.abs(pos % this.tileSize) + 1
+                        );
+                    }
+
+                    if (blockDist < collide.lookahead) {
+                        const newFirst = first - dir * this.tileSize;
+                        const tiles = axis === 'x' ?
+                            this.tilesPane.getTilesInXLine(newFirst, dStart, dEnd) :
+                            this.tilesPane.getTilesInYLine(newFirst, dStart, dEnd);
+                        for (let tile of tiles) {
+                            if (collide.check(tile)) {
+                                dist = blockDist;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (dist === 0 && collide.saveContacts) {
+                    obj.tiles = tiles;
+                }
+
+                obj.dist = Math.min(dist, obstDist);
+                if (obj.dist <= 0 && obj.tiles === undefined) {
+                    obj.tiles = [];
+                }
+
+            } else {
+                const tiles = this.tilesPane.getTilesInRect(
+                    pos.x + collide.margin.left,
+                    pos.y + collide.margin.top,
+                    pos.x + pos.dim.x - collide.margin.right - 1,
+                    pos.y + pos.dim.y - collide.margin.bottom - 1
+                );
+
+                for (let tile of tiles) {
+                    if (collide.check(tile)) {
+                        inst.game.addFrameEvent('collide', tile);
+                    }
+                }
+                obj.tiles = tiles;
+            }
+            result[collideId] = obj;
+        }
+        return result;
+    }
+}
+
+class ObjectController {
+
+    constructor(spritePane, eventType = 'object') {
+        this.spritePane = spritePane;
+        this.uid = 0;
+        this.eventType = eventType;
+        this.activeObjects = [];
+        this.classes = {};
+        this.removeMargin = {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0
+        };
+    }
+
+    setRemoveMargin(key, value) {
+        this.removeMargin[key] = value;
+    }
+
+    addClass(name, handler, state = {}) {
+        this.classes[name] = {
+            handler,
+            state
+        };
+    }
+
+    getObjectWithSpriteId(id) {
+        for (let obj of this.activeObjects) {
+            if (obj.sprites.indexOf(id) !== -1) {
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    getSpriteIdsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result = result.concat(obj.sprites);
+            }
+        }
+        return result;
+    }
+
+    getObjectsForClass(cls) {
+        let result = [];
+        for (let obj of this.activeObjects) {
+            if (obj.class === cls) {
+                result.push(obj);
+            }
+        }
+        return result;
+    }
+
+    deleteObjectsOfClass(cls) {
+        if (!Array.isArray(cls)) {
+            cls = [cls];
+        }
+        for (let obj of this.activeObjects) {
+            if (cls.indexOf(obj.class) !== -1) {
+                obj.deleted = true;
+            }
+        }
+    }
+
+    getObjectIdFromIdParts(idParts, obj) {
+        let subIds = [];
+        for (let part of idParts) {
+            let id = '';
+            if (Array.isArray(part)) {
+                let curr = obj;
+                for (let key of part) {
+                    curr = curr[key];
+                }
+                id = curr;
+            } else {
+                id = obj[part];
+            }
+            subIds.push(id);
+        }
+        return obj.class + '_' + subIds.join('_');
+    }
+
+    hasActiveObject(id) {
+        for (let obj of this.activeObjects) {
+            if (obj.id === id && obj.deleted !== true) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    getClassParts(id) {
+        const parts = id.split('.', 2);
+        return {
+            main: parts[0],
+            variant: (parts.length === 2 ? parts[1] : null)
+        }
+    }
+
+    addObject(clsId, state = {}) {
+        const cls = this.getClassParts(clsId);
+        if (this.classes[cls.main] === undefined) {
+            throw Error('No class with name "' + cls.main + '" found!');
+        }
+        const classState = this.classes[cls.main].state;
+        let varState = {};
+        if (cls.variant !== null) {
+            if (classState.variants[cls.variant] === undefined) {
+                throw Error('Class "' + cls.main + '" does not have variant "' + cls.variant +  '"!');
+            }
+            Object.assign(varState, {variant: cls.variant}, classState.variants[cls.variant]);
+        }
+        const obj = Object.assign({autoRemove: true}, classState, varState, state);
+        obj.class = cls.main;
+        const id = Array.isArray(obj.idParts) ? this.getObjectIdFromIdParts(obj.idParts, obj) : this.getUid(cls.main);
+        if (this.hasActiveObject(id)) {
+            return;
+        }
+        obj.id = id;
+        obj.frame = 0;
+        obj.sprites = [];
+        this.activeObjects.push(obj);
+        return obj;
+    }
+
+    getUid(name) {
+        name += '_' + this.uid;
+        this.uid++;
+        return name;
+    }
+
+    handleObjects(onlyClasses = null) {
+        while (true) {
+            const event = inst.game.getNextEvent(this.eventType);
+            if (event === null) {
+                break;
+            }
+            this.addObject(event.object, {event})
+        }
+
+        let i = 0;
+        const survivedObjects = [];
+        while (i < this.activeObjects.length) {
+            const obj = this.activeObjects[i];
+            const cls = this.classes[obj.class];
+            let remove = obj.deleted === true;
+            if (!remove && (onlyClasses === null || onlyClasses.indexOf(obj.class) !== -1)) {
+                remove = cls.handler(obj) === false;
+                if (!remove) {
+                    if (obj.autoRemove === true) {
+                        remove = false;
+                        for (let spriteId of obj.sprites) {
+                            if (this.spritePane.isSpriteInBounds(spriteId, this.removeMargin.top, this.removeMargin.bottom, this.removeMargin.left, this.removeMargin.right)) {
+                                remove = false;
+                                break;
+                            } else {
+                                remove = true;
+                            }
+                        }
+                    };
+                    if (!remove) {
+                        obj.frame++;
+                    }
+                }
+            }
+            if (remove) {
+                this.spritePane.removeSprites(obj.sprites);
+            } else {
+                survivedObjects.push(obj);
+            }
+            i++;
+        }
+        this.activeObjects = survivedObjects;
+    }
+}
+
+class Gravity {
+
+    constructor(gravity = null, round = true) {
+        this.time = 0;
+        this.gravity = gravity;
+        this.v0 = null;
+        this.currHeight = 0;
+        this.maxHeight = null;
+        this.round = round;
+        this.dragTime = 0;
+        this.drag = null;
+    }
+
+    setSpeed(v0) {
+        this.v0 = v0;
+    }
+
+    setSpeedByHeight(targetHeight) {
+        if (this.gravity === null) {
+            throw Error('No gravity given!');
+        }
+        const height = targetHeight - this.currHeight;
+        this.speed = Math.sqrt(this.gravity * 2 * height);
+    }
+
+    reset() {
+        this.time = 0;
+    }
+
+    getMaxHeight() {
+        if (this.gravity === null || this.v0 === null) {
+            return null;
+        }
+        return this.v0 * this.v0 * this.gravity / 2;
+    }
+
+    setGravity(gravity) {
+        this.gravity = Math.abs(gravity);
+    }
+
+    setGravityByHeightAndSpeed(v0, height) {
+        this.setGravity(v0 * v0 / (2 * height));
+    }
+
+    getCurrentHeight() {
+        if (this.round) {
+            return Math.round(this.currHeight);
+        }
+        return this.currHeight;
+    }
+
+    setMaxHeight(height) {
+        this.maxHeight = height;
+    }
+
+    getTimeUntilMax() {
+        const tMax = Math.round(Math.abs(this.v0 / this.gravity));
+        return tMax;
+    }
+
+    setDrag(value) {
+        this.dragTime = this.time;
+        this.drag = value;
+    }
+
+    move() {
+        this.lastSpeed =  this.v0 + (this.v0 < 0 ? 1 : -1) * (this.gravity * this.time);
+        if (this.drag !== null) {
+            const dragTime = this.time - this.dragTime;
+            this.lastSpeed -= dragTime * this.drag;
+        }
+        this.currHeight += this.lastSpeed;
+        const move = this.round ? Math.round(this.lastSpeed) : this.lastSpeed;
+
+        if (this.maxHeight !== null && Math.abs(this.currHeight) >= this.maxHeight) {
+            this.currHeight = null;
+            this.lastSpeed = null;
+            return null;
+        } else {
+            this.time++;
+        }
+        return move;
+    }
+
+    getAllMovements(from = 0, to = null) {
+        if (this.maxHeight === null) {
+            return [];
+        }
+        this.reset();
+        const result = [];
+        let i = 0;
+        while (true) {
+            const move = this.move();
+            if (move === null) {
+                break;
+            }
+            if (to !== null && i > to) {
+                break;
+            }
+            if (from <= i) {
+                result.push(move);
+            }
+            i++;
+        }
+        return result;
+    }
+}
+
 export {
     inst,
     Game,
@@ -3797,5 +4479,17 @@ export {
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,
-    DivContainer
+    DivContainer,
+    AxisPath,
+    EmptyPane,
+    BoundsScrollHandler,
+    MasterSlavesScrollHandler,
+    SplitArea,
+    States,
+    PlayerProxy,
+    Position,
+    Force,
+    Gravity,
+    SpriteAndTilesCollider,
+    ObjectController
 }

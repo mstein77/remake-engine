@@ -266,4 +266,4 @@ function BackgroundPaneEditor({ model, resource }) {
     )
 }
 
-export default BackgroundPaneEditor;
+export default BackgroundPaneEditor

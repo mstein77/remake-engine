@@ -60,7 +60,7 @@ export class BackgroundPaneConfig extends Config {
         const imgPos = [];
         for (let { image, x, y } of this.images) {
             imgIds.push(image.id);
-            imgCanvas.push(image.getCanvasElem());
+            imgCanvas.push(image.getCanvasElem(true));
             imgPos.push({x, y});
         }
         obj.imgIds = imgIds;

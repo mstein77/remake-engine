@@ -1,5 +1,6 @@
-import inst from "../core/instances.js";
-import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared";
+import inst from "../core/instances"
+import { ANIMATION } from "core/const"
+import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
 
 function d(main, ...params) {
     let stack = null;
@@ -319,13 +320,20 @@ const getResourceTreeForJsonModel = (cls, model) => {
     return tree;
 };
 
+const newPlainConfig = (config, json) => {
+    inst.RL.setDisabled(true)
+    const plainConfig = new config(json)
+    inst.RL.setDisabled(false)
+    return plainConfig
+}
+
 const getRebuildJsonForModel = (cls, model, deep) => {
     if (model instanceof cls) {
-        return deep ? model.config.getRebuildJson(true) : model.config.id;
+        return deep ? model.config.getRebuildJson(true, model) : model.config.id
     }
     const conf = cls.Config;
     if (model instanceof conf) {
-        return deep ? conf.getRebuildJson(true) : conf.id;
+        return deep ? conf.getRebuildJson(true, model) : conf.id;
     }
     if (!deep) {
         return model.id;
@@ -508,7 +516,7 @@ const getTextBlockImage = (block, font, filterer = null) => {
                     font.height
                 );
             } else {
-                trigger = true;
+                // TODO? trigger = true;
             }
         }
         posY += block.lineSpacing + font.height;
@@ -660,28 +668,6 @@ const getCanvasForIndexMatrix = (tilesIndex, aliasIndex, matrix, maxDim = null) 
  * ----------------------------
  *
  */
-
-const ANIMATION = {
-    DIR: {
-        FORWARD: 0,
-        BACKWARD: 1,
-        FORWARD_BACKWARD: 2,
-        BACKWARD_FORWARD: 3
-    },
-    END: {
-        LOOP: 0,
-        STOP: 1,
-        DELETE: 2
-    },
-    STATE: {
-        EMPTY: -1,
-        WAITING: 0,
-        RUNNING: 1,
-        DONE: 2,
-        DESTROYED: 3,
-        PAUSED: 4
-    }
-};
 
 /**
  * TODO: setSync(null|frameState)
@@ -1283,7 +1269,7 @@ function getConfigFromInput(configCls, input, forceId = null) {
     }
     // at this point we should have a valid config instance
     if (!(conf instanceof configCls)) {
-        throw Error('Invalid');
+        throw Error('Could not create config from input');
     }
     return conf;
 }
@@ -1343,6 +1329,7 @@ export {
     getCanvasForIndexMatrix,
     getCanvasForEventMatrix,
     getConfigFromInput,
+    newPlainConfig,
     BitmapPlayer,
     ANIMATION,
     Players,

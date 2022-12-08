@@ -4,7 +4,7 @@ import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, ToolGroup,
     useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext, useCachedState
 } from "./BasicComponents.js";
-import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
+import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, newPlainConfig,
     getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
 } from "../../helper/helper.js";
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents.js";
@@ -1125,11 +1125,12 @@ function useExportModal({ model, resource, update, name }) {
         return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
     };
     const getModelConfig = () => {
-        const rebuildJson = getRebuildJsonForModel(resource.cls, model, true);
-        return new resource.config(rebuildJson);
-    };
+        const rebuildJson = getRebuildJsonForModel(resource.cls, model, true)
+        return newPlainConfig(resource.config, rebuildJson)
+    }
     const getModelResources = () => {
-        return getModelConfig().getResources();
+        const newModel = getModelConfig()
+        return newModel.getResources()
     };
     const storeModel = eContextRef => {
         wContext.resourceLoader.storeScreenResource(wContext.game.currentScreen, getModelConfig());

@@ -9,6 +9,22 @@ class DefaultRenderPlugin extends RenderPlugin {
 
     constructor(...props) {
         super(...props)
+        this.stackH = ( stackProps, ...props ) => {
+            if (typeof stackProps === 'object' && !(stackProps instanceof Node)) {
+                let { class: stackCls = '', ...objProps } = stackProps
+                if (!stackCls.includes('stack-h')) stackCls += ' stack-h'
+                return this.div({ class: stackCls, ...objProps }, ...props)
+            }
+            return this.div({ class: `stack-h ${typeof stackProps === 'string' ? stackProps : ''}`}, typeof stackProps !== 'string' ? stackProps : null, ...props)
+        }
+        this.stackV = ( stackProps, ...props ) => {
+            if (typeof stackProps === 'object' && !(stackProps instanceof Node)) {
+                let { class: stackCls = '', ...objProps } = stackProps
+                if (!stackCls.includes('stack-v')) stackCls += ' stack-v'
+                return this.div({ class: stackCls, ...objProps }, ...props)
+            }
+            return this.div({ class: `stack-v ${typeof stackProps === 'string' ? stackProps : ''}`}, typeof stackProps !== 'string' ? stackProps : null, ...props)
+        }
         const getCentered = (value, max) => ('' + value).padStart(value.length + ((max - value.length) >> 1), ' ')
         this.addFilters({
             toHidden: value => value ? '' : 'hidden',
@@ -88,7 +104,7 @@ class DefaultRenderPlugin extends RenderPlugin {
         const expr = super.notify(action, props)
         if (expr) return expr
 
-        switch(action) {
+        switch (action) {
             case 'state:' + this.game.states.INIT:
                 return {id: 'game-div', nodes: this.getBootSection()}
 
@@ -99,8 +115,69 @@ class DefaultRenderPlugin extends RenderPlugin {
                 return {id: 'status', nodes: this.getSectionPreBootError(props)}
 
             case 'main':
+                const nextFrame = !this.system.supportsTouch ? () => {} :
+                    () => {
+                        this.game.addTouchDiv(
+                            this.stackH(
+                                {style: 'margin-top: 30px; margin-left: 30px', class: 'full-h'},
+                                this.div({
+                                    id: 'touch_btn_left',
+                                    style: 'width: 35px; height: 75px; margin-top: 35px',
+                                    class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
+                                }),
+                                this.stackH(
+                                    'full-h',
+                                    this.stackV(
+                                        'padded',
+                                        this.div(
+                                            {
+                                                id: 'touch_btn_up',
+                                                style: 'width: 55px; height: 35px',
+                                                class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
+                                            }
+                                        ),
+                                        this.div(
+                                            {style: 'height: 50px'}
+                                        ),
+                                        this.div(
+                                            {
+                                                id: 'touch_btn_down',
+                                                style: 'width: 55px; height: 35px; left: 25px top: 125px',
+                                                class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
+                                            }
+                                        )
+                                    ),
+                                    this.div({
+                                        id: 'touch_btn_right',
+                                        style: 'width: 35px; height: 75px; margin-top: 35px',
+                                        class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
+                                    }),
+                                    this.div(
+                                        {class: 'flex'}
+                                    ),
+                                    this.stackH(
+                                        'inner-space-h padded',
+                                        this.div(
+                                            {
+                                                id: 'touch_btn_1',
+                                                style: 'width: 55px; height: 55px',
+                                                class: 'touch-dir-cell boxed-1 transparent block all-events'
+                                            }
+                                        ),
+                                        this.div(
+                                            {
+                                                id: 'touch_btn_2',
+                                                style: 'width: 55px; height: 55px',
+                                                class: 'touch-dir-cell boxed-1 transparent block all-events'
+                                            }
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    };
                 return [
-                    {id: 'game-div', nodes: this.getMainSection(props)},
+                    {id: 'game-div', nodes: this.getMainSection(props), nextFrame},
                     {id: 'game-overlay-div', subId: 'fps', nodes: this.getFpsOverlay()}
                 ]
         }
@@ -108,12 +185,11 @@ class DefaultRenderPlugin extends RenderPlugin {
 
     getFpsOverlay() {
         const game = this.game
-        const { div, pre, icon, kbd, input } = this
+        const { div, pre, icon, kbd, input, stackH, stackV } = this
         return (
-            div(
-                {class: 'padded min-content-h stack-v absolute mono <game.showFps|toHidden>', style: 'background-color: #000000C0; color: white; left: 25px; top: 25px'},
-                div(
-                    {class: 'stack-h'},
+            stackV(
+                {class: 'padded min-content-h absolute mono <game.showFps|toHidden>', style: 'background-color: #000000C0; color: white; left: 25px; top: 25px'},
+                stackH(
                     div(
                         {class: 'flex less'},
                         'FPS:'
@@ -123,8 +199,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                         icon('close')
                     )
                 ),
-                div(
-                    {class: 'stack-h'},
+                stackH(
                     input(
                         {type: 'text', class: 'less', readOnly: true, tab: -1, size: 3, value: '<game.fps|toFpsInfo>'}
                     ),
@@ -149,12 +224,12 @@ class DefaultRenderPlugin extends RenderPlugin {
     }
 
     getSectionLoading() {
-        const { div } = this
+        const { div, stackV } = this
 
         return div(
             {class: 'center-v'},
-            div(
-                {class: 'stack-v center-child-h inner-space-v'},
+            stackV(
+            'center-child-h inner-space-v',
                 div(
                     {class: 'loading padding'}
                 ),
@@ -167,7 +242,7 @@ class DefaultRenderPlugin extends RenderPlugin {
     }
 
     getErrorDiv({ message, error, click, buttonText }) {
-        const { div, button, pre } = this;
+        const { div, button, pre, stackV, stackH } = this;
 
         let stack = !IS_DIST && error.stack;
         if (stack) {
@@ -178,8 +253,8 @@ class DefaultRenderPlugin extends RenderPlugin {
             div(
                 {class: 'center-v'},
                 div({class: 'full-h padded', style: 'background-color: #9f2828;'},
-                    div(
-                        {class: 'stack-v center-child-h inner-space-v'},
+                    stackV(
+                        'center-child-h inner-space-v',
                         div(
                             {style: 'font-family: Monospace; color: #FFFFFF; font-weight: bold'},
                             'An error occured:'
@@ -222,17 +297,17 @@ class DefaultRenderPlugin extends RenderPlugin {
     }
 
     getMainSection() {
-        const { div, button, input, icon } = this;
+        const { div, button, input, icon, stackH, stackV } = this;
 
         const game = this.game
         const system = this.game.system
         const isMobile = system.isMobile
 
-        const toggleFullScreen = () => {
+        const toggleFullscreen = () => {
             if (game.isFullscreen) {
-                game.exitFullScreenMode()
+                game.exitFullscreenMode()
             } else {
-                game.openFullScreenMode()
+                game.openFullscreenMode()
             }
         }
 
@@ -241,7 +316,7 @@ class DefaultRenderPlugin extends RenderPlugin {
         }
         const buttons = [
             {name: 'Reset', sideIcon: 'restart_alt', click: () => game.reset()},
-            {name: 'Fullscreen', sideIcon: '<game.isFullscreen|toFullscreenIcon>', click: toggleFullScreen}
+            {name: 'Fullscreen', sideIcon: '<game.isFullscreen|toFullscreenIcon>', click: toggleFullscreen}
         ]
         if (game.showFpsByUser) {
             buttons.push(
@@ -255,12 +330,12 @@ class DefaultRenderPlugin extends RenderPlugin {
             game.stepZoom = !game.stepZoom
         }
         const buttonElems = []
-        if (game.hasEditor()) {
+        if (game.hasEditor) {
             buttonElems.push(
                 button(
                     {onClick: () => game.openEditorMode()},
-                    div(
-                        {class: 'stack-h inner-space-h'},
+                    stackH(
+                        'inner-space-h',
                         div(
                             {class: 'min-content-h'},
                             icon('build')
@@ -275,8 +350,8 @@ class DefaultRenderPlugin extends RenderPlugin {
         }
         const isZoomable = game.minZoom !== game.maxZoom && !(game.autoZoom && !game.autoZoomByUser)
         buttonElems.push(
-            div(
-                {class: 'stack-h min-content-h padded-h'},
+            stackH(
+                'min-content-h padded-h',
                 !isMobile && div(
                     {class: 'padded-h'},
                     'Zoom:'
@@ -293,8 +368,8 @@ class DefaultRenderPlugin extends RenderPlugin {
                         '<game.stepZoom|toZoomModeIcon>'
                     )
                 ),
-                !isMobile && isZoomable && div(
-                    {id: 'zoomMode', class: 'min-content-h padded-h stack-h', watch: 'game.stepZoom'},
+                !isMobile && isZoomable && stackH(
+                    {id: 'zoomMode', class: 'min-content-h padded-h', watch: 'game.stepZoom'},
                     stepZoom => stepZoom ?
                         input(
                             {id: 'zoomSlider', min: '<game.minZoom>', step: 1, max: '<game.maxAvailZoom>', type: 'range', onInput: e => game.zoom = parseInt(e.target.value), value: '<game.zoom>'}
@@ -324,8 +399,8 @@ class DefaultRenderPlugin extends RenderPlugin {
         for (let { name, click, sideIcon } of buttons) {
             let inner = name;
             if (sideIcon) {
-                inner = div(
-                    {class: 'stack-h inner-space-h'},
+                inner = stackH(
+                    'inner-space-h',
                     div(
                         {class: 'min-content-h'},
                         icon(sideIcon)
@@ -347,8 +422,8 @@ class DefaultRenderPlugin extends RenderPlugin {
             )
         }
         return (
-            div(
-                {class: 'full-v stack-v'},
+            stackV(
+                'full-v',
                 div(
                     {class: 'block padded full-h flex screen-bounds'},
                     div(
@@ -369,8 +444,8 @@ class DefaultRenderPlugin extends RenderPlugin {
                                     actionButtons.push(div(button({ onclick: click }, action)))
                                 }
                                 elems.push(
-                                    div(
-                                        {class: 'stack-h inner-space-h'},
+                                    stackH(
+                                        'inner-space-h',
                                         div(msg),
                                         ...actionButtons
                                     )
@@ -381,14 +456,13 @@ class DefaultRenderPlugin extends RenderPlugin {
                                 )
                             }
                         }
-                        return div(
-                            {class: 'stack-h'},
+                        return stackH(
                             div(
                                 {class: 'padded'},
                                 icon('warning')
                             ),
-                            div(
-                                {class: 'stack-v flex padded inner-space-v mono medium'},
+                            stackV(
+                                'flex padded inner-space-v mono medium',
                                 ...elems
                             ),
                             div(
@@ -399,8 +473,8 @@ class DefaultRenderPlugin extends RenderPlugin {
                     }
 
                 ),
-                div(
-                    {class: 'padded stack-h full-h', style: 'background-color: #494964'},
+                stackH(
+                    {class: 'padded full-h', style: 'background-color: #494964'},
                     !isMobile && div(
                         {class: 'min-content-h nowrap-shorten', style: 'color: #9eaca9; font-family: Tahoma'},
                         'Remake Engine V' + VERSION_ENGINE + ' - © 2022 Servants of Hex'

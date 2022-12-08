@@ -3,12 +3,16 @@ import { ucfirst, d } from "../helper/helper.js";
 class RenderPlugin {
 
     constructor(options = {}) {
+        this.game = null
+        this.system = null
         this.watcher = {};
 
         this.options = options
 
         this.filters = {}
 
+        this.svg = (...args) => this.createNsElem('http://www.w3.org/2000/svg', 'svg', ...args)
+        this.circle = (...args) => this.createNsElem('http://www.w3.org/2000/svg', 'circle', ...args)
         this.div = (...args) => this.createDomElem('div', ...args)
         this.canvas = (...args) => this.createDomElem('canvas', ...args)
         this.button = (...args) => this.createDomElem('button', ...args)
@@ -27,6 +31,10 @@ class RenderPlugin {
 
     setGame(value) {
         this.game = value
+    }
+
+    setSystem(value) {
+        this.system = value
     }
 
     setOptions(options) {
@@ -126,6 +134,32 @@ class RenderPlugin {
             this.addWatcher(name, { node, expr, prop });
         }
         return parsed;
+    }
+
+    createNsElem(ns, name, ...args) {
+        const elem = document.createElementNS(ns, name)
+
+        const propsOrChildren = args.shift();
+        if (typeof propsOrChildren === 'object') {
+            if (propsOrChildren instanceof Element) {
+                elem.append(propsOrChildren)
+            } else {
+                for (let [ key, value ] of Object.entries(propsOrChildren)) {
+                    if (key !== key.toLowerCase()) {
+                        key = key.replace(/[A-Z]/g, m => '-' + m.toLowerCase())
+                    }
+                    elem.setAttributeNS(null, key, value)
+                }
+            }
+        }
+
+        while (args.length) {
+            const item = args.shift()
+            if (!item) continue
+            elem.append(item)
+        }
+
+        return elem
     }
 
     createDomElem(name, ...args) {
