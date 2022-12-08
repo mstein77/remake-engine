@@ -1,7 +1,7 @@
 {
   "name": "2dfireengine",
   "version": "1.0.0",
-  "description": "2D Game Engine",
+  "description": "Remake Engine - Javascript game engine",
   "exports": "./src/engine/index.js",
   "type": "module",
   "scripts": {
