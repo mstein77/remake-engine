@@ -1,3 +1,14 @@
+const STATE = {
+    CONSTRUCT: 0,
+    INIT: 1,
+    CONNECT: 2,
+    PREBOOT_ERROR: 3,
+    BOOT: 4,
+    RUNNING: 5,
+    STOPPED: 6,
+    EDIT: 7
+}
+
 const FILTER = {
     TYPE: {
         CANVAS: 0,
@@ -79,6 +90,7 @@ const TILE = {
 const DEGREE_90 = Math.PI / 2
 
 export {
+    STATE,
     FILTER,
     INPUT,
     PATH,

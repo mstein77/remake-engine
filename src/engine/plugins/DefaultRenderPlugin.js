@@ -1,14 +1,15 @@
-import { RenderPlugin } from "./RenderPlugin.js";
+import { RenderPlugin } from "./classes";
 import "../editor/css/layout.css"
 import "../editor/css/base.css"
 import { d, round } from "helper/helper.js"
+import { STATE } from "core/const"
 
 const IS_DIST = false // TODO replace by env var
 
 class DefaultRenderPlugin extends RenderPlugin {
 
-    constructor(...props) {
-        super(...props)
+    setup() {
+        super.setup()
         this.stackH = ( stackProps, ...props ) => {
             if (typeof stackProps === 'object' && !(stackProps instanceof Node)) {
                 let { class: stackCls = '', ...objProps } = stackProps
@@ -105,76 +106,18 @@ class DefaultRenderPlugin extends RenderPlugin {
         if (expr) return expr
 
         switch (action) {
-            case 'state:' + this.game.states.INIT:
+            case 'state:' + STATE.INIT:
                 return {id: 'game-div', nodes: this.getBootSection()}
 
-            case 'state:' + this.game.states.CONNECT:
+            case 'state:' + STATE.CONNECT:
                 return {id: 'status', nodes: this.getSectionLoading()}
 
-            case 'state:' + this.game.states.PREBOOT_ERROR:
+            case 'state:' + STATE.PREBOOT_ERROR:
                 return {id: 'status', nodes: this.getSectionPreBootError(props)}
 
             case 'main':
                 const nextFrame = !this.system.supportsTouch ? () => {} :
                     () => {
-                        this.game.addTouchDiv(
-                            this.stackH(
-                                {style: 'margin-top: 30px; margin-left: 30px', class: 'full-h'},
-                                this.div({
-                                    id: 'touch_btn_left',
-                                    style: 'width: 35px; height: 75px; margin-top: 35px',
-                                    class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
-                                }),
-                                this.stackH(
-                                    'full-h',
-                                    this.stackV(
-                                        'padded',
-                                        this.div(
-                                            {
-                                                id: 'touch_btn_up',
-                                                style: 'width: 55px; height: 35px',
-                                                class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
-                                            }
-                                        ),
-                                        this.div(
-                                            {style: 'height: 50px'}
-                                        ),
-                                        this.div(
-                                            {
-                                                id: 'touch_btn_down',
-                                                style: 'width: 55px; height: 35px; left: 25px top: 125px',
-                                                class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
-                                            }
-                                        )
-                                    ),
-                                    this.div({
-                                        id: 'touch_btn_right',
-                                        style: 'width: 35px; height: 75px; margin-top: 35px',
-                                        class: 'touch-dir-cell boxed-1 transparent block all-events no-touch-actions'
-                                    }),
-                                    this.div(
-                                        {class: 'flex'}
-                                    ),
-                                    this.stackH(
-                                        'inner-space-h padded',
-                                        this.div(
-                                            {
-                                                id: 'touch_btn_1',
-                                                style: 'width: 55px; height: 55px',
-                                                class: 'touch-dir-cell boxed-1 transparent block all-events'
-                                            }
-                                        ),
-                                        this.div(
-                                            {
-                                                id: 'touch_btn_2',
-                                                style: 'width: 55px; height: 55px',
-                                                class: 'touch-dir-cell boxed-1 transparent block all-events'
-                                            }
-                                        )
-                                    )
-                                )
-                            )
-                        )
                     };
                 return [
                     {id: 'game-div', nodes: this.getMainSection(props), nextFrame},

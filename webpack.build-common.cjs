@@ -359,7 +359,8 @@ module.exports = {
                     helper: path.resolve(__dirname, 'src/engine/helper/'),
                     editor: path.resolve(__dirname, 'src/engine/editor/'),
                     core: path.resolve(__dirname, 'src/engine/core/'),
-                    panes: path.resolve(__dirname, 'src/engine/panes/')
+                    panes: path.resolve(__dirname, 'src/engine/panes/'),
+                    plugins: path.resolve(__dirname, 'src/engine/plugins/')
                 },
                 extensions: ['*', '.js', '.jsx']
             },

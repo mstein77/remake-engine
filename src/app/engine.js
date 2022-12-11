@@ -8210,8 +8210,6 @@ class Gravity {
         this.drag = null;
     }
 
-
-
     setSpeed(v0) {
         this.v0 = v0;
     }

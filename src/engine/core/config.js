@@ -1,6 +1,6 @@
 import { isValidResourceId, d } from "../helper/helper.js";
-import inst from "./instances.js";
 import { ImageResource } from "./classes.js";
+import inst from "./instances.js";
 
 class Config {
 

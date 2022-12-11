@@ -1,8 +1,4 @@
 /* Base CSS */
-.touching {
-    background-color: #FF0000 !important;
-}
-
 html, body {
     cursor: auto;
     overscroll-behavior-x: contain;

@@ -1,7 +1,8 @@
-import { FILTER } from "core/const";
-import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper.js";
-import { ImageResource, AudioResource } from "./classes.js";
-import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin.js";
+import { FILTER } from "core/const"
+import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
+import { ImageResource, AudioResource } from "./classes"
+import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
+import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
 
 /**
  * @type {ResourceLoader}
@@ -15,6 +16,8 @@ let OCM = null
 let game = null
 let system = null
 let filterer = null
+let renderPlugin = null
+let touchControlsPlugin = null
 
 class System {
 
@@ -1290,9 +1293,7 @@ class CanvasManager {
     }
 }
 
-let renderPlugin = null;
-
-export default {
+const inst = {
     setGame: value => {
         if (game !== null) throw Error('There is already a running game instance!')
         game = value
@@ -1305,6 +1306,15 @@ export default {
             renderPlugin = new DefaultRenderPlugin()
         }
         return renderPlugin
+    },
+    setTouchControlsPlugin: value => {
+        touchControlsPlugin = value
+    },
+    get touchControlsPlugin() {
+        if (touchControlsPlugin === null) {
+            touchControlsPlugin = new DefaultTouchControlsPlugin()
+        }
+        return touchControlsPlugin
     },
     setRL: (baseUrl, storage) => RL = new ResourceLoader(new BackEndFetcher(baseUrl), storage),
     get RL() {
@@ -1337,5 +1347,14 @@ export default {
             OCM = new CanvasManager()
         }
         return OCM
+    },
+    get plugins() {
+        const plugins = [ inst.renderPlugin ];
+        if (system.supportsTouch) {
+            plugins.push(inst.touchControlsPlugin)
+        }
+        return plugins
     }
 }
+
+export default inst

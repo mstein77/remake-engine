@@ -1,14 +1,54 @@
-import { ucfirst, d } from "../helper/helper.js";
+import { ucfirst, d } from "../helper/helper";
 
-class RenderPlugin {
+class Plugin {
 
-    constructor(options = {}) {
+    constructor(options) {
         this.game = null
         this.system = null
-        this.watcher = {};
-
         this.options = options
+        this.setup()
+    }
 
+    setup() {}
+
+    setOptions(options) {
+        this.options = options
+    }
+
+    getOption(key, defValue) {
+        if (key in this.options) return this.options[key]
+        return defValue
+    }
+
+    link(game, system) {
+        d('link...')
+        this.game = game
+        this.system = system
+        if (!this.options) this.options = {}
+        this.init(this.options)
+    }
+
+    init(options) {
+        // implement
+    }
+
+    registerListeners() {
+        // implement
+    }
+
+    notify(action, props) {
+        // implement
+    }
+
+    processedChanges(action) {
+        // implement
+    }
+}
+
+class RenderPlugin extends Plugin {
+
+    setup() {
+        this.watcher = {};
         this.filters = {}
 
         this.svg = (...args) => this.createNsElem('http://www.w3.org/2000/svg', 'svg', ...args)
@@ -27,23 +67,6 @@ class RenderPlugin {
             },
             name
         )
-    }
-
-    setGame(value) {
-        this.game = value
-    }
-
-    setSystem(value) {
-        this.system = value
-    }
-
-    setOptions(options) {
-        this.options = options
-    }
-
-    getOption(key, defValue) {
-        if (key in this.options) return this.options[key]
-        return defValue
     }
 
     addFilter(name, filter) {
@@ -243,6 +266,10 @@ class RenderPlugin {
         this.game.running = false
     }
 
+    processedChanges(action) {
+        this.cleanupWatchers()
+    }
+
     notify(action, props) {
         switch(action) {
             case 'error':
@@ -286,4 +313,19 @@ class RenderPlugin {
     }
 }
 
-export { RenderPlugin }
+class TouchControlsPlugin extends Plugin {
+
+    setup(options) {
+        this.touchInputs = new Set()
+    }
+
+    reset() {
+        this.touchInputs.clear()
+    }
+
+    get inputs() {
+        return this.touchInputs
+    }
+}
+
+export { Plugin, RenderPlugin, TouchControlsPlugin }

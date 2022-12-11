@@ -1,3 +1,7 @@
+.touching {
+    background-color: #FF000040 !important;
+}
+
 html.fix-orientation {
     width: 100vh;
     height: 100vw;
@@ -85,11 +89,6 @@ html.fix-orientation {
 
 .touch-dir-cell {
     border: 2px outset #808080
-}
-
-.touch-dir-middle {
-    border: none;
-    background-color: transparent;
 }
 
 
