@@ -3,12 +3,8 @@ const { Hosting } = require('../classes.cjs')
 class ServerWithNodejsHosting extends Hosting {
 
     init(config) {
-        this.supports.checkout = false
+        this.supports.checkout = true
         this.supports.nodejs = true
-    }
-
-    get postBuildMessage() {
-        return `Upload the content of ${this.publicDir} to a target directory on your webserver`
     }
 }
 

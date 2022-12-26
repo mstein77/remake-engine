@@ -47,6 +47,7 @@ class DefaultRenderPlugin extends RenderPlugin {
 
     getCssConstantsValues() {
         return {
+            editorBgRgb: '#202030',
             boxBorderWidthPx: 1,
             boxBorderRgb: "#2b7386",
             lessPerc: 59,

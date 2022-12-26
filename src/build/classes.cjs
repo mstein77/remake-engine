@@ -1,6 +1,21 @@
 const fs = require("fs")
 const path = require("path")
 
+const DEPLOY = {
+    METHOD: {
+        UPLOAD_ROOT: 'upload-dist-to-root',
+        UPLOAD_PUBLIC: 'upload-dist-to-public',
+        CHECKOUT: 'checkout'
+    }
+}
+const RESOURCE = {
+    LOADING: {
+        LOCAL: 'local',
+        STATIC: 'static',
+        API: 'api'
+    }
+}
+
 const absDir = {
     engine: ( ...relPath ) => path.resolve( __dirname, '../../', ...relPath ),
     src: ( ...relPath ) => path.resolve(absDir.engine('src'), ...relPath ),
@@ -14,9 +29,11 @@ const configParams = {
     title: {type: 'string'},
     browsers: {type: 'string'},
     editor: {type: 'bool'},
-    touch: {type: 'bool'},
     gzip: {type: 'bool'},
-    resources: {type: 'string'},
+    resourceloading: {type: 'string', key: 'resourceLoading', values: Object.values(RESOURCE.LOADING)},
+    apimaxjsonsize: {type: 'string', key: 'apiMaxJsonSize'},
+    deployMethod: {type: 'string', key: 'deployMethod', values: Object.values(DEPLOY.METHOD)},
+    hosting: {type: 'string'},
     minimize: {type: 'bool'},
     server: {type: 'bool'},
     baseUrl: {type: 'string', key: 'baseUrl'},
@@ -85,13 +102,28 @@ function getConfigForCtx(args) {
     const { dist, ...config } = configJson
     const envOverwrites = extractEnvOverwrites(config, process.env)
     const appEnvOverwrites = extractAppEnvOverwrites(config, process.env)
-    if (!isDistBuild || !dist) return { ...config, ...appEnvOverwrites, ...envOverwrites }
 
-    for (let [key, value] of Object.entries(dist)) {
-        if (key === 'envPrefix') continue
-        config[key] = value
+    let ctxConfig
+
+    if (!isDistBuild || !dist) {
+        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
+    } else {
+        for (let [key, value] of Object.entries(dist)) {
+            if (key === 'envPrefix') continue
+            config[key] = value
+        }
+        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
     }
-    return { ...config, ...appEnvOverwrites, ...envOverwrites }
+
+    // validation
+    for (const [ name, info ] of Object.entries(configParams)) {
+        const { type, values, key = name } = info
+        if (!values) continue
+        const value = ctxConfig[key]
+        if (!values.includes(value)) throw Error(`Value "${value}" not allowed for config key "${key}"! Allowed values: "${values.join('", "')}"`)
+    }
+
+    return ctxConfig
 }
 
 /**
@@ -130,15 +162,15 @@ class Hosting {
         if (isDist) {
             if (this.server && !this.supportsNodejs)
                 this.throw('Server requires nodejs! Disable "server" in your dist config or use a hosting which supports nodejs!')
-            if (this.deployMethod === 'upload' && !this.supportsManualUpload)
-                this.throw('You selected "upload" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
-            if (this.deployMethod === 'checkout' && !this.supportsCheckout)
+            if ([DEPLOY.METHOD.UPLOAD_PUBLIC, DEPLOY.METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !this.supportsManualUpload)
+                this.throw(`You selected "${config.deployMethod}" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!`)
+            if (this.deployMethod === DEPLOY.METHOD.CHECKOUT && !this.supportsCheckout)
                 this.throw('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
 
             const resourceDirs = ['audio', 'image', 'json']
             const rawResources = ['audio']
 
-            const staticResources = (!this.server || config.resources === 'static') ? [ ...resourceDirs ] : rawResources
+            const staticResources = (!this.server || config.resourceLoading === RESOURCE.LOADING.STATIC) ? [ ...resourceDirs ] : rawResources
 
             for (let dir of resourceDirs) {
                 this.copyPatterns.push({
@@ -146,8 +178,21 @@ class Hosting {
                     to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absDir.dist('resources', dir)
                 })
             }
-            if (this.deployMethod === 'upload') {
+            if (this.deployMethod === DEPLOY.METHOD.UPLOAD_PUBLIC) {
                 this.messages.push(`Upload the content of "${absDir.dist()}" to the public folder of your http web-server`)
+            }
+            if (this.deployMethod === DEPLOY.METHOD.UPLOAD_ROOT) {
+                const distPackageJsonPath = absDir.tmp('package.json')
+                syncFs.writeJson(distPackageJsonPath, {
+                    name: 'game',
+                    version: '1.0.0',
+                    dependencies: {
+                        express: '^4.18.2'
+                    }
+                });
+                this.copyPatterns.push({from: distPackageJsonPath, to: absDir.dist('package.json')})
+                this.messages.push(`Upload the content of "${absDir.dist()}" to the document root folder of your http web-server`);
+                this.messages.push(`Afterwards execute "npm install" in this directory`);
             }
             return
         }
@@ -157,8 +202,7 @@ class Hosting {
     }
 
     cleanUp() {
-        const path = absDir.tmp('instructions.txt')
-        syncFs.writeContent(path, '')
+        syncFs.clearDir(absDir.tmp())
     }
 
     init(config) {}
@@ -186,7 +230,7 @@ class Hosting {
     }
 
     get postBuildMessage() {
-        return null
+        return this.messages.length ? this.messages.join("\n") : null
     }
 
     prepareForCopy() {}
@@ -219,6 +263,24 @@ const syncFs = {
         return fs.readdirSync( ...args )
     },
 
+    unlink: filePath => fs.unlinkSync(filePath),
+
+    rmDir: ( ...args ) => fs.rmSync( ...args ),
+
+    clearDir: dirPath => {
+        if (!syncFs.dirExists(dirPath)) return
+        const items = syncFs.readdir(dirPath, {withFileTypes: true})
+        for (let item of items) {
+            const currPath = path.resolve(dirPath, item.name)
+            if (item.isDirectory()) {
+                syncFs.rmDir(currPath, {recusrive: true, force: true})
+            } else {
+                syncFs.unlink(currPath)
+            }
+        }
+
+    },
+
     fileExists: filePath => {
         try {
             const stat = fs.statSync(filePath);
@@ -246,7 +308,7 @@ const syncFs = {
         return json
     },
 
-    readFile: filePath => fs.readFileSync(filePath),
+    readFile: ( ...args ) => fs.readFileSync( ...args ),
 
     writeContent: (filePath, content) => {
         fs.writeFileSync(filePath, content)
@@ -258,15 +320,12 @@ const syncFs = {
     }
 }
 
-const getFileNameForHosting = name => {
-    return 'server-with-nodejs.cjs'
-}
-
 module.exports = {
     getConfigForCtx,
     Hosting,
     syncFs,
     absDir,
-    configJson,
-    getFileNameForHosting
+    RESOURCE,
+    DEPLOY,
+    configJson
 }

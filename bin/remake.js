@@ -161,12 +161,13 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.start = 'node dist/server.cjs';
+        packageJson.scripts.start = 'run start --prefix ' + engineBasePath;
         packageJson.scripts.game = 'npm run build-game-dev --prefix ' + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
         packageJson.scripts.build = "npm run build-game-prod --prefix " + engineBasePath;
+
         writeJson(packageJsonPath, packageJson);
         packageJson = readJson(packageJsonPath);
     }
@@ -176,11 +177,13 @@ try {
         browsers: '>2.25%, not ie 11, not op_mini all',
         editor: true,
         editorKey: 'Dead',
-        resources: 'server',
-        touch: true,
+        resourceLoading: 'api',
+        apiMaxJsonSize: '10mb',
+        deployMethod: 'checkout',
+        hosting: 'server-with-nodejs',
+        server: true,
         compress: true,
         minimize: false,
-        server: true,
         baseUrl: 'http://localhost:8080',
         sourceMaps: true,
         sourceMapType: 'eval-cheap-source-map',
@@ -190,9 +193,7 @@ try {
         clientLogging: 'info',
         serverLogging: 'info',
         serverLoggingFormat: 'dev',
-        screenBgRgb: '#808080',
         stats: 'normal',
-        deployMethod: 'ftp:manual',
         analyseBundles: false,
         debugPlugins: false,
         port: 8080,

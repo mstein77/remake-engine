@@ -6,10 +6,7 @@ const morgan = require('morgan')
 const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
 
-const MAX_JSON_SIZE = '10mb'
-
 const setupAppMiddlewares = (app, config = null) => {
-
     const absDir = {
         root: ( ...relPath ) => path.resolve( __dirname, config.IS_DIST ? '' : '../../../../', ...relPath ),
         public: ( ...relPath ) => path.resolve(absDir.root('public'), ...relPath ),
@@ -133,8 +130,10 @@ const setupAppMiddlewares = (app, config = null) => {
         }
         app.use(morgan(config.serverLoggingFormat, options))
     }
-    app.use(bodyParser.json({ limit: MAX_JSON_SIZE }))
-    app.use(bodyParser.urlencoded({ extended: true, limit: MAX_JSON_SIZE }));
+    app.use(bodyParser.json(config.IS_DIST ? {} : { limit: config.API_MAX_JSON_SIZE }))
+    if (!config.IS_DIST) {
+        app.use(bodyParser.urlencoded({ extended: true, limit: config.API_MAX_JSON_SIZE }));
+    }
 
     const staticResources = ['audio']
     for (const resource of staticResources) {

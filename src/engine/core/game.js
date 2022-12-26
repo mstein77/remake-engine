@@ -63,7 +63,6 @@ class Game {
         this.fpsTracker = new FpsTracker()
 
         this.cssConstants = {
-            editorBgRgb: SCREEN_BG_RGB,
             ...this.renderPlugin.getCssConstantsValues()
         }
         const style = document.body.style;

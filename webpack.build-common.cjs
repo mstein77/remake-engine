@@ -1,4 +1,4 @@
-const { getFileNameForHosting, absDir, syncFs, getConfigForCtx, configJson } = require('./src/build/classes.cjs')
+const { absDir, syncFs, getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes.cjs')
 
 const { DefinePlugin, NormalModuleReplacementPlugin } = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -11,7 +11,7 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
-const Hosting = require(absDir.src('build/hosting/' + getFileNameForHosting(configJson.deployMethod)))
+const Hosting = require(absDir.src('build/hosting/' + configJson.hosting + '.cjs'))
 const fs = require("fs");
 const path = require("path");
 const enginePackageJson = syncFs.readJson(absDir.engine('package.json'))
@@ -36,7 +36,8 @@ module.exports = {
                 LOGGING: JSON.stringify(config.serverLogging),
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
                 IS_DIST: JSON.stringify(isDistBuild),
-                RESOURCES_API: JSON.stringify(!isDistBuild || config.resources === 'api')
+                API_MAX_JSON_SIZE: JSON.stringify(config.apiMaxJsonSize),
+                RESOURCES_API: JSON.stringify(!isDistBuild || config.resourceLoading === RESOURCE.LOADING.API)
             })
         ];
         return {
@@ -106,7 +107,7 @@ module.exports = {
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 GAME_ID: JSON.stringify(gameId),
                 IS_DIST: JSON.stringify(isDistBuild),
-                RESOURCES_API: JSON.stringify(!isDistBuild ||config.resources === 'api')
+                RESOURCES_API: JSON.stringify(!isDistBuild ||config.resourceLoading === RESOURCE.LOADING.API)
             }),
             new HtmlWebpackPlugin({
                 filename: 'index.html',
@@ -119,7 +120,7 @@ module.exports = {
         if (config.editor) {
             entryParts.push(absDir.src('engine/editor/index.js'))
         }
-        if (isDistBuild && config.resources !== 'api') {
+        if (isDistBuild && config.resourceLoading !== RESOURCE.LOADING.API) {
             const getResourceIds = type => syncFs.readFilesRec(absDir.resources(type))
             const getResourcesJson = name => {
                 const filePath = absDir.resources(name + '.json')
@@ -150,7 +151,7 @@ module.exports = {
                 image: getResourceIds('image'),
                 audio: getResourceIds('audio')
             }
-            const useCache = config.resources === 'local'
+            const useCache = config.resourceLoading === RESOURCE.LOADING.LOCAL
             const resourceInfo = {
                 cache: {
                     json: useCache ? getResourceCache('json', static.json) : {},
