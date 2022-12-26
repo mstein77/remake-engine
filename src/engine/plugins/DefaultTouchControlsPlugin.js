@@ -59,14 +59,25 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
         this.touchedElems = newTouchedElems
     }
 
+    isNestedInNode(tagName, elem, maxLevel = null) {
+        if (!elem) return false
+        if (elem.nodeName === tagName) return true
+        if (maxLevel !== null) {
+            maxLevel--
+            if (maxLevel <= 0) return false
+        }
+        return this.isNestedInNode(tagName, elem.parentNode)
+    }
+
     registerListeners() {
         const { game } = this
-        const elem = game.getMandatoryElem('touch-div')
+        const elem = document.body;
         game.registerListeners([
             {
                 elem,
                 type: 'touchstart',
                 handler: e => {
+                    if (this.isNestedInNode('BUTTON', e.target, 2)) return
                     this.syncEventTouches(e.touches, 'start')
                     e.preventDefault()
                 }
@@ -75,6 +86,7 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                 elem,
                 type: 'touchmove',
                 handler: e => {
+                    if (this.isNestedInNode('BUTTON', e.target, 2)) return
                     this.syncEventTouches(e.touches, 'move')
                     e.preventDefault()
                 }
@@ -83,6 +95,7 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                 elem,
                 type: 'touchcancel',
                 handler: e => {
+                    if (this.isNestedInNode('BUTTON', e.target, 2)) return
                     this.syncEventTouches(e.touches, 'cancel')
                     e.preventDefault()
                 }
@@ -91,6 +104,7 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                 elem,
                 type: 'touchend',
                 handler: e => {
+                    if (this.isNestedInNode('BUTTON', e.target, 2)) return
                     this.syncEventTouches(e.touches, 'end')
                     e.preventDefault()
                 }
@@ -107,46 +121,43 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                 break;
 
             case 'main':
-                const cls = 'touch-btn boxed-1 transparent block'
+                const cls = 'touch-btn boxed-1 transparent block all-events'
                 this.game.addTouchDiv(
-                    div(
-                        {class: 'full-h all-events', style: 'padding-top: 30px; padding-bottom: 30px; opacity: 0.3'},
+                    stackH(
+                        'full-h',
+                        div(
+                            {class: 'grid', style: 'margin-left: 20px; margin-top: 45px; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; grid-gap: 2px'},
+                            div({id: 'touch-btn-left_up', class: cls, style: 'width: 30px; height: 30px; margin-left: 18px; margin-top: 18px'}),
+                            div({id: 'touch-btn-up', class: cls}),
+                            div({id: 'touch-btn-right_up', class: cls, style: 'width: 30px; height: 30px; margin-right: 18px; margin-top: 18px'}),
+                            div({id: 'touch-btn-left', class: cls}),
+                            div(),
+                            div({id: 'touch-btn-right', class: cls}),
+                            div({id: 'touch-btn-left_down', class: cls, style: 'width: 30px; height: 30px; margin-bottom: 18px; margin-left: 18px'}),
+                            div({id: 'touch-btn-down', class: cls}),
+                            div({id: 'touch-btn-right_down', class: cls, style: 'width: 30px; height: 30px; margin-bottom: 18px; margin-right: 18px'})
+                        ),
+                        div(
+                            {class: 'flex'}
+                        ),
                         stackH(
-                            'full-h',
+                            {class: 'inner-space-h padded', style: 'margin-right: 30px; margin-top: 45px'},
                             div(
-                                {class: 'grid', style: 'margin-left: 20px; margin-top: 45px; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; grid-gap: 2px'},
-                                div({id: 'touch-btn-left_up', class: cls, style: 'width: 30px; height: 30px; margin-left: 18px; margin-top: 18px'}),
-                                div({id: 'touch-btn-up', class: cls}),
-                                div({id: 'touch-btn-right_up', class: cls, style: 'width: 30px; height: 30px; margin-right: 18px; margin-top: 18px'}),
-                                div({id: 'touch-btn-left', class: cls}),
-                                div(),
-                                div({id: 'touch-btn-right', class: cls}),
-                                div({id: 'touch-btn-left_down', class: cls, style: 'width: 30px; height: 30px; margin-bottom: 18px; margin-left: 18px'}),
-                                div({id: 'touch-btn-down', class: cls}),
-                                div({id: 'touch-btn-right_down', class: cls, style: 'width: 30px; height: 30px; margin-bottom: 18px; margin-right: 18px'})
+                                {
+                                    id: 'touch_btn_1',
+                                    style: 'width: 55px; height: 110px',
+                                    class: 'touch-btn boxed-1 transparent block all-events'
+                                }
                             ),
                             div(
-                                {class: 'flex'}
-                            ),
-                            stackH(
-                                {class: 'inner-space-h padded', style: 'margin-right: 30px; margin-top: 45px'},
-                                div(
-                                    {
-                                        id: 'touch_btn_1',
-                                        style: 'width: 55px; height: 110px',
-                                        class: 'touch-btn boxed-1 transparent block all-events'
-                                    }
-                                ),
-                                div(
-                                    {
-                                        id: 'touch_btn_2',
-                                        style: 'width: 55px; height: 110px',
-                                        class: 'touch-btn boxed-1 transparent block all-events'
-                                    }
-                                )
+                                {
+                                    id: 'touch_btn_2',
+                                    style: 'width: 55px; height: 110px',
+                                    class: 'touch-btn boxed-1 transparent block all-events'
+                                }
                             )
                         )
-                    ),
+                    )
                 )
                 break;
         }

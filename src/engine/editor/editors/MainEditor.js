@@ -920,13 +920,13 @@ function BaseAppInner({ contentProvider, active }) {
             () => {
                 const gameRef = wContext.game;
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
+
                 if (wContext.isDirty()) {
-                    // TODO: hier sollte eigentlich eher der Screen restartet werden?
-                    // zumindest sollte der Editor nicht direkt wieder geöffnet werden
-                    // man könnte sich aber den letzten Editor durchaus merken
-                    gameRef.reloadScreen(wContext.registry('callStack'));
+                    gameRef.reloadScreen(
+                    //    wContext.registry('callStack')
+                    );
                 } else {
-                    gameRef.restart(true);
+                    gameRef.restart();
                 }
             }
         );

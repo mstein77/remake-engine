@@ -952,7 +952,7 @@ function TextPaneEditor({ model, resource }) {
                                 exec: () => storeModel(eContextRef)
                             },
                             deploy: {
-                                can: () => eContextRef.current.hasStorePos(),
+                                can: () => !IS_DIST && eContextRef.current.hasStorePos(),
                                 exec: () => deployModel()
                             },
                             export: () =>  openExportModal()

@@ -1139,9 +1139,8 @@ function useExportModal({ model, resource, update, name }) {
         update();
     };
     const deployModel = () => {
-        // TODO: reactivate or make dependant on environment
-        d('DEACTIVATED!');
-        return;
+        if (IS_DIST) return
+
         const gameRef = wContext.game;
         const resourcesInfo = getModelResources();
 

@@ -332,7 +332,7 @@ class AudioResource {
         this.updateVolume()
         this.lastAction = 'load'
         return this.audio.play().then(() => {
-            if (this.lastAction === 'pause') {
+            if (this.lastAction === 'pause' || !inst.game.running) {
                 this.audio.pause();
             } else {
                 this.lastAction = 'play';

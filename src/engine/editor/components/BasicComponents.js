@@ -3770,7 +3770,6 @@ function useWatcher(name) {
             }
         }
         if (changed) {
-            d('WATCHER:', name, '->', ...props );
             watchRef.current = props;
         }
     }

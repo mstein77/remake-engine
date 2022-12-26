@@ -4,8 +4,6 @@ import "../editor/css/base.css"
 import { d, round } from "helper/helper.js"
 import { STATE } from "core/const"
 
-const IS_DIST = false // TODO replace by env var
-
 class DefaultRenderPlugin extends RenderPlugin {
 
     setup() {
@@ -420,7 +418,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                     {class: 'padded full-h', style: 'background-color: #494964'},
                     !isMobile && div(
                         {class: 'min-content-h nowrap-shorten', style: 'color: #9eaca9; font-family: Tahoma'},
-                        'Remake Engine V' + VERSION_ENGINE + ' - © 2022 Servants of Hex'
+                        'Remake Engine V' + VERSION_ENGINE + ' - © 2023 do-while-true'
                     ),
                     div(
                         {class: 'flex mono', style: 'color: white'},

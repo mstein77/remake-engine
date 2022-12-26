@@ -1,28 +1,28 @@
-const path = require('path');
-const express = require('express');
-const cors = require('cors');
-const setupAppMiddlewares = require('./setupMiddlewares.cjs');
+const path = require('path')
+const express = require('express')
+const cors = require('cors')
 
-const STATIC_DIR = path.resolve(__dirname, "../public");
-const RESOURCE_DIR = path.join(__dirname, '../resources');
+const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
 
-const app = express();
+const STATIC_DIR = path.resolve(__dirname, "public")
 
-app.use(cors());
-// app.use('/resources', express.static(STATIC_DIR)); // STATIC_DIR)); //DIST_DIR));
-app.use('/js', express.static(STATIC_DIR + '/js')); // STATIC_DIR)); //DIST_DIR));
-app.use('/audio', express.static(
-STATIC_DIR +
-    '/audio')); // STATIC_DIR)); //DIST_DIR));
-app.use('/css', express.static(STATIC_DIR + '/css')); // STATIC_DIR)); //DIST_DIR));
+const app = express()
 
-app.options('*', cors()); // include before other routes
+app.use(cors())
 
-app.get("/", function(req, res) {
+app.use('/js', express.static(STATIC_DIR + '/js')) // STATIC_DIR)); //DIST_DIR));
+app.use('/audio', express.static(STATIC_DIR + '/audio')); // STATIC_DIR)); //DIST_DIR));
+app.use('/css', express.static(STATIC_DIR + '/css')) // STATIC_DIR)); //DIST_DIR));
+
+app.options('*', cors())
+
+app.get('/', function(req, res) {
     res.sendFile(
-        path.join(STATIC_DIR, "index.html"))
-    }
-);
+        path.join(STATIC_DIR, "index.html")
+    )
+})
+if (setupAppMiddlewares) {
+    setupAppMiddlewares(app, {serverLogging: LOGGING, serverLoggingFormat: LOGGING_FORMAT, IS_DIST: true})
+}
 
-setupAppMiddlewares(app, {serverLogging: LOGGING, serverLoggingFormat: LOGGING_FORMAT});
-app.listen(PORT);
+app.listen(PORT)

@@ -298,7 +298,7 @@ const addTreeResource = (tree, resId, resourceInfo, level = 0) => {
     const [type, id] = resId.split(':');
     for (let resource of resourceInfo.resources) {
         if (resource.id === id) {
-            tree.push({level, id, type, source: 'browser'});
+            tree.push({level, id, type, source: ucfirst(inst.RL.getResourceSource(resId))});
             break;
         }
     }

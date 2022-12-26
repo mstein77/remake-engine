@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "jest",
+    "start": "node src/server/static.cjs",
     "build-game-dev": "DEBUG=express:router:dispatching* nodemon -w '../../*.cjs' -e cjs --exec 'webpack-dev-server' -- --config webpack.build-dev.cjs",
-    "build-game-prod": "webpack --config webpack.build-dist.cjs",
+    "build-game-prod": "webpack --config webpack.build-dist.cjs && cat ./tmp/instructions.txt",
     "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
   "engines": {

@@ -21,7 +21,6 @@ class Plugin {
     }
 
     link(game, system) {
-        d('link...')
         this.game = game
         this.system = system
         if (!this.options) this.options = {}

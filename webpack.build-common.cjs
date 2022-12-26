@@ -1,141 +1,32 @@
-const path = require('path');
-const fs = require('fs');
+const { getFileNameForHosting, absDir, syncFs, getConfigForCtx, configJson } = require('./src/build/classes.cjs')
 
-const { DefinePlugin } = require("webpack");
-const HtmlWebpackPlugin = require("html-webpack-plugin");
-const ESLintPlugin = require('eslint-webpack-plugin');
-const TerserPlugin = require("terser-webpack-plugin");
-const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default;
-const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
-const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const { DefinePlugin, NormalModuleReplacementPlugin } = require("webpack")
+const HtmlWebpackPlugin = require("html-webpack-plugin")
+const ESLintPlugin = require('eslint-webpack-plugin')
+const TerserPlugin = require("terser-webpack-plugin")
+const StatoscopeWebpackPlugin = require('@statoscope/webpack-plugin').default
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin")
+const MiniCssExtractPlugin = require("mini-css-extract-plugin")
+const CopyWebpackPlugin = require('copy-webpack-plugin')
+const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
-const gamePath = path.resolve(__dirname, '../../');
-const gameDistPath = path.resolve(gamePath, 'dist');
-const publicDistPath = path.resolve(gameDistPath, 'public');
-
-function getPath(dir, rel) {
-    let path = dir;
-    if (!path.endsWith('/')) {
-        path += '/';
-    }
-    return path + rel;
-}
-
-const configParams = {
-    title: {type: 'string'},
-    browsers: {type: 'string'},
-    editor: {type: 'bool'},
-    touch: {type: 'bool'},
-    gzip: {type: 'bool'},
-    minimize: {type: 'bool'},
-    server: {type: 'bool'},
-    baseUrl: {type: 'string', key: 'baseUrl'},
-    sourcemaps: {type: 'bool', key: 'sourceMaps'},
-    sourcemaptype: {type: 'string', key: 'sourceMapType'},
-    openbrowser: {type: 'string', key: 'openBrowser'},
-    port: {type: 'int'},
-    logging: {type: 'string'},
-    stats: {type: 'string'},
-    envprefix: {type: 'string', key: 'envPrefix'},
-}
-
-require('dotenv').config({path: getPath(gamePath, '.env')});
-
-const configJson = true ? require(getPath(gamePath, 'config.cjs')) : {};
-
-function extractEnvOverwrites(config, env) {
-    let prefix = config.envPrefix;
-    if (!prefix || !env) return {};
-
-    prefix = prefix.toLowerCase();
-    const len = prefix.length;
-    const envOverwrites = {};
-    for (let [name, value] of Object.entries(env)) {
-        name = name.toLowerCase();
-        if (!name.startsWith(prefix) || name.length <= len) continue;
-        const lcKey = name.substring(len);
-        const configParam = configParams[lcKey];
-        if (!configParam) continue;
-        switch (configParam.type) {
-            case 'bool':
-                if (['true', 'false'].includes(value.toLowerCase())) {
-                    value = value[0].toLowerCase() === 't';
-                }
-                break;
-
-            case 'int':
-                value = parseInt(value, 10);
-                break;
-        }
-        envOverwrites[configParam.key ? configParam.key : lcKey] = value
-    }
-    return envOverwrites
-}
-
-function extractAppEnvOverwrites(config, env) {
-    const appEnv = env.APP_ENV;
-    const appEnvOverwrites = {};
-    const keys = Object.keys(config);
-    for (let key of keys) {
-        const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i);
-        if (!match) continue;
-        const matchEnv = match[2];
-        const matchKey = match[1];
-        if (appEnv && matchEnv === appEnv) {
-            appEnvOverwrites[matchKey] = config[key];
-        }
-        delete config[key];
-    }
-    return appEnvOverwrites
-}
-
-function getConfigForCtx(args) {
-    const configArg = args && args.config;
-    const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
-    const { dist, ...config } = configJson;
-    const envOverwrites = extractEnvOverwrites(config, process.env);
-    const appEnvOverwrites = extractAppEnvOverwrites(config, process.env);
-    if (!isDistBuild || !dist) return { ...config, ...appEnvOverwrites, ...envOverwrites };
-
-    for (let [key, value] of Object.entries(dist)) {
-        if (key === 'envPrefix') continue;
-        config[key] = value;
-    }
-    return { ...config, ...appEnvOverwrites, ...envOverwrites };
-}
-
-function fileExists(path) {
-    try {
-        const stat = fs.statSync(path);
-        if (!stat.isFile()) return false;
-        return true
-    } catch (err) {
-        return false
-    }
-}
-
-function readJson(path) {
-    if (!fileExists(path)) throw Error(`File not found: ${path}`);
-    const rawdata = fs.readFileSync(path);
-    const json = JSON.parse(rawdata);
-    return json
-}
-
-const enginePackageJson = readJson(path.join(__dirname, 'package.json'));
-
-const gamePackageJson = readJson(path.join(gamePath, 'package.json'));
-const gameId = gamePackageJson.name;
+const Hosting = require(absDir.src('build/hosting/' + getFileNameForHosting(configJson.deployMethod)))
+const fs = require("fs");
+const path = require("path");
+const enginePackageJson = syncFs.readJson(absDir.engine('package.json'))
+const gamePackageJson = syncFs.readJson(absDir.game('package.json'))
+const gameId = gamePackageJson.name
 
 module.exports = {
     gameId,
-    gamePath,
-    publicDistPath,
+    absDir,
     getConfigForCtx,
-    extractEnvOverwrites,
     getServerWebpackConfig: args => {
-        const config = getConfigForCtx(args);
-        const port = config.port ? config.port : 8080;
+        const config = getConfigForCtx(args)
+        const configArg = args && args.config
+        const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
+        const port = config.port ? config.port : 8080
         const plugins = [
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:' + port),
@@ -143,18 +34,20 @@ module.exports = {
                 VERSION_ENGINE: JSON.stringify(enginePackageJson.version),
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 LOGGING: JSON.stringify(config.serverLogging),
-                LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat)
+                LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
+                IS_DIST: JSON.stringify(isDistBuild),
+                RESOURCES_API: JSON.stringify(!isDistBuild || config.resources === 'api')
             })
         ];
         return {
             name: 'server',
-            context: __dirname,
-            dependencies: ['frontend'],
+            context: absDir.engine(),
             target: 'node',
-            entry: getPath(__dirname, 'src/server/index.cjs'),
+            entry: absDir.src('server/index.cjs'),
             output: {
-                path: gameDistPath,
-                filename: 'server.cjs'
+                path: absDir.dist(),
+                filename: 'server.cjs',
+                clean: true
             },
             stats: {
                 preset: config.stats,
@@ -191,20 +84,19 @@ module.exports = {
             plugins,
             resolve: {
                 alias: {
-                    helper: path.resolve(__dirname, 'src/engine/helper/')
+                    helper: absDir.src('engine/helper') + '/'
                 },
                 extensions: ['*', '.js']
             }
         }
     },
     getCommonWebpackConfig: args => {
-        const config = getConfigForCtx(args);
-        const configArg = args && args.config;
-        const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'));
-        const entryParts = [getPath(gamePath, 'src/index.js')];
-        if (config.editor) {
-            entryParts.push(getPath(__dirname, 'src/engine/editor/index.js'))
-        }
+        const config = getConfigForCtx(args)
+        const configArg = args && args.config
+        const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
+        const hosting = new Hosting(config, isDistBuild)
+        const pubPrefix = config.server ? 'public' : ''
+
         const plugins = [
             new DefinePlugin({
                 BASE_URL: JSON.stringify(config.baseUrl ? config.baseUrl : 'http://localhost:8080'),
@@ -212,13 +104,80 @@ module.exports = {
                 EDITOR_KEY: JSON.stringify(config.editorKey),
                 VERSION_ENGINE: JSON.stringify(enginePackageJson.version),
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
-                GAME_ID: JSON.stringify(gameId)
+                GAME_ID: JSON.stringify(gameId),
+                IS_DIST: JSON.stringify(isDistBuild),
+                RESOURCES_API: JSON.stringify(!isDistBuild ||config.resources === 'api')
             }),
             new HtmlWebpackPlugin({
+                filename: 'index.html',
                 inject: 'body',
                 title: config.title
             })
         ];
+
+        const entryParts = [absDir.game('src/index.js')]
+        if (config.editor) {
+            entryParts.push(absDir.src('engine/editor/index.js'))
+        }
+        if (isDistBuild && config.resources !== 'api') {
+            const getResourceIds = type => syncFs.readFilesRec(absDir.resources(type))
+            const getResourcesJson = name => {
+                const filePath = absDir.resources(name + '.json')
+                return syncFs.fileExists(filePath) ? syncFs.readJson(filePath) : {}
+            }
+            const getResourceCache = (type, ids) => {
+                const cache = {}
+                const ext = type === 'json' ? '.json' : ''
+
+                const getContent =
+                    type === 'json' ? filePath => syncFs.readJson(filePath) :
+                        filePath => {
+                            const imgContent = syncFs.readFile(filePath)
+                            const imgType = path.extname(filePath)
+                            const base64Image = Buffer.from(imgContent, 'binary').toString('base64')
+                            return `data:image/${imgType.split('.').pop()};base64,${base64Image}`
+                        }
+
+                for (const id of ids) {
+                    const filePath = absDir.resources(type, id + ext)
+                    let content = getContent(filePath)
+                    cache[id] = content
+                }
+                return cache
+            }
+            const static = {
+                json: getResourceIds('json').map(id => id.endsWith('.json') ? id.substring(0, id.length - 5) : id),
+                image: getResourceIds('image'),
+                audio: getResourceIds('audio')
+            }
+            const useCache = config.resources === 'local'
+            const resourceInfo = {
+                cache: {
+                    json: useCache ? getResourceCache('json', static.json) : {},
+                    image: useCache ? getResourceCache('image', static.image) : {},
+                    audio: {}
+                },
+                indirect: getResourcesJson('indirect'),
+                direct: getResourcesJson('direct'),
+                static
+            }
+            syncFs.writeContent(
+                absDir.tmp('resources-info.js'),
+`const resourceInfo = ${JSON.stringify(resourceInfo)}
+export default resourceInfo`
+            )
+            plugins.push(
+                new NormalModuleReplacementPlugin(
+                    /fetcher\/api/,
+                    function (resource) {
+                        resource.request = resource.request.replace(
+                            /api/,
+                            `static`
+                        )
+                    }
+                )
+            )
+        }
         if (true || isDistBuild) {
             plugins.push(new CssMinimizerPlugin());
             plugins.push(new MiniCssExtractPlugin({filename: 'css/[name].[contenthash].css'}))
@@ -226,8 +185,8 @@ module.exports = {
         if (config.eslint) {
             plugins.push(
                 new ESLintPlugin({
-                    context: path.join(gamePath, 'src'),
-                    overrideConfigFile: path.join(gamePath, '.eslintrc.cjs')
+                    context: absDir.src(),
+                    overrideConfigFile: absDir.game('.eslintrc.cjs')
                 })
             )
         }
@@ -253,7 +212,7 @@ module.exports = {
                 },
                 extractComments: true
             })
-        ];
+        ]
         if (true || isDistBuild) {
             minimizer.push(new CssMinimizerPlugin({
                 minimizerOptions: {
@@ -264,20 +223,30 @@ module.exports = {
                         },
                     ],
                 },
-            }));
+            }))
         }
+        const patterns = hosting.getCopyPatterns()
+        if (patterns.length) {
+            plugins.push(new CopyWebpackPlugin({
+                patterns
+            }))
+        }
+        plugins.push(new PostBuildMessagePlugin(hosting))
+        const dependencies = (!isDistBuild || config.server) ? ['server'] : [];
+
         return {
             name: 'frontend',
-            context: __dirname,
+            context: absDir.engine(),
+            dependencies,
             devtool: config.sourceMaps && config.sourceMapType,
             entry: {
                 game: entryParts
             },
             output: {
-                path: publicDistPath,
+                path: absDir.dist(pubPrefix),
                 clean: true,
-                filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js',  // Name of generated bundle after build
-                publicPath: '/' // public URL of the output directory when referenced in a browser
+                filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js',
+                publicPath: '/'
             },
             stats: {
                 preset: config.stats,
@@ -297,7 +266,7 @@ module.exports = {
                             name(module, chunks, cacheGroupKey) {
                                 const packageName = module.context.match(
                                     /[\\/]2dfireengine[\\/]node_modules[\\/](.*?)([\\/]|$)/
-                                )[1];
+                                )[1]
                                 return `${cacheGroupKey}.${packageName.replace("@", "")}`
                             },
                             filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js'
@@ -344,6 +313,9 @@ module.exports = {
                     {
                         test: /\.(woff|woff2|eot|ttf|otf)$/i,
                         type: 'asset/resource',
+                        generator: {
+                            filename: 'css/[' + (isDistBuild ? 'contenthash' : 'name') + '][ext]',
+                        }
                     },
                     {
                         test: /\.m?js$/,
@@ -356,11 +328,11 @@ module.exports = {
             plugins,
             resolve: {
                 alias: {
-                    helper: path.resolve(__dirname, 'src/engine/helper/'),
-                    editor: path.resolve(__dirname, 'src/engine/editor/'),
-                    core: path.resolve(__dirname, 'src/engine/core/'),
-                    panes: path.resolve(__dirname, 'src/engine/panes/'),
-                    plugins: path.resolve(__dirname, 'src/engine/plugins/')
+                    helper: absDir.src('engine/helper') + '/',
+                    editor: absDir.src('engine/editor') + '/',
+                    core: absDir.src('engine/core') + '/',
+                    panes: absDir.src('engine/panes') + '/',
+                    plugins: absDir.src('engine/plugins') + '/'
                 },
                 extensions: ['*', '.js', '.jsx']
             },
@@ -370,4 +342,4 @@ module.exports = {
             }
         }
     }
-};
+}

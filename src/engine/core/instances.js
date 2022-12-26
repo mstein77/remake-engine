@@ -3,6 +3,7 @@ import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDepe
 import { ImageResource, AudioResource } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
+import Fetcher from "./fetcher/api"
 
 /**
  * @type {ResourceLoader}
@@ -349,28 +350,6 @@ function has(arr, key) {
     return key !== undefined ?
         (Array.isArray(arr) ? arr.indexOf(key) !== -1 : arr[key] !== undefined) :
         arr.length > 0;
-}
-
-class BackEndFetcher {
-    constructor(baseUrl) {
-        this.baseUrl = baseUrl;
-    }
-
-    fetch(name, json) {
-        return fetch(this.baseUrl + name, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(json)
-        }).then(response => {
-            if (!response.ok) {
-                console.error('failed...');
-                throw Error('BOOM!');
-            }
-            return response.json();
-        })
-    }
 }
 
 class StorageManager {
@@ -765,8 +744,8 @@ class ResourceLoader {
     }
 
     getResourceSource(id) {
-        const source = this.source.get(id);
-        return source ? source : 'new';
+        const source = this.source.get(id)
+        return source ? source : 'code'
     }
 
     getResourceScreen(id) {
@@ -843,7 +822,7 @@ class ResourceLoader {
     hasBrowserResources() {
         for (let key of this.storage.getKeys()) {
             if (key.indexOf(':') !== -1) {
-                return true;
+                return true
             }
         }
         return false;
@@ -912,7 +891,7 @@ class ResourceLoader {
 
     checkServerResources(resources) {
         return this.fetcher.fetch(
-            'has', {resources}
+            'has', { resources }
         ).then(body => {
             const found = [];
             for (let item of body.found) {
@@ -1316,7 +1295,10 @@ const inst = {
         }
         return touchControlsPlugin
     },
-    setRL: (baseUrl, storage) => RL = new ResourceLoader(new BackEndFetcher(baseUrl), storage),
+    setRL: (baseUrl, storage) => RL = new ResourceLoader(
+        Fetcher(baseUrl),
+        storage
+    ),
     get RL() {
         if (RL) return RL
         throw Error('Resource Loader not yet initialized!')

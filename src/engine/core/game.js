@@ -327,19 +327,6 @@ class Game {
 
     // game control
 
-    restart(enableKeys = false) {
-        // this.keyHandling = enableKeys;
-        if (this.running || !this.hasEditor) {
-            return;
-        }
-        if (this.hasEditor) this.hideElem('editor-div')
-        this.showElem('game-overlay-div', 'game-div')
-        this.running = this.before.running
-
-        this.addListeners()
-//        this.gotoScreen(this.currentScreen);
-    }
-
     /**
      * Resets the game
      */
@@ -351,14 +338,53 @@ class Game {
         this.init()
     }
 
-    reloadScreen(restartEditorWithId = null) {
+    restart() {
+        if (this.running || !this.hasEditor) {
+            return;
+        }
+        if (this.hasEditor) this.hideElem('editor-div')
+        this.showElem('game-overlay-div', 'game-div')
+        this.running = this.before.running
+        this.addListeners()
+    }
+
+    reloadScreen(stack) {
         if (this.globalsResolver) {
             this.areGlobalsResolved = false
             inst.RL.invalidatePermanentResources()
         }
         this.globals = this.lastGlobals
         this.gotoScreen(this.currentScreen, true)
-        this.restart()
+        if (stack) {
+            this.switchToEditor(stack)
+        } else {
+            this.restart()
+        }
+    }
+
+    switchToEditor(stack) {
+        inst.RL.loadPermanentResources()
+            .then(() => {
+                this.hideElem('game-div', 'game-overlay-div')
+                this.showElem('editor-div')
+                this.editor = new gameEditor.GameEditor(this, stack)
+            })
+            .catch(
+                e => d('Error: ', e)
+            );
+    }
+
+    openEditorMode() {
+        if (!this.hasEditor) {
+            this.addWarning('NO GAME EDITOR found!')
+            return
+        }
+        this.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"')
+
+        this.before.running = this.running
+        this.running = false
+        this.removeListeners()
+        this.switchToEditor()
     }
 
     openFullscreenMode() {
@@ -378,31 +404,6 @@ class Game {
         this.system.exitFullscreen(document).then(
             () => this.system.unlockOrientation()
         )
-    }
-
-    openEditorMode() {
-        if (!this.hasEditor) {
-            this.addWarning('NO GAME EDITOR found!')
-            return
-        }
-        this.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"')
-        // this.editorRun++;
-
-        this.before.running = this.running
-        this.running = false
-        this.removeListeners()
-
-        // this.keyHandling = false;
-        inst.RL.loadPermanentResources().then(() => {
-            this.hideElem('game-div', 'game-overlay-div')
-            this.showElem('editor-div')
-            // TODO crap
-            const stack = this.activeResource
-            this.activeResource = undefined
-            this.editor = new gameEditor.GameEditor(this, stack)
-        });
-
-        this.log('EDITOR-MODE');
     }
 
     openModal(elem) {
@@ -1041,7 +1042,7 @@ class Game {
                         }
                     ]
                 })
-            }
+            } else this.clearWarnings(msg)
         } else {
             this.resetFps()
             this.audio.pauseAll()
@@ -1622,7 +1623,7 @@ class AudioPlayer {
     }
 
     play(id, channel = null) {
-        this.paused = [];
+        this.paused = []
         const audio = this.audio[id];
         if (channel !== null) {
             if (this.channels[channel] !== undefined) {
