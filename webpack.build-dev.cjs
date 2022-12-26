@@ -38,7 +38,7 @@ module.exports = (env, args) => {
                         if (!devServer) {
                             throw new Error('webpack-dev-server is not defined!')
                         }
-                        setupAppMiddlewares(devServer.app, { ...config, IS_DIST: false, MAX_JSON_SIZE: '10mb' })
+                        setupAppMiddlewares(devServer.app, { ...config, IS_DIST: false })
                         return middlewares
                     },
                     static: absDir.dist(config.server ? 'public' : ''),
