@@ -354,7 +354,7 @@ function has(arr, key) {
 
 class StorageManager {
 
-    constructor(storage, gameId = 'demo') {
+    constructor(storage, gameId) {
         this.storage = storage;
         this.prefix = gameId;
         this.active = this.isAvailable();

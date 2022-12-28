@@ -37,6 +37,7 @@ module.exports = {
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
                 IS_DIST: JSON.stringify(isDistBuild),
                 API_MAX_JSON_SIZE: JSON.stringify(config.apiMaxJsonSize),
+                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE.LOADING.STATIC),
                 RESOURCES_API: JSON.stringify(!isDistBuild || config.resourceLoading === RESOURCE.LOADING.API)
             })
         ];

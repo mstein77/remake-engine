@@ -7,8 +7,11 @@ const { isValidResourceId, getRelevantResources, ResourceDependencies } = requir
 const express = require("express")
 
 const setupAppMiddlewares = (app, config = null) => {
+
+    const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../'
+
     const absDir = {
-        root: ( ...relPath ) => path.resolve( __dirname, config.IS_DIST ? '' : '../../../../', ...relPath ),
+        root: ( ...relPath ) => path.resolve( __dirname, config.IS_DIST ? '' : RMK_GAME_DIR, ...relPath ),
         public: ( ...relPath ) => path.resolve(absDir.root('public'), ...relPath ),
         static: ( ...relPath ) => path.resolve( config.IS_DIST ? absDir.public() : absDir.resources(), ...relPath ),
         resources: ( ...relPath ) => path.resolve(absDir.root('resources'), ...relPath )
@@ -140,6 +143,8 @@ const setupAppMiddlewares = (app, config = null) => {
         app.use('/' + resource, express.static(absDir.static(resource)))
     }
 
+    if (config.LOAD_STATIC) return
+
     app.post('/has', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
         const found = []
@@ -228,7 +233,7 @@ const setupAppMiddlewares = (app, config = null) => {
                 notFound.push(resource)
             }
         }
-        res.json({found, notFound, invalid})
+        res.json({ found, notFound, invalid })
     })
 
     if (config.IS_DIST) return

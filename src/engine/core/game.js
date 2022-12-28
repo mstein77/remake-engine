@@ -31,7 +31,8 @@ class Game {
         this.game = this
         const { system, renderPlugin, touchControlsPlugin, plugins } = inst
         this.system = system
-        inst.setSM(localStorage, GAME_ID)
+
+        inst.setSM(localStorage, (IS_DIST ? '' : 'dev.') + GAME_ID)
         inst.setRL(BASE_URL + '/', inst.SM)
         this.engineStorage = new Storage(localStorage, 'remake-engine.')
 

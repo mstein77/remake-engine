@@ -161,12 +161,13 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {};
         }
-        packageJson.scripts.start = 'run start --prefix ' + engineBasePath;
-        packageJson.scripts.game = 'npm run build-game-dev --prefix ' + engineBasePath;
+        const setGameDir = 'RMK_GAME_DIR=$(pwd) '
+        packageJson.scripts.start = setGameDir + 'npm run start --prefix ' + engineBasePath;
+        packageJson.scripts.game = setGameDir + 'npm run build-game-dev --prefix ' + engineBasePath;
         if (packageJson.type === undefined) {
             packageJson.type = 'module';
         }
-        packageJson.scripts.build = "npm run build-game-prod --prefix " + engineBasePath;
+        packageJson.scripts.build = setGameDir + 'npm run build-game-prod --prefix ' + engineBasePath;
 
         writeJson(packageJsonPath, packageJson);
         packageJson = readJson(packageJsonPath);

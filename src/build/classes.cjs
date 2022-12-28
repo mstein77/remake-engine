@@ -16,10 +16,11 @@ const RESOURCE = {
     }
 }
 
+const RMK_GAME_DIR = process.env.RMK_GAME_DIR
 const absDir = {
     engine: ( ...relPath ) => path.resolve( __dirname, '../../', ...relPath ),
     src: ( ...relPath ) => path.resolve(absDir.engine('src'), ...relPath ),
-    game: ( ...relPath ) => path.resolve(absDir.engine('../../'), ...relPath ),
+    game: ( ...relPath ) => path.resolve(absDir.engine(RMK_GAME_DIR ? RMK_GAME_DIR : '../../'), ...relPath ),
     resources: ( ...relPath ) => path.resolve(absDir.game( 'resources'), ...relPath ),
     dist: ( ...relPath ) => path.resolve(absDir.game('dist'), ...relPath ),
     tmp: ( ...relPath ) => path.resolve(absDir.engine('tmp'), ...relPath )
@@ -172,16 +173,25 @@ class Hosting {
 
             const staticResources = (!this.server || config.resourceLoading === RESOURCE.LOADING.STATIC) ? [ ...resourceDirs ] : rawResources
 
-            for (let dir of resourceDirs) {
+            for (const dir of resourceDirs) {
+                const from = absDir.resources(dir)
+                if (syncFs.isEmptyDir(from)) continue
                 this.copyPatterns.push({
-                    from: absDir.resources(dir),
+                    from,
                     to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absDir.dist('resources', dir)
                 })
+            }
+            if (config.resourceLoading === RESOURCE.LOADING.API) {
+                for (const file of ['indirect.json', 'direct.json']) {
+                    const from = absDir.resources(file)
+                    if (!syncFs.fileExists(from)) continue
+                    this.copyPatterns.push({from, to: absDir.dist('resources', file) })
+                }
             }
             if (this.deployMethod === DEPLOY.METHOD.UPLOAD_PUBLIC) {
                 this.messages.push(`Upload the content of "${absDir.dist()}" to the public folder of your http web-server`)
             }
-            if (this.deployMethod === DEPLOY.METHOD.UPLOAD_ROOT) {
+            if (this.server && [DEPLOY.METHOD.UPLOAD_ROOT, DEPLOY.METHOD.CHECKOUT].includes(this.deployMethod)) {
                 const distPackageJsonPath = absDir.tmp('package.json')
                 syncFs.writeJson(distPackageJsonPath, {
                     name: 'game',
@@ -191,8 +201,13 @@ class Hosting {
                     }
                 });
                 this.copyPatterns.push({from: distPackageJsonPath, to: absDir.dist('package.json')})
-                this.messages.push(`Upload the content of "${absDir.dist()}" to the document root folder of your http web-server`);
-                this.messages.push(`Afterwards execute "npm install" in this directory`);
+                if (this.deployMethod === DEPLOY.METHOD.UPLOAD_ROOT) {
+                    this.messages.push(`Upload the content of "${absDir.dist()}" to the document root folder of your http web-server`);
+                    this.messages.push(`Afterwards execute "npm install" in this directory`);
+                } else {
+                    this.messages.push(`Checkout your game repo on your web server manually or automatically`);
+                    this.messages.push(`Afterwards execute "npm start" in the root directory of your web server`);
+                }
             }
             return
         }
@@ -201,7 +216,14 @@ class Hosting {
         }
     }
 
+    addCopyPattern(from, to) {
+        if (syncFs.exists(from)) {
+            this.copyPatterns.push({ from, to })
+        }
+    }
+
     cleanUp() {
+        if (this.isDist) syncFs.clearDir(absDir.dist())
         syncFs.clearDir(absDir.tmp())
     }
 
@@ -273,12 +295,18 @@ const syncFs = {
         for (let item of items) {
             const currPath = path.resolve(dirPath, item.name)
             if (item.isDirectory()) {
-                syncFs.rmDir(currPath, {recusrive: true, force: true})
+                syncFs.rmDir(currPath, {recursive: true, force: true})
             } else {
                 syncFs.unlink(currPath)
             }
         }
 
+    },
+
+    isEmptyDir: dirPath => {
+        if (!syncFs.dirExists(dirPath)) return true
+        const items = syncFs.readdir(dirPath, {withFileTypes: true})
+        return items.length === 0
     },
 
     fileExists: filePath => {
@@ -299,6 +327,10 @@ const syncFs = {
         } catch (err) {
             return false
         }
+    },
+
+    exists: checkPath => {
+        return syncFs.fileExists(checkPath) || syncFs.dirExists(checkPath)
     },
 
     readJson: filePath => {
