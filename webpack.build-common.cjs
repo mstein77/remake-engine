@@ -12,7 +12,6 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
 const Hosting = require(absDir.src('build/hosting/' + configJson.hosting + '.cjs'))
-const fs = require("fs");
 const path = require("path");
 const enginePackageJson = syncFs.readJson(absDir.engine('package.json'))
 const gamePackageJson = syncFs.readJson(absDir.game('package.json'))

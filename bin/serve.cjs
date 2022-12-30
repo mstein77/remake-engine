@@ -23,11 +23,19 @@ if (syncFs.fileExists(absDir.dist('package.json')) && syncFs.isEmptyDir(absDir.d
     }
 }
 
-const args = ['run']
-args.push(
-    syncFs.fileExists(absDir.dist('server.cjs')) ? 'start-server' : 'start-static'
-)
-spawn('npm', args, {
-    stdio: 'inherit',
-    cwd: absDir.engine()
-});
+const serverPath = absDir.dist('server.cjs')
+if (syncFs.fileExists(serverPath)) {
+    spawn('node', [serverPath], {
+        stdio: 'inherit',
+        cwd: absDir.dist()
+    })
+} else {
+    const args = ['run']
+    args.push(
+        'start-static'
+    )
+    spawn('npm', args, {
+        stdio: 'inherit',
+        cwd: absDir.engine()
+    })
+}

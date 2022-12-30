@@ -8,8 +8,9 @@
     "test": "jest",
     "start-static": "node src/server/static.cjs",
     "start-server": "node ../../dist/server.cjs",
-    "start":  "node bin/serve.cjs",
-    "build-game-dev": "DEBUG=express:router:dispatching* nodemon -w '../../*.cjs' -e cjs --exec 'webpack-dev-server' -- --config webpack.build-dev.cjs",
+    "start": "node bin/serve.cjs",
+    "build-game-dev2": "DEBUG=express:router:dispatching* nodemon -w '../../*.cjs' -e cjs --exec 'webpack-dev-server' -- --config webpack.build-dev.cjs",
+    "build-game-dev": "node bin/dev-server.cjs",
     "build-game-prod": "webpack --config webpack.build-dist.cjs && node bin/cleanup.cjs",
     "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
