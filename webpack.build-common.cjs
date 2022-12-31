@@ -11,7 +11,7 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
-const Hosting = require(absDir.src('build/hosting/' + configJson.hosting + '.cjs'))
+const Hosting = require(absDir.src('build/hosting/' + configJson().hosting + '.cjs'))
 const path = require("path");
 const enginePackageJson = syncFs.readJson(absDir.engine('package.json'))
 const gamePackageJson = syncFs.readJson(absDir.game('package.json'))

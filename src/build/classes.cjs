@@ -33,15 +33,15 @@ const configParams = {
     gzip: {type: 'bool'},
     resourceloading: {type: 'string', key: 'resourceLoading', values: Object.values(RESOURCE.LOADING)},
     apimaxjsonsize: {type: 'string', key: 'apiMaxJsonSize'},
-    deployMethod: {type: 'string', key: 'deployMethod', values: Object.values(DEPLOY.METHOD)},
+    deploymethod: {type: 'string', key: 'deployMethod', values: Object.values(DEPLOY.METHOD)},
     hosting: {type: 'string'},
     minimize: {type: 'bool'},
     server: {type: 'bool'},
-    baseUrl: {type: 'string', key: 'baseUrl'},
+    baseurl: {type: 'string', key: 'baseUrl'},
     sourcemaps: {type: 'bool', key: 'sourceMaps'},
     sourcemaptype: {type: 'string', key: 'sourceMapType'},
     openbrowser: {type: 'string', key: 'openBrowser'},
-    port: {type: 'int'},
+    port: {type: 'uint'},
     logging: {type: 'string'},
     stats: {type: 'string'},
     envprefix: {type: 'string', key: 'envPrefix'}
@@ -49,9 +49,70 @@ const configParams = {
 
 require('dotenv').config({path: absDir.game('.env')})
 
-const configJson = require(absDir.game('config.cjs'))
+let configJsonContent = null
 
-function extractEnvOverwrites(config, env) {
+const configJson = () => {
+    if (!configJsonContent) configJsonContent = require(absDir.game('config.cjs'))
+    return configJsonContent
+}
+
+/**
+ * Casts an environment string value to the given type representation and returns it
+ * Throws an error if the value is not a string or the requested type does not exist
+ *
+ * @param {string} type The type (bool, int, uint, string)
+ * @param {string} value The environment value string
+ * @param {string} context
+ *
+ * @returns {mixed}
+ */
+const castEnvValue = (type, value, context) => {
+    if (typeof value !== 'string')
+        throw Error(`Env value to be casted has type ${typeof value} but must be string!` )
+
+    switch (type) {
+        case 'bool':
+            const lcValue = value.toLowerCase()
+            if (['true', 'on', '1'].includes(lcValue)) {
+                return true
+            }
+            if (['false', 'off', '0'].includes(lcValue)) {
+                return false
+            }
+            break
+
+        case 'int':
+            if (!value.match(/^\-?[0-9]+$/)) break
+            const int = parseInt(value, 10)
+            if (Number.isNaN(int)) break
+            return int
+
+        case 'uint':
+            if (!value.match(/^[0-9]+$/)) break
+            const uint = parseInt(value, 10)
+            if (Number.isNaN(uint)) break
+            return uint
+
+        case 'string':
+            return value
+
+        default:
+            throw Error(`Unknown type ${type} requested for casting environment value` + (context ? ` [${context}]` : ''))
+    }
+    throw Error(`Environment value "${value}" cannot be casted to ${type}!` + (context ? ` [${context}]` : ''))
+}
+
+/**
+ * Returns an array holding all config overwrites in the given environment variables
+ * If no envPrefix was set in the config, no overwrites will be extracted. Underscores
+ * after the envPrefix will be removed in each env key. Config keys are returned
+ * camel-cased and the values are casted and validated against their type
+ *
+ * @param {Object} config The build config json
+ * @param {Object} env The environment variables
+ * @returns {Object}
+ */
+const extractEnvOverwrites = (config, env) => {
     let prefix = config.envPrefix
     if (!prefix || !env) return {}
 
@@ -61,21 +122,10 @@ function extractEnvOverwrites(config, env) {
     for (let [name, value] of Object.entries(env)) {
         name = name.toLowerCase()
         if (!name.startsWith(prefix) || name.length <= len) continue
-        const lcKey = name.substring(len)
+        const lcKey = name.substring(len).replaceAll('_', '')
         const configParam = configParams[lcKey]
         if (!configParam) continue
-        switch (configParam.type) {
-            case 'bool':
-                if (['true', 'false'].includes(value.toLowerCase())) {
-                    value = value[0].toLowerCase() === 't';
-                }
-                break;
-
-            case 'int':
-                value = parseInt(value, 10)
-                break;
-        }
-        envOverwrites[configParam.key ? configParam.key : lcKey] = value
+        envOverwrites[configParam.key ? configParam.key : lcKey] = castEnvValue(configParam.type, value)
     }
     return envOverwrites
 }
@@ -100,7 +150,7 @@ function extractAppEnvOverwrites(config, env) {
 function getConfigForCtx(args) {
     const configArg = args && args.config
     const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
-    const { dist, ...config } = configJson
+    const { dist, ...config } = configJson()
     const envOverwrites = extractEnvOverwrites(config, process.env)
     const appEnvOverwrites = extractAppEnvOverwrites(config, process.env)
 
@@ -354,6 +404,8 @@ const syncFs = {
 
 module.exports = {
     getConfigForCtx,
+    extractEnvOverwrites,
+    castEnvValue,
     Hosting,
     syncFs,
     absDir,
