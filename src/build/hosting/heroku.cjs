@@ -1,4 +1,4 @@
-const { Hosting, syncFs, absDir } = require('../classes.cjs')
+const { Hosting, syncFs, absPath } = require('../classes.cjs')
 
 class HerokuHosting extends Hosting {
 
@@ -9,7 +9,7 @@ class HerokuHosting extends Hosting {
     }
 
     generateRepoFiles() {
-        const procFilePath = absDir.game('Procfile')
+        const procFilePath = absPath.game('Procfile')
         if (this.isDist || syncFs.fileExists(procFilePath)) return
 
         syncFs.writeContent(procFilePath, "web: npm start")

@@ -1,33 +1,34 @@
-const { absDir, syncFs, cleanTmpDir } = require('../src/build/classes.cjs')
+const absPath = require("../src/build/classes/absPath.cjs")
+const syncFs = require("../src/build/classes/syncFs.cjs")
 const { spawn, spawnSync } = require('child_process')
 
-if (syncFs.isEmptyDir(absDir.dist())) {
+if (syncFs.isEmptyDir(absPath.dist())) {
     const build = spawnSync('npm', ['run', 'build'], {
         stdio: 'inherit',
-        cwd: absDir.game()
+        cwd: absPath.game()
     })
-    console.log(build.output.toString('utf8'));
+    console.log(build.output.toString('utf8'))
     if (build.status !== 0) {
         process.exit(build.status)
     }
 }
 
-if (syncFs.fileExists(absDir.dist('package.json')) && syncFs.isEmptyDir(absDir.dist('node_modules'))) {
+if (syncFs.fileExists(absPath.dist('package.json')) && syncFs.isEmptyDir(absPath.dist('node_modules'))) {
     const install = spawnSync('npm', ['install'], {
         stdio: 'inherit',
-        cwd: absDir.dist()
+        cwd: absPath.dist()
     })
-    console.log(install.output.toString('utf8'));
+    console.log(install.output.toString('utf8'))
     if (install.status !== 0) {
         process.exit(install.status)
     }
 }
 
-const serverPath = absDir.dist('server.cjs')
+const serverPath = absPath.dist('server.cjs')
 if (syncFs.fileExists(serverPath)) {
     spawn('node', [serverPath], {
         stdio: 'inherit',
-        cwd: absDir.dist()
+        cwd: absPath.dist()
     })
 } else {
     const args = ['run']
@@ -36,6 +37,6 @@ if (syncFs.fileExists(serverPath)) {
     )
     spawn('npm', args, {
         stdio: 'inherit',
-        cwd: absDir.engine()
+        cwd: absPath.engine()
     })
 }

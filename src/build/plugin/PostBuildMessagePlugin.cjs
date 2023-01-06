@@ -1,4 +1,5 @@
-const { syncFs, absDir } = require("../classes.cjs");
+const syncFs = require('../classes/syncFs.cjs')
+const absPath = require('../classes/absPath.cjs');
 
 class PostBuildMessagePlugin {
 
@@ -12,7 +13,7 @@ class PostBuildMessagePlugin {
             () => {
                 const msg = this.hosting.postBuildMessage
                 if (!msg) return
-                syncFs.writeContent(absDir.tmp('instructions.txt'), msg)
+                syncFs.writeContent(absPath.tmp('instructions.txt'), msg)
             }
         )
     }

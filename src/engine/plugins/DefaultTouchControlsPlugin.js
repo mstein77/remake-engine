@@ -1,6 +1,7 @@
 import { TouchControlsPlugin } from "./classes"
 import { d } from "helper/helper"
 import { div, stackH, stackV } from "helper/dom"
+import './css/defaultTouchControlsPlugin.css'
 
 class DefaultTouchControlsPlugin extends TouchControlsPlugin {
 
@@ -121,12 +122,26 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                 break;
 
             case 'main':
-                const cls = 'touch-btn boxed-1 transparent block all-events'
-                this.game.addTouchDiv(
+                this.game.addTouchDiv(this.getTouchControlsDiv())
+                break;
+        }
+    }
+
+    getTouchControlsDiv() {
+        const cls = 'touch-btn boxed-1 transparent block all-events'
+        return (
+            stackV(
+                'full-v full-h',
+                div({class: 'flex hide-in-landscape'}),
+                div(
+                    {class: 'full-h', style: "height: 50px"}
+                ),
+                div(
+                    {class: 'flex full-h'},
                     stackH(
-                        'full-h',
+                        {class: 'full-h flex', style: 'align-items: center'},
                         div(
-                            {class: 'grid', style: 'margin-left: 20px; margin-top: 45px; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; grid-gap: 2px'},
+                            {class: 'grid', style: 'margin-left: 20px; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; grid-gap: 2px'},
                             div({id: 'touch-btn-left_up', class: cls, style: 'width: 30px; height: 30px; margin-left: 18px; margin-top: 18px'}),
                             div({id: 'touch-btn-up', class: cls}),
                             div({id: 'touch-btn-right_up', class: cls, style: 'width: 30px; height: 30px; margin-right: 18px; margin-top: 18px'}),
@@ -141,7 +156,7 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                             {class: 'flex'}
                         ),
                         stackH(
-                            {class: 'inner-space-h padded', style: 'margin-right: 30px; margin-top: 45px'},
+                            {class: 'inner-space-h padded', style: 'margin-right: 20px'},
                             div(
                                 {
                                     id: 'touch_btn_1',
@@ -158,9 +173,12 @@ class DefaultTouchControlsPlugin extends TouchControlsPlugin {
                             )
                         )
                     )
+                ),
+                div(
+                    {class: 'full-h', style: "height: 50px"}
                 )
-                break;
-        }
+            )
+        )
     }
 }
 

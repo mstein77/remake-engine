@@ -1,6 +1,7 @@
-const { absDir, syncFs, cleanTmpDir } = require('../src/build/classes.cjs')
+const absPath = require('../src/build/classes/absPath.cjs')
+const syncFs = require('../src/build/classes/syncFs.cjs')
 
-const instructionsPath = absDir.tmp('instructions.txt')
+const instructionsPath = absPath.tmp('instructions.txt')
 
 if (syncFs.fileExists(instructionsPath)) {
     const instructions = syncFs.readFile(instructionsPath, {encoding: 'utf8', flag: 'r'})
@@ -12,4 +13,4 @@ if (syncFs.fileExists(instructionsPath)) {
     }
 }
 
-syncFs.clearDir(absDir.tmp())
+syncFs.clearDir(absPath.tmp())

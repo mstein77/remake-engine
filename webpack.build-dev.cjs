@@ -1,7 +1,7 @@
 const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs')
 
 const merge = require('webpack-merge')
-const { getConfigForCtx, getCommonWebpackConfig, absDir, gameId } = require('./webpack.build-common.cjs')
+const { getConfigForCtx, getCommonWebpackConfig, absPath, gameId } = require('./webpack.build-common.cjs')
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args)
@@ -41,7 +41,7 @@ module.exports = (env, args) => {
                         setupAppMiddlewares(devServer.app, { ...config, IS_DIST: false })
                         return middlewares
                     },
-                    static: absDir.dist(config.server ? 'public' : ''),
+                    static: absPath.dist(config.server ? 'public' : ''),
                     port: config.port // port to run dev-server
                 }
             }

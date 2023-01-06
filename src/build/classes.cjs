@@ -1,181 +1,6 @@
-const fs = require("fs")
-const path = require("path")
-
-const DEPLOY = {
-    METHOD: {
-        UPLOAD_ROOT: 'upload-dist-to-root',
-        UPLOAD_PUBLIC: 'upload-dist-to-public',
-        CHECKOUT: 'checkout'
-    }
-}
-const RESOURCE = {
-    LOADING: {
-        LOCAL: 'local',
-        STATIC: 'static',
-        API: 'api'
-    }
-}
-
-const RMK_GAME_DIR = process.env.RMK_GAME_DIR
-const absDir = {
-    engine: ( ...relPath ) => path.resolve( __dirname, '../../', ...relPath ),
-    src: ( ...relPath ) => path.resolve(absDir.engine('src'), ...relPath ),
-    game: ( ...relPath ) => path.resolve(absDir.engine(RMK_GAME_DIR ? RMK_GAME_DIR : '../../'), ...relPath ),
-    resources: ( ...relPath ) => path.resolve(absDir.game( 'resources'), ...relPath ),
-    dist: ( ...relPath ) => path.resolve(absDir.game('dist'), ...relPath ),
-    tmp: ( ...relPath ) => path.resolve(absDir.engine('tmp'), ...relPath )
-}
-
-const configParams = {
-    title: {type: 'string'},
-    browsers: {type: 'string'},
-    editor: {type: 'bool'},
-    gzip: {type: 'bool'},
-    resourceloading: {type: 'string', key: 'resourceLoading', values: Object.values(RESOURCE.LOADING)},
-    apimaxjsonsize: {type: 'string', key: 'apiMaxJsonSize'},
-    deploymethod: {type: 'string', key: 'deployMethod', values: Object.values(DEPLOY.METHOD)},
-    hosting: {type: 'string'},
-    minimize: {type: 'bool'},
-    server: {type: 'bool'},
-    baseurl: {type: 'string', key: 'baseUrl'},
-    sourcemaps: {type: 'bool', key: 'sourceMaps'},
-    sourcemaptype: {type: 'string', key: 'sourceMapType'},
-    openbrowser: {type: 'string', key: 'openBrowser'},
-    port: {type: 'uint'},
-    logging: {type: 'string'},
-    stats: {type: 'string'},
-    envprefix: {type: 'string', key: 'envPrefix'}
-}
-
-require('dotenv').config({path: absDir.game('.env')})
-
-let configJsonContent = null
-
-const configJson = () => {
-    if (!configJsonContent) configJsonContent = require(absDir.game('config.cjs'))
-    return configJsonContent
-}
-
-/**
- * Casts an environment string value to the given type representation and returns it
- * Throws an error if the value is not a string or the requested type does not exist
- *
- * @param {string} type The type (bool, int, uint, string)
- * @param {string} value The environment value string
- * @param {string} context
- *
- * @returns {mixed}
- */
-const castEnvValue = (type, value, context) => {
-    if (typeof value !== 'string')
-        throw Error(`Env value to be casted has type ${typeof value} but must be string!` )
-
-    switch (type) {
-        case 'bool':
-            const lcValue = value.toLowerCase()
-            if (['true', 'on', '1'].includes(lcValue)) {
-                return true
-            }
-            if (['false', 'off', '0'].includes(lcValue)) {
-                return false
-            }
-            break
-
-        case 'int':
-            if (!value.match(/^\-?[0-9]+$/)) break
-            const int = parseInt(value, 10)
-            if (Number.isNaN(int)) break
-            return int
-
-        case 'uint':
-            if (!value.match(/^[0-9]+$/)) break
-            const uint = parseInt(value, 10)
-            if (Number.isNaN(uint)) break
-            return uint
-
-        case 'string':
-            return value
-
-        default:
-            throw Error(`Unknown type ${type} requested for casting environment value` + (context ? ` [${context}]` : ''))
-    }
-    throw Error(`Environment value "${value}" cannot be casted to ${type}!` + (context ? ` [${context}]` : ''))
-}
-
-/**
- * Returns an array holding all config overwrites in the given environment variables
- * If no envPrefix was set in the config, no overwrites will be extracted. Underscores
- * after the envPrefix will be removed in each env key. Config keys are returned
- * camel-cased and the values are casted and validated against their type
- *
- * @param {Object} config The build config json
- * @param {Object} env The environment variables
- * @returns {Object}
- */
-const extractEnvOverwrites = (config, env) => {
-    let prefix = config.envPrefix
-    if (!prefix || !env) return {}
-
-    prefix = prefix.toLowerCase()
-    const len = prefix.length
-    const envOverwrites = {}
-    for (let [name, value] of Object.entries(env)) {
-        name = name.toLowerCase()
-        if (!name.startsWith(prefix) || name.length <= len) continue
-        const lcKey = name.substring(len).replaceAll('_', '')
-        const configParam = configParams[lcKey]
-        if (!configParam) continue
-        envOverwrites[configParam.key ? configParam.key : lcKey] = castEnvValue(configParam.type, value)
-    }
-    return envOverwrites
-}
-
-function extractAppEnvOverwrites(config, env) {
-    const appEnv = env.APP_ENV
-    const appEnvOverwrites = {}
-    const keys = Object.keys(config)
-    for (let key of keys) {
-        const match = key.match(/^([a-z]+)\[([a-z]+)\]$/i)
-        if (!match) continue
-        const matchEnv = match[2]
-        const matchKey = match[1]
-        if (appEnv && matchEnv === appEnv) {
-            appEnvOverwrites[matchKey] = config[key]
-        }
-        delete config[key]
-    }
-    return appEnvOverwrites
-}
-
-function getConfigForCtx(args) {
-    const configArg = args && args.config
-    const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
-    const { dist, ...config } = configJson()
-    const envOverwrites = extractEnvOverwrites(config, process.env)
-    const appEnvOverwrites = extractAppEnvOverwrites(config, process.env)
-
-    let ctxConfig
-
-    if (!isDistBuild || !dist) {
-        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
-    } else {
-        for (let [key, value] of Object.entries(dist)) {
-            if (key === 'envPrefix') continue
-            config[key] = value
-        }
-        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
-    }
-
-    // validation
-    for (const [ name, info ] of Object.entries(configParams)) {
-        const { type, values, key = name } = info
-        if (!values) continue
-        const value = ctxConfig[key]
-        if (!values.includes(value)) throw Error(`Value "${value}" not allowed for config key "${key}"! Allowed values: "${values.join('", "')}"`)
-    }
-
-    return ctxConfig
-}
+const { RESOURCE, DEPLOY } = require('./classes/config.cjs')
+const absPath = require('./classes/absPath.cjs')
+const syncFs = require('./classes/syncFs.cjs')
 
 /**
  *  hosting: gibt den Hosting-Anbieter bzw. die Art des hostings
@@ -224,25 +49,25 @@ class Hosting {
             const staticResources = (!this.server || config.resourceLoading === RESOURCE.LOADING.STATIC) ? [ ...resourceDirs ] : rawResources
 
             for (const dir of resourceDirs) {
-                const from = absDir.resources(dir)
+                const from = absPath.resources(dir)
                 if (syncFs.isEmptyDir(from)) continue
                 this.copyPatterns.push({
                     from,
-                    to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absDir.dist('resources', dir)
+                    to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir)
                 })
             }
             if (config.resourceLoading === RESOURCE.LOADING.API) {
                 for (const file of ['indirect.json', 'direct.json']) {
-                    const from = absDir.resources(file)
+                    const from = absPath.resources(file)
                     if (!syncFs.fileExists(from)) continue
-                    this.copyPatterns.push({from, to: absDir.dist('resources', file) })
+                    this.copyPatterns.push({from, to: absPath.dist('resources', file) })
                 }
             }
             if (this.deployMethod === DEPLOY.METHOD.UPLOAD_PUBLIC) {
-                this.messages.push(`Upload the content of "${absDir.dist()}" to the public folder of your http web-server`)
+                this.messages.push(`Upload the content of "${absPath.dist()}" to the public folder of your http web-server`)
             }
             if (this.server && [DEPLOY.METHOD.UPLOAD_ROOT, DEPLOY.METHOD.CHECKOUT].includes(this.deployMethod)) {
-                const distPackageJsonPath = absDir.tmp('package.json')
+                const distPackageJsonPath = absPath.tmp('package.json')
                 syncFs.writeJson(distPackageJsonPath, {
                     name: 'game',
                     version: '1.0.0',
@@ -250,9 +75,9 @@ class Hosting {
                         express: '^4.18.2'
                     }
                 });
-                this.copyPatterns.push({from: distPackageJsonPath, to: absDir.dist('package.json')})
+                this.copyPatterns.push({from: distPackageJsonPath, to: absPath.dist('package.json')})
                 if (this.deployMethod === DEPLOY.METHOD.UPLOAD_ROOT) {
-                    this.messages.push(`Upload the content of "${absDir.dist()}" to the document root folder of your http web-server`);
+                    this.messages.push(`Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`);
                     this.messages.push(`Afterwards execute "npm install" in this directory`);
                 } else {
                     this.messages.push(`Checkout your game repo on your web server manually or automatically`);
@@ -273,8 +98,8 @@ class Hosting {
     }
 
     cleanUp() {
-        if (this.isDist) syncFs.clearDir(absDir.dist())
-        syncFs.clearDir(absDir.tmp())
+        if (this.isDist) syncFs.clearDir(absPath.dist())
+        syncFs.clearDir(absPath.tmp())
     }
 
     init(config) {}
@@ -298,7 +123,7 @@ class Hosting {
     }
 
     get publicDir() {
-        return absDir.dist(this.server ? 'public' : '')
+        return absPath.dist(this.server ? 'public' : '')
     }
 
     get postBuildMessage() {
@@ -316,100 +141,6 @@ class Hosting {
     generateRepoFiles() {}
 }
 
-const syncFs = {
-
-    readFilesRec: (dirPath, relative = '', files = []) => {
-        const currPath = path.resolve(dirPath, relative)
-        const items = syncFs.readdir(currPath, {withFileTypes: true})
-        for (let item of items) {
-            if (item.isDirectory()) {
-                syncFs.readFilesRec(dirPath, relative + item.name + '/', files)
-            } else {
-                files.push(relative + item.name)
-            }
-        }
-        return files
-    },
-
-    readdir: ( ...args ) => {
-        return fs.readdirSync( ...args )
-    },
-
-    unlink: filePath => fs.unlinkSync(filePath),
-
-    rmDir: ( ...args ) => fs.rmSync( ...args ),
-
-    clearDir: dirPath => {
-        if (!syncFs.dirExists(dirPath)) return
-        const items = syncFs.readdir(dirPath, {withFileTypes: true})
-        for (let item of items) {
-            const currPath = path.resolve(dirPath, item.name)
-            if (item.isDirectory()) {
-                syncFs.rmDir(currPath, {recursive: true, force: true})
-            } else {
-                syncFs.unlink(currPath)
-            }
-        }
-
-    },
-
-    isEmptyDir: dirPath => {
-        if (!syncFs.dirExists(dirPath)) return true
-        const items = syncFs.readdir(dirPath, {withFileTypes: true})
-        return items.length === 0
-    },
-
-    fileExists: filePath => {
-        try {
-            const stat = fs.statSync(filePath);
-            if (!stat.isFile()) return false;
-            return true
-        } catch (err) {
-            return false
-        }
-    },
-
-    dirExists: dirPath => {
-        try {
-            const stat = fs.statSync(dirPath);
-            if (!stat.isDirectory()) return false;
-            return true
-        } catch (err) {
-            return false
-        }
-    },
-
-    exists: checkPath => {
-        return syncFs.fileExists(checkPath) || syncFs.dirExists(checkPath)
-    },
-
-    readJson: filePath => {
-        if (!syncFs.fileExists(filePath)) throw Error(`File not found: ${filePath}`);
-        const rawdata = fs.readFileSync(filePath);
-        const json = JSON.parse(rawdata);
-        return json
-    },
-
-    readFile: ( ...args ) => fs.readFileSync( ...args ),
-
-    writeContent: (filePath, content) => {
-        fs.writeFileSync(filePath, content)
-    },
-
-    writeJson: (filePath, json, space = true) => {
-        const data = JSON.stringify(json, undefined, space ? 4 : undefined);
-        fs.writeFileSync(filePath, data);
-    }
-}
-
 module.exports = {
-    getConfigForCtx,
-    extractEnvOverwrites,
-    castEnvValue,
     Hosting,
-    syncFs,
-    absDir,
-    RESOURCE,
-    DEPLOY,
-    configJson
 }

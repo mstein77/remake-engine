@@ -1,5 +1,5 @@
-.touching {
-    background-color: #FF000040 !important;
+body {
+    overflow: hidden
 }
 
 html.fix-orientation {
@@ -25,71 +25,4 @@ html.fix-orientation {
     margin: 0;
     transform-origin: top left
 }
-
-.loading {
-    display: flex;
-    justify-content: center;
-}
-
-.loading::after {
-    content: "";
-    width: 50px;
-    height: 50px;
-    border: 10px solid #dddddd;
-    border-top-color: #009579;
-    border-radius: 50%;
-    animation: loading 1s ease infinite;
-}
-
-@keyframes loading {
-    to {
-        transform: rotate(1turn);
-    }
-}
-
-#touch-input-dir {
-    position: absolute;
-    top: 50px;
-    left: 20px;
-    display: grid;
-    grid-template-columns: repeat(3, 50px);
-    grid-column-gap: 8px;
-    grid-row-gap: 8px;
-}
-
-#touch-input-dir > .touch-dir-cell {
-    height: 50px;
-}
-
-#touch-input-buttons {
-    position: absolute;
-    top: 50px;
-    right: 20px;
-    display: grid;
-    grid-template-columns: repeat(2, 80px);
-    grid-column-gap: 20px;
-    grid-row-gap: 60px;
-}
-
-#touch-input-buttons > .touch-dir-cell {
-    height: 80px;
-}
-
-#tmp-resources-warning {
-    padding: 3px;
-    text-align: center;
-    background-color: #000000;
-    color: #d78282;
-    border: 2px solid #CC0000;
-    margin-top: 20px;
-    margin-left: auto;
-    margin-right: auto;
-    width: 600px
-}
-
-.touch-dir-cell {
-    border: 2px outset #808080
-}
-
-
 

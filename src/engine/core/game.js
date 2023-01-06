@@ -47,7 +47,7 @@ class Game {
         document.body.classList.toggle('no-touch-actions', true)
         document.body.replaceChildren(
             div({id: 'game-div', class: 'full-v'}),
-            div({id: 'game-overlay-div', class: 'full-v pos-0 fixed'})
+            div({id: 'game-overlay-div', class: 'full-v full-h pos-0 fixed no-events'})
         )
 
         // registration (only construct)
@@ -70,12 +70,6 @@ class Game {
         for (let [ key, value ] of Object.entries(this.cssConstants)) {
             setStyleConstByKey(style, key, value)
         }
-
-        this.resizeObserver = new ResizeObserver(
-            entries => {
-                if (this.autoZoom || this.restrictZoomByWindow) this.syncScreen()
-            }
-        )
         this.registerListeners([
             {
                 type: 'visibilitychange',
@@ -307,6 +301,14 @@ class Game {
         try {
             this.notify('main')
             this.syncScreen()
+            if (!this.resizeObserver) {
+                this.resizeObserver = new ResizeObserver(
+                    entries => {
+                        if (this.autoZoom || this.restrictZoomByWindow) this.syncScreen()
+                    }
+                )
+                this.startObserver()
+            }
             this.showElem('game-overlay-div')
 
             if (!startScreen) {
@@ -912,8 +914,17 @@ class Game {
         }
     }
 
+    startObserver() {
+        if (!this.resizeObserver) return
+
+        const elem = document.getElementsByClassName('screen-bounds').item(0);
+        this.resizeObserver.observe(
+            elem ? elem : document.body
+        )
+    }
+
     addListeners() {
-        this.resizeObserver.observe(document.body)
+        this.startObserver()
         for (let { elem, type, handler, options } of this.listeners) {
             elem.addEventListener(type, handler, options)
         }
@@ -1463,8 +1474,7 @@ class GameConfig extends Config {
             autoZoomByUser: true,
             showFps: false,
             showFpsByUser: true,
-            screenOrientation: 'max'
-
+            screenOrientation: 'free'
         }
     }
 

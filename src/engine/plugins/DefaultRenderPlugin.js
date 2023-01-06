@@ -1,6 +1,7 @@
 import { RenderPlugin } from "./classes";
 import "../editor/css/layout.css"
 import "../editor/css/base.css"
+import "./css/defaultRenderPlugin.css"
 import { d, round } from "helper/helper.js"
 import { STATE } from "core/const"
 
@@ -8,6 +9,8 @@ class DefaultRenderPlugin extends RenderPlugin {
 
     setup() {
         super.setup()
+
+        this.controls = true
         this.stackH = ( stackProps, ...props ) => {
             if (typeof stackProps === 'object' && !(stackProps instanceof Node)) {
                 let { class: stackCls = '', ...objProps } = stackProps
@@ -38,10 +41,12 @@ class DefaultRenderPlugin extends RenderPlugin {
             toZoomModeIcon: value => value ? 'escalator' : 'stairs',
             toAutoZoomIcon: value => value ? 'close_fullscreen' : 'open_in_full',
             toFpsIcon: value => value ? 'visibility' : 'visibility_off',
+            toLeftMargin: value => value ? 'leftpadded' : '',
             toFpsInfo: value => getCentered(value ? value : '-', 3),
             toFpsRange: (min, max) => getCentered((min ? min : '-') + (min !== max ? '-' + max : ''), 7),
             toAvgFps: value => getCentered(value ? round(value, 2, true) : '-', 6),
-            toFullscreenIcon: value => value ? 'fullscreen_exit' : 'fullscreen'
+            toFullscreenIcon: value => value ? 'fullscreen_exit' : 'fullscreen',
+            toRounded: value => '' + round(value, 2)
         })
     }
 
@@ -120,6 +125,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                     };
                 return [
                     {id: 'game-div', nodes: this.getMainSection(props), nextFrame},
+                    {id: 'game-overlay-div', subId: 'controlsToggler', nodes: this.getControlsToggler()},
                     {id: 'game-overlay-div', subId: 'fps', nodes: this.getFpsOverlay()}
                 ]
         }
@@ -130,28 +136,43 @@ class DefaultRenderPlugin extends RenderPlugin {
         const { div, pre, icon, kbd, input, stackH, stackV } = this
         return (
             stackV(
-                {class: 'padded min-content-h absolute mono <game.showFps|toHidden>', style: 'background-color: #000000C0; color: white; left: 25px; top: 25px'},
-                stackH(
-                    div(
-                        {class: 'flex less'},
-                        'FPS:'
-                    ),
-                    div(
-                        {class: 'less', onClick: () => game.showFps = false},
-                        icon('close')
+                {class: 'full-v full-h absolute'},
+                div({class: 'flex'}),
+                div({class: 'align-end'},
+                    stackV(
+                        {class: 'padded inner-space-v align-end all-events min-content-h mono <game.showFps|toHidden>', style: 'background-color: #000000C0; color: white; margin-right: 30px'},
+                        stackH(
+                            div(
+                                {class: 'flex less'},
+                                'FPS:'
+                            ),
+                            div(
+                                {class: 'less', onClick: () => game.showFps = false},
+                                icon('close')
+                            )
+                        ),
+                        stackH(
+                            input(
+                                {type: 'text', class: 'less', readOnly: true, tab: -1, size: 3, value: '<game.fps|toFpsInfo>'}
+                            ),
+                            input(
+                                {type: 'text', class: 'less', readOnly: true, tab: -1, size: 6, value: '<game.avgFps|toAvgFps>'}
+                            ),
+                            input(
+                                {type: 'text', class: 'less', readOnly: true, tab: -1, size: 7, value: '<game.minFps,game.maxFps|toFpsRange>'}
+                            )
+                        ),
+                        stackH(
+                            'full-h',
+                            div({class: 'flex'}),
+                            div(
+                                {style: 'background-color: #000000C0; color: white', class: 'less'},
+                                'Zoom: <game.zoom|toRounded>'
+                            )
+                        )
                     )
                 ),
-                stackH(
-                    input(
-                        {type: 'text', class: 'less', readOnly: true, tab: -1, size: 3, value: '<game.fps|toFpsInfo>'}
-                    ),
-                    input(
-                        {type: 'text', class: 'less', readOnly: true, tab: -1, size: 6, value: '<game.avgFps|toAvgFps>'}
-                    ),
-                    input(
-                        {type: 'text', class: 'less', readOnly: true, tab: -1, size: 7, value: '<game.minFps,game.maxFps|toFpsRange>'}
-                    )
-                )
+                div({style: 'height: 60px'})
             )
         )
     }
@@ -238,6 +259,46 @@ class DefaultRenderPlugin extends RenderPlugin {
         return this.getErrorDiv({ ...props, click, buttonText: 'Continue' })
     }
 
+    getControlsToggler(props) {
+        const { div, button, input, icon, stackH, stackV } = this;
+        const iconButton = ({ onClick, name, iconName }) => div(
+            {class: 'min-content-h'},
+            button(
+                {onClick, class: 'button-padding'},
+                stackH(
+                    'inner-space-h padded-h',
+                    div(
+                        {class: 'min-content-h'},
+                        icon(iconName)
+                    ),
+                    name && div(
+                        {class: 'min-content-h hide-when-small'},
+                        name
+                    )
+                )
+            )
+        )
+        return (
+            stackV(
+                'full-v absolute',
+                div({class: 'flex'}),
+                div(
+                    {class: 'padded all-events'},
+                    iconButton({
+                        iconName: 'vertical_align_bottom',
+                        onClick: () => {
+                            this.game.getMandatoryElem('controls').classList.toggle('slide-down')
+                            const value = !this.toggle
+                            this.toggle = value
+                            this.notify('change', {name: 'toggle', value})
+                        }
+                    })
+                )
+
+            )
+        )
+    }
+
     getMainSection() {
         const { div, button, input, icon, stackH, stackV } = this;
 
@@ -256,13 +317,28 @@ class DefaultRenderPlugin extends RenderPlugin {
         const toggleAutoZoom = e => {
             game.autoZoom = !game.autoZoom
         }
-        const buttons = [
-            {name: 'Reset', sideIcon: 'restart_alt', click: () => game.reset()},
-            {name: 'Fullscreen', sideIcon: '<game.isFullscreen|toFullscreenIcon>', click: toggleFullscreen}
-        ]
-        if (game.showFpsByUser) {
+        const iconButton = ({ onClick, name, iconName }) => div(
+            {class: 'min-content-h'},
+            button(
+            {onClick, class: 'button-padding'},
+                stackH(
+                    'inner-space-h padded-h',
+                    div(
+                        {class: 'min-content-h'},
+                        icon(iconName)
+                    ),
+                    name && div(
+                        {class: 'min-content-h hide-when-small'},
+                        name
+                    )
+                )
+            )
+        )
+        const buttons = []
+
+        if (game.hasEditor) {
             buttons.push(
-                {name: 'FPS', sideIcon: '<game.showFps|toFpsIcon>', click: () => game.showFps = !game.showFps}
+                iconButton({name: 'Editor', iconName: 'build', onClick: () => game.openEditorMode()}),
             )
         }
         const volumeSlider = input(
@@ -271,101 +347,88 @@ class DefaultRenderPlugin extends RenderPlugin {
         const toggleZoomMode = e => {
             game.stepZoom = !game.stepZoom
         }
-        const buttonElems = []
-        if (game.hasEditor) {
-            buttonElems.push(
-                button(
-                    {onClick: () => game.openEditorMode()},
-                    stackH(
-                        'inner-space-h',
-                        div(
-                            {class: 'min-content-h'},
-                            icon('build')
-                        ),
-                        div(
-                            {class: 'min-content-h'},
-                            'Editor'
-                        )
-                    )
-                ),
-            )
-        }
+
         const isZoomable = game.minZoom !== game.maxZoom && !(game.autoZoom && !game.autoZoomByUser)
-        buttonElems.push(
-            stackH(
-                'min-content-h padded-h',
-                !isMobile && div(
-                    {class: 'padded-h'},
-                    'Zoom:'
-                ),
-                isZoomable && game.autoZoomByUser && button(
-                    {onClick: toggleAutoZoom},
-                    icon(
-                        '<game.autoZoom|toAutoZoomIcon>'
-                    )
-                ),
-                game.stepZoomByUser && button(
-                    {onClick: toggleZoomMode},
-                    icon(
-                        '<game.stepZoom|toZoomModeIcon>'
-                    )
-                ),
-                !isMobile && isZoomable && stackH(
-                    {id: 'zoomMode', class: 'min-content-h padded-h', watch: 'game.stepZoom'},
-                    stepZoom => stepZoom ?
-                        input(
-                            {id: 'zoomSlider', min: '<game.minZoom>', step: 1, max: '<game.maxAvailZoom>', type: 'range', onInput: e => game.zoom = parseInt(e.target.value), value: '<game.zoom>'}
-                        ) :
-                        input(
-                            {id: 'zoomSlider', min: '<game.minZoom>', step: 0.01, max: '<game.maxAvailZoom>', type: 'range', onInput: e => game.zoom = parseFloat(e.target.value), value: '<game.zoom>'}
-                        )
-                )
-            ),
-            button(
-                {onClick: () => game.muted = !game.muted},
-                icon(
-                    'volume_<game.muted|onOff>'
-                )
-            ),
-            !isMobile && div(
-                {class: 'stack-h min-content-h padded-h'},
-                volumeSlider
-            ),
-            button(
-                {onClick: () => game.running = !game.running},
-                icon(
-                    '<game.running|pausePlay>'
-                )
-            )
-        );
-        for (let { name, click, sideIcon } of buttons) {
-            let inner = name;
-            if (sideIcon) {
-                inner = stackH(
-                    'inner-space-h',
+
+        if (!isMobile) {
+            buttons.push(
+                stackH(
+                    'min-content-h padded-h hide-when-small',
                     div(
-                        {class: 'min-content-h'},
-                        icon(sideIcon)
+                        {class: 'padded-h'},
+                        'Zoom:'
                     ),
-                    !isMobile && div(
-                        {class: 'min-content-h'},
-                        name
-                    )
-                )
-            }
-            buttonElems.push(
-                div(
-                    {class: 'min-content-h'},
-                    button(
-                        {onClick: click},
-                        inner
+                    isZoomable && game.autoZoomByUser && iconButton(
+                        {onClick: toggleAutoZoom, class: 'button-padding', iconName: '<game.autoZoom|toAutoZoomIcon>'},
+                    ),
+                    game.stepZoomByUser && iconButton(
+                        {onClick: toggleZoomMode, class: 'button-padding', iconName: '<game.stepZoom|toZoomModeIcon>'}
+                    ),
+                    !isMobile && isZoomable && stackH(
+                        {id: 'zoomMode', class: 'min-content-h padded-h hide-when-small', watch: 'game.stepZoom'},
+                        stepZoom => stepZoom ?
+                            input(
+                                {id: 'zoomSlider', min: '<game.minZoom>', step: 1, max: '<game.maxAvailZoom>', type: 'range', onInput: e => game.zoom = parseInt(e.target.value), value: '<game.zoom>'}
+                            ) :
+                            input(
+                                {id: 'zoomSlider', min: '<game.minZoom>', step: 0.01, max: '<game.maxAvailZoom>', type: 'range', onInput: e => game.zoom = parseFloat(e.target.value), value: '<game.zoom>'}
+                            )
                     )
                 )
             )
         }
+        buttons.push(
+            iconButton(
+                {onClick: () => game.muted = !game.muted, iconName: 'volume_<game.muted|onOff>'}
+            )
+        )
+        if (!isMobile) {
+            buttons.push(
+                div(
+                    {class: 'stack-h min-content-h padded-h hide-when-small'},
+                    volumeSlider
+                )
+            )
+        }
+       buttons.push(
+            iconButton(
+                {onClick: () => game.running = !game.running, iconName: '<game.running|pausePlay>'},
+            ),
+            iconButton(
+                {name: 'Reset', iconName: 'restart_alt', onClick: () => game.reset()}
+            )
+        )
+        if (game.showFpsByUser) {
+            buttons.push(iconButton(
+                {name: 'FPS', iconName: '<game.showFps|toFpsIcon>', onClick: () => game.showFps = !game.showFps}
+            ))
+        }
+        buttons.push(
+            iconButton(
+                {name: 'Fullscreen', iconName: '<game.isFullscreen|toFullscreenIcon>', onClick: toggleFullscreen}
+            )
+        )
+        const controlBar = div(
+            {id: 'controls', class: 'full-h', style: 'background-color: #494964'},
+            stackH(
+                {class: 'padded full-h'},
+                !isMobile && div(
+                    {class: 'min-content-h nowrap-shorten hide-when-small', style: 'color: #9eaca9; font-family: Tahoma'},
+                    'Remake Engine V' + VERSION_ENGINE + ' - © 2023 do-while-true'
+                ),
+                div(
+                    {class: 'flex mono', style: 'color: white'},
+                    div(
+                        {class: 'center-h inner-space-h stack-h min-content-h'},
+                        ...buttons
+                    )
+                )
+            )
+        )
+
         return (
             stackV(
-                'full-v',
+                {class: 'full-v <this.toggle|toLeftMargin>'},
                 div(
                     {class: 'block padded full-h flex screen-bounds'},
                     div(
@@ -415,20 +478,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                     }
 
                 ),
-                stackH(
-                    {class: 'padded full-h', style: 'background-color: #494964'},
-                    !isMobile && div(
-                        {class: 'min-content-h nowrap-shorten', style: 'color: #9eaca9; font-family: Tahoma'},
-                        'Remake Engine V' + VERSION_ENGINE + ' - © 2023 do-while-true'
-                    ),
-                    div(
-                        {class: 'flex mono', style: 'color: white'},
-                        div(
-                            {class: 'center-h inner-space-h stack-h min-content-h'},
-                            ...buttonElems
-                        )
-                    )
-                )
+                controlBar
             )
         )
     }

@@ -1,7 +1,7 @@
-const { absDir } = require('../src/build/classes.cjs')
+const absPath = require('../src/build/classes/absPath.cjs')
 const { execSync } = require('child_process')
 
-execSync("nodemon " + "-w '" + absDir.game("*.cjs") + "' -e cjs --exec 'webpack-dev-server' -- --config webpack.build-dev.cjs", {
+execSync("nodemon " + "-w '" + absPath.game("*.cjs") + "' -e cjs --exec 'webpack-dev-server' -- --config webpack.build-dev.cjs", {
     stdio: 'inherit',
-    cwd: absDir.engine()
+    cwd: absPath.engine()
 })

@@ -1,4 +1,6 @@
-const { absDir, syncFs, getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes.cjs')
+const absPath = require('./src/build/classes/absPath.cjs')
+const syncFs = require('./src/build/classes/syncFs.cjs')
+const { getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes/config.cjs')
 
 const { DefinePlugin, NormalModuleReplacementPlugin } = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -11,15 +13,15 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
-const Hosting = require(absDir.src('build/hosting/' + configJson().hosting + '.cjs'))
+const Hosting = require(absPath.src('build/hosting/' + configJson().hosting + '.cjs'))
 const path = require("path");
-const enginePackageJson = syncFs.readJson(absDir.engine('package.json'))
-const gamePackageJson = syncFs.readJson(absDir.game('package.json'))
+const enginePackageJson = syncFs.readJson(absPath.engine('package.json'))
+const gamePackageJson = syncFs.readJson(absPath.game('package.json'))
 const gameId = gamePackageJson.name
 
 module.exports = {
     gameId,
-    absDir,
+    absPath,
     getConfigForCtx,
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args)
@@ -42,11 +44,11 @@ module.exports = {
         ];
         return {
             name: 'server',
-            context: absDir.engine(),
+            context: absPath.engine(),
             target: 'node',
-            entry: absDir.src('server/index.cjs'),
+            entry: absPath.src('server/index.cjs'),
             output: {
-                path: absDir.dist(),
+                path: absPath.dist(),
                 filename: 'server.cjs',
                 clean: true
             },
@@ -85,7 +87,7 @@ module.exports = {
             plugins,
             resolve: {
                 alias: {
-                    helper: absDir.src('engine/helper') + '/'
+                    helper: absPath.src('engine/helper') + '/'
                 },
                 extensions: ['*', '.js']
             }
@@ -112,18 +114,19 @@ module.exports = {
             new HtmlWebpackPlugin({
                 filename: 'index.html',
                 inject: 'body',
-                title: config.title
+                title: config.title,
+                meta: {viewport: 'width=device-width, initial-scale=1, shrink-to-fit=no'}
             })
         ];
 
-        const entryParts = [absDir.game('src/index.js')]
+        const entryParts = [absPath.game('src/index.js')]
         if (config.editor) {
-            entryParts.push(absDir.src('engine/editor/index.js'))
+            entryParts.push(absPath.src('engine/editor/index.js'))
         }
         if (isDistBuild && config.resourceLoading !== RESOURCE.LOADING.API) {
-            const getResourceIds = type => syncFs.readFilesRec(absDir.resources(type))
+            const getResourceIds = type => syncFs.readFilesRec(absPath.resources(type))
             const getResourcesJson = name => {
-                const filePath = absDir.resources(name + '.json')
+                const filePath = absPath.resources(name + '.json')
                 return syncFs.fileExists(filePath) ? syncFs.readJson(filePath) : {}
             }
             const getResourceCache = (type, ids) => {
@@ -140,7 +143,7 @@ module.exports = {
                         }
 
                 for (const id of ids) {
-                    const filePath = absDir.resources(type, id + ext)
+                    const filePath = absPath.resources(type, id + ext)
                     let content = getContent(filePath)
                     cache[id] = content
                 }
@@ -163,7 +166,7 @@ module.exports = {
                 static
             }
             syncFs.writeContent(
-                absDir.tmp('resources-info.js'),
+                absPath.tmp('resources-info.js'),
 `const resourceInfo = ${JSON.stringify(resourceInfo)}
 export default resourceInfo`
             )
@@ -186,8 +189,8 @@ export default resourceInfo`
         if (config.eslint) {
             plugins.push(
                 new ESLintPlugin({
-                    context: absDir.src(),
-                    overrideConfigFile: absDir.game('.eslintrc.cjs')
+                    context: absPath.src(),
+                    overrideConfigFile: absPath.game('.eslintrc.cjs')
                 })
             )
         }
@@ -237,14 +240,14 @@ export default resourceInfo`
 
         return {
             name: 'frontend',
-            context: absDir.engine(),
+            context: absPath.engine(),
             dependencies,
             devtool: config.sourceMaps && config.sourceMapType,
             entry: {
                 game: entryParts
             },
             output: {
-                path: absDir.dist(pubPrefix),
+                path: absPath.dist(pubPrefix),
                 clean: true,
                 filename: 'js/[' + (isDistBuild ? 'contenthash' : 'name') + '].js',
                 publicPath: '/'
@@ -329,11 +332,11 @@ export default resourceInfo`
             plugins,
             resolve: {
                 alias: {
-                    helper: absDir.src('engine/helper') + '/',
-                    editor: absDir.src('engine/editor') + '/',
-                    core: absDir.src('engine/core') + '/',
-                    panes: absDir.src('engine/panes') + '/',
-                    plugins: absDir.src('engine/plugins') + '/'
+                    helper: absPath.src('engine/helper') + '/',
+                    editor: absPath.src('engine/editor') + '/',
+                    core: absPath.src('engine/core') + '/',
+                    panes: absPath.src('engine/panes') + '/',
+                    plugins: absPath.src('engine/plugins') + '/'
                 },
                 extensions: ['*', '.js', '.jsx']
             },
