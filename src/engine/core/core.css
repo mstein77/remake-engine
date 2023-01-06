@@ -1,0 +1,28 @@
+body {
+    overflow: hidden
+}
+
+html.fix-orientation {
+    width: 100vh;
+    height: 100vw;
+    position: absolute;
+    overflow: hidden;
+    top: 100%;
+    left: 0;
+    transform-origin: left top;
+    transform: rotate(-90deg);
+}
+
+#screen-div {
+    flex-shrink: 0;
+    margin: 0 0 0 0;
+    padding: 0;
+}
+
+#screen-overlay-div {
+    position: relative;
+    padding: 0;
+    margin: 0;
+    transform-origin: top left
+}
+

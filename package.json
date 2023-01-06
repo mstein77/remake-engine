@@ -1,60 +1,74 @@
 {
   "name": "2dfireengine",
   "version": "1.0.0",
-  "description": "2D Game Engine",
-  "main": "public/index.html",
+  "description": "Remake Engine - Javascript game engine",
+  "exports": "./src/engine/index.js",
+  "type": "module",
   "scripts": {
-    "babel": "babel --presets es2015 js/main.js -o build/main.bundle.js",
-    "start": "node server.js",
-    "dev-start": "nodemon server.js",
-    "dev-server": "webpack-dev-server --open --config webpack.dev.js --history-api-fallback --inline --progress",
-    "dev": "npm-run-all --parallel dev-server dev-start",
-    "build": "webpack --config webpack.dev.js",
-    "test": "mocha"
+    "test": "jest --config jest.config.cjs --coverage",
+    "start-static": "node src/server/static.cjs",
+    "start-server": "node ../../dist/server.cjs",
+    "start": "node bin/serve.cjs",
+    "build-game-dev": "node bin/dev-server.cjs",
+    "build-game-prod": "webpack --config webpack.build-dist.cjs && node bin/cleanup.cjs",
+    "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
   "engines": {
-    "node": "12.13.1"
+    "node": "16.17.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mstein77/2DFireEngine.git"
+    "url": "git+https://mstein77@github.com/mstein77/2DFireEngine.git"
   },
-  "browserslist": [
-    "last 2 versions"
-  ],
   "author": "",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/mstein77/2DFireEngine/issues"
   },
+  "bin": {
+    "remake-engine-cli": "bin/remake.js"
+  },
   "homepage": "https://github.com/mstein77/2DFireEngine#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  },
   "devDependencies": {
+    "@babel/cli": "^7.18.10",
+    "@babel/core": "^7.18.10",
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
+    "@babel/preset-env": "^7.18.10",
     "@babel/preset-react": "^7.0.0",
+    "@statoscope/webpack-plugin": "^5.24.0",
     "babel-loader": "^8.0.6",
+    "body-parser": "^1.20.0",
     "chai": "^4.2.0",
     "clean-webpack-plugin": "^3.0.0",
-    "copy-webpack-plugin": "^5.1.1",
-    "css-loader": "^1.0.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "cors": "^2.8.5",
+    "css-loader": "^6.7.1",
+    "css-minimizer-webpack-plugin": "^4.1.0",
+    "dotenv": "^16.0.1",
+    "eslint-webpack-plugin": "^3.2.0",
+    "file-loader": "^6.2.0",
+    "gl-matrix": "^3.3.0",
     "html-webpack-plugin": "^5.5.0",
+    "jest": "^29.0.3",
+    "jest-expect-message": "^1.1.3",
+    "jest-extended": "^3.2.0",
     "jsdoc": "^3.6.6",
-    "mocha": "^8.2.1",
+    "mini-css-extract-plugin": "^2.6.1",
+    "mocha": "^10.0.0",
+    "morgan": "^1.10.0",
     "nodemon": "^2.0.4",
     "npm-run-all": "^4.1.5",
-    "style-loader": "^0.23.0",
+    "react": "^16.12.0",
+    "react-dom": "^16.12.0",
+    "style-loader": "^3.3.1",
     "terser-webpack-plugin": "^5.3.3",
     "webpack": "^5.73.0",
-    "webpack-cli": "^3.3.6",
-    "webpack-dev-server": "^3.7.2",
+    "webpack-bundle-analyzer": "^4.5.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.10.1",
     "webpack-merge": "^4.2.2"
-  },
-  "dependencies": {
-    "@babel/core": "^7.5.5",
-    "@babel/preset-env": "^7.5.5",
-    "cors": "^2.8.5",
-    "express": "^4.17.1",
-    "gl-matrix": "^3.3.0",
-    "lodash": "^4.17.15",
-    "react": "^16.12.0",
-    "react-dom": "^16.12.0"
   }
 }

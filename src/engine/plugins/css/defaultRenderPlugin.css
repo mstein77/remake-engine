@@ -1,0 +1,32 @@
+@media (max-width: 1100px) {
+    .hide-when-small {
+        display: none
+    }
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+}
+
+.loading::after {
+    content: "";
+    width: 50px;
+    height: 50px;
+    border: 10px solid #dddddd;
+    border-top-color: #009579;
+    border-radius: 50%;
+    animation: loading 1s ease infinite;
+}
+
+@keyframes loading {
+    to {
+        transform: rotate(1turn);
+    }
+}
+
+.slide-down {
+    height: 0px;
+    overflow-y: hidden;
+    transition: height 1s ease-in-out;
+}
