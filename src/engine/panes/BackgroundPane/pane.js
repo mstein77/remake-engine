@@ -1,14 +1,10 @@
 import { d, getCanvasForDim, getConfigFromInput } from "helper/helper"
 import { BackgroundPaneConfig } from "./config";
 import { DivContainer } from "core/classes";
+import { Pane } from "../classes";
+import inst from "../../core/instances.js";
 
-export class BackgroundPane {
-
-    constructor(input) {
-        const config = getConfigFromInput(BackgroundPane.Config, input);
-        config.applyTo(this);
-        this.config = config;
-    }
+export class BackgroundPane extends Pane {
 
     addImage(image, posX, posY) {
         this.images.push(image);
@@ -79,3 +75,5 @@ export class BackgroundPane {
  * @type {BackgroundPaneConfig}
  */
 BackgroundPane.Config = BackgroundPaneConfig;
+
+inst.paneRegistry.add('BackgroundPane', BackgroundPane, {editable: true})

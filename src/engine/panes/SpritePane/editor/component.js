@@ -192,7 +192,6 @@ function SpritePaneEditorInner({ spriteIndex, animationIndex }) {
 function SpritePaneEditor({ model, resource }) {
     const update = useComponentUpdate();
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'SpritePane', model, resource, update });
-
     const spriteIndex = useMemo(() => {
         return new SpriteIndex(model);
     }, [model]);

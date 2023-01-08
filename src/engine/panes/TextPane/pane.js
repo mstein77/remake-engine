@@ -1,8 +1,9 @@
 import inst from "core/instances"
 import { TextPaneConfig } from "./config"
-import { drawTextBlocks, getInstanceFromInput, getTextBlockImage, getConfigFromInput } from "helper/helper"
+import { drawTextBlocks, getInstanceFromInput, getTextBlockImage } from "helper/helper"
 import { CanvasContainer } from "core/classes"
 import { TextBlock } from "./classes"
+import { Pane } from "../classes"
 
 /**
  * TODO:
@@ -10,12 +11,10 @@ import { TextBlock } from "./classes"
  *   - Scrolling (Buffering?)
  *   - Proper Dirty-Handling (update)
  */
-export class TextPane {
+export class TextPane extends Pane {
 
     constructor(input) {
-        const config = getConfigFromInput(TextPane.Config, input)
-        config.applyTo(this)
-        this.config = config
+        super(input)
         this.blocks = {}
     }
 
@@ -120,6 +119,18 @@ export class TextPane {
         }
     }
 
+    getEditorResources() {
+        const blocks = [];
+        for (let id in this.blocks) {
+            blocks.push(
+                { ...this.blocks[id].config.getJson() }
+            )
+        }
+        const resources = super.getEditorResources()
+        resources.props = { blocks }
+        return resources
+    }
+
     static padStart(value, char, len) {
         value = '' + value
         while (value.length < len) {
@@ -129,3 +140,5 @@ export class TextPane {
     }
 }
 TextPane.Config = TextPaneConfig
+
+inst.paneRegistry.add('TextPane', TextPane, {editable: true})

@@ -1,7 +1,8 @@
 import inst from "core/instances"
-import { BufferedCanvasContainer } from "core/classes"
-import { getConfigFromInput } from "helper/helper"
+import { BufferedCanvasContainer, Configurable } from "core/classes"
 import { BitmapScrollPaneConfig } from "./config.js"
+import { Pane } from "../classes";
+import {BackgroundPane} from "../BackgroundPane/pane.js";
 
 /**
  * TODO:
@@ -12,14 +13,10 @@ import { BitmapScrollPaneConfig } from "./config.js"
  *   - Oversize/Scrolling
  *   - Z-Ordering / MultiBitmaps
  */
-export class BitmapScrollPane {
+export class BitmapScrollPane extends Pane {
 
     constructor(input) {
-
-        const config = getConfigFromInput(BitmapScrollPane.Config, input);
-        config.applyTo(this);
-        this.config = config;
-
+        super(input)
         this.maxState = 0;
         this.pos = 0;
         this.state = -1;
@@ -221,3 +218,5 @@ export class BitmapScrollPane {
     }
 }
 BitmapScrollPane.Config = BitmapScrollPaneConfig
+
+inst.paneRegistry.add('BitmapScrollPane', BitmapScrollPane)

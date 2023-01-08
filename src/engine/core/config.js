@@ -279,7 +279,10 @@ class Config {
         return result;
     }
 
-    validateConfig(config, value) {
+    validateConfig(config, value, props = {}) {
+        if (props.null && value === null) {
+            return null;
+        }
         if (typeof value === 'string') {
             value = inst.RL.getJsonResource(value);
         }

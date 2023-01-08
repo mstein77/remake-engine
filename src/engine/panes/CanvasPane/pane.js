@@ -1,14 +1,9 @@
 import { CanvasContainer } from "core/classes"
-import { CanvasPaneConfig } from "./config";
-import { getConfigFromInput } from "helper/helper"
+import { CanvasPaneConfig } from "./config"
+import { Pane } from "../classes"
+import inst from "core/instances"
 
-export class CanvasPane {
-
-    constructor(input) {
-        const config = getConfigFromInput(CanvasPane.Config, input)
-        config.applyTo(this)
-        this.config = config
-    }
+export class CanvasPane extends Pane {
 
     init(viewPortDimX, viewPortDimY) {
         this.viewPortDim = {
@@ -39,3 +34,5 @@ export class CanvasPane {
     }
 }
 CanvasPane.Config = CanvasPaneConfig
+
+inst.paneRegistry.add('CanvasPane', CanvasPane)

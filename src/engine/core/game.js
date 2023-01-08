@@ -2,16 +2,9 @@ import { STATE, FILTER } from "core/const"
 import { Config } from "core/config"
 import { Storage, getConfigFromInput, clamp, ucfirst, d } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
+import { getResourcesAndCallback } from "./resources.js";
 import { div } from "helper/dom"
 import { ResourceRequest } from "core/classes.js"
-import { TilesMap } from "panes/BufferedTilesPane/classes"
-import { TextPane } from "panes/TextPane/pane"
-import { BackgroundPane } from "panes/BackgroundPane/pane"
-import { CanvasPane } from "panes/CanvasPane/pane"
-import { LinearGradientPane } from "panes/LinearGradientPane/pane"
-import { SpritePane } from "panes/SpritePane/pane"
-import { BitmapScrollPane } from "panes/BitmapScrollPane/pane"
-import { PatternPane } from "panes/PatternPane/pane"
 import inst from "core/instances"
 
 class Game {
@@ -171,7 +164,6 @@ class Game {
         this.setState(STATE.INIT);
 
         this.warnings = []
-        this.warningActions = []
         this.currentScreen = null
         this.elems = {}
         this.props = {}
@@ -214,6 +206,7 @@ class Game {
     connectAndBoot() {
         this.setState(STATE.CONNECT)
         // TODO: load game.json
+
         setTimeout(() => {
             try {
                 // apply input to this
@@ -444,6 +437,12 @@ class Game {
     gotoScreen(screenId, params = {}) {
         this.log(`Goto screen "${screenId}"`)
 
+        if (this.globalsResolver && !inst.RL.hasPermLoaded) {
+            // add perm resources to resource loader
+            const { loader } = this.globalsResolver
+            loader.resolve()
+            d('perm loader registered...')
+        }
         inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
         this.getMandatoryElem('screen-overlay-div').replaceChildren()
         this.frameEvents = {}
@@ -603,118 +602,20 @@ class Game {
     getEditableResources() {
         const resources = [];
 
-        function extractEditablesFromAreas(areas) {
-            if (!Array.isArray(areas)) {
-                return;
-            }
-            for (let area of areas) {
-                if (area.panes !== undefined) {
-                    for (let pane of area.panes) {
-                        if (pane.tilesMap) {
-                            resources.push(
-                                {
-                                    type: 'TilesMap',
-                                    id: pane.tilesMap.id,
-                                    pane,
-                                    config: TilesMap.Config,
-                                    cls: TilesMap,
-                                    data: pane.tilesMap.config,
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim
-                                }
-                            )
-                        } else if (pane instanceof TextPane) {
-                            const blocks = [];
-                            for (let id in pane.blocks) {
-                                blocks.push(
-                                    {...pane.blocks[id].config.getJson()}
-                                );
-                            }
-                            resources.push(
-                                {
-                                    type: 'TextPane',
-                                    id: pane.id,
-                                    pane,
-                                    config: TextPane.Config,
-                                    cls: TextPane,
-                                    elem: pane.getPreview(),
-                                    data: pane.config,
-                                    dim: pane.viewPortDim,
-                                    blocks
-                                });
-                        } else if (pane instanceof BackgroundPane) {
-                            resources.push({
-                                type: 'BackgroundPane',
-                                id: pane.id,
-                                pane,
-                                config: BackgroundPane.Config,
-                                cls: BackgroundPane,
-                                elem: pane.getPreview(),
-                                data: pane.config,
-                                dim: pane.viewPortDim,
+        const extractConfigureablesFromArea = areas => {
+            if (!Array.isArray(areas)) return
 
-                            })
-                        } else if (pane instanceof CanvasPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'canvasPane'
-                                }
-                            )
-                        } else if (pane instanceof LinearGradientPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'linearGradientPane'
-                                }
-                            )
-                        } else if (pane instanceof SpritePane) {
-                            const blocks = [];
-                            for (let { id, x, y } of Object.values(pane.sprites)) {
-                                blocks.push({ id, x, y });
-                            }
-                            resources.push(
-                                {
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'spriteSheet',
-                                    data: pane.spriteSheet
-                                }
-                            );
-                        } else if (pane instanceof BitmapScrollPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'bitmapScrollPane'
-                                }
-                            )
-                        } else if (pane instanceof PatternPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'patternPane'
-                                }
-                            )
-                        }
+            for (let area of areas) {
+                const panes = area.panes
+                if (panes) {
+                    for (let pane of panes) {
+                        resources.push(pane.getEditorResources())
                     }
                 }
-                if (Array.isArray(area)) {
-                    extractEditablesFromAreas(area)
-                } else if (area.areas !== undefined) {
-                    extractEditablesFromAreas(area.areas)
-                }
+                extractConfigureablesFromArea(Array.isArray(area) ? area : area.areas)
             }
         }
-        extractEditablesFromAreas(this.getCurrentScreen().areas)
+        extractConfigureablesFromArea(this.getCurrentScreen().areas)
 
         resources.push({type: 'filters', data: filterer})
         return resources;
@@ -829,10 +730,11 @@ class Game {
             const { globals, game } = this;
             const resources = inst.RL.getResources();
             if (!this.areGlobalsResolved) {
-                globals.unlock();
-                this.globalsResolver({ ...resources, globals, game });
-                globals.lock();
-                this.areGlobalsResolved = true;
+                globals.unlock()
+                const { callback } = this.globalsResolver
+                callback({ ...resources, globals, game })
+                globals.lock()
+                this.areGlobalsResolved = true
             }
             try {
                 this.tempKeyActions = null
@@ -862,11 +764,17 @@ class Game {
         if (autoInit) this.init()
     }
 
-    setGlobalsResolver(resolver) {
-        const game = this.game
-        const globals = this.globals
-        const loader = new ResourceRequest(true)
-        this.globalsResolver = resolver({ loader, game, globals })
+    /**
+     *
+     * @param resourcesAndCallback
+     */
+    setGlobalsResolver( ...resourcesAndCallback ) {
+        const { callback, resources } = getResourcesAndCallback( ...resourcesAndCallback )
+
+        if (!callback) return
+
+        const loader = new ResourceRequest(resources,true)
+        this.globalsResolver = { callback, loader }
         this.areGlobalsResolved = false
     }
 

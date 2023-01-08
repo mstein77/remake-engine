@@ -1285,27 +1285,27 @@ function TilesPaneEditor({ model, resource }) {
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TilesPane', model, resource, update });
 
     const tileIndex = useMemo(() => {
-        return new TileIndex(model);
+        return new TileIndex(model.tilesMap);
     }, [model]);
 
     const tilesGrid = useMemo(() => {
-        return new TilesGrid(tileIndex, model);
+        return new TilesGrid(tileIndex, model.tilesMap);
     }, [model]);
 
     const animationIndex = useMemo(() => {
-        return new AnimationIndex(tileIndex, model)
+        return new AnimationIndex(tileIndex, model.tilesMap)
     }, [model]);
 
     const aliasIndex = useMemo(() => {
-        return new AliasIndex(model, tileIndex, animationIndex);
+        return new AliasIndex(model.tilesMap, tileIndex, animationIndex);
     }, [model]);
 
     const brushIndex = useMemo(() => {
-        return new BrushIndex(model, tileIndex, aliasIndex)
+        return new BrushIndex(model.tilesMap, tileIndex, aliasIndex)
     }, [model]);
 
     const eventIndex = useMemo(() => {
-        return new EventIndex(model)
+        return new EventIndex(model.tilesMap)
     }, [model]);
 
     const models = { tileIndex, tilesGrid, animationIndex, aliasIndex, brushIndex, eventIndex };

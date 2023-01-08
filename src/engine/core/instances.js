@@ -20,6 +20,25 @@ let filterer = null
 let renderPlugin = null
 let touchControlsPlugin = null
 
+class PaneRegistry {
+
+    constructor() {
+        this.registry = new Map()
+    }
+
+    add(name, cls, props = {}) {
+        this.registry.set(cls, { name, cls, ...props })
+    }
+
+    get(cls) {
+        return this.registry.get(cls)
+    }
+
+    getAll() {
+        return this.registry.values()
+    }
+}
+
 class System {
 
     constructor() {
@@ -1336,7 +1355,8 @@ const inst = {
             plugins.push(inst.touchControlsPlugin)
         }
         return plugins
-    }
+    },
+    paneRegistry: new PaneRegistry()
 }
 
 export default inst

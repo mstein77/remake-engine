@@ -1680,7 +1680,7 @@ function useContentSwitcher(contentProvider, defStack) {
             )
         };
         const lastIndex = callStack.length - 1;
-        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true};
+        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true}
     }
     registry.current.update = update;
 

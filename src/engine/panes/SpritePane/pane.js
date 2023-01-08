@@ -1,15 +1,14 @@
 import { COLLISION } from "core/const"
 import { BufferedCanvasContainer, PlayerProxy } from "core/classes"
 import { SpritePaneConfig } from "./config"
-import { getConfigFromInput } from "helper/helper"
+import { d } from "helper/helper"
+import { Pane } from "../classes"
+import inst from "../../core/instances.js";
 
-export class SpritePane {
+export class SpritePane extends Pane {
 
     constructor(input) {
-        const config = getConfigFromInput(SpritePane.Config, input)
-        config.applyTo(this)
-        this.config = config
-
+        super(input)
         this.sprites = {};
         this.actorId = null;
         this.groups = {};
@@ -505,7 +504,6 @@ export class SpritePane {
     }
 
     setSpriteFilters(id, filters, duration = -1) {
-
         const sprites = this.getSpritesById(id);
         for (let sprite of sprites) {
             sprite.filters = filters;
@@ -581,5 +579,14 @@ export class SpritePane {
             height: this.viewPortDim.y
         }
     }
+
+    getEditorResources() {
+        const resources = super.getEditorResources()
+        resources.props.sprites = this.spriteSheet.sprites
+        resources.props.animations = this.spriteSheet.animations
+        return resources
+    }
 }
 SpritePane.Config = SpritePaneConfig
+
+inst.paneRegistry.add('SpritePane', SpritePane, {editable: true})

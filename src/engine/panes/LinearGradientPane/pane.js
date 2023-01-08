@@ -1,19 +1,18 @@
 import inst from "core/instances"
-import { getCanvasForDim, getConfigFromInput } from "helper/helper"
+import { getCanvasForDim } from "helper/helper"
 import { DivContainer } from "core/classes"
-import { LinearGradientPaneConfig } from "./config";
+import { LinearGradientPaneConfig } from "./config"
+import { Pane } from "../classes"
 
 /**
  * TODO:
  *   - endless Scrolling
  *   - Use CSS Background-Property?
  */
-export class LinearGradientPane {
+export class LinearGradientPane extends Pane {
 
     constructor(input) {
-        const config = getConfigFromInput(LinearGradientPane.Config, input);
-        config.applyTo(this);
-        this.config = config;
+        super(input)
         this.viewPosition = null;
         this.viewPositionMax = null;
         this.isHorizontal = (this.axis === 'X');
@@ -184,3 +183,5 @@ export class LinearGradientPane {
     }
 }
 LinearGradientPane.Config = LinearGradientPaneConfig
+
+inst.paneRegistry.add('LinearGradientPane', LinearGradientPane)

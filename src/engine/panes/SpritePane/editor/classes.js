@@ -6,7 +6,8 @@ class SpriteIndex extends EntityIndex {
     constructor(model) {
         super();
         this.model = model;
-        this.img = model.image.canvas.elem;
+        this.img = model.spriteSheet.image.canvas.elem;
+        d('MOD', model)
         const items = [];
         for (let [name, obj] of Object.entries(model.sprites)) {
             if (!obj.img) {

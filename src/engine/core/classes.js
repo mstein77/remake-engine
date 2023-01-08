@@ -1,6 +1,16 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import { d, isValidResourceId, BitmapPlayer } from "helper/helper"
+import {d, isValidResourceId, BitmapPlayer, getConfigFromInput} from "helper/helper"
+import { getResourcesAndCallback } from "./resources.js";
+
+class Configurable {
+
+    constructor(input) {
+        const config = getConfigFromInput(this.constructor.Config, input);
+        config.applyTo(this);
+        this.config = inst.game.hasEditor ? config : null;
+    }
+}
 
 class InputController {
 
@@ -564,8 +574,36 @@ class SplitArea {
 
 class ResourceRequest {
 
-    constructor(permanent = false) {
-        this.permament = permanent;
+    constructor(resources, permanent = false) {
+        this.resources = resources
+        this.permament = permanent
+    }
+
+    resolve() {
+        if (!this.resources) return
+        const { image, audio, json } = this.resources
+
+        if (image) {
+            for(const [ id, content ] of Object.entries(image)) {
+                inst.RL.addImage(
+                    this.permament, id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+        if (audio) {
+            for(const [ id, content ] of Object.entries(audio)) {
+                inst.RL.addAudio(
+                    this.permament, id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+        if (json) {
+            for(const [ id, content ] of Object.entries(json)) {
+                inst.RL.addJson(
+                    this.permament, id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
     }
 
     addImageResource(id, data) {
@@ -609,7 +647,7 @@ class ResourceRequest {
 
 class Screen {
 
-    constructor(id, initHandler = null) {
+    constructor(id, ...params) {
         this.id = id;
         this.areas = [];
         this.keyHandler = null;
@@ -621,7 +659,7 @@ class Screen {
         this.hasDependencies = false;
         this.state = 'NEW';
 
-        if (initHandler) this.setInitHandler(initHandler)
+        this.setInitHandler(...params)
     }
 
     getState() {
@@ -684,19 +722,20 @@ class Screen {
         inst.RL.clearResources();
         this.resources = {};
         this.areas = [];
-        if (this.initHandler !== null) {
-
-            const loader = new ResourceRequest()
+        if (this.initHandler) {
+/*
             const game = inst.game
             const globals = game.globals
-            const initHandler = () => this.initHandler({ loader, game, globals, screen: this });
-
+*/
             this.state = 'INIT';
-            const build = initHandler(params);
+
+            const { loader, callback } = this.initHandler
+            loader.resolve()
+            // const build = this.initHandler({ game, globals, screen: this })
             inst.RL.load(this.id).then(res => {
                 this.hasDependencies = true
             })
-            return build
+            return callback
         }
         this.hasDependencies = true;
         this.state = 'READY';
@@ -763,8 +802,22 @@ class Screen {
         inst.RL.addJson(id, json);
     }
 
-    setInitHandler(handler) {
-        this.initHandler = handler
+    setInitHandler( ...args ) {
+        const { resources, callback } = getResourcesAndCallback( ...args )
+        if (!callback) return
+
+        const loader = new ResourceRequest(resources)
+        this.initHandler = {
+            loader, callback
+        }
+/*
+        obj => {
+            loader.resolve()
+            const resources = inst.RL.getResources()
+            callback({ ...obj, ...resources })
+        }
+
+ */
     }
 
     addAudio(src) {
@@ -2381,5 +2434,6 @@ export {
     ResourceRequest,
     Gravity,
     SpriteAndTilesCollider,
-    ObjectController
+    ObjectController,
+    Configurable
 }

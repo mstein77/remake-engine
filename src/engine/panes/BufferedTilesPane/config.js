@@ -1,5 +1,5 @@
 import inst from "core/instances"
-import { getCanvasForDim, cloneDeep } from "helper/helper"
+import { d, getCanvasForDim, cloneDeep, getRebuildJsonForModel } from "helper/helper"
 import { Config } from "core/config"
 import { TilesMap } from "./classes"
 
@@ -26,7 +26,7 @@ class TilesMapConfig extends Config {
     }
 
     setCount(value) {
-        this.count = this.validateInt(value, {min: 0, null: true});
+        this.count = this.validateInt(value, {min: 0, null: true})
     }
 
     setTileBits(value) {
@@ -41,7 +41,7 @@ class TilesMapConfig extends Config {
         this.events = {};
         for (let [name, obj] of Object.entries(this.validateObject(value))) {
             this.validateObject(obj, {});
-            this.addEvent(name, obj.x, obj.y, obj.width, obj.height, obj.offsetX, obj.offsetY);
+            this.addEvent(name, obj.x, obj.y, obj.width, obj.height, obj.offsetX, obj.offsetY)
         }
     }
 
@@ -54,7 +54,7 @@ class TilesMapConfig extends Config {
                 height: this.validateInt(height, {min: 0}),
                 offsetX: this.validateInt(offsetX),
                 offsetY: this.validateInt(offsetY)
-            };
+            }
     }
 
     setEventsImage(value) {
@@ -62,49 +62,49 @@ class TilesMapConfig extends Config {
     }
 
     setDefaultTile(value) {
-        this.defaultTile = this.validateObject(value);
+        this.defaultTile = this.validateObject(value)
     }
 
     setTiles(value) {
-        this.tiles = this.validateObject(value);
+        this.tiles = this.validateObject(value)
     }
 
     addTile(id, value) {
-        this.tiles[this.validateString(id)] = this.validateObject(value);
+        this.tiles[this.validateString(id)] = this.validateObject(value)
     }
 
     addTiles(values) {
         for (let id in this.validateObject(values)) {
-            this.addTile(id, values[id]);
+            this.addTile(id, values[id])
         }
     }
 
     addTiles(values) {
         for (let tile of values) {
-            this.addTile(tile);
+            this.addTile(tile)
         }
     }
 
     setAnimations(value) {
-        this.animations = this.validateObject(value);
+        this.animations = this.validateObject(value)
     }
 
     addAnimation(id, value) {
-        this.animations[this.validateString(id)] = this.validateObject(value);
+        this.animations[this.validateString(id)] = this.validateObject(value)
     }
 
     addAnimations(values) {
         for (let id in this.validateObject(values)) {
-            this.addAnimation(id, values[id]);
+            this.addAnimation(id, values[id])
         }
     }
 
     setMap(value) {
-        this.map = this.validateArray(value);
+        this.map = this.validateArray(value)
     }
 
     setBrushes(value) {
-        this.brushes = this.validateObject(value);
+        this.brushes = this.validateObject(value)
     }
 
     getSubResources() {
@@ -163,6 +163,61 @@ class TilesMapConfig extends Config {
 TilesMap.Config = TilesMapConfig
 
 class BufferedTilesPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            tilesMap: null,
+            maxSpeed: 4,
+            endlessX: false,
+            endlessY: false
+        }
+    }
+
+    setMaxSpeed(value) {
+        this.maxSpeed = this.validateInt(value)
+    }
+
+    setTilesMap(value) {
+        this.tilesMap = this.validateConfig(TilesMap, value, {null: true})
+    }
+
+    setEndlessX(value) {
+        this.endlessX = this.validateBool(value)
+    }
+
+    setEndlessY(value) {
+        this.endlessY = this.validateBool(value)
+    }
+
+    getSubResources() {
+        d('GSR')
+        return [
+            {id: this.tilesMap.id, type: 'json', data: this.tilesMap}
+        ]
+    }
+
+    addRebuildProps(obj, deep, base) {
+        d('ARP')
+        obj.tilesMap = !deep ? base.tilesMap.id : getRebuildJsonForModel(TilesMap, base.tilesMap, true)
+        obj.maxSpeed = base.maxSpeed
+        obj.endlessX = base.endlessX
+        obj.endlessY = base.endlessY
+
+        return obj
+    }
+
+    applyTo(obj) {
+        super.applyTo(obj);
+        obj.tilesMap = this.tilesMap
+        obj.maxSpeed = this.maxSpeed
+        obj.endlessX = this.endlessX
+        obj.endlessY = this.endlessY
+
+        return obj
+    }
+}
+BufferedTilesPaneConfig.deps = {
+    tilesMap: TilesMap.Config
 }
 
 export {

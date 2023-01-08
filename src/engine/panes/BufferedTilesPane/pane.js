@@ -1,40 +1,41 @@
 import inst from "core/instances"
 import { getCanvasForDim } from "helper/helper"
 import { BufferedCanvasContainer } from "core/classes"
-import { BufferedTilesPaneConfig } from "./config";
+import { BufferedTilesPaneConfig } from "./config"
+import { Pane } from "../classes"
 
 /**
  * TODO:
  *   - Filters
  *   - TileStates
  */
-export class BufferedTilesPane {
+export class BufferedTilesPane extends Pane {
 
-    constructor(tilesMap, config) {
-        // TODO solve instancof problem due to webpack build
-        this.isBufferedTilesPane = true;
-        this.tilesMap = tilesMap;
-        this.defaultTile = null;
-        this.state = -1;
+    constructor(input) {
+        super(input)
+
+        // TODO solve instanceof problem due to webpack build
+        this.isBufferedTilesPane = true
+        this.defaultTile = null
+        this.state = -1
         // mandatory
-        this.maxSpeed = config.maxSpeed;
-        this.maxState = Math.floor(this.tilesMap.tileSize / this.maxSpeed);
+        this.maxState = Math.floor(this.tilesMap.tileSize / this.maxSpeed)
         this.endless = {
-            x: (config.endless !== undefined && config.endless.x !== undefined) ? config.endless.x : false,
-            y: (config.endless !== undefined && config.endless.y !== undefined) ? config.endless.y : false,
-        };
+            x: this.endlessX,
+            y: this.endlessY
+        }
         // scrolling is always relative to the scrollPosOffset (=top left corner of the neutral quadrant)
         this.scrollPos = {
             x: 0,
             y: 0
-        };
+        }
         this.mapTilePos = {
             x: 0,
             y: 0
-        };
-        this.eventBounds = {top: 0, bottom: 0, left: 0, right: 0};
-        this.scrollLock = false;
-        this.dirty = true;
+        }
+        this.eventBounds = {top: 0, bottom: 0, left: 0, right: 0}
+        this.scrollLock = false
+        this.dirty = true
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -760,3 +761,5 @@ export class BufferedTilesPane {
     }
 }
 BufferedTilesPane.Config = BufferedTilesPaneConfig
+
+inst.paneRegistry.add('BufferedTilesPane', BufferedTilesPane, {editable: true})

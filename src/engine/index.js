@@ -2,11 +2,13 @@ import 'core/core.css';
 
 export { Screen, InputController, AxisPath, EmptyPane, BoundsScrollHandler, MasterSlavesScrollHandler,
     SplitArea, States, Position, Force, SpriteAndTilesCollider, ObjectController, Gravity, inst } from "core/classes"
+export { Resources, ImageResources, AudioResources, JsonResources } from "core/resources"
 export { Plugin, RenderPlugin, TouchControlsPlugin } from "plugins/classes"
 export { Game } from "core/game"
 export { INPUT, PATH, FILTER, COLLISION, ANIMATION, TILE } from "core/const"
 export { d } from "helper/helper";
-export { BackgroundPane } from "panes/BackgroundPane/pane";
+export { Pane } from "panes/classes"
+export { BackgroundPane } from "panes/BackgroundPane/pane"
 export { PatternPane } from "panes/PatternPane/pane";
 export { TextPane } from "panes/TextPane/pane"
 export { FontMap } from "panes/TextPane/classes"

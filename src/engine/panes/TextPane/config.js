@@ -99,7 +99,6 @@ class FontMapConfig extends Config {
         return obj;
     }
 }
-// FontMapConfig.__type = 'FontMap';
 FontMap.Config = FontMapConfig
 
 class TextBlockConfig extends Config {
@@ -254,11 +253,10 @@ class TextPaneConfig extends Config {
         return obj
     }
 }
-// TextPaneConfig.__type = 'TextPane';
 TextPaneConfig.deps = {
     font: FontMapConfig,
     block: TextBlockConfig
-};
+}
 
 export {
     FontMapConfig,

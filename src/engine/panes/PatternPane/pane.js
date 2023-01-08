@@ -1,15 +1,13 @@
 import inst from "core/instances"
 import { PatternPaneConfig } from "./config";
-import { d, getConfigFromInput, getCanvasForDim } from "helper/helper"
+import { d, getCanvasForDim } from "helper/helper"
 import { ImageContainer } from "core/classes"
+import { Pane } from "../classes"
 
-export class PatternPane {
+export class PatternPane extends Pane {
 
     constructor(input) {
-        const config = getConfigFromInput(PatternPane.Config, input)
-        config.applyTo(this)
-        this.config = config
-
+        super(input)
         this.pattern = this.image.getImage()
         this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(this.repeat) !== -1);
         this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(this.repeat) !== -1);
@@ -98,3 +96,5 @@ export class PatternPane {
     }
 }
 PatternPane.Config = PatternPaneConfig
+
+inst.paneRegistry.add('PatternPane', PatternPane)

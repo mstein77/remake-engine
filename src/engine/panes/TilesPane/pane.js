@@ -1,24 +1,25 @@
-import { CanvasContainer } from "core/classes";
+import { CanvasContainer } from "core/classes"
 import { TilesPaneConfig } from "./config"
+import { Pane } from "../classes"
+import inst from "core/instances"
 
-export class TilesPane {
+export class TilesPane extends Pane {
 
-    constructor(tilesMap, config = {}) {
-
-        this.tilesMap = tilesMap;
+    constructor(input) {
+        super(input)
 
         this.endless = {
-            x: (config.endless && config.endless.x === true),
-            y: (config.endless && config.endless.y === true)
-        };
+            x: this.endlessX,
+            y: this.endlessY
+        }
         this.scrollPos = {
             x: 0,
             y: 0
-        };
+        }
         this.mapTilePos = {
             x: 0,
             y: 0
-        };
+        }
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -176,3 +177,5 @@ export class TilesPane {
     }
 }
 TilesPane.Config = TilesPaneConfig
+
+inst.paneRegistry.add('TilesPane', TilesPane)

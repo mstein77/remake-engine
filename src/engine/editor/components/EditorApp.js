@@ -1,8 +1,9 @@
-import React, { Suspense, useState, useEffect } from "react";
-import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../../helper/helper.js';
-import { MainEditor } from "../editors/MainEditor.js";
-import { ScreenEditor } from "../editors/ScreenEditor.js";
-import { PocEditor } from "../editors/PocEditor.js";
+import inst from "core/instances"
+import React, { Suspense, useState, useEffect } from "react"
+import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../../helper/helper'
+import { MainEditor } from "../editors/MainEditor"
+import { ScreenEditor } from "../editors/ScreenEditor"
+import { PocEditor } from "../editors/PocEditor"
 
 function EditorApp(props) {
     const [ ready, setReady ] = useState(false);
@@ -58,8 +59,6 @@ function EditorApp(props) {
 
     let filters = null;
     let imageResources = [];
-    let tilesModel = null;
-    let fontModel = null;
     // extract all filters and image resources from the list of resources
     for (let resource of resources) {
         switch(resource.type) {
@@ -67,120 +66,57 @@ function EditorApp(props) {
                 filters = resource.data;
                 break;
 
-            case 'TilesMap':
-                tilesModel = getJsonModelOfInstance(resource.data);
-                /*
-                imageResources.push({
-                    name: 'Tiles Map image',
-                    bitmap: resource.data.tilesImg.elem.toDataURL('image/png')
-                });
-
-                 */
-                break;
-
-            case 'TextPane':
-                // TODO: use this for all resource-types and prevent double ids
-                fontModel = getJsonModelOfInstance(resource.data);
-                const resources = resource.data.getResources('image').resources;
-                for (let resource of resources) {
-                    const canvas = resource.data.getCanvas().elem;
+            default:
+                const matchingResources = resource.data.getResources('image').resources
+                for (let resource of matchingResources) {
+                    const canvas = resource.data.getCanvas().elem
                     imageResources.push({
                         id: resource.id,
                         name: resource.id,
                         bitmap: canvas
-                    });
+                    })
                 }
-                break;
-
-            case 'spriteSheet':
-                const canvas = resource.data.sheet.elem;
-                imageResources.push({
-                    name: 'Sprite Sheet image',
-                    bitmap: canvas
-                });
-                break;
-
-            default:
-                d('???', resource);
                 break;
         }
     }
 
     // TODO: move to game:init?
-    window.oncontextmenu = (e) => {
+    window.oncontextmenu = e => {
         e.preventDefault();
-    };
+    }
 
     const lazyLoadPaneEditor = (pane, params) => {
         const Editor = React.lazy(() => import(`../../panes/${pane}/editor/component.js`));
         return <Suspense fallback={<div>Loading...</div>}><Editor { ...params } /></Suspense>
-    };
+    }
 
     const contentProvider = {
-        'screen': {
+        screen: {
             getContent: params => {
                 return <ScreenEditor resources={resources} game={props.game} />
             }
         },
-
-        'TilesMap': {
-            getContent: params => {
-                const resource = resources[params.id];
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                const model = getJsonModelOfInstance(resource.data);
-                const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return lazyLoadPaneEditor('BufferedTilesPane', {resource, model})
-            }
-        },
-
-        'TextPane': {
-            getContent: params => {
-                const resource = resources[params.id];
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                const model = getJsonModelOfInstance(resource.data);
-                model.blocks = resource.blocks;
-                const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return lazyLoadPaneEditor('TextPane', {resource, model})
-            }
-        },
-
-        'BackgroundPane': {
-            getContent: params => {
-                const resource = resources[params.id];
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                const model = getJsonModelOfInstance(resource.data);
-                // model.blocks = resource.blocks;
-                const tree = getResourceTreeForJsonModel(resource.cls, model);
-                return lazyLoadPaneEditor('BackgroundPane', {resource, model})
-            }
-        },
-
-        'spriteSheet': {
-            getContent: params => {
-                const resource = resources[params.id];
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                const model = getJsonModelOfInstance(resource.data);
-                // model.blocks = resource.blocks;
-                model.sprites = resource.data.sprites
-                model.animations = resource.data.animations
-                // tree = getResourceTreeForJsonModel(resource.cls, model);
-                return lazyLoadPaneEditor('SpritePane', {resource, model})
-            }
-        },
-
-        'poc': {
+        poc: {
             getContent: params => <PocEditor />
         }
-    };
+    }
 
+    const items = inst.paneRegistry.getAll()
+    for (let item of items) {
+        if (!item.editable) continue
+        const cls = item.name
+        contentProvider[cls] = {
+            getContent: params => {
+                const resource = resources[params.id];
+                if (resource.data === null) {
+                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
+                }
+                const model = { ...getJsonModelOfInstance(resource.data), ...resource.props };
+                const tree = getResourceTreeForJsonModel(resource.cls, model);
+                return lazyLoadPaneEditor(cls, { resource, model })
+            }
+        }
+    }
     const resourceLoader = props.game.getResourceLoader();
     resources.push({type: 'poc'});
 
