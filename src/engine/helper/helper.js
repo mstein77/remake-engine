@@ -32,6 +32,57 @@ function d(main, ...params) {
     return main;
 }
 
+/**
+ * Returns whether the given value is a string or not
+ * Instances of the String class will not be regarded as strings.
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
+function isString(value) {
+    return (typeof value === 'string' && value !== null)
+}
+
+/**
+ * Returns whether the given argument is an URL string with http or https protocol or not
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
+function isUrl(value) {
+    if (!isString(value)) return false
+    return /^http(s)?\:\/\/[a-zA-Z0-9]+/.test(value)
+}
+
+/**
+ * Returns whether the first argument is a data URL or not
+ * If a type is given the data url must also match the content type
+ *
+ * @param {midex} value
+ * @param {string} type
+ *
+ * @returns {boolean}
+ */
+function isDataUrl(value, type = null) {
+    if (!isString(value)) return false
+    return type === null ?
+        /^data\:[a-zA-Z0-9]+\/[a-zA-Z0-9]+;base64\,/.test(value) :
+        value.startsWith('data:' + type + ';base64,')
+}
+
+/**
+ * Returns whether the argument is an object or not
+ *
+ * @param {mixed} obj
+ *
+ * @returns {boolean}
+ */
+function isObject(obj) {
+    return (obj && typeof obj === 'object')
+}
+
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
     const newItems = [...oldItems];
     newItems[index] = Object.assign({}, oldItems[index], props);
@@ -1330,6 +1381,10 @@ export {
     getCanvasForEventMatrix,
     getConfigFromInput,
     newPlainConfig,
+    isUrl,
+    isDataUrl,
+    isObject,
+    isString,
     BitmapPlayer,
     ANIMATION,
     Players,
