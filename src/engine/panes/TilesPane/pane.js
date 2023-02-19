@@ -3,7 +3,7 @@ import { TilesPaneConfig } from "./config"
 import { Pane } from "../classes"
 import inst from "core/instances"
 
-export class TilesPane extends Pane {
+class TilesPane extends Pane {
 
     constructor(input) {
         super(input)
@@ -176,6 +176,10 @@ export class TilesPane extends Pane {
         return scrolled;
     }
 }
-TilesPane.Config = TilesPaneConfig
+TilesPaneConfig.linkTo(TilesPane)
 
 inst.paneRegistry.add('TilesPane', TilesPane)
+
+export {
+    TilesPane
+}

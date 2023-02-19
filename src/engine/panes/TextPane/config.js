@@ -1,7 +1,7 @@
-import inst from "core/instances"
-import { Config } from "core/config"
-import { getRebuildJsonForModel, getConfigFromInput, d } from "helper/helper";
-import { FontMap, TextBlock } from "./classes";
+import { Config, ChildConfig } from "core/config"
+import { d, cloneDeep, getCanvasForDim } from "helper/helper"
+import { validated } from "helper/validate"
+import { FontMap, TextBlock } from "./classes"
 
 class FontMapConfig extends Config {
 
@@ -9,7 +9,8 @@ class FontMapConfig extends Config {
         return {
             width: 8,
             height: 8,
-            map: {}
+            map: {},
+            image: undefined
         }
     }
 
@@ -17,95 +18,85 @@ class FontMapConfig extends Config {
         return {
             width: {min: 1, max: 256},
             height: {min: 1, max: 256}
-        };
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
     }
 
     setWidth(width) {
-        this.width = this.validateInt(width, this.getFieldProps('width'));
+        this.width = validated.int(width, this.getFieldProps('width'))
     }
 
     setHeight(height) {
-        this.height = this.validateInt(height, this.getFieldProps('height'));
+        this.height = validated.int(height, this.getFieldProps('height'))
     }
 
     setImage(image) {
-        this.image = this.validateImageResource(image);
+        this.image = validated.imageResource(image)
     }
 
     setChars(values) {
-        this.validateArray(values);
+        validated.array(values)
         for(let value of values) {
-            this.validateArray(value, {size: 3});
-            const [chars, x, y] = value;
-            this.validateString(chars,{min: 1, max: 2});
+            validated.array(value, {size: 3})
+            const [chars, x, y] = value
+            validated.string(chars,{min: 1, max: 2})
             if (chars.length === 1) {
-                this.addChar(chars, x, y);
+                this.addChar(chars, x, y)
             } else {
-                this.addRange(chars[0], chars[1], x, y);
+                this.addRange(chars[0], chars[1], x, y)
             }
         }
     }
 
     setMap(map) {
-        for(let char in this.validateObject(map)) {
-            const props = this.validateObject(map[char]);
-            this.addChar(char, props.x, props.y);
+        this.map = {}
+        for(let char in validated.object(map)) {
+            const props = validated.object(map[char])
+            this.addChar(char, props.x, props.y)
         }
     }
 
     addChar(char, x, y) {
         if (this.map === undefined) {
-            this.map = {};
+            this.map = {}
         }
-        this.map[this.validateString(char, {min: 1, max: 1})] = {
-            x: this.validateInt(x, {min: 0}),
-            y: this.validateInt(y, {min: 0})
+        this.map[validated.string(char, {min: 1, max: 1})] = {
+            x: validated.int(x, {min: 0}),
+            y: validated.int(y, {min: 0})
         };
     }
 
     addRange(from, to, x, y) {
-        if (this.width === undefined) {
-            throw Error('Width required but not set!');
-        }
-        const fromCode = this.validateString(from, {min: 1, max: 1}).charCodeAt(0);
-        const toCode = this.validateString(to, {min: 1, max: 1}).charCodeAt(0);
+        if (this.width === undefined)
+            throw Error('Width required but not set')
+
+        const fromCode = validated.string(from, {min: 1, max: 1}).charCodeAt(0)
+        const toCode = validated.string(to, {min: 1, max: 1}).charCodeAt(0)
         for (let i = fromCode; i <= toCode; i++) {
-            this.addChar(String.fromCharCode(i), x, y);
-            x += this.width;
+            this.addChar(String.fromCharCode(i), x, y)
+            x += this.width
         }
     }
 
-    getSubResources() {
-        return [{id: this.image.id, type: 'image', data: this.image}];
+    getDependentImages(model) {
+        return [
+            model.image
+        ]
     }
 
     addRebuildProps(obj, deep, base) {
-        obj.width = base.width;
-        obj.height = base.height;
-        obj.image = deep ? inst.RL.makeImageResource(base.image, base.imageId) : base.imageId;
-        obj.map = { ...base.map };
-
-        return obj;
-    }
-
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.width = this.width;
-        obj.height = this.height;
-        obj.imageId = this.image.id;
-        obj.image = this.image.getCanvasElem(true);
-        obj.map = { ...this.map };
-
-        return obj;
+        obj.width = base.width
+        obj.height = base.height
+        obj.image = !deep ? base.image.id : base.image.imageResource
+        obj.map = cloneDeep(base.map)
     }
 }
-FontMap.Config = FontMapConfig
+FontMapConfig.linkTo(FontMap)
 
-class TextBlockConfig extends Config {
-
-    isEditable() {
-        return true;
-    }
+class TextBlockConfig extends ChildConfig {
 
     getDefaults() {
         return {
@@ -128,134 +119,145 @@ class TextBlockConfig extends Config {
             y: {min: -9999, max: 9999},
             lineSpacing: {min: 0, max: 9999},
             textAlign: {values: ['left', 'right', 'center']}
-        };
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        const lines = model.text.split('\n')
+        let maxWidth = 0
+        for (let line of lines) {
+            maxWidth = Math.max(maxWidth, line.length)
+        }
+        model.width = maxWidth
+        model.height = lines.length
+        if (model.font === null)
+            model.font =
+                this.parent.fonts.length ? this.parent.fonts[0].id : null
+        const canvas = getCanvasForDim(1, 1)
+        model.canvas = {
+            elem: canvas,
+            ctx: canvas.getContext('2d')
+        }
     }
 
     setFont(value) {
-        this.font = this.validateId(value, {null: true});
+        this.font = validated.id(value, {null: true})
     }
 
     setText(value) {
-        this.text = this.validateString(value);
+        this.text = validated.string(value)
     }
 
     setTextAlign(value) {
-        this.textAlign = this.validateString(value);
+        this.textAlign = validated.string(value)
     }
 
     setX(value) {
-        this.x = this.validateInt(value, this.getFieldProp('x'));
+        this.x = validated.int(value, this.getFieldProp('x'))
     }
 
     setY(value) {
-        this.y = this.validateInt(value, this.getFieldProp('y'));
+        this.y = validated.int(value, this.getFieldProp('y'))
     }
 
     setLineSpacing(value) {
-        this.lineSpacing = this.validateInt(value);
+        this.lineSpacing = validated.int(value)
     }
 
     setAlignToGrid(value) {
-        this.alignToGrid = this.validateBool(value)
+        this.alignToGrid = validated.bool(value)
     }
 
     setAutoCenteringX(value) {
-        this.autoCenteringX = this.validateBool(value);
+        this.autoCenteringX = validated.bool(value)
     }
 
     setAutoCenteringY(value) {
-        this.autoCenteringY = this.validateBool(value);
+        this.autoCenteringY = validated.bool(value)
     }
 
     setFilters(value) {
-        this.filters = this.validateString(value);
+        this.filters = validated.string(value)
     }
 
     addRebuildProps(obj, deep, base) {
-        const defaults = this.getDefaults();
-        for (let prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
-            if (defaults[prop] !== undefined && defaults[prop] === base[prop]) continue;
-            obj[prop] = base[prop];
+        for (const prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
+            obj[prop] = base[prop]
         }
-        return obj;
-    }
-
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.x = this.x;
-        obj.y = this.y;
-        obj.alignToGrid = this.alignToGrid;
-        obj.autoCenteringX = this.autoCenteringX;
-        obj.autoCenteringY = this.autoCenteringY;
-        obj.text = this.text;
-        obj.font = this.font;
-        obj.textAlign = this.textAlign;
-        obj.lineSpacing = this.lineSpacing;
-        obj.filters = this.filters;
-        const lines = this.text.split('\n');
-        let maxWidth = 0;
-        for (let line of lines) {
-            maxWidth = Math.max(maxWidth, line.length);
-        }
-        obj.width = maxWidth;
-        obj.height = lines.length;
-        return obj;
     }
 }
-TextBlock.Config = TextBlockConfig
+TextBlockConfig.linkTo(TextBlock)
 
 class TextPaneConfig extends Config {
 
-    getSubResources() {
-        const result = [];
-        for (let item of this.fonts) {
-            result.push({
-                id: item.id,
-                type: 'json',
-                data: item
-            });
+    getDefaults() {
+        return {
+            fonts: [],
+            blocks: []
         }
-        return result;
     }
 
-    addRebuildProps(obj, deep, base) {
-        obj.fonts = [];
-        if (base.fonts) {
-            for(let font of base.fonts) {
-                obj.fonts.push(
-                    getRebuildJsonForModel(FontMap, font, deep)
-                );
-            }
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        const id2block = {}
+        for (let block of model.blocks) {
+            id2block[block.id] = block
         }
-        return obj;
+        model.id2block = id2block
     }
 
     setFonts(fonts) {
-        this.fonts = this.validateConfigs(FontMap, fonts);
+        validated.array(fonts)
+        for(const font of fonts) {
+            this.addFont(font)
+        }
     }
 
     addFont(font) {
-        if (!this.fonts) {
-            this.fonts = [];
+        if (!this.fonts) this.fonts = []
+
+        const inst = validated.config(FontMap, font)
+        this.fonts.push(
+            inst
+        );
+    }
+
+    setBlocks(value) {
+        validated.array(value)
+        this.blocks = []
+        for (const block of value) {
+            this.addBlock(block)
         }
-        this.fonts.push(this.validateConfig(FontMap, font));
     }
 
-    getDefaults() {
-        return {
-            fonts: []
-        };
+    addBlock(value) {
+        if (!this.blocks) this.blocks = []
+        this.blocks.push(
+            validated.config(TextBlock, value, {parent: this})
+        )
     }
 
-    applyTo(obj) {
-        super.applyTo(obj)
-        obj.fonts = [ ...this.fonts ]
-        return obj
+    getDependentModels(model) {
+        return [ ...model.fonts, ...model.blocks ]
     }
-}
-TextPaneConfig.deps = {
-    font: FontMapConfig,
-    block: TextBlockConfig
+
+    addRebuildProps(obj, deep, base) {
+        const fonts = []
+        for (const font of base.fonts) {
+            fonts.push(
+                this.getRebuildModel(font, deep)
+            )
+        }
+        obj.fonts = fonts
+        const blocks = []
+        for (const block of base.blocks) {
+            blocks.push(
+                this.getRebuildModel(block, deep)
+            )
+        }
+        obj.blocks = blocks
+    }
 }
 
 export {

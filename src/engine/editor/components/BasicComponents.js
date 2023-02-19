@@ -1,11 +1,12 @@
-import ReactDOM from "react-dom";
-import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
-import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../../helper/helper.js"
-import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents.js";
-import { Button, Color, Submit, OkCancelForm } from "./FormComponents.js";
-import { ImageIndex, ColorIndex } from "../classes/EntityIndex.js";
-import { defaultValues } from "../settings.js";
-import { CellValue, CellSelection } from "../classes.js";
+import ReactDOM from "react-dom"
+import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react"
+import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "helper/helper"
+import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents"
+import { Button, Color, Submit, OkCancelForm } from "./FormComponents"
+import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
+import { defaultValues } from "../settings"
+import { CellValue, CellSelection } from "../classes"
+import { AppliedImage } from "core/classes"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();
@@ -3110,14 +3111,14 @@ function useModal() {
     };
     const content = function ({id, full, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
-        const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
+        const dimProps = { full, width, height, maxWidth, minWidth, maxHeight, minHeight }
         dimProps.zIndex = isOpen;
         if (!id && propsRef.current && propsRef.current.id) {
             id = propsRef.current.id
         }
         return (
             <>
-                {isOpen && <Modal id={id} key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal id={id} key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} { ...dimProps }>{props.children}</Modal>}
             </>
         );
     };

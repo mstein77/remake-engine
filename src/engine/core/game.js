@@ -6,6 +6,7 @@ import { getResourcesAndCallback } from "./resources.js";
 import { div } from "helper/dom"
 import { ResourceRequest } from "core/classes.js"
 import inst from "core/instances"
+import { validated } from "helper/validate"
 
 class Game {
 
@@ -210,7 +211,7 @@ class Game {
         setTimeout(() => {
             try {
                 // apply input to this
-                const config = getConfigFromInput(GameConfig, this.input, 'game')
+                const config = getConfigFromInput(GameConfig, [this.input], 'game')
                 config.applyTo(this.props)
                 this.fixOrientation = null
                 const system = this.system
@@ -229,6 +230,7 @@ class Game {
                 this.props.audioBlocked = false
                 this.props.maxAvailZoom = this.maxZoom
                 this.props.isFullscreen = this.system.isFullscreen()
+                Config.storeInModel = this.hasEditor
 
                 this.syncOrientation()
                 this.deactivateAutoZoom = true
@@ -1115,6 +1117,10 @@ class Game {
         return this.fpsTracker.avgFps
     }
 
+    get fpsHistory() {
+        return this.fpsTracker.history
+    }
+
     get showFps() {
         return this.props.showFps
     }
@@ -1225,7 +1231,7 @@ class GameConfig extends Config {
      * @param {number} value An integer value for the width
      */
     setWidth(value) {
-        this.width = this.validateInt(value, this.getFieldProp('dim'))
+        this.width = validated.int(value, this.getFieldProp('dim'))
     }
 
     /**
@@ -1234,7 +1240,7 @@ class GameConfig extends Config {
      * @param {number} value An integer value for the height
      */
     setHeight(value) {
-        this.height = this.validateInt(value, this.getFieldProp('dim'))
+        this.height = validated.int(value, this.getFieldProp('dim'))
     }
 
     /**
@@ -1247,7 +1253,7 @@ class GameConfig extends Config {
     }
 
     getValidatedZoom(value) {
-        const zoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        const zoom = validated.float(value, this.getFieldProp('zoom'))
         if (this.minZoom > zoom) throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
         if (this.maxZoom < zoom) throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
         return zoom
@@ -1259,7 +1265,7 @@ class GameConfig extends Config {
      * @param {number} value A float value for the zoom factor
      */
     setMinZoom(value) {
-        this.minZoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        this.minZoom = validated.float(value, this.getFieldProp('zoom'))
     }
 
     /**
@@ -1268,7 +1274,7 @@ class GameConfig extends Config {
      * @param {number} value A float value for the zoom factor
      */
     setMaxZoom(value) {
-        const maxZoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        const maxZoom = validated.float(value, this.getFieldProp('zoom'))
         if (this.minZoom > maxZoom) throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
         this.maxZoom = maxZoom
     }
@@ -1279,7 +1285,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setRestrictZoomByWindow(value) {
-        this.restrictZoomByWindow = this.validateBool(value)
+        this.restrictZoomByWindow = validated.bool(value)
     }
 
     /**
@@ -1288,7 +1294,7 @@ class GameConfig extends Config {
      * @param value
      */
     setAutoZoom(value) {
-        this.autoZoom = this.validateBool(value)
+        this.autoZoom = validated.bool(value)
     }
 
     /**
@@ -1297,7 +1303,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setAutoZoomByUser(value) {
-        this.autoZoomByUser = this.validateBool(value)
+        this.autoZoomByUser = validated.bool(value)
     }
 
     /**
@@ -1306,7 +1312,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setStepZoom(value) {
-        this.stepZoom = this.validateBool(value)
+        this.stepZoom = validated.bool(value)
     }
 
     /**
@@ -1315,7 +1321,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setStepZoomByUser(value) {
-        this.stepZoomByUser = this.validateBool(value)
+        this.stepZoomByUser = validated.bool(value)
     }
 
     /**
@@ -1324,7 +1330,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setShowFps(value) {
-        this.showFps = this.validateBool(value)
+        this.showFps = validated.bool(value)
     }
 
     /**
@@ -1333,15 +1339,15 @@ class GameConfig extends Config {
      * @param value
      */
     setShowFpsByUser(value) {
-        this.showFpsByUser = this.validateBool(value)
+        this.showFpsByUser = validated.bool(value)
     }
 
     setScreenOrientation(value) {
-        this.screenOrientation = this.validateString(value, this.getFieldProp('screenOrientation'))
+        this.screenOrientation = validated.string(value, this.getFieldProp('screenOrientation'))
     }
 
     setMobile(value) {
-        this.mobile = this.validateConfig(MobileGameConfig, value)
+        this.mobile = validated.config(MobileGameConfig, value)
     }
 
     /**
@@ -1470,6 +1476,7 @@ class FpsTracker {
         this.fpsSet.clear()
         this.totalFrames = 0
         this.totalSeconds = 0
+        this.history = []
 
         const changed = [];
         if (fps !== this.fps) changed.push('fps')
@@ -1485,7 +1492,8 @@ class FpsTracker {
         if (!this.lastStart) {
             this.lastStart = now
             this.frames++;
-            return []
+            this.history.length = 0
+            return ['fpsHistory']
         }
         const time = now - this.lastStart;
         if (time >= 1000) {
@@ -1503,11 +1511,16 @@ class FpsTracker {
             this.avgFps = this.totalFrames / this.totalSeconds
             this.frames = 0
             this.lastStart = now
-            const changed = [];
+            const changed = []
             if (fps !== this.fps) changed.push('fps')
             if (minFps !== this.minFps) changed.push('minFps')
             if (maxFps !== this.maxFps) changed.push('maxFps')
             if (avgFps !== this.avgFps) changed.push('avgFps')
+            if (fps !== null) {
+                this.history.unshift(currFps)
+                if (this.history.length > 30) this.history.pop()
+                changed.push('fpsHistory')
+            }
             return changed
         }
         this.frames++

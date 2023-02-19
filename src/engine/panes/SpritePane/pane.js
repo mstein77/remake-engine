@@ -3,19 +3,19 @@ import { BufferedCanvasContainer, PlayerProxy } from "core/classes"
 import { SpritePaneConfig } from "./config"
 import { d } from "helper/helper"
 import { Pane } from "../classes"
-import inst from "../../core/instances.js";
+import inst from "core/instances"
 
 export class SpritePane extends Pane {
 
     constructor(input) {
         super(input)
-        this.sprites = {};
         this.actorId = null;
         this.groups = {};
         this.bufferClearRects = {
             0: [],
             1: []
         };
+        this.test = {}
         this.uid = 0;
         this.zOrdering = false;
         this.attachDefault = null;
@@ -27,7 +27,7 @@ export class SpritePane extends Pane {
                 return 1;
             }
             return 0;
-        };
+        }
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -555,19 +555,19 @@ export class SpritePane extends Pane {
                     const frameSprite = sprite.animation.getFrame();
                     clearRect = this.spriteSheet.drawFilteredSprite(
                         target, frameSprite.id, sprite.filters, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
-                    );
+                    )
                 } else {
                     clearRect = this.spriteSheet.drawFilteredSprite(
                         target, sprite.name, sprite.filters, sprite.x, sprite.y, 0, 0, sprite.filters
-                    );
+                    )
                 }
-                drawRects.push(clearRect);
-                pixels += clearRect.width * clearRect.height;
+                drawRects.push(clearRect)
+                pixels += clearRect.width * clearRect.height
             }
         }
-        this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : [];
-        this.container.switchBuffer();
-        this.dirty = false;
+        this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : []
+        this.container.switchBuffer()
+        this.dirty = false
     }
 
     getPreview() {
@@ -587,6 +587,6 @@ export class SpritePane extends Pane {
         return resources
     }
 }
-SpritePane.Config = SpritePaneConfig
+SpritePaneConfig.linkTo(SpritePane)
 
 inst.paneRegistry.add('SpritePane', SpritePane, {editable: true})

@@ -1,54 +1,45 @@
 import { Config } from "core/config"
 import { TilesMap } from "../BufferedTilesPane/classes"
-import { getRebuildJsonForModel } from "helper/helper"
+import { validated } from "helper/validate"
 
 class TilesPaneConfig extends Config {
 
     getDefaults() {
         return {
-            tilesMap: null,
+            tilesMap: undefined,
             endlessX: false,
             endlessY: false
         }
     }
 
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+
     setTilesMap(value) {
-        this.tilesMap = this.validateConfig(TilesMap, value)
+        this.tilesMap = validated.config(TilesMap, value)
     }
 
     setEndlessX(value) {
-        this.endlessX = this.validateBool(value)
+        this.endlessX = validated.bool(value)
     }
 
     setEndlessY(value) {
-        this.endlessY = this.validateBool(value)
+        this.endlessY = validated.bool(value)
     }
 
-    getSubResources() {
+    getDependentModels(model) {
         return [
-            {id: this.tilesMap.id, type: 'json', data: this.tilesMap}
+            model.tilesMap
         ]
     }
 
     addRebuildProps(obj, deep, base) {
-        obj.tilesMap = !deep ? base.tilesMap.id : getRebuildJsonForModel(TilesMap, base.tilesMap, true)
+        obj.tilesMap = !deep ? base.tilesMap.id : base.tilesMap.config.getRebuildJson(true, base.tilesMap)
         obj.endlessX = base.endlessX
         obj.endlessY = base.endlessY
-
-        return obj;
     }
 
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.tilesMap = this.tilesMap;
-        obj.endlessX = this.endlessX
-        obj.endlessY = this.endlessY
-
-        return obj;
-    }
-}
-TilesPaneConfig.deps = {
-    tilesMap: TilesMap.Config
 }
 
 export {

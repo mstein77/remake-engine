@@ -1,6 +1,6 @@
 import 'core/core.css';
 
-export { Screen, InputController, AxisPath, EmptyPane, BoundsScrollHandler, MasterSlavesScrollHandler,
+export { Screen, InputController, AxisPath, BoundsScrollHandler, MasterSlavesScrollHandler,
     SplitArea, States, Position, Force, SpriteAndTilesCollider, ObjectController, Gravity, inst } from "core/classes"
 export { Resources, ImageResources, AudioResources, JsonResources } from "core/resources"
 export { Plugin, RenderPlugin, TouchControlsPlugin } from "plugins/classes"
@@ -20,3 +20,4 @@ export { BufferedTilesPane } from "panes/BufferedTilesPane/pane"
 export { TilesMap } from "panes/BufferedTilesPane/classes"
 export { BitmapScrollPane } from "panes/BitmapScrollPane/pane"
 export { TilesPane } from "panes/TilesPane/pane"
+export { EmptyPane } from "panes/EmptyPane/pane"

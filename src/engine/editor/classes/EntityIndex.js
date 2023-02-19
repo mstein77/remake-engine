@@ -1,6 +1,5 @@
-import { EntityIndex } from "../classes.js";
-import { d, cloneDeep, getCanvasForBitmap, getCanvasForIndexMatrix, drawCanvasToAvail } from "../../helper/helper.js";
-import { CellValue } from "../classes.js";
+import { EntityIndex } from "../classes"
+import {d, cloneDeep, getCanvasForDim, drawCanvasToAvail, toPairs} from "helper/helper"
 
 class SimpleIndex extends EntityIndex {
     constructor(model, key = 'items') {
@@ -176,247 +175,26 @@ class FilterIndex extends EntityIndex {
     }
 }
 
-function getMapChanges(map, old2new) {
-    const mapChanges = [];
-
-    for (let y = 0; y < map.length; y++) {
-        const row = map[y];
-        for (let x = 0; x < row.length; x++) {
-            const index = CellValue.tile.get(row[x]);
-            const newIndex = old2new[index];
-            if (newIndex !== undefined) {
-                mapChanges.push([x, y, index, newIndex === null ? 0 : newIndex]);
-            }
-        }
-    }
-    return mapChanges;
-}
-
-function getMapEventChanges(map, old2new, raw = false) {
-    const eventChanges = [];
-    for (let y = 0; y < map.length; y++) {
-        const row = map[y];
-        for (let x = 0; x < row.length; x++) {
-            const events = raw ? row[x] : CellValue.events.get(row[x]);
-            for (let i = 0; i < events.length; i++) {
-                const event = events[i];
-                const newEvent = old2new[event];
-                if (newEvent !== undefined) {
-                    eventChanges.push([x, y, i, event, newEvent]);
-                }
-            }
-        }
-    }
-    return eventChanges;
-}
-
-function doEventChange(map, item, no, raw = false) {
-    const curr = map[item[1]][item[0]];
-    const events = raw ? curr : CellValue.events.get(curr);
-    const index = item[2];
-    const target = item[no];
-    if (target === null) {
-        events.splice(index, 1);
-    } else {
-        events.splice(index, 1, target);
-    }
-    map[item[1]][item[0]] = raw ? events : CellValue.events.set(curr, events);
-}
-
-function doPlanOnModel(model, plan, selection) {
-    if (plan.mapChanges) {
-        for (let item of plan.mapChanges) {
-            model.map[item[1]][item[0]] = item[3];
-        }
-    }
-
-    if (plan.eventChanges) {
-        for (let item of plan.eventChanges) {
-            doEventChange(model.map, item, 4);
-        }
-    }
-
-    if (plan.brushChanges) {
-        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
-            for (let item of changes) {
-                model.brushes[brush][item[1]][item[0]] = item[3];
-            }
-        }
-    }
-
-    // selection changes
-    if (plan.selectionChanges !== undefined) {
-        let selectionChanges = null;
-        if (selection !== null && selection.getType() !== 'entity') {
-            const cells = selection.getCells();
-            const cellValue = selection.getCellValue();
-            if (!plan.event && cellValue === CellValue.tile) {
-                selectionChanges = {
-                    ref: selection,
-                    changes: getMapChanges(cells, plan.old2new)
-                };
-                for (let item of selectionChanges.changes) {
-                    selection.cells[item[1]][item[0]] = item[3];
-                }
-            } else if (cellValue === CellValue.events) {
-                selectionChanges = {
-                    ref: selection,
-                    changes: getMapEventChanges(selection.cells, plan.old2new, true)
-                };
-                for (let item of selectionChanges.changes) {
-                    doEventChange(selection.cells, item, 4, true);
-                }
-                if (selection.cells[0][0].length === 0) {
-                    selection.cells = [[]];
-                }
-            }
-        }
-        plan.selectionChanges = selectionChanges;
-    }
-
-    if (plan.propChanges) {
-        const prop = plan.prop ? plan.prop : 'index';
-        for (let item of plan.propChanges) {
-            model.tiles[item[0]][prop] = item[2]
-        }
-    }
-
-    if (plan.frameIdChanges) {
-        for (let item of plan.frameIdChanges) {
-            model.animations[item[0]].frames[item[1]].id = item[3];
-        }
-    }
-
-    if (plan.propRemovals) {
-        for (let item of plan.propRemovals) {
-            delete model.tiles[item[0]][item[1]]
-        }
-    }
-}
-
-function undoPlanOnModel(model, plan, selection) {
-    if (plan.mapChanges) {
-        for (let item of plan.mapChanges) {
-            model.map[item[1]][item[0]] = item[2];
-        }
-    }
-
-    if (plan.eventChanges) {
-        for (let item of plan.eventChanges) {
-            doEventChange(model.map, item, 3);
-        }
-    }
-
-    if (plan.brushChanges) {
-        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
-            for (let item of changes) {
-                model.brushes[brush][item[1]][item[0]] = item[2];
-            }
-        }
-    }
-
-    if (plan.selectionChanges) {
-        if (plan.selectionChanges && selection === plan.selectionChanges.ref) {
-            if (!plan.event) {
-                for (let item of plan.selectionChanges.changes) {
-                    selection.cells[item[1]][item[0]] = item[2];
-                }
-            } else {
-                for (let item of plan.selectionChanges.changes) {
-                    doEventChange(selection.cells, item, 3, true);
-                }
-            }
-        }
-    }
-    /*
-    if (plan.changes) {
-        for (let item of plan.changes) {
-            const target = item[1];
-            if (target !== null) {
-                if (model.tiles[target] !== undefined) {
-                    model.tiles[item[0]] = model.tiles[target];
-                } else {
-                    delete model.tiles[item[0]];
-                }
-            } else {
-                this.items.push(this.items.length);
-                this.model.tiles[item[0]] = {};
-            }
-        }
-    }
-    /*
-    this.model.count = plan.count;
-    this.model.tilesImg.elem = canvas;
-    this.img = canvas;
-    this.tilesX = dim.tilesX;
-    this.tilesY = dim.tilesY;
-    */
-
-    // restore entity-backups
-    if (plan.backupTiles) {
-        for (let [index, obj] of Object.entries(plan.backupTiles)) {
-            this.setEntityObject(obj, true);
-        }
-    }
-
-    // 4. propChanges
-    if (plan.propChanges) {
-        const prop = plan.prop ? plan.prop : 'index';
-        for (let item of plan.propChanges) {
-            model.tiles[item[0]][prop] = item[1]
-        }
-    }
-    if (plan.frameBackup) {
-        for (let [animation, frames] of Object.entries(plan.frameBackup)) {
-            const currAnimation = model.animations[animation];
-            for (let item of frames) {
-                currAnimation.frames.splice(item[0], 0, item[1]);
-            }
-        }
-    }
-    if (plan.frameIdChanges) {
-        for (let item of plan.frameIdChanges) {
-            model.animations[item[0]].frames[item[1]].id = item[2];
-        }
-    }
-
-    if (plan.propRemovals) {
-        for (let item of plan.propRemovals) {
-            model.tiles[item[0]][item[1]] = item[2];
-        }
-    }
-}
-
-function getPropChanges(prop, model, old2new) {
-    const changes = [];
-    for (let [key, obj] of Object.entries(model.tiles)) {
-        const old = obj[prop];
-        if (old !== undefined) {
-            const target = old2new[old];
-            if (target !== undefined) {
-                changes.push([key, old, target]);
-            }
-        }
-    }
-    return changes;
-}
-
 class AnimationIndex extends EntityIndex {
 
     constructor(entityIndex, model, key = 'animations') {
-        super();
-        this.model = model;
-        this.key = key;
-        this.index = entityIndex;
-        this.fixSize = !this.index.getEntityProps().includes('width');
-        this.items = Object.keys(model[key]).sort();
-        this.sizeX = null;
-        this.sizeY = null;
-        this.indexSorting = (a, b) => a === b ? 0 : (a < b ? -1 : 1);
+        super()
+        this.model = model
+        this.key = key
+        this.index = entityIndex
+        this.fixSize = !this.index.getEntityProps().includes('width')
+        const items = []
+        for (const [ id, obj ] of toPairs(model[key])) {
+            if (!obj.transforms) items.push(id)
+        }
+        this.items = items.sort()
+        this.sizeX = null
+        this.sizeY = null
+        this.indexSorting = (a, b) => a === b ? 0 : (a < b ? -1 : 1)
     }
 
     getEntityProps() {
-        return [...super.getEntityProps(), 'sizeX', 'sizeY', 'dir', 'end', 'speed', 'synchronous', 'frames'];
+        return [...super.getEntityProps(), 'sizeX', 'sizeY', 'dir', 'end', 'speed', 'sync', 'frames'];
     }
 
     getSizeX() {
@@ -474,7 +252,7 @@ class AnimationIndex extends EntityIndex {
                 def = 1;
             case 'dir':
             case 'end':
-            case 'synchronous':
+            case 'sync':
             case 'frames': {
                     const animation = this.model[this.key][this.getEntityValue(index)];
                     return animation[prop] === undefined ? def : animation[prop];
@@ -518,7 +296,7 @@ class AnimationIndex extends EntityIndex {
             case 'speed':
             case 'dir':
             case 'end':
-            case 'synchronous':
+            case 'sync':
             case 'frames': {
                     const animation = this.model[this.key][this.getEntityValue(index)];
                     animation[prop] = value;

@@ -1071,10 +1071,10 @@ function getAreaNode(nodes, panes, items, props, level = 1) {
 }
 
 function getResourceIndexByPane(resources, pane) {
-    if (pane === undefined) return null;
-    let index = 0;
+    if (pane === undefined) return null
+    let index = 0
     while (index < resources.length && resources[index].pane !== pane) {
-        index++;
+        index++
     }
     return index === resources.length ? null : index
 }
@@ -1126,7 +1126,7 @@ function ScreenEditor({ resources, setSelected, ...props }) {
             node.plane = plane;
             if (node.type === 'pane') {
                 const index = getResourceIndexByPane(resources, node.pane);
-                const elem = index !== null ? resources[index].elem : {texture: null};
+                const elem = index !== null && resources[index].elem ? resources[index].elem : {texture: null};
                 elem.offX = node.offX;
                 elem.offY = node.offY;
                 elem.width = node.width;

@@ -1,5 +1,7 @@
-import { Config } from "core/config";
-import inst from "core/instances"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { d } from "helper/helper"
+import { AppliedImage } from "core/classes"
 
 export class BackgroundPaneConfig extends Config {
 
@@ -17,8 +19,19 @@ export class BackgroundPaneConfig extends Config {
         }
     }
 
+    applyPropsTo(obj) {
+        obj.color = this.color
+        obj.images = []
+        obj.imgPos = []
+        for (let { image, x, y } of this.images) {
+            obj.images.push(new AppliedImage(image))
+            obj.imgPos.push({ x, y });
+        }
+        return obj;
+    }
+
     setColor(value) {
-        this.color = this.validateColor(value)
+        this.color = validated.color(value)
         return this
     }
 
@@ -28,17 +41,17 @@ export class BackgroundPaneConfig extends Config {
     }
 
     validateImgObject(value) {
-        this.validateObject(value);
+        validated.object(value);
         const { image, x, y } = value;
         return {
-            image: this.validateImageResource(image),
-            x: this.validateInt(x),
-            y: this.validateInt(y)
+            image: validated.imageResource(image),
+            x: validated.int(x),
+            y: validated.int(y)
         }
     }
 
     validateImgObjects(values) {
-        this.validateArray(values);
+        validated.array(values);
         const newValues = [];
         for (let value of values) {
             newValues.push(this.validateImgObject(value));
@@ -51,46 +64,27 @@ export class BackgroundPaneConfig extends Config {
         return this
     }
 
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.color = this.color;
-
-        const imgIds = [];
-        const imgCanvas = [];
-        const imgPos = [];
-        for (let { image, x, y } of this.images) {
-            imgIds.push(image.id);
-            imgCanvas.push(image.getCanvasElem(true));
-            imgPos.push({x, y});
-        }
-        obj.imgIds = imgIds;
-        obj.imgCanvas = imgCanvas;
-        obj.imgPos = imgPos;
-
-        return obj;
-    }
-
     addRebuildProps(obj, deep, base) {
         obj.color = base.color;
-        const images = [];
+        obj.images = [];
         let i = 0;
-        while (i < base.imgIds.length) {
-            images.push({
-                image: deep ? inst.RL.makeImageResource(base.imgCanvas[i], base.imgIds[i]) : base.imgIds[i],
-                x: base.imgPos[i].x,
-                y: base.imgPos[i].y
-            });
-            i++;
+        while (i < base.images.length) {
+            const { x, y } = base.imgPos[i]
+            const image = base.images[i]
+            obj.images.push({
+                image: deep ? image.imageResource : image.id,
+                x,
+                y
+            })
+            i++
         }
-        obj.images = images;
-        return obj
     }
 
-    getSubResources() {
+    getDependentImages(model) {
         const result = [];
-        for (let item of this.images) {
-            result.push({id: item.image.id, type: 'image', data: item.image})
+        for (let image of model.images) {
+            result.push(image)
         }
-        return result;
+        return result
     }
 }

@@ -1,19 +1,12 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
-import { BitmapPlayer, getConfigFromInput } from "helper/helper"
+import { BitmapPlayer, d } from "helper/helper"
+import { Configurable } from "core/classes"
 
-class SpriteSheet {
+class SpriteSheet extends Configurable {
 
     constructor(input) {
-        const config = getConfigFromInput(SpriteSheet.Config, input)
-        config.applyTo(this)
-        this.config = config
-
-        this.sheet = this.image.getCanvas();
-        this.sprites = {};
-        this.animations = {};
-        this.customImages = [];
-        this.players = {};
+        super(input)
     }
 
     assertSprite(id) {
@@ -29,27 +22,35 @@ class SpriteSheet {
     }
 
     addTransformedSprite(id, base, transformers) {
+/*
         this.assertSprite(base);
         this.customImages.push({
             id,
             base,
             transformers
         });
+
+ */
     }
 
     addTransformedSprites(postfix, baseIds, transformers) {
+/*
         for (let id of baseIds) {
             this.addTransformedSprite(id + postfix, id, transformers);
         }
+
+ */
     }
 
     addTransformedSpritesFromObj(transformers, obj) {
+/*
         for (let target in obj) {
             this.addTransformedSprite(target, obj[target], transformers);
         }
+ */
     }
 
-    addTransformedAnimation(id, base, transformers, synchronous = false, speed = 1) {
+    addTransformedAnimation(id, base, transformers, sync = false, speed = 1) {
         this.assertAnimation(base);
         const baseAnimation = this.animations[base];
         const newFrames = [];
@@ -62,7 +63,7 @@ class SpriteSheet {
             });
         }
         const animation = {
-            synchronous,
+            sync,
             dim: {x: baseAnimation.dim.x, y: baseAnimation.dim.y},
             frames: newFrames,
             speed: speed,
@@ -70,46 +71,54 @@ class SpriteSheet {
             end: baseAnimation.end
         };
         this.animations[id] = animation;
-        if (synchronous) {
+        if (sync) {
             const player = new BitmapPlayer();
             player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
             this.players[id] = player;
         }
     }
 
-    build() {
-        for (let image of this.customImages) {
-            let base = this.getSprite(image.base);
-            const trans = inst.filterer.getCanvasWithFiltersApplied(
-                image.transformers,
-                base.img ? base.img : this.sheet,
-                base.off.x,
-                base.off.y,
-                base.dim.x,
-                base.dim.y
-            );
-            const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
-            sprite.img = trans[0];
-        }
+    /*
+        build() {
+            for (let image of this.customImages) {
+                let base = this.getSprite(image.base);
+                const trans = inst.filterer.getCanvasWithFiltersApplied(
+                    image.transformers,
+                    base.img ? base.img : this.sheet,
+                    base.off.x,
+                    base.off.y,
+                    base.dim.x,
+                    base.dim.y
+                );
+                const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
+                sprite.img = trans[0];
+            }
     }
+     */
 
     addSprite(name, offX, offY, width, height) {
+/*
         const sprite = {
             off: {x: offX, y: offY},
             dim: {x: width, y: height}
         };
         this.sprites[name] = sprite;
         return sprite;
+
+ */
     }
 
     addSpriteSeq(name, offX, offY, width, height, length, spacing = 0) {
+/*
         for (let i = 1; i <= length; i++) {
             this.addSprite(name + i, offX, offY, width, height);
             offX += width + spacing;
         }
+ */
     }
 
-    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, synchronous = false, speed = 1) {
+    addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, sync = false, speed = 1) {
+/*
         let maxX = 0;
         let maxY = 0;
         let sameSize = true;
@@ -132,7 +141,7 @@ class SpriteSheet {
         }
 
         const animation = {
-            synchronous,
+            sync,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
             speed,
@@ -154,11 +163,13 @@ class SpriteSheet {
 
         this.animations[name] = animation;
 
-        if (synchronous) {
+        if (sync) {
             const player = new BitmapPlayer();
             player.loadAnimation(animation.frames, end, dir, speed);
             this.players[name] = player;
         }
+
+ */
     }
 
     isAnimation(name) {
@@ -184,7 +195,7 @@ class SpriteSheet {
     loadAnimationToProxy(name, proxy) {
         this.assertAnimation(name);
         let animation = this.animations[name];
-        if (animation.synchronous) {
+        if (animation.sync) {
             proxy.setPlayer(this.players[name]);
         } else {
             // creates a new player by lazy loading in the proxy
@@ -196,8 +207,9 @@ class SpriteSheet {
         const sprite = this.getSprite(name);
         const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
         ctx.drawImage(
-            sprite.img === undefined ?
-                this.sheet.elem : sprite.img.elem,
+            this.sheet.canvas,
+            // TODO remove: sprite.img === undefined ?
+                // this.sheet.elem : sprite.img.elem,
             sprite.off.x, sprite.off.y,
             sprite.dim.x, sprite.dim.y,
             draw.x,
@@ -216,7 +228,7 @@ class SpriteSheet {
         const draw = {x: posX + paddX, y: posY + paddY, width: sprite.dim.x, height: sprite.dim.y};
         const transformed = inst.filterer.getCanvasWithFiltersApplied(
             filters,
-            sprite.img === undefined ? this.sheet : sprite.img,
+            sprite.img === undefined ? this.sheet.canvasObj : sprite.img,
             sprite.off.x, sprite.off.y,
             draw.width, draw.height
         );
@@ -240,7 +252,8 @@ class SpriteSheet {
             return;
         }
         ctx.drawImage(
-            sprite.img === undefined ? this.sheet.elem : sprite.img.elem,
+            this.sheet.canvas,
+            // TODO remove: sprite.img === undefined ? this.sheet.elem : sprite.img.elem,
             sprite.off.x + offX, sprite.off.y + offY,
             width, height,
             posX, posY,

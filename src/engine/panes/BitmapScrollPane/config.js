@@ -1,5 +1,7 @@
 import { Config } from "core/config"
-import { SpriteSheet } from "../SpritePane/classes";
+import { SpriteSheet } from "../SpritePane/classes"
+import { validated } from "helper/validate"
+import { d } from "helper/helper"
 
 class BitmapScrollPaneConfig extends Config {
 
@@ -20,34 +22,33 @@ class BitmapScrollPaneConfig extends Config {
     }
 
     setSpriteSheet(value) {
-        this.spriteSheet = this.validateConfig(SpriteSheet, value)
+        this.spriteSheet = validated.config(SpriteSheet, value)
     }
 
     setAxis(value) {
-        this.axis = this.validateString(value, this.getFieldProp('axis'))
+        this.axis = validated.string(value, this.getFieldProp('axis'))
     }
 
     setMap(value) {
-        this.map = this.validateArray(value)
+        this.map = validated.array(value)
     }
 
     setMin(value) {
-        this.min = this.validateInt(value)
+        this.min = validated.int(value)
     }
 
     setMax(value) {
-        this.max = this.validateInt(value)
+        this.max = validated.int(value)
     }
 
-    applyTo(obj) {
-        super.applyTo(obj)
-        obj.axis = this.axis
-        obj.spriteSheet = this.spriteSheet
-        obj.map = this.map
-        obj.min = this.min
-        obj.max = this.max
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
+    }
 
-        return obj
+    getDependentModels(model) {
+        return [
+            model.spriteSheet
+        ]
     }
 }
 

@@ -1,6 +1,6 @@
-import { CellValue, EntityIndex } from "editor/classes";
-import { drawCanvasToAvail, getCanvasForIndexMatrix } from "helper/helper";
-import { IndexGrid } from "editor/classes/Grid";
+import { CellValue, EntityIndex } from "editor/classes"
+import { drawCanvasToAvail, getCanvasForIndexMatrix, getCanvasForDim } from "helper/helper"
+import { IndexGrid } from "editor/classes/Grid"
 
 class TileIndex extends EntityIndex {
 
@@ -9,7 +9,7 @@ class TileIndex extends EntityIndex {
         this.model = model;
         this.sizeX = model.tileSize;
         this.sizeY = model.tileSize;
-        this.img = model.tilesImg.elem;
+        this.img = model.tilesImg;
 
         this.tilesX = Math.floor(this.img.width/this.sizeX);
         if (model.count !== null) {
@@ -189,8 +189,7 @@ class TileIndex extends EntityIndex {
         }
 
         this.model.count = plan.count;
-        this.model.tilesImg.elem = canvas;
-        this.img = canvas;
+        this.model.tilesImg.canvas = canvas;
         this.tilesX = dim.tilesX;
         this.tilesY = dim.tilesY;
 
@@ -263,7 +262,7 @@ class TileIndex extends EntityIndex {
 
         this.model.count = length;
         this.model.tilesImg.elem = canvas;
-        this.img = canvas;
+        this.img.canvas = canvas;
         this.tilesX = dim.tilesX;
         this.tilesY = dim.tilesY;
 
@@ -489,7 +488,7 @@ class TileIndex extends EntityIndex {
 
         this.model.count = plan.count;
         this.model.tilesImg.elem = canvas;
-        this.img = canvas;
+        this.img.canvas = canvas;
         this.tilesX = dim.tilesX;
         this.tilesY = dim.tilesY;
     }
@@ -562,7 +561,7 @@ class TileIndex extends EntityIndex {
         }
         this.model.count = plan.count;
         this.model.tilesImg.elem = canvas;
-        this.img = canvas;
+        this.img.canvas = canvas;
         this.tilesX = dim.tilesX;
         this.tilesY = dim.tilesY;
 
@@ -605,9 +604,8 @@ class TileIndex extends EntityIndex {
     setEntityPropValue(index, prop, value) {
         super.setEntityPropValue(index, prop, value);
         if (prop === 'image') {
-            const ctx = this.img.getContext('2d');
-            const pos = this.getIndexPos(index);
-            ctx.putImageData(value, pos.x, pos.y);
+            const pos = this.getIndexPos(index)
+            this.img.ctx.putImageData(value, pos.x, pos.y)
             this.notify();
         }
         if (prop === 'animation') {
@@ -641,9 +639,8 @@ class TileIndex extends EntityIndex {
 
     getEntityPropValue(index, prop) {
         if (prop === 'image') {
-            const ctx = this.img.getContext('2d');
-            const pos = this.getIndexPos(index);
-            return ctx.getImageData(pos.x, pos.y, this.getSizeX(), this.getSizeY());
+            const pos = this.getIndexPos(index)
+            return this.img.ctx.getImageData(pos.x, pos.y, this.getSizeX(), this.getSizeY())
         }
         if (prop === 'animation') {
             const tile = this.model.tiles[index];
@@ -711,8 +708,7 @@ class TileIndex extends EntityIndex {
             }
             index++;
         }
-        this.model.tilesImg.elem = canvas;
-        this.img = canvas;
+        this.model.tilesImg.canvas = canvas;
         this.tilesX = dim.tilesX;
         this.tilesY = dim.tilesY;
 
@@ -736,7 +732,7 @@ class TileIndex extends EntityIndex {
         if (typeof zoomOrAvail === 'object') {
             targetCtx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             if (pos !== null) {
-                drawCanvasToAvail(this.img, targetCtx, x, y, zoomOrAvail, this.getIndexDim(), pos);
+                drawCanvasToAvail(this.img.canvas, targetCtx, x, y, zoomOrAvail, this.getIndexDim(), pos);
             }
         } else {
             const targetWidth = this.sizeX * zoomOrAvail;
@@ -744,7 +740,7 @@ class TileIndex extends EntityIndex {
             targetCtx.clearRect(x, y, targetWidth, targetHeight);
             if (pos !== null) {
                 targetCtx.drawImage(
-                    this.img,
+                    this.img.canvas,
                     pos.x,
                     pos.y,
                     this.sizeX,
@@ -1095,10 +1091,7 @@ class EventIndex extends EntityIndex {
                 }
             }
         }
-        if (model.eventsImg === undefined) {
-            model.eventsImg = getCanvasForDim(0, 0);
-        }
-        this.img = model.eventsImg;
+        this.img = model.eventsImg
         this.items = events.sort();
         this.setSizes();
         this.indexSorting = (a, b) => a === b ? 0 : (a < b ? -1 : 1);
@@ -1142,13 +1135,12 @@ class EventIndex extends EntityIndex {
         }
         if (name === 'image') {
             if (value !== null) {
-                const pos = this.model[this.key][this.getEntityValue(index)];
-                const ctx = this.img.getContext('2d');
-                ctx.putImageData(
+                const pos = this.model[this.key][this.getEntityValue(index)]
+                this.img.ctx.putImageData(
                     value,
                     pos.x,
                     pos.y
-                );
+                )
             }
             this.notify()
         }
@@ -1168,10 +1160,9 @@ class EventIndex extends EntityIndex {
             if (width === 0) {
                 return null;
             }
-            const height = this.getEntityPropValue(index, 'height');
-            const pos = this.model[this.key][this.getEntityValue(index)];
-            const ctx = this.img.getContext('2d');
-            return ctx.getImageData(pos.x, pos.y, width, height);
+            const height = this.getEntityPropValue(index, 'height')
+            const pos = this.model[this.key][this.getEntityValue(index)]
+            return this.img.ctx.getImageData(pos.x, pos.y, width, height)
         }
         return super.getEntityPropValue(index, name);
     }
@@ -1263,8 +1254,7 @@ class EventIndex extends EntityIndex {
             pos.x = offset.x;
             pos.y = offset.y;
         }
-        this.model.eventsImg = canvas;
-        this.img = canvas;
+        this.model.eventsImg.canvas = canvas;
 
         return ['image'];
     }
@@ -1301,7 +1291,7 @@ class EventIndex extends EntityIndex {
         if (typeof zoomOrAvail === 'object') {
             ctx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             if (pos !== null) {
-                drawCanvasToAvail(this.img, ctx, x, y, zoomOrAvail, dim, pos);
+                drawCanvasToAvail(this.img.canvas, ctx, x, y, zoomOrAvail, dim, pos);
             }
         } else {
             const targetWidth = dim.x * zoomOrAvail;
@@ -1309,7 +1299,7 @@ class EventIndex extends EntityIndex {
             ctx.clearRect(x, y, targetWidth, targetHeight);
             if (pos !== null) {
                 ctx.drawImage(
-                    this.img,
+                    this.img.canvas,
                     pos.x,
                     pos.y,
                     dim.x,
@@ -1323,7 +1313,7 @@ class EventIndex extends EntityIndex {
             }
         }
         ctx.drawImage(
-            this.img,
+            this.img.canvas,
             pos.x, pos.y,
             dim.x, dim.y,
             x, y,
@@ -1424,7 +1414,7 @@ class TilesGrid extends IndexGrid {
         if (!event || !event.width) {
             return false;
         }
-        ctx.drawImage(this.index.model.eventsImg, event.x, event.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
+        ctx.drawImage(this.index.model.eventsImg.canvas, event.x, event.y, event.width, event.height, x  + (event.offsetX * zoom), y + (event.offsetY * zoom), event.width * zoom, event.height * zoom);
         return true;
     }
 
@@ -1580,6 +1570,231 @@ class CellEventsValue extends CellValue {
     getId() {
         return 'events'
     }
+}
+
+function getMapChanges(map, old2new) {
+    const mapChanges = [];
+
+    for (let y = 0; y < map.length; y++) {
+        const row = map[y];
+        for (let x = 0; x < row.length; x++) {
+            const index = CellValue.tile.get(row[x]);
+            const newIndex = old2new[index];
+            if (newIndex !== undefined) {
+                mapChanges.push([x, y, index, newIndex === null ? 0 : newIndex]);
+            }
+        }
+    }
+    return mapChanges;
+}
+
+function getMapEventChanges(map, old2new, raw = false) {
+    const eventChanges = [];
+    for (let y = 0; y < map.length; y++) {
+        const row = map[y];
+        for (let x = 0; x < row.length; x++) {
+            const events = raw ? row[x] : CellValue.events.get(row[x]);
+            for (let i = 0; i < events.length; i++) {
+                const event = events[i];
+                const newEvent = old2new[event];
+                if (newEvent !== undefined) {
+                    eventChanges.push([x, y, i, event, newEvent]);
+                }
+            }
+        }
+    }
+    return eventChanges;
+}
+
+function doEventChange(map, item, no, raw = false) {
+    const curr = map[item[1]][item[0]];
+    const events = raw ? curr : CellValue.events.get(curr);
+    const index = item[2];
+    const target = item[no];
+    if (target === null) {
+        events.splice(index, 1);
+    } else {
+        events.splice(index, 1, target);
+    }
+    map[item[1]][item[0]] = raw ? events : CellValue.events.set(curr, events);
+}
+
+function doPlanOnModel(model, plan, selection) {
+    if (plan.mapChanges) {
+        for (let item of plan.mapChanges) {
+            model.map[item[1]][item[0]] = item[3];
+        }
+    }
+
+    if (plan.eventChanges) {
+        for (let item of plan.eventChanges) {
+            doEventChange(model.map, item, 4);
+        }
+    }
+
+    if (plan.brushChanges) {
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                model.brushes[brush][item[1]][item[0]] = item[3];
+            }
+        }
+    }
+
+    // selection changes
+    if (plan.selectionChanges !== undefined) {
+        let selectionChanges = null;
+        if (selection !== null && selection.getType() !== 'entity') {
+            const cells = selection.getCells();
+            const cellValue = selection.getCellValue();
+            if (!plan.event && cellValue === CellValue.tile) {
+                selectionChanges = {
+                    ref: selection,
+                    changes: getMapChanges(cells, plan.old2new)
+                };
+                for (let item of selectionChanges.changes) {
+                    selection.cells[item[1]][item[0]] = item[3];
+                }
+            } else if (cellValue === CellValue.events) {
+                selectionChanges = {
+                    ref: selection,
+                    changes: getMapEventChanges(selection.cells, plan.old2new, true)
+                };
+                for (let item of selectionChanges.changes) {
+                    doEventChange(selection.cells, item, 4, true);
+                }
+                if (selection.cells[0][0].length === 0) {
+                    selection.cells = [[]];
+                }
+            }
+        }
+        plan.selectionChanges = selectionChanges;
+    }
+
+    if (plan.propChanges) {
+        const prop = plan.prop ? plan.prop : 'index';
+        for (let item of plan.propChanges) {
+            model.tiles[item[0]][prop] = item[2]
+        }
+    }
+
+    if (plan.frameIdChanges) {
+        for (let item of plan.frameIdChanges) {
+            model.animations[item[0]].frames[item[1]].id = item[3];
+        }
+    }
+
+    if (plan.propRemovals) {
+        for (let item of plan.propRemovals) {
+            delete model.tiles[item[0]][item[1]]
+        }
+    }
+}
+
+function undoPlanOnModel(model, plan, selection) {
+    if (plan.mapChanges) {
+        for (let item of plan.mapChanges) {
+            model.map[item[1]][item[0]] = item[2];
+        }
+    }
+
+    if (plan.eventChanges) {
+        for (let item of plan.eventChanges) {
+            doEventChange(model.map, item, 3);
+        }
+    }
+
+    if (plan.brushChanges) {
+        for (let [brush, changes] of Object.entries(plan.brushChanges)) {
+            for (let item of changes) {
+                model.brushes[brush][item[1]][item[0]] = item[2];
+            }
+        }
+    }
+
+    if (plan.selectionChanges) {
+        if (plan.selectionChanges && selection === plan.selectionChanges.ref) {
+            if (!plan.event) {
+                for (let item of plan.selectionChanges.changes) {
+                    selection.cells[item[1]][item[0]] = item[2];
+                }
+            } else {
+                for (let item of plan.selectionChanges.changes) {
+                    doEventChange(selection.cells, item, 3, true);
+                }
+            }
+        }
+    }
+    /*
+    if (plan.changes) {
+        for (let item of plan.changes) {
+            const target = item[1];
+            if (target !== null) {
+                if (model.tiles[target] !== undefined) {
+                    model.tiles[item[0]] = model.tiles[target];
+                } else {
+                    delete model.tiles[item[0]];
+                }
+            } else {
+                this.items.push(this.items.length);
+                this.model.tiles[item[0]] = {};
+            }
+        }
+    }
+    /*
+    this.model.count = plan.count;
+    this.model.tilesImg.elem = canvas;
+    this.img = canvas;
+    this.tilesX = dim.tilesX;
+    this.tilesY = dim.tilesY;
+    */
+
+    // restore entity-backups
+    if (plan.backupTiles) {
+        for (let [index, obj] of Object.entries(plan.backupTiles)) {
+            this.setEntityObject(obj, true);
+        }
+    }
+
+    // 4. propChanges
+    if (plan.propChanges) {
+        const prop = plan.prop ? plan.prop : 'index';
+        for (let item of plan.propChanges) {
+            model.tiles[item[0]][prop] = item[1]
+        }
+    }
+    if (plan.frameBackup) {
+        for (let [animation, frames] of Object.entries(plan.frameBackup)) {
+            const currAnimation = model.animations[animation];
+            for (let item of frames) {
+                currAnimation.frames.splice(item[0], 0, item[1]);
+            }
+        }
+    }
+    if (plan.frameIdChanges) {
+        for (let item of plan.frameIdChanges) {
+            model.animations[item[0]].frames[item[1]].id = item[2];
+        }
+    }
+
+    if (plan.propRemovals) {
+        for (let item of plan.propRemovals) {
+            model.tiles[item[0]][item[1]] = item[2];
+        }
+    }
+}
+
+function getPropChanges(prop, model, old2new) {
+    const changes = [];
+    for (let [key, obj] of Object.entries(model.tiles)) {
+        const old = obj[prop];
+        if (old !== undefined) {
+            const target = old2new[old];
+            if (target !== undefined) {
+                changes.push([key, old, target]);
+            }
+        }
+    }
+    return changes;
 }
 
 CellValue.tile = new CellTileValue();

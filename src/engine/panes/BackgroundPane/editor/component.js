@@ -225,18 +225,18 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
 }
 
 function BackgroundPaneEditor({ model, resource }) {
-    const update = useComponentUpdate();
-    const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'BackgroundPane', model, resource, update });
+    const update = useComponentUpdate()
+    const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'BackgroundPane', model, resource, update })
 
-    const tree = getResourceTree();
+    const tree = getResourceTree()
     const details = {
         'From:': tree[0].source,
         'Resources:': tree.length
-    };
+    }
     const imageIndex = useMemo(() => {
         return new ImageBlockIndex(model)
     }, [model])
-    const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
+    const fieldProps = useMemo(() => model.config.getFieldProps(), []);
 
     return (
         <EditorSection

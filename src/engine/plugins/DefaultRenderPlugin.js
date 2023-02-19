@@ -106,6 +106,38 @@ class DefaultRenderPlugin extends RenderPlugin {
                 elem.value = this.game.zoom
             }
         }
+        if (action === 'change' && props.name === 'fpsHistory' && this.fpsCanvas) {
+            const ctx = this.fpsCanvas.getContext('2d')
+            const { width, height } = this.fpsCanvas
+            ctx.strokeStyle = '#C0C0C0'
+            ctx.fillStyle = '#C0C0C0'
+            ctx.clearRect(0, 0, width, height)
+            const fpsRange = this.game.maxFps - this.game.minFps;
+            const drawRange = Math.max(this.game.maxFps - this.game.minFps, 10)
+            const off = Math.max(0, 10 - fpsRange)
+            const heightUnits = height / drawRange
+            let num = 30
+            const widthUnits = width / num
+            let posX = 0
+            let first = true
+            ctx.beginPath()
+            for (let fps of this.game.fpsHistory) {
+                const posY = height - (fps - this.game.minFps + off) * heightUnits
+                if (first) {
+                    if (this.game.fpsHistory.length === 1) {
+                        ctx.arc(posX, posY, 1, 0, 2 * Math.PI, true);
+                        ctx.fill();
+                    } else {
+                        ctx.moveTo(posX, posY)
+                    }
+                } else {
+                    ctx.lineTo(posX, posY)
+                }
+                posX += widthUnits
+                first = false
+            }
+            ctx.stroke()
+        }
         const expr = super.notify(action, props)
         if (expr) return expr
 
@@ -133,7 +165,8 @@ class DefaultRenderPlugin extends RenderPlugin {
 
     getFpsOverlay() {
         const game = this.game
-        const { div, pre, icon, kbd, input, stackH, stackV } = this
+        const { div, pre, icon, kbd, input, stackH, stackV, canvas } = this
+        this.fpsCanvas = canvas({width: 120, height: 100})
         return (
             stackV(
                 {class: 'full-v full-h absolute'},
@@ -162,6 +195,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                                 {type: 'text', class: 'less', readOnly: true, tab: -1, size: 7, value: '<game.minFps,game.maxFps|toFpsRange>'}
                             )
                         ),
+                        div(this.fpsCanvas),
                         stackH(
                             'full-h',
                             div({class: 'flex'}),

@@ -1,8 +1,8 @@
 import inst from "core/instances"
-import { BufferedCanvasContainer, Configurable } from "core/classes"
+import { BufferedCanvasContainer } from "core/classes"
 import { BitmapScrollPaneConfig } from "./config.js"
-import { Pane } from "../classes";
-import {BackgroundPane} from "../BackgroundPane/pane.js";
+import { Pane } from "../classes"
+import { d } from "helper/helper"
 
 /**
  * TODO:
@@ -217,6 +217,6 @@ export class BitmapScrollPane extends Pane {
         }
     }
 }
-BitmapScrollPane.Config = BitmapScrollPaneConfig
+BitmapScrollPaneConfig.linkTo(BitmapScrollPane)
 
 inst.paneRegistry.add('BitmapScrollPane', BitmapScrollPane)

@@ -1,14 +1,125 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import {d, isValidResourceId, BitmapPlayer, getConfigFromInput} from "helper/helper"
-import { getResourcesAndCallback } from "./resources.js";
+import { d, isValidResourceId, BitmapPlayer, getConfigFromInput, getCanvasForDim } from "helper/helper"
+import { getResourcesAndCallback } from "./resources"
+import { ChildConfig } from "./config"
 
 class Configurable {
 
-    constructor(input) {
-        const config = getConfigFromInput(this.constructor.Config, input);
-        config.applyTo(this);
-        this.config = inst.game.hasEditor ? config : null;
+    constructor(input, parent) {
+        const params = [input]
+        if (this.constructor.Config.constructor.prototype.isPrototypeOf(ChildConfig))
+            params.push(parent)
+        const config = getConfigFromInput(this.constructor.Config, params, null)
+        config.applyTo(this)
+    }
+}
+
+/**
+ *
+ */
+class AppliedImage {
+
+    constructor(imageResource) {
+        if (!imageResource instanceof ImageResource)
+            throw Error(`First argument must be an instance of a ImageResource`)
+
+        if (!imageResource.isResolved())
+            throw Error(`ImageResource is not resolved`)
+
+        this.id = imageResource.id
+        this._canvas = typeof Image == 'undefined' ? null :
+            imageResource.getCanvas(true).elem
+        this._ctx = null
+    }
+
+    get data() {
+        return this.canvas
+    }
+
+    get canvas() {
+        return this._canvas
+    }
+
+    set canvas(value) {
+        this._ctx = null
+        this._canvas = value
+    }
+
+    get canvasObj() {
+        const ctx = this.ctx
+        const elem = this.canvas
+        return {
+            ctx,
+            elem,
+            getCanvasElem: () => elem,
+            getCanvas: () => ({
+                ctx,
+                elem
+            })
+        }
+    }
+
+    get width() {
+        if (!this._canvas) return 0
+        return this._canvas.width
+    }
+
+    get height() {
+        if (!this._canvas) return 0
+        return this._canvas.height
+    }
+
+    get ctx() {
+        if (!this._ctx) {
+            if (!this._canvas)
+                throw Error(`Context not available because of missing canvas on applied image with id "${this.id}"`)
+
+            this._ctx = this._canvas.getContext('2d')
+        }
+        return this._ctx
+    }
+
+    get dataUrl() {
+        if (!this._canvas)
+            throw Error(`Call to getDataUrl() failed because no canvas available on applied image with id "${this.id}"`)
+        return this._canvas.toDataURL('image/png')
+    }
+
+    get imageResource() {
+        const resource = new ImageResource(this.canvas)
+        resource.resolved = true
+        resource.setId(this.id)
+        return resource
+    }
+
+    set imageData(data) {
+        this.resize(data.width, data.height)
+        this.ctx.putImageData(data, 0, 0);
+    }
+
+    get imageData() {
+        return this.ctx.getImageData(0, 0, this.width, this.height)
+    }
+
+    isEmpty() {
+        return !this._canvas || this.width === 0
+    }
+
+    resize(width, height) {
+        if (this.width === width && this.height === height) return this
+        this.canvas = getCanvasForDim(width, height)
+        return this
+    }
+
+    drawTo(ctx, x = 0, y = 0) {
+        ctx.drawImage(this.canvas, x, y)
+    }
+}
+
+class RawAppliedImage extends AppliedImage {
+    constructor(id = null) {
+        super(inst.RL.makeImageResource(null, id));
     }
 }
 
@@ -296,13 +407,16 @@ class AudioResource {
         this.audio = null
         this.id = null
         this.volume = 1
+        this.resolved = false
         this.promise = new Promise(resolve => {
             if (typeof Audio == 'undefined') {
                 this.audio = {}
+                this.resolved = true
                 resolve()
             } else {
                 this.audio = new Audio(url)
                 this.audio.oncanplaythrough = () => {
+                    this.resolved = true
                     resolve()
                     if (readyCallback) {
                         readyCallback()
@@ -323,6 +437,10 @@ class AudioResource {
 
     getId() {
         return this.id;
+    }
+
+    isResolved() {
+        return this.resolved
     }
 
     setVolume(value) {
@@ -1066,7 +1184,8 @@ class ImageResource {
             this.canvas = {elem: data, ctx: data.getContext('2d')};
             data = this.getDataUrl();
         }
-        this.image.src = data;
+        if (data !== null)
+            this.image.src = data;
         this.resolved = false;
     }
 
@@ -1080,24 +1199,31 @@ class ImageResource {
 
     get width() {
         if (!this.resolved) return null
-        if (this.image)  return this.image.width
+        if (this.image) return this.image.width
         return this.canvas.width
     }
 
     get height() {
         if (!this.resolved) return null
-        if (this.image)  return this.image.height
+        if (this.image) return this.image.height
         return this.canvas.height
     }
 
     getCanvas(asClone = false) {
+        let width = this.image.width
+        let height = this.image.height
+        let source = this.image
         if (this.canvas === null) {
-            this.canvas = inst.OCM.getNewOffscreenCanvas(this.image.width, this.image.height);
-            this.canvas.ctx.drawImage(this.image, 0, 0);
+            this.canvas = inst.OCM.getNewOffscreenCanvas(width, height)
+            this.canvas.ctx.drawImage(this.image, 0, 0)
+        } else {
+            width = this.canvas.elem.width
+            height = this.canvas.elem.height
+            source = this.canvas.elem
         }
         if (asClone) {
-            const canvas = inst.OCM.getNewOffscreenCanvas(this.image.width, this.image.height)
-            canvas.ctx.drawImage(this.image, 0, 0)
+            const canvas = inst.OCM.getNewOffscreenCanvas(width, height)
+            canvas.ctx.drawImage(source, 0, 0)
             return canvas
         }
         return this.canvas;
@@ -1366,22 +1492,6 @@ class AxisPath {
             points.push(this.points[i]);
         }
         this.points = points;
-    }
-}
-
-class EmptyPane {
-    constructor() {}
-
-    init(viewPortDimX, viewPortDimY) {
-        this.viewPortDim = {
-            x: viewPortDimX,
-            y: viewPortDimY
-        };
-        this.paneDim = this.viewPortDim;
-    }
-
-    render() {
-        this.dirty = false;
     }
 }
 
@@ -1723,8 +1833,8 @@ class PlayerProxy {
 
     constructor() {
         this.players = [
-            null, // non-synchronous player
-            null  // synchronous player
+            null, // non-sync player
+            null  // sync player
         ];
         this.active = 0;
     }
@@ -2417,13 +2527,14 @@ export {
     Screen,
     ImageResource,
     AudioResource,
+    AppliedImage,
+    RawAppliedImage,
     InputController,
     CanvasContainer,
     BufferedCanvasContainer,
     ImageContainer,
     DivContainer,
     AxisPath,
-    EmptyPane,
     BoundsScrollHandler,
     MasterSlavesScrollHandler,
     SplitArea,

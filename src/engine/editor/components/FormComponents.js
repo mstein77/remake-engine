@@ -2236,7 +2236,7 @@ function Entity({ entityIndex, readOnly, value, set, reset, zoomOrAvail = 1, num
                 </Block>
             </Stack>
 
-            <EntityPickerModal.content width="800" height="400">
+            <EntityPickerModal.content width="800px" height="400px">
                 <EditorCtx>
                     <EntityPicker { ...EntityPickerModal.props } />
                 </EditorCtx>
@@ -2345,7 +2345,7 @@ function Bitmap({ value, set, readOnly, colors, resize, empty, zoomOrAvail = 1, 
             {EditBitmapModal}
             {BitmapSelectionModal}
             {entityIndex &&
-                <CopyBitmapModal.content name="Copy image from..." width="75%" height={500}>
+                <CopyBitmapModal.content name="Copy image from..." width="75%" height="500px">
                     <EntityPicker {...CopyBitmapModal.props} />
                 </CopyBitmapModal.content>
             }
@@ -2835,7 +2835,7 @@ function PositionPicker({ entityIndex, position, entity, setPosition, setEntity,
                 }
             </Stack>
 
-            <EntityPickerModal.content width={400} height={400}>
+            <EntityPickerModal.content width="400px" height="400px">
                 <EditorCtx>
                     <EntityPicker { ...EntityPickerModal.props } />
                 </EditorCtx>

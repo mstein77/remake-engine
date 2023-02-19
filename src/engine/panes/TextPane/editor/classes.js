@@ -1,5 +1,6 @@
-import { EntityIndex } from "editor/classes";
-import { drawCanvasToAvail } from "helper/helper.js";
+import { EntityIndex } from "editor/classes"
+import { drawCanvasToAvail, getCanvasForDim } from "helper/helper"
+import { TextBlock } from "../classes"
 
 class FontIndex extends EntityIndex {
 
@@ -83,7 +84,9 @@ class TextBlockIndex extends EntityIndex {
 
     setEntityValue(index, value) {
         if (this.model.blocks.length <= index) {
-            this.model.blocks.push({id: value});
+            this.model.blocks.push(
+                new TextBlock({id: value}, this.model)
+            );
         }
         this.items[index] = value;
     }
@@ -147,18 +150,16 @@ class CharIndex extends EntityIndex {
     setEntityPropValue(index, prop, value) {
         super.setEntityPropValue(index, prop, value);
         if (prop === 'image') {
-            const ctx = this.img.getContext('2d');
             const pos = this.getIndexPos(index);
-            ctx.putImageData(value, pos.x, pos.y);
+            this.img.ctx.putImageData(value, pos.x, pos.y);
             this.notify();
         }
     }
 
     getEntityPropValue(index, prop) {
         if (prop === 'image') {
-            const ctx = this.img.getContext('2d');
             const pos = this.getIndexPos(index);
-            return ctx.getImageData(pos.x, pos.y, this.getSizeX(), this.getSizeY());
+            return this.img.ctx.getImageData(pos.x, pos.y, this.getSizeX(), this.getSizeY());
         }
         return super.getEntityPropValue(index, prop);
     }
@@ -187,8 +188,7 @@ class CharIndex extends EntityIndex {
             x += sizeX;
             index++;
         }
-        this.model.image = canvas;
-        this.img = canvas;
+        this.img.canvas = canvas;
         return ['image'];
     }
 
@@ -227,8 +227,7 @@ class CharIndex extends EntityIndex {
         }
         this.model.width = sizeX;
         this.model.height = sizeY;
-        this.model.image = canvas;
-        this.img = canvas;
+        this.img.canvas = canvas;
         this.notify();
     }
 
@@ -237,7 +236,7 @@ class CharIndex extends EntityIndex {
         if (typeof zoomOrAvail === 'object') {
             targetCtx.clearRect(x, y, zoomOrAvail.width, zoomOrAvail.height);
             if (pos !== null) {
-                drawCanvasToAvail(this.img, targetCtx, x, y, zoomOrAvail, this.getIndexDim(), pos);
+                drawCanvasToAvail(this.img.canvas, targetCtx, x, y, zoomOrAvail, this.getIndexDim(), pos);
             }
         } else {
             const sizeX = this.getSizeX();
@@ -245,7 +244,7 @@ class CharIndex extends EntityIndex {
             targetCtx.clearRect(x, y, sizeX * zoomOrAvail, sizeY * zoomOrAvail);
             if (pos !== null) {
                 targetCtx.drawImage(
-                    this.img,
+                    this.img.canvas,
                     pos.x,
                     pos.y,
                     sizeX,

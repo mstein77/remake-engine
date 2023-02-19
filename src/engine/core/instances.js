@@ -1,6 +1,6 @@
 import { FILTER } from "core/const"
 import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
-import { ImageResource, AudioResource } from "./classes"
+import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
 import Fetcher from "./fetcher/api"
@@ -288,7 +288,7 @@ class BitmapFilterer {
      * @return {*[]}
      */
     getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
-        let data = [canvas, offX, offY, width, height];
+        let data = [ canvas, offX, offY, width, height ];
         let lastType = FILTER.TYPE.CANVAS;
         let imageData = null;
         let isSourceCanvas = true;
@@ -772,16 +772,16 @@ class ResourceLoader {
     }
 
     updateImageResource(storage, img) {
-        if (!(img instanceof ImageResource)) {
-            throw Error(`Expected ImageResource object but got ${typeof img}!`);
+        if (!(img instanceof AppliedImage)) {
+            throw Error(`Expected AppliedImage but got ${typeof img}!`);
         }
         if (!img.id) {
             throw Error('No id given in ImageResource');
         }
         switch (storage) {
             case 'browser':
-                this.storage.storeImage(img.id, img.getDataUrl());
-                this.setResource('image', img.id, img, 'browser');
+                this.storage.storeImage(img.id, img.dataUrl)
+                this.setResource('image', img.id, img.imageResource, 'browser');
                 break;
         }
     }
@@ -854,9 +854,9 @@ class ResourceLoader {
         return img;
     }
 
-    storeScreenResource(screen, config) {
-        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + config.id);
-        const resources = config.getResources();
+    storeScreenModel(screen, model) {
+        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + model.id);
+        const resources = model.config.getResourcesAndDependencies(model);
         for (let resource of resources.resources) {
             switch(resource.type) {
                 case 'json':
@@ -871,7 +871,7 @@ class ResourceLoader {
                     throw Error('TODO');
             }
         }
-        this.storage.storeScreenResource(screen, 'json', config.id);
+        this.storage.storeScreenResource(screen, 'json', model.id);
         this.storage.storeResourceDependencies(resources.dependencies);
 
         const newResources = [];
@@ -939,8 +939,8 @@ class ResourceLoader {
         const overwrites = [];
         for(let resource of resources) {
             let data = resource.data;
-            if (data instanceof ImageResource) {
-                data = data.getDataUrl();
+            if (data instanceof AppliedImage) {
+                data = data.dataUrl;
             }
             overwrites.push({data, type: resource.type, id: resource.id});
         }

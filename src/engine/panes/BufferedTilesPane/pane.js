@@ -760,6 +760,6 @@ export class BufferedTilesPane extends Pane {
         }
     }
 }
-BufferedTilesPane.Config = BufferedTilesPaneConfig
+BufferedTilesPaneConfig.linkTo(BufferedTilesPane)
 
 inst.paneRegistry.add('BufferedTilesPane', BufferedTilesPane, {editable: true})

@@ -1,6 +1,6 @@
 import inst from "core/instances"
 import { TextPaneConfig } from "./config"
-import { drawTextBlocks, getInstanceFromInput, getTextBlockImage } from "helper/helper"
+import { d, drawTextBlocks, getTextBlockImage } from "helper/helper"
 import { CanvasContainer } from "core/classes"
 import { TextBlock } from "./classes"
 import { Pane } from "../classes"
@@ -15,7 +15,9 @@ export class TextPane extends Pane {
 
     constructor(input) {
         super(input)
-        this.blocks = {}
+        for (const block of this.blocks) {
+            this.updateBlock(block.id, {})
+        }
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -32,11 +34,11 @@ export class TextPane extends Pane {
     }
 
     getTextBlockIds() {
-        return Object.keys(this.blocks)
+        return Object.keys(this.id2block)
     }
 
     removeTextBlock(id) {
-        delete this.blocks[id]
+        delete this.id2block[id]
         this.dirty = true
     }
 
@@ -44,7 +46,7 @@ export class TextPane extends Pane {
         if (!block.font) {
             return null
         }
-        for (let font of this.fonts) {
+        for (const font of this.fonts) {
             if (font.id === block.font) {
                 return font
             }
@@ -53,10 +55,10 @@ export class TextPane extends Pane {
     }
 
     addTextBlock(block) {
-        if (!this.fonts.length === 0) {
+        if (!this.fonts.length === 0)
             throw Error('Text block requires a font!');
-        }
-        const instance = getInstanceFromInput(TextBlock, block)
+
+        const instance = new TextBlock(block, this)
         if (instance.font === null) {
             instance.update({font: this.fonts[0].id})
         }
@@ -68,7 +70,7 @@ export class TextPane extends Pane {
         }
         instance.width = font.width * instance.width
         instance.height = font.height * instance.height
-        this.blocks[instance.id] = instance
+        this.id2block[instance.id] = instance
         this.dirty = true
     }
 
@@ -83,7 +85,7 @@ export class TextPane extends Pane {
     }
 
     updateBlock(id, updates) {
-        const block = this.blocks[id]
+        const block = this.id2block[id]
         block.update(updates)
         const canvas = getTextBlockImage(
             block,
@@ -105,7 +107,7 @@ export class TextPane extends Pane {
         const ctx = this.container.getCanvasCtx()
 
         ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y)
-        drawTextBlocks(ctx, this.paneDim, Object.values(this.blocks), this.fonts)
+        drawTextBlocks(ctx, this.paneDim, Object.values(this.id2block), this.fonts)
         this.dirty = false
     }
 
@@ -121,9 +123,9 @@ export class TextPane extends Pane {
 
     getEditorResources() {
         const blocks = [];
-        for (let id in this.blocks) {
+        for (let id in this.id2block) {
             blocks.push(
-                { ...this.blocks[id].config.getJson() }
+                { ...this.id2block[id].config.getJson() }
             )
         }
         const resources = super.getEditorResources()
@@ -139,6 +141,6 @@ export class TextPane extends Pane {
         return value
     }
 }
-TextPane.Config = TextPaneConfig
+TextPaneConfig.linkTo(TextPane)
 
 inst.paneRegistry.add('TextPane', TextPane, {editable: true})

@@ -1,11 +1,11 @@
 import inst from "core/instances"
-import { getConfigFromInput, BitmapPlayer } from "helper/helper"
+import { BitmapPlayer } from "helper/helper"
+import { Configurable } from "core/classes"
 
-class TilesMap {
+class TilesMap extends Configurable {
 
     constructor(input) {
-        this.config = getConfigFromInput(TilesMap.Config, input);
-        this.config.applyTo(this);
+        super(input)
         this.player = {};
         for (let id in this.animations) {
             const player = new BitmapPlayer();
@@ -143,7 +143,7 @@ class TilesMap {
     renderTileTo(target, index) {
         target.clearRect(0, 0, this.tileSize, this.tileSize);
         target.drawImage(
-            this.tilesImg.elem,
+            this.tilesImg.canvas,
             index << this.tileBits,
             0,
             this.tileSize,
@@ -211,7 +211,7 @@ class TilesMap {
             yIndices.push(index);
         }
 
-        const maxTiles = Math.floor(this.tilesImg.elem.width/this.tileSize);
+        const maxTiles = Math.floor(this.tilesImg.width/this.tileSize);
 
         for (let j = 0; j < yIndices.length; j++) {
             const y = yIndices[j];
@@ -229,7 +229,7 @@ class TilesMap {
                 }
                 const row = Math.floor(index/maxTiles);
                 target.drawImage(
-                    this.tilesImg.elem,
+                    this.tilesImg.canvas,
                     (index - row * maxTiles) * this.tileSize,
                     row * this.tileSize,
                     this.tileSize,

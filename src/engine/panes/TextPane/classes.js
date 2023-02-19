@@ -1,24 +1,18 @@
-import { getConfigFromInput } from "helper/helper"
-import { FontMapConfig } from "./config.js"
+import { Configurable } from "core/classes"
+import { d } from "helper/helper"
 
-class FontMap {
-
+class FontMap extends Configurable {
     constructor(input) {
-        this.config = getConfigFromInput(FontMap.Config, input)
-        this.config.applyTo(this)
+        super(input)
     }
 }
 
-class TextBlock {
-
-    constructor(input) {
-        this.config = getConfigFromInput(TextBlock.Config, input)
-        this.config.applyTo(this)
-    }
+class TextBlock extends Configurable {
 
     update(values) {
-        this.config.parse(values)
-        this.config.applyTo(this)
+        for (const [ key, value ] of Object.entries(values)) {
+            this[key] = value
+        }
     }
 }
 

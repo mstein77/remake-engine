@@ -1,4 +1,5 @@
-import { Config } from "core/config";
+import { Config } from "core/config"
+import { validated } from "helper/validate"
 
 class LinearGradientPaneConfig extends Config {
 
@@ -16,7 +17,7 @@ class LinearGradientPaneConfig extends Config {
     }
 
     setAxis(value) {
-        this.axis = this.validateString(value, this.getFieldProp('axis'))
+        this.axis = validated.string(value, this.getFieldProp('axis'))
     }
 
     setColorStops(value) {
@@ -24,10 +25,10 @@ class LinearGradientPaneConfig extends Config {
     }
 
     validateColorStops(value) {
-        this.validateArray(value)
-        if (value.length % 2 == 0) {
+        validated.array(value)
+        if (value.length % 2 == 0)
             throw Error('ColorStops need to be in the format: [<color>, <len>, <color>, ..., <len>, <color>]')
-        }
+
         const colorStops = []
         for (let i = 0; i < value.length; i += 2) {
             colorStops.push([value[i], (i === value.length - 1) ? 0 : value[i + 1]])
@@ -35,12 +36,8 @@ class LinearGradientPaneConfig extends Config {
         return colorStops
     }
 
-    applyTo(obj) {
-        super.applyTo(obj)
-        obj.axis = this.axis
-        obj.colorStops = this.colorStops
-
-        return obj
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
     }
 }
 

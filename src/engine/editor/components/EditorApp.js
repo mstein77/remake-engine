@@ -1,6 +1,6 @@
 import inst from "core/instances"
 import React, { Suspense, useState, useEffect } from "react"
-import { d, getJsonModelOfInstance, getResourceTreeForJsonModel } from '../../helper/helper'
+import { d } from 'helper/helper'
 import { MainEditor } from "../editors/MainEditor"
 import { ScreenEditor } from "../editors/ScreenEditor"
 import { PocEditor } from "../editors/PocEditor"
@@ -60,6 +60,7 @@ function EditorApp(props) {
     let filters = null;
     let imageResources = [];
     // extract all filters and image resources from the list of resources
+    const found = new Set();
     for (let resource of resources) {
         switch(resource.type) {
             case 'filters':
@@ -67,12 +68,14 @@ function EditorApp(props) {
                 break;
 
             default:
-                const matchingResources = resource.data.getResources('image').resources
-                for (let resource of matchingResources) {
-                    const canvas = resource.data.getCanvas().elem
+                const matchingResources = resource.pane.config.getImageResources(resource.pane)
+                for (const { id, data } of matchingResources) {
+                    if (found.has(id)) continue
+                    found.add(id)
+                    const canvas = data.canvas
                     imageResources.push({
-                        id: resource.id,
-                        name: resource.id,
+                        id,
+                        name: id,
                         bitmap: canvas
                     })
                 }
@@ -108,11 +111,17 @@ function EditorApp(props) {
         contentProvider[cls] = {
             getContent: params => {
                 const resource = resources[params.id];
-                if (resource.data === null) {
-                    resource.data = new resource.config(resourceLoader.getResource('json', resource.id));
-                }
-                const model = { ...getJsonModelOfInstance(resource.data), ...resource.props };
-                const tree = getResourceTreeForJsonModel(resource.cls, model);
+                // build new model from pane
+                inst.RL.setDisabled(true)
+                const model = resource.pane.config.getClonedModel(resource.pane)
+                inst.RL.setDisabled(false)
+                /*
+                const model = {
+                    // ...getJsonModelOfInstance(resource.data),
+                    ...resource.data.getJson(),
+                    ...resource.props
+                };
+                */
                 return lazyLoadPaneEditor(cls, { resource, model })
             }
         }
@@ -122,7 +131,10 @@ function EditorApp(props) {
 
     return (
         <>
-            <MainEditor game={props.game} resources={resources} filters={filters} imageResources={imageResources} { ...props } contentProvider={contentProvider} />
+            <MainEditor
+                game={props.game} resources={resources} filters={filters}
+                imageResources={imageResources} { ...props } contentProvider={contentProvider}
+            />
             <div id="modals-container" />
         </>
     )

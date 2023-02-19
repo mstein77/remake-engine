@@ -1,4 +1,6 @@
-import { Config } from "core/config";
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { AppliedImage } from "core/classes"
 
 class PatternPaneConfig extends Config {
 
@@ -16,19 +18,20 @@ class PatternPaneConfig extends Config {
     }
 
     setImage(value) {
-        this.image = this.validateImageResource(value)
+        this.image = validated.imageResource(value)
     }
 
     setRepeat(value) {
-        this.repeat = this.validateString(value, this.getFieldProp('repeat'))
+        this.repeat = validated.string(value, this.getFieldProp('repeat'))
     }
 
-    applyTo(obj) {
-        super.applyTo(obj)
-        obj.image = this.image
-        obj.repeat = this.repeat
+    getDependentImages(model) {
+        return [model.image]
+    }
 
-        return obj
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        model.image = new AppliedImage(this.image)
     }
 }
 

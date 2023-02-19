@@ -1,6 +1,8 @@
 import inst from "../core/instances"
 import { ANIMATION } from "core/const"
 import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
+import { ChildConfig, Config } from "../core/config.js";
+import { AppliedImage, Configurable, ImageResource } from "../core/classes.js";
 
 function d(main, ...params) {
     let stack = null;
@@ -45,6 +47,17 @@ function isString(value) {
 }
 
 /**
+ * Returns whether the given value is an array or not
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
+function isArray(value) {
+    return Array.isArray(value)
+}
+
+/**
  * Returns whether the given argument is an URL string with http or https protocol or not
  *
  * @param {mixed} value
@@ -80,7 +93,7 @@ function isDataUrl(value, type = null) {
  * @returns {boolean}
  */
 function isObject(obj) {
-    return (obj && typeof obj === 'object')
+    return (obj && typeof obj === 'object' && !isArray(obj))
 }
 
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
@@ -345,32 +358,50 @@ const getEmptyImageData = (width, height, color = '#00000000') => {
 const rebuilders = [];
 const rebuildObj = [];
 
-const addTreeResource = (tree, resId, resourceInfo, level = 0) => {
-    const [type, id] = resId.split(':');
-    for (let resource of resourceInfo.resources) {
-        if (resource.id === id) {
-            tree.push({level, id, type, source: ucfirst(inst.RL.getResourceSource(resId))});
-            break;
-        }
-    }
-    if (!resourceInfo.dependencies[resId]) {
-        return;
-    }
-    const deps = resourceInfo.dependencies[resId];
+/**
+ *
+ * @param nodes
+ * @param resId
+ * @param dependencies
+ * @param level
+ */
+const addTreeResource = (nodes, resId, dependencies, level = 0) => {
+    const [ type, id ] = resId.split(':')
+    nodes.push({ level, id, type, source: ucfirst(inst.RL.getResourceSource(resId)) })
+
+    const deps = dependencies[resId]
+    if (!deps) return
+
     for (let dep of deps) {
-        addTreeResource(tree, dep, resourceInfo, level + 1);
+        addTreeResource(nodes, dep, dependencies, level + 1)
     }
-};
+}
 
-const getResourceTreeForJsonModel = (cls, model) => {
-    const rebuildJson = getRebuildJsonForModel(cls, model, true);
-    const config = new cls.Config(rebuildJson);
-    const resourceInfo = config.getResources();
-    const tree = [];
-    addTreeResource(tree, 'json:' + model.id, resourceInfo);
-    return tree;
-};
+/**
+ * Returns an array holding the nodes of a resource dependency tree of the given model. Each node is an object
+ * { id, level, type, source } whereas source returns where the resource was loaded from
+ *
+ * @param {object} config
+ * @param {object} model
+ *
+ * @returns {array}
+ */
+const getResourceTreeForJsonModel = model => {
+    const dependencies = model.config.getDependencies(model)
+    const nodes = []
+    addTreeResource(nodes, 'json:' + model.id, dependencies)
+    return nodes
+}
 
+/**
+ * Returns a new instance of the given config without overwriting referenced configurables
+ * with the one in the resource loader. The configuration is initialized with the given JSON
+ *
+ * @param {function} config The config class
+ * @param {object} json The JSON for initializing the config
+ *
+ * @returns {object}
+ */
 const newPlainConfig = (config, json) => {
     inst.RL.setDisabled(true)
     const plainConfig = new config(json)
@@ -378,22 +409,200 @@ const newPlainConfig = (config, json) => {
     return plainConfig
 }
 
+/**
+ * Returns a JSON which can be passed to the config of the configurable to rebuild its
+ * current state.
+ *
+ * @param {function} cls The configurable class
+ * @param {object} model The configurable representation
+ * @param {boolean} deep
+ *
+ * @returns {object}
+ *
+ *  1. JSON -> Config
+ *  2.         Config.setX() : speichert in this (Config)
+ *      ...
+ *  3. new Configurable(Config)
+ *  4.           Config.applyTo(Configurable) : übernimmt von Config (this) auf Configurable
+ *  5.           this.config = Config : speichert diese sealed
+ *
+ *   Speicherweg:
+ *     JSON.x => new Config(JSON) => Config.setX(JSON.x) => Config.x
+                                     Config.setX(...)    => Config.x
+
+       new Configurable(Config) => Configurable.x
+
+       Also:
+         JSON.x   => [setX]: Config.x   =>  [applyTo]: Configurable.x
+
+         a) Image
+
+         JSON.img   : muss eine resolved ImageResource (inkl. id) sein ... d.h. steht im RL unter dieser ID (?)
+           ----------------------------------------------------------------------------------
+           Config.img : Referenz auf die ImageResource (damit Daten und ID gespeichert sind)
+              Configurable.img : die Image-Daten in einem NEUEN Canvas oder Image (damit Änderungen gemacht werden können)
+
+         b) subConfigurable
+
+         JSON.sub   : eine JSON-Config oder eine Config für das Configurable (inkl. id)
+            ---------------------------------------------------------------------------------
+            Config.sub : die Config für das Configurable basierend auf dem JSON.sub (oder einer JSON-Resource aus dem RL)
+                Configurable.sub : eine Configurable-Instanz (
+
+Beispiele:
+
+  Pane:init:
+   {
+      id: 'myPaneId',
+      maxSpeed: 6,
+      tilesMap: {
+          id: 'myMap',
+          image: image['xy']
+      }
+   }
+
+   Pane:resources:JsonResource
+   {
+      id: 'myPaneId',
+      maxSpeed: 6,
+      tilesMap: {
+          id: 'myMap',
+          image: 'xy'      <-- erfordert, dass die Resource ebenfalls definiert (oder als Abhängigkeit geladen) wurde
+      }
+   }
+
+ => Config:
+    {
+        id: 'myPaneId'    setId('myPaneId')
+        maxSpeed: 6        setMaxSpeed(6)
+        tilesMap:          setTilesMap({id: 'myMap', image: image['xy']})
+                             => new TilesMapConfig({id: 'myMap', image: image['xy']})
+    }
+
+ => Configurable:
+    {
+        tilesMap: TilesMap
+    }
+
+ Use-Cases:
+   a) Normale Pane-Instantiierung
+        => RL-Auflösung
+
+   b) Open-Editor:
+        a) Live-state:
+           aus dem aktuellen Pane-Model wird ein Rebuild-JSON erstellt, was dann über eine Config ein Model liefert
+
+        b) Init-state:
+           die config der Pane wird noch mal auf ein Object applied, was dann als Model dient
+
+        => RL-Auflösung
+
+       Über getResources('image') werden die Image-Resourcen (zum aktuellen Model) generiert
+
+       Über getResources() werden alle Resourcen zum aktuellen Model gebaut und ein Tree generiert
+
+   c) Speichern der Editor-Resource
+        Es wird ein Rebuild-JSON für das Model erstellt (ohne RL-Auflösung, da sonst refConfigurables durch die zuletzt geladen ersetzt würden)
+        Dabei werden die Resourcen und Dependencies über getResources() geholt, wobei als data hier
+          - "image" => dataurl-string
+          - "json" => JSON der rebuild-config
+        generiert und im Storage gespeichert oder (beim Deployment) auf den Server geschickt werden
+
+
+   getResources:
+     - muss die Daten in speicherbar für den Server aufbereiten, d.h. { id, type, data }
+         image => dataurl
+         json => json
+         audio => dataurl
+     - kann genutzt werden, um alle images/audios der aktuellen screen-resourcen zu extrahieren
+     - muss Referenzen auf andere Configurables/Resourcen in einem JSON immer nur per id erzeugen
+     - liefert ebenso die direkten Abhängigkeiten von Screenresource auf alle Resourcen (auch indirekt?)
+
+
+
+
+
+
+
+ *
+ * Wird aktuell genutzt in
+ *   - editorComponents.getModelConfig() um zum aktuellem Configurable model ein deep-rebuild-JSON
+ *     zu erhalten
+ *
+ *       - wird immer am Anfang eines Edits aufgerufen
+ *       - das Model entspricht dem aktuellem Spielstand bzw. dem letzten Save-Stand und enthält damit auch
+ *         referenzierte Configurables aus dem RL
+ *
+ *       - ein refImage wird also als resolved ImageResource vorliegen und kann per ID referenziert werden
+ *         (erst beim getResources() muss dieses als zusätzliche Resource dazugesetzt werden)
+ *       - ein refConfigurable muss wiederum als rebuild-JSON vorliegen und muss evt. konvertiert werden
+ *
+ *       Configurable-Instanz:       Rebuild-JSON:
+ *         id: 'hey'                  {
+ *         config: xxx                  id: 'hey'
+ *         bla: x                 =>    bla: x,
+ *         foo: bar                     foo: bar
+ *                                    }
+ *
+ *         Auf der Configurable-Instanz muss ein refConfigurable-prop immer auch die Instanz dieses Configurables
+ *         enthalten...d.h. zum Beispiel:
+ *
+ *           model.tilesMap = TilesMap({id: 'xy'})                                   refDirect
+ *           model.fonts = [FontMap({id: 'tFont'}), FontMap({id: 'bFont'})]          refDirectArray
+ *
+ *         D.h. in dem Model haben wir neben den Instanzen zwar auch die ursprüngliche Config im config-key, aber
+ *         um die aktuellsten Änderungen zu bekommen, würden wir ein neues Rebuild-JSON generieren müssen mit diesem subModel
+ *
+ *   Ein Configurable speichert unter dem key "config", die Configurable.Config und wenn diese nicht als editierbar
+ *   festgelegt wurde, dann wurden auf dieser nachträglich auch keine Änderungen mehr gemacht, d.h. wenn diese auf ein
+ *   leeres JSON applied wird, dann würden wir den Configurable-State der Instantiierung auf dem Object haben - um das
+ *   rebuild-JSON zu diesem State zu generieren müssten wir diesen in den Aufruf von getRebuildJson auf dieser Config geben.
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *   - helper:getResourceTreeForJsonModel() um zum aktuellem Configurable model ein deep-rebuild-JSON
+ *     zu erhalten, aus dem dann die Resourcen ermittelt werden
+ *
+ *       -
+ *
+ *
+ *   - config:addRebuildProps() um im deep-Fall aus einem referenziertem Configurable ein deep-rebuild
+ *     JSON zu erzeugen
+ *
+ *
+ */
 const getRebuildJsonForModel = (cls, model, deep) => {
     if (model instanceof cls) {
+        // the model is already an instance of the configurable, so it should have
+        // a config instance in the config property which we can use
+        // TODO: macht das mit der id-only hier sinn?
         return deep ? model.config.getRebuildJson(true, model) : model.config.id
     }
+
     const conf = cls.Config;
     if (model instanceof conf) {
-        return deep ? conf.getRebuildJson(true, model) : conf.id;
+        // the model is represented by a config instance of the configurable
+        return deep ? conf.getRebuildJson(true) : conf.id;
     }
+    // the model is represented by a JSON config of the configurable
     if (!deep) {
         return model.id;
     }
+
+    // we don't want unresolved ids in our config that's why we
+
     const index = rebuilders.indexOf(conf);
     let obj;
     if (index !== -1) {
         obj = rebuildObj[index]
     } else {
+        // wird failen, wenn irgendein property required ist
         obj = new conf({});
         rebuilders.push(conf);
         rebuildObj.push(obj)
@@ -495,7 +704,6 @@ const getBlockPos = (block, fonts, dim) => {
 const drawTextBlocks = (ctx, dim, blocks, fonts, zoom = 1) => {
     for (let block of blocks) {
         const pos = getBlockPos(block, fonts, dim);
-
         ctx.drawImage(
             block.canvas.elem,
             0,
@@ -556,7 +764,7 @@ const getTextBlockImage = (block, font, filterer = null) => {
             const char = font.map[line[x]];
             if (char) {
                 ctx.drawImage(
-                    font.image,
+                    font.image.canvas,
                     char.x,
                     char.y,
                     font.width,
@@ -1118,6 +1326,49 @@ const intersect = (a, b) => {
     return a.filter(x => b.includes(x))
 }
 
+const entriesSort = (a, b) => a[0] === b[0] ? 0 : (a[0] < b[0] ? 1 : -1)
+
+const isEqual = (a, b) => {
+    if (isArray(a)) {
+        if (!isArray(b) || a.length !== b.length) return false
+        for (let i = 0; i < a.length; i++) if (!isEqual(a[i], b[i])) return false
+        return true
+    }
+    if (isObject(a)) {
+        if (!isObject(b)) return false
+        const aPairs = Object.entries(a)
+        const bPairs = Object.entries(b)
+        if (aPairs.length !== bPairs.length) return false
+        aPairs.sort(entriesSort)
+        bPairs.sort(entriesSort)
+        for (let i = 0; i < aPairs.length; i++) {
+            if (aPairs[i][0] !== bPairs[i][0] || !isEqual(aPairs[i][1], bPairs[i][1])) return false
+        }
+        return true
+    }
+    return a === b
+}
+
+const getClonedProp = value => {
+    if (isArray(value)) {
+        return value.map(getClonedProp)
+    }
+    if (isObject(value)) {
+        if (value instanceof Config) return value.getModelInstance()
+        // TODO: remove
+        //if (value instanceof Configurable) throw Error('???', value)
+        // return value
+        if (value instanceof ImageResource) return new AppliedImage(value)
+
+        const result = {}
+        for (const [ key, subValue ] of Object.entries(value)) {
+            result[key] = getClonedProp(subValue)
+        }
+        return result
+    }
+    return value
+}
+
 function getParsedCssValueRec(value, splitBy = false) {
     if (value === null) {
         return null;
@@ -1281,10 +1532,13 @@ class RelativeBlock {
  *
  * @returns {Config}
  */
-function getConfigFromInput(configCls, input, forceId = null) {
+function getConfigFromInput(configCls, params, forceId = null) {
     let fetchId = null;
     let confJson = null;
+    const [ input, ...args ] = params
     let conf = input;
+
+    const isChildConfig = configCls.prototype.isPrototypeOf(ChildConfig)
 
     if (typeof input === 'string') {
         // string given means that we have to load the json resource
@@ -1310,13 +1564,13 @@ function getConfigFromInput(configCls, input, forceId = null) {
     }
 
     // try to load config json with the id (if it could be extracted) from the resource loader
-    if (fetchId && inst.RL.hasResource('json', fetchId)) {
+    if (fetchId && !isChildConfig && inst.RL.hasResource('json', fetchId)) {
         confJson = inst.RL.getJsonResource(fetchId)
     }
     if (confJson !== null) {
         // if we have a JSON config either from the param or the resource loader, instantiate config object
         if (forceId) confJson.id = forceId
-        conf = new configCls(confJson)
+        conf = new configCls(confJson, ...args)
     }
     // at this point we should have a valid config instance
     if (!(conf instanceof configCls)) {
@@ -1325,11 +1579,44 @@ function getConfigFromInput(configCls, input, forceId = null) {
     return conf;
 }
 
+function findSameRefs(a, b, path = '', pathElems = []) {
+    if (isObject(a) && isObject(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
+        }
+
+        for (const key of Object.keys(a)) {
+            if (key in b && key !== 'config') findSameRefs(a[key], b[key], path + '.' + key, [ ...pathElems, a])
+        }
+    }
+    if (isArray(a) && isArray(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
+        }
+        let i = 0
+        while (i < a.length && i < b.length) {
+            findSameRefs(a[i], a[i], path + '[' + i + ']', [ ...pathElems, a])
+            i++
+        }
+    }
+}
+
+const toPairs = Object.entries
+const toValues = Object.values
+const toKeys = Object.keys
+
 export {
     d,
     ts,
     td,
     noop,
+    toPairs,
+    toValues,
+    toKeys,
     reverse,
     round,
     without,
@@ -1380,13 +1667,17 @@ export {
     getCanvasForIndexMatrix,
     getCanvasForEventMatrix,
     getConfigFromInput,
+    getClonedProp,
     newPlainConfig,
     isUrl,
     isDataUrl,
     isObject,
     isString,
+    isArray,
+    isEqual,
     BitmapPlayer,
     ANIMATION,
     Players,
-    RelativeBlock
+    RelativeBlock,
+    findSameRefs
 };

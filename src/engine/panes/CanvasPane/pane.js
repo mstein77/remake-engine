@@ -10,10 +10,10 @@ export class CanvasPane extends Pane {
             x: viewPortDimX,
             y: viewPortDimY
         };
-        this.paneDim = this.viewPortDim;
-        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
-        this.dirty = false;
-        return this.container;
+        this.paneDim = this.viewPortDim
+        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque)
+        this.dirty = false
+        return this.container
     }
 
     render() {
@@ -33,6 +33,6 @@ export class CanvasPane extends Pane {
         }
     }
 }
-CanvasPane.Config = CanvasPaneConfig
+CanvasPaneConfig.linkTo(CanvasPane)
 
 inst.paneRegistry.add('CanvasPane', CanvasPane)

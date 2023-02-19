@@ -182,6 +182,6 @@ export class LinearGradientPane extends Pane {
         }
     }
 }
-LinearGradientPane.Config = LinearGradientPaneConfig
+LinearGradientPaneConfig.linkTo(LinearGradientPane)
 
 inst.paneRegistry.add('LinearGradientPane', LinearGradientPane)

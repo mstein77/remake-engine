@@ -59,7 +59,7 @@ function SpriteManager({ spriteIndex, editSprite }) {
             });
         };
         openBitmapSelectionModal({
-            colors: new ColorIndex({colors: getColorsFromCanvas(spriteIndex.img)}),
+            colors: new ColorIndex({colors: getColorsFromCanvas(spriteIndex.img.canvas)}),
             resize: true,
             save: select,
             selection: {}
@@ -165,7 +165,7 @@ function SpritePaneEditorInner({ spriteIndex, animationIndex }) {
                 );
                 closeEditBitmapModal()
             },
-            colors: new ColorIndex({colors: getColorsFromCanvas(spriteIndex.img)}),
+            colors: new ColorIndex({colors: getColorsFromCanvas(spriteIndex.img.canvas)}),
             image
         });
     };
@@ -193,16 +193,15 @@ function SpritePaneEditor({ model, resource }) {
     const update = useComponentUpdate();
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'SpritePane', model, resource, update });
     const spriteIndex = useMemo(() => {
-        return new SpriteIndex(model);
-    }, [model]);
+        return new SpriteIndex(model.spriteSheet)
+    }, [model])
     const animationIndex = useMemo(() => {
-        return new AnimationIndex(spriteIndex, model)
+        return new AnimationIndex(spriteIndex, model.spriteSheet)
     }, [model]);
 
-    const tree = []; // getResourceTree();
-    // TODO:
+    const tree = getResourceTree();
     const details = {
-        'From:': 'wherever', // tree[0].source,
+        'From:': tree[0].source,
         'Resources:': tree.length
     };
     return (

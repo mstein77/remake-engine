@@ -1,5 +1,7 @@
 import { d, isObject, isUrl, isDataUrl } from "helper/helper"
 
+class ResourceProvider {}
+
 /**
  * @class ResourceProvider
  *
@@ -8,7 +10,7 @@ import { d, isObject, isUrl, isDataUrl } from "helper/helper"
  * as JSON object
  *
  */
-class ResourceProvider {
+class SingleResourceProvider extends ResourceProvider {
 
     /**
      * Creates a new provider which is initialized with the resources given in the passed JSON object.
@@ -16,6 +18,7 @@ class ResourceProvider {
      * @param resources
      */
     constructor(resources) {
+        super()
         this.id2content = {}
         this.addObject(resources)
     }
@@ -150,7 +153,7 @@ class ResourceProvider {
      * @returns {object}
      */
     get resources() {
-        return {[this.key]: this.id2content}
+        return {[this.key]: { ...this.id2content }}
     }
 }
 
@@ -162,7 +165,7 @@ class ResourceProvider {
  * The content of an image resource can be a data url string and ids must a file extension ".png"
  *
  */
-class ImageResourceProvider extends ResourceProvider {
+class ImageResourceProvider extends SingleResourceProvider {
 
     /**
      * @inheritDoc
@@ -205,7 +208,7 @@ class ImageResourceProvider extends ResourceProvider {
  * The content of an audio resource must be a http link to an audio file and ids must have a file extension ".wav" or
  * ".mp3"
  */
-class AudioResourceProvider extends ResourceProvider {
+class AudioResourceProvider extends SingleResourceProvider {
 
     /**
      * @inheritDoc
@@ -249,7 +252,7 @@ class AudioResourceProvider extends ResourceProvider {
  * The content of a JSON resource can be everything which is allowed within a JSON
  *
  */
-class JsonResourceProvider extends ResourceProvider {
+class JsonResourceProvider extends SingleResourceProvider {
 
     /**
      * @inheritDoc
@@ -274,7 +277,7 @@ class JsonResourceProvider extends ResourceProvider {
  A resource provider which allows to add resources of the types "image", "audio" or "json". The resources of each
  type are returned under the according key in the resources JSON
  */
-class MultiResourcesProvider {
+class MultiResourcesProvider extends ResourceProvider {
 
     /**
      * Creates a new provider which is initialized with the resources given in the passed JSON object.
@@ -283,6 +286,7 @@ class MultiResourcesProvider {
      * @param {object} resources
      */
     constructor(resources = {}) {
+        super()
         this.image = new ImageResourceProvider()
         this.audio = new AudioResourceProvider()
         this.json = new JsonResourceProvider()
