@@ -1,5 +1,6 @@
-import { EntityIndex } from "editor/classes";
+import { EntityIndex } from "editor/classes"
 import { drawCanvasToAvail, getCanvasForDim, toPairs, d } from "helper/helper"
+import { minRectPositions } from "helper/algo"
 
 class SpriteIndex extends EntityIndex {
 
@@ -21,64 +22,22 @@ class SpriteIndex extends EntityIndex {
     }
 
     assignAutoProps(updateIndices = []) {
-        let maxWidth = 500;
-        const sprites = [];
-        let iMax = this.getLength();
-        let i = 0;
+        const sprites = []
+        let iMax = this.getLength()
+        let i = 0
         while(i < iMax) {
-            const value = this.items[i];
-            const dim = this.model.sprites[value].dim;
-            maxWidth = Math.max(maxWidth, dim.x);
-            sprites.push([value, dim.x, dim.y, i]);
-            i++;
+            const value = this.items[i]
+            const dim = this.model.sprites[value].dim
+            sprites.push([dim.x, dim.y, value, i])
+            i++
         }
-        sprites.sort((a, b) => a[2] === b[2] ? (a[1] === b[1] ? 0 : (a[1] > b[1] ? -1 : 1)) : (a[2] > b[2] ? -1 : 1));
 
-        // now them to free space blocks
-        let spaceBlocks = [[0, 0, maxWidth, null]];
-        let canvasWidth  = 0;
-        let canvasHeight = 0;
-        let offsets = {};
+        const { id2pos, width, height } = minRectPositions(sprites)
 
-        for (let sprite of sprites) {
-            const [name, width, height, index] = sprite;
-            // find free block matching width and height
-            let found = false;
-            const newBlocks = [];
-            for (let block of spaceBlocks) {
-                if (!found) {
-                    const [x, y, blockWidth, blockHeight] = block;
-                    if (blockHeight !== null && (blockWidth < width || blockHeight < height)) {
-                        newBlocks.push(block);
-                        continue;
-                    }
-                    offsets[name] = {x, y, index};
-                    if (blockHeight === null) {
-                        if (blockWidth > width) {
-                            newBlocks.push([x + width, y, blockWidth - width, height]);
-                        }
-                        newBlocks.push([0, y + height, maxWidth, null]);
-                    } else {
-                        if (blockWidth > width) {
-                            newBlocks.push([x + width, y, blockWidth - width, height]);
-                        }
-                        if (blockHeight > height) {
-                            newBlocks.push([x, y + height, blockWidth, blockHeight - height]);
-                        }
-                    }
-                    found = true;
-                    canvasWidth = Math.max(x + width, canvasWidth);
-                    canvasHeight = Math.max(y + height, canvasHeight);
-                } else {
-                    newBlocks.push(block);
-                }
-            }
-            spaceBlocks = newBlocks;
-        }
-        const canvas = getCanvasForDim(canvasWidth, canvasHeight);
+        const canvas = getCanvasForDim(width, height)
         const ctx = canvas.getContext('2d');
 
-        for (const [ name, offset ] of Object.entries(offsets)) {
+        for (const [ name, offset ] of Object.entries(id2pos)) {
             if (!updateIndices.includes(offset.index)) {
                 this.drawEntity(ctx, offset.index, offset.x, offset.y);
             }

@@ -1,17 +1,75 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import { d, isValidResourceId, BitmapPlayer, getConfigFromInput, getCanvasForDim } from "helper/helper"
+import { d, isValidResourceId, BitmapPlayer, getCanvasForDim } from "helper/helper"
 import { getResourcesAndCallback } from "./resources"
 import { ChildConfig } from "./config"
 
-class Configurable {
+/**
+ * A model is a class which is constructed using a corresponding config instance.
+ */
+class Model {
 
-    constructor(input, parent) {
-        const params = [input]
-        if (this.constructor.Config.constructor.prototype.isPrototypeOf(ChildConfig))
-            params.push(parent)
-        const config = getConfigFromInput(this.constructor.Config, params, null)
+    static getConfigFromInput(params, forceId = null, cls = null) {
+        const configCls = (cls ? cls : this).Config
+        let fetchId = null;
+        let confJson = null;
+        const [ input, ...args ] = params
+        let conf = input;
+
+        const isChildConfig = configCls.prototype.isPrototypeOf(ChildConfig)
+
+        if (typeof input === 'string') {
+            // string given means that we have to load the json resource
+            fetchId = input
+        } else if (input instanceof configCls) {
+            // we got a config instance
+            // if the resource was already loaded by the resource load we are fine
+            if (!input.isResolved()) {
+                // otherwise we have to check if there is new resource with the same id
+                fetchId = input.id;
+            }
+        } else {
+            // we got a json config
+            confJson = input;
+            if (!input.__resolved) {
+                // json was not fetched by the resource loader, so check for a new resource with this id
+                fetchId = input.id;
+            }
+        }
+        if (fetchId !== null) {
+            if (forceId) fetchId = forceId
+            if (fetchId === undefined) throw Error('Could not extract id from config')
+        }
+
+        // try to load config json with the id (if it could be extracted) from the resource loader
+        if (fetchId && !isChildConfig && inst.RL.hasResource('json', fetchId)) {
+            confJson = inst.RL.getJsonResource(fetchId)
+        }
+        if (confJson !== null) {
+            // if we have a JSON config either from the param or the resource loader, instantiate config object
+            if (forceId) confJson.id = forceId
+            conf = new configCls(confJson, ...args)
+        }
+        // at this point we should have a valid config instance
+        if (!(conf instanceof configCls)) {
+            throw Error(`Could not create config ${configCls.name} from input`);
+        }
+        return conf;
+    }
+
+    constructor(...args) {
+        const config = this.constructor.getConfigFromInput(this.getInputParams(...args))
         config.applyTo(this)
+    }
+
+    getInputParams(input) {
+        return [input]
+    }
+}
+
+class ChildModel extends Model {
+    getInputParams(input, parent) {
+        return [input, parent]
     }
 }
 
@@ -2546,5 +2604,6 @@ export {
     Gravity,
     SpriteAndTilesCollider,
     ObjectController,
-    Configurable
+    Model,
+    ChildModel
 }

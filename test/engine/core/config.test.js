@@ -1,6 +1,6 @@
 import { Config } from "core/config"
 import { validated } from "helper/validate"
-import { AppliedImage, Configurable, ImageResource, AudioResource } from "core/classes"
+import { AppliedImage, Model, ImageResource, AudioResource } from "core/classes"
 import inst from "core/instances"
 
 test('config class', () => {
@@ -204,7 +204,7 @@ test('MyConfig <-> RebuildJson', () => {
         }
     }
 
-    class MyModel extends Configurable {}
+    class MyModel extends Model {}
     MyModel.Config = DepConfig;
 
     class MyConfig extends Config {

@@ -1,10 +1,10 @@
 import { STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { Storage, getConfigFromInput, clamp, ucfirst, d } from "helper/helper"
+import { Storage, clamp, ucfirst, d } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
 import { getResourcesAndCallback } from "./resources.js";
 import { div } from "helper/dom"
-import { ResourceRequest } from "core/classes.js"
+import { ResourceRequest, Model } from "core/classes"
 import inst from "core/instances"
 import { validated } from "helper/validate"
 
@@ -211,7 +211,7 @@ class Game {
         setTimeout(() => {
             try {
                 // apply input to this
-                const config = getConfigFromInput(GameConfig, [this.input], 'game')
+                const config = Model.getConfigFromInput([this.input], 'game', Game)
                 config.applyTo(this.props)
                 this.fixOrientation = null
                 const system = this.system

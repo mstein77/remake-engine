@@ -579,13 +579,6 @@ export class SpritePane extends Pane {
             height: this.viewPortDim.y
         }
     }
-
-    getEditorResources() {
-        const resources = super.getEditorResources()
-        resources.props.sprites = this.spriteSheet.sprites
-        resources.props.animations = this.spriteSheet.animations
-        return resources
-    }
 }
 SpritePaneConfig.linkTo(SpritePane)
 

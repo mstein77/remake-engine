@@ -1,8 +1,8 @@
 import inst from "core/instances"
 import { BitmapPlayer } from "helper/helper"
-import { Configurable } from "core/classes"
+import { Model } from "core/classes"
 
-class TilesMap extends Configurable {
+class TilesMap extends Model {
 
     constructor(input) {
         super(input)

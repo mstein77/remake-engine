@@ -1,5 +1,6 @@
-import { d, isObject, isArray, without, isEqual, getClonedProp, findSameRefs } from "helper/helper"
+import { d, isObject, without, isEqual, getClonedProp } from "helper/helper"
 import { validated } from "helper/validate"
+import { Model } from "./classes"
 
 /**
  * Represents a configuration object of a configurable model. Validates and parses the configuration and
@@ -155,12 +156,6 @@ class Config {
         return model
     }
 
-    getClonedModel(model) {
-        return this.getModelInstance(
-            this.getRebuildJson(true, model)
-        )
-    }
-
     getModelInstance(input) {
         if (!this.constructor.factory)
             throw Error(`Missing model factory method in config ${this.constructor.name}`)
@@ -200,16 +195,6 @@ class Config {
      */
     getType() {
         return Object.getPrototypeOf(this).constructor.name
-    }
-
-    /**
-     * Returns a JSON object which represents the current configuration
-     *
-     * @returns {object}
-     */
-    getJson() {
-        const obj = this.applyTo({})
-        return obj
     }
 
     /**
@@ -261,7 +246,25 @@ class Config {
      * @returns {boolean}
      */
     isEditable() {
+        // TODO remove?
         return false
+    }
+
+    /**
+     * Deletes all properties from the given model which have the default as value
+     *
+     * @param {object} model
+     * @returns {object}
+     *
+     */
+    removeDefaults(model) {
+        const defaults = this.getDefaultProps()
+        for (const [ key, value ] of Object.entries(defaults)) {
+            if (key in model && isEqual(value, model[key])) {
+                delete model[key]
+            }
+        }
+        return model
     }
 
     /**
@@ -273,6 +276,8 @@ class Config {
      * @param {object} base
      *
      * @returns {object}
+     *
+     * model.getRebuildJson(deep = true, base = null)
      */
     getRebuildJson(deep = true, base = null) {
         if (base === null) {
@@ -281,22 +286,6 @@ class Config {
         const obj = {id: base.id}
         this.addRebuildProps(obj, deep, base)
         return this.removeDefaults(obj)
-    }
-
-    /**
-     * Deletes all properties from the given model which have the default as value
-     *
-     * @param {object} model
-     * @returns {object}
-     */
-    removeDefaults(model) {
-        const defaults = this.getDefaultProps()
-        for (const [ key, value ] of Object.entries(defaults)) {
-            if (key in model && isEqual(value, model[key])) {
-                delete model[key]
-            }
-        }
-        return model
     }
 
     /**
@@ -310,7 +299,7 @@ class Config {
      *
      * @returns {object}
      *
-     * TODO ist der return nötig?
+     * model.addRebuildProps(...)
      */
     addRebuildProps(obj, deep, base) {
         return obj
@@ -620,6 +609,28 @@ class Config {
 
     getRebuildImage(modelImage, deep) {
         return deep ? modelImage.imageResource : modelImage.id
+    }
+
+    // TODO: move these to the model
+
+    /**
+     * Returns a JSON object which represents the current configuration
+     *
+     * @returns {object}
+     *
+     * model.getInitialJson() => this.config.applyTo({})
+     *
+     */
+    getJson() {
+        const obj = this.applyTo({})
+        return obj
+    }
+
+    // model.getClone()
+    getClonedModel(model) {
+        return this.getModelInstance(
+            this.getRebuildJson(true, model)
+        )
     }
 }
 Config.storeInModel = true

@@ -121,18 +121,6 @@ export class TextPane extends Pane {
         }
     }
 
-    getEditorResources() {
-        const blocks = [];
-        for (let id in this.id2block) {
-            blocks.push(
-                { ...this.id2block[id].config.getJson() }
-            )
-        }
-        const resources = super.getEditorResources()
-        resources.props = { blocks }
-        return resources
-    }
-
     static padStart(value, char, len) {
         value = '' + value
         while (value.length < len) {

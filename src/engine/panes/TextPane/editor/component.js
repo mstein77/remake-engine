@@ -968,6 +968,7 @@ function TextPaneEditor({ model, resource }) {
                     return {
                         export: () => {
                             const jsons = [];
+                            // TODO remove
                             for (let block of model.blocks) {
                                 const obj = new resource.config.deps.block(block);
                                 jsons.push(obj.getRebuildJson());

@@ -4,8 +4,8 @@ import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, ToolGroup,
     useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext, useCachedState
 } from "./BasicComponents"
-import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, newPlainConfig,
-    getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
+import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
+    getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
 } from "helper/helper"
 import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents"
 import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents.js";
@@ -1125,12 +1125,7 @@ function useExportModal({ model, resource, update, name }) {
         }
         return `    "${id}": ${value}`
     }
-    /*
-    const getModelConfig = () => {
-        const rebuildJson = getRebuildJsonForModel(resource.cls, model, true)
-        return newPlainConfig(resource.config, rebuildJson)
-    }
-     */
+
     const getModelResources = () => {
         return model.config.getResources(model)
     }
@@ -1173,7 +1168,6 @@ function useExportModal({ model, resource, update, name }) {
         return getResourceTreeForJsonModel(model)
     }
     return {
-//        getModelConfig,
         getModelResources,
         getResourceTree,
         storeModel,

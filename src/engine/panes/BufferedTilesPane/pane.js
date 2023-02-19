@@ -3,6 +3,7 @@ import { getCanvasForDim } from "helper/helper"
 import { BufferedCanvasContainer } from "core/classes"
 import { BufferedTilesPaneConfig } from "./config"
 import { Pane } from "../classes"
+import {TilesPane} from "../TilesPane/pane.js";
 
 /**
  * TODO:

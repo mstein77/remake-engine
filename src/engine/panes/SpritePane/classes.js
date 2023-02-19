@@ -1,9 +1,9 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
 import { BitmapPlayer, d } from "helper/helper"
-import { Configurable } from "core/classes"
+import { Model } from "core/classes"
 
-class SpriteSheet extends Configurable {
+class SpriteSheet extends Model {
 
     constructor(input) {
         super(input)

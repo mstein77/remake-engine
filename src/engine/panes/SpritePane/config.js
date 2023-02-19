@@ -4,6 +4,7 @@ import { d, isArray, isString, BitmapPlayer, cloneDeep, without, toPairs } from 
 import { validated } from "helper/validate"
 import { AppliedImage, RawAppliedImage } from "core/classes"
 import inst from "core/instances"
+import { minRectPositions } from "helper/algo"
 
 class SpriteSheetConfig extends Config {
 
@@ -128,7 +129,7 @@ class SpriteSheetConfig extends Config {
         }
 
         const animation = {
-            sync: sync,
+            sync,
             dim: {x: maxX, y: maxY},
             frames: frameDetails,
             speed,
@@ -260,7 +261,8 @@ class SpriteSheetConfig extends Config {
                     )
                     posX += dimX
                 }
-                sprite.off = pos
+                sprite.off.x = pos.x
+                sprite.off.y = pos.y
             }
         }
 
@@ -282,65 +284,11 @@ class SpriteSheetConfig extends Config {
     }
 
     minRectPositions(id2elem) {
-        let maxWidth =  1000
-        const items = []
-        for (const [ id, elem ] of toPairs(id2elem)) {
-            const { x, y } = elem.dim
-            maxWidth = Math.max(maxWidth, x)
-            items.push([ x, y, id ])
-        }
-
-        const compCompare = (idx, a, b) => a[idx] === b[idx] ? 0 : (a[idx] > b[idx] ? -1 : 1)
-
-        items.sort((a, b) => {
-            const c = compCompare(1, a, b)
-            if (c !== 0) return c
-            return compCompare(0, a, b)
-        })
-
-        let spaceBlocks = [[0, 0, maxWidth, null]];
-        let canvasWidth  = 0;
-        let canvasHeight = 0;
-        const id2pos = {};
-
-        for (const [ width, height, id ] of items) {
-            let found = false
-            const newBlocks = []
-            for (const block of spaceBlocks) {
-                if (found) {
-                    newBlocks.push(block)
-                    continue
-                }
-                const [ x, y, blockWidth, blockHeight ] = block
-                if (blockHeight !== null && (blockWidth < width || blockHeight < height)) {
-                    newBlocks.push(block)
-                    continue
-                }
-                id2pos[id] = { x, y }
-                if (blockHeight === null) {
-                    if (blockWidth > width) {
-                        newBlocks.push([ x + width, y, blockWidth - width, height ])
-                    }
-                    newBlocks.push([0, y + height, maxWidth, null])
-                } else {
-                    if (blockWidth > width) {
-                        newBlocks.push([ x + width, y, blockWidth - width, height ])
-                    }
-                    if (blockHeight > height) {
-                        newBlocks.push([ x, y + height, blockWidth, blockHeight - height ])
-                    }
-                }
-                found = true
-                canvasWidth = Math.max(x + width, canvasWidth)
-                canvasHeight = Math.max(y + height, canvasHeight)
-            }
-            spaceBlocks = newBlocks
-        }
-        return {
-            id2pos,
-            width: canvasWidth,
-            height: canvasHeight
-        }
+        return minRectPositions(
+            toPairs(id2elem).map(
+                ([ id, elem ]) => [ elem.dim.x, elem.dim.y, id ]
+            )
+        )
     }
 
     getDependentImages(model) {
@@ -412,7 +360,8 @@ class SpriteSheetConfig extends Config {
                 )
                 posX += dimX
             }
-            sprite.off = pos
+            sprite.off.x = pos.x
+            sprite.off.y = pos.y
             const rect = [ pos.x, pos.y, dimX, sprite.dim.y ]
             if (offs.length > 1) {
                 rect.push(offs.length)
@@ -472,7 +421,6 @@ class SpritePaneConfig extends Config {
     addRebuildProps(obj, deep, base) {
         obj.spriteSheet = this.getRebuildModel(base.spriteSheet, deep)
         obj.sprites = {}
-            // cloneDeep(base.sprites)
     }
 }
 
