@@ -63,28 +63,4 @@ export class BackgroundPaneConfig extends Config {
         this.images.push({ image, x, y })
         return this
     }
-
-    addRebuildProps(obj, deep, base) {
-        obj.color = base.color;
-        obj.images = [];
-        let i = 0;
-        while (i < base.images.length) {
-            const { x, y } = base.imgPos[i]
-            const image = base.images[i]
-            obj.images.push({
-                image: deep ? image.imageResource : image.id,
-                x,
-                y
-            })
-            i++
-        }
-    }
-
-    getDependentImages(model) {
-        const result = [];
-        for (let image of model.images) {
-            result.push(image)
-        }
-        return result
-    }
 }

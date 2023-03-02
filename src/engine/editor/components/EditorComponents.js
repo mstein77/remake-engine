@@ -1127,7 +1127,7 @@ function useExportModal({ model, resource, update, name }) {
     }
 
     const getModelResources = () => {
-        return model.config.getResources(model)
+        return model.getResources()
     }
     const storeModel = eContextRef => {
         wContext.resourceLoader.storeScreenModel(wContext.game.currentScreen, model)
@@ -1140,12 +1140,12 @@ function useExportModal({ model, resource, update, name }) {
         eContextRef.current.updateRestorePos()
         wContext.markDirty()
         update()
-    };
+    }
     const deployModel = () => {
         if (IS_DIST) return
 
         const gameRef = wContext.game
-        const { resources, dependencies } = model.config.getResourcesAndDependencies(model)
+        const { resources, dependencies } = model.getResourcesAndDependencies()
 
         LoadingModal.open()
         gameRef.getResourceLoader().deployResources(

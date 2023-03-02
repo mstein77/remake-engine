@@ -760,6 +760,17 @@ export class BufferedTilesPane extends Pane {
             height: this.viewPortDim.y
         }
     }
+
+    getDependentModels() {
+        return [ this.tilesMap ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.tilesMap = !deep ? this.tilesMap.id : this.tilesMap.getRebuildJson(true)
+        obj.maxSpeed = this.maxSpeed
+        obj.endlessX = this.endlessX
+        obj.endlessY = this.endlessY
+    }
 }
 BufferedTilesPaneConfig.linkTo(BufferedTilesPane)
 

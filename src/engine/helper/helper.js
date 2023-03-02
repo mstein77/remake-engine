@@ -387,7 +387,7 @@ const addTreeResource = (nodes, resId, dependencies, level = 0) => {
  * @returns {array}
  */
 const getResourceTreeForJsonModel = model => {
-    const dependencies = model.config.getDependencies(model)
+    const dependencies = model.getDependencies()
     const nodes = []
     addTreeResource(nodes, 'json:' + model.id, dependencies)
     return nodes
@@ -1069,20 +1069,24 @@ const isEqual = (a, b) => {
     return a === b
 }
 
-const getClonedProp = value => {
+const getClonedProp = (value, parent) => {
     if (isArray(value)) {
-        return value.map(getClonedProp)
+        const result = []
+        for (const item of value) {
+            result.push(getClonedProp(item, parent))
+        }
+        return result
     }
     if (isObject(value)) {
-        if (value instanceof Config) return value.getModelInstance()
-        // TODO: remove
-        //if (value instanceof Model) throw Error('???', value)
-        // return value
+        if (value instanceof Config)
+            return value.constructor.isChild ?
+                value.getInitialModelInstance({ parent }) :
+                value.getInitialModelInstance()
         if (value instanceof ImageResource) return new AppliedImage(value)
 
         const result = {}
         for (const [ key, subValue ] of Object.entries(value)) {
-            result[key] = getClonedProp(subValue)
+            result[key] = getClonedProp(subValue, parent)
         }
         return result
     }

@@ -1,5 +1,5 @@
 import { FILTER } from "core/const"
-import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
+import { toValues, flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
@@ -856,7 +856,7 @@ class ResourceLoader {
 
     storeScreenModel(screen, model) {
         const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + model.id);
-        const resources = model.config.getResourcesAndDependencies(model);
+        const resources = model.getResourcesAndDependencies(model);
         for (let resource of resources.resources) {
             switch(resource.type) {
                 case 'json':
@@ -964,6 +964,10 @@ class ResourceLoader {
                 return body;
             })
         )
+    }
+
+    loadGameConfig() {
+        return Promise.resolve()
     }
 
     loadResources(images, jsons, audios, screen = '') {
@@ -1291,6 +1295,62 @@ class CanvasManager {
     }
 }
 
+class AutoIdGenerator {
+
+    constructor() {
+        this.context2ids = {}
+        this.context = null
+    }
+
+    startContext(value) {
+        this.context = value
+    }
+
+    endContext() {
+        this.context = null
+    }
+
+    getContext() {
+        return this.context
+    }
+
+    getIdPrefix() {
+        if (this.context === null) return ''
+        return this.context === 'screen' ? 'screen_' + inst.game.currentScreen : this.context
+    }
+
+    getNewId(name) {
+        const context = this.context
+        if (context === null)
+            throw Error('Cannot generate new id outside context')
+
+        let contextMap = this.context2ids[this.context]
+        if (!contextMap) {
+            contextMap = new Map()
+            this.context2ids[context] = contextMap
+        }
+
+        let no = contextMap.get(name)
+        if (no === undefined) no = 0
+        no++
+        contextMap.set(name, no)
+        return this.getIdPrefix() + '_' + name + '_' + no
+    }
+
+    clearAllIds() {
+        for (const map of toValues(this.context2ids)) {
+            map.clear()
+        }
+    }
+
+    clearScreenIds() {
+        const map = this.context2ids.screen
+        if (map) map.clear()
+    }
+}
+let autoIds = null
+
+
 const inst = {
     setGame: value => {
         if (game !== null) throw Error('There is already a running game instance!')
@@ -1355,6 +1415,10 @@ const inst = {
             plugins.push(inst.touchControlsPlugin)
         }
         return plugins
+    },
+    get autoIds() {
+        if (autoIds === null) autoIds = new AutoIdGenerator()
+        return autoIds
     },
     paneRegistry: new PaneRegistry()
 }

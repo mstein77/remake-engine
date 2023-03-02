@@ -68,7 +68,7 @@ function EditorApp(props) {
                 break;
 
             default:
-                const matchingResources = resource.pane.config.getImageResources(resource.pane)
+                const matchingResources = resource.pane.getImageResources(resource.pane)
                 for (const { id, data } of matchingResources) {
                     if (found.has(id)) continue
                     found.add(id)
@@ -113,15 +113,8 @@ function EditorApp(props) {
                 const resource = resources[params.id];
                 // build new model from pane
                 inst.RL.setDisabled(true)
-                const model = resource.pane.config.getClonedModel(resource.pane)
+                const model = resource.pane.getClone()
                 inst.RL.setDisabled(false)
-                /*
-                const model = {
-                    // ...getJsonModelOfInstance(resource.data),
-                    ...resource.data.getJson(),
-                    ...resource.props
-                };
-                */
                 return lazyLoadPaneEditor(cls, { resource, model })
             }
         }

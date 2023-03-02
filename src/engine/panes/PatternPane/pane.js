@@ -93,6 +93,10 @@ export class PatternPane extends Pane {
             height: this.viewPortDim.y
         }
     }
+
+    getDependentImages() {
+        return [this.image]
+    }
 }
 PatternPaneConfig.linkTo(PatternPane)
 

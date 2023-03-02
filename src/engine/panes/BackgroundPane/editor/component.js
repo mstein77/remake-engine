@@ -241,7 +241,7 @@ function BackgroundPaneEditor({ model, resource }) {
     return (
         <EditorSection
             id="backgroundPaneEditor" area={1} link={3} full name="BackgroundPane"
-            sub={model.id} details={details}
+            sub={model.id} warn={model.hasAutoId() ? `This pane has an automatically created ID. It's recommended to assign your own unique id to prevent problems with conflicting auto-generated IDs!` : ''} details={details}
             confirm tree={tree}
 
             actions={

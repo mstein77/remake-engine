@@ -27,19 +27,6 @@ class TilesPaneConfig extends Config {
     setEndlessY(value) {
         this.endlessY = validated.bool(value)
     }
-
-    getDependentModels(model) {
-        return [
-            model.tilesMap
-        ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        obj.tilesMap = !deep ? base.tilesMap.id : base.tilesMap.config.getRebuildJson(true, base.tilesMap)
-        obj.endlessX = base.endlessX
-        obj.endlessY = base.endlessY
-    }
-
 }
 
 export {

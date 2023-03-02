@@ -25,10 +25,6 @@ class PatternPaneConfig extends Config {
         this.repeat = validated.string(value, this.getFieldProp('repeat'))
     }
 
-    getDependentImages(model) {
-        return [model.image]
-    }
-
     applyPropsTo(model) {
         this.applyDefaultKeysTo(model)
         model.image = new AppliedImage(this.image)

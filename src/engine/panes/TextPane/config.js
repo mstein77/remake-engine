@@ -1,5 +1,5 @@
-import { Config, ChildConfig } from "core/config"
-import { d, cloneDeep, getCanvasForDim } from "helper/helper"
+import { Config } from "core/config"
+import { d, getCanvasForDim } from "helper/helper"
 import { validated } from "helper/validate"
 import { FontMap, TextBlock } from "./classes"
 
@@ -80,23 +80,10 @@ class FontMapConfig extends Config {
             x += this.width
         }
     }
-
-    getDependentImages(model) {
-        return [
-            model.image
-        ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        obj.width = base.width
-        obj.height = base.height
-        obj.image = !deep ? base.image.id : base.image.imageResource
-        obj.map = cloneDeep(base.map)
-    }
 }
 FontMapConfig.linkTo(FontMap)
 
-class TextBlockConfig extends ChildConfig {
+class TextBlockConfig extends Config {
 
     getDefaults() {
         return {
@@ -133,7 +120,7 @@ class TextBlockConfig extends ChildConfig {
         model.height = lines.length
         if (model.font === null)
             model.font =
-                this.parent.fonts.length ? this.parent.fonts[0].id : null
+                model.parent.fonts.length ? model.parent.fonts[0].id : null
         const canvas = getCanvasForDim(1, 1)
         model.canvas = {
             elem: canvas,
@@ -179,12 +166,6 @@ class TextBlockConfig extends ChildConfig {
 
     setFilters(value) {
         this.filters = validated.string(value)
-    }
-
-    addRebuildProps(obj, deep, base) {
-        for (const prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
-            obj[prop] = base[prop]
-        }
     }
 }
 TextBlockConfig.linkTo(TextBlock)
@@ -236,27 +217,6 @@ class TextPaneConfig extends Config {
         this.blocks.push(
             validated.config(TextBlock, value, {parent: this})
         )
-    }
-
-    getDependentModels(model) {
-        return [ ...model.fonts, ...model.blocks ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        const fonts = []
-        for (const font of base.fonts) {
-            fonts.push(
-                this.getRebuildModel(font, deep)
-            )
-        }
-        obj.fonts = fonts
-        const blocks = []
-        for (const block of base.blocks) {
-            blocks.push(
-                this.getRebuildModel(block, deep)
-            )
-        }
-        obj.blocks = blocks
     }
 }
 

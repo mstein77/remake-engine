@@ -1,12 +1,13 @@
 import { STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { Storage, clamp, ucfirst, d } from "helper/helper"
+import { Storage, clamp, ucfirst, toKeys, toPairs, d, without } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
 import { getResourcesAndCallback } from "./resources.js";
 import { div } from "helper/dom"
-import { ResourceRequest, Model } from "core/classes"
-import inst from "core/instances"
+import { ResourceRequest } from "core/classes"
+import { Model, ChildModel } from "./model"
 import { validated } from "helper/validate"
+import inst from "core/instances"
 
 class Game {
 
@@ -178,17 +179,19 @@ class Game {
         this.frameEvents = {}
         this.running = false
         this.before = {}
+        this.globals = getNewStateObj()
 
         inst.RL.clear()
         inst.OCM.clear()
-        this.globals = getNewStateObj()
+        inst.autoIds.clearAllIds()
 
         this.hideElem('game-overlay-div', 'modals-div')
 
         if (!this.initHandler) return
 
         if (this.domLoaded) {
-            this.connectAndBoot()
+            // wait for the next frame in case of a reset
+            requestAnimationFrame(() => this.connectAndBoot())
             return
         }
         document.addEventListener(
@@ -201,85 +204,90 @@ class Game {
         )
     }
 
+    applyConfig() {
+        const config = this.gameProps.config
+        this.gameProps.applyTo(this.props)
+
+        this.fixOrientation = null
+        const system = this.system
+        if (system.isMobile) {
+            this.gameProps.mobile.applyTo(this.props)
+
+            if (system.supportsOrientation) {
+                if (props.screenOrientation === 'max') {
+                    this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
+                } else if (props.screenOrientation !== 'free') {
+                    this.fixOrientation = props.screenOrientation
+                }
+            }
+        }
+        this.props.audioBlocked = false
+        this.props.maxAvailZoom = this.maxZoom
+        this.props.isFullscreen = this.system.isFullscreen()
+        Config.storeInModel = this.hasEditor
+
+        this.syncOrientation()
+        this.deactivateAutoZoom = true
+        this.trackFps = this.showFpsByUser || this.showFps
+        const skipChecks = {
+            autoZoom: this.autoZoomByUser,
+            stepZoom: this.stepZoomByUser,
+            showFps: this.showFpsByUser
+        }
+        // overwrite with persisted values
+        for (let [ prop, type ] of Object.entries(persistedProps2type)) {
+            if (prop in skipChecks && !skipChecks[prop]) continue
+            let value = this.engineStorage.getJson(prop)
+            if (value === undefined || value === null) continue
+            if (prop === 'muted') {
+                this.audio.setMuted(value)
+            } else if (prop === 'masterVolume') {
+                this.audio.setMasterVolume(value)
+            } else {
+                try {
+                    let mismatch = false
+                    switch(type) {
+                        case 'bool':
+                            mismatch = typeof value !== 'boolean'
+                            break
+
+                        case 'float':
+                            mismatch = typeof value !== 'number'
+                            break
+                    }
+                    if (mismatch) throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
+                    const validator = 'getValidated' + ucfirst(prop);
+                    if (config[validator]) value = config[validator](value)
+                } catch (e) {
+                    console.log(e)
+                    this.addWarning(`There was a problem with the persisted value for "${prop}", falling back to default value`)
+                    const defaults = config.getDefaults();
+                    value = defaults[prop]
+                    this.engineStorage.deleteJson(prop)
+                }
+                this.props[prop] = value
+            }
+        }
+    }
+
     /**
      * Tries to connect to the backend and boots the game if this was successful
      */
     connectAndBoot() {
         this.setState(STATE.CONNECT)
-        // TODO: load game.json
 
-        setTimeout(() => {
-            try {
-                // apply input to this
-                const config = Model.getConfigFromInput([this.input], 'game', Game)
-                config.applyTo(this.props)
-                this.fixOrientation = null
-                const system = this.system
-
-                if (system.isMobile) {
-                    config.mobile.applyTo(this.props)
-
-                    if (system.supportsOrientation) {
-                        if (this.props.screenOrientation === 'max') {
-                            this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
-                        } else if (this.props.screenOrientation !== 'free') {
-                            this.fixOrientation = this.props.screenOrientation
-                        }
-                    }
+        inst.RL.loadGameConfig()
+            .then(() => {
+                try {
+                    this.gameProps = new GameProps(this.input)
+                    this.applyConfig()
+                    this.boot()
+                } catch (e) {
+                    console.error(e)
+                    this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
                 }
-                this.props.audioBlocked = false
-                this.props.maxAvailZoom = this.maxZoom
-                this.props.isFullscreen = this.system.isFullscreen()
-                Config.storeInModel = this.hasEditor
-
-                this.syncOrientation()
-                this.deactivateAutoZoom = true
-                this.trackFps = this.showFpsByUser || this.showFps
-                const skipChecks = {
-                    autoZoom: this.autoZoomByUser,
-                    stepZoom: this.stepZoomByUser,
-                    showFps: this.showFpsByUser
-                }
-                // overwrite with persisted values
-                for (let [ prop, type ] of Object.entries(persistedProps2type)) {
-                    if (prop in skipChecks && !skipChecks[prop]) continue
-                    let value = this.engineStorage.getJson(prop)
-                    if (value === undefined || value === null) continue
-                    if (prop === 'muted') {
-                        this.audio.setMuted(value)
-                    } else if (prop === 'masterVolume') {
-                        this.audio.setMasterVolume(value)
-                    } else {
-                        try {
-                            let mismatch = false
-                            switch(type) {
-                                case 'bool':
-                                    mismatch = typeof value !== 'boolean'
-                                    break
-
-                                case 'float':
-                                    mismatch = typeof value !== 'number'
-                                    break
-                            }
-                            if (mismatch) throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
-                            const validator = 'getValidated' + ucfirst(prop);
-                            if (config[validator]) value = config[validator](value)
-                        } catch (e) {
-                            console.log(e)
-                            this.addWarning(`There was a problem with the persisted value for "${prop}", falling back to default value`)
-                            const defaults = config.getDefaults();
-                            value = defaults[prop]
-                            this.engineStorage.deleteJson(prop)
-                        }
-                        this.props[prop] = value
-                    }
-                }
-                this.boot()
-            } catch (e) {
-                console.error(e)
-                this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
             }
-        }, 2000)
+        )
     }
 
     /**
@@ -348,6 +356,7 @@ class Game {
     reloadScreen(stack) {
         if (this.globalsResolver) {
             this.areGlobalsResolved = false
+            inst.autoIds.clearAllIds()
             inst.RL.invalidatePermanentResources()
         }
         this.globals = this.lastGlobals
@@ -443,7 +452,6 @@ class Game {
             // add perm resources to resource loader
             const { loader } = this.globalsResolver
             loader.resolve()
-            d('perm loader registered...')
         }
         inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
         this.getMandatoryElem('screen-overlay-div').replaceChildren()
@@ -458,7 +466,8 @@ class Game {
             // inst.RL.clearResources()
 
             const { globals, game } = this
-            this.build = screen.init({ globals, game, screen })
+            inst.autoIds.clearScreenIds()
+            this. build = screen.init({ globals, game, screen })
             this.resetFps()
         } catch (e) {
             this.handleError(e)
@@ -733,14 +742,18 @@ class Game {
             const resources = inst.RL.getResources();
             if (!this.areGlobalsResolved) {
                 globals.unlock()
+                inst.autoIds.startContext('global')
                 const { callback } = this.globalsResolver
                 callback({ ...resources, globals, game })
+                inst.autoIds.endContext()
                 globals.lock()
                 this.areGlobalsResolved = true
             }
             try {
                 this.tempKeyActions = null
+                inst.autoIds.startContext('screen')
                 const frameHandler = this.build({ ...resources, globals, game, screen })
+                inst.autoIds.endContext()
                 if (frameHandler) screen.setFrameHandler(frameHandler)
                 screen.setDimension(this.width, this.height)
                 screen.render(true)
@@ -1216,14 +1229,30 @@ class Game {
     }
 }
 
+class GameProps extends Model {
+
+    getDependentModels() {
+        return [ this.mobile ]
+    }
+
+    applyTo(obj) {
+        const keys = without(toKeys(this.config.getDefaults()), ['id', 'mobile'])
+        for (const key of keys) {
+            if (this[key] !== undefined) obj[key] = this[key]
+        }
+    }
+}
+
 /**
  * A config object for the game instance
  */
 class GameConfig extends Config {
 
-    setId() {
-        this.id = 'game';
+    getAutoId() {
+        return 'game'
     }
+
+    setId(value) {}
 
     /**
      * Sets a fix width of the game in pixel
@@ -1347,7 +1376,7 @@ class GameConfig extends Config {
     }
 
     setMobile(value) {
-        this.mobile = validated.config(MobileGameConfig, value)
+        this.mobile = validated.config(MobileGameProps, value)
     }
 
     /**
@@ -1375,6 +1404,7 @@ class GameConfig extends Config {
      */
     getDefaults() {
         return {
+            id: 'game',
             mobile: {},
             width: 320,
             height: 200,
@@ -1395,35 +1425,25 @@ class GameConfig extends Config {
     /**
      * @inheritDoc
      */
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.width = this.width
-        obj.height = this.height
-        obj.zoom = this.zoom
-        obj.minZoom = this.minZoom
-        obj.maxZoom = this.maxZoom
-        obj.restrictZoomByWindow = this.restrictZoomByWindow
-        obj.stepZoom = this.stepZoom
-        obj.stepZoomByUser = this.stepZoomByUser
-        obj.autoZoom = this.autoZoom
-        obj.autoZoomByUser = this.autoZoomByUser
-        obj.showFps = this.showFps
-        obj.showFpsByUser = this.showFpsByUser
-        obj.screenOrientation = this.screenOrientation
-        obj.mobile = this.mobile
-        return obj
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
     }
 }
 /**
  * @type {GameConfig}
  */
-Game.Config = GameConfig
+GameConfig.linkTo(GameProps)
+
+class MobileGameProps extends ChildModel {}
 
 class MobileGameConfig extends GameConfig {
 
+    getAutoId() {
+        return 'mobile-id'
+    }
+
     getDefaults() {
         return {
-            id: 'mobile-game-config',
             zoom: 2,
             minZoom: 0,
             maxZoom: 5,
@@ -1439,22 +1459,13 @@ class MobileGameConfig extends GameConfig {
     /**
      * @inheritDoc
      */
-    applyTo(obj) {
-        obj.zoom = this.zoom
-        obj.minZoom = this.minZoom
-        obj.maxZoom = this.maxZoom
-        obj.restrictZoomByWindow = this.restrictZoomByWindow
-        obj.stepZoom = this.stepZoom
-        obj.stepZoomByUser = this.stepZoomByUser
-        obj.autoZoom = this.autoZoom
-        obj.autoZoomByUser = this.autoZoomByUser
-        obj.screenOrientation = this.screenOrientation
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
         if (this.showFps !== undefined) obj.showFps = this.showFps
         if (this.showFpsByUser !== undefined) obj.showFpsByUser = this.showFpsByUser
-        return obj
     }
 }
-MobileGameConfig.Config = MobileGameConfig
+MobileGameConfig.linkTo(MobileGameProps)
 
 class FpsTracker {
 
@@ -1648,8 +1659,8 @@ class AudioPlayer {
     }
 
     reset() {
-        this.audio = {}
         this.resetChannels()
+        this.audio = {}
     }
 
     resetChannel(id) {
@@ -1657,6 +1668,7 @@ class AudioPlayer {
         if (channel !== null) {
             channel.reset();
             channel.pause();
+            this.channels[id] = null
         }
     }
 

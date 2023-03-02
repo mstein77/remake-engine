@@ -68,6 +68,30 @@ export class BackgroundPane extends Pane {
             height: this.viewPortDim.y
         }
     }
+
+    addRebuildProps(obj, deep) {
+        obj.color = this.color;
+        obj.images = [];
+        let i = 0;
+        while (i < this.images.length) {
+            const { x, y } = this.imgPos[i]
+            const image = this.images[i]
+            obj.images.push({
+                image: deep ? image.imageResource : image.id,
+                x,
+                y
+            })
+            i++
+        }
+    }
+
+    getDependentImages() {
+        const result = [];
+        for (let image of this.images) {
+            result.push(image)
+        }
+        return result
+    }
 }
 BackgroundPaneConfig.linkTo(BackgroundPane)
 

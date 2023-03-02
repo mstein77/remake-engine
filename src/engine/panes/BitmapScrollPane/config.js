@@ -44,12 +44,6 @@ class BitmapScrollPaneConfig extends Config {
     applyPropsTo(obj) {
         this.applyDefaultKeysTo(obj)
     }
-
-    getDependentModels(model) {
-        return [
-            model.spriteSheet
-        ]
-    }
 }
 
 export {

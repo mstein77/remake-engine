@@ -1,6 +1,6 @@
 import inst from "core/instances"
-import { BitmapPlayer } from "helper/helper"
-import { Model } from "core/classes"
+import { BitmapPlayer, cloneDeep } from "helper/helper"
+import { Model } from "core/model"
 
 class TilesMap extends Model {
 
@@ -241,6 +241,27 @@ class TilesMap extends Model {
                 );
             }
         }
+    }
+
+    getDependentImages() {
+        return [
+            this.tilesImg,
+            this.eventsImg
+        ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.tileBits = this.tileBits;
+        obj.image = !deep ? this.tilesImg.id : this.tilesImg.imageResource
+        if (this.eventsImg && !this.eventsImg.isEmpty())
+            obj.eventsImage = !deep ? this.eventsImg.id : this.eventsImg.imageResource
+        obj.map = cloneDeep(this.map)
+        obj.defaultTile = cloneDeep(this.defaultTile)
+        obj.tiles = cloneDeep(this.tiles)
+        obj.animations = cloneDeep(this.animations)
+        obj.brushes = cloneDeep(this.brushes)
+        obj.events = cloneDeep(this.events)
+        obj.count = this.count
     }
 }
 

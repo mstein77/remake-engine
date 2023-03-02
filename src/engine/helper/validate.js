@@ -264,10 +264,6 @@ const validated = {
 
         if (!(value instanceof config.Config)) {
             const params = [value]
-            if (props.parent) {
-                params.push(props.parent)
-            }
-
             if (isObject(value)) {
                 if (!(value instanceof config.Config)) {
                     value = new config.Config(...params)
@@ -275,26 +271,6 @@ const validated = {
             }
         }
         return value
-
-
-        if (!(value instanceof config)) {
-            const params = [value]
-            if (props.parent) {
-                params.push(props.parent)
-            }
-
-            if (typeof value === 'object') {
-                if (!(value instanceof config.Config)) {
-                    value = new config.Config(...params)
-                }
-            }
-            if (value instanceof config.Config) {
-                value = new config(...params)
-            }
-            if (!(value instanceof config))
-                throw Error('YYY')
-        }
-        return value;
     }
 }
 

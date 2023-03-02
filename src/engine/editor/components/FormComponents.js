@@ -3269,5 +3269,6 @@ export {
     PropSection,
     PositionPicker,
     PositionPickerProp,
-    getDimAttr
+    getDimAttr,
+    useTooltip
 }

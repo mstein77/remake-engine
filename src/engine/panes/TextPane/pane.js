@@ -58,7 +58,7 @@ export class TextPane extends Pane {
         if (!this.fonts.length === 0)
             throw Error('Text block requires a font!');
 
-        const instance = new TextBlock(block, this)
+        const instance = new TextBlock(block, {parent: this})
         if (instance.font === null) {
             instance.update({font: this.fonts[0].id})
         }
@@ -120,6 +120,28 @@ export class TextPane extends Pane {
             height: this.paneDim.y
         }
     }
+
+    getDependentModels() {
+        return [ ...this.fonts, ...this.blocks ]
+    }
+
+    addRebuildProps(obj, deep) {
+        const fonts = []
+        for (const font of this.fonts) {
+            fonts.push(
+                this.getRebuildModel(font, deep)
+            )
+        }
+        obj.fonts = fonts
+        const blocks = []
+        for (const block of this.blocks) {
+            blocks.push(
+                this.getRebuildModel(block, deep)
+            )
+        }
+        obj.blocks = blocks
+    }
+
 
     static padStart(value, char, len) {
         value = '' + value

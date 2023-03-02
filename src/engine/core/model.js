@@ -1,0 +1,392 @@
+import { d, isString, isEqual, isObject } from "helper/helper"
+import inst from "./instances"
+
+/**
+ * A model is a class which is constructed using a corresponding config instance.
+ */
+class Model {
+
+    constructor( input, options = {} ) {
+
+        let { fetch = true } = options
+
+        this.prepareArguments(input, options)
+        fetch = this.supportsLoading(fetch)
+
+        let fetchId = null
+        if (isString(input)) {
+            fetchId = input
+        } else {
+            if (!isObject(input))
+                throw Error(`Cannot instantiate model ${this.constructor.name}`)
+
+            if (input.id && (fetch && inst.RL.hasResource('json', input.id))) {
+                fetchId = input.id
+            } else {
+                if (!(input instanceof this.constructor.Config)) {
+                    input = new this.constructor.Config(input)
+                }
+                const id = input.getId()
+
+                if (fetch && inst.RL.hasResource('json', id)) {
+                    fetchId = id
+                    input.clear()
+                } else {
+                    input.applyTo(this)
+                }
+            }
+        }
+        if (fetchId !== null) {
+            if (!fetch)
+                throw Error(`Instantiation doesn't allow loading resource id "${fetchId}"`)
+
+            if (!inst.RL.hasResource('json', fetchId))
+                throw Error(`Required resource id "${fetchId}" not found`)
+
+            input = inst.RL.getJsonResource(fetchId)
+            input = new this.constructor.Config(input)
+            input.applyTo(this)
+        }
+    }
+
+    hasAutoId() {
+        return this.id && this.id.startsWith('_auto_')
+    }
+
+    supportsLoading(value) {
+        return value
+    }
+
+    prepareArguments() {}
+
+    /**
+     * Returns a JSON object which builds the same configuration given in the base model (or the )
+     * If the deep flag is set, all dependent resources will also be represented as rebuild JSON, otherwise
+     * dependent resources will only be linked via ids.
+     *
+     * @param {boolean}  deep
+     *
+     * @returns {object}
+     *
+     * model.getRebuildJson(deep = true, base = null)
+     */
+    getRebuildJson(deep = true) {
+        const obj = {id: this.id, version: this.config.getVersion() }
+        this.addRebuildProps(obj, deep)
+
+        // remove defaults
+        const defaults = this.config.getDefaultProps()
+        for (const [ key, value ] of Object.entries(defaults)) {
+            if (key in obj && isEqual(value, obj[key])) {
+                delete obj[key]
+            }
+        }
+        return obj
+    }
+
+    /**
+     * Adds all properties to the given rebuild JSON object, which rebuild the given base model and returns it.
+     * Properties holding other configurables will only be converted to rebuild JSONs when the deep flag is set,
+     * otherwise these will only be referenced via their id
+     *
+     * @param {object} obj
+     * @param {boolean} deep
+     *
+     * @returns {object}
+     *
+     * model.addRebuildProps(...)
+     */
+    addRebuildProps(obj, deep) {
+        return obj
+    }
+
+    /**
+     * Returns an object holding all resources under the "resources" key and all
+     * dependencies under the "dependencies" for the given (or initial) model.
+     *
+     * Resources are returned as objects { id, type, data } and dependencies are
+     * given as resource pair strings "<type>:<id>"
+     *
+     * @param {object} model
+     *
+     * @returns {object}
+     */
+    getResourcesAndDependencies() {
+        return {
+            resources: this.getResources(),
+            dependencies: this.getDependencies()
+        }
+    }
+
+    /**
+     * Returns an object mapping the direct and indirect json resources of the
+     * given (or initial) model to direct dependent resource ids
+     *
+     * Each resource is returned as resource pair string "<type>:<id>"
+     *
+     * @returns {object}
+     */
+    getDependencies() {
+        const dependencies = {}
+        this.addDependencies(dependencies)
+        return dependencies
+    }
+
+    /**
+     * Adds all direct and indirect resource ids the given (or initial) model
+     * is dependant from to the dependencies object and return it
+     *
+     * Each resource is returned as resource pair string "<type>:<id>"
+     *
+     * @param {object} dependencies
+     *
+     * @returns {object}
+     */
+    addDependencies(dependencies) {
+        const dependentIds = []
+        const isChildModel = this instanceof ChildModel
+        const images = this.getDependentImages()
+        for (const image of images) {
+            if (!image) continue
+            dependentIds.push('image:' + image.id)
+        }
+        const audios = this.getDependentAudio()
+        for (const audio of audios) {
+            if (!audio) continue
+            dependentIds.push('audio:' + audio.id)
+        }
+        const depModels = this.getDependentModels()
+        for (const depModel of depModels) {
+            if (!depModel) continue
+            if (!(depModel instanceof ChildModel)) {
+                dependentIds.push('json:' + depModel.id)
+            }
+            depModel.addDependencies(dependencies)
+        }
+        if (!isChildModel)
+            dependencies['json:' + this.id] = dependentIds
+
+        return dependencies
+    }
+
+    /**
+     * Returns an array holding all resources of the given (or initial) model
+     * Each resource is returned as object { id, type, data }
+     *
+     * @returns {array}
+     */
+    getResources() {
+        const resources = []
+        this.addDependentImageResources(resources)
+        this.addDependentAudioResources(resources)
+        this.addDependentJsonResources(resources)
+        return resources
+    }
+
+    /**
+     * Returns an array holding image resources of the given (or initial) model
+     * Each resource is returned as object { id, type, data }
+     *
+     * @returns {array}
+     */
+    getImageResources(model) {
+        const images = []
+        this.addDependentImageResources(images)
+        return images
+    }
+
+    /**
+     * Returns an array holding all image resource ids which are directly or indirectly
+     * dependent from the given (or inital) model
+     *
+     * @returns {object}
+     */
+    getImageResourceIds() {
+        const images = []
+        this.addDependentImageResources(images, true)
+        return images
+    }
+
+    /**
+     * Returns an array with all directly dependent image instances of the given model.
+     * The result can include falsy values which must be filtered out (which allows to
+     * return model properties here regardless if they are set or not)
+     *
+     * @returns {array}
+     */
+    getDependentImages() {
+        return []
+    }
+
+    /**
+     * Adds all directly and indirectly dependant image resources of the given
+     * model to the given result array and returns them. If the idOnly argument is true
+     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     *
+     * @param {array} result
+     * @param {boolean} idOnly
+     */
+    addDependentImageResources(result, idOnly = false) {
+        const images = this.getDependentImages()
+        for (const image of images) {
+            if (!image || !image.id || image.isEmpty()) continue
+            if (idOnly) {
+                result.push(image.id)
+            } else {
+                result.push({ id: image.id, data: image, type: 'image' })
+            }
+        }
+        const depModels = this.getDependentModels()
+        for (const depModel of depModels) {
+            if (!depModel) continue
+            depModel.addDependentImageResources(result, idOnly)
+        }
+    }
+
+    /**
+     * Returns an array holding all audio resource ids which are directly or indirectly
+     * dependent from the given (or inital) model
+     *
+     * @returns {object}
+     */
+    getAudioResourceIds(model) {
+        const ids = []
+        this.addDependentAudioResources(ids, true)
+        return ids
+    }
+
+    /**
+     * Returns an array with all directly dependent audio instances of the given model.
+     * The result can include falsy values which must be filtered out (which allows to
+     * return model properties here regardless if they are set or not)
+     *
+     * @returns {array}
+     */
+    getDependentAudio() {
+        return []
+    }
+
+    /**
+     * Adds all directly and indirectly dependant audio resources of the given
+     * model to the given result array and returns them. If the idOnly argument is true
+     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     *
+     * @param {array} result
+     * @param {boolean} idOnly
+     */
+    addDependentAudioResources(result, idOnly = false) {
+        const audios = this.getDependentAudio()
+        for (const audio of audios) {
+            if (!audio) continue
+            if (idOnly) {
+                result.push(audio.id)
+            } else {
+                const { id, data } = audio
+                result.push({ id, data, type: 'audio' })
+            }
+
+        }
+        const depModels = this.getDependentModels()
+        for (const depModel of depModels) {
+            if (!depModel) continue
+            depModel.addDependentAudioResources(result, idOnly)
+        }
+    }
+
+    /**
+     * Returns an array with all directly dependent model instances of the given model.
+     * The result can include falsy values which must be filtered out (which allows to
+     * return model properties here regardless if they are set or not)
+     *
+     * @returns {array}
+     */
+    getDependentModels() {
+        return []
+    }
+
+    /**
+     * Adds all directly and indirectly dependant model resources of the given
+     * model to the given result array and returns them. If the idOnly argument is true
+     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     *
+     * @param {array} result
+     * @param {boolean} idOnly
+     */
+    addDependentJsonResources(result, idOnly = false) {
+        if (!(this instanceof ChildModel)) {
+            result.push(
+                idOnly ? this.id : {
+                    id: this.id,
+                    type: 'json',
+                    data: this.getRebuildJson(false)
+                }
+            )
+        }
+        const depModels = this.getDependentModels()
+        for (const depModel of depModels) {
+            if (!depModel) continue
+            depModel.addDependentJsonResources(result, idOnly)
+        }
+    }
+
+    /**
+     * Returns an array holding all json resource ids which are directly or indirectly
+     * dependent from the given (or inital) model
+     *
+     * @param {object} model
+     * @returns {object}
+     */
+    getJsonResourceIds() {
+        const ids = []
+        this.addDependentJsonResources(ids, true)
+        return ids
+    }
+
+    /**
+     * Returns an array holding the json resources of the given (or initial) model
+     * Each resource is returned as object { id, type, data }
+     *
+     * @returns {array}
+     */
+    getJsonResources(model) {
+        const resources = []
+        this.addDependentJsonResources(resources)
+        return resources
+    }
+
+    getRebuildModel(model, deep) {
+        if (!deep && !(model instanceof ChildModel))
+            return model.id
+
+        return model.getRebuildJson(deep)
+    }
+
+    getRebuildImage(modelImage, deep) {
+        return deep ? modelImage.imageResource : modelImage.id
+    }
+
+    getClone() {
+        return this.config.getModelInstance(
+            this.getRebuildJson(true), {fetch: false}
+        )
+    }
+}
+
+class ChildModel extends Model {
+
+    prepareArguments(input, { parent }) {
+        if (!parent)
+           throw Error(`A child model must be instantiated with a parent model but no was given`)
+
+        this.parent = parent
+    }
+
+    supportsLoading(value) {
+        return false
+    }
+}
+
+export {
+    Model,
+    ChildModel
+}

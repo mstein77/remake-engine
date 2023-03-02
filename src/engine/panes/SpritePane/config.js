@@ -290,104 +290,6 @@ class SpriteSheetConfig extends Config {
             )
         )
     }
-
-    getDependentImages(model) {
-        return [ model.sheet ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        const rawSprites = {}
-        const seq = {}
-        for (const [ id, sprite ] of toPairs(base.sprites)) {
-            if (sprite.transforms) continue
-            const matches = id.match(/^(.*[^0-9])([0-9])+$/)
-            if (matches !== null) {
-                const [, name, no] = matches
-                if (!seq[name]) seq[name] = []
-                seq[name].push(id)
-            } else {
-                rawSprites[id] = cloneDeep(sprite)
-            }
-        }
-        for (const [ name, sprites ] of toPairs(seq)) {
-            let no = 1
-            const found = []
-            const off = []
-            let compDim = null
-            while (sprites.includes(name + no)) {
-                const sprite = base.sprites[name + no]
-                if (compDim) {
-                    const dim = sprite.dim
-                    if (compDim.x !== dim.x || compDim.y !== dim.y) {
-                        no++
-                        continue
-                    }
-                } else {
-                    compDim = sprite.dim
-                }
-                found.push(name + no)
-                off.push(sprite.off)
-                no++
-            }
-            if (found.length > 1) {
-                const sprite = cloneDeep(base.sprites[name + '1'])
-                sprite.dim.x *= found.length
-                sprite.off = off
-                rawSprites[name] = sprite
-            }
-            const notFound = found.length <= 1 ? sprites : without(sprites, found)
-            while (notFound.length) {
-                const spriteId = notFound.pop()
-                rawSprites[spriteId] = cloneDeep(base.sprites[spriteId])
-            }
-        }
-        const { id2pos, ...rect } = this.minRectPositions(rawSprites)
-        const sprites = {}
-        const minImage = (new RawAppliedImage(base.sheet.id)).resize(rect.width, rect.height)
-        for (const [ id, pos ] of toPairs(id2pos)) {
-            const sprite = rawSprites[id]
-            const dim = sprite.dim
-            const offs = isArray(sprite.off) ? sprite.off : [sprite.off]
-            const dimX = dim.x / offs.length
-            let posX = pos.x
-            for (const off of offs) {
-                minImage.ctx.drawImage(
-                    base.sheet.canvas,
-                    off.x, off.y,
-                    dimX, dim.y,
-                    posX, pos.y,
-                    dimX, dim.y
-                )
-                posX += dimX
-            }
-            sprite.off.x = pos.x
-            sprite.off.y = pos.y
-            const rect = [ pos.x, pos.y, dimX, sprite.dim.y ]
-            if (offs.length > 1) {
-                rect.push(offs.length)
-            }
-            sprites[id] = rect
-        }
-        const animations = {}
-        for (const [ id, animation ] of toPairs(base.animations)) {
-            if (animation.transforms) continue
-            const { frames, end, dir, speed } = animation
-            const newFrames = []
-            for (const frameObj of frames) {
-                const { id, duration, padding } = frameObj
-                newFrames.push(
-                    (duration === 1 && padding.x === 0 && padding.y === 0) ?
-                        id : cloneDeep(frameObj)
-                )
-            }
-            animations[id] =
-                { frames: newFrames, end, dir, speed }
-        }
-        obj.image = this.getRebuildImage(minImage, deep)
-        obj.sprites = sprites
-        obj.animations = animations
-        obj.transforms = cloneDeep(base.transforms)
-    }
 }
 SpriteSheetConfig.linkTo(SpriteSheet)
 
@@ -410,17 +312,6 @@ class SpritePaneConfig extends Config {
 
     setSprites(value) {
         this.sprites = validated.object(value)
-    }
-
-    getDependentModels(model) {
-        return [
-            model.spriteSheet
-        ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        obj.spriteSheet = this.getRebuildModel(base.spriteSheet, deep)
-        obj.sprites = {}
     }
 }
 

@@ -1,4 +1,4 @@
-import { Model } from "../core/classes.js";
+import { Model } from "core/model"
 
 class Pane extends Model {
 

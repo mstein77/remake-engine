@@ -175,6 +175,18 @@ class TilesPane extends Pane {
 
         return scrolled;
     }
+
+    getDependentModels() {
+        return [
+            this.tilesMap
+        ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.tilesMap = !deep ? this.tilesMap.id : this.tilesMap.getRebuildJson(true)
+        obj.endlessX = this.endlessX
+        obj.endlessY = this.endlessY
+    }
 }
 TilesPaneConfig.linkTo(TilesPane)
 

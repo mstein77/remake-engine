@@ -123,27 +123,6 @@ class TilesMapConfig extends Config {
     setBrushes(value) {
         this.brushes = validated.object(value)
     }
-
-    getDependentImages(model) {
-        return [
-            model.tilesImg,
-            model.eventsImg
-        ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        obj.tileBits = base.tileBits;
-        obj.image = !deep ? base.tilesImg.id : base.tilesImg.imageResource
-        if (base.eventsImg && !base.eventsImg.isEmpty())
-            obj.eventsImage = !deep ? base.eventsImg.id : base.eventsImg.imageResource
-        obj.map = cloneDeep(base.map)
-        obj.defaultTile = cloneDeep(base.defaultTile)
-        obj.tiles = cloneDeep(base.tiles)
-        obj.animations = cloneDeep(base.animations)
-        obj.brushes = cloneDeep(base.brushes)
-        obj.events = cloneDeep(base.events)
-        obj.count = base.count
-    }
 }
 TilesMapConfig.linkTo(TilesMap)
 
@@ -176,17 +155,6 @@ class BufferedTilesPaneConfig extends Config {
 
     setEndlessY(value) {
         this.endlessY = validated.bool(value)
-    }
-
-    getDependentModels(model) {
-        return [ model.tilesMap ]
-    }
-
-    addRebuildProps(obj, deep, base) {
-        obj.tilesMap = !deep ? base.tilesMap.id : base.tilesMap.config.getRebuildJson(true, base.tilesMap)
-        obj.maxSpeed = base.maxSpeed
-        obj.endlessX = base.endlessX
-        obj.endlessY = base.endlessY
     }
 }
 

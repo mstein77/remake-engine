@@ -579,6 +579,17 @@ export class SpritePane extends Pane {
             height: this.viewPortDim.y
         }
     }
+
+    getDependentModels() {
+        return [
+            this.spriteSheet
+        ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.spriteSheet = this.getRebuildModel(this.spriteSheet, deep)
+        obj.sprites = {}
+    }
 }
 SpritePaneConfig.linkTo(SpritePane)
 

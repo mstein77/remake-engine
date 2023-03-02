@@ -1,7 +1,8 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
-import { BitmapPlayer, d } from "helper/helper"
-import { Model } from "core/classes"
+import { BitmapPlayer, cloneDeep, d, isArray, toPairs, without } from "helper/helper"
+import { RawAppliedImage } from "core/classes"
+import { Model } from "core/model"
 
 class SpriteSheet extends Model {
 
@@ -22,32 +23,12 @@ class SpriteSheet extends Model {
     }
 
     addTransformedSprite(id, base, transformers) {
-/*
-        this.assertSprite(base);
-        this.customImages.push({
-            id,
-            base,
-            transformers
-        });
-
- */
     }
 
     addTransformedSprites(postfix, baseIds, transformers) {
-/*
-        for (let id of baseIds) {
-            this.addTransformedSprite(id + postfix, id, transformers);
-        }
-
- */
     }
 
     addTransformedSpritesFromObj(transformers, obj) {
-/*
-        for (let target in obj) {
-            this.addTransformedSprite(target, obj[target], transformers);
-        }
- */
     }
 
     addTransformedAnimation(id, base, transformers, sync = false, speed = 1) {
@@ -78,98 +59,13 @@ class SpriteSheet extends Model {
         }
     }
 
-    /*
-        build() {
-            for (let image of this.customImages) {
-                let base = this.getSprite(image.base);
-                const trans = inst.filterer.getCanvasWithFiltersApplied(
-                    image.transformers,
-                    base.img ? base.img : this.sheet,
-                    base.off.x,
-                    base.off.y,
-                    base.dim.x,
-                    base.dim.y
-                );
-                const sprite = this.addSprite(image.id, 0, 0, base.dim.x, base.dim.y);
-                sprite.img = trans[0];
-            }
-    }
-     */
-
     addSprite(name, offX, offY, width, height) {
-/*
-        const sprite = {
-            off: {x: offX, y: offY},
-            dim: {x: width, y: height}
-        };
-        this.sprites[name] = sprite;
-        return sprite;
-
- */
     }
 
     addSpriteSeq(name, offX, offY, width, height, length, spacing = 0) {
-/*
-        for (let i = 1; i <= length; i++) {
-            this.addSprite(name + i, offX, offY, width, height);
-            offX += width + spacing;
-        }
- */
     }
 
     addAnimation(name, frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, sync = false, speed = 1) {
-/*
-        let maxX = 0;
-        let maxY = 0;
-        let sameSize = true;
-        let dims = [];
-        const frameDetails = [];
-        for (let rawFrame of frames) {
-            const frame = (typeof rawFrame === 'string' || rawFrame instanceof String) ?
-                {
-                    duration: 1,
-                    id: rawFrame,
-                    padding: {x: 0, y: 0}
-                } : rawFrame;
-
-            const dim = this.getSpriteDim(frame.id);
-            maxX = Math.max(maxX, dim.x);
-            maxY = Math.max(maxY, dim.y);
-            sameSize = sameSize && (maxX === dim.x || maxY === dim.y);
-            dims.push(dim);
-            frameDetails.push(frame);
-        }
-
-        const animation = {
-            sync,
-            dim: {x: maxX, y: maxY},
-            frames: frameDetails,
-            speed,
-            dir,
-            end
-        };
-
-        if (!sameSize) {
-            for (let i = 0; i < dims.length; i++) {
-                const frame = animation.frames[i];
-                const dim = dims[i];
-                // TODO multiple auto padding strategies per axis
-                // (V-CENTERING, V-TOP, V-BOTTOM, H-CENTERING, H-LEFT, H-RIGHT)
-                const offX = (maxX - dim.x) >> 1;
-                const offY = (maxY - dim.y) >> 1;
-                frame.padding = {x: offX, y: offY};
-            }
-        }
-
-        this.animations[name] = animation;
-
-        if (sync) {
-            const player = new BitmapPlayer();
-            player.loadAnimation(animation.frames, end, dir, speed);
-            this.players[name] = player;
-        }
-
- */
     }
 
     isAnimation(name) {
@@ -260,6 +156,104 @@ class SpriteSheet extends Model {
             width, height
         );
     };
+
+    getDependentImages() {
+        return [ this.sheet ]
+    }
+
+    addRebuildProps(obj, deep) {
+        const rawSprites = {}
+        const seq = {}
+        for (const [ id, sprite ] of toPairs(this.sprites)) {
+            if (sprite.transforms) continue
+            const matches = id.match(/^(.*[^0-9])([0-9])+$/)
+            if (matches !== null) {
+                const [, name, no] = matches
+                if (!seq[name]) seq[name] = []
+                seq[name].push(id)
+            } else {
+                rawSprites[id] = cloneDeep(sprite)
+            }
+        }
+        for (const [ name, sprites ] of toPairs(seq)) {
+            let no = 1
+            const found = []
+            const off = []
+            let compDim = null
+            while (sprites.includes(name + no)) {
+                const sprite = this.sprites[name + no]
+                if (compDim) {
+                    const dim = sprite.dim
+                    if (compDim.x !== dim.x || compDim.y !== dim.y) {
+                        no++
+                        continue
+                    }
+                } else {
+                    compDim = sprite.dim
+                }
+                found.push(name + no)
+                off.push(sprite.off)
+                no++
+            }
+            if (found.length > 1) {
+                const sprite = cloneDeep(this.sprites[name + '1'])
+                sprite.dim.x *= found.length
+                sprite.off = off
+                rawSprites[name] = sprite
+            }
+            const notFound = found.length <= 1 ? sprites : without(sprites, found)
+            while (notFound.length) {
+                const spriteId = notFound.pop()
+                rawSprites[spriteId] = cloneDeep(this.sprites[spriteId])
+            }
+        }
+        const { id2pos, ...rect } = this.config.minRectPositions(rawSprites)
+        const sprites = {}
+        const minImage = (new RawAppliedImage(this.sheet.id)).resize(rect.width, rect.height)
+        for (const [ id, pos ] of toPairs(id2pos)) {
+            const sprite = rawSprites[id]
+            const dim = sprite.dim
+            const offs = isArray(sprite.off) ? sprite.off : [sprite.off]
+            const dimX = dim.x / offs.length
+            let posX = pos.x
+            for (const off of offs) {
+                minImage.ctx.drawImage(
+                    this.sheet.canvas,
+                    off.x, off.y,
+                    dimX, dim.y,
+                    posX, pos.y,
+                    dimX, dim.y
+                )
+                posX += dimX
+            }
+            sprite.off.x = pos.x
+            sprite.off.y = pos.y
+            const rect = [ pos.x, pos.y, dimX, sprite.dim.y ]
+            if (offs.length > 1) {
+                rect.push(offs.length)
+            }
+            sprites[id] = rect
+        }
+        const animations = {}
+        for (const [ id, animation ] of toPairs(this.animations)) {
+            if (animation.transforms) continue
+            const { frames, end, dir, speed } = animation
+            const newFrames = []
+            for (const frameObj of frames) {
+                const { id, duration, padding } = frameObj
+                newFrames.push(
+                    (duration === 1 && padding.x === 0 && padding.y === 0) ?
+                        id : cloneDeep(frameObj)
+                )
+            }
+            animations[id] =
+                { frames: newFrames, end, dir, speed }
+        }
+        obj.image = this.getRebuildImage(minImage, deep)
+        obj.sprites = sprites
+        obj.animations = animations
+        obj.transforms = cloneDeep(this.transforms)
+    }
 }
 
 export {

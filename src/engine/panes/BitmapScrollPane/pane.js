@@ -216,6 +216,12 @@ export class BitmapScrollPane extends Pane {
             height: this.paneDim.y
         }
     }
+
+    getDependentModels() {
+        return [
+            this.spriteSheet
+        ]
+    }
 }
 BitmapScrollPaneConfig.linkTo(BitmapScrollPane)
 
