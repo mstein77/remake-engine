@@ -1,18 +1,58 @@
 import inst from "core/instances"
 import { getCanvasForDim } from "helper/helper"
 import { DivContainer } from "core/classes"
-import { LinearGradientPaneConfig } from "./config"
 import { Pane } from "../classes"
+import { validated } from "helper/validate"
+import { Config } from "core/config"
+
+class LinearGradientPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            colorStops: [],
+            axis: 'Y'
+        }
+    }
+
+    getFieldProps() {
+        return {
+            axis: {values: ['X', 'Y']}
+        }
+    }
+
+    setAxis(value) {
+        this.axis = validated.string(value, this.getFieldProp('axis'))
+    }
+
+    setColorStops(value) {
+        this.colorStops = this.validateColorStops(value)
+    }
+
+    validateColorStops(value) {
+        validated.array(value)
+        if (value.length % 2 == 0)
+            throw Error('ColorStops need to be in the format: [<color>, <len>, <color>, ..., <len>, <color>]')
+
+        const colorStops = []
+        for (let i = 0; i < value.length; i += 2) {
+            colorStops.push([value[i], (i === value.length - 1) ? 0 : value[i + 1]])
+        }
+        return colorStops
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+}
 
 /**
  * TODO:
  *   - endless Scrolling
  *   - Use CSS Background-Property?
  */
-export class LinearGradientPane extends Pane {
+export class LinearGradientPaneImpl extends Pane {
 
-    constructor(input) {
-        super(input)
+    finalizeApply() {
         this.viewPosition = null;
         this.viewPositionMax = null;
         this.isHorizontal = (this.axis === 'X');
@@ -182,6 +222,13 @@ export class LinearGradientPane extends Pane {
         }
     }
 }
-LinearGradientPaneConfig.linkTo(LinearGradientPane)
 
-inst.paneRegistry.add('LinearGradientPane', LinearGradientPane)
+const type = Pane.createType(
+    'LinearGradientPane',
+    LinearGradientPane,
+    LinearGradientPaneConfig
+)
+
+export function LinearGradientPane(...args) {
+    return LinearGradientPaneImpl.newInst(type, ...args)
+}

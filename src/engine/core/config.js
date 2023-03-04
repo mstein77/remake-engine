@@ -1,6 +1,5 @@
 import { d, isObject, without, getClonedProp, toKeys, toPairs } from "helper/helper"
 import { validated } from "helper/validate"
-import { ChildModel } from "./model"
 import inst from "./instances"
 
 /**
@@ -12,12 +11,6 @@ import inst from "./instances"
  *
  */
 class Config {
-
-    static linkTo(modelCls) {
-        modelCls.Config = this
-        this.isChild = modelCls.prototype instanceof ChildModel
-        this.factory = modelCls
-    }
 
     /**
      * Creates a new configuration object and initializes it with values in the given JSON object
@@ -220,7 +213,7 @@ class Config {
      * @returns {string}
      */
     getType() {
-        return Object.getPrototypeOf(this).constructor.name
+        return this.constructor.typeName
     }
 
     /**
@@ -235,7 +228,7 @@ class Config {
     }
 
     getAutoId() {
-        return '_auto_' + inst.autoIds.getNewId(this.constructor.factory.name)
+        return '_auto_' + inst.autoIds.getNewId(this.getType())
     }
 
     getId() {

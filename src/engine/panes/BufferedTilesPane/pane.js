@@ -1,21 +1,51 @@
 import inst from "core/instances"
-import { getCanvasForDim } from "helper/helper"
+import { d, getCanvasForDim } from "helper/helper"
 import { BufferedCanvasContainer } from "core/classes"
-import { BufferedTilesPaneConfig } from "./config"
 import { Pane } from "../classes"
-import {TilesPane} from "../TilesPane/pane.js";
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { TilesMap } from "./models"
+
+class BufferedTilesPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            maxSpeed: 4,
+            endlessX: false,
+            endlessY: false,
+            tilesMap: undefined
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+
+    setMaxSpeed(value) {
+        this.maxSpeed = validated.int(value)
+    }
+
+    setTilesMap(value) {
+        this.tilesMap = validated.config(TilesMap, value)
+    }
+
+    setEndlessX(value) {
+        this.endlessX = validated.bool(value)
+    }
+
+    setEndlessY(value) {
+        this.endlessY = validated.bool(value)
+    }
+}
 
 /**
  * TODO:
  *   - Filters
  *   - TileStates
  */
-export class BufferedTilesPane extends Pane {
+class BufferedTilesPaneImpl extends Pane {
 
-    constructor(input) {
-        super(input)
-
-        // TODO solve instanceof problem due to webpack build
+    finalizeApply() {
         this.isBufferedTilesPane = true
         this.defaultTile = null
         this.state = -1
@@ -772,6 +802,13 @@ export class BufferedTilesPane extends Pane {
         obj.endlessY = this.endlessY
     }
 }
-BufferedTilesPaneConfig.linkTo(BufferedTilesPane)
 
-inst.paneRegistry.add('BufferedTilesPane', BufferedTilesPane, {editable: true})
+const type = Pane.createType(
+    {name: 'BufferedTilesPane', editor: true},
+    BufferedTilesPane,
+    BufferedTilesPaneConfig
+)
+
+export function BufferedTilesPane(...args) {
+    return BufferedTilesPaneImpl.newInst(type, ...args)
+}

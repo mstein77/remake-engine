@@ -7,7 +7,7 @@ import { Checkbox, Input, InputProp, KeyInput, NumberProp, RadioProp, SelectProp
 import { EntityStack, EntityStackSections, EntityManager } from "editor/components/EntityComponents";
 import { AssignIndex, ColorIndex } from "editor/classes/EntityIndex"
 import { FontIndex, CharIndex, TextBlockIndex } from "./classes"
-import { FontMap } from "../classes"
+import { FontMap } from "../models"
 
 function FontProperties({ font, reserved, save, close }) {
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select Size');

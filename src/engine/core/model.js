@@ -6,13 +6,50 @@ import inst from "./instances"
  */
 class Model {
 
-    constructor( input, options = {} ) {
+    static createType(nameOrInfo, factory, config, subtype = false) {
+        if (isString(nameOrInfo)) {
+            nameOrInfo = { name: nameOrInfo }
+        }
+        const { name } = nameOrInfo
+        if (!name)
+            throw Error(`Name required for creating a new model type but not given!`)
 
-        let { fetch = true } = options
+        if (name.endsWith('Pane'))
+            inst.paneRegistry.add(name, factory, {editable: !!nameOrInfo.editor})
 
-        this.prepareArguments(input, options)
-        fetch = this.supportsLoading(fetch)
+        factory.Config = config
+        config.factory = factory
+        config.typeName = name
+        config.isChild = subtype
+        return {
+            name,
+            factory,
+            config,
+            subtype
+        }
+    }
 
+    static createSubType(name, factory, config) {
+        return this.createType(name, factory, config, true)
+    }
+
+    static newInst(type, input, options = {}) {
+        return new this(input, { ...options, type })
+    }
+
+    constructor( input, options ) {
+
+        let { fetch = true, type } = options
+        this._type = type
+
+        if (this.isChild) {
+            const { parent } = options
+            if (!parent)
+                throw Error(`A child model must be instantiated with a parent model but no was given`)
+
+            this.parent = parent
+            fetch = false
+        }
         let fetchId = null
         if (isString(input)) {
             fetchId = input
@@ -23,8 +60,8 @@ class Model {
             if (input.id && (fetch && inst.RL.hasResource('json', input.id))) {
                 fetchId = input.id
             } else {
-                if (!(input instanceof this.constructor.Config)) {
-                    input = new this.constructor.Config(input)
+                if (!(input instanceof type.config)) {
+                    input = new type.config(input)
                 }
                 const id = input.getId()
 
@@ -44,20 +81,25 @@ class Model {
                 throw Error(`Required resource id "${fetchId}" not found`)
 
             input = inst.RL.getJsonResource(fetchId)
-            input = new this.constructor.Config(input)
+            input = new type.config(input)
             input.applyTo(this)
         }
+        this.finalizeApply()
+    }
+
+    finalizeApply() {}
+
+    get typeName() {
+        return this._type.name
+    }
+
+    get isChild() {
+        return this._type.subtype
     }
 
     hasAutoId() {
         return this.id && this.id.startsWith('_auto_')
     }
-
-    supportsLoading(value) {
-        return value
-    }
-
-    prepareArguments() {}
 
     /**
      * Returns a JSON object which builds the same configuration given in the base model (or the )
@@ -144,7 +186,6 @@ class Model {
      */
     addDependencies(dependencies) {
         const dependentIds = []
-        const isChildModel = this instanceof ChildModel
         const images = this.getDependentImages()
         for (const image of images) {
             if (!image) continue
@@ -158,12 +199,12 @@ class Model {
         const depModels = this.getDependentModels()
         for (const depModel of depModels) {
             if (!depModel) continue
-            if (!(depModel instanceof ChildModel)) {
+            if (!depModel.isChild) {
                 dependentIds.push('json:' + depModel.id)
             }
             depModel.addDependencies(dependencies)
         }
-        if (!isChildModel)
+        if (!this.isChild)
             dependencies['json:' + this.id] = dependentIds
 
         return dependencies
@@ -313,7 +354,7 @@ class Model {
      * @param {boolean} idOnly
      */
     addDependentJsonResources(result, idOnly = false) {
-        if (!(this instanceof ChildModel)) {
+        if (!this.isChild) {
             result.push(
                 idOnly ? this.id : {
                     id: this.id,
@@ -355,7 +396,7 @@ class Model {
     }
 
     getRebuildModel(model, deep) {
-        if (!deep && !(model instanceof ChildModel))
+        if (!deep && !model.isChild)
             return model.id
 
         return model.getRebuildJson(deep)
@@ -372,21 +413,6 @@ class Model {
     }
 }
 
-class ChildModel extends Model {
-
-    prepareArguments(input, { parent }) {
-        if (!parent)
-           throw Error(`A child model must be instantiated with a parent model but no was given`)
-
-        this.parent = parent
-    }
-
-    supportsLoading(value) {
-        return false
-    }
-}
-
 export {
-    Model,
-    ChildModel
+    Model
 }

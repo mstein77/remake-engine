@@ -1,11 +1,12 @@
-import inst from "core/instances"
 import { Pane } from "panes/classes"
-import { EmptyPaneConfig } from "./config"
+import { Config } from "core/config"
 
-export class EmptyPane extends Pane {
+class EmptyPaneConfig extends Config {}
 
-    constructor() {
-        super({id: 'empty'})
+class EmptyPaneImpl extends Pane {
+
+    constructor(input, options) {
+        super({id: 'empty'}, options)
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -20,6 +21,13 @@ export class EmptyPane extends Pane {
         this.dirty = false;
     }
 }
-EmptyPaneConfig.linkTo(EmptyPane)
 
-inst.paneRegistry.add('EmptyPane', EmptyPane)
+const type = Pane.createType(
+    'EmptyPane',
+    EmptyPane,
+    EmptyPaneConfig
+)
+
+export function EmptyPane(...args) {
+    return EmptyPaneImpl.newInst(type, ...args)
+}

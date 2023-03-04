@@ -5,7 +5,7 @@ class Pane extends Model {
     getEditorResources() {
         return {
             id: this.id,
-            type: this.constructor.name,
+            type: this.typeName,
             elem: this.getPreview ? this.getPreview() : null,
             dim: this.viewPortDim,
             pane: this

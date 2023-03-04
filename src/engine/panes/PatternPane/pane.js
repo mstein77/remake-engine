@@ -1,13 +1,43 @@
 import inst from "core/instances"
-import { PatternPaneConfig } from "./config"
 import { d, getCanvasForDim } from "helper/helper"
 import { ImageContainer } from "core/classes"
 import { Pane } from "../classes"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { AppliedImage } from "core/classes"
 
-export class PatternPane extends Pane {
+class PatternPaneConfig extends Config {
 
-    constructor(input) {
-        super(input)
+    getDefaults() {
+        return {
+            image: undefined,
+            repeat: 'repeat'
+        }
+    }
+
+    getFieldProps() {
+        return {
+            repeat: {values: ['repeat', 'repeat-x', 'repeat-y', 'no-repeat'], null: true}
+        }
+    }
+
+    setImage(value) {
+        this.image = validated.imageResource(value)
+    }
+
+    setRepeat(value) {
+        this.repeat = validated.string(value, this.getFieldProp('repeat'))
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        model.image = new AppliedImage(this.image)
+    }
+}
+
+class PatternPaneImpl extends Pane {
+
+    finalizeApply() {
         this.repeatX = [null, '', 'repeat', 'repeat-x'].includes(this.repeat)
         this.repeatY = [null, '', 'repeat', 'repeat-y'].includes(this.repeat)
     }
@@ -98,6 +128,13 @@ export class PatternPane extends Pane {
         return [this.image]
     }
 }
-PatternPaneConfig.linkTo(PatternPane)
 
-inst.paneRegistry.add('PatternPane', PatternPane)
+const type = Pane.createType(
+    'PatternPane',
+    PatternPane,
+    PatternPaneConfig
+)
+
+export function PatternPane(...args) {
+    return PatternPaneImpl.newInst(type, ...args)
+}

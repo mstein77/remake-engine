@@ -1005,7 +1005,7 @@ function getAreaNode(nodes, panes, items, props, level = 1) {
             nodes.push({
                 level,
                 type: 'pane',
-                name: Object.getPrototypeOf(pane).constructor.name,
+                name: pane.typeName,
                 width: pane.viewPortDim.x,
                 height: pane.viewPortDim.y,
                 offX: props.x,

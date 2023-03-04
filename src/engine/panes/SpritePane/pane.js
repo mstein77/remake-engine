@@ -1,14 +1,36 @@
 import { COLLISION } from "core/const"
 import { BufferedCanvasContainer, PlayerProxy } from "core/classes"
-import { SpritePaneConfig } from "./config"
 import { d } from "helper/helper"
 import { Pane } from "../classes"
-import inst from "core/instances"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { SpriteSheet } from "./models"
 
-export class SpritePane extends Pane {
+class SpritePaneConfig extends Config {
 
-    constructor(input) {
-        super(input)
+    getDefaults() {
+        return {
+            spriteSheet: undefined,
+            sprites: {}
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+
+    setSpriteSheet(value) {
+        this.spriteSheet = validated.config(SpriteSheet, value)
+    }
+
+    setSprites(value) {
+        this.sprites = validated.object(value)
+    }
+}
+
+class SpritePaneImpl extends Pane {
+
+    finalizeApply() {
         this.actorId = null;
         this.groups = {};
         this.bufferClearRects = {
@@ -591,6 +613,13 @@ export class SpritePane extends Pane {
         obj.sprites = {}
     }
 }
-SpritePaneConfig.linkTo(SpritePane)
 
-inst.paneRegistry.add('SpritePane', SpritePane, {editable: true})
+const type = Pane.createType(
+    {name: 'SpritePane', editor: true},
+    SpritePane,
+    SpritePaneConfig
+)
+
+export function SpritePane(...args) {
+    return SpritePaneImpl.newInst(type, ...args)
+}

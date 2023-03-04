@@ -1,9 +1,60 @@
 import inst from "core/instances"
-import { TextPaneConfig } from "./config"
 import { d, drawTextBlocks, getTextBlockImage } from "helper/helper"
 import { CanvasContainer } from "core/classes"
-import { TextBlock } from "./classes"
+import { FontMap, TextBlock } from "./models"
 import { Pane } from "../classes"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+
+class TextPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            fonts: [],
+            blocks: []
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        const id2block = {}
+        for (let block of model.blocks) {
+            id2block[block.id] = block
+        }
+        model.id2block = id2block
+    }
+
+    setFonts(fonts) {
+        validated.array(fonts)
+        for(const font of fonts) {
+            this.addFont(font)
+        }
+    }
+
+    addFont(font) {
+        if (!this.fonts) this.fonts = []
+
+        const inst = validated.config(FontMap, font)
+        this.fonts.push(
+            inst
+        );
+    }
+
+    setBlocks(value) {
+        validated.array(value)
+        this.blocks = []
+        for (const block of value) {
+            this.addBlock(block)
+        }
+    }
+
+    addBlock(value) {
+        if (!this.blocks) this.blocks = []
+        this.blocks.push(
+            validated.config(TextBlock, value, {parent: this})
+        )
+    }
+}
 
 /**
  * TODO:
@@ -11,10 +62,9 @@ import { Pane } from "../classes"
  *   - Scrolling (Buffering?)
  *   - Proper Dirty-Handling (update)
  */
-export class TextPane extends Pane {
+export class TextPaneImpl extends Pane {
 
-    constructor(input) {
-        super(input)
+    finalizeApply() {
         for (const block of this.blocks) {
             this.updateBlock(block.id, {})
         }
@@ -141,16 +191,14 @@ export class TextPane extends Pane {
         }
         obj.blocks = blocks
     }
-
-
-    static padStart(value, char, len) {
-        value = '' + value
-        while (value.length < len) {
-            value = char + value
-        }
-        return value
-    }
 }
-TextPaneConfig.linkTo(TextPane)
 
-inst.paneRegistry.add('TextPane', TextPane, {editable: true})
+const type = Pane.createType(
+    {name: 'TextPane', editor: true},
+    TextPane,
+    TextPaneConfig,
+)
+
+export function TextPane(...args) {
+    return TextPaneImpl.newInst(type, ...args)
+}

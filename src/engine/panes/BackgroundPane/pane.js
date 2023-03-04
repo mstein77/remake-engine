@@ -1,10 +1,73 @@
 import { d, getCanvasForDim } from "helper/helper"
-import { BackgroundPaneConfig } from "./config"
 import { DivContainer } from "core/classes"
 import { Pane } from "../classes"
-import inst from "core/instances"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { AppliedImage } from "core/classes"
 
-export class BackgroundPane extends Pane {
+export class BackgroundPaneConfig extends Config {
+
+    getFieldProps() {
+        return {
+            x: {min: -9999, max: 9999},
+            y: {min: -9999, max: 9999}
+        };
+    }
+
+    getDefaults() {
+        return {
+            color: '#000000',
+            images: []
+        }
+    }
+
+    applyPropsTo(obj) {
+        obj.color = this.color
+        obj.images = []
+        obj.imgPos = []
+        for (let { image, x, y } of this.images) {
+            obj.images.push(new AppliedImage(image))
+            obj.imgPos.push({ x, y });
+        }
+        return obj;
+    }
+
+    setColor(value) {
+        this.color = validated.color(value)
+        return this
+    }
+
+    setImages(values) {
+        this.images = this.validateImgObjects(values)
+        return this
+    }
+
+    validateImgObject(value) {
+        validated.object(value);
+        const { image, x, y } = value;
+        return {
+            image: validated.imageResource(image),
+            x: validated.int(x),
+            y: validated.int(y)
+        }
+    }
+
+    validateImgObjects(values) {
+        validated.array(values);
+        const newValues = [];
+        for (let value of values) {
+            newValues.push(this.validateImgObject(value));
+        }
+        return newValues;
+    }
+
+    addImage(image, x = 0, y = 0) {
+        this.images.push({ image, x, y })
+        return this
+    }
+}
+
+class BackgroundPaneImpl extends Pane {
 
     addImage(image, posX, posY) {
         // TODO appliedImage ?
@@ -93,6 +156,13 @@ export class BackgroundPane extends Pane {
         return result
     }
 }
-BackgroundPaneConfig.linkTo(BackgroundPane)
 
-inst.paneRegistry.add('BackgroundPane', BackgroundPane, {editable: true})
+const type = Pane.createType(
+    {name: 'BackgroundPane', editor: true},
+    BackgroundPane,
+    BackgroundPaneConfig
+)
+
+export function BackgroundPane(...args) {
+    return BackgroundPaneImpl.newInst(type, ...args)
+}

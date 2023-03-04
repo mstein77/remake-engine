@@ -1,7 +1,7 @@
+import { Model } from "core/model"
 import { Config } from "core/config"
-import { d, getCanvasForDim } from "helper/helper"
+import { d, cloneDeep, getCanvasForDim } from "helper/helper"
 import { validated } from "helper/validate"
-import { FontMap, TextBlock } from "./classes"
 
 class FontMapConfig extends Config {
 
@@ -81,7 +81,32 @@ class FontMapConfig extends Config {
         }
     }
 }
-FontMapConfig.linkTo(FontMap)
+
+class FontMapImpl extends Model {
+
+    getDependentImages() {
+        return [
+            this.image
+        ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.width = this.width
+        obj.height = this.height
+        obj.image = !deep ? this.image.id : this.image.imageResource
+        obj.map = cloneDeep(this.map)
+    }
+}
+
+const FontMap = (...args) => {
+    return FontMapImpl.newInst(fontMapType, ...args)
+}
+
+const fontMapType = Model.createType(
+    'FontMap',
+    FontMap,
+    FontMapConfig
+)
 
 class TextBlockConfig extends Config {
 
@@ -168,60 +193,33 @@ class TextBlockConfig extends Config {
         this.filters = validated.string(value)
     }
 }
-TextBlockConfig.linkTo(TextBlock)
 
-class TextPaneConfig extends Config {
+class TextBlockImpl extends Model {
 
-    getDefaults() {
-        return {
-            fonts: [],
-            blocks: []
+    update(values) {
+        for (const [ key, value ] of Object.entries(values)) {
+            this[key] = value
         }
     }
 
-    applyPropsTo(model) {
-        this.applyDefaultKeysTo(model)
-        const id2block = {}
-        for (let block of model.blocks) {
-            id2block[block.id] = block
+    addRebuildProps(obj, deep) {
+        for (const prop of ['x', 'y', 'alignToGrid', 'autoCenteringX', 'autoCenteringY', 'text', 'font', 'textAlign', 'lineSpacing', 'filters']) {
+            obj[prop] = this[prop]
         }
-        model.id2block = id2block
-    }
-
-    setFonts(fonts) {
-        validated.array(fonts)
-        for(const font of fonts) {
-            this.addFont(font)
-        }
-    }
-
-    addFont(font) {
-        if (!this.fonts) this.fonts = []
-
-        const inst = validated.config(FontMap, font)
-        this.fonts.push(
-            inst
-        );
-    }
-
-    setBlocks(value) {
-        validated.array(value)
-        this.blocks = []
-        for (const block of value) {
-            this.addBlock(block)
-        }
-    }
-
-    addBlock(value) {
-        if (!this.blocks) this.blocks = []
-        this.blocks.push(
-            validated.config(TextBlock, value, {parent: this})
-        )
     }
 }
 
+const TextBlock = (...args) => {
+    return TextBlockImpl.newInst(textBlockType, ...args)
+}
+
+const textBlockType = Model.createSubType(
+    'TextBlock',
+    TextBlock,
+    TextBlockConfig
+)
+
 export {
-    FontMapConfig,
-    TextBlockConfig,
-    TextPaneConfig
+    FontMap,
+    TextBlock
 }

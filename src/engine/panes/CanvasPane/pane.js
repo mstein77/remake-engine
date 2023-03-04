@@ -1,9 +1,10 @@
 import { CanvasContainer } from "core/classes"
-import { CanvasPaneConfig } from "./config"
 import { Pane } from "../classes"
-import inst from "core/instances"
+import { Config } from "core/config"
 
-export class CanvasPane extends Pane {
+class CanvasPaneConfig extends Config {}
+
+export class CanvasPaneImpl extends Pane {
 
     init(viewPortDimX, viewPortDimY) {
         this.viewPortDim = {
@@ -33,6 +34,13 @@ export class CanvasPane extends Pane {
         }
     }
 }
-CanvasPaneConfig.linkTo(CanvasPane)
 
-inst.paneRegistry.add('CanvasPane', CanvasPane)
+const type = Pane.createType(
+    'CanvasPane',
+    CanvasPane,
+    CanvasPaneConfig
+)
+
+export function CanvasPane(...args) {
+    return CanvasPaneImpl.newInst(type, ...args)
+}

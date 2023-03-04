@@ -1,6 +1,6 @@
 import { EntityIndex } from "editor/classes"
 import { drawCanvasToAvail, getCanvasForDim } from "helper/helper"
-import { TextBlock } from "../classes"
+import { TextBlock } from "../models"
 
 class FontIndex extends EntityIndex {
 

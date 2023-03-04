@@ -279,7 +279,7 @@ class Game {
         inst.RL.loadGameConfig()
             .then(() => {
                 try {
-                    this.gameProps = new GameProps(this.input)
+                    this.gameProps = GameProps(this.input)
                     this.applyConfig()
                     this.boot()
                 } catch (e) {
@@ -1229,7 +1229,7 @@ class Game {
     }
 }
 
-class GameProps extends Model {
+class GamePropsInst extends Model {
 
     getDependentModels() {
         return [ this.mobile ]
@@ -1429,12 +1429,16 @@ class GameConfig extends Config {
         this.applyDefaultKeysTo(obj)
     }
 }
-/**
- * @type {GameConfig}
- */
-GameConfig.linkTo(GameProps)
+const gameType = Model.createType(
+    'Game',
+    GameProps,
+    GameConfig
+)
+function GameProps(...args) {
+    return GamePropsInst.newInst(gameType, ...args)
+}
 
-class MobileGameProps extends ChildModel {}
+class MobileGamePropsInst extends Model {}
 
 class MobileGameConfig extends GameConfig {
 
@@ -1465,7 +1469,14 @@ class MobileGameConfig extends GameConfig {
         if (this.showFpsByUser !== undefined) obj.showFpsByUser = this.showFpsByUser
     }
 }
-MobileGameConfig.linkTo(MobileGameProps)
+const mobileGameType = Model.createSubType(
+    'MobileGame',
+    MobileGameProps,
+    MobileGameConfig
+)
+function MobileGameProps(...args) {
+    return MobileGamePropsInst.newInst(mobileGameType, ...args)
+}
 
 class FpsTracker {
 

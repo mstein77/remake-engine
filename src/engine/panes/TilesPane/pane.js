@@ -1,13 +1,39 @@
 import { CanvasContainer } from "core/classes"
-import { TilesPaneConfig } from "./config"
 import { Pane } from "../classes"
-import inst from "core/instances"
+import { Config } from "core/config"
+import { TilesMap } from "../BufferedTilesPane/models"
+import { validated } from "helper/validate"
 
-class TilesPane extends Pane {
+class TilesPaneConfig extends Config {
 
-    constructor(input) {
-        super(input)
+    getDefaults() {
+        return {
+            tilesMap: undefined,
+            endlessX: false,
+            endlessY: false
+        }
+    }
 
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+
+    setTilesMap(value) {
+        this.tilesMap = validated.config(TilesMap, value)
+    }
+
+    setEndlessX(value) {
+        this.endlessX = validated.bool(value)
+    }
+
+    setEndlessY(value) {
+        this.endlessY = validated.bool(value)
+    }
+}
+
+class TilesPaneImpl extends Pane {
+
+    finalizeApply() {
         this.endless = {
             x: this.endlessX,
             y: this.endlessY
@@ -188,10 +214,13 @@ class TilesPane extends Pane {
         obj.endlessY = this.endlessY
     }
 }
-TilesPaneConfig.linkTo(TilesPane)
 
-inst.paneRegistry.add('TilesPane', TilesPane)
+const type = Pane.createType(
+    'TilesPane',
+    TilesPane,
+    TilesPaneConfig
+)
 
-export {
-    TilesPane
+export function TilesPane(...args) {
+    return TilesPaneImpl.newInst(type, ...args)
 }

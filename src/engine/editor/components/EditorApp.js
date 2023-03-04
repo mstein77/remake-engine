@@ -107,7 +107,7 @@ function EditorApp(props) {
     const items = inst.paneRegistry.getAll()
     for (let item of items) {
         if (!item.editable) continue
-        const cls = item.name
+        const cls = item.constructor.factory ? item.constructor.factory.name : item.name
         contentProvider[cls] = {
             getContent: params => {
                 const resource = resources[params.id];
