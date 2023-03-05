@@ -4,6 +4,7 @@ import { Pane } from "../classes"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
 import { AppliedImage } from "core/classes"
+import { ModelFactory } from "core/model"
 
 export class BackgroundPaneConfig extends Config {
 
@@ -157,12 +158,11 @@ class BackgroundPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    {name: 'BackgroundPane', editor: true},
-    BackgroundPane,
-    BackgroundPaneConfig
-)
+const BackgroundPane =
+    ModelFactory(
+        {name: 'BackgroundPane', editor: true},
+        BackgroundPaneConfig
+    )
+    .addImplementation(BackgroundPaneImpl)
 
-export function BackgroundPane(...args) {
-    return BackgroundPaneImpl.newInst(type, ...args)
-}
+export default BackgroundPane

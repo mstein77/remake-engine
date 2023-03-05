@@ -413,6 +413,41 @@ class Model {
     }
 }
 
+function ModelFactory(name, config, subModel = false) {
+    const f = function(input, options = {}) {
+        let { implementation } = options
+        if (implementation === undefined) {
+            let def = f.default
+            if (typeof def === 'function') {
+                def = f.default(input, options)
+            }
+            implementation = def ? def : 'browser'
+        }
+        const impl = f.implementations[implementation]
+        if (!impl)
+            throw Error(`No implementation found!`)
+
+        return d(impl.newInst(type, input, options), '<--- model')
+    }
+    const type = Model.createType(name, f, config, subModel)
+    f.implementations = {}
+    f.setDefault = value => {
+        f.default = value
+        return f
+    }
+    f.addImplementation = (cls, name = 'browser') =>  {
+        f.implementations[name] = cls
+        return f
+    }
+    return f
+}
+
+function SubModelFactory(name, config) {
+    return ModelFactory(name, config, true)
+}
+
 export {
-    Model
+    Model,
+    ModelFactory,
+    SubModelFactory
 }

@@ -5,6 +5,7 @@ import { FontMap, TextBlock } from "./models"
 import { Pane } from "../classes"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
+import { ModelFactory } from "core/model"
 
 class TextPaneConfig extends Config {
 
@@ -193,12 +194,11 @@ export class TextPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
+const TextPane =
+    ModelFactory(
     {name: 'TextPane', editor: true},
-    TextPane,
-    TextPaneConfig,
-)
+        TextPaneConfig
+    )
+    .addImplementation(TextPaneImpl)
 
-export function TextPane(...args) {
-    return TextPaneImpl.newInst(type, ...args)
-}
+export default TextPane

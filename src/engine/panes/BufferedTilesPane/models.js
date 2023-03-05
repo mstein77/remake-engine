@@ -1,5 +1,5 @@
 import inst from "core/instances"
-import { Model } from "core/model"
+import { Model, ModelFactory } from "core/model"
 import { d, cloneDeep, BitmapPlayer } from "helper/helper"
 import { validated } from "helper/validate"
 import { Config } from "core/config"
@@ -388,15 +388,12 @@ class TilesMapImpl extends Model {
     }
 }
 
-const TilesMap = (...args) => {
-    return TilesMapImpl.newInst(type, ...args)
-}
-
-const type = Model.createType(
-    'TilesMap',
-    TilesMap,
-    TilesMapConfig
-)
+const TilesMap =
+    ModelFactory(
+        'TilesMap',
+        TilesMapConfig
+    )
+    .addImplementation(TilesMapImpl)
 
 export {
     TilesMap

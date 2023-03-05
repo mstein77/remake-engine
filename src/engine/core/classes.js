@@ -1,7 +1,8 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import { d, isValidResourceId, BitmapPlayer, getCanvasForDim } from "helper/helper"
+import { d, isValidResourceId, BitmapPlayer, getCanvasForDim, getCanvasObjForDim } from "helper/helper"
 import { getResourcesAndCallback } from "./resources"
+import { getContainerElem } from "../helper/dom";
 
 /**
  *
@@ -633,7 +634,7 @@ class SplitArea {
         };
         const oversize = (this.axis === 'X') ? (dimX < this.areaLength) : (dimY < this.areaLength);
         if (oversize) {
-            const container = inst.OCM.getContainerElem(dimX, dimY, offX, offY);
+            const container = getContainerElem(dimX, dimY, offX, offY)
             this.scrollElem = document.createElement('div');
             this.scrollElem.setAttribute(
                 'style',
@@ -952,7 +953,7 @@ class DivContainer {
     }
 
     buildDom(parent) {
-        this.containerElem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        this.containerElem = getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
         if (this.child !== null) {
             this.containerElem.appendChild(this.child);
         }
@@ -1012,6 +1013,9 @@ class ImageContainer {
         this.image.style.left = 0;
         this.image.style.right = 0;
         this.image.style.position = 'absolute';
+        if (inst.game.pixelated) {
+            this.image.setAttribute('class', 'pixelated')
+        }
     }
 
     setViewPort(viewPortX, viewPortY, offsetX, offsetY) {
@@ -1026,7 +1030,7 @@ class ImageContainer {
     }
 
     buildDom(parent) {
-        this.containerElem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        this.containerElem = getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
         this.containerElem.appendChild(this.image);
         inst.game.addDomChild(parent, this.containerElem);
     }
@@ -1068,13 +1072,18 @@ class BufferedCanvasContainer {
     }
 
     buildDom(parent) {
-        this.containerElem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        this.containerElem = getContainerElem(this.viewPortDim.x, this.viewPortDim.y, this.viewPortOffsetPos.x, this.viewPortOffsetPos.y);
+        const options = {
+            opaque: this.opaque,
+            parent: this.containerElem,
+            gpu: true,
+            cls: inst.game.pixelated ? 'pixelated' : '',
+            style: 'position: absolute'
+        }
         this.buffers = [
-            inst.OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque),
-            inst.OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque)
+            getCanvasObjForDim(this.dim.x, this.dim.y, options),
+            getCanvasObjForDim(this.dim.x, this.dim.y, options)
         ];
-        this.containerElem.appendChild(this.buffers[0].elem);
-        this.containerElem.appendChild(this.buffers[1].elem);
         inst.game.addDomChild(parent, this.containerElem);
     }
 
@@ -1130,11 +1139,12 @@ class CanvasContainer {
             x: offsetX,
             y: offsetY
         };
-        this.canvas = inst.OCM.getCanvasElem(this.dim.x, this.dim.y, this.opaque);
+        const cls = inst.game.pixelated ? 'pixelated' : ''
+        this.canvas = getCanvasObjForDim(this.dim.x, this.dim.y, {opaque: this.opaque, style: 'position: absolute', cls, gpu: true})
         this.elem = null;
 
         if ((this.dim.x !== this.viewPortDim.x) || (this.dim.y !== this.viewPortDim.y)) {
-            this.elem = inst.OCM.getContainerElem(this.viewPortDim.x, this.viewPortDim.y, offsetX, offsetY);
+            this.elem = getContainerElem(this.viewPortDim.x, this.viewPortDim.y, offsetX, offsetY);
         } else {
             this.canvas.elem.style.left = offsetX + 'px';
             this.canvas.elem.style.top = offsetY + 'px';
@@ -1202,7 +1212,7 @@ class ImageResource {
         let height = this.image.height
         let source = this.image
         if (this.canvas === null) {
-            this.canvas = inst.OCM.getNewOffscreenCanvas(width, height)
+            this.canvas = getCanvasObjForDim(width, height)
             this.canvas.ctx.drawImage(this.image, 0, 0)
         } else {
             width = this.canvas.elem.width
@@ -1210,7 +1220,7 @@ class ImageResource {
             source = this.canvas.elem
         }
         if (asClone) {
-            const canvas = inst.OCM.getNewOffscreenCanvas(width, height)
+            const canvas = getCanvasObjForDim(width, height)
             canvas.ctx.drawImage(source, 0, 0)
             return canvas
         }

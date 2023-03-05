@@ -5,6 +5,7 @@ import { Pane } from "../classes"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
 import { TilesMap } from "./models"
+import { ModelFactory } from "core/model"
 
 class BufferedTilesPaneConfig extends Config {
 
@@ -803,12 +804,11 @@ class BufferedTilesPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    {name: 'BufferedTilesPane', editor: true},
-    BufferedTilesPane,
-    BufferedTilesPaneConfig
-)
+const BufferedTilesPane =
+    ModelFactory(
+        {name: 'BufferedTilesPane', editor: true},
+        BufferedTilesPaneConfig
+    )
+    .addImplementation(BufferedTilesPaneImpl)
 
-export function BufferedTilesPane(...args) {
-    return BufferedTilesPaneImpl.newInst(type, ...args)
-}
+export default BufferedTilesPane

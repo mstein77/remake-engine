@@ -1,11 +1,11 @@
 import { STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { Storage, clamp, ucfirst, toKeys, toPairs, d, without } from "helper/helper"
+import { Storage, clamp, ucfirst, toKeys, d, without, getCanvasObjForDim } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
-import { getResourcesAndCallback } from "./resources.js";
+import { getResourcesAndCallback } from "./resources"
 import { div } from "helper/dom"
 import { ResourceRequest } from "core/classes"
-import { Model, ChildModel } from "./model"
+import { Model, ModelFactory, SubModelFactory } from "./model"
 import { validated } from "helper/validate"
 import inst from "core/instances"
 
@@ -182,7 +182,6 @@ class Game {
         this.globals = getNewStateObj()
 
         inst.RL.clear()
-        inst.OCM.clear()
         inst.autoIds.clearAllIds()
 
         this.hideElem('game-overlay-div', 'modals-div')
@@ -453,7 +452,6 @@ class Game {
             const { loader } = this.globalsResolver
             loader.resolve()
         }
-        inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
         this.getMandatoryElem('screen-overlay-div').replaceChildren()
         this.frameEvents = {}
         const screen = this.screens[screenId]
@@ -1092,6 +1090,10 @@ class Game {
         return this.props.autoZoomByUser
     }
 
+    get pixelated() {
+        return this.props.pixelated
+    }
+
     get width() {
         return this.props.width
     }
@@ -1375,6 +1377,14 @@ class GameConfig extends Config {
         this.screenOrientation = validated.string(value, this.getFieldProp('screenOrientation'))
     }
 
+    setGpu(value) {
+        this.gpu = validated.string(value, this.getFieldProp('gpu'))
+    }
+
+    setPixelated(value) {
+        this.pixelated = validated.bool(value)
+    }
+
     setMobile(value) {
         this.mobile = validated.config(MobileGameProps, value)
     }
@@ -1386,7 +1396,8 @@ class GameConfig extends Config {
         return {
             dim: {min: 1, max: 9999},
             zoom: {min: 0, max: 10},
-            screenOrientation: {values: ['free', 'max', 'landscape', 'portrait']}
+            screenOrientation: {values: ['free', 'max', 'landscape', 'portrait']},
+            gpu: {values: ['prefer', 'required', 'ignore']}
         };
     }
 
@@ -1409,6 +1420,8 @@ class GameConfig extends Config {
             width: 320,
             height: 200,
             zoom: 2,
+            gpu: 'prefer',
+            pixelated: false,
             minZoom: 1,
             maxZoom: 5,
             restrictZoomByWindow: true,
@@ -1429,14 +1442,14 @@ class GameConfig extends Config {
         this.applyDefaultKeysTo(obj)
     }
 }
-const gameType = Model.createType(
-    'Game',
-    GameProps,
-    GameConfig
-)
-function GameProps(...args) {
-    return GamePropsInst.newInst(gameType, ...args)
-}
+
+const GameProps =
+    ModelFactory(
+        'Game',
+        GameConfig
+    )
+    .addImplementation(GamePropsInst)
+
 
 class MobileGamePropsInst extends Model {}
 
@@ -1469,14 +1482,13 @@ class MobileGameConfig extends GameConfig {
         if (this.showFpsByUser !== undefined) obj.showFpsByUser = this.showFpsByUser
     }
 }
-const mobileGameType = Model.createSubType(
+
+const MobileGameProps =
+    SubModelFactory(
     'MobileGame',
-    MobileGameProps,
-    MobileGameConfig
-)
-function MobileGameProps(...args) {
-    return MobileGamePropsInst.newInst(mobileGameType, ...args)
-}
+        MobileGameConfig
+    )
+    .addImplementation(MobileGamePropsInst)
 
 class FpsTracker {
 
@@ -1806,7 +1818,7 @@ filterer.addFilter(
     'clear-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
         if (params.pixels > 0) {
             newCanvas.ctx.clearRect(0, 0, data[3], params.pixels);
@@ -1825,7 +1837,7 @@ filterer.addFilter(
     'flip-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(data[3], 0);
         newCanvas.ctx.scale(-1, 1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1838,7 +1850,7 @@ filterer.addFilter(
     'flip-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(0, data[4]);
         newCanvas.ctx.scale(1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1851,7 +1863,7 @@ filterer.addFilter(
     'flip-xy',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(data[3], data[4]);
         newCanvas.ctx.scale(-1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1864,7 +1876,7 @@ filterer.addFilter(
     'shift-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         const shiftedSize = data[4] - Math.abs(params.pixels);
         let sourceY = data[2];
         if (params.pixels < 0) {
@@ -1884,7 +1896,7 @@ filterer.addFilter(
     'shift-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         const shiftedSize = data[3] - Math.abs(params.pixels);
         let sourceX = data[1];
         if (params.pixels < 0) {

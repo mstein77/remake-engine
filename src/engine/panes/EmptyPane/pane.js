@@ -1,5 +1,6 @@
 import { Pane } from "panes/classes"
 import { Config } from "core/config"
+import { ModelFactory } from "core/model"
 
 class EmptyPaneConfig extends Config {}
 
@@ -22,12 +23,11 @@ class EmptyPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    'EmptyPane',
-    EmptyPane,
-    EmptyPaneConfig
-)
+const EmptyPane =
+    ModelFactory(
+        'EmptyPane',
+        EmptyPaneConfig
+    )
+    .addImplementation(EmptyPaneImpl)
 
-export function EmptyPane(...args) {
-    return EmptyPaneImpl.newInst(type, ...args)
-}
+export default EmptyPane

@@ -5,6 +5,7 @@ import { d } from "helper/helper"
 import { Config } from "core/config"
 import { SpriteSheet } from "../SpritePane/models"
 import { validated } from "helper/validate"
+import { ModelFactory } from "core/model"
 
 class BitmapScrollPaneConfig extends Config {
 
@@ -268,12 +269,11 @@ class BitmapScrollPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    {name: 'BitmapScrollPane'},
-    BitmapScrollPane,
-    BitmapScrollPaneConfig
-)
+const BitmapScrollPane =
+    ModelFactory(
+        {name: 'BitmapScrollPane'},
+        BitmapScrollPaneConfig
+    )
+    .addImplementation(BitmapScrollPaneImpl)
 
-export function BitmapScrollPane(...args) {
-    return BitmapScrollPaneImpl.newInst(type, ...args)
-}
+export default BitmapScrollPane

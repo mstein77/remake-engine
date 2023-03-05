@@ -1,4 +1,4 @@
-import { Model } from "core/model"
+import { Model, ModelFactory, SubModelFactory } from "core/model"
 import { Config } from "core/config"
 import { d, cloneDeep, getCanvasForDim } from "helper/helper"
 import { validated } from "helper/validate"
@@ -98,15 +98,12 @@ class FontMapImpl extends Model {
     }
 }
 
-const FontMap = (...args) => {
-    return FontMapImpl.newInst(fontMapType, ...args)
-}
-
-const fontMapType = Model.createType(
-    'FontMap',
-    FontMap,
-    FontMapConfig
-)
+const FontMap =
+    ModelFactory(
+        'FontMap',
+        FontMapConfig
+    )
+    .addImplementation(FontMapImpl)
 
 class TextBlockConfig extends Config {
 
@@ -209,15 +206,12 @@ class TextBlockImpl extends Model {
     }
 }
 
-const TextBlock = (...args) => {
-    return TextBlockImpl.newInst(textBlockType, ...args)
-}
-
-const textBlockType = Model.createSubType(
-    'TextBlock',
-    TextBlock,
-    TextBlockConfig
-)
+const TextBlock =
+    SubModelFactory(
+        'TextBlock',
+        TextBlockConfig
+    )
+    .addImplementation(TextBlockImpl)
 
 export {
     FontMap,

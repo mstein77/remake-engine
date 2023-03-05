@@ -4,6 +4,7 @@ import { DivContainer } from "core/classes"
 import { Pane } from "../classes"
 import { validated } from "helper/validate"
 import { Config } from "core/config"
+import { ModelFactory } from "core/model"
 
 class LinearGradientPaneConfig extends Config {
 
@@ -223,12 +224,11 @@ export class LinearGradientPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    'LinearGradientPane',
-    LinearGradientPane,
-    LinearGradientPaneConfig
-)
+const LinearGradientPane =
+    ModelFactory(
+        'LinearGradientPane',
+        LinearGradientPaneConfig
+    )
+    .addImplementation(LinearGradientPaneImpl)
 
-export function LinearGradientPane(...args) {
-    return LinearGradientPaneImpl.newInst(type, ...args)
-}
+export default LinearGradientPane

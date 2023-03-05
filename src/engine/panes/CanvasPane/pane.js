@@ -1,6 +1,7 @@
 import { CanvasContainer } from "core/classes"
 import { Pane } from "../classes"
 import { Config } from "core/config"
+import { ModelFactory } from "core/model"
 
 class CanvasPaneConfig extends Config {}
 
@@ -35,12 +36,12 @@ export class CanvasPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    'CanvasPane',
-    CanvasPane,
-    CanvasPaneConfig
-)
+const CanvasPane =
+    ModelFactory(
+        'CanvasPane',
+        CanvasPaneConfig
+    )
+    .addImplementation(CanvasPaneImpl)
 
-export function CanvasPane(...args) {
-    return CanvasPaneImpl.newInst(type, ...args)
-}
+
+export default CanvasPane

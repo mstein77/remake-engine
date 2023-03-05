@@ -1,5 +1,13 @@
 import { FILTER } from "core/const"
-import { toValues, flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
+import {
+    toValues,
+    flattenResources,
+    getDeflatedResources,
+    isValidResourceId,
+    ResourceDependencies,
+    d,
+    getCanvasObjForDim
+} from "../helper/helper"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
@@ -13,7 +21,6 @@ let RL = null
  * @type {StorageManager}
  */
 let SM = null
-let OCM = null
 let game = null
 let system = null
 let filterer = null
@@ -322,7 +329,7 @@ class BitmapFilterer {
                 case FILTER.TYPE.CANVAS:
                     if (lastType === FILTER.TYPE.IMAGEDATA) {
                         if (isSourceCanvas) {
-                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                            data = [getCanvasObjForDim(data[3], data[4]), 0, 0, data[3], data[4]];
                             isSourceCanvas = false;
                         }
                         data[0].ctx.putImageData(imageData, 0, 0);
@@ -345,7 +352,7 @@ class BitmapFilterer {
 
         if (lastType === FILTER.TYPE.IMAGEDATA) {
             if (isSourceCanvas) {
-                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                data = [getCanvasObjForDim(data[3], data[4]), 0, 0, data[3], data[4]];
             }
             data[0].ctx.putImageData(imageData, 0, 0);
         }
@@ -1207,94 +1214,6 @@ class ResourceLoader {
     }
 }
 
-class CanvasManager {
-
-    constructor() {
-        this.overlayElem = null;
-        this.offscreenElem = null;
-        this.canvasElems = [];
-    }
-
-    getCanvasElem(dimX, dimY, opaque) {
-        const elem = document.createElement('canvas');
-        elem.id = 'canvas_' + this.canvasElems.length;
-        elem.setAttribute('width', dimX);
-        elem.setAttribute('height', dimY);
-        elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px');
-
-        const ctx = elem.getContext('2d', {alpha: !opaque});
-        ctx.imageSmoothingEnabled = false;
-        const canvas = {elem, ctx};
-        this.canvasElems.push(canvas);
-        return canvas;
-    }
-
-    getOverlayElem() {
-        if (this.overlayElem === null) {
-            this.overlayElem = document.getElementById('screen-overlay-div');
-        }
-        return this.overlayElem;
-    }
-
-    getOffscreenElem() {
-        if (this.offscreenElem === null) {
-            this.offscreenElem = document.getElementById('offscreen-div');
-        }
-        return this.offscreenElem;
-    }
-
-    getContainerElem(viewPortX, viewPortY, offX, offY) {
-        const elem = document.createElement('div');
-        elem.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + viewPortX + 'px; height: ' + viewPortY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden');
-        return elem;
-    }
-
-    getNewOffscreenCanvas(dimX, dimY) {
-        return this.getNewCanvas('offscreen', dimX, dimY);
-    }
-
-    getNewCanvas(type, dimX, dimY, offX = 0, offY = 0, opaque = false) {
-        const id = type + '_' + this.canvasElems.length;
-        const parentElem = type === 'offscreen' ? this.getOffscreenElem() : this.getOverlayElem();
-        const elem = document.createElement('canvas');
-        elem.id = id;
-        elem.setAttribute('width', dimX);
-        elem.setAttribute('height', dimY);
-        if (type === 'overlay') {
-            elem.setAttribute('style', 'position: absolute; top: ' + offY + 'px; left: ' + offX + 'px');
-        }
-        parentElem.appendChild(elem);
-        const ctx = elem.getContext('2d', {alpha: !opaque});
-        ctx.imageSmoothingEnabled = false;
-        const canvas = {id, type, elem, ctx, width: dimX, height: dimY};
-        this.canvasElems.push(canvas);
-
-        return canvas;
-    }
-
-    discard(canvas) {
-        canvas.elem.parentNode.removeChild(canvas.elem);
-        canvas.elem = null;
-        const index = this.canvasElems.indexOf(canvas);
-        if (index !== -1) {
-            this.canvasElems.splice(index, 1);
-        }
-    }
-
-    removeChildren(node) {
-        if (!node) return
-        while (node.firstChild) {
-            node.removeChild(node.firstChild);
-        }
-    }
-
-    clear() {
-        this.canvasElems = [];
-        this.removeChildren(this.getOffscreenElem());
-        this.removeChildren(this.getOverlayElem());
-    }
-}
-
 class AutoIdGenerator {
 
     constructor() {
@@ -1402,12 +1321,6 @@ const inst = {
             filterer = new BitmapFilterer()
         }
         return filterer
-    },
-    get OCM() {
-        if (!OCM) {
-            OCM = new CanvasManager()
-        }
-        return OCM
     },
     get plugins() {
         const plugins = [ inst.renderPlugin ];

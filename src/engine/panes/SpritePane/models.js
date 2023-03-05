@@ -1,4 +1,4 @@
-import { Model } from "core/model"
+import { Model, ModelFactory } from "core/model"
 import { ANIMATION, BitmapPlayer, cloneDeep, isArray, d, isString, without, toPairs } from "helper/helper"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
@@ -540,15 +540,12 @@ class SpriteSheetImpl extends Model {
     }
 }
 
-const SpriteSheet = (...args) => {
-    return SpriteSheetImpl.newInst(type, ...args)
-}
-
-const type = SpriteSheetImpl.createType(
+const SpriteSheet =
+    ModelFactory(
     'SpriteSheet',
-    SpriteSheet,
-    SpriteSheetConfig
-)
+        SpriteSheetConfig
+    )
+    .addImplementation(SpriteSheetImpl)
 
 export {
     SpriteSheet

@@ -5,6 +5,7 @@ import { Pane } from "../classes"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
 import { SpriteSheet } from "./models"
+import { ModelFactory } from "core/model"
 
 class SpritePaneConfig extends Config {
 
@@ -614,12 +615,11 @@ class SpritePaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
+const SpritePane =
+    ModelFactory(
     {name: 'SpritePane', editor: true},
-    SpritePane,
-    SpritePaneConfig
-)
+        SpritePaneConfig
+    )
+    .addImplementation(SpritePaneImpl)
 
-export function SpritePane(...args) {
-    return SpritePaneImpl.newInst(type, ...args)
-}
+export default SpritePane

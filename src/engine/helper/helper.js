@@ -300,8 +300,27 @@ const getCanvasForDim = (width, height) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
+
     return canvas;
-};
+}
+
+const getCanvasObjForDim = (width, height, options = {}) => {
+    const elem = getCanvasForDim(width, height)
+    const { opaque = false, aliasing = false, gpu = false, parent, cls, style } = options
+    if (parent)
+        parent.appendChild(elem)
+    if (cls)
+        elem.setAttribute('class', cls)
+    if (style) {
+        elem.setAttribute('style', style)
+    }
+    const ctx = elem.getContext('2d', {alpha: !opaque, willReadFrequently: !gpu})
+    ctx.imageSmoothingEnabled = aliasing
+    return {
+        elem,
+        ctx
+    }
+}
 
 const getCanvasForBitmap = bitmap => {
     const canvas = getCanvasForDim(bitmap.width, bitmap.height);
@@ -1316,6 +1335,7 @@ export {
     getNextUid,
     getNextUniqueName,
     getCanvasForDim,
+    getCanvasObjForDim,
     getCanvasForBitmap,
     getImageDataForImage,
     getColorsFromCanvas,

@@ -46,8 +46,17 @@ const stackV = ( stackProps, ...props ) => {
     return div({ class: `stack-v ${typeof stackProps === 'string' ? stackProps : ''}`}, typeof stackProps !== 'string' ? stackProps : null, ...props)
 }
 
+// TODO replace this
+const getContainerElem = (viewPortX, viewPortY, offX, offY, cls = '') => {
+    const elem = document.createElement('div')
+    elem.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + viewPortX + 'px; height: ' + viewPortY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden')
+    if (cls) elem.setAttribute('class', cls)
+    return elem
+}
+
 export {
     div,
+    getContainerElem,
     stackH,
     stackV
 }

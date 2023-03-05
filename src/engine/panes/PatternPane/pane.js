@@ -1,10 +1,11 @@
 import inst from "core/instances"
-import { d, getCanvasForDim } from "helper/helper"
+import { d, getCanvasForDim, getCanvasObjForDim } from "helper/helper"
 import { ImageContainer } from "core/classes"
 import { Pane } from "../classes"
 import { Config } from "core/config"
 import { validated } from "helper/validate"
 import { AppliedImage } from "core/classes"
+import { ModelFactory } from "core/model"
 
 class PatternPaneConfig extends Config {
 
@@ -61,11 +62,10 @@ class PatternPaneImpl extends Pane {
         };
 
         this.container = new ImageContainer(this.paneDim.x, this.paneDim.y);
-        const tmpCanvas = inst.OCM.getNewOffscreenCanvas(this.paneDim.x, this.paneDim.y);
+        const tmpCanvas = getCanvasObjForDim(this.paneDim.x, this.paneDim.y);
         tmpCanvas.ctx.fillStyle = tmpCanvas.ctx.createPattern(this.image.canvas, this.repeat);
         tmpCanvas.ctx.fillRect(0, 0, this.paneDim.x, this.paneDim.y);
         this.container.getImageElem().src = tmpCanvas.elem.toDataURL('image/png');
-        inst.OCM.discard(tmpCanvas);
         return this.container;
     }
 
@@ -129,12 +129,11 @@ class PatternPaneImpl extends Pane {
     }
 }
 
-const type = Pane.createType(
-    'PatternPane',
-    PatternPane,
-    PatternPaneConfig
-)
+const PatternPane =
+    ModelFactory(
+        'PatternPane',
+        PatternPaneConfig
+    )
+    .addImplementation(PatternPaneImpl)
 
-export function PatternPane(...args) {
-    return PatternPaneImpl.newInst(type, ...args)
-}
+export default PatternPane

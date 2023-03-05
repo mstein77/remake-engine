@@ -2,6 +2,10 @@ body {
     overflow: hidden
 }
 
+.pixelated, .pixelated img, .pixelated canvas {
+    image-rendering: pixelated
+}
+
 html.fix-orientation {
     width: 100vh;
     height: 100vw;
