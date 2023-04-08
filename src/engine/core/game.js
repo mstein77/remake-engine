@@ -254,7 +254,9 @@ class Game {
                             mismatch = typeof value !== 'number'
                             break
                     }
-                    if (mismatch) throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
+                    if (mismatch)
+                        throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
+
                     const validator = 'getValidated' + ucfirst(prop);
                     if (config[validator]) value = config[validator](value)
                 } catch (e) {
@@ -275,10 +277,10 @@ class Game {
     connectAndBoot() {
         this.setState(STATE.CONNECT)
 
-        inst.RL.loadGameConfig()
-            .then(() => {
+        inst.RL.loadGameConfig(this.input)
+            .then(config => {
                 try {
-                    this.gameProps = GameProps(this.input)
+                    this.gameProps = GameProps(config)
                     this.applyConfig()
                     this.boot()
                 } catch (e) {
@@ -1243,6 +1245,25 @@ class GamePropsInst extends Model {
             if (this[key] !== undefined) obj[key] = this[key]
         }
     }
+
+    addRebuildProps(obj, deep) {
+        obj.mobile = this.getRebuildModel(this.mobile, deep)
+        obj.width = this.width
+        obj.height = this.height
+        obj.zoom = this.zoom
+        obj.gpu = this.gpu
+        obj.pixelated = this.pixelated
+        obj.minZoom = this.minZoom
+        obj.maxZoom = this.maxZoom
+        obj.restrictZoomByWindow = this.restrictZoomByWindow
+        obj.stepZoom = this.stepZoom
+        obj.stepZoomByUser = this.stepZoomByUser
+        obj.autoZoom = this.autoZoom
+        obj.autoZoomByUser = this.autoZoomByUser
+        obj.showFps = this.showFps
+        obj.showFpsByUser = this.showFpsByUser
+        obj.screenOrientation = this.screenOrientation
+    }
 }
 
 /**
@@ -1250,11 +1271,13 @@ class GamePropsInst extends Model {
  */
 class GameConfig extends Config {
 
-    getAutoId() {
+    getNewAutoId() {
         return 'game'
     }
 
-    setId(value) {}
+    setId(value) {
+        return this.getNewAutoId()
+    }
 
     /**
      * Sets a fix width of the game in pixel
@@ -1285,8 +1308,12 @@ class GameConfig extends Config {
 
     getValidatedZoom(value) {
         const zoom = validated.float(value, this.getFieldProp('zoom'))
-        if (this.minZoom > zoom) throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
-        if (this.maxZoom < zoom) throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
+        if (this.minZoom > zoom)
+            throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
+
+        if (this.maxZoom < zoom)
+            throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
+
         return zoom
     }
 
@@ -1306,12 +1333,14 @@ class GameConfig extends Config {
      */
     setMaxZoom(value) {
         const maxZoom = validated.float(value, this.getFieldProp('zoom'))
-        if (this.minZoom > maxZoom) throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
+        if (this.minZoom > maxZoom)
+            throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
+
         this.maxZoom = maxZoom
     }
 
     /**
-     * Sets whether the maximum available zoom should be dependant on the current window size or not
+     * Sets whether the maximum available zoom should be dependent on the current window size or not
      *
      * @param {boolean} value
      */
@@ -1415,7 +1444,7 @@ class GameConfig extends Config {
      */
     getDefaults() {
         return {
-            id: 'game',
+            id: '',
             mobile: {},
             width: 320,
             height: 200,
@@ -1455,12 +1484,13 @@ class MobileGamePropsInst extends Model {}
 
 class MobileGameConfig extends GameConfig {
 
-    getAutoId() {
+    getNewAutoId() {
         return 'mobile-id'
     }
 
     getDefaults() {
         return {
+            id: '',
             zoom: 2,
             minZoom: 0,
             maxZoom: 5,

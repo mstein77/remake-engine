@@ -4,6 +4,7 @@ import { d } from 'helper/helper'
 import { MainEditor } from "../editors/MainEditor"
 import { ScreenEditor } from "../editors/ScreenEditor"
 import { PocEditor } from "../editors/PocEditor"
+import { GamePropsEditor } from "../editors/GamePropsEditor"
 
 function EditorApp(props) {
     const [ ready, setReady ] = useState(false);
@@ -94,6 +95,12 @@ function EditorApp(props) {
     }
 
     const contentProvider = {
+        game: {
+            getContent: params => {
+                const resource = {pane: props.game.gameProps}
+                return <GamePropsEditor game={props.game} resource={resource} />
+            }
+        },
         screen: {
             getContent: params => {
                 return <ScreenEditor resources={resources} game={props.game} />
@@ -119,8 +126,8 @@ function EditorApp(props) {
             }
         }
     }
-    const resourceLoader = props.game.getResourceLoader();
-    resources.push({type: 'poc'});
+    resources.push({type: 'poc'})
+    resources.push({type: 'game'})
 
     return (
         <>

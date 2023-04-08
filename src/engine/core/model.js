@@ -2,10 +2,21 @@ import { d, isString, isEqual, isObject } from "helper/helper"
 import inst from "./instances"
 
 /**
- * A model is a class which is constructed using a corresponding config instance.
+ * A model is a class which is constructed using a corresponding config instance. It can be linked to dependant models
+ * and resources and also can be persisted via a configuration JSON object that allows to rebuild the model at any time
  */
 class Model {
 
+    /**
+     * Returns a new model type object with the given name and links its factory method and config class. Also registers
+     * the model and its type in the pane registry if the model represents a pane.
+     *
+     * @param {object|string} nameOrInfo
+     * @param {function} factory
+     * @param {object} config
+     * @param {boolean} subtype
+     * @returns {object}
+     */
     static createType(nameOrInfo, factory, config, subtype = false) {
         if (isString(nameOrInfo)) {
             nameOrInfo = { name: nameOrInfo }
@@ -20,7 +31,6 @@ class Model {
         factory.Config = config
         config.factory = factory
         config.typeName = name
-        config.isChild = subtype
         return {
             name,
             factory,
@@ -29,15 +39,30 @@ class Model {
         }
     }
 
-    static createSubType(name, factory, config) {
-        return this.createType(name, factory, config, true)
-    }
-
+    /**
+     * Returns a new instance of this model with the given type, input and options
+     *
+     * @param {object} type
+     * @param {string|object} input
+     * @param {object} options
+     *
+     * @returns {Model}
+     */
     static newInst(type, input, options = {}) {
         return new this(input, { ...options, type })
     }
 
-    constructor( input, options ) {
+    /**
+     * Constructs a new model based on the input argument and the given options. The input can be a string holding
+     * the id of a JSON resource which was resolved by the resource loader before. An instance of a configuration or
+     * a JSON configuration object, which will be used to instantiate a new configuration. The options object must have
+     * the type property with the model type object and can also have fetch property which should be set to false if
+     * the resource loader should not be asked for a loaded configuration with the same id
+     *
+     * @param {string|object} input
+     * @param {object} options
+     */
+    constructor(input, options) {
 
         let { fetch = true, type } = options
         this._type = type
@@ -87,30 +112,48 @@ class Model {
         this.finalizeApply()
     }
 
+    /**
+     * This method is called after the configuration was applied to this model to allow to set additional properties
+     * which are not part of the configuration
+     */
     finalizeApply() {}
 
+    /**
+     * Returns the type name of this model
+     *
+     * @returns {string}
+     */
     get typeName() {
         return this._type.name
     }
 
+    /**
+     * Returns whether this model is a composite child of another model or not. If true it means that this model
+     * can not exist without its parent
+     *
+     * @returns {boolean}
+     */
     get isChild() {
         return this._type.subtype
     }
 
+    /**
+     * Returns whether this model has an id assigned and if this id was assigned automatically or not
+     *
+     * @returns {boolean}
+     */
     hasAutoId() {
-        return this.id && this.id.startsWith('_auto_')
+        return !!(this.id && this.id.startsWith('_auto_'))
     }
 
     /**
-     * Returns a JSON object which builds the same configuration given in the base model (or the )
+     * Returns a JSON object which builds a configuration representing the current model state.
      * If the deep flag is set, all dependent resources will also be represented as rebuild JSON, otherwise
-     * dependent resources will only be linked via ids.
+     * dependent models and resources will only be linked via ids.
      *
-     * @param {boolean}  deep
+     * @param {boolean} deep
      *
      * @returns {object}
-     *
-     * model.getRebuildJson(deep = true, base = null)
      */
     getRebuildJson(deep = true) {
         const obj = {id: this.id, version: this.config.getVersion() }
@@ -127,27 +170,25 @@ class Model {
     }
 
     /**
-     * Adds all properties to the given rebuild JSON object, which rebuild the given base model and returns it.
-     * Properties holding other configurables will only be converted to rebuild JSONs when the deep flag is set,
+     * Adds all properties to the given rebuild JSON object, which rebuild the current model and returns it.
+     * Properties holding other models or resources will only be converted to rebuild JSONs when the deep flag is set,
      * otherwise these will only be referenced via their id
      *
      * @param {object} obj
      * @param {boolean} deep
      *
      * @returns {object}
-     *
-     * model.addRebuildProps(...)
      */
     addRebuildProps(obj, deep) {
         return obj
     }
 
     /**
-     * Returns an object holding all resources under the "resources" key and all
-     * dependencies under the "dependencies" for the given (or initial) model.
+     * Returns an object holding all resources of this model under the "resources" key and all dependencies under the
+     * "dependencies" key
      *
-     * Resources are returned as objects { id, type, data } and dependencies are
-     * given as resource pair strings "<type>:<id>"
+     * Resources are returned as objects { id, type, data } and dependencies are given as resource pair strings
+     * "<type>:<id>"
      *
      * @param {object} model
      *
@@ -161,8 +202,7 @@ class Model {
     }
 
     /**
-     * Returns an object mapping the direct and indirect json resources of the
-     * given (or initial) model to direct dependent resource ids
+     * Returns an object mapping the direct and indirect json resources of this model to direct dependent resource ids
      *
      * Each resource is returned as resource pair string "<type>:<id>"
      *
@@ -175,8 +215,7 @@ class Model {
     }
 
     /**
-     * Adds all direct and indirect resource ids the given (or initial) model
-     * is dependant from to the dependencies object and return it
+     * Adds all direct and indirect resource ids this model is dependant from to the dependencies object and returns it
      *
      * Each resource is returned as resource pair string "<type>:<id>"
      *
@@ -221,37 +260,37 @@ class Model {
         this.addDependentImageResources(resources)
         this.addDependentAudioResources(resources)
         this.addDependentJsonResources(resources)
+
         return resources
     }
 
     /**
-     * Returns an array holding image resources of the given (or initial) model
-     * Each resource is returned as object { id, type, data }
+     * Returns an array holding image resources of this model. Each resource is returned as object { id, type, data }
      *
      * @returns {array}
      */
-    getImageResources(model) {
+    getImageResources() {
         const images = []
         this.addDependentImageResources(images)
+
         return images
     }
 
     /**
-     * Returns an array holding all image resource ids which are directly or indirectly
-     * dependent from the given (or inital) model
+     * Returns an array holding all image resource ids which are directly or indirectly dependent from this model
      *
-     * @returns {object}
+     * @returns {array}
      */
     getImageResourceIds() {
         const images = []
         this.addDependentImageResources(images, true)
+
         return images
     }
 
     /**
-     * Returns an array with all directly dependent image instances of the given model.
-     * The result can include falsy values which must be filtered out (which allows to
-     * return model properties here regardless if they are set or not)
+     * Returns an array with all directly dependent image instances of this model. The result can include falsy values
+     * which must be filtered out (which allows to return model properties here regardless if they are set or not)
      *
      * @returns {array}
      */
@@ -260,9 +299,8 @@ class Model {
     }
 
     /**
-     * Adds all directly and indirectly dependant image resources of the given
-     * model to the given result array and returns them. If the idOnly argument is true
-     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     * Adds all directly and indirectly dependant image resources of this model to the given result array and returns
+     * them. If the idOnly argument is true then each resource is only pushed as id, otherwise an object { id, type, data }
      *
      * @param {array} result
      * @param {boolean} idOnly
@@ -285,21 +323,19 @@ class Model {
     }
 
     /**
-     * Returns an array holding all audio resource ids which are directly or indirectly
-     * dependent from the given (or inital) model
+     * Returns an array holding all audio resource ids which are directly or indirectly dependent from this model
      *
      * @returns {object}
      */
-    getAudioResourceIds(model) {
+    getAudioResourceIds() {
         const ids = []
         this.addDependentAudioResources(ids, true)
         return ids
     }
 
     /**
-     * Returns an array with all directly dependent audio instances of the given model.
-     * The result can include falsy values which must be filtered out (which allows to
-     * return model properties here regardless if they are set or not)
+     * Returns an array with all directly dependent audio instances of this model. The result can include falsy values
+     * which must be filtered out (which allows to return model properties here regardless if they are set or not)
      *
      * @returns {array}
      */
@@ -308,9 +344,8 @@ class Model {
     }
 
     /**
-     * Adds all directly and indirectly dependant audio resources of the given
-     * model to the given result array and returns them. If the idOnly argument is true
-     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     * Adds all directly and indirectly dependant audio resources of this model to the given result array and returns
+     * them. If the idOnly argument is true then each resource is only pushed as id, otherwise an object { id, type, data }
      *
      * @param {array} result
      * @param {boolean} idOnly
@@ -325,7 +360,6 @@ class Model {
                 const { id, data } = audio
                 result.push({ id, data, type: 'audio' })
             }
-
         }
         const depModels = this.getDependentModels()
         for (const depModel of depModels) {
@@ -335,9 +369,8 @@ class Model {
     }
 
     /**
-     * Returns an array with all directly dependent model instances of the given model.
-     * The result can include falsy values which must be filtered out (which allows to
-     * return model properties here regardless if they are set or not)
+     * Returns an array with all directly dependent model instances of this model. The result can include falsy values
+     * which must be filtered out (which allows to return model properties here regardless if they are set or not)
      *
      * @returns {array}
      */
@@ -346,9 +379,8 @@ class Model {
     }
 
     /**
-     * Adds all directly and indirectly dependant model resources of the given
-     * model to the given result array and returns them. If the idOnly argument is true
-     * then each resource is only pushed as id, otherwise an object { id, type, data }
+     * Adds all directly and indirectly dependant model resources of this model to the given result array and returns
+     * them. If the idOnly argument is true then each resource is only pushed as id, otherwise an object { id, type, data }
      *
      * @param {array} result
      * @param {boolean} idOnly
@@ -371,30 +403,39 @@ class Model {
     }
 
     /**
-     * Returns an array holding all json resource ids which are directly or indirectly
-     * dependent from the given (or inital) model
+     * Returns an array holding all json resource ids which are directly or indirectly dependent from this model
      *
      * @param {object} model
+     *
      * @returns {object}
      */
     getJsonResourceIds() {
         const ids = []
         this.addDependentJsonResources(ids, true)
+
         return ids
     }
 
     /**
-     * Returns an array holding the json resources of the given (or initial) model
-     * Each resource is returned as object { id, type, data }
+     * Returns an array holding the json resources of this model. Each resource is returned as object { id, type, data }
      *
      * @returns {array}
      */
-    getJsonResources(model) {
+    getJsonResources() {
         const resources = []
         this.addDependentJsonResources(resources)
+
         return resources
     }
 
+    /**
+     * Returns a rebuild json for the given model or a string with the model id if the deep flag is not set or the model
+     * is a child
+     *
+     * @param {object} model
+     * @param {boolean} deep
+     * @returns {string|object}
+     */
     getRebuildModel(model, deep) {
         if (!deep && !model.isChild)
             return model.id
@@ -402,10 +443,23 @@ class Model {
         return model.getRebuildJson(deep)
     }
 
+    /**
+     * Returns a new image resource object for the given AppliedImage or a string with the image id if the deep flag is
+     * not set
+     *
+     * @param {object} modelImage
+     * @param {boolean} deep
+     * @returns {string|object}
+     */
     getRebuildImage(modelImage, deep) {
         return deep ? modelImage.imageResource : modelImage.id
     }
 
+    /**
+     * Returns a new instance of this model with the current state
+     *
+     * @returns {object}
+     */
     getClone() {
         return this.config.getModelInstance(
             this.getRebuildJson(true), {fetch: false}
@@ -413,35 +467,54 @@ class Model {
     }
 }
 
+/**
+ * Creates a new model type for the given configuration and returns a factory function for this model.
+ * The first argument can also be a model description object which must have a name property and the subModel
+ * flag indicates whether the models of this factory will be child models or not.
+ *
+ *
+ * @param {string|object} name
+ * @param {object} config
+ * @param {boolean} subModel
+ *
+ * @returns {function}
+ */
 function ModelFactory(name, config, subModel = false) {
-    const f = function(input, options = {}) {
+    const factory = function(input, options = {}) {
         let { implementation } = options
         if (implementation === undefined) {
-            let def = f.default
+            let def = factory.default
             if (typeof def === 'function') {
-                def = f.default(input, options)
+                def = factory.default(input, options)
             }
             implementation = def ? def : 'browser'
         }
-        const impl = f.implementations[implementation]
+        const impl = factory.implementations[implementation]
         if (!impl)
-            throw Error(`No implementation found!`)
+            throw Error(`No implementation found with name "${implementation}"!`)
 
-        return d(impl.newInst(type, input, options), '<--- model')
+        return impl.newInst(type, input, options)
     }
-    const type = Model.createType(name, f, config, subModel)
-    f.implementations = {}
-    f.setDefault = value => {
-        f.default = value
-        return f
+    const type = Model.createType(name, factory, config, subModel)
+    factory.implementations = {}
+    factory.setDefault = value => {
+        factory.default = value
+        return factory
     }
-    f.addImplementation = (cls, name = 'browser') =>  {
-        f.implementations[name] = cls
-        return f
+    factory.addImplementation = (cls, name = 'browser') =>  {
+        factory.implementations[name] = cls
+        return factory
     }
-    return f
+    return factory
 }
 
+/**
+ * Shorthand function to create and return ModelFactory for a sub model which is a child of another model
+ * @see ModelFactory
+ *
+ * @param {string|object} name
+ * @param {object} config
+ */
 function SubModelFactory(name, config) {
     return ModelFactory(name, config, true)
 }

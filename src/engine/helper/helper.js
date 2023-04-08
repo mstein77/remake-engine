@@ -144,14 +144,22 @@ const getFlatDependencies = (indirect, resource, found = []) => {
     return found;
 };
 
-const getDeflatedResources = resources => {
-    const result = {json: [], image: [], audio: []};
-    for (let resource of resources) {
-        const [type, id] = resource.split(':');
-        result[type].push(id);
+/**
+ * Returns an object where the resource ids of the given typed resource ids are distributed
+ * under a type key. The result object will have "image", "json" und "audio" key with an array
+ * of ids.
+ *
+ * @param {array} typedResourceIds
+ * @returns {object}
+ */
+const getDeflatedResources = typedResourceIds => {
+    const result = {json: [], image: [], audio: []}
+    for (let typedResourceId of typedResourceIds) {
+        const [ type, id ] = typedResourceId.split(':')
+        result[type].push(id)
     }
-    return result;
-};
+    return result
+}
 
 const getFlatObjectResources = resources => {
     const result = [];
@@ -159,7 +167,7 @@ const getFlatObjectResources = resources => {
         result.push(obj.type + ':' + obj.id);
     }
     return result;
-};
+}
 
 class Storage {
 
@@ -1088,30 +1096,6 @@ const isEqual = (a, b) => {
     return a === b
 }
 
-const getClonedProp = (value, parent) => {
-    if (isArray(value)) {
-        const result = []
-        for (const item of value) {
-            result.push(getClonedProp(item, parent))
-        }
-        return result
-    }
-    if (isObject(value)) {
-        if (value instanceof Config)
-            return value.constructor.isChild ?
-                value.getInitialModelInstance({ parent }) :
-                value.getInitialModelInstance()
-        if (value instanceof ImageResource) return new AppliedImage(value)
-
-        const result = {}
-        for (const [ key, subValue ] of Object.entries(value)) {
-            result[key] = getClonedProp(subValue, parent)
-        }
-        return result
-    }
-    return value
-}
-
 function getParsedCssValueRec(value, splitBy = false) {
     if (value === null) {
         return null;
@@ -1352,7 +1336,6 @@ export {
     drawEventsValue,
     getCanvasForIndexMatrix,
     getCanvasForEventMatrix,
-    getClonedProp,
     isUrl,
     isDataUrl,
     isObject,

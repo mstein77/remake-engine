@@ -1,14 +1,38 @@
-import { d, isObject, without, getClonedProp, toKeys, toPairs } from "helper/helper"
+import { d, isObject, without, toKeys, toPairs, isArray } from "helper/helper"
 import { validated } from "helper/validate"
+import { AppliedImage, ImageResource } from "./classes"
 import inst from "./instances"
 
+const getClonedProp = (value, parent) => {
+    if (isArray(value)) {
+        const result = []
+        for (const item of value) {
+            result.push(getClonedProp(item, parent))
+        }
+        return result
+    }
+    if (isObject(value)) {
+        if (value instanceof Config)
+            return value.getInitialModelInstance({ parent })
+
+        if (value instanceof ImageResource)
+            return new AppliedImage(value)
+
+        const result = {}
+        for (const [ key, subValue ] of Object.entries(value)) {
+            result[key] = getClonedProp(subValue, parent)
+        }
+        return result
+    }
+    return value
+}
+
 /**
- * Represents a configuration object of a configurable model. Validates and parses the configuration and
- * initializes a model with this configuration. Also allows to rebuild a JSON configuration object based on a
- * given model.
+ * Represents a configuration object of a model. Validates and parses the configuration and initializes a model with
+ * this configuration. The configuration will be sealed and finalized once the configuration is applied to a model for
+ * the first time.
  *
- * The configuration will be sealed and finalized once the configuration is applied to a model for the first time.
- *
+ * @class Config
  */
 class Config {
 
@@ -22,25 +46,36 @@ class Config {
             throw Error('Config must be instantiated with a JSON!')
 
         this.fieldProps = this.getFieldProps()
-        this.resolved = false
-
         const compJson = this.getCompatibleJson(json)
 
         this.parse({ ...this.getDefaultProps(), ...compJson })
     }
 
+    /**
+     * Returns a string holding the current version number of the configuration
+     *
+     * @returns {string}
+     */
     getVersion() {
         // TODO use engine version here by default
         return '1.0.0'
     }
 
+    /**
+     * Returns a compatible version of the given json configuration object. This method should be used to transform
+     * configurations from lower versions to the current one if necessary
+     *
+     * @param {object} json
+     * @returns {object}
+     */
     getCompatibleJson(json) {
         return json
     }
 
     /**
      * Returns an object holding all defaults for properties which should be used when they are missing in the
-     * JSON object which is passed to the constructor
+     * JSON object which is passed to the constructor. Mandatory properties which have no default value should be set
+     * to undefined here to trigger an exception when the configuration is applied to the model
      *
      * @returns {object}
      */
@@ -157,35 +192,54 @@ class Config {
      */
     applyTo(model) {
         const id = this.getId()
-        if (!this.isEditable()) {
-            this.resolve()
-        }
+        this.checkAndFreeze()
         if (Config.storeInModel) model.config = this
         model.id = id
         this.applyPropsTo(model)
         return model
     }
 
+    /**
+     * Deletes all properties which are given in the defaults object from this configuration. Only works if the
+     * configuration was not applied to a model before
+     */
     clear() {
         const keys = toKeys(this.getDefaults())
         for (const key of keys) delete this[key]
     }
 
+    /**
+     * Returns a new model instance with this configuration and the given options.
+     * Throws an exception if no factory was linked to this configuration
+     *
+     * @param {object} options
+     *
+     * @returns {object}
+     */
     getInitialModelInstance(options) {
         return this.getModelInstance(this, options)
     }
 
+    /**
+     * Returns a new model instance with the given input and options from the model factory linked to this
+     * configuration. Throws an exception if no factory was linked to this configuration
+     *
+     * @param {string|object} input
+     * @param {object} options
+     *
+     * @returns {object}
+     */
     getModelInstance(input, options) {
         if (!this.constructor.factory)
             throw Error(`Missing model factory method in config ${this.constructor.name}`)
 
-        return new this.constructor.factory(input, options)
+        return this.constructor.factory(input, options)
     }
 
     /**
      * Applies the current configuration props to the given model
      *
-     * @param obj
+     * @param {object} obj
      */
     applyPropsTo(model) {}
 
@@ -196,15 +250,12 @@ class Config {
      *
      * @param {object} obj
      * @param {array} except
-     *
-     * @returns {object}
      */
     applyDefaultKeysTo(obj, except = []) {
         const keys = without(toKeys(this.getDefaults()), except)
         for (const key of keys) {
             obj[key] = getClonedProp(this[key], obj)
         }
-        return obj
     }
 
     /**
@@ -212,28 +263,28 @@ class Config {
      *
      * @returns {string}
      */
-    getType() {
+    getModelType() {
         return this.constructor.typeName
     }
 
     /**
-     * Freezes the given JSON object so that no more changes can be made and returns it
+     * Returns a new automatically generated id which is used when no id was given in the configuration
      *
-     * @param {object} obj
-     *
-     * @returns {object}
+     * @returns {string}
      */
-    freezeDeep(obj) {
-        return Object.freeze(obj)
+    getNewAutoId() {
+        return '_auto_' + inst.autoIds.getNewId(this.getModelType())
     }
 
-    getAutoId() {
-        return '_auto_' + inst.autoIds.getNewId(this.getType())
-    }
-
+    /**
+     * Returns the id given in the configuration or automatically generates a new one if none was set before
+     * Throws an exception if there is no id after the auto generation
+     *
+     * @returns {string}
+     */
     getId() {
         if (!this.id) {
-            this.id = this.getAutoId()
+            this.id = this.getNewAutoId()
             if (!this.id)
                 throw Error(`Missing mandatory key "id" in config`)
         }
@@ -241,10 +292,10 @@ class Config {
     }
 
     /**
-     * Sets the configuration to resolved and freezes it
-     * Throws an exception if no id was set
+     * Checks and freezes the configuration if this was not done before.
+     * Throws an exception if no id was set or if mandatory properties were not set before
      */
-    resolve() {
+    checkAndFreeze() {
         if (Object.isFrozen(this)) return
 
         const mandatoryKeys = this.getMandatoryKeys()
@@ -252,27 +303,7 @@ class Config {
             if (!(key in this))
                 throw Error(`Missing mandatory config key "${key}" was not set`)
         }
-        this.resolved = true;
-        this.freezeDeep(this)
-    }
-
-    /**
-     * Returns a boolean indicating whether the configuration has been resolved (means applied) or not
-     *
-     * @returns {boolean}
-     */
-    isResolved() {
-        return this.resolved
-    }
-
-    /**
-     * Returns whether the configuration should be editable after its applied to an object or not
-     *
-     * @returns {boolean}
-     */
-    isEditable() {
-        // TODO remove?
-        return false
+        Object.freeze(this)
     }
 }
 Config.storeInModel = true

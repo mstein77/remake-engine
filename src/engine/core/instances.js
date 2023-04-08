@@ -1,13 +1,5 @@
 import { FILTER } from "core/const"
-import {
-    toValues,
-    flattenResources,
-    getDeflatedResources,
-    isValidResourceId,
-    ResourceDependencies,
-    d,
-    getCanvasObjForDim
-} from "../helper/helper"
+import { toValues, toPairs, flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d, getCanvasObjForDim } from "../helper/helper"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
@@ -381,22 +373,23 @@ function has(arr, key) {
 class StorageManager {
 
     constructor(storage, gameId) {
-        this.storage = storage;
-        this.prefix = gameId;
-        this.active = this.isAvailable();
-        this.remotes = null;
+        this.storage = storage
+        this.prefix = gameId
+        this.active = this.isAvailable()
+        this.remotes = null
 
+        const keys = this.getKeys()
         this.dependencies = new ResourceDependencies(
-            () => (!this.getKeys().includes('direct')) ?
+            () => !keys.includes('direct') ?
                 {} : JSON.parse(this.storage.getItem(this.prefix + ':direct')),
             direct => {
-                this.storage.setItem(this.prefix + ':direct', JSON.stringify(direct));
-            },
-            () => (!this.getKeys().includes('indirect')) ?
+                    this.storage.setItem(this.prefix + ':direct', JSON.stringify(direct))
+                },
+            () => !keys.includes('indirect') ?
                 {} : this.indirect = JSON.parse(this.storage.getItem(this.prefix + ':indirect')),
             indirect => {
-                this.storage.setItem(this.prefix + ':indirect', JSON.stringify(indirect));
-            },
+                    this.storage.setItem(this.prefix + ':indirect', JSON.stringify(indirect))
+                },
             (type, id) => this.deleteResourceItem(type, id)
         )
     }
@@ -625,6 +618,13 @@ class StorageManager {
         }
     }
 
+    /**
+     * Returns an object mapping the resource types to the direct and indirect
+     * resource ids of the given screen found in the storage
+     *
+     * @param {string} screen
+     * @returns {object}
+     */
     getAllScreenResources(screen) {
         return getDeflatedResources(this.dependencies.getRelevantScreenResources(screen).found)
     }
@@ -646,6 +646,257 @@ class StorageManager {
     }
 }
 
+
+class ResourceManager {
+
+    constructor(fetcher, storage, previewStorage) {
+        this.fetcher = fetcher
+        this.storage = storage
+        this.previewStorage = previewStorage
+        this.registry = new Map()
+        this.clear()
+    }
+
+    clear() {
+        this._resources = null
+        this.registry.clear()
+    }
+
+    clearResources(permanent = false) {
+        this._resources = null
+        const resources = this.registry.entries()
+        for (const [ id, resource ] of resources) {
+            if (resource.permanent === permanent) this.registry.remove(id)
+        }
+        return resources
+    }
+
+    registerResource({ id, type, permanent = false, value = null, source = 'code' }) {
+        const tId = type + ':' + id
+        if (this.resources.has(tId))
+            throw Error(`Resource "${tId}" already registered in resource manager!`)
+
+        const resource = { id, type, value, resolved: false, permanent, source }
+        this.resources.set(tId, resource)
+        return resource
+    }
+
+    resolveScreenResources(screen) {
+        // 1. get direct resources of screen
+        const typedResourceIds = []
+        this.resolveResources(typedResourceIds)
+    }
+
+    getFromStorages(trId, preview) {
+        if (preview && this.previewStorage.has(trId))
+            return this.previewStorage.get(trId)
+
+        return this.storage.has(trId) ? this.storage.get(trId) : null
+    }
+
+    getStorageOverwrites(preview) {
+        const overwrites =  this.storage.dependencies.getIndirect()
+        if (!preview) return overwrites
+        return {
+            ...overwrites,
+            ...this.previewStorage.dependencies.getIndirect()
+        }
+    }
+
+    getStorageScreenRemotes(screen) {
+        return this.storage.getScreenRemotes(screen)
+    }
+
+    buildUnresolvedResources() {
+        const promises = []
+        for (const resource of this.registry) {
+            if (resource.resolved) continue
+
+            const doResolve = () => resource.resolve = true
+            switch (resource.type) {
+                case 'image':
+                    const image = new ImageResource(resource.value)
+                    resource.value = image
+                    promises.push(
+                        image.getNewDecodePromise().then(doResolve)
+                    )
+                    break
+
+                case 'audio':
+                    const audio = new AudioResource(resource.value)
+                    resource.value = audio
+                    promises.push(
+                        audio.getNewLoadingPromise().then(doResolve)
+                    )
+                    break
+
+                case 'json':
+                    doResolve()
+                    break
+            }
+        }
+        return Promise.all(promises)
+            .then(
+                () => {
+                    const unresolved = []
+                    for (const { id, type, resolved } of this.registry) {
+                        if (!resolved) unresolved.push(type + ':' + id)
+                    }
+                    if (unresolved.length)
+                        throw Error(`Could not resolve the following resources: ${unresolved.join(', ')}`)
+                }
+            )
+
+    }
+
+    getRegistryTrIds(preview) {
+        const regIds = this.registry.keys()
+        if (preview) {
+            this.previewStorage.dependencies.getRelevantScreenResources()
+        }
+        return regIds
+    }
+
+    resolveResources(screen = '') {
+        const preview = false
+
+        const fetchTrIds = []
+        const resolved = []
+
+        const promises = []
+        const trIds = this.getRegistryTrIds(preview)
+
+        for (const trId of trIds) {
+            let resource = this.registry.get(trId)
+            if (!resource) {
+                const [ type, id ] = trId.split(':')
+                resource = this.registerResource({ id, type })
+            }
+            if (resource.resolved) {
+                resolved.push(trId)
+                continue
+            }
+            const value = this.getFromStorages(trId, preview)
+            if (value) {
+                resource.value = value
+                resource.source = 'browser'
+                resolved.push(trId)
+                continue
+            }
+            if (resource.value &&  resource.value.startsWith('http') &&
+                ['image', 'audio'].includes(resource.type) ) {
+                resource.source = 'external'
+                promises.push(
+                    fetch(value, {mode: 'cors'}).then(
+                        response => {
+                            if (!response.ok)
+                                throw Error('Could not open url')
+
+                            return response.blob()
+                                .then(blob => {
+                                    resource.value = URL.createObjectURL(blob)
+                                })
+                        }
+                    )
+                )
+            } else {
+                fetchTrIds.push(trId)
+            }
+        }
+        const fetchPromise = this.fetcher.fetch('resources', {
+            resources: fetchTrIds,
+            screen,
+            resolved,
+            overwrites: this.getStorageOverwrites(preview),
+            remotes: this.getStorageScreenRemotes(screen, preview)
+        }).then(({ found }) => {
+            for (const { id, type, data } of found) {
+
+                const trId = type + ':'  + id
+                let resource = this.registry.get(trId)
+
+                if (!resource) {
+                    resource = this.registerResource({ id, type, permanent: false, value: data, source: 'server' })
+                }
+                resource.source = 'server'
+                resource.value = data
+            }
+        })
+        promises.push(fetchPromise)
+
+        return Promise.all(promises)
+            .then(
+                () => this.buildUnresolvedResources()
+            )
+    }
+
+    get resources() {
+        if (!this._resources) {
+            const result = {
+                image: {},
+                audio: {},
+                json: {}
+            }
+            const resources = this.registry.values()
+            for (const { id, type, value } of resources) {
+                result[type][id] = value
+            }
+            this._resources = result
+        }
+        return this._resources
+    }
+}
+
+/**
+ * ResourceLoader
+ *
+ *   - Registration (entweder id-only oder mit local-fallback)
+ *       Wird genutzt:
+ *         a) von Game-Instanz um die Configs (Game + Screens, evt. auch direct/indirect) als Perm-Resourcen zu reg.
+ *         b) von GlobalsResolver um die permanenten Resourcen zu reg.
+ *         c) vom Screen um die Screen-Config als auch die direkten Resourcen zu reg.
+ *
+ *   - Loading
+ *       Schaut
+ *         a) welche permanenten Resourcen
+ *         b) welche Screen-Resourcen
+ *       geladen werden müssen und
+ *
+ *   - Invalidierung
+ *
+ *
+ *   Resources:
+ *     <type>: <id> => { resolved: <null|mixed>, code: <mixed>, permanent: <bool>, source: <string> }
+ *
+ *   Modes:
+ *     disabled: all hasResource(x) will fail (required for editing a resource in the editor)
+ *     preview:  the loading-strategy will first look at the session storage
+ *     normal
+ *
+ *
+ *   registerResource({ id, type, permanent = false, code = null }) {
+         const tId = type + ':' + id
+ *       if (this.resourceTypedIds.includes(tId))
+ *          throw 'Really or return?'
+ *
+ *       this.resources.push({ id, type, permanent, code, source })
+ *       this.resourceTypeIds.push(tId)
+ *   }
+ *
+ *
+ *
+ *   getResources()
+ *     const resources = { images: {}, audios: {}, jsons: {} }
+ *     for (const [ id, resource ] of this.resources) {
+ *         const { type, resolved }
+ *         resources[type][id] = resource.resolved
+ *     }
+ *     return resources
+ *
+ *
+ *
+ *
+ */
 class ResourceLoader {
 
     constructor(fetcher, storage) {
@@ -675,76 +926,76 @@ class ResourceLoader {
     }
 
     invalidatePermanentResources() {
-        this.hasPermLoaded = false;
+        this.hasPermLoaded = false
     }
 
     clearResources() {
-        this.resources = {};
+        this.resources = {}
     }
 
     clearBrowserResources() {
-        this.storage.truncate();
+        this.storage.truncate()
     }
 
     hasLocalResource(type, id) {
-        return this.hasLocal.has(type + ':' + id);
+        return this.hasLocal.has(type + ':' + id)
     }
 
     hasExternalResource(type, id) {
-        return this.hasExternal.has(type + ':' + id);
+        return this.hasExternal.has(type + ':' + id)
     }
 
     isExternalValue(value) {
-        return typeof value === 'string' && /^http(s)?:\/\//.test(value);
+        return typeof value === 'string' && /^http(s)?:\/\//.test(value)
     }
 
     registerLocal(id, value) {
         if (this.isExternalValue(value)) {
-            this.hasExternal.add(id);
+            this.hasExternal.add(id)
         } else {
-            this.hasLocal.add(id);
+            this.hasLocal.add(id)
         }
     }
 
     addJson(perm, id, local = null) {
         if (!isValidResourceId('json', id)) {
-            throw Error(`Invalid id "${id}" given for JSON resource...TODO`);
+            throw Error(`Invalid id "${id}" given for JSON resource...TODO`)
         }
         if (local !== null) {
-            this.hasLocal.add('json:' + id);
+            this.hasLocal.add('json:' + id)
         }
         if (perm) {
-            this.permJson[id] = local;
+            this.permJson[id] = local
         } else {
-            this.json[id] = local;
+            this.json[id] = local
         }
     }
 
     addImage(perm, id, localValue = null) {
         if (!isValidResourceId('image', id)) {
-            throw Error(`Invalid id "${id}" given for image resource...TODO`);
+            throw Error(`Invalid id "${id}" given for image resource...TODO`)
         }
         if (localValue !== null) {
-            this.registerLocal('image:' + id, localValue);
+            this.registerLocal('image:' + id, localValue)
         }
         if (perm) {
-            this.permImage[id] = localValue;
+            this.permImage[id] = localValue
         } else {
-            this.image[id] = localValue;
+            this.image[id] = localValue
         }
     }
 
     addAudio(perm, id, localValue = null) {
         if (!isValidResourceId('audio', id)) {
-            throw Error(`Invalid id "${id}" given for audio resource...TODO`);
+            throw Error(`Invalid id "${id}" given for audio resource...TODO`)
         }
         if (localValue !== null) {
-            this.registerLocal('audio:' + id, localValue);
+            this.registerLocal('audio:' + id, localValue)
         }
         if (perm) {
-            this.permAudio[id] = localValue;
+            this.permAudio[id] = localValue
         } else {
-            this.audio[id] = localValue;
+            this.audio[id] = localValue
         }
     }
 
@@ -861,9 +1112,8 @@ class ResourceLoader {
         return img;
     }
 
-    storeScreenModel(screen, model) {
-        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + model.id);
-        const resources = model.getResourcesAndDependencies(model);
+    storeModel(model) {
+        const resources = model.getResourcesAndDependencies(model)
         for (let resource of resources.resources) {
             switch(resource.type) {
                 case 'json':
@@ -878,6 +1128,12 @@ class ResourceLoader {
                     throw Error('TODO');
             }
         }
+        return resources
+    }
+
+    storeScreenModel(screen, model) {
+        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + model.id);
+        const resources = this.storeModel(model)
         this.storage.storeScreenResource(screen, 'json', model.id);
         this.storage.storeResourceDependencies(resources.dependencies);
 
@@ -973,32 +1229,50 @@ class ResourceLoader {
         )
     }
 
-    loadGameConfig() {
-        return Promise.resolve()
+    loadGameConfig(config) {
+        return this.fetcher.fetch('resources', {
+            resources: [{id: 'game', type: 'json'}],
+            screen: '',
+            resolved: {},
+            overwrites: {},
+            remotes: []
+        }).then(
+            response => {
+                if (response.notFound.length) return config
+                return response.found[0].data
+            }
+        )
     }
 
-    loadResources(images, jsons, audios, screen = '') {
-        const direct = this.storage.getAllScreenResources(screen);
+    /**
+     *
+     *
+     * @param images
+     * @param jsons
+     * @param audios
+     * @param screen
+     * @returns {Promise<Awaited<unknown>[]>}
+     */
+    loadResources(loadedImages, loadedJsons, loadedAudios, screen = '') {
+        // direct here just means, the direct and indirected ids that are locally available
+        // as long as no resource was stored locally, we will only have direct resources here and
+        // the dependencies will be added on the server request
+        const direct = this.storage.getAllScreenResources(screen)
 
+        // add all of these ids which were missing to the resource request objects with null
         for (let id of direct.json) {
-            if (jsons[id] === undefined) {
-                jsons[id] = null;
-            }
+            if (loadedJsons[id] === undefined) loadedJsons[id] = null
         }
         for (let id of direct.image) {
-            if (images[id] === undefined) {
-                images[id] = null;
-            }
+            if (loadedImages[id] === undefined) loadedImages[id] = null
         }
         for (let id of direct.audio) {
-            if (audios[id] === undefined) {
-                audios[id] = null;
-            }
+            if (loadedAudios[id] === undefined) loadedAudios[id] = null
         }
-
-        const resolved = flattenResources(direct);
+        // all ids of the locally available screen resources
+        const resolved = flattenResources(direct)
         /*
-        WHY ????
+                WHY ????
                 const resourcesWithChildren = this.storage.getResourcesWithChildren();
 
                 for(let resource of resourcesWithChildren) {
@@ -1007,93 +1281,98 @@ class ResourceLoader {
                     }
                 }
         */
-        const promises = [];
-        const fetchResources = [];
-        const storedImageIds = this.storage.getImageIds();
-        each(images,(value, id) => {
-            if (has(storedImageIds, id)) {
-                const value = this.storage.getImage(id);
-                const image = new ImageResource(value);
+        const promises = []
+        const fetchResources = []
+        const storedImageIds = this.storage.getImageIds()
+
+        // we check each of the loaded image resources
+        for (const [ id, value ] of toPairs(loadedImages)) {
+            // overwrite in local storage?
+            if (storedImageIds.includes(id)) {
+                const value = this.storage.getImage(id)
+                const image = new ImageResource(value)
                 promises.push(
                     image.getNewDecodePromise().then(() => {
-                        this.setResource('image', id, image, 'browser', screen);
+                        this.setResource('image', id, image, 'browser', screen)
                     })
-                );
-            } else {
-                if (value !== null && value.startsWith('http')) {
-                    // try to fetch image directly
-                    promises.push(
-                        fetch(value, {mode: 'cors'}).then(
-                            response => {
-                                if (!response.ok) {
-                                    throw Error('Could not open url');
-                                }
-                                return (
-                                    response.blob().then(blob => {
-                                        const resource = new ImageResource(URL.createObjectURL(blob));
-                                        return resource.getNewDecodePromise().then(() => {
-                                            this.setResource('image', id, resource, 'external', screen);
-                                        });
-                                    })
-                                )
-                            }
-                        )
-                    );
-                } else {
-                    fetchResources.push({id, type: 'image'});
-                }
+                )
+                continue
             }
-        });
+            if (value === null || !value.startsWith('http')) {
+                // we try to fetch the resource from the server, because it could be overwritten
+                fetchResources.push({ id, type: 'image' })
+                continue
+            }
+            // try to fetch image directly
+            // TODO: wouldn't it make sense to check a server overwrite anyway?
+            promises.push(
+                fetch(value, {mode: 'cors'}).then(
+                    response => {
+                        if (!response.ok)
+                            throw Error('Could not open url')
 
-        const storedAudioIds = this.storage.getAudioIds();
-        each(audios, (value, id) => {
-            if (has(storedAudioIds, id)) {
-                const audio = new AudioResource(this.storage.getAudio(id));
+                        return (
+                            response.blob().then(blob => {
+                                const resource = new ImageResource(URL.createObjectURL(blob))
+                                return resource.getNewDecodePromise().then(() => {
+                                    this.setResource('image', id, resource, 'external', screen)
+                                })
+                            })
+                        )
+                    }
+                )
+            )
+        }
+
+        // we check each of the loaded audio resources
+        const storedAudioIds = this.storage.getAudioIds()
+        for (const [ id, value ] of loadedAudios) {
+            if (storedAudioIds.includes(id)) {
+                const audio = new AudioResource(this.storage.getAudio(id))
                 promises.push(
                     audio.getNewLoadingPromise().then(() => {
-                        this.setResource('audio', id, audio, 'browser', screen);
+                        this.setResource('audio', id, audio, 'browser', screen)
                     })
-                );
-            } else {
-                if (value !== null && value.startsWith('http')) {
-                    // try to fetch audio directly
-                    promises.push(
-                        fetch(value, {mode: 'cors'}).then(
-                            response => {
-                                if (!response.ok) {
-                                    throw Error('Could not open url');
-                                }
-                                return (
-                                    response.blob().then(blob => {
-                                        const resource = new AudioResource(URL.createObjectURL(blob));
-                                        return resource.getNewLoadingPromise().then(() => {
-                                            this.setResource('audio', id, resource, 'external', screen);
-                                        });
-                                    })
-                                )
-                            }
-                        )
-                    );
-                } else {
-                    fetchResources.push({id, type: 'audio'});
-                }
+                )
+                continue
             }
-        });
+            if (value === null || !value.startsWith('http')) {
+                fetchResources.push({ id, type: 'audio' })
+                continue
+            }
+            // try to fetch audio directly
+            promises.push(
+                fetch(value, {mode: 'cors'}).then(
+                    response => {
+                        if (!response.ok) {
+                            throw Error('Could not open url')
+                        }
+                        return (
+                            response.blob().then(blob => {
+                                const resource = new AudioResource(URL.createObjectURL(blob))
+                                return resource.getNewLoadingPromise().then(() => {
+                                    this.setResource('audio', id, resource, 'external', screen)
+                                })
+                            })
+                        )
+                    }
+                )
+            )
+        }
 
         // do the same for jsons
-        const storedJsonIds = this.storage.getJsonIds();
-        each(jsons,(value, id) => {
-            if (has(storedJsonIds, id)) {
-                this.setResource('json', id, this.storage.getJson(id), 'browser', screen);
+        const storedJsonIds = this.storage.getJsonIds()
+        for (const [ id, value ] of loadedJsons) {
+            if (storedJsonIds.includes(id)) {
+                this.setResource('json', id, this.storage.getJson(id), 'browser', screen)
                 promises.push(
                     Promise.resolve()
-                );
-            } else {
-                // TODO: url-load?
-                fetchResources.push({id, type: 'json'});
+                )
+                continue
             }
-        });
-
+            // TODO: url-load?
+            fetchResources.push({ id, type: 'json' })
+        }
         // load ids from server
 //        if (has(fetchResources)) {
         /*
@@ -1113,31 +1392,31 @@ class ResourceLoader {
             }).then(body => {
                 const subPromises = [];
                 for (let resource of body.found) {
-                    if (resource.data === null) {
-                        continue;
-                    }
+                    if (resource.data === null) continue
+
                     switch (resource.type) {
+
                         case 'image':
-                            const image = new ImageResource(resource.data);
+                            const image = new ImageResource(resource.data)
                             subPromises.push(
                                 image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'server', screen);
+                                    this.setResource(resource.type, resource.id, image, 'server', screen)
                                 })
-                            );
-                            break;
+                            )
+                            break
 
                         case 'audio':
-                            const audio = new AudioResource(resource.data);
+                            const audio = new AudioResource(resource.data)
                             subPromises.push(
                                 audio.getNewLoadingPromise().then(() =>{
-                                    this.setResource(resource.type, resource.id, audio, 'server', screen);
+                                    this.setResource(resource.type, resource.id, audio, 'server', screen)
                                 })
-                            );
-                            break;
+                            )
+                            break
 
                         case 'json':
-                            this.setResource('json', resource.id, resource.data, 'server', screen);
-                            break;
+                            this.setResource('json', resource.id, resource.data, 'server', screen)
+                            break
                     }
                 }
 
@@ -1149,68 +1428,69 @@ class ResourceLoader {
                             this.storage.getResource(resource.type, resource.id),
                             'browser',
                             screen
-                        );
+                        )
                     } else {
                         let value = null;
                         switch(resource.type) {
+
                             case 'json':
-                                value = jsons[resource.id];
-                                break;
+                                value = loadedJsons[resource.id]
+                                break
 
                             case 'image':
-                                value = images[resource.id];
-                                break;
+                                value = loadedImages[resource.id]
+                                break
 
                             case 'audio':
-                                value = audios[resource.id];
-                                break;
+                                value = loadedAudios[resource.id]
+                                break
                         }
-                        if (value === null) {
-                            throw Error(`Missing remote ${resource.type} resource ${resource.id}`);
-                        }
+                        if (value === null)
+                            throw Error(`Missing remote ${resource.type} resource ${resource.id}`)
+
                         if (resource.type === 'image') {
-                            const image = new ImageResource(value);
+                            const image = new ImageResource(value)
                             subPromises.push(
                                 image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'code', screen);
+                                    this.setResource(resource.type, resource.id, image, 'code', screen)
                                 })
-                            );
-                            continue;
-                        } else if (resource.type === 'audio') {
-                            const audio = new AudioResource(value);
+                            )
+                            continue
+                        }
+                        if (resource.type === 'audio') {
+                            const audio = new AudioResource(value)
                             subPromises.push(
                                 audio.getNewLoadingPromise().then(() => {
-                                    this.setResource(resource.type, resource.id, audio, 'code', screen);
+                                    this.setResource(resource.type, resource.id, audio, 'code', screen)
                                 })
-                            );
-                            continue;
+                            )
+                            continue
                         }
-                        this.setResource(resource.type, resource.id, value, 'code', screen);
+                        this.setResource(resource.type, resource.id, value, 'code', screen)
                     }
                 }
-                return Promise.all(subPromises);
+                return Promise.all(subPromises)
             })
         )
-        //       }
-
         return Promise.all(promises).then(() => {
             return this.resources
-        });
+        })
     }
 
     loadPermanentResources() {
         return this.loadResources(
             this.permImage, this.permJson, this.permAudio
         ).then(() => {
-            this.hasPermLoaded = true;
-        });
+            this.hasPermLoaded = true
+        })
     }
 
     load(screen) {
-        const promise = this.hasPermLoaded ? Promise.resolve() : this.loadPermanentResources(this.permImage, this.permJson, this.permAudio);
+        const promise = this.hasPermLoaded ? Promise.resolve() : this.loadPermanentResources(this.permImage, this.permJson, this.permAudio)
+
         return promise.then(() => this.loadResources(
             this.image, this.json, this.audio, screen
-        ));
+        ))
     }
 }
 

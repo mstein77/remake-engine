@@ -20,6 +20,7 @@ class GameEditor {
             if (!Array.isArray(areas)) return
 
             for (let area of areas) {
+                // TODO remove this
                 if (area.panes !== undefined) {
                     for (let pane of area.panes) {
                         if (pane.isBufferedTilesPane) {

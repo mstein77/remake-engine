@@ -1141,7 +1141,8 @@ function StateContentArea() {
     const registry = useRef(null);
     if (registry.current === null) {
         const callStack = [
-            {key: 'screen', params: {}}
+            // {key: 'screen', params: {}}
+            {key: 'game', params: {}}
         ];
         const getBlock = (level, item) => {
             return (

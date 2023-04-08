@@ -1,12 +1,18 @@
+/**
+ * Returns an array holding the typed resource ids given in the type2ids object
+ *
+ * @param {object} resources
+ * @returns {array}
+ */
 const flattenResources = resources => {
-    const result = [];
-    for(let [type, ids] of Object.entries(resources)) {
-        for (let id of ids) {
-            result.push(type + ':' + id);
+    const result = []
+    for(const [ type, ids ] of Object.entries(resources)) {
+        for (const id of ids) {
+            result.push(type + ':' + id)
         }
     }
-    return result;
-};
+    return result
+}
 
 const isValidResourceId = (type, id) => {
     let regexp = null;
@@ -246,33 +252,45 @@ class ResourceDependencies {
         return result
     }
 
+    /**
+     * Returns an object which includes all typed resource ids of the direct and indirect resources of the given
+     * screen which are already resolved (found) or are missing (notFound) and must be fetched from the server.
+     * The overwrites array allows to overwrite the initially loaded dependencies of the storage
+     *
+     * @param {string} screen
+     * @param {array} resolved
+     * @param {object} overwrites
+     * @param {array} remotes
+     * @returns {object}
+     */
     getRelevantScreenResources(screen, resolved = [], overwrites = {}, remotes = []) {
-        const direct = this.getDirectScreenResources(screen);
-        for (let remote of remotes) {
-            const [type, id] = remote.split(':');
-            if (!direct[type].includes(id)) {
-                direct[type].push(id);
-            }
+        // hole object welches die resource-types of die direkten Resource-Ids des Screens abbildet
+        const direct = this.getDirectScreenResources(screen)
+
+        // die remotes sind als "<type>:<id>" gegeben und alles was fehlt wird im direct ergänzt
+        for (const remote of remotes) {
+            const [ type, id ] = remote.split(':')
+            if (direct[type].includes(id)) continue
+            direct[type].push(id)
         }
 
-        const found = [];
-        const notFound = [];
-        for (let [type, ids] of Object.entries(direct)) {
-            for (let id of ids) {
+        const found = []
+        const notFound = []
+        for (const [ type, ids ] of Object.entries(direct)) {
+            for (const id of ids) {
+                // ermittel die abhängigen Resourcen "<type>:<id>" der aktuellen Resource unterteilt in die,
+                // die im resolved array vorkommen und die diejenigen, die nicht
                 const paths = this.extractDependencies(type + ':' + id, overwrites, resolved);
-                for (let id of paths.found) {
-                    if (!found.includes(id)) {
-                        found.push(id);
-                    }
+                // anschliessend übernehme die gefundenen und nicht gefundenen resource ids in das resultat
+                for (const id of paths.found) {
+                    if (!found.includes(id)) found.push(id)
                 }
-                for (let id of paths.notFound) {
-                    if (!notFound.includes(id)) {
-                        notFound.push(id);
-                    }
+                for (const id of paths.notFound) {
+                    if (!notFound.includes(id)) notFound.push(id)
                 }
             }
         }
-        return {found, notFound};
+        return { found, notFound };
     }
 }
 

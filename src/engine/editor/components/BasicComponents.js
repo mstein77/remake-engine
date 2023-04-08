@@ -1890,7 +1890,6 @@ function EditorCtx({ id, children }) {
                 },
                 getGridActions: () => modesContext ? modesContext.actions : [],
                 doGridAction: (name, data) => {
-                    d('DO ACTION', name);
                     const action = modesContext.actions[name];
                     if (!action || (action.can && !action.can())) return;
                     return action.exec(data)
