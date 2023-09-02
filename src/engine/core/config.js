@@ -143,7 +143,6 @@ class Config {
                 try {
                     this[setKey](value);
                 } catch (e) {
-                    d(value)
                     throw Error(`[${this.constructor.name}] Error setting config key "${key}": ${e.message}`)
                 }
             }

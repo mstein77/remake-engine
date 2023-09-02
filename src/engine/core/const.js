@@ -6,7 +6,44 @@ const STATE = {
     BOOT: 4,
     RUNNING: 5,
     STOPPED: 6,
-    EDIT: 7
+    EDIT: 7,
+    READY: 8
+}
+
+const RENDERER_STATE = {
+    CONSTRUCTED: 0,
+    WAIT_LOADING: 1,
+    LOADING: 2,
+    LOADED: 3,
+    WAIT_BUILD: 4,
+    BUILD: 5,
+    WAIT_HANDLING: 6,
+    HANDLING: 7,
+    HALTED: 8,
+    WAIT_DESTROY: 9
+}
+
+const RESOURCE = {
+    TYPE: {
+        JSON: 0,
+        IMAGE: 1,
+        AUDIO: 2
+    }
+}
+RESOURCE.PREFIX = {
+    [RESOURCE.TYPE.JSON]: 'j',
+    [RESOURCE.TYPE.IMAGE]: 'i',
+    [RESOURCE.TYPE.AUDIO]: 'a'
+}
+RESOURCE.TEXT = {
+    [RESOURCE.TYPE.JSON]: 'json',
+    [RESOURCE.TYPE.IMAGE]: 'image',
+    [RESOURCE.TYPE.AUDIO]: 'audio'
+}
+RESOURCE.KEY = {
+    [RESOURCE.TYPE.JSON]: 'json',
+    [RESOURCE.TYPE.IMAGE]: 'image',
+    [RESOURCE.TYPE.AUDIO]: 'audio'
 }
 
 const FILTER = {
@@ -91,11 +128,13 @@ const DEGREE_90 = Math.PI / 2
 
 export {
     STATE,
+    RENDERER_STATE,
     FILTER,
     INPUT,
     PATH,
     COLLISION,
     ANIMATION,
     TILE,
-    DEGREE_90
+    DEGREE_90,
+    RESOURCE
 }

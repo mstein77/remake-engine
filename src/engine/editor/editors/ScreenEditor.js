@@ -1112,12 +1112,13 @@ function ScreenEditor({ resources, setSelected, ...props }) {
 
     const tree = useMemo(() => {
         const game = props.game;
-        const screen = game.getCurrentScreen();
+        const renderer = game.getActiveScreenRenderer()
+        const screen = renderer.paneTree;
         const nodes = [];
 
         const innerNodes = [];
         getAreaNode(innerNodes,false, reverse(screen.areas), {width: game.width, height: game.height, x: 0, y: 0});
-        nodes.push({type: 'Screen', name: screen.id, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
+        nodes.push({type: 'Screen', name: renderer.scope, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
         nodes.push( ...innerNodes );
 
         // assign planes

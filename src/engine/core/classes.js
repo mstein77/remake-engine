@@ -1,7 +1,6 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import { d, isValidResourceId, BitmapPlayer, getCanvasForDim, getCanvasObjForDim } from "helper/helper"
-import { getResourcesAndCallback } from "./resources"
+import {d, isValidResourceId, BitmapPlayer, getCanvasForDim, getCanvasObjForDim, toValues} from "helper/helper"
 import { getContainerElem } from "../helper/dom";
 
 /**
@@ -108,17 +107,20 @@ class AppliedImage {
 
 class RawAppliedImage extends AppliedImage {
     constructor(id = null) {
-        super(inst.RL.makeImageResource(null, id));
+        super(inst.RL.createImageResource(null, id));
     }
 }
 
+const neutralInputState = {xDir: 0, yDir: 0, inputs: {}, touchPressed: [], forced: null}
+
 class InputController {
 
-    constructor() {
+    constructor(blockInitial = true) {
         this.xDir = 0;
         this.yDir = 0;
         this.inputs = {};
         this.forced = null;
+        this._active = true
         this.dirInputsKeyboard = {
             up: null,
             down: null,
@@ -139,6 +141,23 @@ class InputController {
         };
         this.touchPressed = [];
         this.gamepadNo = 0;
+
+        this.blockedKeys = blockInitial ? toValues(inst.game.keysDown) : null
+        // TODO blocked Gamepad inputs like keys
+    }
+
+    get state() {
+        if (!this.active) return neutralInputState
+
+        return this
+    }
+
+    get active() {
+        return this._active && inst.game.controlsActive
+    }
+
+    setActive(value) {
+        this._active = value
     }
 
     assignGamepadNo(value) {
@@ -167,7 +186,7 @@ class InputController {
     }
 
     isForced() {
-        return this.forced !== null;
+        return this.state.forced !== null;
     }
 
     getDirKeys() {
@@ -186,21 +205,32 @@ class InputController {
     }
 
     getKeysDown() {
-        if (this.forced !== null) {
+        if (this.state.forced !== null) {
             return this.forced;
         }
-        return inst.game.keysDown
+
+        if (!this.blockedKeys) return inst.game.keysDown
+
+        const keysDown = { ...inst.game.keysDown }
+        const stillBlocked = []
+        for (const key of this.blockedKeys) {
+            if (!(key in keysDown)) continue
+            stillBlocked.push(key)
+            delete keysDown[key]
+        }
+        this.blockedKeys = stillBlocked.length ? stillBlocked : null
+        return keysDown
     }
 
     getGamepadPressed() {
-        if (this.forced !== null) {
+        if (this.state.forced !== null) {
             return [];
         }
         return inst.game.getGamepadPressed(this.gamepadNo);
     }
 
     getTouchPressed() {
-        if (this.forced !== null) {
+        if (this.state.forced !== null) {
             return [];
         }
         return this.touchPressed;
@@ -226,7 +256,7 @@ class InputController {
     }
 
     getDirVector() {
-        return {x: this.xDir, y: this.yDir};
+        return {x: this.state.xDir, y: this.state.yDir};
     }
 
     updateTouchInputs() {
@@ -291,6 +321,8 @@ class InputController {
     }
 
     isPressed(name) {
+        if (!this.active) return false
+
         const input = this.inputs[name];
         const keysDown = this.getKeysDown();
         if (input.map.key !== null && keysDown[input.map.key] === input.map.key) {
@@ -310,7 +342,7 @@ class InputController {
     }
 
     hasInput(name) {
-        return this.inputs[name].state === INPUT.STATE.PRESSED;
+        return this.active && this.inputs[name].state === INPUT.STATE.PRESSED;
     }
 
     awaitInput(name) {
@@ -346,47 +378,47 @@ class InputController {
     }
 
     noXDir() {
-        return this.xDir === 0
+        return this.state.xDir === 0
     }
 
     noYDir() {
-        return this.yDir === 0
+        return this.state.yDir === 0
     }
 
     noDir() {
-        return this.xDir === 0 && this.yDir === 0;
+        return this.state.xDir === 0 && this.state.yDir === 0
     }
 
     isDownDir() {
-        return this.yDir === 1;
+        return this.state.yDir === 1
     }
 
     isUpDir() {
-        return this.yDir === -1;
+        return this.state.yDir === -1
     }
 
     isRightDir() {
-        return this.xDir === 1;
+        return this.state.xDir === 1
     }
 
     isLeftDir() {
-        return this.xDir === -1;
+        return this.state.xDir === -1
     }
 
     isDown() {
-        return this.yDir === 1 && this.xDir === 0;
+        return this.state.yDir === 1 && this.state.xDir === 0
     }
 
     isUp() {
-        return this.yDir === -1 && this.xDir === 0;
+        return this.state.yDir === -1 && this.state.xDir === 0
     }
 
     isLeft() {
-        return this.yDir === 0 && this.xDir === -1;
+        return this.state.yDir === 0 && this.state.xDir === -1
     }
 
     isRight() {
-        return this.yDir === 0 && this.xDir === 1;
+        return this.state.yDir === 0 && this.state.xDir === 1
     }
 }
 
@@ -500,217 +532,52 @@ class AudioResource {
     }
 }
 
-// ########################################
-//       A r e a s
-// ########################################
-
-class Area {
-
-    constructor() {
-        this.panes = [];
-    }
-
-    addPane(pane) {
-        this.panes.push(pane);
-    }
-
-    addViewNodesToTree(tree, dimX, dimY, offX = 0, offY = 0) {
-        const areaNode = {
-            type: 'area',
-            dim: {
-                x: dimX,
-                y: dimY
-            },
-            offset: {
-                x: offX,
-                y: offY
-            },
-            children: []
-        };
-        for (let i = 0; i < this.panes.length; i++) {
-            const pane = this.panes[i];
-            if (this.firstArea === true && i === 0) {
-                pane.opaque = true;
-            }
-            const node = {
-                type: 'pane',
-                pane,
-                container: pane.init(dimX, dimY),
-                children: []
-            };
-            areaNode.children.push(node);
-            if (node.container) {
-                node.container.setViewPort(dimX, dimY, offX, offY);
-            }
-        }
-        tree.children.push(areaNode);
-    }
-}
-
-class SplitArea {
-
-    constructor(axis, areaSizes) {
-        this.axis = axis;
-        this.areaSizes = areaSizes;
-        this.areaLength = 0;
-        this.areas = [];
-        this.scrollElem = null;
-        this.scrollPos = 0;
-        this.maxScrollPos = 0;
-        let i = 0;
-        while (i < areaSizes.length) {
-            this.areaLength += this.areaSizes[i];
-            this.areas.push([]);
-            i++;
-        }
-    }
-
-    scrollBy(sx, sy) {
-        if (!this.scrollElem) {
-            return {
-                x: 0,
-                y: 0,
-                unscrolled: {
-                    x: sx,
-                    y: sy
-                }
-            };
-        }
-        const move = this.axis === 'X' ? sx : sy;
-        const old = this.scrollPos;
-        this.scrollPos += move;
-        if (this.scrollPos < 0) {
-            this.scrollPos = 0;
-        } else if (this.scrollPos > this.maxScrollPos) {
-            this.scrollPos = this.maxScrollPos;
-        }
-        const unscrolled = old + move - this.scrollPos;
-
-        inst.game.addDomOp(this.scrollElem, 'style.' + (this.axis === 'X' ? 'left' : 'top'), -this.scrollPos + 'px');
-        return {
-            x: (this.axis === 'X') ? this.scrollPos - old : 0,
-            y: (this.axis !== 'X') ? this.scrollPos - old : 0,
-            unscrolled: {
-                x: (this.axis === 'X') ? unscrolled : sx,
-                y: (this.axis !== 'X') ? unscrolled : sy
-            }
-        };
-    }
-
-    addArea(area, pos = null) {
-        if (pos === null) {
-            pos = 0;
-            while (pos < this.areas.length && this.areas[pos].length !== 0) {
-                pos++;
-            }
-            if (pos === this.areas.length) {
-                throw new Error('No free area slot found!');
-            }
-        }
-        if (pos >= this.areas.length) {
-            return;
-        }
-        this.areas[pos].push(area);
-    }
-
-    addPane(pane, pos = null) {
-        const area = new Area();
-        area.addPane(pane);
-        this.addArea(area, pos);
-    }
-
-    addViewNodesToTree(tree, dimX, dimY, offX = 0, offY = 0) {
-        const areaNode = {
-            type: 'area',
-            dim: {
-                x: dimX,
-                y: dimY
-            },
-            offset: {
-                x: offX,
-                y: offY
-            },
-            children: []
-        };
-        const oversize = (this.axis === 'X') ? (dimX < this.areaLength) : (dimY < this.areaLength);
-        if (oversize) {
-            const container = getContainerElem(dimX, dimY, offX, offY)
-            this.scrollElem = document.createElement('div');
-            this.scrollElem.setAttribute(
-                'style',
-                'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' +
-                (this.axis === 'X' ? this.areaLength : dimX) + 'px; height: ' +
-                (this.axis !== 'X' ? this.areaLength : dimY) + 'px; top: 0px; left: 0px;'
-            );
-            container.appendChild(this.scrollElem);
-            areaNode.parents = [container, this.scrollElem];
-            offX = 0;
-            offY = 0;
-            this.maxScrollPos = this.areaLength - (this.axis === 'X' ? dimX : dimY);
-        }
-        let pos = 0;
-        for (let i = 0; i < this.areas.length; i++) {
-            // TODO check
-            /*
-                        if (this.areas[i].length === 0) {
-                            continue;
-                        }
-
-             */
-            const size = this.areaSizes[i];
-            let x = (this.axis === 'X') ? size : dimX;
-            let y = (this.axis !== 'X') ? size : dimY;
-            pos += size;
-            let firstArea = (this.firstArea === true);
-            for (let area of this.areas[i]) {
-                if (firstArea) {
-                    area.firstArea = true;
-                    firstArea = false;
-                }
-                area.addViewNodesToTree(areaNode, x, y, offX, offY);
-            }
-            if (this.axis === 'X') {
-                offX += size;
-            } else {
-                offY += size;
-            }
-        }
-        tree.children.push(areaNode);
-    }
-}
-
+/**
+ * When an init-handler is registered, a callback function and some resource providers which are called directly to
+ * get all necessary resources, but some values can be given as functions so that the value can be called
+ * lazy. The purpose of the is class is to collect all required resource for the init handler from the providers and
+ * to resolve its values and to request them from the ResourceManager
+ */
 class ResourceRequest {
 
-    constructor(resources, permanent = false) {
+    constructor(resources) {
         this.resources = resources
-        this.permament = permanent
     }
 
     resolve() {
         if (!this.resources) return
+
         const { image, audio, json } = this.resources
 
         if (image) {
             for(const [ id, content ] of Object.entries(image)) {
                 inst.RL.addImage(
-                    this.permament, id, typeof content === 'function' ? content() : content
+                    id, typeof content === 'function' ? content() : content
                 )
             }
         }
         if (audio) {
             for(const [ id, content ] of Object.entries(audio)) {
                 inst.RL.addAudio(
-                    this.permament, id, typeof content === 'function' ? content() : content
+                    id, typeof content === 'function' ? content() : content
                 )
             }
         }
         if (json) {
             for(const [ id, content ] of Object.entries(json)) {
                 inst.RL.addJson(
-                    this.permament, id, typeof content === 'function' ? content() : content
+                    id, typeof content === 'function' ? content() : content
                 )
             }
         }
+    }
+
+    isEmpty() {
+        if (!this.resources) return true
+
+        const { image, audio, json } = this.resources
+
+        return !(image || audio || json)
     }
 
     addImageResource(id, data) {
@@ -720,161 +587,7 @@ class ResourceRequest {
             }
             for (let index = 0; index < data.length; index++) {
                 const parts = id.split('.');
-                inst.RL.addImage(this.permament,parts[0] + '_' + index + '.' + parts[1], data[index]);
-            }
-        } else {
-            inst.RL.addImage(this.permament, id, data);
-        }
-    }
-
-    addImageResources(dataObj) {
-        for (let id in dataObj) {
-            this.addImageResource(id, dataObj[id]);
-        }
-    }
-
-    addAudioResource(id, url) {
-        inst.RL.addAudio(this.permament, id, url);
-    }
-
-    addAudioResources(dataObj) {
-        for (let id in dataObj) {
-            inst.RL.addAudio(this.permament, id, dataObj[id]);
-        }
-    }
-
-    addJsonResource(id, json) {
-        inst.RL.addJson(this.permament, id, json);
-    }
-}
-
-// ########################################
-//       S c r e e n
-// ########################################
-
-class Screen {
-
-    constructor(id, ...params) {
-        this.id = id;
-        this.areas = [];
-        this.keyHandler = null;
-        this.initHandler = null;
-        this.resources = {};
-        this.frameHandler = null;
-        this.tree = null;
-        this.audio = null;
-        this.hasDependencies = false;
-        this.state = 'NEW';
-
-        this.setInitHandler(...params)
-    }
-
-    getState() {
-        return this.state;
-    }
-
-    addArea(area) {
-        if (this.areas.length === 0) {
-            area.firstArea = true;
-        }
-        this.areas.push(area);
-    }
-
-    addPane(pane) {
-        const area = new Area();
-        area.addPane(pane);
-        this.addArea(area);
-    }
-
-    setDimension(dimX, dimY) {
-        this.tree = {
-            type: 'screen',
-            dim: {x: dimX, y: dimY},
-            children: []
-        };
-
-        for (let i = 0; i < this.areas.length; i++) {
-            this.areas[i].addViewNodesToTree(this.tree, dimX, dimY);
-        }
-
-        function buildNodeDom(node, containerParent) {
-            let parent = containerParent;
-            if (node.parents)  {
-                parent = node.parents[node.parents.length - 1];
-            }
-
-            if (node.container) {
-                node.container.buildDom(parent);
-            }
-            for (let child of node.children) {
-                buildNodeDom(child, parent);
-            }
-            if (parent !== containerParent) {
-                inst.game.addDomChild(containerParent, node.parents[0]);
-            }
-        }
-        buildNodeDom(this.tree, inst.game.getMandatoryElem('screen-overlay-div'));
-    }
-
-    hasAllDependencies() {
-        const hasAll = this.hasDependencies;
-        if (this.state === 'INIT' && hasAll) {
-            this.state = 'READY';
-        }
-        return hasAll;
-    }
-
-    init(params) {
-        this.hasDependencies = false;
-        inst.RL.clearResources();
-        this.resources = {};
-        this.areas = [];
-        if (this.initHandler) {
-/*
-            const game = inst.game
-            const globals = game.globals
-*/
-            this.state = 'INIT';
-
-            const { loader, callback } = this.initHandler
-            loader.resolve()
-            // const build = this.initHandler({ game, globals, screen: this })
-            inst.RL.load(this.id).then(res => {
-                this.hasDependencies = true
-            })
-            return callback
-        }
-        this.hasDependencies = true;
-        this.state = 'READY';
-    }
-
-    render(force = false) {
-        function renderPanes(tree) {
-            for (let child of tree.children) {
-                if (child.type === 'pane' && child.pane !== null) {
-                    const isDirty = !(child.pane.dirty === false);
-                    if (force || isDirty) {
-                        child.pane.render();
-                    }
-                }
-                renderPanes(child);
-            }
-        }
-        renderPanes(this.tree);
-    }
-
-    setKeyHandler(handler) {
-        this.keyHandler = handler.bind(inst.game);
-    }
-
-    setFrameHandler(handler) {
-        this.frameHandler = handler;
-    }
-
-    addImageResource(id, data) {
-        if (Array.isArray(data)) {
-            for (let index = 0; index < data.length; index++) {
-                inst.RL.addImage(id + '_' + index, data[index]);
+                inst.RL.addImage(parts[0] + '_' + index + '.' + parts[1], data[index]);
             }
         } else {
             inst.RL.addImage(id, data);
@@ -889,14 +602,6 @@ class Screen {
 
     addAudioResource(id, url) {
         inst.RL.addAudio(id, url);
-        /*
-        this.dependencies++;
-        const resource = new AudioResource(url, () => {
-            this.dependencies--;
-        });
-        this.resources[id] = resource;
-
-         */
     }
 
     addAudioResources(dataObj) {
@@ -907,28 +612,6 @@ class Screen {
 
     addJsonResource(id, json) {
         inst.RL.addJson(id, json);
-    }
-
-    setInitHandler( ...args ) {
-        const { resources, callback } = getResourcesAndCallback( ...args )
-        if (!callback) return
-
-        const loader = new ResourceRequest(resources)
-        this.initHandler = {
-            loader, callback
-        }
-/*
-        obj => {
-            loader.resolve()
-            const resources = inst.RL.getResources()
-            callback({ ...obj, ...resources })
-        }
-
- */
-    }
-
-    addAudio(src) {
-//        this.audio = src;
     }
 }
 
@@ -965,7 +648,11 @@ class DivContainer {
     }
 
     setBackgroundColor(color) {
-        inst.game.addDomOp(this.containerElem, 'style.backgroundColor', color);
+        inst.game.addDomOp(this.containerElem, 'style.backgroundColor', color)
+    }
+
+    setInnerHtml(html) {
+        inst.game.addDomOp(this.containerElem, 'innerHTML', html)
     }
 
     setBackgroundImages(dataElems, pos) {
@@ -2522,7 +2209,6 @@ class Gravity {
 
 export {
     inst,
-    Screen,
     ImageResource,
     AudioResource,
     AppliedImage,
@@ -2535,7 +2221,6 @@ export {
     AxisPath,
     BoundsScrollHandler,
     MasterSlavesScrollHandler,
-    SplitArea,
     States,
     PlayerProxy,
     Position,

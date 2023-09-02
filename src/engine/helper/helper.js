@@ -1,6 +1,7 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
 import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
+import { resId2tid } from "../core/resources"
 import { Config } from "core/config"
 import { AppliedImage, ImageResource } from "core/classes"
 
@@ -169,6 +170,8 @@ const getFlatObjectResources = resources => {
     return result;
 }
 
+// TODO: delete
+/*
 class Storage {
 
     constructor(storage, prefix = '') {
@@ -267,6 +270,7 @@ class Storage {
         return { ...defaults, ...json }
     }
 }
+*/
 
 const getIdToItems = items => {
     const id2items = {};
@@ -394,7 +398,8 @@ const rebuildObj = [];
  */
 const addTreeResource = (nodes, resId, dependencies, level = 0) => {
     const [ type, id ] = resId.split(':')
-    nodes.push({ level, id, type, source: ucfirst(inst.RL.getResourceSource(resId)) })
+    const source = inst.RL.getResourceSource(d(resId2tid(resId), resId)) ?? 'code'
+    nodes.push({ level, id, type, source: ucfirst(source) })
 
     const deps = dependencies[resId]
     if (!deps) return
@@ -1306,7 +1311,6 @@ export {
     getItemsCloneWithUpdatedItem,
     getSinePath,
     getCosinePath,
-    Storage,
     ResourceDependencies,
     flattenResources,
     drawTextBlocks,

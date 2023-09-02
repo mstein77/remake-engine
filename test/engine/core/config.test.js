@@ -1,6 +1,7 @@
 import { Config } from "core/config"
 import { validated } from "helper/validate"
-import { AppliedImage, Model, ImageResource, AudioResource } from "core/classes"
+import { AppliedImage, ImageResource, AudioResource } from "core/classes"
+import { Model } from "core/model"
 import inst from "core/instances"
 
 test('config class', () => {
@@ -10,9 +11,10 @@ test('config class', () => {
     expect(() => new Config(true))
         .toThrow('JSON')
 
-    expect(() => (new Config({})).getJson())
-        .toThrow('id')
+    expect(() => (new Config({})).applyTo({}))
+        .toThrow('context')
 
+    /*
     expect(() => (new Config({})).getResources())
         .toThrow('id')
 
@@ -27,27 +29,32 @@ test('config class', () => {
 
     expect(() => (new Config({id: 'bar'})).validatedModel([]))
         .toThrow('object')
+     */
 
     expect(new Config({}))
         .toBeInstanceOf(Config)
 
-    expect(new Config({}).isResolved())
-        .toBeFalse()
+    expect(new Config({}))
+        .not.toBeFrozen()
 
     {
         const config = new Config({id: 'foo'})
         config.applyTo({})
-        expect(config.isResolved())
-            .toBeTrue()
+        expect(config)
+            .toBeFrozen()
+        config.checkAndFreeze();
+        expect(config.getVersion())
+            .toEqual('1.0.0');
     }
 
     {
-        const config = new Config({id: 'foo'})
-        config.getJson()
-        expect(config.isResolved())
-            .toBeTrue()
+        const config = new Config({id: 'foo', 'foo': 'bar'})
+        const applied = config.applyTo({});
+        expect(applied)
+            .toContainEntry(['id', 'foo'])
     }
 
+    /*
     {
         const config = new Config({id: 'foo'})
         config.getResources()
@@ -58,7 +65,7 @@ test('config class', () => {
         expect(config.isResolved())
             .toBeTrue()
     }
-
+    */
 
     expect((new Config({})).getFieldProp('id'))
         .toBeEmptyObject()
@@ -69,6 +76,7 @@ test('config class', () => {
     expect((new Config({})).getFieldProp('id', {foo: 'bar'}))
         .toContainAllEntries([['foo', 'bar']])
 
+    /*
     expect((new Config({id: 'foo', bar: 'no'})).getJson())
         .toContainAllEntries([['__type', 'Config'], ['id', 'foo']])
 
@@ -104,6 +112,8 @@ test('config class', () => {
 
     expect((new Config({id: 'foo'})).getImageResources())
         .toHaveLength(0)
+
+     */
 })
 
 test('MyConfig class', () => {
@@ -114,12 +124,8 @@ test('MyConfig class', () => {
             super(config)
         }
 
-        isEditable() {
-            return true
-        }
-
         getDefaults() {
-            return {s: 'foo1', b: true}
+            return {s: 'foo1', b: true, x: undefined}
         }
 
         setS(value) {
@@ -134,6 +140,10 @@ test('MyConfig class', () => {
             this.obj = validated.object(value)
         }
 
+        setX(value) {
+            this.x = value
+        }
+
         applyPropsTo(model) {
             this.applyDefaultKeysTo(model)
             model.obj = this.obj
@@ -144,23 +154,58 @@ test('MyConfig class', () => {
                 obj: {null: true}
             }
         }
+
+        getNewAutoId() {
+            return;
+        }
     }
+    MyConfig.typeName = 'MyConfig';
 
     expect(() => new MyConfig({id: 'foo', obj: false}))
         .toThrow('obj')
 
-    expect((new MyConfig({id: 'foo', s: 'foo2', undef: undefined})).getFieldProp('obj'))
+    expect(() => (new MyConfig({id: 'foo'})).applyTo({}))
+        .toThrow('mandatory')
+
+    expect(() => (new MyConfig({x: 'x'})).applyTo({}))
+        .toThrow('mandatory')
+
+    expect((new MyConfig({id: 'foo', s: 'foo2', x: 'x', undef: undefined})).getFieldProp('obj'))
         .toContainAllEntries([['null', true]])
+
+    expect((new MyConfig({id: 'foo'})).getModelType())
+        .toEqual('MyConfig')
+
+    expect(() => (new MyConfig({id: 'foo'})).getModelInstance({}, {}))
+        .toThrow('Missing')
+
+    expect(() => (new MyConfig({id: 'foo'})).getInitialModelInstance({}))
+        .toThrow('Missing')
 
     {
         const conf = new MyConfig({id: 'foo', s: 'foo2'})
-        expect(conf.getJson())
-            .toContainAllEntries([
-                ['id', 'foo'], ['__type', 'MyConfig'], ['s', 'foo2'], ['b', true], ['obj', undefined]
-            ])
-        expect(conf.isResolved()).toBeFalse()
+        conf.setX('x');
+        expect(conf.applyTo({}))
+            .toContainEntries([
+                ['id', 'foo'],
+                ['s', 'foo2'],
+                ['x', 'x'],
+                ['b', true],
+                ['obj', undefined]
+            ]);
     }
 
+    {
+        const conf = new MyConfig({id: 'foo', s: 'foo2'})
+        conf.setX('x');
+        conf.clear()
+        expect(conf)
+            .toContainEntries([
+                ['id', 'foo']
+            ]);
+    }
+
+    /*
     expect((new MyConfig({id: 'foo', s: 'foo2'})).getImageResourceIds())
         .toBeEmpty()
 
@@ -172,8 +217,11 @@ test('MyConfig class', () => {
         .toHaveLength(1)
     expect(resources)
         .toPartiallyContain({id: 'foo', type: 'json'})
+     */
 })
 
+
+/*
 test('MyConfig <-> RebuildJson', () => {
 
     class DepConfig extends Config {
@@ -419,3 +467,4 @@ test('MyConfig <-> RebuildJson', () => {
             .toBe('dep.png')
     }
 })
+*/

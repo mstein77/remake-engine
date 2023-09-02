@@ -1,5 +1,6 @@
 import React from "react"
 import ReactDOM from "react-dom"
+import { d } from 'helper/helper'
 
 import EditorApp from './components/EditorApp'
 import './css/base.css'
@@ -37,7 +38,8 @@ class GameEditor {
         }
 
         const panes = [];
-        extractEditablesFromAreas(game.screens[game.currentScreen].areas, panes)
+        const renderer = game.getActiveScreenRenderer()
+        extractEditablesFromAreas(renderer.paneTree.areas, panes)
         this.oldStyle = JSON.stringify(document.body.style)
 
         const play = () => {

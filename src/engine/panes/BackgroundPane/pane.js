@@ -103,7 +103,7 @@ class BackgroundPaneImpl extends Pane {
 
     render() {
         this.container.setBackgroundColor(this.color)
-        if (this.images.length > 0) {
+        if (this.images.length) {
             const rawImg = []
             for (const img of this.images) {
                 rawImg.push(img.dataUrl)

@@ -1130,13 +1130,9 @@ function useExportModal({ model, resource, update, name, screenResource = true }
         return model.getResources()
     }
     const storeModel = eContextRef => {
-        if (screenResource) {
-            wContext.resourceLoader.storeScreenModel(
-                wContext.game.currentScreen, model
-            )
-        } else {
-            wContext.resourceLoader.storeModel(model)
-        }
+        wContext.resourceLoader.storeModel(
+            model, screenResource ? wContext.game.getActiveScreenRenderer().scope : null
+        )
         // reload the whole model to have a new config that we can apply to the pane
         // TODO: better solution by overwriting resource.pane and invalidating caches?
         const storedModel = model.config.getModelInstance(model.id)
@@ -1681,7 +1677,7 @@ function useContentSwitcher(contentProvider, defStack) {
     const registry = useRef(null);
     if (registry.current === null) {
         const callStack = defStack === undefined ? [
-            {key: 'game', params: {}}
+            {key: 'screen', params: {}}
         ] : [ ...defStack ];
 
         const getBlock = (level, item) => {

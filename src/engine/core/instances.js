@@ -3,10 +3,11 @@ import { toValues, toPairs, flattenResources, getDeflatedResources, isValidResou
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
+import { ResourceManager } from "./resources"
 import Fetcher from "./fetcher/api"
 
 /**
- * @type {ResourceLoader}
+ * @type {ResourceManager}
  */
 let RL = null
 /**
@@ -370,6 +371,7 @@ function has(arr, key) {
         arr.length > 0;
 }
 
+/*
 class StorageManager {
 
     constructor(storage, gameId) {
@@ -624,7 +626,6 @@ class StorageManager {
      *
      * @param {string} screen
      * @returns {object}
-     */
     getAllScreenResources(screen) {
         return getDeflatedResources(this.dependencies.getRelevantScreenResources(screen).found)
     }
@@ -645,8 +646,9 @@ class StorageManager {
         return Object.keys(this.dependencies.getIndirect());
     }
 }
+*/
 
-
+/*
 class ResourceManager {
 
     constructor(fetcher, storage, previewStorage) {
@@ -847,6 +849,7 @@ class ResourceManager {
     }
 }
 
+ */
 /**
  * ResourceLoader
  *
@@ -1097,10 +1100,10 @@ class ResourceLoader {
     }
 
     hasBrowserResources() {
-        for (let key of this.storage.getKeys()) {
-            if (key.indexOf(':') !== -1) {
+        for (let key of this.storage.getTypedIds()) {
+            // if (key.indexOf(':') !== -1) {
                 return true
-            }
+            // }
         }
         return false;
     }
@@ -1186,7 +1189,8 @@ class ResourceLoader {
     getAllResourceIds(type) {
         // TODO: we might also fetch the server ids here
         let ids = [];
-        switch(type) {
+        switch (type) {
+
             case 'json':
                 ids = this.storage.getJsonIds();
                 break;
@@ -1231,7 +1235,9 @@ class ResourceLoader {
 
     loadGameConfig(config) {
         return this.fetcher.fetch('resources', {
-            resources: [{id: 'game', type: 'json'}],
+            resources: [
+                {id: 'game', type: 'json'}
+            ],
             screen: '',
             resolved: {},
             overwrites: {},
@@ -1326,7 +1332,7 @@ class ResourceLoader {
 
         // we check each of the loaded audio resources
         const storedAudioIds = this.storage.getAudioIds()
-        for (const [ id, value ] of loadedAudios) {
+        for (const [ id, value ] of toPairs(loadedAudios)) {
             if (storedAudioIds.includes(id)) {
                 const audio = new AudioResource(this.storage.getAudio(id))
                 promises.push(
@@ -1362,7 +1368,7 @@ class ResourceLoader {
 
         // do the same for jsons
         const storedJsonIds = this.storage.getJsonIds()
-        for (const [ id, value ] of loadedJsons) {
+        for (const [ id, value ] of toPairs(loadedJsons)) {
             if (storedJsonIds.includes(id)) {
                 this.setResource('json', id, this.storage.getJson(id), 'browser', screen)
                 promises.push(
@@ -1515,7 +1521,7 @@ class AutoIdGenerator {
 
     getIdPrefix() {
         if (this.context === null) return ''
-        return this.context === 'screen' ? 'screen_' + inst.game.currentScreen : this.context
+        return this.context === 'screen' ? 'screen_' + inst.game.getActiveScreenRenderer().scope : this.context
     }
 
     getNewId(name) {
@@ -1573,16 +1579,17 @@ const inst = {
         }
         return touchControlsPlugin
     },
-    setRL: (baseUrl, storage) => RL = new ResourceLoader(
+    setRL: (baseUrl, ...params) => RL = new ResourceManager(
         Fetcher(baseUrl),
-        storage
+        ...params
     ),
     get RL() {
         if (RL) return RL
         throw Error('Resource Loader not yet initialized!')
     },
-    setSM: (storage, gameId) => SM = new StorageManager(storage, gameId),
+    setSM: manager => SM = manager,
     get SM() {
+        d('really?')
         if (SM) return SM
         throw Error('Storage Manager not yet initialized!')
     },

@@ -1,11 +1,12 @@
 import ReactDOM from "react-dom"
 import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react"
-import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "helper/helper"
+import { d, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "helper/helper"
 import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents"
 import { Button, Color, Submit, OkCancelForm, useTooltip } from "./FormComponents"
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
 import { defaultValues } from "../settings"
 import { CellValue, CellSelection } from "../classes"
+import { StorageManager, BrowserStorageHandler } from "core/storage"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();
@@ -2079,7 +2080,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
     const gameId = game.id;
     const [ storage ] = useState(() => {
-        return new Storage(localStorage, 'remake-engine.editor.');
+        return new StorageManager(BrowserStorageHandler(localStorage), 'remake-engine.editor.');
     });
     const doPersistCache = force => {
         if (force === true || document.visibilityState === 'hidden') {
@@ -2400,7 +2401,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             getNewImageResource: (template, width, height) => {
                 return (
-                    resourceLoader.makeImageResource(
+                    resourceLoader.createImageResource(
                         getCanvasForDim(width, height),
                         getUniqueName(template, resourceLoader.getAllResourceIds('image'))
                     )
@@ -2628,7 +2629,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             hotKeyActions: registry('hotKeyActions'),
 
             clearAllSettings: () => {
-                const keys = storage.getKeys();
+                const keys = storage.getJsonIds();
                 for(let key of keys) {
                     if (!key.startsWith('presets.')) {
                         storage.deleteJson(key);

@@ -413,6 +413,7 @@ class SpritePaneImpl extends Pane {
 
     getSpritePos(id, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
+        if (!sprite) throw Error(`Sprite with id "${id}" not found!`)
         let x = sprite.x;
         if (xEnd) {
             x += sprite.dim.x - 1;

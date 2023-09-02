@@ -1,5 +1,6 @@
 import { d, isString, isEqual, isObject } from "helper/helper"
 import inst from "./instances"
+import { id2audioTid, id2imageTid, id2jsonTid } from "./resources.js";
 
 /**
  * A model is a class which is constructed using a corresponding config instance. It can be linked to dependant models
@@ -82,7 +83,7 @@ class Model {
             if (!isObject(input))
                 throw Error(`Cannot instantiate model ${this.constructor.name}`)
 
-            if (input.id && (fetch && inst.RL.hasResource('json', input.id))) {
+            if (input.id && (fetch && inst.RL.hasJson(input.id))) {
                 fetchId = input.id
             } else {
                 if (!(input instanceof type.config)) {
@@ -90,7 +91,7 @@ class Model {
                 }
                 const id = input.getId()
 
-                if (fetch && inst.RL.hasResource('json', id)) {
+                if (fetch && inst.RL.hasJson(id)) {
                     fetchId = id
                     input.clear()
                 } else {
@@ -102,10 +103,10 @@ class Model {
             if (!fetch)
                 throw Error(`Instantiation doesn't allow loading resource id "${fetchId}"`)
 
-            if (!inst.RL.hasResource('json', fetchId))
+            if (!inst.RL.hasJson(fetchId))
                 throw Error(`Required resource id "${fetchId}" not found`)
 
-            input = inst.RL.getJsonResource(fetchId)
+            input = inst.RL.getJson(fetchId)
             input = new type.config(input)
             input.applyTo(this)
         }
@@ -228,26 +229,27 @@ class Model {
         const images = this.getDependentImages()
         for (const image of images) {
             if (!image) continue
-            dependentIds.push('image:' + image.id)
+            dependentIds.push(id2imageTid(image.id))
         }
         const audios = this.getDependentAudio()
         for (const audio of audios) {
             if (!audio) continue
-            dependentIds.push('audio:' + audio.id)
+            dependentIds.push(id2audioTid(audio.id))
         }
         const depModels = this.getDependentModels()
         for (const depModel of depModels) {
             if (!depModel) continue
             if (!depModel.isChild) {
-                dependentIds.push('json:' + depModel.id)
+                dependentIds.push(id2jsonTid(depModel.id))
             }
             depModel.addDependencies(dependencies)
         }
         if (!this.isChild)
-            dependencies['json:' + this.id] = dependentIds
+            dependencies[id2jsonTid(this.id)] = dependentIds
 
         return dependencies
     }
+
 
     /**
      * Returns an array holding all resources of the given (or initial) model

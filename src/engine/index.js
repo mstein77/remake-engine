@@ -1,11 +1,13 @@
 import 'core/core.css';
 
-export { Screen, InputController, AxisPath, BoundsScrollHandler, MasterSlavesScrollHandler,
-    SplitArea, States, Position, Force, SpriteAndTilesCollider, ObjectController, Gravity, inst } from "core/classes"
+export { InputController, AxisPath, BoundsScrollHandler, MasterSlavesScrollHandler,
+    States, Position, Force, SpriteAndTilesCollider, ObjectController, Gravity, inst } from "core/classes"
 export { Resources, ImageResources, AudioResources, JsonResources } from "core/resources"
 export { Plugin, RenderPlugin, TouchControlsPlugin } from "plugins/classes"
+export { Screen, SplitArea } from "core/screen"
+export { TransitionRegistry, Transition, BlendTransition, PushInTransition, LoadingTransition, FadeInOutTransition } from "core/transition"
 export { Game } from "core/game"
-export { INPUT, PATH, FILTER, COLLISION, ANIMATION, TILE } from "core/const"
+export { INPUT, PATH, FILTER, COLLISION, ANIMATION, TILE, RENDERER_STATE } from "core/const"
 export { d } from "helper/helper";
 export { Pane } from "panes/classes"
 export { default as BackgroundPane } from "panes/BackgroundPane/pane"
@@ -21,3 +23,4 @@ export { TilesMap } from "panes/TilesPane/models"
 export { default as BitmapScrollPane } from "panes/BitmapScrollPane/pane"
 export { default as TilesPane } from "panes/TilesPane/pane"
 export { default as EmptyPane } from "panes/EmptyPane/pane"
+export { default as HtmlPane } from "panes/HtmlPane/pane"

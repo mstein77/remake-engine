@@ -85,7 +85,7 @@ class TextBlockIndex extends EntityIndex {
     setEntityValue(index, value) {
         if (this.model.blocks.length <= index) {
             this.model.blocks.push(
-                new TextBlock({id: value}, this.model)
+                new TextBlock({ id: value }, {parent: this.model})
             );
         }
         this.items[index] = value;

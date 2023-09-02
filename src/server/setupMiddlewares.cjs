@@ -6,6 +6,8 @@ const morgan = require('morgan')
 const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
 
+const resourcesController = require("./controller/resources.cjs")
+
 const setupAppMiddlewares = (app, config = null) => {
 
     const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../'
@@ -145,7 +147,10 @@ const setupAppMiddlewares = (app, config = null) => {
 
     if (config.LOAD_STATIC) return
 
-    app.post('/has', (req, res) => {
+    app.post('/has', resourcesController.has);
+    app.post('/resources', resourcesController.resources);
+
+    app.post('/has2', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
         const found = []
         const notFound = []
@@ -173,7 +178,7 @@ const setupAppMiddlewares = (app, config = null) => {
         res.json({found, notFound, invalid})
     });
 
-    app.post('/resources', (req, res) => {
+    app.post('/resources2', (req, res) => {
         const found = []
         const notFound = []
         const invalid = []

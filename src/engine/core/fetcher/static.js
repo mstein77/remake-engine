@@ -1,6 +1,85 @@
 import resourceInfo from "../../../../tmp/resources-info"
 import { ResourceDependencies } from "helper/shared"
 
+/*
+  routes:
+
+  a) resources
+
+     {
+        resources: [ { id, type }, ... ]
+        screen: <string>,
+        resolved: [ trId, ... ],
+        overwrites: {<trId>: [ trId, ...]},
+        remotes: [ trId, ... ]
+     }
+
+     => {
+        found: [ { id, type, data }, ... ]
+        notFound: [ { id, type } ],
+        invalid: [ { id, type } ]
+     }
+
+    --------------------------------------------
+
+    {
+        resources: [ tid, ... ]
+        scope: <string>,
+        storage: { ids: [ tid, ... ], id2children: {<tid>: [ tid, ... ]} }
+    }
+
+    => {
+        found: {<tid>: <value>},
+        missing: [ tid, ... ],
+        add: [ tid, ... ]
+    }
+
+
+
+
+  b) delete
+
+     { resources: [ trId, ... ] }
+
+     => {
+        deleted: [ trId ]
+     }
+
+  c) has
+
+     { resources: [ trId, ... ] }
+
+     => {
+        found: [ { id, type }, ... ]
+     }
+
+  d) store
+
+     // eine Image resource wo data instanceof AppliedImage wird per dat.dataUrl in einen String konvertiert
+
+     {
+        screen: <string>,
+        resources: [ { id, type, data }, ... ],
+        direct: {<type>: [ id, ... ]},
+        indirect: {<trId>: [ trId, ... ]}
+     }
+
+     => {
+        stored: [ { id, type }, ... ]
+     }
+
+     ----------------------------------------------------
+
+     {
+        scope: <string>,
+        resources: {<tid>: <value>}
+     }
+
+     => {
+        stored: [ tid, ... ]
+     }
+ */
+
 const StaticFetcher = baseUrl => {
     const cache = resourceInfo.cache
     const dependencies = new ResourceDependencies(
@@ -13,8 +92,8 @@ const StaticFetcher = baseUrl => {
     return {
         fetch: (name, json) => {
             const found = []
-            const notFound = []
-            const invalid = []
+            const missing = []
+            const add = []
 
             const { resources = [], screen, resolved, overwrites, remotes } = json
             const relevant = dependencies.getRelevantScreenResources(screen, resolved, overwrites, remotes)
@@ -24,7 +103,7 @@ const StaticFetcher = baseUrl => {
             }
             for (let resId of relevant.notFound) {
                 const [type, id] = resId.split(':')
-                notFound.push({ id, type })
+                missing.push({ id, type })
             }
             const promises = []
             for (const resource of resources) {
@@ -71,15 +150,15 @@ const StaticFetcher = baseUrl => {
             return Promise.all(promises).then(resources => {
                 for(const resource of resources) {
                     if (resource.data === null) {
-                        notFound.push(resource)
+                        missing.push(resource)
                     } else {
                         found.push(resource)
                     }
                 }
                 return {
                     found,
-                    notFound,
-                    invalid
+                    missing,
+                    add
                 }
             })
         }

@@ -1,7 +1,7 @@
 import inst from "core/instances"
 import { isValidResourceId } from "./shared"
-import {AudioResource, ImageResource} from "core/classes"
-import { isObject, without, cloneDeep, d } from "./helper"
+import { AudioResource, ImageResource } from "core/classes"
+import { isObject, without, d } from "./helper"
 
 const validated = {
 
@@ -19,7 +19,7 @@ const validated = {
             throw Error('id must be a string')
 
         if (!isValidResourceId('json', value))
-            throw Error('Invalid id for json resource')
+            throw Error(`Invalid id "${value}" for json resource`)
 
         return value;
     },
@@ -128,7 +128,7 @@ const validated = {
             id = value.id;
         }
         if (id && inst.RL.hasResource('json', id)) {
-            value = inst.RL.getJsonResource(value);
+            value = inst.RL.getJson(value);
         }
         if (!(typeof value !== 'object')) {
             throw Error('value is no JSON object!');
@@ -162,7 +162,7 @@ const validated = {
             throw Error(`Excepted ImageResource but got null`)
         }
         if (typeof value === 'string') {
-            value = inst.RL.getImageResource(value);
+            value = inst.RL.getImage(value)
         }
         if (!(value instanceof ImageResource)) {
             throw Error('value is no image resource!');
@@ -196,7 +196,7 @@ const validated = {
             throw Error(`Excepted AudioResource but got null`)
         }
         if (typeof value === 'string') {
-            value = inst.RL.getAudioResource(value);
+            value = inst.RL.getAudio(value);
         }
         if (!(value instanceof AudioResource)) {
             throw Error('value is no audio resource!');
@@ -258,7 +258,7 @@ const validated = {
             return null;
         }
         if (typeof value === 'string') {
-            value = inst.RL.getJsonResource(value);
+            value = inst.RL.getJson(value);
         }
         // TODO this will probaly not work in production mode
         if (value._type && value._type.factory === config) return value.config
