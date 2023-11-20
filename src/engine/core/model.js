@@ -195,9 +195,16 @@ class Model {
      *
      * @returns {object}
      */
-    getResourcesAndDependencies() {
+    getResourcesAndDependencies(forTransport = false) {
+        const resources = this.getResources()
+        if (forTransport) {
+            for (const resource of resources) {
+                if (resource.type !== 'image') continue
+                resource.data = resource.data.dataUrl
+            }
+        }
         return {
-            resources: this.getResources(),
+            resources,
             dependencies: this.getDependencies()
         }
     }

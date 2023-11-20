@@ -1,4 +1,4 @@
-const absPath = require('./absPath.cjs')
+const absPath = require('../../shared/classes/absPath.cjs')
 
 const DEPLOY = {
     METHOD: {
@@ -31,6 +31,7 @@ const key2params = {
     sourceMapType: {type: 'string'},
     openBrowser: {type: 'string'},
     port: {type: 'uint'},
+    staticTypes: {type: 'string'},
     logging: {type: 'string'},
     stats: {type: 'string'},
     envPrefix: {type: 'string'}

@@ -260,8 +260,10 @@ const validated = {
         if (typeof value === 'string') {
             value = inst.RL.getJson(value);
         }
-        // TODO this will probaly not work in production mode
-        if (value._type && value._type.factory === config) return value.config
+        // TODO this will probably not work in production mode
+        if (value._type && value._type.factory === config) {
+            if (value.config) return value.config
+        }
 
         if (!(value instanceof config.Config)) {
             const params = [value]

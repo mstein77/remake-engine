@@ -6,7 +6,9 @@ import { Button, Color, Submit, OkCancelForm, useTooltip } from "./FormComponent
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
 import { defaultValues } from "../settings"
 import { CellValue, CellSelection } from "../classes"
-import { StorageManager, BrowserStorageHandler } from "core/storage"
+import { BrowserStorage } from "core/storage/browserStorage"
+import { StorageManager } from "shared/classes/storage.cjs"
+import { RESOURCE } from "shared/classes/resources.cjs"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();
@@ -2080,7 +2082,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
     const gameId = game.id;
     const [ storage ] = useState(() => {
-        return new StorageManager(BrowserStorageHandler(localStorage), 'remake-engine.editor.');
+        return new StorageManager(BrowserStorage(localStorage, 'remake-engine.editor.'));
     });
     const doPersistCache = force => {
         if (force === true || document.visibilityState === 'hidden') {
@@ -2403,7 +2405,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
                 return (
                     resourceLoader.createImageResource(
                         getCanvasForDim(width, height),
-                        getUniqueName(template, resourceLoader.getAllResourceIds('image'))
+                        getUniqueName(template, resourceLoader.getAllResourceIds(RESOURCE.TYPE.IMAGE))
                     )
                 )
             },

@@ -9,7 +9,8 @@ import { Model, ModelFactory, SubModelFactory } from "./model"
 import { validated } from "helper/validate"
 import { ScreenRegistry } from "./screen"
 import { BlendTransition, FadeInOutTransition, LoadingTransition, PushInTransition, TransitionRegistry } from "./transition"
-import { BrowserStorageHandler, StorageManager } from "./storage"
+import { BrowserStorage } from "./storage/browserStorage"
+import { StorageManager } from "shared/classes/storage.cjs"
 import inst from "core/instances"
 
 class Game {
@@ -30,9 +31,15 @@ class Game {
         const { system, renderPlugin, touchControlsPlugin, plugins } = inst
         this.system = system
 
-        const SM = new StorageManager(BrowserStorageHandler(localStorage), (IS_DIST ? '' : 'dev.') + GAME_ID)
-        inst.setRL(BASE_URL + '/', SM, new StorageManager(BrowserStorageHandler(sessionStorage)), ResourceResolver)
-        this.engineStorage = new StorageManager(BrowserStorageHandler(localStorage), 'remake-engine.')
+
+        const resourceLocalStorage = new StorageManager(
+            BrowserStorage(localStorage, (IS_DIST ? '' : 'dev.') + GAME_ID + '/')
+        )
+        const resourceSessionStorage = new StorageManager(
+            BrowserStorage(sessionStorage)
+        )
+        inst.setRL(BASE_URL + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
+        this.engineStorage = new StorageManager(BrowserStorage(localStorage, 'remake-engine.'))
 
         // TODO get from plugin-registry
         this.plugins = plugins;
@@ -236,7 +243,7 @@ class Game {
         this.props.audioBlocked = false
         this.props.maxAvailZoom = this.maxZoom
         this.props.isFullscreen = this.system.isFullscreen()
-        Config.storeInModel = this.hasEditor
+        Config.storeInModel = true // TODO: this.hasEditor
 
         this.syncOrientation()
         this.deactivateAutoZoom = true
@@ -398,9 +405,7 @@ class Game {
     reloadScreen(stack) {
         if (this.globalsResolver) {
             inst.autoIds.clearAllIds()
-            // TODO game?
-            inst.RL.invalidatePermanentScope('globals')
-            inst.RL.clearTemporary()
+            inst.RL.clearTempAndGlobals()
         }
         this.globals = this.lastGlobals
         this.skipTransition = true

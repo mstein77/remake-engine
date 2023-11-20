@@ -1,12 +1,13 @@
-import React, { useContext, useMemo, useState } from "react";
-import { TupleProp, BitmapProp, OkCancelForm, InputProp } from "editor/components/FormComponents";
-import { EntityStackSections } from "editor/components/EntityComponents";
-import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "editor/components/BasicComponents";
-import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "editor/components/EditorComponents";
-import { Block, Stack } from 'editor/components/LayoutComponents';
-import { d, getEmptyImageData, getUniqueName } from "helper/helper";
-import { EntityPicker } from "editor/components/EntityComponents";
-import { ImageBlockIndex } from "./classes";
+import React, { useContext, useMemo, useState } from "react"
+import { TupleProp, BitmapProp, OkCancelForm, InputProp } from "editor/components/FormComponents"
+import { EntityStackSections } from "editor/components/EntityComponents"
+import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "editor/components/BasicComponents"
+import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "editor/components/EditorComponents"
+import { Block, Stack } from 'editor/components/LayoutComponents'
+import { d, getEmptyImageData, getUniqueName } from "helper/helper"
+import { EntityPicker } from "editor/components/EntityComponents"
+import { ImageBlockIndex } from "./classes"
+import { RESOURCE } from "shared/classes/resources.cjs"
 
 function BackgroundPreview({ model, imageIndex, newImage, width, height, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);
@@ -176,7 +177,7 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
     const getReservedIds = () => {
         const reserved = [
             ...imageIndex.getPropValues('value'),
-            ...wContext.resourceLoader.getAllResourceIds('image')
+            ...wContext.resourceLoader.getAllResourceIds(RESOURCE.TYPE.IMAGE)
         ];
         return reserved
     };

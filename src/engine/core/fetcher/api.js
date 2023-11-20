@@ -18,4 +18,5 @@ const ApiFetcher = baseUrl => {
 
     }
 }
+
 export default ApiFetcher

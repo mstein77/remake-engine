@@ -1,5 +1,11 @@
 import resourceInfo from "../../../../tmp/resources-info"
-import { ResourceDependencies } from "helper/shared"
+import { makeDescriptor, RESOURCE } from "shared/classes/resources.cjs"
+import { d } from "helper/helper"
+
+const cache = resourceInfo.cache || {}
+const scope2ids = cache[RESOURCE.PREFIX[RESOURCE.TYPE.CORE] + 'scope2ids.json'] || {}
+const id2children = cache[RESOURCE.PREFIX[RESOURCE.TYPE.CORE] + 'id2children.json'] || {}
+const tids = resourceInfo.tids || []
 
 /*
   routes:
@@ -80,7 +86,97 @@ import { ResourceDependencies } from "helper/shared"
      }
  */
 
+{
+
+}
+
+
 const StaticFetcher = baseUrl => {
+
+    return {
+        fetch: (name, json) => {
+            d('FETCH...', name, json)
+            const { scope, ids, permIds, tempIds } = json
+            const scopeIds = scope2ids[scope] || []
+
+            for (const id of scopeIds) {
+                if (!ids.includes(id)) ids.push(id)
+            }
+            const deps = { ...id2children }
+
+            const processed = []
+            const add = []
+            const found = {}
+            const invalid = []
+            const missing = []
+            const drop = []
+
+            const promises = []
+            while (ids.length) {
+                const rawTid = ids.pop()
+                const descriptor = makeDescriptor.fromTid(rawTid)
+                const id = descriptor.tid
+                const extTid = descriptor.extTid
+
+                if (!processed.includes(id)) {
+                    processed.push(id)
+
+                    if (!permIds.includes(rawTid) && !tempIds.includes(rawTid)) {
+                        if (tids.includes(extTid)) {
+                            const cached = cache[extTid]
+                            const promise = cached ?
+                                Promise.resolve([id, cached]) :
+                                fetch(baseUrl + descriptor.key + '/' + descriptor.extId)
+                                    .then(response => {
+                                        if (!response.ok || response.status !== 200)
+                                            throw new Error(`HTTP error! Status: ${response.status}`)
+
+                                        return descriptor.isJson() ? response.json() : response.blob()
+                                    })
+                                    .then(data => {
+                                        if (data && !descriptor.isJson()) {
+                                            data = URL.createObjectURL(data)
+                                        }
+                                        return [
+                                            id, data
+                                        ]
+                                    })
+                            promises.push(promise)
+                        } else {
+                            missing.push(id)
+                        }
+                    }
+                    const idDeps = deps[id]
+                    if (idDeps && idDeps.length) {
+                        ids.push( ...idDeps )
+                    }
+                }
+            }
+            for (const id of tempIds) {
+                if (!processed.includes(id)) drop.push(id)
+            }
+            return Promise.all(promises).then(
+                resources => {
+                    for (const [id, content] of resources) {
+                        if (!content) {
+                            missing.push(id)
+                        } else {
+                            found[id] = content
+                        }
+                    }
+                    return d({ found, missing, invalid, add, drop })
+                }
+            )
+        }
+    }
+}
+
+
+
+
+
+/*
+const StaticFetcher2 = baseUrl => {
     const cache = resourceInfo.cache
     const dependencies = new ResourceDependencies(
         () => resourceInfo.direct,
@@ -97,6 +193,7 @@ const StaticFetcher = baseUrl => {
 
             const { resources = [], screen, resolved, overwrites, remotes } = json
             const relevant = dependencies.getRelevantScreenResources(screen, resolved, overwrites, remotes)
+
             for (let resId of relevant.found) {
                 const [ type, id ] = resId.split(':')
                 resources.push({ id, type })
@@ -164,5 +261,6 @@ const StaticFetcher = baseUrl => {
         }
     }
 }
+*/
 
 export default StaticFetcher

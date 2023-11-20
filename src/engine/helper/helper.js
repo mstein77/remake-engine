@@ -1,101 +1,8 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
 import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
-import { resId2tid } from "../core/resources"
-import { Config } from "core/config"
-import { AppliedImage, ImageResource } from "core/classes"
-
-function d(main, ...params) {
-    let stack = null;
-    try {
-        throw new Error('myError');
-    }
-    catch(e) {
-        stack = e.stack.split('\n');
-    }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
-        }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
-    }
-    console.group('Debug ' + func.join(' <- '));
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
-}
-
-/**
- * Returns whether the given value is a string or not
- * Instances of the String class will not be regarded as strings.
- *
- * @param {mixed} value
- *
- * @returns {boolean}
- */
-function isString(value) {
-    return (typeof value === 'string' && value !== null)
-}
-
-/**
- * Returns whether the given value is an array or not
- *
- * @param {mixed} value
- *
- * @returns {boolean}
- */
-function isArray(value) {
-    return Array.isArray(value)
-}
-
-/**
- * Returns whether the given argument is an URL string with http or https protocol or not
- *
- * @param {mixed} value
- *
- * @returns {boolean}
- */
-function isUrl(value) {
-    if (!isString(value)) return false
-    return /^http(s)?\:\/\/[a-zA-Z0-9]+/.test(value)
-}
-
-/**
- * Returns whether the first argument is a data URL or not
- * If a type is given the data url must also match the content type
- *
- * @param {midex} value
- * @param {string} type
- *
- * @returns {boolean}
- */
-function isDataUrl(value, type = null) {
-    if (!isString(value)) return false
-    return type === null ?
-        /^data\:[a-zA-Z0-9]+\/[a-zA-Z0-9]+;base64\,/.test(value) :
-        value.startsWith('data:' + type + ';base64,')
-}
-
-/**
- * Returns whether the argument is an object or not
- *
- * @param {mixed} obj
- *
- * @returns {boolean}
- */
-function isObject(obj) {
-    return (obj && typeof obj === 'object' && !isArray(obj))
-}
+import { d, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/classes/helper.cjs"
+import { typeText2tid } from "../../shared/classes/resources.cjs"
 
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
     const newItems = [...oldItems];
@@ -104,7 +11,7 @@ function getItemsCloneWithUpdatedItem(oldItems, index, props) {
 }
 
 function hex2rgb(hex) {
-    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null;
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null
 
     const color = {};
     color.r = parseInt(hex.substr(1, 2), 16);
@@ -112,7 +19,7 @@ function hex2rgb(hex) {
     color.b = parseInt(hex.substr(5, 2), 16);
     color.a = hex.length === 9 ? parseInt(hex.substr(7, 2), 16) : 255;
 
-    return color;
+    return color
 }
 
 function hex2rgbaArray(hex) {
@@ -122,14 +29,14 @@ function hex2rgbaArray(hex) {
         parseInt(hex.substr(3, 2), 16)/255,
         parseInt(hex.substr(5, 2), 16)/255,
         hex.length === 9 ? parseInt(hex.substr(7, 2), 16)/255 : 1.0
-    ];
+    ]
 }
 
 function rgb2hex(rgb) {
     if (typeof rgb === 'string') {
-        return rgb;
+        return rgb
     }
-    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0');
+    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0')
 }
 
 const getFlatDependencies = (indirect, resource, found = []) => {
@@ -169,108 +76,6 @@ const getFlatObjectResources = resources => {
     }
     return result;
 }
-
-// TODO: delete
-/*
-class Storage {
-
-    constructor(storage, prefix = '') {
-        this.storage = storage;
-        this.prefix = prefix;
-        this.active = this.isAvailable();
-    }
-
-    isQuotaExceededException(e) {
-        return e instanceof DOMException && (
-            e.name === 'QuotaExceededError' ||
-            e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        );
-    }
-
-    isAvailable() {
-        if (!this.storage) {
-            return false;
-        }
-        try {
-            const x = '__storage_test__';
-            this.storage.setItem(x, '1');
-            this.storage.removeItem(x);
-            return true;
-        } catch(e) {
-            return e instanceof DOMException && !this.isQuotaExceededException(e) && (
-                    e.code === 22 ||
-                    e.code === 1014) &&
-                (localStorage && localStorage.length !== 0);
-        }
-    }
-
-    getKeys() {
-        if (!this.isAvailable()) {
-            return [];
-        }
-        const keys = [];
-        for(let i = 0; i < this.storage.length; i++) {
-            const key = this.storage.key(i);
-            if (key.startsWith(this.prefix)) {
-                keys.push(key.substring(this.prefix.length));
-            }
-        }
-        return keys;
-    }
-
-    storeJson(id, data) {
-        if (!this.isAvailable()) {
-            return false;
-        }
-        try {
-            this.storage.setItem(this.prefix + id, JSON.stringify(data));
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    getJson(id) {
-        if (!this.isAvailable()) {
-            return null;
-        }
-        try {
-            const item = this.storage.getItem(this.prefix + id);
-            try {
-                return JSON.parse(item);
-            } catch (e) {
-                return null;
-            }
-        } catch (e) {
-            console.error(e);
-            return null;
-        }
-    }
-
-    deleteJson(id) {
-        this.storage.removeItem(this.prefix + id);
-    }
-
-    getDefaultedArray(id, defaults = []) {
-        const json = this.getJson(id);
-        if (Array.isArray(json)) {
-            return json;
-        }
-        return Array.isArray(defaults) ? defaults : []
-    }
-
-    getDefaultedJson(id, defaults = null) {
-        const json = this.getJson(id);
-        if (json === null) {
-            return typeof defaults === 'object' ? { ...defaults } : defaults;
-        }
-        if (defaults === null) {
-            return json
-        }
-        return { ...defaults, ...json }
-    }
-}
-*/
 
 const getIdToItems = items => {
     const id2items = {};
@@ -386,9 +191,6 @@ const getEmptyImageData = (width, height, color = '#00000000') => {
     return ctx.getImageData(0, 0, width, height);
 };
 
-const rebuilders = [];
-const rebuildObj = [];
-
 /**
  *
  * @param nodes
@@ -398,7 +200,8 @@ const rebuildObj = [];
  */
 const addTreeResource = (nodes, resId, dependencies, level = 0) => {
     const [ type, id ] = resId.split(':')
-    const source = inst.RL.getResourceSource(d(resId2tid(resId), resId)) ?? 'code'
+    const tid = typeText2tid(type, id)
+    const source = inst.RL.getResourceOrigin(tid) ?? 'code'
     nodes.push({ level, id, type, source: ucfirst(source) })
 
     const deps = dependencies[resId]
@@ -1057,25 +860,9 @@ const round = (value, decimals = 0, fill = false) => {
     return rounded;
 };
 
-const ucfirst = (value) => {
-    if (value === '') return '';
-    return value[0].toUpperCase() + value.substring(1);
-};
-
 const isEventInRect = (e, rect) => {
     return (rect.x <= e.clientX && (rect.x + rect.width) >= e.clientX &&
         rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
-}
-
-const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
-
-const without = (source, remove) => {
-    if (!Array.isArray(remove)) remove = [remove];
-    return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
-}
-
-const intersect = (a, b) => {
-    return a.filter(x => b.includes(x))
 }
 
 const entriesSort = (a, b) => a[0] === b[0] ? 0 : (a[0] < b[0] ? 1 : -1)
@@ -1281,10 +1068,6 @@ function findSameRefs(a, b, path = '', pathElems = []) {
         }
     }
 }
-
-const toPairs = Object.entries
-const toValues = Object.values
-const toKeys = Object.keys
 
 export {
     d,

@@ -23,6 +23,7 @@ const RENDERER_STATE = {
     WAIT_DESTROY: 9
 }
 
+/*
 const RESOURCE = {
     TYPE: {
         JSON: 0,
@@ -33,7 +34,8 @@ const RESOURCE = {
 RESOURCE.PREFIX = {
     [RESOURCE.TYPE.JSON]: 'j',
     [RESOURCE.TYPE.IMAGE]: 'i',
-    [RESOURCE.TYPE.AUDIO]: 'a'
+    [RESOURCE.TYPE.AUDIO]: 'a',
+    CORE: '.'
 }
 RESOURCE.TEXT = {
     [RESOURCE.TYPE.JSON]: 'json',
@@ -45,6 +47,7 @@ RESOURCE.KEY = {
     [RESOURCE.TYPE.IMAGE]: 'image',
     [RESOURCE.TYPE.AUDIO]: 'audio'
 }
+*/
 
 const FILTER = {
     TYPE: {
@@ -135,6 +138,5 @@ export {
     COLLISION,
     ANIMATION,
     TILE,
-    DEGREE_90,
-    RESOURCE
+    DEGREE_90
 }

@@ -180,6 +180,7 @@ try {
         editorKey: 'Dead',
         resourceLoading: 'api',
         apiMaxJsonSize: '10mb',
+        staticTypes: 'audio,video',
         deployMethod: 'checkout',
         hosting: 'server-with-nodejs',
         server: true,

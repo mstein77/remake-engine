@@ -1,6 +1,6 @@
 const { RESOURCE, DEPLOY } = require('./classes/config.cjs')
-const absPath = require('./classes/absPath.cjs')
-const syncFs = require('./classes/syncFs.cjs')
+const absPath = require('../shared/classes/absPath.cjs')
+const syncFs = require('../shared/classes/syncFs.cjs')
 
 /**
  *  hosting: gibt den Hosting-Anbieter bzw. die Art des hostings
@@ -46,17 +46,20 @@ class Hosting {
             const resourceDirs = ['audio', 'image', 'json']
             const rawResources = ['audio']
 
+            // all resources are static if no server is used or if static loading is configured
             const staticResources = (!this.server || config.resourceLoading === RESOURCE.LOADING.STATIC) ? [ ...resourceDirs ] : rawResources
 
             for (const dir of resourceDirs) {
                 const from = absPath.resources(dir)
                 if (syncFs.isEmptyDir(from)) continue
+                // copy the static resources directories to the public folder of the dist
                 this.copyPatterns.push({
                     from,
                     to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir)
                 })
             }
             if (config.resourceLoading === RESOURCE.LOADING.API) {
+                // api loading still requires the core files
                 for (const file of ['indirect.json', 'direct.json']) {
                     const from = absPath.resources(file)
                     if (!syncFs.fileExists(from)) continue

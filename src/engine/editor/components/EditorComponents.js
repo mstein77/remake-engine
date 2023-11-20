@@ -1147,14 +1147,11 @@ function useExportModal({ model, resource, update, name, screenResource = true }
         if (IS_DIST) return
 
         const gameRef = wContext.game
-        const { resources, dependencies } = model.getResourcesAndDependencies()
 
         LoadingModal.open()
-        gameRef.getResourceLoader().deployResources(
-            gameRef.currentScreen,
-            resources,
-            {json: [model.id]},
-            dependencies
+        gameRef.getResourceLoader().deployModel(
+            model,
+            gameRef.getActiveScreenRenderer().scope
         ).then(
             response => {
                 ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'))

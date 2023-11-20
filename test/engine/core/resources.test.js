@@ -127,7 +127,7 @@ test('ResourceManager', () => {
         RB.load().then(() => {
             expect(RB.resources.json)
                 .toContainAllEntries([['test', 'z']])
-            expect(RB.getJsonSource('test')).toEqual('browser')
+            expect(RB.getJsonOrigin('test')).toEqual('browser')
         })
     }
 
@@ -140,7 +140,7 @@ test('ResourceManager', () => {
         RB.load().then(() => {
             expect(RB.resources.json)
                 .toContainAllEntries([['foo', 'bar']])
-            expect(RB.getJsonSource('foo'))
+            expect(RB.getJsonOrigin('foo'))
                 .toEqual('code')
         })
     }
@@ -154,7 +154,7 @@ test('ResourceManager', () => {
         RB.load().then(() => {
             expect(RB.resources.json)
                 .toContainAllEntries([['foo', 'bar2']])
-            expect(RB.getJsonSource('foo'))
+            expect(RB.getJsonOrigin('foo'))
                 .toEqual('server')
         })
     }
@@ -397,7 +397,7 @@ test('ResourceManager', () => {
                 .toContainAllEntries([['foo', 'bar']])
             expect(RB.resources.image)
                 .toBeEmptyObject()
-            expect(RB.getResourceSource(id2jsonTid('foo'))).toEqual('browser')
+            expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser')
         })
     }
 
@@ -411,7 +411,7 @@ test('ResourceManager', () => {
                     .toContainAllEntries([['foo', 'bar2']])
                 expect(RB.resources.image)
                     .toBeEmptyObject()
-                expect(RB.getResourceSource(id2jsonTid('foo'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
             })
         })
     }
@@ -446,8 +446,8 @@ test('ResourceManager', () => {
                     .toContainAllEntries([['foo', 'bar']])
                 expect(RB.resources.image)
                     .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceSource(id2jsonTid('foo'))).toEqual('server')
-                expect(RB.getResourceSource(id2imageTid('barimg'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
             })
         })
     }
@@ -484,9 +484,9 @@ test('ResourceManager', () => {
                     .toContainAllEntries([['foo', 'bar'], ['font', 'myFont']])
                 expect(RB.resources.image)
                     .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceSource(id2jsonTid('foo'))).toEqual('server')
-                expect(RB.getResourceSource(id2jsonTid('font'))).toEqual('server')
-                expect(RB.getResourceSource(id2imageTid('barimg'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2jsonTid('font'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
             })
         })
     }
@@ -509,8 +509,8 @@ test('ResourceManager', () => {
                     .toContainAllEntries([['foo', 'bar']])
                 expect(RB.resources.image)
                     .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceSource(id2jsonTid('foo'))).toEqual('browser')
-                expect(RB.getResourceSource(id2imageTid('barimg'))).toEqual('server')
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
             })
         })
     }

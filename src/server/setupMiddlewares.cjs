@@ -147,8 +147,9 @@ const setupAppMiddlewares = (app, config = null) => {
 
     if (config.LOAD_STATIC) return
 
-    app.post('/has', resourcesController.has);
-    app.post('/resources', resourcesController.resources);
+    app.post('/has', resourcesController.has)
+    app.post('/resources', resourcesController.resources)
+    app.post('/store', resourcesController.store)
 
     app.post('/has2', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
@@ -266,7 +267,7 @@ const setupAppMiddlewares = (app, config = null) => {
         res.json({deleted, notDeleted, invalid})
     });
 
-    app.post('/store', (req, res) => {
+    app.post('/store2', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
         const stored = []
         const failed = []

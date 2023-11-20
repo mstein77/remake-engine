@@ -1,45 +1,27 @@
-import { d, isObject, isUrl, isDataUrl, toPairs, toKeys, toValues } from "helper/helper"
-import { RESOURCE } from "./const"
-import {ImageResource, AudioResource, AppliedImage} from "./classes"
+import { d, isObject, isUrl, isDataUrl, toPairs, toValues, without } from "helper/helper"
+import { RESOURCE, makeDescriptor, typeText2tid  } from "shared/classes/resources.cjs"
+import { ImageResource, AudioResource, AppliedImage } from "./classes"
+import { MapStorage } from "shared/storage/mapStorage.cjs"
+import { StorageManager } from "shared/classes/storage.cjs"
 
-const tid2id = tid => tid.substring(1) // tid => tid.substring(tid.indexOf(':') + 1)
+const tid2id = tid => tid.substring(1)
 
 const text2id = {}
 for (const [ id, text ] of Object.entries(RESOURCE.TEXT)) {
     text2id[text] = id
 }
 
-const prefix2type = {}
-for (const [ type, prefix ] of Object.entries(RESOURCE.PREFIX)) {
-    prefix2type[prefix] = type
-}
-
-const isTid = value => {
-    const type = tid2type(value, false)
-    return type !== undefined
-}
-
 const tid2type = (tid, strict = true) => {
-    if (!tid) {
+    const descriptor = makeDescriptor.fromTid(tid)
+
+    if (!descriptor || !descriptor.isValid()) {
         if (strict)
             throw Error('Empty typed resource id given')
 
         return
     }
-
-    // const typeText = tid.substring(0, tid.indexOf(':') + 1) // tid[0]
-    const type = prefix2type[tid[0]]
-
-    if (!type) {
-        if (strict)
-            throw Error(`Could not extract type from typed id "${tid}"`)
-
-        return
-    }
-
-    return parseInt(type, 10)
+    return descriptor.type
 }
-
 
 const jsonPrefix = RESOURCE.PREFIX[RESOURCE.TYPE.JSON]
 const imagePrefix = RESOURCE.PREFIX[RESOURCE.TYPE.IMAGE]
@@ -48,118 +30,15 @@ const id2jsonTid = id => jsonPrefix + id
 const id2imageTid = id => imagePrefix + id
 const id2audioTid = id => audioPrefix + id
 
-const type2tid = {
-    [RESOURCE.TYPE.JSON]: id2jsonTid,
-    [RESOURCE.TYPE.IMAGE]: id2imageTid,
-    [RESOURCE.TYPE.AUDIO]: id2audioTid
-}
-
-const id2tid = (type, id) => {
-    const func = type2tid[type]
-    if (!func)
-        throw Error(`Invalid resource type "${type}" given!`);
-
-    return func(id)
-}
-const typeText2tid = (typeText, id) => {
-    const type = text2id[typeText]
-    if (type === undefined)
-        throw Error(`Could not find type matching "${typeText}"`)
-
-    return id2tid(type, id)
-}
-
-
-const resId2tid = resId => {
-    const index = resId.indexOf(':')
-    if (index === -1)
-        throw Error(`Invalid resource id "${resId}" given`)
-
-    return id2tid(text2id[resId.substring(0, index)], resId.substring(index + 1))
-}
-
 const tid2typeText = tid => RESOURCE.TEXT[tid2type(tid)]
 
-/*
-    CHECK:
-
-     - clear() / clearResources() wo wird das gebraucht?
-     - resolved-flag
-
-     - storageOverwrites wofür?
-     - storageScreenRemotes?
-     - buildUnresolvedResources
-     - getRelevantScreenResources
-
-     - http-link-fetch?
-     - hasLocalResources wofür?
-     - updateXResource() wikrlich?
-     - makeImageResource()
-     - storeScreenModel()
-     - deployResources(screen, resources, direct, indirect)
-
-    TODO:
-      - storage class
-      - error handling
-      - server routen
-      - resId methoden
-      - resourceOverwrite-Cleanup
-
-    Json:
-    ------------------
-
-
-
-    Image:
-    ------------------
-       ImageResource.resolved
-    ------------------
-      const image = new ImageResource(value)
-      promises.push(
-         image.getNewDecodingPromise().then(() => {
-            this.setResource('image', id, image, 'browser')
-         })
-      )
-
-      // value.startsWith('http')
-      promises.push(
-         fetch(value, {mode: 'cors'}).then(
-             response => {
-                if (!response.ok)
-                    throw Error(`Could not open url`)
-
-                return (
-                    response.blob().then(blob => {
-                        const resource = new ImageResource(URL.createObjectURL(blob))
-                        return resource.getNewDecodePromise().then(() => {
-                            this.setResource('image', 'id', resource, 'external')
-                        })
-                    })
-                )
-             }
-         )
-      )
-
-    Audio:
-    ------------------
-       AudioResource.resolved
-    ------------------
-      const audio = new AudioResource(value)
-      promises.push(
-         audio.getNewLoadingPromise().then(() => {
-             this.setResource('audio', id, audio, 'browser')
-         })
-      )
-
-
-
- */
-
-const SyncResolver = (id2source, permanentIds) => {
+const SyncResolver = (id2source, permId2scope) => {
     const added = []
+    const ids = []
 
     return {
-        add: (tid, value, source, permanent) => {
+        add: (tid, value, source) => {
+            ids.push(tid)
             const type = tid2type(tid)
             switch (type) {
 
@@ -176,23 +55,28 @@ const SyncResolver = (id2source, permanentIds) => {
                     added.push({id: tid, value })
             }
             if (source) id2source.set(tid, source)
-            if (permanent) permanentIds.add(tid)
         },
-
-        resolve: resolvedResources => {
+        resolve: (resolvedResources, permScope) => {
             for (const { id, value } of added) {
                 resolvedResources.set(id, value)
+            }
+            if (!permScope) return
+            for (const id of ids) {
+                permId2scope.set(id, permScope)
             }
         }
     }
 }
 
-const ResourceResolver = (id2source, permanentIds) => {
+const ResourceResolver = (id2source, permId2scope) => {
     const promises = []
+    const ids = []
 
     return {
-        add: (tid, value, source, permanent) => {
-            const type = tid2type(tid)
+        add: (tid, value, source) => {
+            ids.push(tid)
+
+            const { type } = makeDescriptor.fromTid(tid)
             switch (type) {
                 case RESOURCE.TYPE.JSON:
                     promises.push(
@@ -261,16 +145,22 @@ const ResourceResolver = (id2source, permanentIds) => {
                         })
                     )
                     break;
+
+                default:
+                    throw Error(`Unknown resource type "${type}" given`)
             }
 
             if (source) id2source.set(tid, source)
-            if (permanent) permanentIds.add(tid)
         },
 
-        resolve: (resolvedResources) => {
+        resolve: (resolvedResources, permScope) => {
             return Promise.all(promises).then(resolved => {
                 for (const { id, value } of resolved) {
                     resolvedResources.set(id, value)
+                }
+                if (!permScope) return
+                for (const id of ids) {
+                    permId2scope.set(id, permScope)
                 }
             })
         }
@@ -301,11 +191,75 @@ const DummyResolver = (id2source, permanentIds) => {
 }
 
 
+/**
+ * Fragen:
+ *   - beim Speichern werden temp-resourcen überschrieben, aber werden die wirklich mit ihren
+ *     Dependencies neu geladen, wenn der Screen reloaded wird, oder spielt da die Regel rein, dass
+ *     eine Resource nur neu geladen wird, wenn sie nicht schon vorher drin war?
+ *
+ *   - Wenn man eine globale Resource editiert, die bislang nur im Code über den Globals-Init()
+ *     definiert wurde: wie kann ich dann feststellen, dass diese in den "globals"-scope gespeichert
+ *     werden muss, statt dem aktuellen Screen, denn es sollte keinen Eintrag in permId2scope geben?
+ *
+ * The resource manager
+ *
+ *   Allows adding of resources which should be available in the next screen. When a resource is requested
+ *   by its type and id, it's also possible to give a fallback value for the case that the requested id
+ *   could not be found in the browser or server storage. All added resources are resolved when the next
+ *   load is triggered which can either be temporary or permanent. A permanent load will remove all permanently
+ *   loaded resources from before, which are not required in the current screen. Permanent resources are only
+ *   loaded once and will be kept in the manager. After loading all permanent and requested resources will be
+ *   available by their id or as resources object
+ *
+ *   The manager is used as follows:
+ *
+ *    - in the global request phase resources are added and afterwards the permanent load is triggered which
+ *      will pass the resources object to the global init method
+ *
+ *    - in the screen request phase resources are added and afterwards the permanent load is triggered which
+ *      will pass the resources object to the screen init method
+ *
+ *    - Model instantiation in the init-Methods will try to get a config for the id of the model from the
+ *      manager first. This means that not all instantiated models must be stored in the manager.
+ *      The manager is disabled by the editor, when a model should be instantiated with a temporary
+ *      config.
+ *
+ *    - An image-property in a model config, must be an ImageResource instance or a string holding an id, so
+ *      that the manager can be asked if he has already loaded the image.
+ *
+ *
+ *   TODO:
+ *      store
+ *
+ *   Resolving:
+ *     a) JSON
+ *          - addJson('foo', {bla: 'fasel'})
+ *
+ *            1. SM.hasJsonResource('foo') => SM.getJsonResource('foo')  // browserStorage converts string to JSON
+ *            2. apiFetcher.load('jfoo') => ...SM.getResource('jfoo') // fileStorage converts file content to JSON
+ *            3. fallback => JSON // is already a JSON
+ *
+ *            resolver.add('jfoo', {bla: 'fasel'}, 'code')
+ *            resolver.add('jfoo', <json>, 'browser')
+ *            resolver.add('jfoo', <json>, 'server')
+ *
+ *
+ *     b) IMAGE
+ *          - addImage('foo', 'data:image/png,base64...')
+ *
+ *            1. SM.hasImageResource('foo') => SM.getImageResource('foo')  // browserStorage converts string to image
+ *            2. apiFetcher.load('jfoo') => ...SM.getResource('jfoo') // fileStorage converts file content to JSON
+ *            3. fallback =>  //
+ *
+             resolver.add('ifoo', 'data:...', 'code')
+             resolver.add('jfoo', 'data:...', 'browser')
+             resolver.add('jfoo', 'data:...', 'server')  // API loaded
+             resolver.add('') // static load
+             resolver.add('ifoo', 'http://...' // external load
+ */
 class ResourceManager {
 
     constructor(apiFetcher, localStorage, sessionStorage, resolver = DummyResolver) {
-
-        this.permanent = false
 
         this.resolvedResources = new Map()
         this.requested = new Map()
@@ -313,15 +267,29 @@ class ResourceManager {
         this.resolver = resolver
 
         this.apiFetcher = apiFetcher
-        this.sessionStorage = sessionStorage
-        this.localStorage = localStorage
+        const dummyStorage = new StorageManager(MapStorage())
+        this.sessionStorage = IS_DIST ? dummyStorage : sessionStorage
+        this.localStorage = IS_DIST ? dummyStorage : localStorage
 
-        this.id2source = new Map()
-        this.permanentIds = new Set()
+        this.id2origin = new Map()
+        this.permId2scope = new Map()
+        this.permScopes = new Set();
 
         this.disabled = false
         this.preview = false
-        this.permScopes = new Set();
+    }
+
+    getPermanentIds() {
+        return [ ...this.permId2scope.keys() ]
+    }
+
+    getTemporaryIds() {
+        const permIds = this.getPermanentIds()
+        const tempIds = []
+        for (const id of this.resolvedResources.keys()) {
+            if (!permIds.includes(id)) tempIds.push(id)
+        }
+        return tempIds
     }
 
     setPreview(value) {
@@ -333,11 +301,12 @@ class ResourceManager {
         this.disabled = value
     }
 
-    setPermanent(value) {
-        this.permanent = value === true
-    }
-
     invalidatePermanentScope(scope) {
+        const ids = this.getPermanentIds()
+        for (const id of ids) {
+            if (this.permId2scope.get(id) !== scope) continue
+            this.permId2scope.delete(id)
+        }
         this.permScopes.delete(scope)
     }
 
@@ -346,84 +315,106 @@ class ResourceManager {
     }
 
     delete(scope, id) {
+        // TODO check where this is needed
         const blockedIds = this.localStorage.getJson('blocked') ?? []
         if (blockedIds.includes(id)) return
         blockedIds.push(id)
         this.localStorage.storeJson('blocked', blockedIds)
     }
 
-    revert(id) {
-    }
-
     deployModel(model, scope = null) {
-        const { resources, dependencies } = model.getResourcesAndDependencies()
+        const { resources, dependencies } = model.getResourcesAndDependencies(true)
+
         const lastResource = resources.at(-1)
-        let tid = typeText2tid(lastResource.type, lastResource.id)
-        return this.apiFetcher.fetch('store', { resources, dependencies, scope }).then(({ stored }) => {
-            let success = stored.includes(tid)
-            for (const tid of stored) {
-                this.deleteFromStore(tid, true)
-            }
+        const id = typeText2tid(lastResource.type, lastResource.id)
+
+        return this.apiFetcher.fetch('store', { id, resources, dependencies, scope }).then(({ stored }) => {
+            let success = stored.includes(id)
+            this.deleteIdsFromStore(stored)
             return success
 		})
 	}
 
+    deleteIdsFromStore(tids) {
+        const id2children = this.localStorage.getCoreResource('id2children') ?? {}
+        for (const tid of tids) {
+            this.localStorage.deleteResource(tid)
+            delete id2children[tid]
+        }
+        this.localStorage.storeCoreResource('id2children', id2children)
+        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
+        let changed = false
+        for (const [ scope, ids ] of toPairs(scope2ids)) {
+            const oldLength = ids.length
+            const newIds = without(ids, tids)
+            if (oldLength === newIds.length) continue
+            scope2ids[scope] = newIds
+            changed = true
+        }
+        if (changed) this.localStorage.storeCoreResource('scope2ids', scope2ids)
+    }
+
     storeModel(model, scope = null) {
         const { resources, dependencies } = model.getResourcesAndDependencies()
-        const resolver = SyncResolver(this.id2source, this.permanentIds)
+
+        const lastResource = resources.at(-1)
+        const tid = typeText2tid(lastResource.type, lastResource.id)
+        const permScope = this.permId2scope[tid]
+        const resolver = SyncResolver(this.id2origin, this.permId2scope)
 
         // store all resources this model uses
-        let tid = null
         for (const { id, data, type } of resources) {
             this.localStorage.storeResourceById(text2id[type], id, data)
             const addTid = typeText2tid(type, id)
-            tid = addTid // last resource should be the root resource
-            resolver.add(addTid, data, 'browser', scope === null)
+            resolver.add(addTid, data, 'browser')
         }
 
         // update deps
-        const id2children = this.localStorage.getJson('id2children') ?? {}
+        const id2children = this.localStorage.getCoreResource('id2children') ?? {}
 
         for (const [ tid, depTids ] of toPairs(dependencies)) {
             id2children[tid] = depTids
         }
-        this.localStorage.storeJson('id2children', id2children)
-        resolver.resolve(this.resolvedResources)
+        this.localStorage.storeCoreResource('id2children', id2children)
+        resolver.resolve(this.resolvedResources, permScope)
         this._resources = null
 
         if (scope === null) return
 
         // update scope ids
-        const scope2ids = this.localStorage.getJson('scope2ids') ?? {}
+        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
         const scopeIds = scope2ids[scope] ?? []
         if (!scopeIds.includes(tid)) scopeIds.push(tid)
         scope2ids[scope] = scopeIds
-        this.localStorage.storeJson('scope2ids', scope2ids)
+        this.localStorage.storeCoreResource('scope2ids', scope2ids)
     }
 
     clear() {
         this.resolvedResources.clear()
         this.requested.clear()
-        this.id2source.clear()
-        this.permanentIds.clear()
+        this.id2origin.clear()
+        this.permId2scope.clear()
+        this.permScopes.clear()
+        this._resources = null
+    }
+
+    clearTempAndGlobals() {
+        this.invalidatePermanentScope('globals')
+        this.clearTemporary()
         this._resources = null
     }
 
     clearTemporary() {
-        this.resolvedResources.clear()
-        /*
-        const ids = [ ...this.resolvedResources.keys() ].filter(id => !this.permanentIds.has(id))
+        const ids = this.getTemporaryIds()
         for (const id of ids) {
             this.resolvedResources.delete(id)
         }
-
-         */
     }
 
     deleteFromStore(tid, sync = false) {
 		this.localStorage.deleteResource(tid)
 
-        const scope2ids = this.localStorage.getJson('scope2ids') ?? {}
+        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
         let changed = false
 		for (const ids of toValues(scope2ids)) {
             const index = ids.indexOf(tid)
@@ -431,9 +422,9 @@ class ResourceManager {
 			ids.splice(index, 1)
             changed = true
 		}
-		if (changed) this.localStorage.storeJson('scope2ids', scope2ids)
+		if (changed) this.localStorage.storeCoreResource('scope2ids', scope2ids)
 			
-		const id2children = this.localStorage.getJson('id2children') ?? {}
+		const id2children = this.localStorage.getCoreResource('id2children') ?? {}
         const deps = id2children[tid] ?? []
 		delete id2children[tid]
 
@@ -443,7 +434,7 @@ class ResourceManager {
                 if (index === -1) continue
                 ids.splice(index, 1)
             }
-            this.localStorage.storeJson('id2children', id2children)
+            this.localStorage.storeCoreResource('id2children', id2children)
             return
         }
 
@@ -454,7 +445,7 @@ class ResourceManager {
                     if (index === -1) continue
                     ids.splice(index, 1)
                 }
-                this.localStorage.storeJson('id2children', id2children)
+                this.localStorage.storeCoreResource('id2children', id2children)
             }
             const promises = [];
             for (const tid of deps) {
@@ -479,12 +470,12 @@ class ResourceManager {
     remove(tid) {
         this._resources = null
         this.resolvedResources.delete(tid)
-        this.id2source.delete(tid)
-        this.permanentIds.delete(tid)
+        this.id2origin.delete(tid)
+        this.permId2scope.delete(tid)
     }
 
     hasPermanent(tid) {
-        return this.permanentIds.has(tid)
+        return this.permId2scope.has(tid)
     }
 
     hasPermanentJson(id) {
@@ -518,7 +509,7 @@ class ResourceManager {
     }
 
     hasBrowserResources() {
-        return !this.localStorage.hasNoTypedIds()
+        return !this.localStorage.isEmpty()
     }
 
     add(tid, value = null) {
@@ -542,34 +533,34 @@ class ResourceManager {
     }
 
     clearBrowserResources() {
-        this._resources = null
-        return this.localStorage.truncate()
+        this.clearTempAndGlobals()
+        return this.localStorage.truncateResources()
     }
 
-    getResourceSource(tid) {
-        return this.id2source.get(tid)
+    getResourceOrigin(tid) {
+        return this.id2origin.get(tid)
     }
 
-    getJsonSource(id) {
-        return this.getResourceSource(id2jsonTid(id))
+    getJsonOrigin(id) {
+        return this.getResourceOrigin(id2jsonTid(id))
     }
 
     getImageSource(id) {
-        return this.getResourceSource(id2imageTid(id))
+        return this.getResourceOrigin(id2imageTid(id))
     }
 
-    getAudioSource(id) {
-        return this.getResourceSource(id2audioTid(id))
+    getAudioOrigin(id) {
+        return this.getResourceOrigin(id2audioTid(id))
     }
 
     getAllResourceIds(type) {
         // TODO: we might also fetch the server ids here
         switch (type) {
-            case 'json':
-                return this.localStorage.getJsonIds();
+            case RESOURCE.TYPE.JSON:
+                return this.localStorage.getJsonResourceIds();
 
-            case 'image':
-                return this.localStorage.getImageIds();
+            case RESOURCE.TYPE.IMAGE:
+                return this.localStorage.getImageResourceIds();
         }
         return [];
     }
@@ -623,7 +614,8 @@ class ResourceManager {
             }
             for (const resourceMap of resourceMaps) {
                 for (const [ tid, value ] of toPairs(resourceMap)) {
-                    map[tid2type(tid)][tid2id(tid)] = value
+                    const { id, type } = makeDescriptor.fromTid(tid)
+                    map[type][id] = value
                 }
             }
             this._resources = { json, image, audio }
@@ -632,83 +624,53 @@ class ResourceManager {
     }
 
     load(scope, permanent = false) {
+        if (!scope)
+            throw Error(`No scope given`)
 
-        const resolver = this.resolver(this.id2source, this.permanentIds)
+        const resolver = this.resolver(this.id2origin, this.permId2scope)
 
-        // add missing ids from local scope
-        const scope2ids = this.localStorage.getJson('scope2ids') ?? {}
+        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
         const scopeIds = scope2ids[scope] ?? []
-        const id2children = this.localStorage.getJson('id2children') ?? {}
-
         for (const tid of scopeIds) {
             if (!this.requested.has(tid)) this.requested.set(tid, null) // null means that we get an error if no store or server resource exists
         }
 
-        // lets add dependencies
-        const checkIds = [ ...this.requested.keys() ];
-        while (checkIds.length) {
-            const tid = checkIds.pop()
-            if (!this.requested.has(tid)) {
-                this.requested.set(tid, null)
+        const ids = [ ...this.requested.keys() ];
+        return this.apiFetcher.fetch('resources', {
+            scope,
+            ids,
+            storedIds: this.localStorage.getPublicTypedResourceIds(),
+            storedDeps: this.localStorage.getCoreResource('id2children') ?? {},
+            tempIds: permanent ? [] : this.getTemporaryIds(),
+            permIds: [ ...this.getPermanentIds() ]
+        }).then(({ found, missing, add = [], drop = [] }) => {
+            for (const tid of missing) {
+                const value = this.requested.get(tid)
+                if (!value)
+                    throw Error(`Could not resolve resource of type ${tid2typeText(tid)} with id "${tid2id(tid)}"`)
+
+                resolver.add(tid, value, 'code')
             }
-            if (!(tid in id2children)) continue
-            checkIds.push( ...id2children[tid] )
-        }
-
-        const ids = [ ...this.requested.keys() ]
-        const resources = []
-        const id2resolved = {}
-        for (const id of this.localStorage.getTypedIds()) {
-            id2resolved[id] = false
-        }
-
-        for (const tid of ids) {
-            if (this.resolvedResources.has(tid)) continue
-            if (this.localStorage.hasResource(tid)) {
-                resolver.add(tid, this.localStorage.getResource(tid), 'browser', permanent)
-                id2resolved[tid] = true
-            } else {
-                resources.push(tid)
+            for (const tid of add) {
+                resolver.add(tid, this.localStorage.getResource(tid), 'browser')
             }
-        }
-        const storeInfo = { id2resolved, id2children }
-        return (
-            this.apiFetcher.fetch('resources', {
-                scope: permanent ? '' : scope, // TODO permanent request should send null
-                resources,
-                storeInfo
-            })
-                .then(({ found, missing, add = [] }) => {
-                    for (const tid of missing) {
-                        const value = this.requested.get(tid)
-                        if (!value)
-                            throw Error(`Could not resolve resource of type ${tid2typeText(tid)} with id "${tid2id(tid)}"`)
-
-                        resolver.add(tid, value, 'code', permanent)
-                    }
-                    for (const tid of add) {
-                        resolver.add(tid, this.localStorage.getResource(tid), 'browser', permanent)
-                    }
-                    if (!permanent) {
-                        // remove all temporary resolved value which were not requested again
-                        for (const tid of this.resolvedResources.keys()) {
-                            if (this.requested.has(tid) || this.permanentIds.has(tid) || add.includes(tid)) continue
-                            this.resolvedResources.delete(tid)
-                        }
-                    }
-                    for (const [ tid, resource ] of Object.entries(found)) {
-                        resolver.add(tid, resource, 'server', permanent)
-                    }
-                    return resolver.resolve(this.resolvedResources)
-                })
-                .then(() => {
-                    if (permanent && scope !== null) {
-                        this.permScopes.add(scope)
-                    }
-                    this.requested.clear()
-                    this._resources = null
-                })
-        )
+            for (const [ tid, data ] of toPairs(found)) {
+                resolver.add(tid, data, 'server')
+            }
+            if (!permanent) {
+                for (const tid of drop) {
+                    this.resolvedResources.delete(tid)
+                }
+            }
+            return resolver.resolve(this.resolvedResources, permanent ? scope : undefined)
+        })
+        .then(() => {
+            if (permanent && scope !== null) {
+                this.permScopes.add(scope)
+            }
+            this.requested.clear()
+            this._resources = null
+        })
     }
 
     loadPermanentScope(scope) {
@@ -966,6 +928,7 @@ class AudioResourceProvider extends SingleResourceProvider {
     validateContent(content) {
         if (typeof content !== 'string') throw Error(`Audio resources must be a string but got ${typeof content}`)
 
+        return;
         if (!isUrl(content)) throw Error(`Audio resource string must be an URL`)
     }
 
@@ -1266,13 +1229,6 @@ export {
     id2jsonTid,
     id2imageTid,
     id2audioTid,
-    tid2typeText,
-    typeText2tid,
-    tid2id,
-    tid2type,
-    id2tid,
-    resId2tid,
-    isTid,
 
     ResourceProvider,
     SingleResourceProvider,
