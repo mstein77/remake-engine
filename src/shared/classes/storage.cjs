@@ -80,7 +80,7 @@ class StorageManager {
     }
 
     getJsonIds() {
-        // TODO wie vollen wir hier unterscheiden?
+        // TODO wie wollen wir hier unterscheiden?
         return this.storage.keys()
     }
 
@@ -129,7 +129,7 @@ class StorageManager {
     getResource(tid) {
         const descriptor = this.getResourceDescriptor(tid)
 
-        return d(this.storage.get(descriptor.type, descriptor.extId), '<-- GET ', tid, descriptor.extId)
+        return this.storage.get(descriptor.type, descriptor.extTid)
     }
 
     /**
@@ -142,7 +142,7 @@ class StorageManager {
     }
 
     getJson(id) {
-        return d(this.storage.get(RESOURCE.TYPE.JSON, id), '<-- GET-JSON ', id)
+        return this.storage.get(RESOURCE.TYPE.JSON, id)
     }
 
     getDefaultedArray(id, defaults = []) {
@@ -170,7 +170,7 @@ class StorageManager {
     hasResource(tid) {
         const descriptor = this.getResourceDescriptor(tid)
 
-        return this.storage.has(descriptor.extId)
+        return this.storage.has(descriptor.extTid)
     }
 
     hasJson(id) {
@@ -381,7 +381,7 @@ class StorageManager {
      * @returns {boolean}
      */
     isEmpty() {
-        return this.storage.size === 0
+        return this.storage.size() === 0
     }
 }
 

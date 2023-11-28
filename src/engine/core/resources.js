@@ -1,4 +1,4 @@
-import { d, isObject, isUrl, isDataUrl, toPairs, toValues, without } from "helper/helper"
+import { d, isNull, isObject, isUrl, isDataUrl, toPairs, toValues, without } from "helper/helper"
 import { RESOURCE, makeDescriptor, typeText2tid  } from "shared/classes/resources.cjs"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { MapStorage } from "shared/storage/mapStorage.cjs"
@@ -68,95 +68,97 @@ const SyncResolver = (id2source, permId2scope) => {
     }
 }
 
+const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') => {
+    const descriptor = makeDescriptor.fromTid(tid)
+    if (isNull(value)) {
+        if (!descriptor.type) // TODO implement check
+            throw Error(`Resource with id "${descriptor.id}" was requested as static resource, but static ${descriptor.key} resources are not allowed`)
+
+        const staticUrl = BASE_URL + '/' + descriptor.key + '/' + descriptor.extId
+
+        return getResourceResolvePromise(tid, staticUrl, mainOrigin, 'staticurl')
+    }
+    if (isUrl(value)) {
+        switch (descriptor.type) {
+
+            case RESOURCE.TYPE.JSON:
+                return fetch(value)
+                    .then(response => {
+                        if (!response.ok)
+                            throw Error(`Failed to fetch json resource "${descriptor.id}"`)
+
+                        return response.json()
+                    })
+                    .then(
+                        data => ({ id: tid, value: data, origin: mainOrigin + '.' + urlType })
+                    )
+
+            case RESOURCE.TYPE.IMAGE:
+                const image = new ImageResource(value);
+                image.setId(descriptor.id)
+                return image
+                    .getNewDecodePromise()
+                    .then(
+                        () => ({id: tid, value: image, origin: mainOrigin + '.' + urlType})
+                    )
+
+            case RESOURCE.TYPE.AUDIO:
+                const audio = new AudioResource(value)
+                audio.setId(descriptor.id)
+                return audio
+                    .getNewLoadingPromise()
+                    .then(
+                        () => ({id: tid, value: audio, origin: mainOrigin + '.' + urlType})
+                    )
+
+            default:
+                throw Error(`No ${urlType} support for ${descriptor.key} resource "${descriptor.id}"`)
+        }
+    }
+    // data
+    if (descriptor.type === RESOURCE.TYPE.JSON) {
+        return Promise.resolve({id: tid, value, origin: mainOrigin + '.data'})
+    }
+    if (!isDataUrl(value))
+        throw Error(`Given value of ${descriptor.key} resource "${descriptor.id}" is no data url`)
+
+    if (descriptor.type === RESOURCE.TYPE.IMAGE) {
+        const image = new ImageResource(value)
+        image.setId(descriptor.id)
+        return image
+            .getNewDecodePromise()
+            .then(
+                () => ({id: tid, value: image, origin: mainOrigin + '.data'})
+            )
+    }
+    if (descriptor.type === RESOURCE.TYPE.AUDIO) {
+        const audio = new AudioResource(value)
+        audio.setId(descriptor.id)
+        return audio
+            .getNewLoadingPromise()
+            .then(
+                () => ({id: tid, value: audio, origin: mainOrigin + '.data'})
+            )
+    }
+    throw Error(`No data url support for ${descriptor.key} resource "${descriptor.id}"`)
+}
+
 const ResourceResolver = (id2source, permId2scope) => {
     const promises = []
     const ids = []
 
     return {
-        add: (tid, value, source) => {
+
+        add: (tid, value, mainOrigin) => {
             ids.push(tid)
-
-            const { type } = makeDescriptor.fromTid(tid)
-            switch (type) {
-                case RESOURCE.TYPE.JSON:
-                    promises.push(
-                        Promise.resolve({id: tid, value: value})
-                    )
-                    break;
-
-                case RESOURCE.TYPE.IMAGE:
-                    if (source === 'code' && value.startsWith('http')) {
-                        source = 'external'
-                        promises.push(
-                            fetch(value, {mode: 'cors'}).then(
-                                response => {
-                                    if (!response.ok)
-                                        throw Error(`Could not open url`)
-
-                                    return (
-                                        response.blob().then(blob => {
-                                            const image = new ImageResource(URL.createObjectURL(blob))
-                                            image.setId(tid2id(tid))
-                                            return image.getNewDecodePromise().then(() => {
-                                                return { id: tid, value: image }
-                                            })
-                                        })
-                                    )
-                                }
-                            )
-                        )
-                        break
-                    }
-                    const image = new ImageResource(value)
-                    image.setId(tid2id(tid))
-                    promises.push(
-                        image.getNewDecodePromise().then(() => {
-                            return { id: tid, value: image }
-                        })
-                    )
-                    break;
-
-                case RESOURCE.TYPE.AUDIO:
-                    if (source === 'code' && value.startsWith('http')) {
-                        source = 'external'
-                        promises.push(
-                            fetch(value, {mode: 'cors'}).then(
-                                response => {
-                                    if (!response.ok)
-                                        throw Error(`Could not open url`)
-
-                                    return (
-                                        response.blob().then(blob => {
-                                            const audio = new AudioResource(URL.createObjectURL(blob))
-                                            return audio.getNewLoadingPromise().then(() => {
-                                                return { id: tid, value: audio }
-                                            })
-                                        })
-                                    )
-                                }
-                            )
-                        )
-                        break
-                    }
-                    const audio = new AudioResource(value)
-                    promises.push(
-                        audio.getNewLoadingPromise().then(() => {
-                            return { id: tid, value: audio }
-                        })
-                    )
-                    break;
-
-                default:
-                    throw Error(`Unknown resource type "${type}" given`)
-            }
-
-            if (source) id2source.set(tid, source)
+            promises.push(getResourceResolvePromise(tid, value, mainOrigin))
         },
 
         resolve: (resolvedResources, permScope) => {
             return Promise.all(promises).then(resolved => {
-                for (const { id, value } of resolved) {
+                for (const { id, value, origin } of resolved) {
                     resolvedResources.set(id, value)
+                    id2source.set(id, origin)
                 }
                 if (!permScope) return
                 for (const id of ids) {
@@ -883,6 +885,8 @@ class ImageResourceProvider extends SingleResourceProvider {
      * @inheritDoc
      */
     validateContent(content) {
+        if (content === null) return
+
         if (typeof content !== 'string') throw Error(`Image resources must be a string but got ${typeof content}`)
 
         if (!isUrl(content) && !isDataUrl(content, 'image/png')) throw Error(`Image resource string must be an URL or data URL`)
@@ -926,6 +930,8 @@ class AudioResourceProvider extends SingleResourceProvider {
      * @inheritDoc
      */
     validateContent(content) {
+        if (content === null) return
+
         if (typeof content !== 'string') throw Error(`Audio resources must be a string but got ${typeof content}`)
 
         return;

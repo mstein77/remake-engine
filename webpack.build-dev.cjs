@@ -1,7 +1,8 @@
 const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs')
 
 const merge = require('webpack-merge')
-const { getConfigForCtx, getCommonWebpackConfig, absPath, gameId } = require('./webpack.build-common.cjs')
+const { getConfigForCtx, getHosting, getCommonWebpackConfig, absPath, gameId } = require('./webpack.build-common.cjs')
+const { d } = require('./src/shared/classes/helper.cjs')
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args)
@@ -9,6 +10,7 @@ module.exports = (env, args) => {
     console.log(`Building game "${gameId}" in develop mode with the following config following:`, config)
     console.log()
 
+    const hosting = getHosting(config, false)
     let open = false
     if (config.openBrowser) {
         if (config.openBrowser === 'default') {
@@ -38,7 +40,7 @@ module.exports = (env, args) => {
                         if (!devServer) {
                             throw new Error('webpack-dev-server is not defined!')
                         }
-                        setupAppMiddlewares(devServer.app, { ...config, IS_DIST: false })
+                        setupAppMiddlewares(devServer.app, { ...config, staticTypes: hosting.getStaticTypes().join(','), IS_DIST: false })
                         return middlewares
                     },
                     static: absPath.dist(config.server ? 'public' : ''),

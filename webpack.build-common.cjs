@@ -3,6 +3,7 @@ const syncFs = require('./src/shared/classes/syncFs.cjs')
 const { getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes/config.cjs')
 const { makeDescriptor } = require('./src/shared/classes/resources.cjs')
 const { FileCodec } = require('./src/shared/classes/fileCodec.cjs')
+const { d } = require('./src/shared/classes/helper.cjs')
 
 const { DefinePlugin, NormalModuleReplacementPlugin } = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -20,14 +21,28 @@ const enginePackageJson = syncFs.readJson(absPath.engine('package.json'))
 const gamePackageJson = syncFs.readJson(absPath.game('package.json'))
 const gameId = gamePackageJson.name
 
+FileCodec.init(absPath)
+
+const requiresApi = value => [RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(value)
+
+let _hosting = null
+const getHosting = (config, isDistBuild) =>  {
+    if (_hosting === null) {
+        _hosting = new Hosting(config, isDistBuild)
+    }
+    return _hosting
+}
+
 module.exports = {
     gameId,
     absPath,
+    getHosting,
     getConfigForCtx,
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args)
         const configArg = args && args.config
         const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
+        const hosting = getHosting(config, isDistBuild)
         const port = config.port ? config.port : 8080
         const plugins = [
             new DefinePlugin({
@@ -39,8 +54,9 @@ module.exports = {
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
                 IS_DIST: JSON.stringify(isDistBuild),
                 API_MAX_JSON_SIZE: JSON.stringify(config.apiMaxJsonSize),
-                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE.LOADING.STATIC),
-                RESOURCES_API: JSON.stringify(!isDistBuild || config.resourceLoading === RESOURCE.LOADING.API)
+                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE.LOADING.STATIC_ALL),
+                STATIC_TYPES: JSON.stringify(hosting.getStaticTypes().join(',')),
+                RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             })
         ];
         return {
@@ -99,7 +115,7 @@ module.exports = {
         const config = getConfigForCtx(args)
         const configArg = args && args.config
         const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
-        const hosting = new Hosting(config, isDistBuild)
+        const hosting = getHosting(config, isDistBuild)
         const pubPrefix = config.server ? 'public' : ''
 
         const plugins = [
@@ -111,7 +127,7 @@ module.exports = {
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 GAME_ID: JSON.stringify(gameId),
                 IS_DIST: JSON.stringify(isDistBuild),
-                RESOURCES_API: JSON.stringify(!isDistBuild ||config.resourceLoading === RESOURCE.LOADING.API)
+                RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             }),
             new HtmlWebpackPlugin({
                 filename: 'index.html',
@@ -125,28 +141,24 @@ module.exports = {
         if (config.editor) {
             entryParts.push(absPath.src('engine/editor/index.js'))
         }
-        if (isDistBuild && config.resourceLoading !== RESOURCE.LOADING.API) {
+        const useStaticFetcher = isDistBuild && ![RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)
+        if (useStaticFetcher) {
             // we are not loading from a server api, so only static or from a local cache file
             // the static api fetcher will first check the generated cache file and only fetch statically from the server
             // if the resource was not found
             const files = syncFs.readFilesRec(absPath.resources())
             const tids = []
 
-            const useCache = config.resourceLoading === RESOURCE.LOADING.LOCAL
             const cache = {}
-
-            const staticTypes = ['audio', 'video'] // config.staticTypes.split(',')
-
+            const staticTypes = hosting.getStaticTypes()
             for (const file of files) {
                 const descriptor = makeDescriptor.fromFile(file)
                 if (!descriptor || !descriptor.isValid()) continue
 
                 const tid = descriptor.extTid
                 if (!descriptor.isCoreJson()) tids.push(tid)
-
-                if (!descriptor.isCoreJson() && (!useCache && staticTypes.includes(descriptor.key))) continue
-
-                cache[tid] = FileCodec.decode(descriptor)
+                cache[tid] =
+                    !descriptor.isCoreJson() && staticTypes.includes(descriptor.key) ? null : FileCodec.decode(descriptor)
             }
             syncFs.writeContent(
                 absPath.tmp('resources-info.js'),

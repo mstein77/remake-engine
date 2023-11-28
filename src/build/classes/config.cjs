@@ -9,9 +9,11 @@ const DEPLOY = {
 }
 const RESOURCE = {
     LOADING: {
+        API: 'api',
+        API_ALL: 'api-all',
         LOCAL: 'local',
-        STATIC: 'static',
-        API: 'api'
+        LOCAL_ALL: 'local-all',
+        STATIC_ALL: 'static-all'
     }
 }
 

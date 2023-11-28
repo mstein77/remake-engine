@@ -1,3 +1,4 @@
+// this index file is the entry point for the server when the game was not started via `npm run game`
 const path = require('path')
 const express = require('express')
 const cors = require('cors')
@@ -11,13 +12,7 @@ const app = express()
 app.use(cors())
 
 app.use('/js', express.static(STATIC_DIR + '/js'))
-app.use('/audio', express.static(STATIC_DIR + '/audio'))
 app.use('/css', express.static(STATIC_DIR + '/css'))
-
-if (LOAD_STATIC) {
-    app.use('/json', express.static(STATIC_DIR + '/json'))
-    app.use('/image', express.static(STATIC_DIR + '/image'))
-}
 
 app.options('*', cors())
 
@@ -27,7 +22,18 @@ app.get('/', function(req, res) {
     )
 })
 if (setupAppMiddlewares) {
-    setupAppMiddlewares(app, {serverLogging: LOGGING, serverLoggingFormat: LOGGING_FORMAT, IS_DIST: true, API_MAX_JSON_SIZE})
+    setupAppMiddlewares(app, {
+        serverLogging: LOGGING,
+        serverLoggingFormat: LOGGING_FORMAT,
+        staticTypes: STATIC_TYPES,
+        resourceLoading: 'api',
+        IS_DIST: true,
+        API_MAX_JSON_SIZE
+    })
+} else if (STATIC_TYPES !== '') {
+    for (const type of STATIC_TYPES.split(',')) {
+        app.use('/' + type, express.static(STATIC_DIR + '/' + type))
+    }
 }
 
 app.listen(PORT)

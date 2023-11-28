@@ -1,7 +1,11 @@
 const syncFs = require("./syncFs.cjs")
-const absPath = require("./absPath.cjs")
+let absPath = null
 
 const FileCodec = {
+
+    init: _absPath => {
+        absPath = _absPath
+    },
     // writes an api-encoded resource to the file given in the descriptor
     encode: (apiEncoded, descriptor) => {
         const path = absPath.resources(descriptor.file)
@@ -19,7 +23,7 @@ const FileCodec = {
             return syncFs.readJson(path)
         }
         const buffer = syncFs.readFile(path)
-        return buffer.toString('base64')
+        return 'data:' + descriptor.mimeType + ';base64,' + buffer.toString('base64')
     }
 }
 

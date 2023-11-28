@@ -29,6 +29,15 @@ function d(main, ...params) {
 }
 
 /**
+ * Returns whether the given value is null or not
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
+const isNull = value => value === null
+
+/**
  * Returns whether the given value is a string or not
  * Instances of the String class will not be regarded as strings.
  *
@@ -112,6 +121,7 @@ const toKeys = Object.keys
 
 module.exports = {
     d,
+    isNull,
     isString,
     isArray,
     isObject,

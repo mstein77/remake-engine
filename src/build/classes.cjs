@@ -38,29 +38,32 @@ class Hosting {
         if (isDist) {
             if (this.server && !this.supportsNodejs)
                 this.throw('Server requires nodejs! Disable "server" in your dist config or use a hosting which supports nodejs!')
+
             if ([DEPLOY.METHOD.UPLOAD_PUBLIC, DEPLOY.METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !this.supportsManualUpload)
                 this.throw(`You selected "${config.deployMethod}" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!`)
+
             if (this.deployMethod === DEPLOY.METHOD.CHECKOUT && !this.supportsCheckout)
                 this.throw('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
 
             const resourceDirs = ['audio', 'image', 'json']
-            const rawResources = ['audio']
-
-            // all resources are static if no server is used or if static loading is configured
-            const staticResources = (!this.server || config.resourceLoading === RESOURCE.LOADING.STATIC) ? [ ...resourceDirs ] : rawResources
+            const staticTypes = this.getStaticTypes()
+            const isLocal = [RESOURCE.LOADING.LOCAL, RESOURCE.LOADING.LOCAL_ALL].includes(config.resourceLoading)
 
             for (const dir of resourceDirs) {
                 const from = absPath.resources(dir)
                 if (syncFs.isEmptyDir(from)) continue
+
+                if (isLocal && !staticTypes.includes(dir)) continue
                 // copy the static resources directories to the public folder of the dist
                 this.copyPatterns.push({
                     from,
-                    to: staticResources.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir)
+                    to: staticTypes.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir)
                 })
             }
-            if (config.resourceLoading === RESOURCE.LOADING.API) {
+            if ([RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)) {
+                // TODO: get rid of hardcoded files
                 // api loading still requires the core files
-                for (const file of ['indirect.json', 'direct.json']) {
+                for (const file of ['scope2ids.json', 'id2children.json']) {
                     const from = absPath.resources(file)
                     if (!syncFs.fileExists(from)) continue
                     this.copyPatterns.push({from, to: absPath.dist('resources', file) })
@@ -92,6 +95,19 @@ class Hosting {
         if (this.deployMethod === 'checkout') {
             this.generateRepoFiles()
         }
+    }
+
+    getStaticTypes() {
+        const config = this.config
+        const staticTypes = []
+        if (![RESOURCE.LOADING.LOCAL_ALL, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)) {
+            if (!config.server || config.resourceLoading === RESOURCE.LOADING.STATIC_ALL) {
+                staticTypes.push( ...['json', 'image', 'audio', 'video'] )
+            } else if (config.staticTypes !== '') {
+                staticTypes.push( ...config.staticTypes.split(',') )
+            }
+        }
+        return staticTypes
     }
 
     addCopyPattern(from, to) {

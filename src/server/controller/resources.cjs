@@ -1,18 +1,22 @@
+const { d } = require('../../shared/classes/helper.cjs')
 const { StorageManager } = require('../../shared/classes/storage.cjs')
 const { FileStorage } = require('../../shared/storage/fileStorage.cjs')
-const { typeText2tid, text2id } = require("../../shared/classes/resources.cjs")
+const { typeText2tid, text2id, makeDescriptor} = require("../../shared/classes/resources.cjs")
 const path = require('path')
 
 const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../../'
-const absDir = {
-    root: ( ...relPath ) => path.resolve( __dirname, /* TODO? config.IS_DIST */ false ? '' : RMK_GAME_DIR, ...relPath ),
-    resources: ( ...relPath ) => path.resolve(absDir.root('resources'), ...relPath )
-}
-
-const storage = FileStorage(absDir)
-const SM = new StorageManager(storage)
+let SM = null
 
 const controller = {
+
+    init: (config, absDir) => {
+        const staticTypes = []
+        if (config.staticTypes !== '') {
+            staticTypes.push(...config.staticTypes.split(','))
+        }
+        let storage = FileStorage(absDir, staticTypes)
+        SM = new StorageManager(storage)
+    },
 
     resources: (req, res) => {
         const { scope , ids, permIds, tempIds, storedDeps, storedIds } = req.body
