@@ -112,6 +112,10 @@ const syncFs = {
     writeJson: (filePath, json, space = true) => {
         const data = JSON.stringify(json, undefined, space ? 4 : undefined);
         fs.writeFileSync(filePath, data);
+    },
+
+    realpath: ( ...args ) => {
+        return fs.realpathSync( ...args )
     }
 }
 

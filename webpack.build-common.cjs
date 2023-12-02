@@ -1,6 +1,7 @@
 const absPath = require('./src/shared/classes/absPath.cjs')
 const syncFs = require('./src/shared/classes/syncFs.cjs')
-const { getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes/config.cjs')
+const { getConfigForCtx, configJson } = require('./src/build/classes/config.cjs')
+const { RESOURCE_LOADING } = require('./src/build/classes/const.cjs')
 const { makeDescriptor } = require('./src/shared/classes/resources.cjs')
 const { FileCodec } = require('./src/shared/classes/fileCodec.cjs')
 const { d } = require('./src/shared/classes/helper.cjs')
@@ -23,18 +24,18 @@ const gameId = gamePackageJson.name
 
 FileCodec.init(absPath)
 
-const requiresApi = value => [RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(value)
+const requiresApi = value => [RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(value)
 
 let _hosting = null
 const getHosting = (config, isDistBuild) =>  {
     if (_hosting === null) {
-        _hosting = new Hosting(config, isDistBuild)
+        _hosting = new Hosting()
+        _hosting.init(config, isDistBuild)
     }
     return _hosting
 }
 
 module.exports = {
-    gameId,
     absPath,
     getHosting,
     getConfigForCtx,
@@ -54,7 +55,7 @@ module.exports = {
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
                 IS_DIST: JSON.stringify(isDistBuild),
                 API_MAX_JSON_SIZE: JSON.stringify(config.apiMaxJsonSize),
-                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE.LOADING.STATIC_ALL),
+                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE_LOADING.STATIC_ALL),
                 STATIC_TYPES: JSON.stringify(hosting.getStaticTypes().join(',')),
                 RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             })
@@ -141,7 +142,7 @@ module.exports = {
         if (config.editor) {
             entryParts.push(absPath.src('engine/editor/index.js'))
         }
-        const useStaticFetcher = isDistBuild && ![RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)
+        const useStaticFetcher = isDistBuild && ![RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)
         if (useStaticFetcher) {
             // we are not loading from a server api, so only static or from a local cache file
             // the static api fetcher will first check the generated cache file and only fetch statically from the server

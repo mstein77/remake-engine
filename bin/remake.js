@@ -1,176 +1,92 @@
 #! /usr/bin/env node
-import * as dotenv from 'dotenv';
-import * as fs from 'node:fs';
-import { execSync } from 'child_process';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import * as dotenv from 'dotenv'
+import { execSync } from 'child_process'
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+const { colorLog, FG } = require('../src/shared/classes/color.cjs')
+const { syncFs } = require('../src/shared/classes/syncFs.cjs')
+const { d, toPairs } = require('../src/shared/classes/helper.cjs')
 
-const __dirname = fs.realpathSync(dirname(fileURLToPath(import.meta.url)) + '/../');
-console.log(__dirname + '/.env');
-dotenv.config({path: __dirname + '/.env'});
+const __dirname = syncFs.realpath(dirname(fileURLToPath(import.meta.url)) + '/../')
+const dotenvPath = __dirname + '/.env'
+colorLog(dotenvPath)
+dotenv.config({path: dotenvPath})
 
-const enginePackage = '2dfireengine';
-const packageJsonPath = './package.json';
-const engineBasePath = './node_modules/' + enginePackage;
-
-const IN = {
-    RED: '\x1b[31m',
-    GREEN: '\x1b[32m',
-    YELLOW: '\x1b[33m',
-    CYAN: '\x1b[36m',
-    GRAY: '\x1b[90m',
-    BLUE: '\x1b[34m',
-    MAGENTA: '\x1b[35m',
-    WHITE: '\x1b[97m',
-    NO_COL: '\x1b[0m'
-};
-
-function d(main, ...params) {
-    let stack = null;
-    try {
-        throw new Error('myError');
-    }
-    catch(e) {
-        stack = e.stack.split('\n');
-    }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
-        }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
-    }
-    console.group(IN.GRAY  + 'Debug ' + func.join(' <- ') + IN.NO_COL);
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
-}
-
-function log( ...logArgs ) {
-    let [ arg, ...args ] = logArgs;
-    if (!arg) {
-        console.log();
-        return
-    }
-    if (typeof arg === 'string') {
-        arg += IN.NO_COL
-    }
-    const newArgs = [ arg, ...args ];
-    console.log( ...newArgs );
-}
-
-
-const pairs = Object.entries;
-
-function fileExists(path) {
-    try {
-        const stat = fs.statSync(path);
-        if (!stat.isFile()) return false;
-        return true
-    } catch (err) {
-        return false
-    }
-}
-
-function dirExists(path) {
-    try {
-        const stat = fs.statSync(path);
-        if (!stat.isDirectory()) return false;
-        return true
-    } catch (err) {
-        return false
-    }
-}
-
-function readJson(path) {
-    if (!fileExists(path)) throw Error(`File not found: ${path}`);
-    const rawdata = fs.readFileSync(path);
-    const json = JSON.parse(rawdata);
-    return json
-}
-
-function writeJson(path, json) {
-    const data = JSON.stringify(json, undefined, 4);
-    fs.writeFileSync(path, data);
-}
+const enginePackage = '2dfireengine'
+const packageJsonPath = './package.json'
+const engineBasePath = './node_modules/' + enginePackage
 
 function exec(cmd, expectedStatus = 0) {
-    log();
-    log(IN.YELLOW + `Executing: ${IN.WHITE + cmd + IN.NO_COL}`);
-    log();
+    colorLog()
+    colorLog(FG.YELLOW + `Executing: ${FG.WHITE + cmd}`)
+    colorLog()
     try {
-        let stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'});
-        return stdout !== null ? stdout.toString() : null;
+        const stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'})
+        return stdout !== null ? stdout.toString() : null
     } catch (err) {
         if (err.status === expectedStatus) {
-            return err.stdout;
+            return err.stdout
         }
-        console.error(err);
-        throw err;
+        console.error(err)
+        throw err
     }
 }
 
 function addMissingDirsAndFiles(missing, path = './') {
-    for (let [name, content] of pairs(missing)) {
-        const itemPath = path + name;
+    for (const [ name, content ] of toPairs(missing)) {
+        const itemPath = path + name
         switch (typeof content) {
+
             case 'string':
-                if (!fileExists(itemPath)) {
-                    fs.writeFileSync(itemPath, content)
+                if (!syncFs.fileExists(itemPath)) {
+                    syncFs.writeFile(itemPath, content)
                 }
-                break;
+                break
 
             case 'object':
-                if (!dirExists(itemPath)) {
-                    fs.mkdirSync(itemPath)
+                if (!syncFs.dirExists(itemPath)) {
+                    syncFs.mkdir(itemPath)
                 }
-                addMissingDirsAndFiles(missing[name], itemPath + '/');
-                break;
+                addMissingDirsAndFiles(missing[name], itemPath + '/')
+                break
         }
     }
 }
-
 try {
-    if (!dirExists('.git')) {
-        exec('git init');
+    if (!syncFs.dirExists('.git')) {
+        exec('git init')
     }
-    if (!fileExists('./package.json')) {
-        exec('npm init -y');
+    if (!syncFs.fileExists('./package.json')) {
+        exec('npm init -y')
     }
-    let packageJson = readJson(packageJsonPath);
-    if (typeof packageJson !== 'object') throw Error(`Could not parse package.json!`);
+    let packageJson = readJson(packageJsonPath)
+    if (!isObject('object'))
+        throw Error(`Could not parse package.json!`)
 
-    if (packageJson.name === enginePackage) throw Error('Cannot be executed in the engine package!');
+    if (packageJson.name === enginePackage)
+        throw Error('Cannot be executed in the engine package!')
 
-    const hasPackage = (packageJson.dependencies !== undefined && packageJson.dependencies[enginePackage] !== undefined);
+    const hasPackage = (packageJson.dependencies !== undefined && packageJson.dependencies[enginePackage] !== undefined)
     if (!hasPackage) {
-        exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild');
-        packageJson = readJson(packageJsonPath)
+        // TODO get PAT and link out of here
+        exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild')
+        packageJson = syncFs.readJson(packageJsonPath)
     }
-    const hasScript = (packageJson.scripts !== undefined && packageJson.scripts.game !== undefined);
+    const hasScript = (packageJson.scripts !== undefined && packageJson.scripts.game !== undefined)
     if (!hasScript) {
         if (packageJson.scripts === undefined) {
-            packageJson.scripts = {};
+            packageJson.scripts = {}
         }
         const setGameDir = 'RMK_GAME_DIR=$(pwd) '
-        packageJson.scripts.start = setGameDir + 'npm run start --prefix ' + engineBasePath;
-        packageJson.scripts.game = setGameDir + 'npm run build-game-dev --prefix ' + engineBasePath;
+        packageJson.scripts.start = setGameDir + 'npm run start --prefix ' + engineBasePath
+        packageJson.scripts.game = setGameDir + 'npm run build-game-dev --prefix ' + engineBasePath
         if (packageJson.type === undefined) {
-            packageJson.type = 'module';
+            packageJson.type = 'module'
         }
-        packageJson.scripts.build = setGameDir + 'npm run build-game-prod --prefix ' + engineBasePath;
+        packageJson.scripts.build = setGameDir + 'npm run build-game-prod --prefix ' + engineBasePath
 
-        writeJson(packageJsonPath, packageJson);
-        packageJson = readJson(packageJsonPath);
+        syncFs.writeJson(packageJsonPath, packageJson)
+        packageJson = syncFs.readJson(packageJsonPath)
     }
 
     let baseConfig = {
@@ -227,12 +143,11 @@ try {
     });
 
     // trigger install of engine dependencies
-    if (!dirExists( + engineBasePath + '/node_modules')) {
-        exec('npm install --prefix=' + engineBasePath);
+    if (!syncFs.dirExists( + engineBasePath + '/node_modules')) {
+        exec('npm install --prefix=' + engineBasePath)
     }
-
     process.exit(0)
 } catch (err) {
-    console.error(err);
+    console.error(err)
     process.exit(1)
 }

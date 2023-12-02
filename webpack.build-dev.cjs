@@ -1,15 +1,11 @@
 const setupAppMiddlewares = require('./src/server/setupMiddlewares.cjs')
 
 const merge = require('webpack-merge')
-const { getConfigForCtx, getHosting, getCommonWebpackConfig, absPath, gameId } = require('./webpack.build-common.cjs')
+const { getConfigForCtx, getHosting, getCommonWebpackConfig, absPath} = require('./webpack.build-common.cjs')
 const { d } = require('./src/shared/classes/helper.cjs')
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args)
-    console.log()
-    console.log(`Building game "${gameId}" in develop mode with the following config following:`, config)
-    console.log()
-
     const hosting = getHosting(config, false)
     let open = false
     if (config.openBrowser) {

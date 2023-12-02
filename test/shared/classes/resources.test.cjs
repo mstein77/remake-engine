@@ -1,4 +1,4 @@
-const { makeDescriptor, ResourceTypeRegistry, RESOURCE } = require('../../../src/server/classes/resources.cjs')
+const { makeDescriptor, ResourceTypeRegistry, RESOURCE } = require('../../../src/shared/classes/resources.cjs')
 
 const jType = RESOURCE.TYPE.JSON
 const jTid = id => RESOURCE.PREFIX[jType] + id

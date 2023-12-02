@@ -7,7 +7,7 @@ const { isValidResourceId, ResourceDependencies } = require('../engine/helper/sh
 const express = require("express")
 
 const { d } = require('../shared/classes/helper.cjs')
-const { RESOURCE } = require('../build/classes/config.cjs')
+const { RESOURCE_LOADING } = require('../build/classes/const.cjs')
 const resourcesController = require('./controller/resources.cjs')
 
 
@@ -146,7 +146,7 @@ const setupAppMiddlewares = (app, config = null) => {
     }
 
     const staticTypes = [];
-    if (config.resourceLoading !== RESOURCE.LOADING.API_ALL && config.staticTypes !== '') {
+    if (config.resourceLoading !== RESOURCE_LOADING.API_ALL && config.staticTypes !== '') {
         staticTypes.push( ...config.staticTypes.split(',') )
     }
     for (const type of staticTypes) {

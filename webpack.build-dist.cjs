@@ -3,10 +3,6 @@ const { getConfigForCtx, getCommonWebpackConfig, getServerWebpackConfig } = requ
 
 module.exports = (env, args) => {
     const config = getConfigForCtx(args)
-    console.log()
-    console.log('Building game in dist folder with the following config following:', config)
-    console.log()
-
     frontendWebpackConfig =
         merge(
             getCommonWebpackConfig(args),

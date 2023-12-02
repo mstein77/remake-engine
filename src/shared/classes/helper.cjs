@@ -1,3 +1,10 @@
+/**
+ * Debug function which logs the given parameters on the console and returns the first param
+ *
+ * @param {mixed} main
+ * @param {mixed} params
+ * @returns {mixed}
+ */
 function d(main, ...params) {
     let stack = null;
     try {
@@ -61,6 +68,17 @@ function isArray(value) {
 }
 
 /**
+ * Returns whether the argument is an object or not
+ *
+ * @param {mixed} obj
+ *
+ * @returns {boolean}
+ */
+function isObject(obj) {
+    return (obj && typeof obj === 'object' && !isArray(obj))
+}
+
+/**
  * Returns whether the given argument is an URL string with http or https protocol or not
  *
  * @param {mixed} value
@@ -76,7 +94,7 @@ function isUrl(value) {
  * Returns whether the first argument is a data URL or not
  * If a type is given the data url must also match the content type
  *
- * @param {midex} value
+ * @param {mixed} value
  * @param {string} type
  *
  * @returns {boolean}
@@ -89,30 +107,48 @@ function isDataUrl(value, type = null) {
 }
 
 /**
- * Returns whether the argument is an object or not
+ * Returns the given string with the first character converted to uppercase (if not empty)
  *
- * @param {mixed} obj
+ * @param {string} value
  *
- * @returns {boolean}
+ * @returns {string}
  */
-function isObject(obj) {
-    return (obj && typeof obj === 'object' && !isArray(obj))
-}
-
 const ucfirst = (value) => {
     if (value === '') return '';
     return value[0].toUpperCase() + value.substring(1);
-};
+}
 
+/**
+ * Returns an array holding all unique elements of both given arrays
+ *
+ * @param {array} a
+ * @param {array} b
+ * @returns {array}
+ */
 const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
 
+/**
+ * Returns the given array without the given element or elements (if an array)
+ *
+ * @param {array} source
+ * @param {mixed|array} remove
+ *
+ * @returns {array}
+ */
 const without = (source, remove) => {
     if (!Array.isArray(remove)) remove = [remove];
     return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
 }
 
+/**
+ * Returns an array holding all items which are available in both given arrays
+ *
+ * @param {array} a
+ * @param {array} b
+ * @returns {array}
+ */
 const intersect = (a, b) => {
-    return a.filter(x => b.includes(x))
+    return [ ...new Set([ ...a ]) ].filter(x => b.includes(x))
 }
 
 const toPairs = Object.entries

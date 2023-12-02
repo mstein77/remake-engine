@@ -16,7 +16,6 @@ const absPath = {
     setDeps: (dirname, gameDir) => {
         deps.dirname = dirname
         deps.RMK_GAME_DIR = gameDir
-        console.log(deps)
     }
 }
 

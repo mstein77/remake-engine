@@ -1,4 +1,4 @@
-const { RESOURCE, DEPLOY } = require('./classes/config.cjs')
+const { RESOURCE_LOADING, DEPLOY_METHOD } = require('./classes/const.cjs')
 const absPath = require('../shared/classes/absPath.cjs')
 const syncFs = require('../shared/classes/syncFs.cjs')
 
@@ -16,14 +16,12 @@ const syncFs = require('../shared/classes/syncFs.cjs')
  */
 class Hosting {
 
-    constructor(config, isDist) {
+    constructor() {
+        this.supports = this.getSupport()
+    }
+
+    init(config, isDist) {
         this.config = config
-        this.supports = {
-            nodejs: true,
-            manualUpload: true,
-            checkout: true,
-            pwa: true
-        }
         this.isDist = isDist
         this.deployMethod = config.deployMethod
         this.editor = config.editor
@@ -31,23 +29,21 @@ class Hosting {
         this.messages = []
         this.copyPatterns = []
 
-        this.init(config)
-
         this.cleanUp()
 
         if (isDist) {
             if (this.server && !this.supportsNodejs)
                 this.throw('Server requires nodejs! Disable "server" in your dist config or use a hosting which supports nodejs!')
 
-            if ([DEPLOY.METHOD.UPLOAD_PUBLIC, DEPLOY.METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !this.supportsManualUpload)
+            if ([DEPLOY_METHOD.UPLOAD_PUBLIC, DEPLOY_METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !this.supportsManualUpload)
                 this.throw(`You selected "${config.deployMethod}" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!`)
 
-            if (this.deployMethod === DEPLOY.METHOD.CHECKOUT && !this.supportsCheckout)
+            if (this.deployMethod === DEPLOY_METHOD.CHECKOUT && !this.supportsCheckout)
                 this.throw('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
 
             const resourceDirs = ['audio', 'image', 'json']
             const staticTypes = this.getStaticTypes()
-            const isLocal = [RESOURCE.LOADING.LOCAL, RESOURCE.LOADING.LOCAL_ALL].includes(config.resourceLoading)
+            const isLocal = [RESOURCE_LOADING.LOCAL, RESOURCE_LOADING.LOCAL_ALL].includes(config.resourceLoading)
 
             for (const dir of resourceDirs) {
                 const from = absPath.resources(dir)
@@ -60,7 +56,7 @@ class Hosting {
                     to: staticTypes.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir)
                 })
             }
-            if ([RESOURCE.LOADING.API, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)) {
+            if ([RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
                 // TODO: get rid of hardcoded files
                 // api loading still requires the core files
                 for (const file of ['scope2ids.json', 'id2children.json']) {
@@ -69,20 +65,23 @@ class Hosting {
                     this.copyPatterns.push({from, to: absPath.dist('resources', file) })
                 }
             }
-            if (this.deployMethod === DEPLOY.METHOD.UPLOAD_PUBLIC) {
+            if (this.deployMethod === DEPLOY_METHOD.UPLOAD_PUBLIC) {
                 this.messages.push(`Upload the content of "${absPath.dist()}" to the public folder of your http web-server`)
             }
-            if (this.server && [DEPLOY.METHOD.UPLOAD_ROOT, DEPLOY.METHOD.CHECKOUT].includes(this.deployMethod)) {
+            if (this.server && [DEPLOY_METHOD.UPLOAD_ROOT, DEPLOY_METHOD.CHECKOUT].includes(this.deployMethod)) {
                 const distPackageJsonPath = absPath.tmp('package.json')
                 syncFs.writeJson(distPackageJsonPath, {
                     name: 'game',
                     version: '1.0.0',
+                    scripts: {
+                        start: 'node server.cjs'
+                    },
                     dependencies: {
                         express: '^4.18.2'
                     }
                 });
                 this.copyPatterns.push({from: distPackageJsonPath, to: absPath.dist('package.json')})
-                if (this.deployMethod === DEPLOY.METHOD.UPLOAD_ROOT) {
+                if (this.deployMethod === DEPLOY_METHOD.UPLOAD_ROOT) {
                     this.messages.push(`Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`);
                     this.messages.push(`Afterwards execute "npm install" in this directory`);
                 } else {
@@ -97,11 +96,20 @@ class Hosting {
         }
     }
 
+    getSupport() {
+        return {
+            nodejs: true,
+            manualUpload: true,
+            checkout: true,
+            pwa: true
+        }
+    }
+
     getStaticTypes() {
         const config = this.config
         const staticTypes = []
-        if (![RESOURCE.LOADING.LOCAL_ALL, RESOURCE.LOADING.API_ALL].includes(config.resourceLoading)) {
-            if (!config.server || config.resourceLoading === RESOURCE.LOADING.STATIC_ALL) {
+        if (![RESOURCE_LOADING.LOCAL_ALL, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
+            if (!config.server || config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
                 staticTypes.push( ...['json', 'image', 'audio', 'video'] )
             } else if (config.staticTypes !== '') {
                 staticTypes.push( ...config.staticTypes.split(',') )
@@ -120,8 +128,6 @@ class Hosting {
         if (this.isDist) syncFs.clearDir(absPath.dist())
         syncFs.clearDir(absPath.tmp())
     }
-
-    init(config) {}
 
     throw(msg) {
         throw new Error(msg)

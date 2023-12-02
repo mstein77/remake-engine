@@ -1,5 +1,5 @@
 const path = require("path")
-const absPath = require('../../../src/build/classes/absPath.cjs')
+const absPath = require('../../../src/shared/classes/absPath.cjs')
 
 jest.mock('path', () => {
     return {
