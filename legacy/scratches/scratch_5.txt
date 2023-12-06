@@ -596,7 +596,7 @@ c) truncate
 
 
 ===========================================
-  Simple (Load im Configurable)
+  Simple (Load im Model)
 ===========================================
  a) myFont = new FontMap({id: 'xy'});               // json (ohne __resolved)
      - !hasKey(__resolved, input)
@@ -772,7 +772,7 @@ Screen-Resource-Loading:
  Problem A) JSON-Dependency
 --------------------------------
 
- 1.) explizites JSON-Resource-Prop im Configurable
+ 1.) explizites JSON-Resource-Prop im Model
 
  this.addJsonResource('bongo', {foo: 'bar'});
  ---
@@ -792,7 +792,7 @@ Screen-Resource-Loading:
    - angelegt
 
 
- 2.) JSON-Composition mit JSON-Resource im Configurable (direct)
+ 2.) JSON-Composition mit JSON-Resource im Model (direct)
 
  this.addJsonResource('bongo', {foo: 'bar'});
  ---
@@ -805,7 +805,7 @@ Screen-Resource-Loading:
  Editor überschrieben werden. Ausnahme: User legt JSON mit dieser ID händisch auf Server ab.
 
 
- 3.) JSON-Composition mit JSON-Resource im Configurable (indirect)
+ 3.) JSON-Composition mit JSON-Resource im Model (indirect)
 
  this.addJsonResource('bongo', {foo: 'bar'});
  ---
@@ -838,11 +838,11 @@ Haken: die Dependency wird nicht gespeichert und hängt von der Registrierung im
 
 Die Methode setFontMap(RES) wird RES zunächst wie eine JSON-Resource auflösen, sofern RES keine Instanz
 des Configurables ist...ist es keine resolved-Instanz wird die ID über den RL versucht aufzulösen
-Ist ein JSON ermittelt muss das Configurable instantiiert werden. Am Ende steht dann im Configurable unter
-dem Key eine entsprechende Configurable-Instanz
+Ist ein JSON ermittelt muss das Model instantiiert werden. Am Ende steht dann im Model unter
+dem Key eine entsprechende Model-Instanz
 
 Wenn das Editor-Modell gebildet wird, muss die Instanz über ein getJSON() resolved werden
-Beim STORE muss das Configurable als Abhängigkeit von <screen>: ['myPane', ['bongo', b1...]] mit allen
+Beim STORE muss das Model als Abhängigkeit von <screen>: ['myPane', ['bongo', b1...]] mit allen
 abhängigkeiten von bongo eingetragen werden (!!! vielleicht doch besser auf Top-Level? !!!)
 
 --------------------------------
@@ -858,7 +858,7 @@ abhängigkeiten von bongo eingetragen werden (!!! vielleicht doch besser auf Top
  const myTextPane = new TextPane('TextPane');
 
 Hier wird setFonts() auf einen Array über Configurables vom Typ FontMap checken, indem die Methode
-addFont(Configurable) aufgerufen wird, die wie ein Explizites Configurable Prop arbeitet nur dass die Instanz
+addFont(Model) aufgerufen wird, die wie ein Explizites Model Prop arbeitet nur dass die Instanz
 am Ende in ein Array gepushed wird.
 
 Beim GetJSON wird hier analog auf jedem Item das getJSON aufgerufen und beim STORE werden die Items mitsamt

@@ -1,6 +1,10 @@
-const absPath = require('./src/build/classes/absPath.cjs')
-const syncFs = require('./src/build/classes/syncFs.cjs')
-const { getConfigForCtx, configJson, RESOURCE } = require('./src/build/classes/config.cjs')
+const absPath = require('./src/shared/classes/absPath.cjs')
+const syncFs = require('./src/shared/classes/syncFs.cjs')
+const { getConfigForCtx, configJson } = require('./src/build/classes/config.cjs')
+const { RESOURCE_LOADING } = require('./src/build/classes/const.cjs')
+const { makeDescriptor } = require('./src/shared/classes/resources.cjs')
+const { FileCodec } = require('./src/shared/classes/fileCodec.cjs')
+const { d } = require('./src/shared/classes/helper.cjs')
 
 const { DefinePlugin, NormalModuleReplacementPlugin } = require("webpack")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -14,19 +18,32 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const PostBuildMessagePlugin = require("./src/build/plugin/PostBuildMessagePlugin.cjs")
 
 const Hosting = require(absPath.src('build/hosting/' + configJson().hosting + '.cjs'))
-const path = require("path");
 const enginePackageJson = syncFs.readJson(absPath.engine('package.json'))
 const gamePackageJson = syncFs.readJson(absPath.game('package.json'))
 const gameId = gamePackageJson.name
 
+FileCodec.init(absPath)
+
+const requiresApi = value => [RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(value)
+
+let _hosting = null
+const getHosting = (config, isDistBuild) =>  {
+    if (_hosting === null) {
+        _hosting = new Hosting()
+        _hosting.init(config, isDistBuild)
+    }
+    return _hosting
+}
+
 module.exports = {
-    gameId,
     absPath,
+    getHosting,
     getConfigForCtx,
     getServerWebpackConfig: args => {
         const config = getConfigForCtx(args)
         const configArg = args && args.config
         const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
+        const hosting = getHosting(config, isDistBuild)
         const port = config.port ? config.port : 8080
         const plugins = [
             new DefinePlugin({
@@ -38,8 +55,9 @@ module.exports = {
                 LOGGING_FORMAT: JSON.stringify(config.serverLoggingFormat),
                 IS_DIST: JSON.stringify(isDistBuild),
                 API_MAX_JSON_SIZE: JSON.stringify(config.apiMaxJsonSize),
-                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE.LOADING.STATIC),
-                RESOURCES_API: JSON.stringify(!isDistBuild || config.resourceLoading === RESOURCE.LOADING.API)
+                LOAD_STATIC: JSON.stringify(config.resourceLoading === RESOURCE_LOADING.STATIC_ALL),
+                STATIC_TYPES: JSON.stringify(hosting.getStaticTypes().join(',')),
+                RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             })
         ];
         return {
@@ -87,7 +105,8 @@ module.exports = {
             plugins,
             resolve: {
                 alias: {
-                    helper: absPath.src('engine/helper') + '/'
+                    helper: absPath.src('engine/helper') + '/',
+                    shared: absPath.src('shared') + '/'
                 },
                 extensions: ['*', '.js']
             }
@@ -97,7 +116,7 @@ module.exports = {
         const config = getConfigForCtx(args)
         const configArg = args && args.config
         const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
-        const hosting = new Hosting(config, isDistBuild)
+        const hosting = getHosting(config, isDistBuild)
         const pubPrefix = config.server ? 'public' : ''
 
         const plugins = [
@@ -109,7 +128,7 @@ module.exports = {
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 GAME_ID: JSON.stringify(gameId),
                 IS_DIST: JSON.stringify(isDistBuild),
-                RESOURCES_API: JSON.stringify(!isDistBuild ||config.resourceLoading === RESOURCE.LOADING.API)
+                RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             }),
             new HtmlWebpackPlugin({
                 filename: 'index.html',
@@ -123,51 +142,29 @@ module.exports = {
         if (config.editor) {
             entryParts.push(absPath.src('engine/editor/index.js'))
         }
-        if (isDistBuild && config.resourceLoading !== RESOURCE.LOADING.API) {
-            const getResourceIds = type => syncFs.readFilesRec(absPath.resources(type))
-            const getResourcesJson = name => {
-                const filePath = absPath.resources(name + '.json')
-                return syncFs.fileExists(filePath) ? syncFs.readJson(filePath) : {}
-            }
-            const getResourceCache = (type, ids) => {
-                const cache = {}
-                const ext = type === 'json' ? '.json' : ''
+        const useStaticFetcher = isDistBuild && ![RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)
+        if (useStaticFetcher) {
+            // we are not loading from a server api, so only static or from a local cache file
+            // the static api fetcher will first check the generated cache file and only fetch statically from the server
+            // if the resource was not found
+            const files = syncFs.readFilesRec(absPath.resources())
+            const tids = []
 
-                const getContent =
-                    type === 'json' ? filePath => syncFs.readJson(filePath) :
-                        filePath => {
-                            const imgContent = syncFs.readFile(filePath)
-                            const imgType = path.extname(filePath)
-                            const base64Image = Buffer.from(imgContent, 'binary').toString('base64')
-                            return `data:image/${imgType.split('.').pop()};base64,${base64Image}`
-                        }
+            const cache = {}
+            const staticTypes = hosting.getStaticTypes()
+            for (const file of files) {
+                const descriptor = makeDescriptor.fromFile(file)
+                if (!descriptor || !descriptor.isValid()) continue
 
-                for (const id of ids) {
-                    const filePath = absPath.resources(type, id + ext)
-                    let content = getContent(filePath)
-                    cache[id] = content
-                }
-                return cache
-            }
-            const static = {
-                json: getResourceIds('json').map(id => id.endsWith('.json') ? id.substring(0, id.length - 5) : id),
-                image: getResourceIds('image'),
-                audio: getResourceIds('audio')
-            }
-            const useCache = config.resourceLoading === RESOURCE.LOADING.LOCAL
-            const resourceInfo = {
-                cache: {
-                    json: useCache ? getResourceCache('json', static.json) : {},
-                    image: useCache ? getResourceCache('image', static.image) : {},
-                    audio: {}
-                },
-                indirect: getResourcesJson('indirect'),
-                direct: getResourcesJson('direct'),
-                static
+                const tid = descriptor.extTid
+                if (!descriptor.isCoreJson()) tids.push(tid)
+                cache[tid] =
+                    !descriptor.isCoreJson() && staticTypes.includes(descriptor.key) ? null : FileCodec.decode(descriptor)
             }
             syncFs.writeContent(
                 absPath.tmp('resources-info.js'),
-`const resourceInfo = ${JSON.stringify(resourceInfo)}
+`const resourceInfo = ${JSON.stringify({ cache, tids }, null, 4)}
+
 export default resourceInfo`
             )
             plugins.push(
@@ -182,7 +179,7 @@ export default resourceInfo`
                 )
             )
         }
-        if (true || isDistBuild) {
+        if (true || isDistBuild) { // TODO remove true
             plugins.push(new CssMinimizerPlugin());
             plugins.push(new MiniCssExtractPlugin({filename: 'css/[name].[contenthash].css'}))
         }
@@ -336,7 +333,8 @@ export default resourceInfo`
                     editor: absPath.src('engine/editor') + '/',
                     core: absPath.src('engine/core') + '/',
                     panes: absPath.src('engine/panes') + '/',
-                    plugins: absPath.src('engine/plugins') + '/'
+                    plugins: absPath.src('engine/plugins') + '/',
+                    shared: absPath.src('shared') + '/'
                 },
                 extensions: ['*', '.js', '.jsx']
             },

@@ -1,391 +1,311 @@
-import { isValidResourceId, d } from "../helper/helper.js";
-import { ImageResource } from "./classes.js";
-import inst from "./instances.js";
+import { d, isObject, without, toKeys, toPairs, isArray } from "helper/helper"
+import { validated } from "helper/validate"
+import { AppliedImage, ImageResource } from "./classes"
+import inst from "./instances"
 
-class Config {
-
-    constructor(json) {
-        if (typeof json !== 'object') {
-            throw Error('Config must be instantiated with a JSON!');
-        }
-        this.fieldProps = this.getFieldProps();
-        this.resolved = false;
-        this.parse({ ...this.getDefaults(), ...json });
-    }
-
-    getFieldProps() {
-        return {};
-    }
-
-    getFieldProp(field, add = {}) {
-        const props = this.fieldProps[field] ? this.fieldProps[field] : {};
-        return {...props, ...add};
-    }
-
-    getRebuildJson(deep = true, base = null) {
-        if (base === null) {
-            base = this.getJson();
-        }
-        return this.addRebuildProps({id: base.id}, deep, base);
-    }
-
-    addRebuildProps(obj, deep, base) {
-        return obj;
-    }
-
-    getResources(type = null) {
-        const result = {
-            resources: [],
-            dependencies: {}
-        };
-        this.addResources(result, type);
-        return result;
-    }
-
-    addResources(result, type = null) {
-        if (type === null || type === 'json') {
-            result.resources.push({
-                id: this.id,
-                type: 'json',
-                data: this.getRebuildJson(false)
-            });
-        }
-        result.dependencies['json:' + this.id] = [];
-        this.addSubResources(result, type);
-    };
-
-    addSubResources(result, type) {
-        const deps = this.getSubResources();
-        for (let dep of deps) {
-            const sourceId = 'json:' + this.id;
-            const targetId = dep.type + ':' + dep.id;
-            if (!result.dependencies[sourceId].includes(targetId)) {
-                result.dependencies[sourceId].push(targetId);
-            }
-            if (dep.type === 'json') {
-                dep.data.config.addResources(result, type);
-            } else if (type === null || dep.type === type) {
-                result.resources.push(dep);
-            }
+const getClonedProp = (value, parent) => {
+    if (isArray(value)) {
+        const result = []
+        for (const item of value) {
+            result.push(getClonedProp(item, parent))
         }
         return result
     }
+    if (isObject(value)) {
+        if (value instanceof Config)
+            return value.getInitialModelInstance({ parent })
 
-    getSubResources() {
-        return [];
+        if (value instanceof ImageResource)
+            return new AppliedImage(value)
+
+        const result = {}
+        for (const [ key, subValue ] of Object.entries(value)) {
+            result[key] = getClonedProp(subValue, parent)
+        }
+        return result
+    }
+    return value
+}
+
+/**
+ * Represents a configuration object of a model. Validates and parses the configuration and initializes a model with
+ * this configuration. The configuration will be sealed and finalized once the configuration is applied to a model for
+ * the first time.
+ *
+ * @class Config
+ */
+class Config {
+
+    /**
+     * Creates a new configuration object and initializes it with values in the given JSON object
+     *
+     * @param json
+     */
+    constructor(json) {
+        if (!isObject(json))
+            throw Error('Config must be instantiated with a JSON!')
+
+        this.fieldProps = this.getFieldProps()
+        const compJson = this.getCompatibleJson(json)
+
+        this.parse({ ...this.getDefaultProps(), ...compJson })
     }
 
+    /**
+     * Returns a string holding the current version number of the configuration
+     *
+     * @returns {string}
+     */
+    getVersion() {
+        // TODO use engine version here by default
+        return '1.0.0'
+    }
+
+    /**
+     * Returns a compatible version of the given json configuration object. This method should be used to transform
+     * configurations from lower versions to the current one if necessary
+     *
+     * @param {object} json
+     * @returns {object}
+     */
+    getCompatibleJson(json) {
+        return json
+    }
+
+    /**
+     * Returns an object holding all defaults for properties which should be used when they are missing in the
+     * JSON object which is passed to the constructor. Mandatory properties which have no default value should be set
+     * to undefined here to trigger an exception when the configuration is applied to the model
+     *
+     * @returns {object}
+     */
     getDefaults() {
-        return {};
+        return {}
     }
 
-    validateBool(value) {
-        if (typeof value !== 'boolean') {
-            throw Error('value must be a boolean');
+    /**
+     * Returns an object with all default properties which have a defined value
+     *
+     * @returns {object}
+     */
+    getDefaultProps() {
+        const props = {}
+        const defaults = this.getDefaults()
+        for (const [ key, value ] of toPairs(defaults)) {
+            if (value === undefined) continue
+            props[key] = value
         }
-        return value;
+        return props
     }
 
-    validateInt(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
+    /**
+     * Returns an array with all default property names which the value undefined and thus are mandatory
+     *
+     * @returns {array}
+     */
+    getMandatoryKeys() {
+        const keys = []
+        const defaults = this.getDefaults()
+        for (const [ key, value ] of toPairs(defaults)) {
+            if (value !== undefined) continue
+            keys.push(key)
         }
-        if (props.null && value === null) {
-            return null;
-        }
-        if (typeof value !== 'number') {
-            throw Error('value must be an integer');
-        }
-        if (props.min && value < props.min) {
-            throw Error('value is less than ' + props.min);
-        }
-        if (props.max && value > props.max) {
-            throw Error('value is more than ' + props.max);
-        }
-        return value;
+        return keys
     }
 
-    validateFloat(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (props.null && value === null) {
-            return null;
-        }
-        if (typeof value !== 'number') {
-            throw Error('value must be a float');
-        }
-        if (props.min && value < props.min) {
-            throw Error('value is less than ' + props.min);
-        }
-        if (props.max && value > props.max) {
-            throw Error('value is more than ' + props.max);
-        }
-        return value;
-    }
-
-    validateString(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (props.null && value === null) {
-            return null;
-        }
-        if (typeof value !== 'string') {
-            throw Error('value must be a string');
-        }
-        if (props.min && value.length < props.min) {
-            throw Error('value is shorter than ' + props.min);
-        }
-        if (props.max && value.length > props.max) {
-            throw Error('value is longer than ' + props.max);
-        }
-        if (props.size && value.length !== props.size) {
-            throw Error('value must have a length of ' + props.size);
-        }
-        if (props.values && !props.values.includes(value)) {
-            throw Error('value not allowed');
-        }
-        return value;
-    }
-
-    validateArray(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (props.null && value === null) {
-            return null;
-        }
-        if (!Array.isArray(value)) {
-            throw Error('value must be an array');
-        }
-        if (props.min && value.length < props.min) {
-            throw Error('value is shorter than ' + props.min);
-        }
-        if (props.max && value.length > props.max) {
-            throw Error('value is longer than ' + props.max);
-        }
-        if (props.size && value.length !== props.size) {
-            throw Error('value must have a length of ' + props.size);
-        }
-        return value;
-    }
-
-    validateJsonResource(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        let id = null;
-        if (typeof value === 'string') {
-            id = value;
-        } else if (typeof value === 'object') {
-            id = value.id;
-        }
-        if (id && inst.RL.hasResource('json', id)) {
-            value = inst.RL.getJsonResource(value);
-        }
-        if (!(typeof value !== 'object')) {
-            throw Error('value is no JSON object!');
-        }
-        if (!value.__resolved) {
-            throw Error(`JSON resource "${value.id}" not yet resolved, must be registered first!`);
-        }
-        return value;
-    }
-
-    validateJsonResources(values, props = {}) {
-        if (values === undefined) {
-            throw Error('Undefined value');
-        }
-        if (!Array.isArray(values)) {
-            throw Error(`Expected array of json resources but got ${typeof values}`);
-        }
-        const result = [];
-        for (let value of values) {
-            result.push(this.validateJsonResource(value));
-        }
-        return result;
-    }
-
-    validateImageResource(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (typeof value === 'string') {
-            value = inst.RL.getImageResource(value);
-        }
-        if (!(value instanceof ImageResource)) {
-            throw Error('value is no image resource!');
-        }
-        if (!value.isResolved()) {
-            throw Error(`ImageResource "${value.id}" not yet resolved, must be registered first!`);
-        }
-        return value;
-    }
-
-    validateImageResources(values, props = {}) {
-        if (values === undefined) {
-            throw Error('Undefined value');
-        }
-        if (!Array.isArray(values)) {
-            throw Error(`Expected array of image resources but got ${typeof values}`);
-        }
-        const result = [];
-        for (let value of values) {
-            result.push(this.validateImageResource(value));
-        }
-        return result;
-    }
-
-    validateObject(value, props = {}) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (typeof value !== 'object') {
-            throw Error('value must be an object');
-        }
-        return value;
-    }
-
-    validateImage(value) {
-        if (value === undefined) {
-            throw Error('Undefined value');
-        }
-        if (typeof value !== 'string' || !value.startsWith('data:image/')) {
-            throw Error('value must be an image dataURL');
-        }
-        return value;
-    }
-
-    validateColor(value) {
-        this.validateString(value);
-        if (value[0] !== '#') {
-            throw Error('Must start with #')
-        }
-        return value
-    }
-
-    validateConfigs(config, values) {
-        if (values === undefined) {
-            throw Error('Undefined value');
-        }
-        if (!Array.isArray(values)) {
-            throw Error('value must be an array of ');
-        }
-        const result = [];
-        for (let value of values) {
-            result.push(this.validateConfig(config, value));
-        }
-        return result;
-    }
-
-    validateConfig(config, value) {
-        if (typeof value === 'string') {
-            value = inst.RL.getJsonResource(value);
-        }
-        if (!(value instanceof config)) {
-            if (typeof value === 'object') {
-                if (!(value instanceof config.Config)) {
-                    value = new config.Config(value);
-                }
-            }
-            if (value instanceof config.Config) {
-                value = new config(value);
-            }
-            if (!(value instanceof config)) {
-                throw Error('YYY');
-            }
-        }
-        return value;
-    }
-
-    validateId(value, options = {}) {
-        if (value == undefined) {
-            if (options.null) {
-                return null;
-            }
-            throw Error('config requires an id property');
-        }
-        if (options.null && value === null) {
-            return null;
-        }
-        if (typeof value !== 'string') {
-            throw Error('id must be a string');
-        }
-
-        if (!isValidResourceId('json', value)) {
-            throw Error('Invalid id for json resource');
-        }
-        return value;
-    }
-
-    setId(value) {
-        this.id = this.validateId(value);
-    }
-
+    /**
+     * Returns an array which holds the properties of the given JSON object split over multiple to JSON to
+     * allow the parsing some properties before others
+     *
+     * @param {object} json
+     *
+     * @returns {array}
+     */
     getJsonsToParse(json) {
         return [json]
     }
 
+    /**
+     * Validates and sets the properties of the given JSON object by calling the setter method of the property.
+     * Throw an error when the validation of a property fails
+     *
+     * @param {object} json
+     */
     parse(json) {
-        if (json.id !== undefined) {
-            this.setId(json.id);
-        }
-        const jsons = this.getJsonsToParse(json);
+        if (json.id) this.setId(json.id)
+
+        const jsons = this.getJsonsToParse(json)
         for (let json of jsons) {
-            for (let [ key, value ] of Object.entries(json)) {
+            for (let [ key, value ] of toPairs(json)) {
                 if (value === undefined) continue
                 const setKey = 'set' + key[0].toUpperCase() + key.substring(1)
                 if (!this[setKey]) continue
                 try {
                     this[setKey](value);
                 } catch (e) {
-                    throw Error(`Error setting config key "${key}": ${e.message}`);
+                    throw Error(`[${this.constructor.name}] Error setting config key "${key}": ${e.message}`)
                 }
             }
         }
     }
 
-    freezeDeep(obj) {
-        return Object.freeze(obj);
+    /**
+     * Returns an object holding validation properties for certain fields
+     *
+     * @returns {object}
+     */
+    getFieldProps() {
+        return {}
     }
 
-    resolve() {
-        if (this['id'] === undefined) {
-            throw Error(`Missing key "id" in config`);
+    /**
+     * Returns an object holding the validation properties for the given field and overwrites it with
+     * the properties from the second argument
+     *
+     * @param {string} field
+     * @param {object} add
+     *
+     * @returns {object}
+     */
+    getFieldProp(field, add = {}) {
+        const props = this.fieldProps[field] ? this.fieldProps[field] : {}
+        return { ...props, ...add }
+    }
+
+    /**
+     * Sets the id property to the given value. Throws an error if the validation fails
+     *
+     * @param value
+     */
+    setId(value) {
+        this.id = validated.id(value)
+    }
+
+    /**
+     * Applies the current config to the given model object and freezes the config when this configuration is not editable.
+     * Returns the given model with the configuration applied to it
+     *
+     * @param {object} model
+     *
+     * @returns {object}
+     */
+    applyTo(model) {
+        const id = this.getId()
+        this.checkAndFreeze()
+        if (Config.storeInModel) model.config = this
+        model.id = id
+        this.applyPropsTo(model)
+        return model
+    }
+
+    /**
+     * Deletes all properties which are given in the defaults object from this configuration. Only works if the
+     * configuration was not applied to a model before
+     */
+    clear() {
+        const keys = toKeys(this.getDefaults())
+        for (const key of keys) delete this[key]
+    }
+
+    /**
+     * Returns a new model instance with this configuration and the given options.
+     * Throws an exception if no factory was linked to this configuration
+     *
+     * @param {object} options
+     *
+     * @returns {object}
+     */
+    getInitialModelInstance(options) {
+        return this.getModelInstance(this, options)
+    }
+
+    /**
+     * Returns a new model instance with the given input and options from the model factory linked to this
+     * configuration. Throws an exception if no factory was linked to this configuration
+     *
+     * @param {string|object} input
+     * @param {object} options
+     *
+     * @returns {object}
+     */
+    getModelInstance(input, options) {
+        if (!this.constructor.factory)
+            throw Error(`Missing model factory method in config ${this.constructor.name}`)
+
+        return this.constructor.factory(input, options)
+    }
+
+    /**
+     * Applies the current configuration props to the given model
+     *
+     * @param {object} obj
+     */
+    applyPropsTo(model) {}
+
+    /**
+     * Applies all properties which have a default to the given object by using the
+     * value of the same property from "this". The second argument allows to skip
+     * certain default keys. Returns the object with default keys applied
+     *
+     * @param {object} obj
+     * @param {array} except
+     */
+    applyDefaultKeysTo(obj, except = []) {
+        const keys = without(toKeys(this.getDefaults()), except)
+        for (const key of keys) {
+            obj[key] = getClonedProp(this[key], obj)
         }
-        this.resolved = true;
-        if (!Object.isFrozen(this)) {
-            this.freezeDeep(this);
+    }
+
+    /**
+     * Returns a string holding the class name of this configuration
+     *
+     * @returns {string}
+     */
+    getModelType() {
+        return this.constructor.typeName
+    }
+
+    /**
+     * Returns a new automatically generated id which is used when no id was given in the configuration
+     *
+     * @returns {string}
+     */
+    getNewAutoId() {
+        return '_auto_' + inst.autoIds.getNewId(this.getModelType())
+    }
+
+    /**
+     * Returns the id given in the configuration or automatically generates a new one if none was set before
+     * Throws an exception if there is no id after the auto generation
+     *
+     * @returns {string}
+     */
+    getId() {
+        if (!this.id) {
+            this.id = this.getNewAutoId()
+            if (!this.id)
+                throw Error(`Missing mandatory key "id" in config`)
         }
+        return this.id
     }
 
-    isEditable() {
-        return false;
-    }
+    /**
+     * Checks and freezes the configuration if this was not done before.
+     * Throws an exception if no id was set or if mandatory properties were not set before
+     */
+    checkAndFreeze() {
+        if (Object.isFrozen(this)) return
 
-    applyTo(obj) {
-        if (!this.isEditable) {
-            this.resolve();
+        const mandatoryKeys = this.getMandatoryKeys()
+        for (const key of mandatoryKeys) {
+            if (!(key in this))
+                throw Error(`Missing mandatory config key "${key}" was not set`)
         }
-        obj.id = this.id;
-        return obj;
-    }
-
-    getJson() {
-        const obj = this.applyTo({});
-        obj.__type = this.getType();
-        return obj;
-    }
-
-    getType() {
-        return Object.getPrototypeOf(this).constructor.name;
-    }
-
-    isResolved() {
-        return this.resolved;
+        Object.freeze(this)
     }
 }
+Config.storeInModel = true
 
 export {
     Config

@@ -1005,7 +1005,7 @@ function getAreaNode(nodes, panes, items, props, level = 1) {
             nodes.push({
                 level,
                 type: 'pane',
-                name: Object.getPrototypeOf(pane).constructor.name,
+                name: pane.typeName,
                 width: pane.viewPortDim.x,
                 height: pane.viewPortDim.y,
                 offX: props.x,
@@ -1071,10 +1071,10 @@ function getAreaNode(nodes, panes, items, props, level = 1) {
 }
 
 function getResourceIndexByPane(resources, pane) {
-    if (pane === undefined) return null;
-    let index = 0;
+    if (pane === undefined) return null
+    let index = 0
     while (index < resources.length && resources[index].pane !== pane) {
-        index++;
+        index++
     }
     return index === resources.length ? null : index
 }
@@ -1112,12 +1112,13 @@ function ScreenEditor({ resources, setSelected, ...props }) {
 
     const tree = useMemo(() => {
         const game = props.game;
-        const screen = game.getCurrentScreen();
+        const renderer = game.getActiveScreenRenderer()
+        const screen = renderer.paneTree;
         const nodes = [];
 
         const innerNodes = [];
         getAreaNode(innerNodes,false, reverse(screen.areas), {width: game.width, height: game.height, x: 0, y: 0});
-        nodes.push({type: 'Screen', name: screen.id, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
+        nodes.push({type: 'Screen', name: renderer.scope, level: 0, last: true, children: innerNodes.length, closed: false, end: true, offX: 0, offY: 0, width: game.width, height: game.height});
         nodes.push( ...innerNodes );
 
         // assign planes
@@ -1126,7 +1127,7 @@ function ScreenEditor({ resources, setSelected, ...props }) {
             node.plane = plane;
             if (node.type === 'pane') {
                 const index = getResourceIndexByPane(resources, node.pane);
-                const elem = index !== null ? resources[index].elem : {texture: null};
+                const elem = index !== null && resources[index].elem ? resources[index].elem : {texture: null};
                 elem.offX = node.offX;
                 elem.offY = node.offY;
                 elem.width = node.width;

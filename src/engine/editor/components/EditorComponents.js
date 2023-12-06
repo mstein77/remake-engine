@@ -1,13 +1,13 @@
-import ReactDOM from "react-dom";
-import React, { useContext, useMemo, useState, useRef, useEffect } from "react";
-import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex.js";
+import ReactDOM from "react-dom"
+import React, { useContext, useMemo, useState, useRef, useEffect } from "react"
+import { AnimationIndex, ColorIndex, FilterIndex, FrameIndex } from "../classes/EntityIndex"
 import { EditorContext, EditorCtx, LoadingIndicator, ButtonStack, Canvas, CenterInfo, Kbd, OkCancelForm, PropertyGrid, Section, Toolbar, ToolGroup,
     useModal, useUpdateOnEntityIndexChanges, WindowContext, AvailContextProvider, useMounted, useCssProps, useComponentUpdate, AvailContext, useCachedState
-} from "./BasicComponents.js";
-import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel, newPlainConfig,
-    getRebuildJsonForModel, getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
-} from "../../helper/helper.js";
-import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents.js";
+} from "./BasicComponents"
+import { d, RelativeBlock, ucfirst, rgb2hex, getEmptyImageData, copy2clipboard, drawCanvasToAvail, getResourceTreeForJsonModel,
+    getCanvasForBitmap, getImageDataForImage, getColorsFromImageData, BitmapPlayer, getCosinePath, ts, td, getCanvasForDim
+} from "helper/helper"
+import { FileDropZone, Button, AsyncButton, Color, ColorProp, CheckboxProp, RadioProp, Checkbox, ImageProp, InputProp, Number, NumberProp, Tuple, Hidden, TupleProp, LabelProp, TextArea } from "./FormComponents"
 import { DIR, Block, Stack, Overlays, Overlay } from "./LayoutComponents.js";
 import { EntityStack, EntityStackSections, EntityPicker, EntityManager, TreeStack } from "./EntityComponents.js";
 import { FlexGrid, BaseGrid, PictureCell, GridCellMarker } from "./GridComponents.js";
@@ -80,6 +80,7 @@ function ScreenBlocksGrid({ blockIndex, active, setActive, width, setWidth, heig
     });
 
     const getBlockDim = props.getBlockDim ? props.getBlockDim : index => {
+        if (index === null) return
         return {
             width: blockIndex.getEntityPropValue(index, 'width'),
             height: blockIndex.getEntityPropValue(index, 'height')
@@ -1063,11 +1064,11 @@ function ExportDialog({code, close}) {
     )
 }
 
-function useExportModal({ model, resource, update, name }) {
-    const wContext = useContext(WindowContext);
-    const ExportModal = useModal();
-    const LoadingModal = useModal();
-    const ErrorModal = useModal();
+function useExportModal({ model, resource, update, name, screenResource = true }) {
+    const wContext = useContext(WindowContext)
+    const ExportModal = useModal()
+    const LoadingModal = useModal()
+    const ErrorModal = useModal()
 
     const getResourceDef = (type, id, value, details) => {
         if (type === 'image') {
@@ -1120,67 +1121,73 @@ function useExportModal({ model, resource, update, name }) {
             } else {
                 jsonLines = lines;
             }
-            value = jsonLines.join('\n    ');
+            value = jsonLines.join('\n    ')
         }
-        return "this.add" + type[0].toUpperCase() + type.substr(1) + 'Resource(\n' + `    '${id}',\n    ${value}\n);`;
-    };
-    const getModelConfig = () => {
-        const rebuildJson = getRebuildJsonForModel(resource.cls, model, true)
-        return newPlainConfig(resource.config, rebuildJson)
+        return `    "${id}": ${value}`
     }
+
     const getModelResources = () => {
-        const newModel = getModelConfig()
-        return newModel.getResources()
-    };
+        return model.getResources()
+    }
     const storeModel = eContextRef => {
-        wContext.resourceLoader.storeScreenResource(wContext.game.currentScreen, getModelConfig());
-        eContextRef.current.updateRestorePos();
-        wContext.markDirty();
-        update();
-    };
+        wContext.resourceLoader.storeModel(
+            model, screenResource ? wContext.game.getActiveScreenRenderer().scope : null
+        )
+        // reload the whole model to have a new config that we can apply to the pane
+        // TODO: better solution by overwriting resource.pane and invalidating caches?
+        const storedModel = model.config.getModelInstance(model.id)
+        storedModel.config.applyTo(resource.pane)
+
+        // resource.pane
+        eContextRef.current.updateRestorePos()
+        wContext.markDirty()
+        update()
+    }
     const deployModel = () => {
         if (IS_DIST) return
 
-        const gameRef = wContext.game;
-        const resourcesInfo = getModelResources();
+        const gameRef = wContext.game
 
-        LoadingModal.open();
-        gameRef.getResourceLoader().deployResources(
-            gameRef.currentScreen,
-            resourcesInfo.resources,
-            {json: [resource.id]},
-            resourcesInfo.dependencies
+        LoadingModal.open()
+        gameRef.getResourceLoader().deployModel(
+            model,
+            gameRef.getActiveScreenRenderer().scope
         ).then(
             response => {
-                ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'));
-                gameRef.reloadScreen(wContext.registry('callStack'));
+                ReactDOM.unmountComponentAtNode(document.getElementById('editor-div'))
+                gameRef.reloadScreen(wContext.registry('callStack'))
             }
         ).catch(err => {
-            console.error(err);
-            LoadingModal.close();
+            console.error(err)
+            LoadingModal.close()
             ErrorModal.open({msg: 'Error deploying ' + name})
         })
-    };
-
+    }
     const getResourceTree = () => {
-        return getResourceTreeForJsonModel(resource.cls, model)
-    };
-
+        return getResourceTreeForJsonModel(model)
+    }
     return {
-        getModelConfig,
         getModelResources,
         getResourceTree,
         storeModel,
         deployModel,
         openExportModal: (code = null, details = {}) => {
             if (code === null) {
-                const resources = getModelResources();
-                const lines = [];
-                for (let res of resources.resources.reverse()) {
-                    const data = res.type === 'image' ? res.data.getDataUrl() : res.data;
-                    lines.push(getResourceDef(res.type, res.id, data, details));
+                const resources = getModelResources()
+                const result = {}
+                for (const { id, data, type } of resources) {
+                    if (!result[type]) result[type] = []
+                    result[type].push(
+                        getResourceDef(type, id, type === 'image' ? data.dataUrl : data, details)
+                    )
                 }
-                code = lines.join('\n');
+                code = `Resources({\n`
+                const blocks = [];
+                for (const [ type, lines ] of Object.entries(result)) {
+                    blocks.push(`"${type}": {\n` + lines.join(',\n') + `  }\n`)
+                }
+                code += blocks.join(',\n')
+                code += `\n})`
             }
             ExportModal.open({
                 code
@@ -1230,7 +1237,7 @@ function AnimationProps({ animationIndex }) {
                 <NumberProp name="Speed:" value={animation.speed} set={value => setProp('speed', value)} decimals={2} min={0.0} max={2.0} slider="h" />
                 <RadioProp name="Direction:" gaps="1" padded="h" options={dirOptions} value={animation.dir} set={value => setProp( 'dir', value)} />
                 <RadioProp name="End:" gaps="1" padded="h" options={endOptions} value={animation.end} set={value => setProp( 'end', value)} />
-                <CheckboxProp name="Synchronous:" value={animation.synchronous} set={value => setProp( 'synchronous', value)} />
+                <CheckboxProp name="Synchronous:" value={animation.sync} set={value => setProp( 'sync', value)} />
             </PropertyGrid>
         </Block>
     )
@@ -1464,7 +1471,7 @@ function AnimationFormNew({ save, close, isValid, ...props }) {
             frames: [],
             end: 0,
             dir: 0,
-            synchronous: true,
+            sync: true,
             sizeX: width,
             sizeY: height
         })
@@ -1680,7 +1687,7 @@ function useContentSwitcher(contentProvider, defStack) {
             )
         };
         const lastIndex = callStack.length - 1;
-        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true};
+        registry.current = {callStack, blocks: [getBlock(lastIndex, callStack[lastIndex])], getBlock, subDir: true}
     }
     registry.current.update = update;
 

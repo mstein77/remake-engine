@@ -1,24 +1,21 @@
 import { CanvasContainer } from "core/classes"
-import { CanvasPaneConfig } from "./config";
-import { getConfigFromInput } from "helper/helper"
+import { Pane } from "../classes"
+import { Config } from "core/config"
+import { ModelFactory } from "core/model"
 
-export class CanvasPane {
+class CanvasPaneConfig extends Config {}
 
-    constructor(input) {
-        const config = getConfigFromInput(CanvasPane.Config, input)
-        config.applyTo(this)
-        this.config = config
-    }
+export class CanvasPaneImpl extends Pane {
 
     init(viewPortDimX, viewPortDimY) {
         this.viewPortDim = {
             x: viewPortDimX,
             y: viewPortDimY
         };
-        this.paneDim = this.viewPortDim;
-        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque);
-        this.dirty = false;
-        return this.container;
+        this.paneDim = this.viewPortDim
+        this.container = new CanvasContainer(viewPortDimX, viewPortDimY, this.opaque)
+        this.dirty = false
+        return this.container
     }
 
     render() {
@@ -38,4 +35,13 @@ export class CanvasPane {
         }
     }
 }
-CanvasPane.Config = CanvasPaneConfig
+
+const CanvasPane =
+    ModelFactory(
+        'CanvasPane',
+        CanvasPaneConfig
+    )
+    .addImplementation(CanvasPaneImpl)
+
+
+export default CanvasPane

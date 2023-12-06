@@ -1,8 +1,61 @@
 import inst from "core/instances"
-import { TextPaneConfig } from "./config"
-import { drawTextBlocks, getInstanceFromInput, getTextBlockImage, getConfigFromInput } from "helper/helper"
+import { d, drawTextBlocks, getTextBlockImage } from "helper/helper"
 import { CanvasContainer } from "core/classes"
-import { TextBlock } from "./classes"
+import { FontMap, TextBlock } from "./models"
+import { Pane } from "../classes"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { ModelFactory } from "core/model"
+
+class TextPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            fonts: [],
+            blocks: []
+        }
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        const id2block = {}
+        for (let block of model.blocks) {
+            id2block[block.id] = block
+        }
+        model.id2block = id2block
+    }
+
+    setFonts(fonts) {
+        validated.array(fonts)
+        for(const font of fonts) {
+            this.addFont(font)
+        }
+    }
+
+    addFont(font) {
+        if (!this.fonts) this.fonts = []
+
+        const inst = validated.config(FontMap, font)
+        this.fonts.push(
+            inst
+        );
+    }
+
+    setBlocks(value) {
+        validated.array(value)
+        this.blocks = []
+        for (const block of value) {
+            this.addBlock(block)
+        }
+    }
+
+    addBlock(value) {
+        if (!this.blocks) this.blocks = []
+        this.blocks.push(
+            validated.config(TextBlock, value, {parent: this})
+        )
+    }
+}
 
 /**
  * TODO:
@@ -10,13 +63,12 @@ import { TextBlock } from "./classes"
  *   - Scrolling (Buffering?)
  *   - Proper Dirty-Handling (update)
  */
-export class TextPane {
+export class TextPaneImpl extends Pane {
 
-    constructor(input) {
-        const config = getConfigFromInput(TextPane.Config, input)
-        config.applyTo(this)
-        this.config = config
-        this.blocks = {}
+    finalizeApply() {
+        for (const block of this.blocks) {
+            this.updateBlock(block.id, {})
+        }
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -33,11 +85,11 @@ export class TextPane {
     }
 
     getTextBlockIds() {
-        return Object.keys(this.blocks)
+        return Object.keys(this.id2block)
     }
 
     removeTextBlock(id) {
-        delete this.blocks[id]
+        delete this.id2block[id]
         this.dirty = true
     }
 
@@ -45,7 +97,7 @@ export class TextPane {
         if (!block.font) {
             return null
         }
-        for (let font of this.fonts) {
+        for (const font of this.fonts) {
             if (font.id === block.font) {
                 return font
             }
@@ -54,10 +106,10 @@ export class TextPane {
     }
 
     addTextBlock(block) {
-        if (!this.fonts.length === 0) {
+        if (!this.fonts.length === 0)
             throw Error('Text block requires a font!');
-        }
-        const instance = getInstanceFromInput(TextBlock, block)
+
+        const instance = new TextBlock(block, {parent: this})
         if (instance.font === null) {
             instance.update({font: this.fonts[0].id})
         }
@@ -69,7 +121,7 @@ export class TextPane {
         }
         instance.width = font.width * instance.width
         instance.height = font.height * instance.height
-        this.blocks[instance.id] = instance
+        this.id2block[instance.id] = instance
         this.dirty = true
     }
 
@@ -84,7 +136,7 @@ export class TextPane {
     }
 
     updateBlock(id, updates) {
-        const block = this.blocks[id]
+        const block = this.id2block[id]
         block.update(updates)
         const canvas = getTextBlockImage(
             block,
@@ -106,7 +158,7 @@ export class TextPane {
         const ctx = this.container.getCanvasCtx()
 
         ctx.clearRect(0, 0, this.paneDim.x, this.paneDim.y)
-        drawTextBlocks(ctx, this.paneDim, Object.values(this.blocks), this.fonts)
+        drawTextBlocks(ctx, this.paneDim, Object.values(this.id2block), this.fonts)
         this.dirty = false
     }
 
@@ -120,12 +172,33 @@ export class TextPane {
         }
     }
 
-    static padStart(value, char, len) {
-        value = '' + value
-        while (value.length < len) {
-            value = char + value
+    getDependentModels() {
+        return [ ...this.fonts, ...this.blocks ]
+    }
+
+    addRebuildProps(obj, deep) {
+        const fonts = []
+        for (const font of this.fonts) {
+            fonts.push(
+                this.getRebuildModel(font, deep)
+            )
         }
-        return value
+        obj.fonts = fonts
+        const blocks = []
+        for (const block of this.blocks) {
+            blocks.push(
+                this.getRebuildModel(block, deep)
+            )
+        }
+        obj.blocks = blocks
     }
 }
-TextPane.Config = TextPaneConfig
+
+const TextPane =
+    ModelFactory(
+    {name: 'TextPane', editor: true},
+        TextPaneConfig
+    )
+    .addImplementation(TextPaneImpl)
+
+export default TextPane

@@ -1,12 +1,13 @@
-import React, { useContext, useMemo, useState, useRef } from "react";
-import { EditorSection, Kbd, EditorContext, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, ButtonStack, WindowContext } from "editor/components/BasicComponents";
-import { DIR, Block, Stack } from "editor/components/LayoutComponents";
-import { d, RelativeBlock, getEmptyImageData, getColorsFromCanvas } from "helper/helper.js";
-import { useExportModal, NameDialog, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal, ScreenBlocksGrid } from "editor/components/EditorComponents";
-import { Checkbox, Input, InputProp, KeyInput, NumberProp, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "editor/components/FormComponents";
+import React, { useContext, useMemo, useState, useRef } from "react"
+import { EditorSection, Kbd, EditorContext, useModal, useComponentUpdate, useUpdateOnEntityIndexChanges, PropertyGrid, Section, ButtonStack, WindowContext } from "editor/components/BasicComponents"
+import { DIR, Block, Stack } from "editor/components/LayoutComponents"
+import { d, RelativeBlock, getEmptyImageData, getColorsFromCanvas } from "helper/helper"
+import { useExportModal, NameDialog, ResizeProps, useFilterPipelineModal, useBitmapSelectionModal, useEditBitmapModal, ScreenBlocksGrid } from "editor/components/EditorComponents"
+import { Checkbox, Input, InputProp, KeyInput, NumberProp, RadioProp, SelectProp, LabelProp, CheckboxProp, FullProp, Button, TextArea, Tuple, TupleProp, BitmapProp, Hidden, OkCancelForm } from "editor/components/FormComponents"
 import { EntityStack, EntityStackSections, EntityManager } from "editor/components/EntityComponents";
-import { AssignIndex, ColorIndex } from "editor/classes/EntityIndex";
+import { AssignIndex, ColorIndex } from "editor/classes/EntityIndex"
 import { FontIndex, CharIndex, TextBlockIndex } from "./classes"
+import { FontMap } from "../models"
 
 function FontProperties({ font, reserved, save, close }) {
     const { BitmapSelectionModal, openBitmapSelectionModal, closeBitmapSelectionModal } = useBitmapSelectionModal('Select Size');
@@ -239,7 +240,7 @@ function CharProperties({ charIndex, char, save, close }) {
         value,
         image
     });
-    const colors = new ColorIndex({colors: getColorsFromCanvas(charIndex.img)});
+    const colors = new ColorIndex({colors: getColorsFromCanvas(charIndex.img.canvas)});
     return (
         <OkCancelForm submit save={saveChar} cancel={close} full>
             <Block full="h" padded>
@@ -291,7 +292,7 @@ function CharManager({ charIndex }) {
         const image = charIndex.getEntityPropValue(index, 'image');
         openEditBitmapModal({
             image,
-            colors: new ColorIndex({colors: getColorsFromCanvas(charIndex.img)}),
+            colors: new ColorIndex({colors: getColorsFromCanvas(charIndex.img.canvas)}),
             save: newImage => {
                 const undoImage = charIndex.getEntityPropValue(index, 'image');
                 eContext.doAction(
@@ -527,13 +528,13 @@ function FontEditor({ resource, fontIndex, blockIndex, activeFont, setActiveFont
             font,
             reserved: fontIndex.getPropValues('value'),
             save: newFont => {
-                let index = null;
-                const fontConfig = new resource.config.deps.font({id: newFont.value, map: {}, width: newFont.width, height: newFont.height});
+                let index = null
+                const fontConfig = new FontMap.Config({id: newFont.value, map: {}, width: newFont.width, height: newFont.height})
                 fontConfig.setImage(
                     wContext.getNewImageResource('font_' + newFont.value + '$.png', newFont.width, newFont.height)
-                );
-                const fontJson = fontConfig.getJson();
-                const chars = new CharIndex(fontJson);
+                )
+                const fontMap = new FontMap(fontConfig)
+                const chars = new CharIndex(fontMap)
                 newFont.chars = chars;
 
                 if (newFont.images) {
@@ -769,7 +770,7 @@ function TextBlockEditor({ blockIndex, fontIndex, activeFont, ...props }) {
                 const char = font.map[line[x]];
                 if (char) {
                     ctx.drawImage(
-                        font.image,
+                        font.image.canvas,
                         char.x,
                         char.y,
                         font.width,
@@ -967,6 +968,7 @@ function TextPaneEditor({ model, resource }) {
                     return {
                         export: () => {
                             const jsons = [];
+                            // TODO remove
                             for (let block of model.blocks) {
                                 const obj = new resource.config.deps.block(block);
                                 jsons.push(obj.getRebuildJson());

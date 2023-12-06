@@ -8,7 +8,6 @@ import { useBitmapSelectionModal, AnimationManager, useExportModal } from "edito
 import { Bitmap, Entity, InputProp, NumberProp, LabelProp, CheckboxProp, FullProp, Button, Tuple, TupleProp, BitmapProp, PositionPickerProp, OkCancelForm, TextAreaProp, EntityProp } from "editor/components/FormComponents"
 import { BaseGrid, TrackingCtx, useTracker } from "editor/components/GridComponents"
 import { EntityPicker, EntityManager, EntityStack } from "editor/components/EntityComponents"
-// import {  } from "editor/classes/Grid"
 import { CellSelection, CellValue } from "editor/classes"
 import { SimpleIndex, ColorIndex, AnimationIndex } from "editor/classes/EntityIndex"
 import { TileIndex, AliasIndex, BrushIndex, EventIndex, TilesGrid } from "./classes"
@@ -74,7 +73,7 @@ function EventStack({ events, eventIndex }) {
                 deselect
                 emptyText="No event"
             />
-            <AddEventModal.content name="Add Event" width="600" height="500">
+            <AddEventModal.content name="Add Event" width="600px" height="500px">
                 <EntityPicker { ...AddEventModal.props } />
             </AddEventModal.content>
         </Block>
@@ -400,7 +399,7 @@ function TilesManager({ tileIndex, animationIndex, editTile }) {
     const titleHeight = 2 * defaultPaddingPx + fmMonoMedium;
 
     const getColorIndexFromTiles = () => {
-        return new ColorIndex({colors: getColorsFromCanvas(tileIndex.img, false)});
+        return new ColorIndex({colors: getColorsFromCanvas(tileIndex.img.canvas, false)});
     };
 
     const addTile = () => {
@@ -952,7 +951,7 @@ function EventForm({ isValid, event, close, save, tileIndex, eventIndex }) {
         <OkCancelForm submit padded save={saveEvent} cancel={close}>
             <PropertyGrid>
                 <InputProp required invalid={!canSave} name="Name:" value={value} set={setValue} />
-                <BitmapProp name="Image:" colors={new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)})} zoomOrAvail={avail} value={image} set={setImage} resize empty={() => getEmptyImageData(tileIndex.getSizeX(), tileIndex.getSizeY())} entityIndex={eventIndex} />
+                <BitmapProp name="Image:" colors={new ColorIndex({colors: getColorsFromCanvas(tileIndex.img.canvas)})} zoomOrAvail={avail} value={image} set={setImage} resize empty={() => getEmptyImageData(tileIndex.getSizeX(), tileIndex.getSizeY())} entityIndex={eventIndex} />
                 {image &&
                     <>
                         <TupleProp name="Size:" readOnly x={width} y={height} buttons />
@@ -1087,7 +1086,7 @@ function TilesPaneEditorInner({ tileIndex, tilesGrid, animationIndex, aliasIndex
             tile,
             tileIndex,
             animationIndex,
-            colors: new ColorIndex({colors: getColorsFromCanvas(tileIndex.img)}),
+            colors: new ColorIndex({colors: getColorsFromCanvas(tileIndex.img.canvas)}),
             save: editedTile => {
                 const undoTile = tileIndex.getEntityObject(index);
                 eContext.doAction(
@@ -1285,27 +1284,27 @@ function TilesPaneEditor({ model, resource }) {
     const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'TilesPane', model, resource, update });
 
     const tileIndex = useMemo(() => {
-        return new TileIndex(model);
+        return new TileIndex(model.tilesMap);
     }, [model]);
 
     const tilesGrid = useMemo(() => {
-        return new TilesGrid(tileIndex, model);
+        return new TilesGrid(tileIndex, model.tilesMap);
     }, [model]);
 
     const animationIndex = useMemo(() => {
-        return new AnimationIndex(tileIndex, model)
+        return new AnimationIndex(tileIndex, model.tilesMap)
     }, [model]);
 
     const aliasIndex = useMemo(() => {
-        return new AliasIndex(model, tileIndex, animationIndex);
+        return new AliasIndex(model.tilesMap, tileIndex, animationIndex);
     }, [model]);
 
     const brushIndex = useMemo(() => {
-        return new BrushIndex(model, tileIndex, aliasIndex)
+        return new BrushIndex(model.tilesMap, tileIndex, aliasIndex)
     }, [model]);
 
     const eventIndex = useMemo(() => {
-        return new EventIndex(model)
+        return new EventIndex(model.tilesMap)
     }, [model]);
 
     const models = { tileIndex, tilesGrid, animationIndex, aliasIndex, brushIndex, eventIndex };

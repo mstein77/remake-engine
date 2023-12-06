@@ -1,5 +1,5 @@
-const absPath = require('../src/build/classes/absPath.cjs')
-const syncFs = require('../src/build/classes/syncFs.cjs')
+const absPath = require('../src/shared/classes/absPath.cjs')
+const syncFs = require('../src/shared/classes/syncFs.cjs')
 
 const instructionsPath = absPath.tmp('instructions.txt')
 

@@ -1,22 +1,44 @@
 import { COLLISION } from "core/const"
 import { BufferedCanvasContainer, PlayerProxy } from "core/classes"
-import { SpritePaneConfig } from "./config"
-import { getConfigFromInput } from "helper/helper"
+import { d } from "helper/helper"
+import { Pane } from "../classes"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { SpriteSheet } from "./models"
+import { ModelFactory } from "core/model"
 
-export class SpritePane {
+class SpritePaneConfig extends Config {
 
-    constructor(input) {
-        const config = getConfigFromInput(SpritePane.Config, input)
-        config.applyTo(this)
-        this.config = config
+    getDefaults() {
+        return {
+            spriteSheet: undefined,
+            sprites: {}
+        }
+    }
 
-        this.sprites = {};
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+
+    setSpriteSheet(value) {
+        this.spriteSheet = validated.config(SpriteSheet, value)
+    }
+
+    setSprites(value) {
+        this.sprites = validated.object(value)
+    }
+}
+
+class SpritePaneImpl extends Pane {
+
+    finalizeApply() {
         this.actorId = null;
         this.groups = {};
         this.bufferClearRects = {
             0: [],
             1: []
         };
+        this.test = {}
         this.uid = 0;
         this.zOrdering = false;
         this.attachDefault = null;
@@ -28,7 +50,7 @@ export class SpritePane {
                 return 1;
             }
             return 0;
-        };
+        }
     }
 
     init(viewPortDimX, viewPortDimY) {
@@ -391,6 +413,7 @@ export class SpritePane {
 
     getSpritePos(id, xEnd = false, yEnd = false) {
         const sprite = this.sprites[id];
+        if (!sprite) throw Error(`Sprite with id "${id}" not found!`)
         let x = sprite.x;
         if (xEnd) {
             x += sprite.dim.x - 1;
@@ -505,7 +528,6 @@ export class SpritePane {
     }
 
     setSpriteFilters(id, filters, duration = -1) {
-
         const sprites = this.getSpritesById(id);
         for (let sprite of sprites) {
             sprite.filters = filters;
@@ -557,19 +579,19 @@ export class SpritePane {
                     const frameSprite = sprite.animation.getFrame();
                     clearRect = this.spriteSheet.drawFilteredSprite(
                         target, frameSprite.id, sprite.filters, sprite.x, sprite.y, frameSprite.padding.x, frameSprite.padding.y, sprite.filters
-                    );
+                    )
                 } else {
                     clearRect = this.spriteSheet.drawFilteredSprite(
                         target, sprite.name, sprite.filters, sprite.x, sprite.y, 0, 0, sprite.filters
-                    );
+                    )
                 }
-                drawRects.push(clearRect);
-                pixels += clearRect.width * clearRect.height;
+                drawRects.push(clearRect)
+                pixels += clearRect.width * clearRect.height
             }
         }
-        this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : [];
-        this.container.switchBuffer();
-        this.dirty = false;
+        this.bufferClearRects[this.container.getActiveIndex()] = (pixels <= this.pixelLimit) ? drawRects : []
+        this.container.switchBuffer()
+        this.dirty = false
     }
 
     getPreview() {
@@ -581,5 +603,24 @@ export class SpritePane {
             height: this.viewPortDim.y
         }
     }
+
+    getDependentModels() {
+        return [
+            this.spriteSheet
+        ]
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.spriteSheet = this.getRebuildModel(this.spriteSheet, deep)
+        obj.sprites = {}
+    }
 }
-SpritePane.Config = SpritePaneConfig
+
+const SpritePane =
+    ModelFactory(
+    {name: 'SpritePane', editor: true},
+        SpritePaneConfig
+    )
+    .addImplementation(SpritePaneImpl)
+
+export default SpritePane

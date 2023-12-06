@@ -1,19 +1,59 @@
 import inst from "core/instances"
-import { getCanvasForDim, getConfigFromInput } from "helper/helper"
+import { getCanvasForDim } from "helper/helper"
 import { DivContainer } from "core/classes"
-import { LinearGradientPaneConfig } from "./config";
+import { Pane } from "../classes"
+import { validated } from "helper/validate"
+import { Config } from "core/config"
+import { ModelFactory } from "core/model"
+
+class LinearGradientPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            colorStops: [],
+            axis: 'Y'
+        }
+    }
+
+    getFieldProps() {
+        return {
+            axis: {values: ['X', 'Y']}
+        }
+    }
+
+    setAxis(value) {
+        this.axis = validated.string(value, this.getFieldProp('axis'))
+    }
+
+    setColorStops(value) {
+        this.colorStops = this.validateColorStops(value)
+    }
+
+    validateColorStops(value) {
+        validated.array(value)
+        if (value.length % 2 == 0)
+            throw Error('ColorStops need to be in the format: [<color>, <len>, <color>, ..., <len>, <color>]')
+
+        const colorStops = []
+        for (let i = 0; i < value.length; i += 2) {
+            colorStops.push([value[i], (i === value.length - 1) ? 0 : value[i + 1]])
+        }
+        return colorStops
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+    }
+}
 
 /**
  * TODO:
  *   - endless Scrolling
  *   - Use CSS Background-Property?
  */
-export class LinearGradientPane {
+export class LinearGradientPaneImpl extends Pane {
 
-    constructor(input) {
-        const config = getConfigFromInput(LinearGradientPane.Config, input);
-        config.applyTo(this);
-        this.config = config;
+    finalizeApply() {
         this.viewPosition = null;
         this.viewPositionMax = null;
         this.isHorizontal = (this.axis === 'X');
@@ -183,4 +223,12 @@ export class LinearGradientPane {
         }
     }
 }
-LinearGradientPane.Config = LinearGradientPaneConfig
+
+const LinearGradientPane =
+    ModelFactory(
+        'LinearGradientPane',
+        LinearGradientPaneConfig
+    )
+    .addImplementation(LinearGradientPaneImpl)
+
+export default LinearGradientPane

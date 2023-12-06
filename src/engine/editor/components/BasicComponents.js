@@ -1,11 +1,14 @@
-import ReactDOM from "react-dom";
-import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react";
-import { d, Storage, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "../../helper/helper.js"
-import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents.js";
-import { Button, Color, Submit, OkCancelForm } from "./FormComponents.js";
-import { ImageIndex, ColorIndex } from "../classes/EntityIndex.js";
-import { defaultValues } from "../settings.js";
-import { CellValue, CellSelection } from "../classes.js";
+import ReactDOM from "react-dom"
+import React, { useMemo, useEffect, useRef, useState, Fragment, useContext, useLayoutEffect } from "react"
+import { d, without, intersect, clamp, isEventInRect, getCanvasForBitmap, getCanvasForDim, getUniqueName, hex2rgb, rgb2hex, Players } from "helper/helper"
+import { DIR, Block, Stack, Grid, Overlays, Overlay, useHotKeys } from "./LayoutComponents"
+import { Button, Color, Submit, OkCancelForm, useTooltip } from "./FormComponents"
+import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
+import { defaultValues } from "../settings"
+import { CellValue, CellSelection } from "../classes"
+import { BrowserStorage } from "core/storage/browserStorage"
+import { StorageManager } from "shared/classes/storage.cjs"
+import { RESOURCE } from "shared/classes/resources.cjs"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();
@@ -343,7 +346,7 @@ function EditorSection({ id, ...props }) {
     )
 }
 
-function EditorSectionInner({ id, name, sub, details, actions = [], area, link, confirm, children, ...props }) {
+function EditorSectionInner({ id, name, sub, warn, details, actions = [], area, link, confirm, children, ...props }) {
     const wContext = useContext(WindowContext);
     const eContext = useContext(EditorContext);
     const eContextRef = useRef(null);
@@ -385,7 +388,7 @@ function EditorSectionInner({ id, name, sub, details, actions = [], area, link, 
     }, []);
     const header = (
         <Stack full="h" key="eh" className={headerBgType === 0 ? '' : (headerBgType === 2 ? "header-gradient-bg" : "header-bg")}>
-            <TitleBlocks title={name} sub={sub} details={details} />
+            <TitleBlocks title={name} sub={sub} warn={warn} details={details} />
             <Block center="v"><UndoRedoButtons hotKeys={hotKeys} /></Block>
             <ButtonStack center="v" padded="h" gaps="1" buttons={buttons} />
         </Stack>
@@ -468,7 +471,17 @@ function Separator() {
     )
 }
 
-function TitleBlocks({title, sub, details}) {
+function WarnIcon({ msg }) {
+    const tooltip = useTooltip({title: msg})
+    return (
+        <Block { ...tooltip.attr }>
+            <Icon name="warning" />
+            {tooltip.render}
+        </Block>
+    )
+}
+
+function TitleBlocks({ title, sub, warn, details }) {
     const detailBlocks = [];
     if (details) {
         for (let [name, value] of Object.entries(details)) {
@@ -484,8 +497,9 @@ function TitleBlocks({title, sub, details}) {
         <Stack wrap gaps full="h">
             <Block center="v" className="big more">{title}</Block>
             {sub &&
-            <Block center="v" className="medium">{sub}</Block>
+                <Block center="v" className="medium">{sub}</Block>
             }
+            {warn && <WarnIcon msg={warn} />}
             {details && <Separator />}
             {details && detailBlocks}
         </Stack>
@@ -1879,7 +1893,6 @@ function EditorCtx({ id, children }) {
                 },
                 getGridActions: () => modesContext ? modesContext.actions : [],
                 doGridAction: (name, data) => {
-                    d('DO ACTION', name);
                     const action = modesContext.actions[name];
                     if (!action || (action.can && !action.can())) return;
                     return action.exec(data)
@@ -2069,7 +2082,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
     const gameId = game.id;
     const [ storage ] = useState(() => {
-        return new Storage(localStorage, 'remake-engine.editor.');
+        return new StorageManager(BrowserStorage(localStorage, 'remake-engine.editor.'));
     });
     const doPersistCache = force => {
         if (force === true || document.visibilityState === 'hidden') {
@@ -2390,9 +2403,9 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             getNewImageResource: (template, width, height) => {
                 return (
-                    resourceLoader.makeImageResource(
+                    resourceLoader.createImageResource(
                         getCanvasForDim(width, height),
-                        getUniqueName(template, resourceLoader.getAllResourceIds('image'))
+                        getUniqueName(template, resourceLoader.getAllResourceIds(RESOURCE.TYPE.IMAGE))
                     )
                 )
             },
@@ -2618,7 +2631,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
             hotKeyActions: registry('hotKeyActions'),
 
             clearAllSettings: () => {
-                const keys = storage.getKeys();
+                const keys = storage.getJsonIds();
                 for(let key of keys) {
                     if (!key.startsWith('presets.')) {
                         storage.deleteJson(key);
@@ -3110,14 +3123,14 @@ function useModal() {
     };
     const content = function ({id, full, width, maxWidth, minWidth, height, maxHeight, minHeight, transparent, drag, ...props}) {
         const title = propsRef.current && propsRef.current.title ? propsRef.current.title : props.name;
-        const dimProps = {full, width, height, maxWidth, minWidth, maxHeight, minHeight};
+        const dimProps = { full, width, height, maxWidth, minWidth, maxHeight, minHeight }
         dimProps.zIndex = isOpen;
         if (!id && propsRef.current && propsRef.current.id) {
             id = propsRef.current.id
         }
         return (
             <>
-                {isOpen && <Modal id={id} key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} {...dimProps}>{props.children}</Modal>}
+                {isOpen && <Modal id={id} key={openedRef.current} close={close} name={title} drag={drag} transparent={transparent} closeable={props.closeable} { ...dimProps }>{props.children}</Modal>}
             </>
         );
     };

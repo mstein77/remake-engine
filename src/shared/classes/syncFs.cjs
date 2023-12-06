@@ -3,6 +3,16 @@ const fs = require("fs");
 
 const syncFs = {
 
+    /**
+     * Returns an array holding all relative paths of files in the given directory or its
+     * subdirectories
+     *
+     * @param dirPath
+     * @param [relative]
+     * @param [files]
+     *
+     * @returns {array}
+     */
     readFilesRec: (dirPath, relative = '', files = []) => {
         const currPath = path.resolve(dirPath, relative)
         const items = syncFs.readdir(currPath, {withFileTypes: true})
@@ -64,6 +74,24 @@ const syncFs = {
         }
     },
 
+    mkdir: ( ...args ) => {
+        return fs.mkdirSync( ...args )
+    },
+
+    createPathTo: filePath => {
+        const index = filePath.lastIndexOf('/')
+        const dirPath = filePath.substring(0, index)
+        try {
+            if (syncFs.dirExists(dirPath)) return true
+
+            syncFs.mkdir(dirPath, {recursive: true})
+        } catch (e) {
+            console.error(e)
+            return false
+        }
+        return true
+    },
+
     exists: checkPath => {
         return syncFs.fileExists(checkPath) || syncFs.dirExists(checkPath)
     },
@@ -77,13 +105,17 @@ const syncFs = {
 
     readFile: ( ...args ) => fs.readFileSync( ...args ),
 
-    writeContent: (filePath, content) => {
-        fs.writeFileSync(filePath, content)
+    writeContent: ( ...args ) => {
+        return fs.writeFileSync( ...args )
     },
 
     writeJson: (filePath, json, space = true) => {
         const data = JSON.stringify(json, undefined, space ? 4 : undefined);
         fs.writeFileSync(filePath, data);
+    },
+
+    realpath: ( ...args ) => {
+        return fs.realpathSync( ...args )
     }
 }
 

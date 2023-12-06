@@ -1,24 +1,41 @@
 import { FILTER } from "core/const"
-import { flattenResources, getDeflatedResources, isValidResourceId, ResourceDependencies, d } from "../helper/helper"
-import { ImageResource, AudioResource } from "./classes"
+import { toValues, d, getCanvasObjForDim } from "../helper/helper"
 import { DefaultRenderPlugin } from "../plugins/DefaultRenderPlugin"
 import { DefaultTouchControlsPlugin } from "../plugins/DefaultTouchControlsPlugin"
+import { ResourceManager } from "./resources"
 import Fetcher from "./fetcher/api"
 
 /**
- * @type {ResourceLoader}
+ * @type {ResourceManager}
  */
 let RL = null
 /**
  * @type {StorageManager}
  */
-let SM = null
-let OCM = null
 let game = null
 let system = null
 let filterer = null
 let renderPlugin = null
 let touchControlsPlugin = null
+
+class PaneRegistry {
+
+    constructor() {
+        this.registry = new Map()
+    }
+
+    add(name, cls, props = {}) {
+        this.registry.set(cls, { name, cls, ...props })
+    }
+
+    get(cls) {
+        return this.registry.get(cls)
+    }
+
+    getAll() {
+        return this.registry.values()
+    }
+}
 
 class System {
 
@@ -269,7 +286,7 @@ class BitmapFilterer {
      * @return {*[]}
      */
     getCanvasWithFiltersApplied(filters, canvas, offX, offY, width, height) {
-        let data = [canvas, offX, offY, width, height];
+        let data = [ canvas, offX, offY, width, height ];
         let lastType = FILTER.TYPE.CANVAS;
         let imageData = null;
         let isSourceCanvas = true;
@@ -303,7 +320,7 @@ class BitmapFilterer {
                 case FILTER.TYPE.CANVAS:
                     if (lastType === FILTER.TYPE.IMAGEDATA) {
                         if (isSourceCanvas) {
-                            data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                            data = [getCanvasObjForDim(data[3], data[4]), 0, 0, data[3], data[4]];
                             isSourceCanvas = false;
                         }
                         data[0].ctx.putImageData(imageData, 0, 0);
@@ -326,7 +343,7 @@ class BitmapFilterer {
 
         if (lastType === FILTER.TYPE.IMAGEDATA) {
             if (isSourceCanvas) {
-                data = [OCM.getNewOffscreenCanvas(data[3], data[4]), 0, 0, data[3], data[4]];
+                data = [getCanvasObjForDim(data[3], data[4]), 0, 0, data[3], data[4]];
             }
             data[0].ctx.putImageData(imageData, 0, 0);
         }
@@ -334,943 +351,61 @@ class BitmapFilterer {
     }
 }
 
-function each(obj, f) {
-    if (Array.isArray(obj)) {
-        for (let item of obj) {
-            f(item);
-        }
-    } else {
-        for (let [key, value] of Object.entries(obj)) {
-            f(value, key);
-        }
-    }
-}
-
-function has(arr, key) {
-    return key !== undefined ?
-        (Array.isArray(arr) ? arr.indexOf(key) !== -1 : arr[key] !== undefined) :
-        arr.length > 0;
-}
-
-class StorageManager {
-
-    constructor(storage, gameId) {
-        this.storage = storage;
-        this.prefix = gameId;
-        this.active = this.isAvailable();
-        this.remotes = null;
-
-        this.dependencies = new ResourceDependencies(
-            () => (!this.getKeys().includes('direct')) ?
-                {} : JSON.parse(this.storage.getItem(this.prefix + ':direct')),
-            direct => {
-                this.storage.setItem(this.prefix + ':direct', JSON.stringify(direct));
-            },
-            () => (!this.getKeys().includes('indirect')) ?
-                {} : this.indirect = JSON.parse(this.storage.getItem(this.prefix + ':indirect')),
-            indirect => {
-                this.storage.setItem(this.prefix + ':indirect', JSON.stringify(indirect));
-            },
-            (type, id) => this.deleteResourceItem(type, id)
-        )
-    }
-
-    getRemotes() {
-        if (this.remotes === null) {
-            if (!this.getKeys().includes('remotes')) {
-                this.remotes = {};
-            } else {
-                this.remotes = JSON.parse(this.storage.getItem(this.prefix + ':remotes'));
-            }
-        }
-        return this.remotes;
-    }
-
-    setRemotes(remotes) {
-        this.remotes = remotes;
-    }
-
-    getScreenRemotes(screen) {
-        const remotes = this.getRemotes();
-        const resources = this.dependencies.getRelevantScreenResources(screen).found;
-        const result = [];
-        for (let resource of resources) {
-            if (remotes[resource]) {
-                for (let remote of remotes[resource]) {
-                    if (!result.includes(remote)) {
-                        result.push(remote);
-                    }
-                }
-            }
-        }
-        return result;
-    }
-
-    storeRemotes() {
-        this.storage.setItem(this.prefix + ':remotes', JSON.stringify(this.getRemotes()));
-    }
-
-    isQuotaExceededException(e) {
-        return e instanceof DOMException && (
-            e.name === 'QuotaExceededError' ||
-            e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        );
-    }
-
-    isAvailable() {
-        if (!this.storage) {
-            return false;
-        }
-        try {
-            const x = '__storage_test__';
-            this.storage.setItem(x, '1');
-            this.storage.removeItem(x);
-            return true;
-        } catch(e) {
-            return e instanceof DOMException && !this.isQuotaExceededException(e) && (
-                    e.code === 22 ||
-                    e.code === 1014) &&
-                (localStorage && localStorage.length !== 0);
-        }
-    }
-
-    getKeys(type = null) {
-        if (!this.isAvailable()) {
-            return [];
-        }
-        const prefix = this.prefix + (type !== null ? ':' + type : '') + ':';
-        const keys = [];
-        for(let i = 0; i < this.storage.length; i++) {
-            const key = this.storage.key(i);
-            if (key.startsWith(prefix)) {
-                keys.push(key.substring(prefix.length));
-            }
-        }
-        return keys;
-    }
-
-    getImageIds() {
-        return this.getKeys('image');
-    }
-
-    getJsonIds() {
-        return this.getKeys('json');
-    }
-
-    getAudioIds() {
-        return this.getKeys('audio');
-    }
-
-    storeResource(type, id, data) {
-        if (!this.isAvailable()) {
-            return false;
-        }
-        try {
-            this.storage.setItem(this.prefix + ':' + type + ':' + id, data);
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    storeImage(id, data) {
-        return this.storeResource('image', id, data);
-    }
-
-    storeJson(id, data) {
-        let json;
-        try {
-            json = JSON.stringify(data);
-        } catch (e) {
-            return null;
-        }
-        return this.storeResource('json', id, json);
-    }
-
-    storeAudio(id, data) {
-        return this.storeResource('audio', id, data);
-    }
-
-    getResource(type, id) {
-        if (!this.isAvailable()) {
-            return null;
-        }
-        try {
-            const item = this.storage.getItem(this.prefix + ':' + type + ':' + id);
-            if (type === 'json') {
-                try {
-                    return JSON.parse(item);
-                } catch (e) {
-                    return null;
-                }
-            }
-            return item;
-        } catch (e) {
-            console.error(e);
-            return null;
-        }
-    }
-
-    getImage(id) {
-        return this.getResource('image', id)
-    }
-
-    getJson(id) {
-        return this.getResource('json', id);
-    }
-
-    getAudio(id) {
-        return this.getResource('audio', id)
-    }
-
-    truncate() {
-        const keys = this.getKeys();
-        for (let key of keys) {
-            this.storage.removeItem(this.prefix + ':' + key);
-        }
-        this.dependencies.truncate();
-        this.remotes = {};
-        return true;
-    }
-
-    deleteResources(type = null) {
-        if (type === null) {
-            this.deleteResources('image');
-            this.deleteResources('audio');
-            this.deleteResources('json');
-        } else {
-            const keys = this.getKeys(type);
-            for (let key of keys) {
-                this.deleteResource(type, key);
-            }
-        }
-    }
-
-    deleteResourceItem(type, id) {
-        const resId = type + ':' + id;
-        this.storage.removeItem(this.prefix + ':' + resId);
-    }
-
-    deleteResource(type, id) {
-        if (!this.isAvailable()) {
-            return false;
-        }
-        this.dependencies.deleteResource(type, id);
-        return true;
-    }
-
-    deleteScreenResource(screen, type, id) {
-        this.dependencies.deleteScreenResource(screen, type, id);
-        return true;
-    }
-
-    deleteImage(id) {
-        return this.deleteResource('image', id);
-    }
-
-    deleteJson(id) {
-        return this.deleteResource('json', id);
-    }
-
-    deleteAudio(id) {
-        return this.deleteResource('audio', id);
-    }
-
-    hasResource(type, id) {
-        return has(this.getKeys(type), id);
-    }
-
-    hasImage(id) {
-        return this.hasResource('image', id)
-    }
-
-    hasJson(id) {
-        return this.hasResource('json', id)
-    }
-
-    hasAudio(id) {
-        return this.hasResource('audio', id)
-    }
-
-    safeDeleteResources(resources) {
-        for(let resource of resources) {
-            const [type, id] = resource.split(':');
-            this.dependencies.safeDeleteScreenResource(type, id);
-        }
-    }
-
-    getAllScreenResources(screen) {
-        return getDeflatedResources(this.dependencies.getRelevantScreenResources(screen).found)
-    }
-
-    getDirectScreenResources(screen) {
-        return this.dependencies.getDirectScreenResources(screen);
-    }
-
-    storeScreenResource(screen, type, resource) {
-        this.dependencies.storeScreenResource(screen, type, resource)
-    }
-
-    storeResourceDependencies(indirect) {
-        this.dependencies.storeResourceDependencies(indirect);
-    }
-
-    getResourcesWithChildren() {
-        return Object.keys(this.dependencies.getIndirect());
-    }
-}
-
-class ResourceLoader {
-
-    constructor(fetcher, storage) {
-        this.fetcher = fetcher;
-        this.storage = storage;
-        this.clear()
-    }
-
-    clear() {
-        this.disabled = false
-        this.resources = {};
-        this.image = {};
-        this.json = {};
-        this.audio = {};
-        this.permImage = {};
-        this.permJson = {};
-        this.permAudio = {};
-        this.hasPermLoaded = false;
-        this.source = new Map();
-        this.screen = new Map();
-        this.hasLocal = new Set();
-        this.hasExternal = new Set();
-    }
-
-    setDisabled(value) {
-        this.disabled = value
-    }
-
-    invalidatePermanentResources() {
-        this.hasPermLoaded = false;
-    }
-
-    clearResources() {
-        this.resources = {};
-    }
-
-    clearBrowserResources() {
-        this.storage.truncate();
-    }
-
-    hasLocalResource(type, id) {
-        return this.hasLocal.has(type + ':' + id);
-    }
-
-    hasExternalResource(type, id) {
-        return this.hasExternal.has(type + ':' + id);
-    }
-
-    isExternalValue(value) {
-        return typeof value === 'string' && /^http(s)?:\/\//.test(value);
-    }
-
-    registerLocal(id, value) {
-        if (this.isExternalValue(value)) {
-            this.hasExternal.add(id);
-        } else {
-            this.hasLocal.add(id);
-        }
-    }
-
-    addJson(perm, id, local = null) {
-        if (!isValidResourceId('json', id)) {
-            throw Error(`Invalid id "${id}" given for JSON resource...TODO`);
-        }
-        if (local !== null) {
-            this.hasLocal.add('json:' + id);
-        }
-        if (perm) {
-            this.permJson[id] = local;
-        } else {
-            this.json[id] = local;
-        }
-    }
-
-    addImage(perm, id, localValue = null) {
-        if (!isValidResourceId('image', id)) {
-            throw Error(`Invalid id "${id}" given for image resource...TODO`);
-        }
-        if (localValue !== null) {
-            this.registerLocal('image:' + id, localValue);
-        }
-        if (perm) {
-            this.permImage[id] = localValue;
-        } else {
-            this.image[id] = localValue;
-        }
-    }
-
-    addAudio(perm, id, localValue = null) {
-        if (!isValidResourceId('audio', id)) {
-            throw Error(`Invalid id "${id}" given for audio resource...TODO`);
-        }
-        if (localValue !== null) {
-            this.registerLocal('audio:' + id, localValue);
-        }
-        if (perm) {
-            this.permAudio[id] = localValue;
-        } else {
-            this.audio[id] = localValue;
-        }
-    }
-
-    setResource(type, id, value, source, screen = null) {
-        if (!has(this.resources, type)) {
-            this.resources[type] = {};
-        }
-        if (type === 'json' && typeof value === 'object') {
-            value.id = id;
-            value.__resolved = true;
-        } else {
-            value.setId(id);
-        }
-        this.resources[type][id] = value;
-        this.source.set(type + ':' + id, source);
-        if (screen !== null) {
-            this.screen.set(type + ':' + id, screen);
-        }
-        if (source === 'browser') {
-            this.hasBrowserResource = true;
-        }
-        delete this[type][id];
-    }
-
-    getResourceSource(id) {
-        const source = this.source.get(id)
-        return source ? source : 'code'
-    }
-
-    getResourceScreen(id) {
-        return this.screen.get(id);
-    }
-
-    updateImageResource(storage, img) {
-        if (!(img instanceof ImageResource)) {
-            throw Error(`Expected ImageResource object but got ${typeof img}!`);
-        }
-        if (!img.id) {
-            throw Error('No id given in ImageResource');
-        }
-        switch (storage) {
-            case 'browser':
-                this.storage.storeImage(img.id, img.getDataUrl());
-                this.setResource('image', img.id, img, 'browser');
-                break;
-        }
-    }
-
-    updateJsonResource(storage, json) {
-        if (!json.id) {
-            throw Error('Missing id property in JSON resource!');
-        }
-        switch (storage) {
-            case 'browser':
-                this.storage.storeJson(json.id, json);
-                this.setResource('json', json.id, json, 'browser');
-                break;
-        }
-    }
-
-    hasResource(type, id) {
-        if (this.disabled) return false
-        return this.resources[type] !== undefined && this.resources[type][id] !== undefined
-    }
-
-    getResources(type = null) {
-        if (type === null) {
-            return this.resources;
-        }
-        return this.resources[type];
-    }
-
-    getJsonResource(id) {
-        if (this.resources.json[id] !== undefined) {
-            return this.resources.json[id];
-        }
-        throw Error(`JSON resource "${id}" does not exists!`);
-    }
-
-    getResource(type, id) {
-        if (this.resources[type] && this.resources[type][id] !== undefined) {
-            return this.resources[type][id];
-        }
-        throw Error(`Resource "${id}" of type ${type} does not exists!`);
-    }
-
-    getImageResource(id) {
-        if (this.resources.image[id] !== undefined) {
-            return this.resources.image[id];
-        }
-        throw Error(`Image resource "${id}" does not exists!`);
-    }
-
-    getAudioResource(id) {
-        if (this.resources.audio[id] !== undefined) {
-            return this.resources.audio[id];
-        }
-        throw Error(`Audio resource "${id}" does not exists!`);
-    }
-
-    hasBrowserResources() {
-        for (let key of this.storage.getKeys()) {
-            if (key.indexOf(':') !== -1) {
-                return true
-            }
-        }
-        return false;
-    }
-
-    makeImageResource(data, id = null) {
-        const img = new ImageResource(data);
-        img.resolved = true;
-        img.id = id;
-        return img;
-    }
-
-    storeScreenResource(screen, config) {
-        const oldResources = this.storage.dependencies.getResourceWithDependencies('json:' + config.id);
-        const resources = config.getResources();
-        for (let resource of resources.resources) {
-            switch(resource.type) {
-                case 'json':
-                    this.updateJsonResource('browser', resource.data);
-                    break;
-
-                case 'image':
-                    this.updateImageResource('browser', resource.data);
-                    break;
-
-                default:
-                    throw Error('TODO');
-            }
-        }
-        this.storage.storeScreenResource(screen, 'json', config.id);
-        this.storage.storeResourceDependencies(resources.dependencies);
-
-        const newResources = [];
-        for (let node of Object.keys(resources.dependencies)) {
-            if (!newResources.includes(node)) {
-                newResources.push(node);
-            }
-            for (let target of resources.dependencies[node]) {
-                if (!newResources.includes(target)) {
-                    newResources.push(target);
-                }
-            }
-        }
-        for (let resource of oldResources) {
-            const deleteResources = [];
-            if (!newResources.includes(resource)) {
-                deleteResources.push(resource);
-            }
-            if (deleteResources.length) {
-                this.storage.safeDeleteResources(deleteResources);
-            }
-        }
-    }
-
-    deleteServerResources(resources) {
-        if (resources.length === 0) {
-            return Promise.resolve();
-        }
-        return this.fetcher.fetch(
-            'delete', {resources}
-        ).then(body => {
-            for (let resource of body.deleted) {}
-            return body.deleted;
-        });
-    }
-
-    checkServerResources(resources) {
-        return this.fetcher.fetch(
-            'has', { resources }
-        ).then(body => {
-            const found = [];
-            for (let item of body.found) {
-                found.push(item.type + ':' + item.id);
-            }
-            return found;
-        })
-    }
-
-    getAllResourceIds(type) {
-        // TODO: we might also fetch the server ids here
-        let ids = [];
-        switch(type) {
-            case 'json':
-                ids = this.storage.getJsonIds();
-                break;
-
-            case 'image':
-                ids = this.storage.getImageIds();
-                break;
-        }
-        return ids;
-    }
-
-    deployResources(screen, resources, direct, indirect) {
-        const overwrites = [];
-        for(let resource of resources) {
-            let data = resource.data;
-            if (data instanceof ImageResource) {
-                data = data.getDataUrl();
-            }
-            overwrites.push({data, type: resource.type, id: resource.id});
-        }
-        if (overwrites.length === 0) {
-            return Promise.resolve();
-        }
-        return (
-            this.fetcher.fetch('store', {
-                screen,
-                resources: overwrites,
-                direct,
-                indirect
-            }).then(body => {
-                for (let resource of body.stored) {
-                    const screen = this.getResourceScreen(resource.type + ':' + resource.id);
-                    if (screen) {
-                        // TODO: check why global state resource fails here
-                        this.storage.deleteScreenResource(screen, resource.type, resource.id);
-                    }
-                }
-                return body;
-            })
-        )
-    }
-
-    loadResources(images, jsons, audios, screen = '') {
-        const direct = this.storage.getAllScreenResources(screen);
-
-        for (let id of direct.json) {
-            if (jsons[id] === undefined) {
-                jsons[id] = null;
-            }
-        }
-        for (let id of direct.image) {
-            if (images[id] === undefined) {
-                images[id] = null;
-            }
-        }
-        for (let id of direct.audio) {
-            if (audios[id] === undefined) {
-                audios[id] = null;
-            }
-        }
-
-        const resolved = flattenResources(direct);
-        /*
-        WHY ????
-                const resourcesWithChildren = this.storage.getResourcesWithChildren();
-
-                for(let resource of resourcesWithChildren) {
-                    if (!resolved.includes(resource)) {
-                        resolved.push(resource);
-                    }
-                }
-        */
-        const promises = [];
-        const fetchResources = [];
-        const storedImageIds = this.storage.getImageIds();
-        each(images,(value, id) => {
-            if (has(storedImageIds, id)) {
-                const value = this.storage.getImage(id);
-                const image = new ImageResource(value);
-                promises.push(
-                    image.getNewDecodePromise().then(() => {
-                        this.setResource('image', id, image, 'browser', screen);
-                    })
-                );
-            } else {
-                if (value !== null && value.startsWith('http')) {
-                    // try to fetch image directly
-                    promises.push(
-                        fetch(value, {mode: 'cors'}).then(
-                            response => {
-                                if (!response.ok) {
-                                    throw Error('Could not open url');
-                                }
-                                return (
-                                    response.blob().then(blob => {
-                                        const resource = new ImageResource(URL.createObjectURL(blob));
-                                        return resource.getNewDecodePromise().then(() => {
-                                            this.setResource('image', id, resource, 'external', screen);
-                                        });
-                                    })
-                                )
-                            }
-                        )
-                    );
-                } else {
-                    fetchResources.push({id, type: 'image'});
-                }
-            }
-        });
-
-        const storedAudioIds = this.storage.getAudioIds();
-        each(audios, (value, id) => {
-            if (has(storedAudioIds, id)) {
-                const audio = new AudioResource(this.storage.getAudio(id));
-                promises.push(
-                    audio.getNewLoadingPromise().then(() => {
-                        this.setResource('audio', id, audio, 'browser', screen);
-                    })
-                );
-            } else {
-                if (value !== null && value.startsWith('http')) {
-                    // try to fetch audio directly
-                    promises.push(
-                        fetch(value, {mode: 'cors'}).then(
-                            response => {
-                                if (!response.ok) {
-                                    throw Error('Could not open url');
-                                }
-                                return (
-                                    response.blob().then(blob => {
-                                        const resource = new AudioResource(URL.createObjectURL(blob));
-                                        return resource.getNewLoadingPromise().then(() => {
-                                            this.setResource('audio', id, resource, 'external', screen);
-                                        });
-                                    })
-                                )
-                            }
-                        )
-                    );
-                } else {
-                    fetchResources.push({id, type: 'audio'});
-                }
-            }
-        });
-
-        // do the same for jsons
-        const storedJsonIds = this.storage.getJsonIds();
-        each(jsons,(value, id) => {
-            if (has(storedJsonIds, id)) {
-                this.setResource('json', id, this.storage.getJson(id), 'browser', screen);
-                promises.push(
-                    Promise.resolve()
-                );
-            } else {
-                // TODO: url-load?
-                fetchResources.push({id, type: 'json'});
-            }
-        });
-
-        // load ids from server
-//        if (has(fetchResources)) {
-        /*
-                    const remotes = this.storage.getScreenRemotes(screen);
-                    for(let remote of remotes) {
-                        const [type, id] = remote.split(':');
-                        fetchResources.push({type, id});
-                    }
-        */
-        promises.push(
-            this.fetcher.fetch('resources', {
-                resources: fetchResources,
-                screen,
-                resolved,
-                overwrites: this.storage.dependencies.getIndirect(),
-                remotes: this.storage.getScreenRemotes(screen)
-            }).then(body => {
-                const subPromises = [];
-                for (let resource of body.found) {
-                    if (resource.data === null) {
-                        continue;
-                    }
-                    switch (resource.type) {
-                        case 'image':
-                            const image = new ImageResource(resource.data);
-                            subPromises.push(
-                                image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'server', screen);
-                                })
-                            );
-                            break;
-
-                        case 'audio':
-                            const audio = new AudioResource(resource.data);
-                            subPromises.push(
-                                audio.getNewLoadingPromise().then(() =>{
-                                    this.setResource(resource.type, resource.id, audio, 'server', screen);
-                                })
-                            );
-                            break;
-
-                        case 'json':
-                            this.setResource('json', resource.id, resource.data, 'server', screen);
-                            break;
-                    }
-                }
-
-                for (let resource of body.notFound) {
-                    if (this.storage.hasResource(resource.type, resource.id)) {
-                        this.setResource(
-                            resource.type,
-                            resource.id,
-                            this.storage.getResource(resource.type, resource.id),
-                            'browser',
-                            screen
-                        );
-                    } else {
-                        let value = null;
-                        switch(resource.type) {
-                            case 'json':
-                                value = jsons[resource.id];
-                                break;
-
-                            case 'image':
-                                value = images[resource.id];
-                                break;
-
-                            case 'audio':
-                                value = audios[resource.id];
-                                break;
-                        }
-                        if (value === null) {
-                            throw Error(`Missing remote ${resource.type} resource ${resource.id}`);
-                        }
-                        if (resource.type === 'image') {
-                            const image = new ImageResource(value);
-                            subPromises.push(
-                                image.getNewDecodePromise().then(() => {
-                                    this.setResource(resource.type, resource.id, image, 'code', screen);
-                                })
-                            );
-                            continue;
-                        } else if (resource.type === 'audio') {
-                            const audio = new AudioResource(value);
-                            subPromises.push(
-                                audio.getNewLoadingPromise().then(() => {
-                                    this.setResource(resource.type, resource.id, audio, 'code', screen);
-                                })
-                            );
-                            continue;
-                        }
-                        this.setResource(resource.type, resource.id, value, 'code', screen);
-                    }
-                }
-                return Promise.all(subPromises);
-            })
-        )
-        //       }
-
-        return Promise.all(promises).then(() => {
-            return this.resources
-        });
-    }
-
-    loadPermanentResources() {
-        return this.loadResources(
-            this.permImage, this.permJson, this.permAudio
-        ).then(() => {
-            this.hasPermLoaded = true;
-        });
-    }
-
-    load(screen) {
-        const promise = this.hasPermLoaded ? Promise.resolve() : this.loadPermanentResources(this.permImage, this.permJson, this.permAudio);
-        return promise.then(() => this.loadResources(
-            this.image, this.json, this.audio, screen
-        ));
-    }
-}
-
-class CanvasManager {
+class AutoIdGenerator {
 
     constructor() {
-        this.overlayElem = null;
-        this.offscreenElem = null;
-        this.canvasElems = [];
+        this.context2ids = {}
+        this.context = null
     }
 
-    getCanvasElem(dimX, dimY, opaque) {
-        const elem = document.createElement('canvas');
-        elem.id = 'canvas_' + this.canvasElems.length;
-        elem.setAttribute('width', dimX);
-        elem.setAttribute('height', dimY);
-        elem.setAttribute('style', 'position: absolute; left: 0px; top: 0px');
-
-        const ctx = elem.getContext('2d', {alpha: !opaque});
-        ctx.imageSmoothingEnabled = false;
-        const canvas = {elem, ctx};
-        this.canvasElems.push(canvas);
-        return canvas;
+    startContext(value) {
+        this.context = value
     }
 
-    getOverlayElem() {
-        if (this.overlayElem === null) {
-            this.overlayElem = document.getElementById('screen-overlay-div');
+    endContext() {
+        this.context = null
+    }
+
+    getContext() {
+        return this.context
+    }
+
+    getIdPrefix() {
+        if (this.context === null) return ''
+        return this.context === 'screen' ? 'screen_' + inst.game.getActiveScreenRenderer().scope : this.context
+    }
+
+    getNewId(name) {
+        const context = this.context
+        if (context === null)
+            throw Error('Cannot generate new id outside context')
+
+        let contextMap = this.context2ids[this.context]
+        if (!contextMap) {
+            contextMap = new Map()
+            this.context2ids[context] = contextMap
         }
-        return this.overlayElem;
+
+        let no = contextMap.get(name)
+        if (no === undefined) no = 0
+        no++
+        contextMap.set(name, no)
+        return this.getIdPrefix() + '_' + name + '_' + no
     }
 
-    getOffscreenElem() {
-        if (this.offscreenElem === null) {
-            this.offscreenElem = document.getElementById('offscreen-div');
-        }
-        return this.offscreenElem;
-    }
-
-    getContainerElem(viewPortX, viewPortY, offX, offY) {
-        const elem = document.createElement('div');
-        elem.setAttribute('style', 'display: inline; margin: 0px; padding: 0px; position: absolute; width: ' + viewPortX + 'px; height: ' + viewPortY + 'px; top: ' + offY + 'px; left: ' + offX + 'px; overflow: hidden');
-        return elem;
-    }
-
-    getNewOffscreenCanvas(dimX, dimY) {
-        return this.getNewCanvas('offscreen', dimX, dimY);
-    }
-
-    getNewCanvas(type, dimX, dimY, offX = 0, offY = 0, opaque = false) {
-        const id = type + '_' + this.canvasElems.length;
-        const parentElem = type === 'offscreen' ? this.getOffscreenElem() : this.getOverlayElem();
-        const elem = document.createElement('canvas');
-        elem.id = id;
-        elem.setAttribute('width', dimX);
-        elem.setAttribute('height', dimY);
-        if (type === 'overlay') {
-            elem.setAttribute('style', 'position: absolute; top: ' + offY + 'px; left: ' + offX + 'px');
-        }
-        parentElem.appendChild(elem);
-        const ctx = elem.getContext('2d', {alpha: !opaque});
-        ctx.imageSmoothingEnabled = false;
-        const canvas = {id, type, elem, ctx, width: dimX, height: dimY};
-        this.canvasElems.push(canvas);
-
-        return canvas;
-    }
-
-    discard(canvas) {
-        canvas.elem.parentNode.removeChild(canvas.elem);
-        canvas.elem = null;
-        const index = this.canvasElems.indexOf(canvas);
-        if (index !== -1) {
-            this.canvasElems.splice(index, 1);
+    clearAllIds() {
+        for (const map of toValues(this.context2ids)) {
+            map.clear()
         }
     }
 
-    removeChildren(node) {
-        if (!node) return
-        while (node.firstChild) {
-            node.removeChild(node.firstChild);
-        }
-    }
-
-    clear() {
-        this.canvasElems = [];
-        this.removeChildren(this.getOffscreenElem());
-        this.removeChildren(this.getOverlayElem());
+    clearScreenIds() {
+        const map = this.context2ids.screen
+        if (map) map.clear()
     }
 }
+let autoIds = null
+
 
 const inst = {
     setGame: value => {
@@ -1295,18 +430,13 @@ const inst = {
         }
         return touchControlsPlugin
     },
-    setRL: (baseUrl, storage) => RL = new ResourceLoader(
+    setRL: (baseUrl, ...params) => RL = new ResourceManager(
         Fetcher(baseUrl),
-        storage
+        ...params
     ),
     get RL() {
         if (RL) return RL
         throw Error('Resource Loader not yet initialized!')
-    },
-    setSM: (storage, gameId) => SM = new StorageManager(storage, gameId),
-    get SM() {
-        if (SM) return SM
-        throw Error('Storage Manager not yet initialized!')
     },
     get game() {
         if (game) return game
@@ -1324,19 +454,18 @@ const inst = {
         }
         return filterer
     },
-    get OCM() {
-        if (!OCM) {
-            OCM = new CanvasManager()
-        }
-        return OCM
-    },
     get plugins() {
         const plugins = [ inst.renderPlugin ];
         if (system.supportsTouch) {
             plugins.push(inst.touchControlsPlugin)
         }
         return plugins
-    }
+    },
+    get autoIds() {
+        if (autoIds === null) autoIds = new AutoIdGenerator()
+        return autoIds
+    },
+    paneRegistry: new PaneRegistry()
 }
 
 export default inst

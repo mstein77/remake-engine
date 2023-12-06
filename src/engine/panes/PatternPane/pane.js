@@ -1,24 +1,52 @@
 import inst from "core/instances"
-import { PatternPaneConfig } from "./config";
-import { d, getConfigFromInput, getCanvasForDim } from "helper/helper"
+import { d, getCanvasForDim, getCanvasObjForDim } from "helper/helper"
 import { ImageContainer } from "core/classes"
+import { Pane } from "../classes"
+import { Config } from "core/config"
+import { validated } from "helper/validate"
+import { AppliedImage } from "core/classes"
+import { ModelFactory } from "core/model"
 
-export class PatternPane {
+class PatternPaneConfig extends Config {
 
-    constructor(input) {
-        const config = getConfigFromInput(PatternPane.Config, input)
-        config.applyTo(this)
-        this.config = config
+    getDefaults() {
+        return {
+            image: undefined,
+            repeat: 'repeat'
+        }
+    }
 
-        this.pattern = this.image.getImage()
-        this.repeatX = ([null, '', 'repeat', 'repeat-x'].indexOf(this.repeat) !== -1);
-        this.repeatY = ([null, '', 'repeat', 'repeat-y'].indexOf(this.repeat) !== -1);
+    getFieldProps() {
+        return {
+            repeat: {values: ['repeat', 'repeat-x', 'repeat-y', 'no-repeat'], null: true}
+        }
+    }
+
+    setImage(value) {
+        this.image = validated.imageResource(value)
+    }
+
+    setRepeat(value) {
+        this.repeat = validated.string(value, this.getFieldProp('repeat'))
+    }
+
+    applyPropsTo(model) {
+        this.applyDefaultKeysTo(model)
+        model.image = new AppliedImage(this.image)
+    }
+}
+
+class PatternPaneImpl extends Pane {
+
+    finalizeApply() {
+        this.repeatX = [null, '', 'repeat', 'repeat-x'].includes(this.repeat)
+        this.repeatY = [null, '', 'repeat', 'repeat-y'].includes(this.repeat)
     }
 
     init(viewPortDimX, viewPortDimY) {
         this.patternDim = {
-            x: this.pattern.width,
-            y: this.pattern.height
+            x: this.image.width,
+            y: this.image.height
         };
         this.viewPortDim = {
             x: viewPortDimX,
@@ -34,11 +62,10 @@ export class PatternPane {
         };
 
         this.container = new ImageContainer(this.paneDim.x, this.paneDim.y);
-        const tmpCanvas = inst.OCM.getNewOffscreenCanvas(this.paneDim.x, this.paneDim.y);
-        tmpCanvas.ctx.fillStyle = tmpCanvas.ctx.createPattern(this.pattern, this.repeat);
+        const tmpCanvas = getCanvasObjForDim(this.paneDim.x, this.paneDim.y);
+        tmpCanvas.ctx.fillStyle = tmpCanvas.ctx.createPattern(this.image.canvas, this.repeat);
         tmpCanvas.ctx.fillRect(0, 0, this.paneDim.x, this.paneDim.y);
         this.container.getImageElem().src = tmpCanvas.elem.toDataURL('image/png');
-        inst.OCM.discard(tmpCanvas);
         return this.container;
     }
 
@@ -96,5 +123,17 @@ export class PatternPane {
             height: this.viewPortDim.y
         }
     }
+
+    getDependentImages() {
+        return [this.image]
+    }
 }
-PatternPane.Config = PatternPaneConfig
+
+const PatternPane =
+    ModelFactory(
+        'PatternPane',
+        PatternPaneConfig
+    )
+    .addImplementation(PatternPaneImpl)
+
+export default PatternPane

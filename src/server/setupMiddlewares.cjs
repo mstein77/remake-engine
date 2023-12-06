@@ -1,10 +1,15 @@
 const bodyParser = require('body-parser')
-const path = require("path")
+const path = require('path')
 const fs = require('fs')
 const morgan = require('morgan')
 
-const { isValidResourceId, getRelevantResources, ResourceDependencies } = require('../engine/helper/shared.cjs')
+const { isValidResourceId, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
+
+const { d } = require('../shared/classes/helper.cjs')
+const { RESOURCE_LOADING } = require('../build/classes/const.cjs')
+const resourcesController = require('./controller/resources.cjs')
+
 
 const setupAppMiddlewares = (app, config = null) => {
 
@@ -16,6 +21,8 @@ const setupAppMiddlewares = (app, config = null) => {
         static: ( ...relPath ) => path.resolve( config.IS_DIST ? absDir.public() : absDir.resources(), ...relPath ),
         resources: ( ...relPath ) => path.resolve(absDir.root('resources'), ...relPath )
     }
+
+    resourcesController.init(config, absDir)
 
     const getFilesFromDir = dir => fs.readdirSync(dir, {withFileTypes: true})
         .filter(item => !item.isDirectory())
@@ -138,14 +145,18 @@ const setupAppMiddlewares = (app, config = null) => {
         app.use(bodyParser.urlencoded({ extended: true, limit: config.API_MAX_JSON_SIZE }));
     }
 
-    const staticResources = ['audio']
-    for (const resource of staticResources) {
-        app.use('/' + resource, express.static(absDir.static(resource)))
+    const staticTypes = [];
+    if (config.resourceLoading !== RESOURCE_LOADING.API_ALL && config.staticTypes !== '') {
+        staticTypes.push( ...config.staticTypes.split(',') )
     }
+    for (const type of staticTypes) {
+        app.use('/' + type, express.static(absDir.static(type)))
+    }
+    app.post('/has', resourcesController.has)
+    app.post('/resources', resourcesController.resources)
+    app.post('/store', resourcesController.store)
 
-    if (config.LOAD_STATIC) return
-
-    app.post('/has', (req, res) => {
+    app.post('/has2', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
         const found = []
         const notFound = []
@@ -173,7 +184,7 @@ const setupAppMiddlewares = (app, config = null) => {
         res.json({found, notFound, invalid})
     });
 
-    app.post('/resources', (req, res) => {
+    app.post('/resources2', (req, res) => {
         const found = []
         const notFound = []
         const invalid = []
@@ -261,7 +272,7 @@ const setupAppMiddlewares = (app, config = null) => {
         res.json({deleted, notDeleted, invalid})
     });
 
-    app.post('/store', (req, res) => {
+    app.post('/store2', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []
         const stored = []
         const failed = []

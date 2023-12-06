@@ -1,18 +1,26 @@
-const absPath = require('./absPath.cjs')
+const absPath = require('../../shared/classes/absPath.cjs')
+const { d, intersect, isArray } = require("../../shared/classes/helper.cjs")
+const { DEPLOY_METHOD, RESOURCE_LOADING } = require('../classes/const.cjs')
+const { colorLog, FG } = require("../../shared/classes/color.cjs")
 
-const DEPLOY = {
-    METHOD: {
-        UPLOAD_ROOT: 'upload-dist-to-root',
-        UPLOAD_PUBLIC: 'upload-dist-to-public',
-        CHECKOUT: 'checkout'
-    }
+const heroku = require("../hosting/heroku.cjs")
+const serverWithNode = require("../hosting/server-with-nodejs.cjs")
+const serverWithoutNode = require("../hosting/server-without-nodejs.cjs")
+
+const hosting2cls = {
+    'heroku': heroku,
+    'server-with-nodejs': serverWithNode,
+    'server-without-nodejs': serverWithoutNode
 }
-const RESOURCE = {
-    LOADING: {
-        LOCAL: 'local',
-        STATIC: 'static',
-        API: 'api'
-    }
+
+const MSG = {
+    noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
+    enableEditor: `Editor was deactivated in the config, but is required in the dev build, that's why "editor" was set to true`,
+    allStaticApi: `Requested resourceLoading "api" replaced with "static-all" because "staticTypes" include all types`,
+    localToApi: `Requested resourceLoading "local" not supported in dev or editor environment, using "api" instead`,
+    localAllToApi: `Requested resourceLoading "local-all" not supported in dev or editor environment, using "api" instead`,
+    simStaticAll: `Requested resourceLoading "static-all" not supported in dev or editor environment, switching to simulation using "api"`,
+    noServerNodejs: `Enabling of "server" not possible because your hosting is set to "server-without-nodejs" and does not support nodejs`
 }
 
 const key2params = {
@@ -20,9 +28,9 @@ const key2params = {
     browsers: {type: 'string'},
     editor: {type: 'bool'},
     gzip: {type: 'bool'},
-    resourceLoading: {type: 'string', values: Object.values(RESOURCE.LOADING)},
+    resourceLoading: {type: 'string', values: Object.values(RESOURCE_LOADING)},
     apiMaxJsonSize: {type: 'string'},
-    deployMethod: {type: 'string', values: Object.values(DEPLOY.METHOD)},
+    deployMethod: {type: 'string', values: Object.values(DEPLOY_METHOD)},
     hosting: {type: 'string'},
     minimize: {type: 'bool'},
     server: {type: 'bool'},
@@ -31,6 +39,7 @@ const key2params = {
     sourceMapType: {type: 'string'},
     openBrowser: {type: 'string'},
     port: {type: 'uint'},
+    staticTypes: {type: 'string'},
     logging: {type: 'string'},
     stats: {type: 'string'},
     envPrefix: {type: 'string'}
@@ -51,6 +60,50 @@ const configJson = () => {
     return configJsonContent
 }
 
+/**
+ * Returns an object holding the config after applying all integrity checks and all errors and
+ * warnings which happened during the check
+ *
+ * @param {object} config
+ * @param {boolean} isDist
+ *
+ * @returns {object}
+ */
+const applyConfigIntegrityChecks = (config, isDist) => {
+    const warnings = []
+
+    if (config.editor && !config.server)
+        throw Error(MSG.noServer)
+
+    if (!isDist && config.editor === false) {
+        warnings.push(MSG.enableEditor)
+        config.editor = true
+    }
+
+    if (isDist && config.server && !(new hosting2cls[config.hosting]()).supportsNodejs)
+        throw Error(MSG.noServerNodejs)
+
+    const staticTypes = config.staticTypes === '' ? [] : config.staticTypes.split(',')
+    const allStaticTypes = intersect(['json', 'audio', 'image', 'video'], staticTypes).length === 4
+    if (allStaticTypes && config.resourceLoading === RESOURCE_LOADING.API) {
+        warnings.push(MSG.allStaticApi)
+        config.resourceLoading = RESOURCE_LOADING.STATIC_ALL
+    }
+
+    if (config.editor && [RESOURCE_LOADING.LOCAL, RESOURCE_LOADING.LOCAL_ALL].includes(config.resourceLoading)) {
+        warnings.push(config.resourceLoading === RESOURCE_LOADING.LOCAL ? MSG.localToApi : MSG.localAllToApi)
+        config.resourceLoading = RESOURCE_LOADING.API
+    }
+
+    if (config.editor && config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
+        warnings.push(MSG.simStaticAll)
+    }
+
+    return {
+        config,
+        warnings
+    }
+}
 
 /**
  * Casts an environment string value to the given type representation and returns it
@@ -191,22 +244,48 @@ const buildConfig = (json, env, isDistBuild) => {
     return ctxConfig
 }
 
+let ctxConfig = null
+
 const getConfigForCtx = args => {
-    const configArg = args && args.config
-    const isDistBuild = (Array.isArray(configArg) && configArg.includes('webpack.build-dist.cjs'))
-    return buildConfig(configJson(), process.env, isDistBuild)
+    if (ctxConfig === null) {
+        const configArg = args && args.config
+        const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
+        const rawConfig = buildConfig(configJson(), process.env, isDistBuild)
+        console.log()
+        console.log('Checking integrity of config...')
+        const { config, error, warnings} = applyConfigIntegrityChecks(rawConfig, isDistBuild)
+        if (warnings.length) {
+            colorLog(FG.YELLOW + `...there are warnings:`);
+            console.log()
+            while (warnings.length) {
+                colorLog(FG.L_YELLOW + ` WARNING ` + FG.WHITE + warnings.pop())
+            }
+        } else {
+            colorLog(FG.GREEN + `...ok!`)
+        }
+        console.log()
+        console.log(
+            `Building game in ` + (isDistBuild ? 'dist folder' : 'develop mode') +
+            ` with the following config:`,
+            config
+        )
+        console.log()
+        ctxConfig = config
+    }
+    return ctxConfig
 }
 
 const internal = process.env.NODE_ENV === 'test' ? {
+    MSG,
     buildConfig,
+    applyConfigIntegrityChecks,
     extractEnvOverwrites,
     castEnvValue,
     extractAppEnvOverwrites } : {}
 
 module.exports = {
+    applyConfigIntegrityChecks,
     getConfigForCtx,
     configJson,
-    internal,
-    DEPLOY,
-    RESOURCE
+    internal
 }

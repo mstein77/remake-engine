@@ -1,7 +1,54 @@
 import inst from "core/instances"
 import { BufferedCanvasContainer } from "core/classes"
-import { getConfigFromInput } from "helper/helper"
-import { BitmapScrollPaneConfig } from "./config.js"
+import { Pane } from "../classes"
+import { d } from "helper/helper"
+import { Config } from "core/config"
+import { SpriteSheet } from "../SpritePane/models"
+import { validated } from "helper/validate"
+import { ModelFactory } from "core/model"
+
+class BitmapScrollPaneConfig extends Config {
+
+    getDefaults() {
+        return {
+            spriteSheet: undefined,
+            map: [],
+            axis: 'X',
+            min: 0,
+            max: 100
+        }
+    }
+
+    getFieldProps() {
+        return {
+            axis: {values: ['X', 'Y']}
+        }
+    }
+
+    setSpriteSheet(value) {
+        this.spriteSheet = validated.config(SpriteSheet, value)
+    }
+
+    setAxis(value) {
+        this.axis = validated.string(value, this.getFieldProp('axis'))
+    }
+
+    setMap(value) {
+        this.map = validated.array(value)
+    }
+
+    setMin(value) {
+        this.min = validated.int(value)
+    }
+
+    setMax(value) {
+        this.max = validated.int(value)
+    }
+
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
+    }
+}
 
 /**
  * TODO:
@@ -12,14 +59,9 @@ import { BitmapScrollPaneConfig } from "./config.js"
  *   - Oversize/Scrolling
  *   - Z-Ordering / MultiBitmaps
  */
-export class BitmapScrollPane {
+class BitmapScrollPaneImpl extends Pane {
 
-    constructor(input) {
-
-        const config = getConfigFromInput(BitmapScrollPane.Config, input);
-        config.applyTo(this);
-        this.config = config;
-
+    finalizeApply() {
         this.maxState = 0;
         this.pos = 0;
         this.state = -1;
@@ -219,5 +261,19 @@ export class BitmapScrollPane {
             height: this.paneDim.y
         }
     }
+
+    getDependentModels() {
+        return [
+            this.spriteSheet
+        ]
+    }
 }
-BitmapScrollPane.Config = BitmapScrollPaneConfig
+
+const BitmapScrollPane =
+    ModelFactory(
+        {name: 'BitmapScrollPane'},
+        BitmapScrollPaneConfig
+    )
+    .addImplementation(BitmapScrollPaneImpl)
+
+export default BitmapScrollPane

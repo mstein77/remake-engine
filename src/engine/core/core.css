@@ -2,6 +2,10 @@ body {
     overflow: hidden
 }
 
+.pixelated, .pixelated img, .pixelated canvas {
+    image-rendering: pixelated
+}
+
 html.fix-orientation {
     width: 100vh;
     height: 100vw;
@@ -19,7 +23,7 @@ html.fix-orientation {
     padding: 0;
 }
 
-#screen-overlay-div {
+#screen-overlays-div {
     position: relative;
     padding: 0;
     margin: 0;

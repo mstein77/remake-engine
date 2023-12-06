@@ -923,7 +923,7 @@ function BaseAppInner({ contentProvider, active }) {
 
                 if (wContext.isDirty()) {
                     gameRef.reloadScreen(
-                    //    wContext.registry('callStack')
+//                       wContext.registry('callStack')
                     );
                 } else {
                     gameRef.restart();

@@ -1,12 +1,13 @@
-import React, { useContext, useMemo, useState } from "react";
-import { TupleProp, BitmapProp, OkCancelForm, InputProp } from "editor/components/FormComponents";
-import { EntityStackSections } from "editor/components/EntityComponents";
-import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "editor/components/BasicComponents";
-import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "editor/components/EditorComponents";
-import { Block, Stack } from 'editor/components/LayoutComponents';
-import { d, getEmptyImageData, getUniqueName } from "helper/helper";
-import { EntityPicker } from "editor/components/EntityComponents";
-import { ImageBlockIndex } from "./classes";
+import React, { useContext, useMemo, useState } from "react"
+import { TupleProp, BitmapProp, OkCancelForm, InputProp } from "editor/components/FormComponents"
+import { EntityStackSections } from "editor/components/EntityComponents"
+import { CenterInfo, Coords, Section, EditorSection, PropertyGrid, useComponentUpdate, WindowContext, EditorContext, useUpdateOnEntityIndexChanges, useModal } from "editor/components/BasicComponents"
+import { ScreenBlocksGrid, useEditBitmapModal, useExportModal } from "editor/components/EditorComponents"
+import { Block, Stack } from 'editor/components/LayoutComponents'
+import { d, getEmptyImageData, getUniqueName } from "helper/helper"
+import { EntityPicker } from "editor/components/EntityComponents"
+import { ImageBlockIndex } from "./classes"
+import { RESOURCE } from "shared/classes/resources.cjs"
 
 function BackgroundPreview({ model, imageIndex, newImage, width, height, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);
@@ -176,7 +177,7 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
     const getReservedIds = () => {
         const reserved = [
             ...imageIndex.getPropValues('value'),
-            ...wContext.resourceLoader.getAllResourceIds('image')
+            ...wContext.resourceLoader.getAllResourceIds(RESOURCE.TYPE.IMAGE)
         ];
         return reserved
     };
@@ -225,23 +226,23 @@ function BackgroudPaneEditorInner({ model, imageIndex, fieldProps, resource }) {
 }
 
 function BackgroundPaneEditor({ model, resource }) {
-    const update = useComponentUpdate();
-    const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'BackgroundPane', model, resource, update });
+    const update = useComponentUpdate()
+    const { storeModel, deployModel, getResourceTree, openExportModal, Modals } = useExportModal({ name: 'BackgroundPane', model, resource, update })
 
-    const tree = getResourceTree();
+    const tree = getResourceTree()
     const details = {
         'From:': tree[0].source,
         'Resources:': tree.length
-    };
+    }
     const imageIndex = useMemo(() => {
         return new ImageBlockIndex(model)
     }, [model])
-    const fieldProps = useMemo(() => resource.data.getFieldProps(), []);
+    const fieldProps = useMemo(() => model.config.getFieldProps(), []);
 
     return (
         <EditorSection
             id="backgroundPaneEditor" area={1} link={3} full name="BackgroundPane"
-            sub={model.id} details={details}
+            sub={model.id} warn={model.hasAutoId() ? `This pane has an automatically created ID. It's recommended to assign your own unique id to prevent problems with conflicting auto-generated IDs!` : ''} details={details}
             confirm tree={tree}
 
             actions={

@@ -1,36 +1,8 @@
-import inst from "../core/instances"
+import inst from "core/instances"
 import { ANIMATION } from "core/const"
 import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
-
-function d(main, ...params) {
-    let stack = null;
-    try {
-        throw new Error('myError');
-    }
-    catch(e) {
-        stack = e.stack.split('\n');
-    }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
-        }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
-    }
-    console.group('Debug ' + func.join(' <- '));
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
-}
+import { d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/classes/helper.cjs"
+import { typeText2tid } from "../../shared/classes/resources.cjs"
 
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
     const newItems = [...oldItems];
@@ -39,7 +11,7 @@ function getItemsCloneWithUpdatedItem(oldItems, index, props) {
 }
 
 function hex2rgb(hex) {
-    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null;
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null
 
     const color = {};
     color.r = parseInt(hex.substr(1, 2), 16);
@@ -47,7 +19,7 @@ function hex2rgb(hex) {
     color.b = parseInt(hex.substr(5, 2), 16);
     color.a = hex.length === 9 ? parseInt(hex.substr(7, 2), 16) : 255;
 
-    return color;
+    return color
 }
 
 function hex2rgbaArray(hex) {
@@ -57,14 +29,14 @@ function hex2rgbaArray(hex) {
         parseInt(hex.substr(3, 2), 16)/255,
         parseInt(hex.substr(5, 2), 16)/255,
         hex.length === 9 ? parseInt(hex.substr(7, 2), 16)/255 : 1.0
-    ];
+    ]
 }
 
 function rgb2hex(rgb) {
     if (typeof rgb === 'string') {
-        return rgb;
+        return rgb
     }
-    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0');
+    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0')
 }
 
 const getFlatDependencies = (indirect, resource, found = []) => {
@@ -80,14 +52,22 @@ const getFlatDependencies = (indirect, resource, found = []) => {
     return found;
 };
 
-const getDeflatedResources = resources => {
-    const result = {json: [], image: [], audio: []};
-    for (let resource of resources) {
-        const [type, id] = resource.split(':');
-        result[type].push(id);
+/**
+ * Returns an object where the resource ids of the given typed resource ids are distributed
+ * under a type key. The result object will have "image", "json" und "audio" key with an array
+ * of ids.
+ *
+ * @param {array} typedResourceIds
+ * @returns {object}
+ */
+const getDeflatedResources = typedResourceIds => {
+    const result = {json: [], image: [], audio: []}
+    for (let typedResourceId of typedResourceIds) {
+        const [ type, id ] = typedResourceId.split(':')
+        result[type].push(id)
     }
-    return result;
-};
+    return result
+}
 
 const getFlatObjectResources = resources => {
     const result = [];
@@ -95,105 +75,6 @@ const getFlatObjectResources = resources => {
         result.push(obj.type + ':' + obj.id);
     }
     return result;
-};
-
-class Storage {
-
-    constructor(storage, prefix = '') {
-        this.storage = storage;
-        this.prefix = prefix;
-        this.active = this.isAvailable();
-    }
-
-    isQuotaExceededException(e) {
-        return e instanceof DOMException && (
-            e.name === 'QuotaExceededError' ||
-            e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        );
-    }
-
-    isAvailable() {
-        if (!this.storage) {
-            return false;
-        }
-        try {
-            const x = '__storage_test__';
-            this.storage.setItem(x, '1');
-            this.storage.removeItem(x);
-            return true;
-        } catch(e) {
-            return e instanceof DOMException && !this.isQuotaExceededException(e) && (
-                    e.code === 22 ||
-                    e.code === 1014) &&
-                (localStorage && localStorage.length !== 0);
-        }
-    }
-
-    getKeys() {
-        if (!this.isAvailable()) {
-            return [];
-        }
-        const keys = [];
-        for(let i = 0; i < this.storage.length; i++) {
-            const key = this.storage.key(i);
-            if (key.startsWith(this.prefix)) {
-                keys.push(key.substring(this.prefix.length));
-            }
-        }
-        return keys;
-    }
-
-    storeJson(id, data) {
-        if (!this.isAvailable()) {
-            return false;
-        }
-        try {
-            this.storage.setItem(this.prefix + id, JSON.stringify(data));
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    getJson(id) {
-        if (!this.isAvailable()) {
-            return null;
-        }
-        try {
-            const item = this.storage.getItem(this.prefix + id);
-            try {
-                return JSON.parse(item);
-            } catch (e) {
-                return null;
-            }
-        } catch (e) {
-            console.error(e);
-            return null;
-        }
-    }
-
-    deleteJson(id) {
-        this.storage.removeItem(this.prefix + id);
-    }
-
-    getDefaultedArray(id, defaults = []) {
-        const json = this.getJson(id);
-        if (Array.isArray(json)) {
-            return json;
-        }
-        return Array.isArray(defaults) ? defaults : []
-    }
-
-    getDefaultedJson(id, defaults = null) {
-        const json = this.getJson(id);
-        if (json === null) {
-            return typeof defaults === 'object' ? { ...defaults } : defaults;
-        }
-        if (defaults === null) {
-            return json
-        }
-        return { ...defaults, ...json }
-    }
 }
 
 const getIdToItems = items => {
@@ -236,8 +117,27 @@ const getCanvasForDim = (width, height) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
+
     return canvas;
-};
+}
+
+const getCanvasObjForDim = (width, height, options = {}) => {
+    const elem = getCanvasForDim(width, height)
+    const { opaque = false, aliasing = false, gpu = false, parent, cls, style } = options
+    if (parent)
+        parent.appendChild(elem)
+    if (cls)
+        elem.setAttribute('class', cls)
+    if (style) {
+        elem.setAttribute('style', style)
+    }
+    const ctx = elem.getContext('2d', {alpha: !opaque, willReadFrequently: !gpu})
+    ctx.imageSmoothingEnabled = aliasing
+    return {
+        elem,
+        ctx
+    }
+}
 
 const getCanvasForBitmap = bitmap => {
     const canvas = getCanvasForDim(bitmap.width, bitmap.height);
@@ -291,127 +191,42 @@ const getEmptyImageData = (width, height, color = '#00000000') => {
     return ctx.getImageData(0, 0, width, height);
 };
 
-const rebuilders = [];
-const rebuildObj = [];
+/**
+ *
+ * @param nodes
+ * @param resId
+ * @param dependencies
+ * @param level
+ */
+const addTreeResource = (nodes, resId, dependencies, level = 0) => {
+    const [ type, id ] = resId.split(':')
+    const tid = typeText2tid(type, id)
+    const source = inst.RL.getResourceOrigin(tid) ?? 'code'
+    nodes.push({ level, id, type, source: ucfirst(source) })
 
-const addTreeResource = (tree, resId, resourceInfo, level = 0) => {
-    const [type, id] = resId.split(':');
-    for (let resource of resourceInfo.resources) {
-        if (resource.id === id) {
-            tree.push({level, id, type, source: ucfirst(inst.RL.getResourceSource(resId))});
-            break;
-        }
-    }
-    if (!resourceInfo.dependencies[resId]) {
-        return;
-    }
-    const deps = resourceInfo.dependencies[resId];
+    const deps = dependencies[resId]
+    if (!deps) return
+
     for (let dep of deps) {
-        addTreeResource(tree, dep, resourceInfo, level + 1);
+        addTreeResource(nodes, dep, dependencies, level + 1)
     }
-};
-
-const getResourceTreeForJsonModel = (cls, model) => {
-    const rebuildJson = getRebuildJsonForModel(cls, model, true);
-    const config = new cls.Config(rebuildJson);
-    const resourceInfo = config.getResources();
-    const tree = [];
-    addTreeResource(tree, 'json:' + model.id, resourceInfo);
-    return tree;
-};
-
-const newPlainConfig = (config, json) => {
-    inst.RL.setDisabled(true)
-    const plainConfig = new config(json)
-    inst.RL.setDisabled(false)
-    return plainConfig
 }
 
-const getRebuildJsonForModel = (cls, model, deep) => {
-    if (model instanceof cls) {
-        return deep ? model.config.getRebuildJson(true, model) : model.config.id
-    }
-    const conf = cls.Config;
-    if (model instanceof conf) {
-        return deep ? conf.getRebuildJson(true, model) : conf.id;
-    }
-    if (!deep) {
-        return model.id;
-    }
-    const index = rebuilders.indexOf(conf);
-    let obj;
-    if (index !== -1) {
-        obj = rebuildObj[index]
-    } else {
-        obj = new conf({});
-        rebuilders.push(conf);
-        rebuildObj.push(obj)
-    }
-    return obj.getRebuildJson(true, model)
-};
-
 /**
- * Wandelt die gegebene Resource (PaneModel) bzw. ResourceConfig in ein
- * JSON um, wobei Canvas gecloned werden
+ * Returns an array holding the nodes of a resource dependency tree of the given model. Each node is an object
+ * { id, level, type, source } whereas source returns where the resource was loaded from
  *
- * null => null
- * array => [self(item1), ...self(itemN)]
- * !object(x) => x
- * (x.config === undef && x.getJson === undef)
- *   => x instanceof Canvas ? clone Canvas : x;
+ * @param {object} config
+ * @param {object} model
  *
- * config = x.config ? x.config : x;
- * json = config.getJson()
- * for (let key in json) {
- *     json[key] = self(json[key])
- * }
- *
- * @param instance
- * @returns {null|undefined|[]|HTMLCanvasElement|*}
+ * @returns {array}
  */
-const getJsonModelOfInstance = instance => {
-    if (instance === null) {
-        return null
-    }
-    if (Array.isArray(instance)) {
-        const json = [];
-        for (let item of instance) {
-            json.push(getJsonModelOfInstance(item));
-        }
-        return json;
-    }
-    if (typeof instance !== 'object') {
-        return instance;
-    }
-    if (instance.config === undefined && instance.getJson === undefined) {
-        if (instance instanceof HTMLCanvasElement) {
-            const canvas = getCanvasForDim(instance.width, instance.height);
-            if (canvas.width > 0 && canvas.height > 0) {
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(instance, 0, 0);
-            }
-            return canvas;
-        }
-    } else {
-        const config = instance.config ? instance.config : instance;
-        instance = config.getJson();
-    }
-    const json = {};
-    for (let [key, value] of Object.entries(instance)) {
-        json[key] = getJsonModelOfInstance(value);
-    }
-    return json;
-};
-
-const getInstanceFromInput = (cls, input) => {
-    if (input instanceof cls) {
-        return input;
-    }
-    if (!(input instanceof cls.Config)) {
-        input = new cls.Config(input);
-    }
-    return new cls(input);
-};
+const getResourceTreeForJsonModel = model => {
+    const dependencies = model.getDependencies()
+    const nodes = []
+    addTreeResource(nodes, 'json:' + model.id, dependencies)
+    return nodes
+}
 
 const getBlockPos = (block, fonts, dim) => {
     let blockDim = {};
@@ -444,7 +259,6 @@ const getBlockPos = (block, fonts, dim) => {
 const drawTextBlocks = (ctx, dim, blocks, fonts, zoom = 1) => {
     for (let block of blocks) {
         const pos = getBlockPos(block, fonts, dim);
-
         ctx.drawImage(
             block.canvas.elem,
             0,
@@ -505,7 +319,7 @@ const getTextBlockImage = (block, font, filterer = null) => {
             const char = font.map[line[x]];
             if (char) {
                 ctx.drawImage(
-                    font.image,
+                    font.image.canvas,
                     char.x,
                     char.y,
                     font.width,
@@ -1046,25 +860,32 @@ const round = (value, decimals = 0, fill = false) => {
     return rounded;
 };
 
-const ucfirst = (value) => {
-    if (value === '') return '';
-    return value[0].toUpperCase() + value.substring(1);
-};
-
 const isEventInRect = (e, rect) => {
     return (rect.x <= e.clientX && (rect.x + rect.width) >= e.clientX &&
         rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
 }
 
-const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
+const entriesSort = (a, b) => a[0] === b[0] ? 0 : (a[0] < b[0] ? 1 : -1)
 
-const without = (source, remove) => {
-    if (!Array.isArray(remove)) remove = [remove];
-    return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
-}
-
-const intersect = (a, b) => {
-    return a.filter(x => b.includes(x))
+const isEqual = (a, b) => {
+    if (isArray(a)) {
+        if (!isArray(b) || a.length !== b.length) return false
+        for (let i = 0; i < a.length; i++) if (!isEqual(a[i], b[i])) return false
+        return true
+    }
+    if (isObject(a)) {
+        if (!isObject(b)) return false
+        const aPairs = Object.entries(a)
+        const bPairs = Object.entries(b)
+        if (aPairs.length !== bPairs.length) return false
+        aPairs.sort(entriesSort)
+        bPairs.sort(entriesSort)
+        for (let i = 0; i < aPairs.length; i++) {
+            if (aPairs[i][0] !== bPairs[i][0] || !isEqual(aPairs[i][1], bPairs[i][1])) return false
+        }
+        return true
+    }
+    return a === b
 }
 
 function getParsedCssValueRec(value, splitBy = false) {
@@ -1222,56 +1043,30 @@ class RelativeBlock {
     }
 }
 
-/**
- *
- * @param configCls
- * @param input
- * @param forceId
- *
- * @returns {Config}
- */
-function getConfigFromInput(configCls, input, forceId = null) {
-    let fetchId = null;
-    let confJson = null;
-    let conf = input;
-
-    if (typeof input === 'string') {
-        // string given means that we have to load the json resource
-        fetchId = input
-    } else if (input instanceof configCls) {
-        // we got a config instance
-        // if the resource was already loaded by the resource load we are fine
-        if (!input.isResolved()) {
-            // otherwise we have to check if there is new resource with the same id
-            fetchId = input.id;
+function findSameRefs(a, b, path = '', pathElems = []) {
+    if (isObject(a) && isObject(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
         }
-    } else {
-        // we got a json config
-        confJson = input;
-        if (!input.__resolved) {
-            // json was not fetched by the resource loader, so check for a new resource with this id
-            fetchId = input.id;
+
+        for (const key of Object.keys(a)) {
+            if (key in b && key !== 'config') findSameRefs(a[key], b[key], path + '.' + key, [ ...pathElems, a])
         }
     }
-    if (fetchId !== null) {
-        if (forceId) fetchId = forceId
-        if (fetchId === undefined) throw Error('Could not extract id from config')
+    if (isArray(a) && isArray(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
+        }
+        let i = 0
+        while (i < a.length && i < b.length) {
+            findSameRefs(a[i], a[i], path + '[' + i + ']', [ ...pathElems, a])
+            i++
+        }
     }
-
-    // try to load config json with the id (if it could be extracted) from the resource loader
-    if (fetchId && inst.RL.hasResource('json', fetchId)) {
-        confJson = inst.RL.getJsonResource(fetchId)
-    }
-    if (confJson !== null) {
-        // if we have a JSON config either from the param or the resource loader, instantiate config object
-        if (forceId) confJson.id = forceId
-        conf = new configCls(confJson)
-    }
-    // at this point we should have a valid config instance
-    if (!(conf instanceof configCls)) {
-        throw Error('Could not create config from input');
-    }
-    return conf;
 }
 
 export {
@@ -1279,6 +1074,9 @@ export {
     ts,
     td,
     noop,
+    toPairs,
+    toValues,
+    toKeys,
     reverse,
     round,
     without,
@@ -1296,7 +1094,6 @@ export {
     getItemsCloneWithUpdatedItem,
     getSinePath,
     getCosinePath,
-    Storage,
     ResourceDependencies,
     flattenResources,
     drawTextBlocks,
@@ -1309,15 +1106,13 @@ export {
     getNextUid,
     getNextUniqueName,
     getCanvasForDim,
+    getCanvasObjForDim,
     getCanvasForBitmap,
     getImageDataForImage,
     getColorsFromCanvas,
     getColorsFromImageData,
     getEmptyImageData,
-    getRebuildJsonForModel,
-    getJsonModelOfInstance,
     getResourceTreeForJsonModel,
-    getInstanceFromInput,
     getTextBlockImage,
     getBlockDim,
     getBlockPos,
@@ -1328,10 +1123,16 @@ export {
     drawEventsValue,
     getCanvasForIndexMatrix,
     getCanvasForEventMatrix,
-    getConfigFromInput,
-    newPlainConfig,
+    isUrl,
+    isDataUrl,
+    isObject,
+    isString,
+    isArray,
+    isNull,
+    isEqual,
     BitmapPlayer,
     ANIMATION,
     Players,
-    RelativeBlock
+    RelativeBlock,
+    findSameRefs
 };

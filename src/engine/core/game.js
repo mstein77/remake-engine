@@ -1,17 +1,16 @@
-import { STATE, FILTER } from "core/const"
+import { STATE, RENDERER_STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { Storage, getConfigFromInput, clamp, ucfirst, d } from "helper/helper"
+import { clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
+import { getResourcesAndCallback, ResourceResolver } from "./resources"
 import { div } from "helper/dom"
-import { ResourceRequest } from "core/classes.js"
-import { TilesMap } from "panes/BufferedTilesPane/classes"
-import { TextPane } from "panes/TextPane/pane"
-import { BackgroundPane } from "panes/BackgroundPane/pane"
-import { CanvasPane } from "panes/CanvasPane/pane"
-import { LinearGradientPane } from "panes/LinearGradientPane/pane"
-import { SpritePane } from "panes/SpritePane/pane"
-import { BitmapScrollPane } from "panes/BitmapScrollPane/pane"
-import { PatternPane } from "panes/PatternPane/pane"
+import { ResourceRequest } from "core/classes"
+import { Model, ModelFactory, SubModelFactory } from "./model"
+import { validated } from "helper/validate"
+import { ScreenRegistry } from "./screen"
+import { BlendTransition, FadeInOutTransition, LoadingTransition, PushInTransition, TransitionRegistry } from "./transition"
+import { BrowserStorage } from "./storage/browserStorage"
+import { StorageManager } from "shared/classes/storage.cjs"
 import inst from "core/instances"
 
 class Game {
@@ -32,9 +31,15 @@ class Game {
         const { system, renderPlugin, touchControlsPlugin, plugins } = inst
         this.system = system
 
-        inst.setSM(localStorage, (IS_DIST ? '' : 'dev.') + GAME_ID)
-        inst.setRL(BASE_URL + '/', inst.SM)
-        this.engineStorage = new Storage(localStorage, 'remake-engine.')
+
+        const resourceLocalStorage = new StorageManager(
+            BrowserStorage(localStorage, (IS_DIST ? '' : 'dev.') + GAME_ID + '/')
+        )
+        const resourceSessionStorage = new StorageManager(
+            BrowserStorage(sessionStorage)
+        )
+        inst.setRL(BASE_URL + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
+        this.engineStorage = new StorageManager(BrowserStorage(localStorage, 'remake-engine.'))
 
         // TODO get from plugin-registry
         this.plugins = plugins;
@@ -56,7 +61,6 @@ class Game {
         this.keys = {}
         this.gamepads = []
         this.modals = []
-        this.screens = {}
         this.listeners = []
         this.domLoaded = false
         this.deactivateAutoZoom = false
@@ -171,31 +175,42 @@ class Game {
         this.setState(STATE.INIT);
 
         this.warnings = []
-        this.warningActions = []
-        this.currentScreen = null
         this.elems = {}
         this.props = {}
         this.domQueue = []
         this.viewportBounds = null
         this.globalsResolver = null
-        this.areGlobalsResolved = true
         this.trackFps = true
         this.tempKeyActions = null
         this.keyActions = null
-        this.frameEvents = {}
         this.running = false
         this.before = {}
+        this.globals = getNewStateObj()
+        this.skipTransition = true
+        this.paneTreeRenderers = {
+            screen: null,
+            transition: null,
+            temp: null
+        }
+        this.currRendererType = null
+        this.activeTransition = null
+        this.cancelRequestId = null
+        this.nextGoto = null
+        this.lastGoto = null
+        this.controlsActive = false
+        this.controlsIndex = 0
+        this.preview = false
 
         inst.RL.clear()
-        inst.OCM.clear()
-        this.globals = getNewStateObj()
+        inst.autoIds.clearAllIds()
 
         this.hideElem('game-overlay-div', 'modals-div')
 
         if (!this.initHandler) return
 
         if (this.domLoaded) {
-            this.connectAndBoot()
+            // wait for the next frame in case of a reset
+            requestAnimationFrame(() => this.connectAndBoot())
             return
         }
         document.addEventListener(
@@ -208,83 +223,98 @@ class Game {
         )
     }
 
+    applyConfig() {
+        const config = this.gameProps.config
+        this.gameProps.applyTo(this.props)
+
+        this.fixOrientation = null
+        const system = this.system
+        if (system.isMobile) {
+            this.gameProps.mobile.applyTo(this.props)
+
+            if (system.supportsOrientation) {
+                if (props.screenOrientation === 'max') {
+                    this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
+                } else if (props.screenOrientation !== 'free') {
+                    this.fixOrientation = props.screenOrientation
+                }
+            }
+        }
+        this.props.audioBlocked = false
+        this.props.maxAvailZoom = this.maxZoom
+        this.props.isFullscreen = this.system.isFullscreen()
+        Config.storeInModel = true // TODO: this.hasEditor
+
+        this.syncOrientation()
+        this.deactivateAutoZoom = true
+        this.trackFps = this.showFpsByUser || this.showFps
+        const skipChecks = {
+            autoZoom: this.autoZoomByUser,
+            stepZoom: this.stepZoomByUser,
+            showFps: this.showFpsByUser
+        }
+        // overwrite with persisted values
+        for (let [ prop, type ] of Object.entries(persistedProps2type)) {
+            if (prop in skipChecks && !skipChecks[prop]) continue
+            let value = this.engineStorage.getJson(prop)
+            if (value === undefined || value === null) continue
+            if (prop === 'muted') {
+                this.audio.setMuted(value)
+            } else if (prop === 'masterVolume') {
+                this.audio.setMasterVolume(value)
+            } else {
+                try {
+                    let mismatch = false
+                    switch(type) {
+
+                        case 'bool':
+                            mismatch = typeof value !== 'boolean'
+                            break
+
+                        case 'float':
+                            mismatch = typeof value !== 'number'
+                            break
+                    }
+                    if (mismatch)
+                        throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
+
+                    const validator = 'getValidated' + ucfirst(prop);
+                    if (config[validator]) value = config[validator](value)
+                } catch (e) {
+                    console.log(e)
+                    this.addWarning(`There was a problem with the persisted value for "${prop}", falling back to default value`)
+                    const defaults = config.getDefaults();
+                    value = defaults[prop]
+                    this.engineStorage.deleteJson(prop)
+                }
+                this.props[prop] = value
+            }
+        }
+    }
+
     /**
      * Tries to connect to the backend and boots the game if this was successful
      */
     connectAndBoot() {
         this.setState(STATE.CONNECT)
-        // TODO: load game.json
+
+        // TODO remove timeout...
         setTimeout(() => {
-            try {
-                // apply input to this
-                const config = getConfigFromInput(GameConfig, this.input, 'game')
-                config.applyTo(this.props)
-                this.fixOrientation = null
-                const system = this.system
-
-                if (system.isMobile) {
-                    config.mobile.applyTo(this.props)
-
-                    if (system.supportsOrientation) {
-                        if (this.props.screenOrientation === 'max') {
-                            this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
-                        } else if (this.props.screenOrientation !== 'free') {
-                            this.fixOrientation = this.props.screenOrientation
-                        }
+            inst.RL.addJson('game', this.input)
+            inst.RL.loadPermanentScope('game').then(
+                () => {
+                    try {
+                        this.gameProps = GameProps(inst.RL.getJson('game'))
+                        this.applyConfig()
+                        this.boot()
+                    } catch (e) {
+                        console.error(e)
+                        this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
                     }
                 }
-                this.props.audioBlocked = false
-                this.props.maxAvailZoom = this.maxZoom
-                this.props.isFullscreen = this.system.isFullscreen()
+            )
 
-                this.syncOrientation()
-                this.deactivateAutoZoom = true
-                this.trackFps = this.showFpsByUser || this.showFps
-                const skipChecks = {
-                    autoZoom: this.autoZoomByUser,
-                    stepZoom: this.stepZoomByUser,
-                    showFps: this.showFpsByUser
-                }
-                // overwrite with persisted values
-                for (let [ prop, type ] of Object.entries(persistedProps2type)) {
-                    if (prop in skipChecks && !skipChecks[prop]) continue
-                    let value = this.engineStorage.getJson(prop)
-                    if (value === undefined || value === null) continue
-                    if (prop === 'muted') {
-                        this.audio.setMuted(value)
-                    } else if (prop === 'masterVolume') {
-                        this.audio.setMasterVolume(value)
-                    } else {
-                        try {
-                            let mismatch = false
-                            switch(type) {
-                                case 'bool':
-                                    mismatch = typeof value !== 'boolean'
-                                    break
-
-                                case 'float':
-                                    mismatch = typeof value !== 'number'
-                                    break
-                            }
-                            if (mismatch) throw Error(`Persisted value for ${prop} expected to be type of ${type} but got ${typeof value}`)
-                            const validator = 'getValidated' + ucfirst(prop);
-                            if (config[validator]) value = config[validator](value)
-                        } catch (e) {
-                            console.log(e)
-                            this.addWarning(`There was a problem with the persisted value for "${prop}", falling back to default value`)
-                            const defaults = config.getDefaults();
-                            value = defaults[prop]
-                            this.engineStorage.deleteJson(prop)
-                        }
-                        this.props[prop] = value
-                    }
-                }
-                this.boot()
-            } catch (e) {
-                console.error(e)
-                this.setState(STATE.PREBOOT_ERROR, {message: e.message, error: e})
-            }
-        }, 2000)
+        }, 1000)
     }
 
     /**
@@ -295,11 +325,15 @@ class Game {
         this.log(`Booting game "${GAME_ID}"...`)
         // build game dom structure
 
+        this.registerDefaultTransitions()
         const { game, globals } = this
         let startScreen = this.initHandler({ game, globals })
 
         try {
             this.notify('main')
+
+            TransitionRegistry.lock()
+            ScreenRegistry.lock()
             this.syncScreen()
             if (!this.resizeObserver) {
                 this.resizeObserver = new ResizeObserver(
@@ -327,6 +361,16 @@ class Game {
         }
     }
 
+    registerDefaultTransitions() {
+        TransitionRegistry.clear()
+        TransitionRegistry.addAll({
+            'default': LoadingTransition,
+            'blend': BlendTransition,
+            'fade': FadeInOutTransition,
+            'push-in': PushInTransition
+        })
+    }
+
     // game control
 
     /**
@@ -337,6 +381,8 @@ class Game {
         const clearElemIds = ['screen-overlay-div', 'game-div', 'game-overlay-div'];
         if (this.system.supportsTouch) clearElemIds.push('touch-div')
         for (let id of clearElemIds) this.getMandatoryElem(id).replaceChildren()
+        inst.RL.invalidatePermanentScope('globals')
+        inst.RL.invalidatePermanentScope('game')
         this.init()
     }
 
@@ -350,13 +396,20 @@ class Game {
         this.addListeners()
     }
 
+    startPreview() {
+        this.preview = true
+        inst.RL.invalidatePermanentScope('globals')
+        this.skipTransition = true
+    }
+
     reloadScreen(stack) {
         if (this.globalsResolver) {
-            this.areGlobalsResolved = false
-            inst.RL.invalidatePermanentResources()
+            inst.autoIds.clearAllIds()
+            inst.RL.clearTempAndGlobals()
         }
         this.globals = this.lastGlobals
-        this.gotoScreen(this.currentScreen, true)
+        this.skipTransition = true
+        this.gotoScreen( ...this.lastGoto )
         if (stack) {
             this.switchToEditor(stack)
         } else {
@@ -365,15 +418,21 @@ class Game {
     }
 
     switchToEditor(stack) {
+    /*
         inst.RL.loadPermanentResources()
             .then(() => {
+
+     */
                 this.hideElem('game-div', 'game-overlay-div')
                 this.showElem('editor-div')
                 this.editor = new gameEditor.GameEditor(this, stack)
+        /*
             })
             .catch(
                 e => d('Error: ', e)
             );
+
+         */
     }
 
     openEditorMode() {
@@ -381,7 +440,7 @@ class Game {
             this.addWarning('NO GAME EDITOR found!')
             return
         }
-        this.log('OPEN EDITOR MODE for Screen "' + this.currentScreen + '"')
+        this.log('OPEN EDITOR MODE for Screen "' + this.getActiveScreenRenderer().scope + '"')
 
         this.before.running = this.running
         this.running = false
@@ -441,28 +500,37 @@ class Game {
         document.documentElement.classList.toggle('fix-orientation', doFix)
     }
 
-    gotoScreen(screenId, params = {}) {
-        this.log(`Goto screen "${screenId}"`)
+    resolveGlobals() {
+        if (inst.RL.hasPermanentScope('globals')) return Promise.resolve()
 
-        inst.OCM.clear() // TODO: clear should remove all children of overlay via DomOp
-        this.getMandatoryElem('screen-overlay-div').replaceChildren()
-        this.frameEvents = {}
-        const screen = this.screens[screenId]
+        const loaders = []
+        const transLoader = TransitionRegistry.getLoader()
+        if (!transLoader.isEmpty())
+            loaders.push(transLoader)
 
-        try {
-            if (!screen) throw Error(`Unknown screen id "${screenId}" given in gotoScreen!`)
-            this.currentScreen = screenId
-            this.globals = Object.assign(this.globals, params)
-            this.lastGlobals = this.hasEditor ? this.globals.getClone() : null
-            // inst.RL.clearResources()
+        let responseHandler = () => {}
+        if (this.globalsResolver) {
+            const { loader, callback } = this.globalsResolver
+            if (!loader.isEmpty()) {
+                loaders.push(loader)
+                responseHandler = () => {
+                    const resources = inst.RL.resources
+                    const { globals, game } = this
+                    globals.unlock()
+                    inst.autoIds.startContext('globals')
+                    callback({ ...resources, globals, game })
+                    inst.autoIds.endContext()
+                    globals.lock()
+                }
+            }
+        } else if (!loaders.length) return Promise.resolve()
 
-            const { globals, game } = this
-            this.build = screen.init({ globals, game, screen })
-            this.resetFps()
-        } catch (e) {
-            this.handleError(e)
-            throw e
+        for (const loader of loaders) {
+            loader.resolve()
         }
+        return inst.RL.loadPermanentScope('globals').then(
+            responseHandler
+        )
     }
 
     // internal methods
@@ -559,7 +627,7 @@ class Game {
             this.deactivateAutoZoom = true
             return
         }
-        this.screenOverlayDiv.style.transform =  'scale(' + calcZoom +')'
+        this.screenOverlaysDiv.style.transform =  'scale(' + calcZoom +')'
         const style = this.screenDiv.style
         style.width = '' + (this.width * calcZoom) + 'px'
         style.height = '' + (this.height * calcZoom) + 'px'
@@ -603,144 +671,49 @@ class Game {
     getEditableResources() {
         const resources = [];
 
-        function extractEditablesFromAreas(areas) {
-            if (!Array.isArray(areas)) {
-                return;
-            }
-            for (let area of areas) {
-                if (area.panes !== undefined) {
-                    for (let pane of area.panes) {
-                        if (pane.tilesMap) {
-                            resources.push(
-                                {
-                                    type: 'TilesMap',
-                                    id: pane.tilesMap.id,
-                                    pane,
-                                    config: TilesMap.Config,
-                                    cls: TilesMap,
-                                    data: pane.tilesMap.config,
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim
-                                }
-                            )
-                        } else if (pane instanceof TextPane) {
-                            const blocks = [];
-                            for (let id in pane.blocks) {
-                                blocks.push(
-                                    {...pane.blocks[id].config.getJson()}
-                                );
-                            }
-                            resources.push(
-                                {
-                                    type: 'TextPane',
-                                    id: pane.id,
-                                    pane,
-                                    config: TextPane.Config,
-                                    cls: TextPane,
-                                    elem: pane.getPreview(),
-                                    data: pane.config,
-                                    dim: pane.viewPortDim,
-                                    blocks
-                                });
-                        } else if (pane instanceof BackgroundPane) {
-                            resources.push({
-                                type: 'BackgroundPane',
-                                id: pane.id,
-                                pane,
-                                config: BackgroundPane.Config,
-                                cls: BackgroundPane,
-                                elem: pane.getPreview(),
-                                data: pane.config,
-                                dim: pane.viewPortDim,
+        const extractConfigureablesFromArea = areas => {
+            if (!Array.isArray(areas)) return
 
-                            })
-                        } else if (pane instanceof CanvasPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'canvasPane'
-                                }
-                            )
-                        } else if (pane instanceof LinearGradientPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'linearGradientPane'
-                                }
-                            )
-                        } else if (pane instanceof SpritePane) {
-                            const blocks = [];
-                            for (let { id, x, y } of Object.values(pane.sprites)) {
-                                blocks.push({ id, x, y });
-                            }
-                            resources.push(
-                                {
-                                    elem: pane.getPreview ? pane.getPreview() : null,
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'spriteSheet',
-                                    data: pane.spriteSheet
-                                }
-                            );
-                        } else if (pane instanceof BitmapScrollPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'bitmapScrollPane'
-                                }
-                            )
-                        } else if (pane instanceof PatternPane) {
-                            resources.push(
-                                {
-                                    elem: pane.getPreview(),
-                                    dim: pane.viewPortDim,
-                                    pane,
-                                    type: 'patternPane'
-                                }
-                            )
-                        }
+            for (let area of areas) {
+                const panes = area.panes
+                if (panes) {
+                    for (let pane of panes) {
+                        resources.push(pane.getEditorResources())
                     }
                 }
-                if (Array.isArray(area)) {
-                    extractEditablesFromAreas(area)
-                } else if (area.areas !== undefined) {
-                    extractEditablesFromAreas(area.areas)
-                }
+                extractConfigureablesFromArea(Array.isArray(area) ? area : area.areas)
             }
         }
-        extractEditablesFromAreas(this.getCurrentScreen().areas)
+        const renderer = this.getActiveScreenRenderer()
+        extractConfigureablesFromArea(renderer.paneTree.areas)
 
         resources.push({type: 'filters', data: filterer})
         return resources;
     }
 
-    getCurrentScreen() {
-        return this.screens[this.currentScreen]
+    getActiveScreenRenderer() {
+        const renderer = this.paneTreeRenderers.temp
+        return renderer && renderer.isBuild() ? renderer : this.paneTreeRenderers.screen
     }
 
-    render(force = false) {
-        try {
-            if (this.currentScreen !== null && this.screens[this.currentScreen].getState() === 'READY') {
-                this.screens[this.currentScreen].render(force);
-            }
-        } catch (e) {
-            this.handleError(e)
-        }
+    getCurrentPaneTree() {
+        if (this.paneTreeRenderers['screen'] !== null)
+            return this.paneTreeRenderers['screen'].paneTree
+
+        if (this.paneTreeRenderers['temp'] !== null)
+            return this.paneTreeRenderers['temp'].paneTree
+
+        return null
     }
 
     updateDom() {
         while (this.domQueue.length > 0) {
             const next = this.domQueue.shift()
             switch(next.op) {
+
                 case 'set':
                     const parts = next.key.split('.')
-                    let elem = next.elem;
+                    let elem = next.elem
                     while (parts.length > 1) {
                         elem = elem[parts.shift()]
                     }
@@ -750,6 +723,10 @@ class Game {
                 case 'add':
                     next.target.appendChild(next.child)
                     break
+
+                case 'clear':
+                    next.elem.replaceChildren()
+                    break
             }
         }
     }
@@ -758,8 +735,16 @@ class Game {
         this.domQueue.push({op: 'set', elem, key, value})
     }
 
+    clearDomOp(elem) {
+        this.domQueue.push({op: 'clear', elem})
+    }
+
     addDomChild(target, child) {
         this.domQueue.push({op: 'add', target, child})
+    }
+
+    endActiveTransition() {
+        this.activeTransition = null
     }
 
     updateGamepads() {
@@ -786,66 +771,203 @@ class Game {
         }
     }
 
-    updateFrame() {
-        if (!this.currentScreen) return
+    updateRendererFrames(renderers) {
+        this.updateDom()
+        if (!renderers.length) return
 
-        const screen = this.screens[this.currentScreen]
-        if (screen.getState() === 'READY') {
-            this.updateDom();
-            this.keys = {};
-            if (this.running) {
-                if (this.showFps) {
-                    const changed = this.fpsTracker.track()
-                    for (const name of changed) {
-                        this.notify('change', {name, value: this.fpsTracker[name]})
-                    }
+        this.keys = {}
+        if (this.running) {
+            if (this.showFps) {
+                const changed = this.fpsTracker.track()
+                for (const name of changed) {
+                    this.notify('change', {name, value: this.fpsTracker[name]})
                 }
-                this.render()
-                if (screen.frameHandler !== null) {
-                    const { globals, game, frames } = this
-                    screen.frameHandler({ screen, globals, game, frames })
-                }
-                this.frames++
             }
-            this.updateGamepads()
-            /*
-            if (this.restartEditorWithId !== null) {
-                this.activeResource = this.restartEditorWithId;
-                this.restartEditorWithId = null;
-                this.openEditorMode();
+            for (const { renderer, type } of renderers) {
+                this.currRendererType = type
+                renderer.render()
             }
-             */
+            for (const { renderer, type } of renderers) {
+                this.currRendererType = type
+                if (this.controlsIndex === controlsOrder.indexOf(type)) this.controlsActive = true
+                renderer.handleNextFrame()
+                this.controlsActive = false
+            }
+            this.currRendererType = null
         }
-        this.waitForNextFrame()
+        this.updateGamepads()
+    }
+
+    resetOverlayAttributes(elem) {
+        elem.className = ''
+        elem.style = this.getDimAttributes() + 'position: absolute; background-color: transparent'
+    }
+
+    getRendererElem(type) {
+        switch (type) {
+            case 'screen':
+                return false && this.preview ? 'preview-overlay-div' : this.screenOverlayDiv
+
+            case 'trans':
+                return this.transOverlayDiv
+
+            case 'temp':
+                return this.tempOverlayDiv
+        }
+        throw Error(`Unknown renderer type "${type}" given`)
+    }
+
+    setRenderer(type, renderer) {
+        const currRenderer = this.paneTreeRenderers[type]
+        this.paneTreeRenderers[type] = renderer
+        const elem = this.getRendererElem(type)
+        if (renderer) {
+            renderer.setElem(elem)
+            return
+        }
+        // delete element
+        this.resetOverlayAttributes(elem)
+        switch (type) {
+
+            case 'trans':
+                this.endActiveTransition()
+                currRenderer.clear()
+                this.setRenderer('temp', null)
+                break
+
+            case 'temp':
+                const screenRenderer = this.paneTreeRenderers['screen']
+                const toParent = this.getRendererElem('screen')
+                toParent.replaceChildren()
+                while (elem.childNodes.length)
+                    toParent.appendChild(elem.childNodes[0])
+                this.resetOverlayAttributes(toParent)
+                toParent.style.display = 'block'
+                if (screenRenderer) screenRenderer.triggerEnd()
+                this.setRenderer('screen', currRenderer)
+                this.controlsIndex = 0
+                break
+        }
+        elem.style.display = 'none'
     }
 
     waitForNextFrame() {
-        const screen = this.screens[this.currentScreen];
-        if (screen.getState() !== 'READY') {
-            if (!screen.hasAllDependencies()) {
-                requestAnimationFrame(() => this.waitForNextFrame())
-                return
+        try {
+            if (this.nextGoto && !this.activeTransition) {
+                const params = this.nextGoto
+                this.nextGoto = null
+                this.doGotoScreen( ...params )
             }
-            const { globals, game } = this;
-            const resources = inst.RL.getResources();
-            if (!this.areGlobalsResolved) {
-                globals.unlock();
-                this.globalsResolver({ ...resources, globals, game });
-                globals.lock();
-                this.areGlobalsResolved = true;
+            const updateRenderers = []
+            for (const [ type, renderer ] of toPairs(this.paneTreeRenderers)) {
+
+                if (!renderer) continue
+
+                let doRender = false
+                switch (renderer.state) {
+
+                    case RENDERER_STATE.WAIT_LOADING:
+                        renderer.loadResources(
+                            renderer.loader ? this.resolveGlobals() : Promise.resolve()
+                        )
+                        break
+
+                    case RENDERER_STATE.WAIT_BUILD:
+                        this.currRendererType = type
+                        renderer.buildTree(this.width, this.height)
+                        this.currRendererType = null
+                        this.tempKeyActions = null // TODO check
+                        break
+
+                    case RENDERER_STATE.WAIT_DESTROY:
+                        renderer.triggerEnd()
+                        this.setRenderer(type, null)
+                        break
+
+                    case RENDERER_STATE.WAIT_HANDLING:
+                        this.frames = 0
+                        renderer.startHandling()
+
+                    case RENDERER_STATE.HANDLING:
+                        doRender = true
+                        break;
+                }
+                if (doRender) updateRenderers.push({type, renderer})
             }
-            try {
-                this.tempKeyActions = null
-                const frameHandler = this.build({ ...resources, globals, game, screen })
-                if (frameHandler) screen.setFrameHandler(frameHandler)
-                screen.setDimension(this.width, this.height)
-                screen.render(true)
-                this.frames = 0
-            } catch (e) {
-                this.handleError(e)
-            }
+
+            if (this.cancelRequestId) cancelAnimationFrame(this.cancelRequestId)
+
+            this.cancelRequestId = requestAnimationFrame(() => {
+                this.cancelRequestId = null
+                this.updateRendererFrames(updateRenderers)
+                this.waitForNextFrame()
+            })
+
+        } catch (e) {
+            this.handleError(e)
+            throw e
         }
-        requestAnimationFrame(() => this.updateFrame());
+    }
+
+    gotoScreen(screenId, params = {}, transId = 'default') {
+        if (this.preview) {
+            this.skipTransition = true
+            this.nextGoto = [ ...this.lastGoto ]
+            return
+        }
+
+        if (this.activeTransition || this.nextGoto) return
+        this.nextGoto = [ screenId, params, transId ]
+    }
+
+    doGotoScreen(screenId, params, transId) {
+        const screen = ScreenRegistry.get(screenId)
+        if (!screen)
+            throw Error(`Unknown screen id "${screenId}" given in gotoScreen!`)
+
+        if (!this.preview) {
+            this.lastGoto = [ screenId, params, transId ]
+        } else {
+            inst.RL.invalidatePermanentScope('globals')
+            // this.globals = this.lastGlobals
+        }
+
+        const screenRenderer = screen.getPaneTreeRenderer(screenId)
+        screenRenderer.setPrepareBuildCallback(
+            () => {
+                if (this.preview) {
+                    this.globals = this.lastGlobals.getClone()
+                }
+                this.globals = Object.assign(this.globals, params)
+                if (!this.preview) {
+                    this.lastGlobals = this.hasEditor ? this.globals.getClone() : null
+                }
+                inst.autoIds.clearScreenIds()
+                this.resetFps()
+            }
+        )
+        let transObj = null
+        if (transId !== null) {
+            transObj = TransitionRegistry.get(transId)
+        }
+        if (this.skipTransition || transObj === null || transObj.transition === null) {
+            this.setRenderer('screen', screenRenderer)
+            screenRenderer.forwardTo(RENDERER_STATE.HANDLING)
+            this.skipTransition = false
+            this.log(`Goto screen "${screenId}"`)
+            return
+        }
+
+        // transition
+        const { transition, id, options } = transObj
+        this.setRenderer('temp', screenRenderer)
+        const transRenderer = transition.getPaneTreeRenderer(this.paneTreeRenderers['screen'], screenRenderer, options)
+        this.setRenderer('trans', transRenderer)
+        transRenderer.forwardTo(RENDERER_STATE.HANDLING)
+        this.activeTransition = screenId
+        this.log(`Goto screen "${screenId}" with transition "${id}"`)
+
+        // if (screenId === 'mario') this.preview = true
     }
 
     // public methods
@@ -862,16 +984,21 @@ class Game {
         if (autoInit) this.init()
     }
 
-    setGlobalsResolver(resolver) {
-        const game = this.game
-        const globals = this.globals
-        const loader = new ResourceRequest(true)
-        this.globalsResolver = resolver({ loader, game, globals })
-        this.areGlobalsResolved = false
+    /**
+     *
+     * @param resourcesAndCallback
+     */
+    setGlobalsResolver( ...resourcesAndCallback ) {
+        const { callback, resources } = getResourcesAndCallback( ...resourcesAndCallback )
+
+        if (!callback) return
+
+        const loader = new ResourceRequest(resources)
+        this.globalsResolver = { loader, callback }
     }
 
-    addScreen(screen) {
-        this.screens[screen.id] = screen;
+    addScreen(id, screen) {
+        ScreenRegistry.set(id, screen)
     }
 
     addKeyDownAction(key, handler) {
@@ -981,32 +1108,58 @@ class Game {
         this.notify('error', err)
     }
 
+    getCurrEvents() {
+        if (!this.currRendererType)
+            throw Error(`No renderer currently active`)
+
+        const renderer = this.paneTreeRenderers[this.currRendererType]
+        if (!renderer) return {}
+        return renderer.events
+    }
+
     addFrameEvent(type, event) {
-        if (this.frameEvents[type] === undefined) {
-            this.frameEvents[type] = [];
+        const frameEvents = this.getCurrEvents()
+        if (frameEvents[type] === undefined) {
+            frameEvents[type] = [];
         }
-        this.frameEvents[type].push(event);
+        frameEvents[type].push(event);
     }
 
     getEvents(type) {
-        if (this.frameEvents[type] === undefined) {
+        const frameEvents = this.getCurrEvents()
+        if (!frameEvents[type]) {
             return [];
         }
-        const events = this.frameEvents[type];
-        delete this.frameEvents[type];
+        const events = frameEvents[type];
+        delete frameEvents[type];
         return events;
     }
 
     getNextEvent(type) {
-        const events = this.frameEvents[type];
+        const frameEvents = this.getCurrEvents()
+        const events = frameEvents[type];
         if (events === undefined) {
             return null;
         }
         const event = events.shift();
         if (events.length === 0) {
-            delete this.frameEvents[type];
+            delete frameEvents[type];
         }
         return event;
+    }
+
+    requestControlsForRenderer(renderer) {
+        for (const [ type, typeRenderer ] of toPairs(this.paneTreeRenderers)) {
+            if (renderer !== typeRenderer) continue
+            const index = controlsOrder.indexOf(type)
+            if (this.controlsIndex < index) {
+                this.controlsIndex = index
+                return true
+            } else {
+                return false
+            }
+        }
+        return false
     }
 
     // check flags
@@ -1027,12 +1180,17 @@ class Game {
         return GAME_ID
     }
 
+    get currentScreen() {
+        return this.getActiveScreenRenderer().scope
+    }
+
     get running() {
         return this.props.running
     }
 
     set running(value) {
         if (value === this.running) return
+
         this.props.running = value
         if (value) {
             this.keys = {}
@@ -1169,6 +1327,10 @@ class Game {
         return this.props.autoZoomByUser
     }
 
+    get pixelated() {
+        return this.props.pixelated
+    }
+
     get width() {
         return this.props.width
     }
@@ -1207,6 +1369,10 @@ class Game {
         return this.fpsTracker.avgFps
     }
 
+    get fpsHistory() {
+        return this.fpsTracker.history
+    }
+
     get showFps() {
         return this.props.showFps
     }
@@ -1235,17 +1401,61 @@ class Game {
         this.notify('change', {name: 'isFullscreen', value})
     }
 
+    getDimAttributes(zoomed = false) {
+        const zoom = zoomed ? this.zoom : 1
+        return "width: " + (this.width * zoom) + 'px; height: ' + (this.height * zoom) + 'px;'
+    }
+
     get screenDiv() {
         if (!this.elems.screenDiv) {
             this.elems.screenDiv = div(
                 {
                     id: "screen-div",
-                    style: "width: " + (this.width * this.zoom) + 'px; height: ' + (this.height * this.zoom) + 'px'
+                    style: this.getDimAttributes(true)
                 },
-                this.screenOverlayDiv
+                this.screenOverlaysDiv
             )
         }
         return this.elems.screenDiv
+    }
+
+    get screenOverlaysDiv() {
+        if(!this.elems.screenOverlaysDiv) {
+            this.elems.screenOverlaysDiv = div(
+                {
+                    id: 'screen-overlays-div',
+                    style: this.getDimAttributes() + "position: relative"
+                },
+                this.screenOverlayDiv,
+                this.tempOverlayDiv,
+                this.transOverlayDiv
+            )
+        }
+        return this.elems.screenOverlaysDiv
+    }
+
+    get transOverlayDiv() {
+        if (!this.elems.transOverlayDiv) {
+            this.elems.transOverlayDiv = div(
+                {
+                    id: "trans-overlay-div",
+                    style: this.getDimAttributes() + "background-color: transparent; position: absolute"
+                }
+            )
+        }
+        return this.elems.transOverlayDiv
+    }
+
+    get tempOverlayDiv() {
+        if (!this.elems.tempOverlayDiv) {
+            this.elems.tempOverlayDiv = div(
+                {
+                    id: "temp-overlay-div",
+                    style: this.getDimAttributes() + "background-color: transparent; position: absolute"
+                }
+            )
+        }
+        return this.elems.tempOverlayDiv
     }
 
     get screenOverlayDiv() {
@@ -1253,7 +1463,7 @@ class Game {
             this.elems.screenOverlayDiv = div(
                 {
                     id: "screen-overlay-div",
-                    style: "width: " + this.width + 'px; height: ' + this.height + 'px'
+                    style: this.getDimAttributes() + "background-color: transparent; position: absolute"
                 }
             )
         }
@@ -1296,9 +1506,38 @@ class Game {
     getResourceLoader() {
         return inst.RL;
     }
+}
 
-    getStorageManager() {
-        return inst.SM;
+class GamePropsInst extends Model {
+
+    getDependentModels() {
+        return [ this.mobile ]
+    }
+
+    applyTo(obj) {
+        const keys = without(toKeys(this.config.getDefaults()), ['id', 'mobile'])
+        for (const key of keys) {
+            if (this[key] !== undefined) obj[key] = this[key]
+        }
+    }
+
+    addRebuildProps(obj, deep) {
+        obj.mobile = this.getRebuildModel(this.mobile, deep)
+        obj.width = this.width
+        obj.height = this.height
+        obj.zoom = this.zoom
+        obj.gpu = this.gpu
+        obj.pixelated = this.pixelated
+        obj.minZoom = this.minZoom
+        obj.maxZoom = this.maxZoom
+        obj.restrictZoomByWindow = this.restrictZoomByWindow
+        obj.stepZoom = this.stepZoom
+        obj.stepZoomByUser = this.stepZoomByUser
+        obj.autoZoom = this.autoZoom
+        obj.autoZoomByUser = this.autoZoomByUser
+        obj.showFps = this.showFps
+        obj.showFpsByUser = this.showFpsByUser
+        obj.screenOrientation = this.screenOrientation
     }
 }
 
@@ -1307,8 +1546,12 @@ class Game {
  */
 class GameConfig extends Config {
 
-    setId() {
-        this.id = 'game';
+    getNewAutoId() {
+        return 'game'
+    }
+
+    setId(value) {
+        return this.getNewAutoId()
     }
 
     /**
@@ -1317,7 +1560,7 @@ class GameConfig extends Config {
      * @param {number} value An integer value for the width
      */
     setWidth(value) {
-        this.width = this.validateInt(value, this.getFieldProp('dim'))
+        this.width = validated.int(value, this.getFieldProp('dim'))
     }
 
     /**
@@ -1326,7 +1569,7 @@ class GameConfig extends Config {
      * @param {number} value An integer value for the height
      */
     setHeight(value) {
-        this.height = this.validateInt(value, this.getFieldProp('dim'))
+        this.height = validated.int(value, this.getFieldProp('dim'))
     }
 
     /**
@@ -1339,9 +1582,13 @@ class GameConfig extends Config {
     }
 
     getValidatedZoom(value) {
-        const zoom = this.validateFloat(value, this.getFieldProp('zoom'))
-        if (this.minZoom > zoom) throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
-        if (this.maxZoom < zoom) throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
+        const zoom = validated.float(value, this.getFieldProp('zoom'))
+        if (this.minZoom > zoom)
+            throw Error(`Cannot set the value ${zoom} because it's smaller than the minZoom ${this.minZoom}`)
+
+        if (this.maxZoom < zoom)
+            throw Error(`Cannot set the value ${zoom} because it's bigger than the maxZoom ${this.maxZoom}`)
+
         return zoom
     }
 
@@ -1351,7 +1598,7 @@ class GameConfig extends Config {
      * @param {number} value A float value for the zoom factor
      */
     setMinZoom(value) {
-        this.minZoom = this.validateFloat(value, this.getFieldProp('zoom'))
+        this.minZoom = validated.float(value, this.getFieldProp('zoom'))
     }
 
     /**
@@ -1360,18 +1607,20 @@ class GameConfig extends Config {
      * @param {number} value A float value for the zoom factor
      */
     setMaxZoom(value) {
-        const maxZoom = this.validateFloat(value, this.getFieldProp('zoom'))
-        if (this.minZoom > maxZoom) throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
+        const maxZoom = validated.float(value, this.getFieldProp('zoom'))
+        if (this.minZoom > maxZoom)
+            throw Error(`Cannot set the value ${maxZoom} because it's smaller than the minZoom of ${this.minZoom}`)
+
         this.maxZoom = maxZoom
     }
 
     /**
-     * Sets whether the maximum available zoom should be dependant on the current window size or not
+     * Sets whether the maximum available zoom should be dependent on the current window size or not
      *
      * @param {boolean} value
      */
     setRestrictZoomByWindow(value) {
-        this.restrictZoomByWindow = this.validateBool(value)
+        this.restrictZoomByWindow = validated.bool(value)
     }
 
     /**
@@ -1380,7 +1629,7 @@ class GameConfig extends Config {
      * @param value
      */
     setAutoZoom(value) {
-        this.autoZoom = this.validateBool(value)
+        this.autoZoom = validated.bool(value)
     }
 
     /**
@@ -1389,7 +1638,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setAutoZoomByUser(value) {
-        this.autoZoomByUser = this.validateBool(value)
+        this.autoZoomByUser = validated.bool(value)
     }
 
     /**
@@ -1398,7 +1647,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setStepZoom(value) {
-        this.stepZoom = this.validateBool(value)
+        this.stepZoom = validated.bool(value)
     }
 
     /**
@@ -1407,7 +1656,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setStepZoomByUser(value) {
-        this.stepZoomByUser = this.validateBool(value)
+        this.stepZoomByUser = validated.bool(value)
     }
 
     /**
@@ -1416,7 +1665,7 @@ class GameConfig extends Config {
      * @param {boolean} value
      */
     setShowFps(value) {
-        this.showFps = this.validateBool(value)
+        this.showFps = validated.bool(value)
     }
 
     /**
@@ -1425,15 +1674,23 @@ class GameConfig extends Config {
      * @param value
      */
     setShowFpsByUser(value) {
-        this.showFpsByUser = this.validateBool(value)
+        this.showFpsByUser = validated.bool(value)
     }
 
     setScreenOrientation(value) {
-        this.screenOrientation = this.validateString(value, this.getFieldProp('screenOrientation'))
+        this.screenOrientation = validated.string(value, this.getFieldProp('screenOrientation'))
+    }
+
+    setGpu(value) {
+        this.gpu = validated.string(value, this.getFieldProp('gpu'))
+    }
+
+    setPixelated(value) {
+        this.pixelated = validated.bool(value)
     }
 
     setMobile(value) {
-        this.mobile = this.validateConfig(MobileGameConfig, value)
+        this.mobile = validated.config(MobileGameProps, value)
     }
 
     /**
@@ -1443,7 +1700,8 @@ class GameConfig extends Config {
         return {
             dim: {min: 1, max: 9999},
             zoom: {min: 0, max: 10},
-            screenOrientation: {values: ['free', 'max', 'landscape', 'portrait']}
+            screenOrientation: {values: ['free', 'max', 'landscape', 'portrait']},
+            gpu: {values: ['prefer', 'required', 'ignore']}
         };
     }
 
@@ -1461,10 +1719,13 @@ class GameConfig extends Config {
      */
     getDefaults() {
         return {
+            id: '',
             mobile: {},
             width: 320,
             height: 200,
             zoom: 2,
+            gpu: 'prefer',
+            pixelated: false,
             minZoom: 1,
             maxZoom: 5,
             restrictZoomByWindow: true,
@@ -1481,35 +1742,32 @@ class GameConfig extends Config {
     /**
      * @inheritDoc
      */
-    applyTo(obj) {
-        super.applyTo(obj);
-        obj.width = this.width
-        obj.height = this.height
-        obj.zoom = this.zoom
-        obj.minZoom = this.minZoom
-        obj.maxZoom = this.maxZoom
-        obj.restrictZoomByWindow = this.restrictZoomByWindow
-        obj.stepZoom = this.stepZoom
-        obj.stepZoomByUser = this.stepZoomByUser
-        obj.autoZoom = this.autoZoom
-        obj.autoZoomByUser = this.autoZoomByUser
-        obj.showFps = this.showFps
-        obj.showFpsByUser = this.showFpsByUser
-        obj.screenOrientation = this.screenOrientation
-        obj.mobile = this.mobile
-        return obj
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
     }
 }
-/**
- * @type {GameConfig}
- */
-Game.Config = GameConfig
+
+const controlsOrder = ['screen', 'trans', 'temp']
+
+const GameProps =
+    ModelFactory(
+        'Game',
+        GameConfig
+    )
+    .addImplementation(GamePropsInst)
+
+
+class MobileGamePropsInst extends Model {}
 
 class MobileGameConfig extends GameConfig {
 
+    getNewAutoId() {
+        return 'mobile-id'
+    }
+
     getDefaults() {
         return {
-            id: 'mobile-game-config',
+            id: '',
             zoom: 2,
             minZoom: 0,
             maxZoom: 5,
@@ -1525,22 +1783,19 @@ class MobileGameConfig extends GameConfig {
     /**
      * @inheritDoc
      */
-    applyTo(obj) {
-        obj.zoom = this.zoom
-        obj.minZoom = this.minZoom
-        obj.maxZoom = this.maxZoom
-        obj.restrictZoomByWindow = this.restrictZoomByWindow
-        obj.stepZoom = this.stepZoom
-        obj.stepZoomByUser = this.stepZoomByUser
-        obj.autoZoom = this.autoZoom
-        obj.autoZoomByUser = this.autoZoomByUser
-        obj.screenOrientation = this.screenOrientation
+    applyPropsTo(obj) {
+        this.applyDefaultKeysTo(obj)
         if (this.showFps !== undefined) obj.showFps = this.showFps
         if (this.showFpsByUser !== undefined) obj.showFpsByUser = this.showFpsByUser
-        return obj
     }
 }
-MobileGameConfig.Config = MobileGameConfig
+
+const MobileGameProps =
+    SubModelFactory(
+    'MobileGame',
+        MobileGameConfig
+    )
+    .addImplementation(MobileGamePropsInst)
 
 class FpsTracker {
 
@@ -1562,6 +1817,7 @@ class FpsTracker {
         this.fpsSet.clear()
         this.totalFrames = 0
         this.totalSeconds = 0
+        this.history = []
 
         const changed = [];
         if (fps !== this.fps) changed.push('fps')
@@ -1577,7 +1833,8 @@ class FpsTracker {
         if (!this.lastStart) {
             this.lastStart = now
             this.frames++;
-            return []
+            this.history.length = 0
+            return ['fpsHistory']
         }
         const time = now - this.lastStart;
         if (time >= 1000) {
@@ -1595,11 +1852,16 @@ class FpsTracker {
             this.avgFps = this.totalFrames / this.totalSeconds
             this.frames = 0
             this.lastStart = now
-            const changed = [];
+            const changed = []
             if (fps !== this.fps) changed.push('fps')
             if (minFps !== this.minFps) changed.push('minFps')
             if (maxFps !== this.maxFps) changed.push('maxFps')
             if (avgFps !== this.avgFps) changed.push('avgFps')
+            if (fps !== null) {
+                this.history.unshift(currFps)
+                if (this.history.length > 30) this.history.pop()
+                changed.push('fpsHistory')
+            }
             return changed
         }
         this.frames++
@@ -1727,8 +1989,8 @@ class AudioPlayer {
     }
 
     reset() {
-        this.audio = {}
         this.resetChannels()
+        this.audio = {}
     }
 
     resetChannel(id) {
@@ -1736,6 +1998,7 @@ class AudioPlayer {
         if (channel !== null) {
             channel.reset();
             channel.pause();
+            this.channels[id] = null
         }
     }
 
@@ -1847,6 +2110,9 @@ class stateProxyHandler {
                 clone[key] = target[key];
             }
             return () => clone;
+        } else if (prop === 'dump') {
+            d(target)
+            return () => target
         }
         return Reflect.get(...arguments);
     }
@@ -1862,7 +2128,7 @@ filterer.addFilter(
     'clear-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
         if (params.pixels > 0) {
             newCanvas.ctx.clearRect(0, 0, data[3], params.pixels);
@@ -1881,7 +2147,7 @@ filterer.addFilter(
     'flip-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(data[3], 0);
         newCanvas.ctx.scale(-1, 1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1894,7 +2160,7 @@ filterer.addFilter(
     'flip-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(0, data[4]);
         newCanvas.ctx.scale(1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1907,7 +2173,7 @@ filterer.addFilter(
     'flip-xy',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         newCanvas.ctx.translate(data[3], data[4]);
         newCanvas.ctx.scale(-1, -1);
         newCanvas.ctx.drawImage(data[0].elem, data[1], data[2], data[3], data[4], 0, 0, data[3], data[4]);
@@ -1920,7 +2186,7 @@ filterer.addFilter(
     'shift-y',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         const shiftedSize = data[4] - Math.abs(params.pixels);
         let sourceY = data[2];
         if (params.pixels < 0) {
@@ -1940,7 +2206,7 @@ filterer.addFilter(
     'shift-x',
     FILTER.TYPE.CANVAS,
     function(data, params) {
-        const newCanvas = inst.OCM.getNewOffscreenCanvas(data[3], data[4]);
+        const newCanvas = getCanvasObjForDim(data[3], data[4]);
         const shiftedSize = data[3] - Math.abs(params.pixels);
         let sourceX = data[1];
         if (params.pixels < 0) {

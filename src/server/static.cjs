@@ -12,10 +12,11 @@ app.use(cors())
 const pubPrefix = config.server ? 'public/' : ''
 
 app.use('/js', express.static(absDir.dist(pubPrefix + 'js')))
-app.use('/audio', express.static(absDir.dist(pubPrefix + 'audio')))
+app.use('/css', express.static(absDir.dist(pubPrefix + 'css')))
+
 app.use('/json', express.static(absDir.dist(pubPrefix + 'json')))
 app.use('/image', express.static(absDir.dist(pubPrefix + 'image')))
-app.use('/css', express.static(absDir.dist(pubPrefix + 'css')))
+app.use('/audio', express.static(absDir.dist(pubPrefix + 'audio')))
 
 app.options('*', cors())
 
