@@ -44,7 +44,7 @@ const FileStorage = (absDir, staticTypes) => {
             storage.set(tid, relPath)
         },
 
-        set: (type, id, value) => {
+        set: (type, tid, value) => {
             try {
                 const descriptor = makeDescriptor.fromTid(tid)
                 const filePath = absDir.resources(descriptor.file)

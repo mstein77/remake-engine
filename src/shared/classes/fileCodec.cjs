@@ -1,4 +1,5 @@
 const syncFs = require("./syncFs.cjs")
+const { isDataUrl } = require("./helper.cjs")
 let absPath = null
 
 const FileCodec = {
@@ -13,7 +14,11 @@ const FileCodec = {
             syncFs.writeJson(path, apiEncoded, true)
             return
         }
-        const content = Buffer.from(apiEncoded, 'base64')
+        if (!isDataUrl(apiEncoded))
+            throw Error(`Given value for ${descriptor.key} resource with id "${descriptor.id}" is no dataurl`)
+
+        const base64part = apiEncoded.substring(apiEncoded.indexOf(',') + 1)
+        const content = Buffer.from(base64part, 'base64')
         syncFs.writeContent(path, content, {encoding: 'binary'})
     },
     // returns the api-encoded resource

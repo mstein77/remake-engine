@@ -1,6 +1,5 @@
 import { RESOURCE } from "shared/classes/resources.cjs"
 import { d } from "helper/helper"
-import {makeDescriptor} from "../../../shared/classes/resources.cjs";
 
 /**
  * Returns a boolean whether the given exception represents a quota exceeded on a browser storage or not
@@ -45,8 +44,7 @@ const BrowserStorage = (storage, prefix = '') => {
 
                 case RESOURCE.TYPE.IMAGE:
                 case RESOURCE.TYPE.AUDIO:
-                    const descriptor = makeDescriptor.fromTid(id)
-                    return `data:${descriptor.mimeType};base64,${value}`
+                    return value
             }
             throw Error(`Unsupported type "${type}" for decoding given!`)
         },
@@ -69,9 +67,11 @@ const BrowserStorage = (storage, prefix = '') => {
                    break
 
                case RESOURCE.TYPE.IMAGE:
+                   encoded = value.dataUrl
                    break
 
                case RESOURCE.TYPE.AUDIO:
+                   encoded = value.dataUrl
                    break
            }
             if (!encoded)
@@ -98,7 +98,7 @@ const BrowserStorage = (storage, prefix = '') => {
             return true
         },
 
-        keys: () => keys.keys(),
+        keys: () => [ ...keys ],
 
         isAvailable: () => {
             try {

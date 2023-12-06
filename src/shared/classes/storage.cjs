@@ -219,10 +219,9 @@ class StorageManager {
      * @returns {boolean}
      */
     storeResource(tid, value) {
+        const { type, extTid } = this.getResourceDescriptor(tid)
 
-        const { type, extId } = this.getResourceDescriptor(tid)
-
-        return this.storage.set(type, extId, value)
+        return this.storage.set(type, extTid, value)
     }
 
     /**
@@ -307,8 +306,8 @@ class StorageManager {
      * @returns {boolean}
      */
     deleteResource(tid) {
-        const { extId } = this.getResourceDescriptor(tid)
-        return this.storage.delete(extId)
+        const { extTid } = this.getResourceDescriptor(tid)
+        return this.storage.delete(extTid)
     }
 
     /**

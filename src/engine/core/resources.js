@@ -3,6 +3,7 @@ import { RESOURCE, makeDescriptor, typeText2tid  } from "shared/classes/resource
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { MapStorage } from "shared/storage/mapStorage.cjs"
 import { StorageManager } from "shared/classes/storage.cjs"
+import { tids2extTids } from "shared/classes/resources.cjs"
 
 const tid2id = tid => tid.substring(1)
 
@@ -37,28 +38,28 @@ const SyncResolver = (id2source, permId2scope) => {
     const ids = []
 
     return {
-        add: (tid, value, source) => {
+        add: (tid, value, origin) => {
             ids.push(tid)
             const type = tid2type(tid)
             switch (type) {
 
                 case RESOURCE.TYPE.JSON:
-                    added.push({ id: tid, value })
+                    added.push({ id: tid, value, origin })
                     break;
 
                 case RESOURCE.TYPE.IMAGE:
-                    added.push({id: tid, value: value instanceof AppliedImage ? value.imageResource : value})
+                    added.push({ id: tid, value: value instanceof AppliedImage ? value.imageResource : value, origin })
                     break;
 
                 case RESOURCE.TYPE.AUDIO:
                     // TODO resolvedAudio?
-                    added.push({id: tid, value })
+                    added.push({ id: tid, value, origin })
             }
-            if (source) id2source.set(tid, source)
         },
         resolve: (resolvedResources, permScope) => {
-            for (const { id, value } of added) {
+            for (const { id, value, origin } of added) {
                 resolvedResources.set(id, value)
+                id2source.set(id, origin + '.data')
             }
             if (!permScope) return
             for (const id of ids) {
@@ -182,7 +183,7 @@ const DummyResolver = (id2source, permanentIds) => {
             );
         },
 
-        resolve: (resolvedResources) => {
+        resolve: resolvedResources => {
             return Promise.all(promises).then(resolved => {
                 for (const { id, value } of resolved) {
                     resolvedResources.set(id, value)
@@ -192,6 +193,25 @@ const DummyResolver = (id2source, permanentIds) => {
     }
 }
 
+const getResourceProxy = (type, resources) => {
+    return (
+        new Proxy(resources, {
+            get(target, id, receiver) {
+                if (id in target) return target[id]
+
+                const descriptor = makeDescriptor.fromTid(RESOURCE.PREFIX[type] + id)
+                if (descriptor && descriptor.isValid()) {
+                    const extId = descriptor.extId
+                    if (extId in target) return target[extId]
+                }
+                throw Error(`No ${RESOURCE.KEY[type]} resource with id "${id}" was loaded in the resource manager` + d('', resources))
+            },
+            set( obj, id, value ) {
+                throw Error(`It's not possible to set a ${RESOURCE.KEY[type]} resource with id "${id}"`)
+            }
+        })
+    )
+}
 
 /**
  * Fragen:
@@ -333,6 +353,7 @@ class ResourceManager {
         return this.apiFetcher.fetch('store', { id, resources, dependencies, scope }).then(({ stored }) => {
             let success = stored.includes(id)
             this.deleteIdsFromStore(stored)
+
             return success
 		})
 	}
@@ -341,15 +362,25 @@ class ResourceManager {
         const id2children = this.localStorage.getCoreResource('id2children') ?? {}
         for (const tid of tids) {
             this.localStorage.deleteResource(tid)
-            delete id2children[tid]
+            const extTid = makeDescriptor.fromTid(tid)
+            delete id2children[extTid !== tid ? extTid : tid]
         }
         this.localStorage.storeCoreResource('id2children', id2children)
+
         const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
         let changed = false
         for (const [ scope, ids ] of toPairs(scope2ids)) {
             const oldLength = ids.length
-            const newIds = without(ids, tids)
+            const newIds = []
+            for (const id of ids) {
+                const descriptor = makeDescriptor.fromTid(id)
+                const idx = tids.indexOf(id)
+                const extIdx = tids.indexOf(descriptor.extTid)
+                if (idx > -1 || extIdx > -1) continue
+                newIds.push(id)
+            }
             if (oldLength === newIds.length) continue
+
             scope2ids[scope] = newIds
             changed = true
         }
@@ -361,21 +392,20 @@ class ResourceManager {
 
         const lastResource = resources.at(-1)
         const tid = typeText2tid(lastResource.type, lastResource.id)
-        const permScope = this.permId2scope[tid]
+        const extTid = makeDescriptor.fromTid(tid).extTid
+        const permScope = this.permId2scope[extTid]
         const resolver = SyncResolver(this.id2origin, this.permId2scope)
 
         // store all resources this model uses
         for (const { id, data, type } of resources) {
             this.localStorage.storeResourceById(text2id[type], id, data)
-            const addTid = typeText2tid(type, id)
-            resolver.add(addTid, data, 'browser')
+            resolver.add(makeDescriptor.fromTid(typeText2tid(type, id)).extTid, data, 'browser')
         }
-
         // update deps
         const id2children = this.localStorage.getCoreResource('id2children') ?? {}
 
-        for (const [ tid, depTids ] of toPairs(dependencies)) {
-            id2children[tid] = depTids
+        for (const [ id, depTids ] of toPairs(dependencies)) {
+            id2children[id] = depTids
         }
         this.localStorage.storeCoreResource('id2children', id2children)
         resolver.resolve(this.resolvedResources, permScope)
@@ -386,7 +416,8 @@ class ResourceManager {
         // update scope ids
         const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
         const scopeIds = scope2ids[scope] ?? []
-        if (!scopeIds.includes(tid)) scopeIds.push(tid)
+        const extScopeIds = tids2extTids(scopeIds)
+        if (!extScopeIds.includes(extTid)) scopeIds.push(tid)
         scope2ids[scope] = scopeIds
         this.localStorage.storeCoreResource('scope2ids', scope2ids)
     }
@@ -470,14 +501,16 @@ class ResourceManager {
     }
 
     remove(tid) {
+        const extTid = makeDescriptor.fromTid(tid).extTid
         this._resources = null
-        this.resolvedResources.delete(tid)
-        this.id2origin.delete(tid)
-        this.permId2scope.delete(tid)
+        this.resolvedResources.delete(extTid)
+        this.id2origin.delete(extTid)
+        this.permId2scope.delete(extTid)
     }
 
     hasPermanent(tid) {
-        return this.permId2scope.has(tid)
+        const extTid = makeDescriptor.fromTid(tid).extTid
+        return this.permId2scope.has(extTid)
     }
 
     hasPermanentJson(id) {
@@ -495,7 +528,8 @@ class ResourceManager {
     has(tid) {
         if (this.disabled) return false;
 
-        return this.resolvedResources.has(tid)
+        const extTid = makeDescriptor.fromTid(tid).extTid
+        return this.resolvedResources.has(extTid)
     }
 
     hasJson(id) {
@@ -515,10 +549,11 @@ class ResourceManager {
     }
 
     add(tid, value = null) {
-        if (this.requested.has(tid))
+        const extTid = makeDescriptor.fromTid(tid).extTid
+        if (this.requested.has(extTid))
             throw Error(`Resource of type ${tid2typeText(tid)} with id "${tid2id(tid)}" was already requested!`)
 
-        this.requested.set(tid, value)
+        this.requested.set(extTid, value)
         return this
     }
 
@@ -540,7 +575,8 @@ class ResourceManager {
     }
 
     getResourceOrigin(tid) {
-        return this.id2origin.get(tid)
+        const extTid = makeDescriptor.fromTid(tid).extTid
+        return this.id2origin.get(extTid)
     }
 
     getJsonOrigin(id) {
@@ -580,7 +616,8 @@ class ResourceManager {
         if (!resources)
             throw Error(`Invalid resource type "${type}" requested`)
 
-        const value = resources[id]
+        const extId = makeDescriptor.fromTypeAndId(text2id[type], id).extId
+        const value = resources[extId]
         if (!value)
             throw Error(`Requested ${type} resource "${id}" is not available`)
 
@@ -601,9 +638,8 @@ class ResourceManager {
 
     get resources() {
         if (this._resources === null) {
-            const resourceMaps = [Object.fromEntries(this.resolvedResources)];
+            const resourceMaps = [this.resolvedResources.entries()]
             if (this.preview) {
-
                 // TODO: resourceMaps.push(Object.fromEntries(this.sessionStorage))
             }
             const json = {}
@@ -615,12 +651,16 @@ class ResourceManager {
                 [RESOURCE.TYPE.AUDIO]: audio,
             }
             for (const resourceMap of resourceMaps) {
-                for (const [ tid, value ] of toPairs(resourceMap)) {
+                for (const [ tid, value ] of resourceMap) {
                     const { id, type } = makeDescriptor.fromTid(tid)
                     map[type][id] = value
                 }
             }
-            this._resources = { json, image, audio }
+            this._resources = {
+                json: getResourceProxy(RESOURCE.TYPE.JSON, json),
+                image: getResourceProxy(RESOURCE.TYPE.IMAGE, image),
+                audio: getResourceProxy(RESOURCE.TYPE.AUDIO, audio)
+            }
         }
         return this._resources
     }
@@ -654,7 +694,8 @@ class ResourceManager {
                 resolver.add(tid, value, 'code')
             }
             for (const tid of add) {
-                resolver.add(tid, this.localStorage.getResource(tid), 'browser')
+                const extTid = makeDescriptor.fromTid(tid).extTid
+                resolver.add(extTid, this.localStorage.getResource(tid), 'browser')
             }
             for (const [ tid, data ] of toPairs(found)) {
                 resolver.add(tid, data, 'server')
@@ -868,14 +909,6 @@ class ImageResourceProvider extends SingleResourceProvider {
     /**
      * @inheritDoc
      */
-    validateNewId(id) {
-        super.validateNewId(id)
-        if (!id.endsWith('.png')) throw Error(`Resource id "${id}" must have file extension .png`)
-    }
-
-    /**
-     * @inheritDoc
-     */
     getIdWithIndex(id, index) {
         const idx = id.lastIndexOf('.')
         return id.substring(0, idx) + '_' + index + id.substring(idx)
@@ -908,14 +941,6 @@ class AudioResourceProvider extends SingleResourceProvider {
      */
     get key() {
         return 'audio'
-    }
-
-    /**
-     * @inheritDoc
-     */
-    validateNewId(id) {
-        super.validateNewId(id)
-        if (!id.endsWith('.mp3') && !id.endsWith('.wav')) throw Error(`Resource id "${id}" must have file extension .wav or .mp3`)
     }
 
     /**

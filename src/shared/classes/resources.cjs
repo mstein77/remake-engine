@@ -1,4 +1,4 @@
-const { d } = require('./helper.cjs')
+const { d, toPairs} = require('./helper.cjs')
 
 const RESOURCE = {
     TYPE: {
@@ -323,6 +323,23 @@ const resId2tid = resId => {
 
 const tid2typeText = tid => RESOURCE.TEXT[tid2type(tid)]
 
+const tids2extTids = tids => {
+    const extTids = []
+    for (const tid of tids) {
+        extTids.push(makeDescriptor.fromTid(tid).extTid)
+    }
+    return extTids
+}
+
+const map2extMap = map => {
+    const extMap = {}
+    for (const [ id, tids ] of toPairs(map)) {
+        const extId = makeDescriptor.fromTid(id).extTid
+        extMap[extId] = tids2extTids(tids)
+    }
+    return extMap
+}
+
 module.exports = {
     RESOURCE,
     id2tid,
@@ -334,6 +351,8 @@ module.exports = {
     type2tid,
     typeText2tid,
     resId2tid,
+    map2extMap,
+    tids2extTids,
     makeDescriptor,
     ResourceTypeRegistry
 }

@@ -1,6 +1,7 @@
 import resourceInfo from "../../../../tmp/resources-info"
-import { makeDescriptor, RESOURCE } from "shared/classes/resources.cjs"
+import { RESOURCE } from "shared/classes/resources.cjs"
 import { d } from "helper/helper"
+import { tids2extTids, map2extMap } from "shared/classes/resources.cjs"
 
 const cache = resourceInfo.cache || {}
 const scope2ids = cache[RESOURCE.PREFIX[RESOURCE.TYPE.CORE] + 'scope2ids.json'] || {}
@@ -12,12 +13,12 @@ const StaticFetcher = baseUrl => {
     return {
         fetch: (name, json) => {
             const { scope, ids, permIds, tempIds } = json
-            const scopeIds = scope2ids[scope] || []
+            const scopeIds = tids2extTids(scope2ids[scope] || [])
 
             for (const id of scopeIds) {
                 if (!ids.includes(id)) ids.push(id)
             }
-            const deps = { ...id2children }
+            const deps = { ...map2extMap(id2children) }
 
             const processed = []
             const add = []
@@ -27,17 +28,13 @@ const StaticFetcher = baseUrl => {
             const drop = []
 
             while (ids.length) {
-                const rawTid = ids.pop()
-                const descriptor = makeDescriptor.fromTid(rawTid)
-                const id = descriptor.tid
-                const extTid = descriptor.extTid
-
+                const id = ids.pop()
                 if (!processed.includes(id)) {
                     processed.push(id)
 
-                    if (!permIds.includes(rawTid) && !tempIds.includes(rawTid)) {
-                        if (tids.includes(extTid)) {
-                            found[id] = cache[extTid]
+                    if (!permIds.includes(id) && !tempIds.includes(id)) {
+                        if (tids.includes(id)) {
+                            found[id] = cache[id]
                         } else {
                             missing.push(id)
                         }

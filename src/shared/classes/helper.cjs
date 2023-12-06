@@ -6,33 +6,34 @@
  * @returns {mixed}
  */
 function d(main, ...params) {
-    let stack = null;
+    let stack = []
     try {
-        throw new Error('myError');
+        throw Error('foo')
     }
-    catch(e) {
-        stack = e.stack.split('\n');
+    catch (e) {
+        stack = e.stack.split('\n')
     }
-    const func = [];
-    let no = 0;
-    for (let line of stack) {
-        const pos = no;
-        no++;
-        if (pos <= 1) {
-            continue;
-        } else if (pos === 2) {
-            func.push(line.trim());
-            continue;
-        } else if (pos > 6) {
-            break;
+    const func = []
+    let no = 0
+    for (const line of stack) {
+        const pos = no
+        no++
+        if (pos <= 1) continue
+
+        if (pos === 2) {
+            func.push(line.trim())
+            continue
         }
-        line = line.split('(');
-        func.push(line[0].substr(6).trim());
+        if (pos > 6) break
+
+        const [ first ] = line.split('(')
+        func.push(first.substring(6).trim())
     }
-    console.group('Debug ' + func.join(' <- '));
-    console.log(main, ...params);
-    console.groupEnd();
-    return main;
+    console.group('Debug ' + func.join(' <- '))
+    console.log(main, ...params)
+    console.groupEnd()
+
+    return main
 }
 
 /**

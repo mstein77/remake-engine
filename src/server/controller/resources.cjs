@@ -1,7 +1,7 @@
-const { d } = require('../../shared/classes/helper.cjs')
+const { d,toPairs } = require('../../shared/classes/helper.cjs')
 const { StorageManager } = require('../../shared/classes/storage.cjs')
 const { FileStorage } = require('../../shared/storage/fileStorage.cjs')
-const { typeText2tid, text2id, makeDescriptor} = require("../../shared/classes/resources.cjs")
+const { tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/classes/resources.cjs")
 const path = require('path')
 
 const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../../'
@@ -12,7 +12,7 @@ const controller = {
     init: (config, absDir) => {
         const staticTypes = []
         if (config.staticTypes !== '') {
-            staticTypes.push(...config.staticTypes.split(','))
+            staticTypes.push( ...config.staticTypes.split(',') )
         }
         let storage = FileStorage(absDir, staticTypes)
         SM = new StorageManager(storage)
@@ -22,13 +22,13 @@ const controller = {
         const { scope , ids, permIds, tempIds, storedDeps, storedIds } = req.body
 
         const scope2ids = SM.getCoreResource('scope2ids') || {}
-        const scopeIds = scope2ids[scope] || []
+        const scopeIds = tids2extTids(scope2ids[scope] || [])
 
         for (const id of scopeIds) {
             if (!ids.includes(id)) ids.push(id)
         }
         const id2children = SM.getCoreResource('id2children') || {}
-        const deps = { ...id2children, ...storedDeps }
+        const deps = { ...map2extMap(id2children), ...map2extMap(storedDeps) }
 
         const processed = []
         const add = []
@@ -42,8 +42,9 @@ const controller = {
             if (!processed.includes(id)) {
                 processed.push(id)
 
+                const extTid = makeDescriptor.fromTid(id).extTid
                 if (!permIds.includes(id) && !tempIds.includes(id)) {
-                    if (storedIds.includes(id)) {
+                    if (storedIds.includes(id) || storedIds.includes(extTid)) {
                         add.push(id)
                     } else if (SM.hasResource(id)) {
                         found[id] = SM.getResource(id)
@@ -51,7 +52,7 @@ const controller = {
                         missing.push(id)
                     }
                 }
-                const idDeps = deps[id]
+                const idDeps = deps[extTid]
                 if (idDeps && idDeps.length) {
                     ids.push( ...idDeps )
                 }

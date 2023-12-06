@@ -10,6 +10,7 @@ const ApiFetcher = baseUrl => {
             }).then(response => {
                 if (!response.ok) {
                     console.error('failed...');
+                    // TODO better error handling
                     throw Error('BOOM!');
                 }
                 return response.json();
