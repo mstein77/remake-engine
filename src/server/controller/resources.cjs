@@ -1,4 +1,4 @@
-const { d,toPairs } = require('../../shared/classes/helper.cjs')
+const { d } = require('../../shared/classes/helper.cjs')
 const { StorageManager } = require('../../shared/classes/storage.cjs')
 const { FileStorage } = require('../../shared/storage/fileStorage.cjs')
 const { tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/classes/resources.cjs")

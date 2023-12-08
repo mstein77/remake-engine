@@ -21,14 +21,7 @@ const FileStorage = (absDir, staticTypes) => {
             const filePath = absDir.resources(relPath)
             if (!syncFs.fileExists(filePath)) return
 
-            const descriptor = makeDescriptor.fromTid(tid)
-            if (!descriptor || !descriptor.isValid())
-                throw Error(`Could not instantiate valid descriptor for typed id "${tid}"`)
-
-            if (descriptor.type !== type)
-                throw Error(`The given typed resource id "${tid}" is not matching the requested type ${RESOURCE.TEXT[type]}`)
-
-            return FileCodec.decode(descriptor)
+            return FileCodec.decode(makeDescriptor.fromTid(tid, true, type))
         },
 
         has: tid => storage.has(tid),
@@ -59,8 +52,8 @@ const FileStorage = (absDir, staticTypes) => {
         },
 
         delete: tid => {
-            const descriptor = makeDescriptor.fromTid(tid)
-            if (!descriptor || descriptor.isValid())
+            const descriptor = makeDescriptor.fromTid(tid, false)
+            if (!descriptor.isValid())
                 return false
 
             const filePath = absDir.resources(descriptor.file)
@@ -89,7 +82,7 @@ const FileStorage = (absDir, staticTypes) => {
         const files = syncFs.readFilesRec(baseDir)
         for (const file of files) {
             const descriptor = makeDescriptor.fromFile(file)
-            if (!descriptor || !descriptor.isValid() || staticTypes.includes(descriptor.key)) continue
+            if (!descriptor.isValid() || staticTypes.includes(descriptor.key)) continue
             handler.register(descriptor.extTid)
         }
     }
@@ -100,7 +93,7 @@ const FileStorage = (absDir, staticTypes) => {
         const files = syncFs.readFilesRec(dir)
         for (const file of files) {
             const descriptor = makeDescriptor.fromFile(type + '/' + file)
-            if (!descriptor || !descriptor.isValid() || descriptor.isCoreJson()) continue
+            if (!descriptor.isValid() || descriptor.isCoreJson()) continue
             handler.register(descriptor.extTid, true)
         }
     }

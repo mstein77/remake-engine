@@ -1,3 +1,5 @@
+const { d } = require('../../../src/shared/classes/helper.cjs')
+
 /**
  * A factory method which returns a storage handler which is based on a Map. Since a map is not persisted this
  * handler is only used for unit testing. If a limit is given, the storage cannot have more than entries than the
@@ -38,7 +40,7 @@ const MapStorage = limit => {
             isFull = false
         },
 
-        keys: () => storage.keys(),
+        keys: () => [ ...storage.keys() ],
 
         isAvailable: () => true,
 

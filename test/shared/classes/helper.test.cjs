@@ -1,4 +1,4 @@
-const { isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect } = require('../../../src/shared/classes/helper.cjs')
+const { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect } = require('../../../src/shared/classes/helper.cjs')
 
 const allTrue = (func, ...params ) => {
     for (const param of params) {
@@ -11,6 +11,12 @@ const allFalse = (func, ...params ) => {
         expect(func(param)).toBeFalse()
     }
 }
+
+test('d', () => {
+    setLogger({log: () => undefined, group: () => undefined, groupEnd: () => undefined})
+    expect(d('test', 'foo')).toBe('test')
+    setLogger(console)
+})
 
 test('isNull', () => {
     allTrue(isNull,null)

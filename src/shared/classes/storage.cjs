@@ -2,15 +2,13 @@ const { RESOURCE, makeDescriptor, id2tid } = require('./resources.cjs')
 const { isArray, isObject, toPairs, d } = require("./helper.cjs")
 
 /**
- * Allows the storage of JSON, image and audio resource data by invoking a storage handler
- *
+ * Allows the storage and retrieval of resources and raw json data by invoking a storage handler implementation
  */
 class StorageManager {
 
     /**
-     * Constructs a new storage manager which uses the given prefix for all internal storage keys and
-     * is bound to the given storage handler. Throws an exception if no storage handler is given or if
-     * the storage is not available
+     * Constructs a new storage manager which bound to the given storage handler. Throws an exception if no storage
+     * handler is given or if the storage is not available
      *
      * @param {object} storageHandler
      */
@@ -25,51 +23,65 @@ class StorageManager {
     }
 
     /**
-     * Returns an array with all typed resource ids of the storage matching the given resource type(s)
+     * Returns an array with all extended typed resource ids of the storage matching the given resource type(s)
      *
-     * @param array|string types
+     * @param {array|string} types
+     *
      * @returns {array}
      */
     getTypedResourceIdsByType(types) {
         if (!isArray(types)) types = [types]
-        const tids = this.storage.keys()
+        const extTids = this.storage.keys()
         const result = []
-        for (const tid of tids) {
-            const descriptor = makeDescriptor.fromTid(tid)
-            if (!descriptor || !descriptor.isValid()) continue
+        for (const extTid of extTids) {
+            const descriptor = makeDescriptor.fromTid(extTid, false)
+            if (!descriptor.isValid()) continue
 
             if (!types.includes(descriptor.type)) continue
-            result.push(tid)
+            result.push(extTid)
         }
         return result
-    }
-
-    getTypedResourceIds() {
-        const tids = this.storage.keys()
-        const result = []
-        for (const tid of tids) {
-            const descriptor = makeDescriptor.fromTid(tid)
-            if (!descriptor || !descriptor.isValid()) continue
-
-            result.push(tid)
-        }
-        return result
-    }
-
-    getResourceIdsByType(type) {
-        const tids = this.storage.keys()
-        const ids = []
-        for (const tid of tids) {
-            const descriptor = makeDescriptor.fromTid(tid)
-            if (!descriptor || !descriptor.isValid() || descriptor.type !== type) continue
-
-            ids.push(descriptor.id)
-        }
-        return ids
     }
 
     /**
-     * Returns an array holding all typed resource ids of the storage except core resources
+     * Returns an array with all extended typed resource ids of the storage
+     *
+     * @returns {array}
+     */
+    getTypedResourceIds() {
+        const extTids = this.storage.keys()
+        const result = []
+        for (const extTid of extTids) {
+            const descriptor = makeDescriptor.fromTid(extTid, false)
+            if (!descriptor.isValid()) continue
+
+            result.push(extTid)
+        }
+        return result
+    }
+
+    /**
+     * Returns an array holding all extended resource ids (extId) of the given type
+     *
+     * @param {string} type
+     *
+     * @returns {array}
+     */
+    getResourceIdsByType(type) {
+        const extTids = this.storage.keys()
+        const extIds = []
+        for (const extTid of extTids) {
+            const descriptor = makeDescriptor.fromTid(extTid, false, type)
+            if (!descriptor.isValid()) continue
+            // the id here will always be the extId because it was created from an extTid
+            extIds.push(descriptor.id)
+        }
+        return extIds
+    }
+
+    /**
+     * Returns an array holding all extended typed resource ids (extTids) of the storage except the ones from
+     * core resources
      *
      * @returns {array}
      */
@@ -79,72 +91,96 @@ class StorageManager {
         ])
     }
 
+    /**
+     * Returns an array holding all non-resource ids of the storage
+     *
+     * @returns {array}
+     */
     getJsonIds() {
-        // TODO wie wollen wir hier unterscheiden?
+        // TODO currently this method also returns typed resource ids
         return this.storage.keys()
     }
 
     /**
-     * Returns an array holding all ids of stored JSON resources
+     * Returns an array holding all extended ids of stored JSON resources
      *
-     * @returns {Array}
+     * @returns {array}
      */
     getJsonResourceIds() {
         return this.getResourceIdsByType(RESOURCE.TYPE.JSON)
     }
 
     /**
-     * Returns an array holding all ids of stored image resources
+     * Returns an array holding all extended ids of stored image resources
      *
-     * @returns {Array}
+     * @returns {array}
      */
     getImageResourceIds() {
         return this.getResourceIdsByType(RESOURCE.TYPE.IMAGE)
     }
 
     /**
-     * Returns an array holding all ids of stored audio resources
+     * Returns an array holding all extended ids of stored audio resources
      *
-     * @returns {Array}
+     * @returns {array}
      */
     getAudioResourceIds() {
         return this.getResourceIdsByType(RESOURCE.TYPE.AUDIO)
     }
 
-    getResourceDescriptor(tid) {
-        const descriptor = makeDescriptor.fromTid(tid)
-        if (!descriptor || !descriptor.isValid())
-            throw Error(`Invalid typed resource id "${tid}" given`)
-
-        return descriptor
+    /**
+     * Returns an array holding all extended ids of stored video resources
+     *
+     * @returns {array}
+     */
+    getVideoResourceIds() {
+        return this.getResourceIdsByType(RESOURCE.TYPE.VIDEO)
     }
 
     /**
-     * Returns the data of resource matching the given typed resource id or undefined if no resource was found
+     * Returns the data of the resource matching the given typed resource id or undefined if no resource was found
      *
      * @param {string} tid
      *
      * @returns {mixed}
      */
     getResource(tid) {
-        const descriptor = this.getResourceDescriptor(tid)
+        const { type, extTid } = makeDescriptor.fromTid(tid)
 
-        return this.storage.get(descriptor.type, descriptor.extTid)
+        return this.storage.get(type, extTid)
     }
 
     /**
+     * Returns the data of the core resource matching the given id or undefined if the resource does not exist
      *
-     * @param id
-     * @returns {mixed}
+     * @param {string} id
+     *
+     * @returns {object|undefined}
      */
     getCoreResource(id) {
         return this.getResource(id2tid(RESOURCE.TYPE.CORE, id))
     }
 
+    /**
+     * Returns the json object stored under the given id or undefined if the id does not exist
+     *
+     * @param {string} id
+     *
+     * @returns {object|undefined}
+     */
     getJson(id) {
         return this.storage.get(RESOURCE.TYPE.JSON, id)
     }
 
+    /**
+     * Returns an array which holds either the array stored under the given id or the defaults array if the id is not
+     * found
+     *
+     * @param {string} id
+     * @param {array|undefined} defaults
+     *
+     * @returns {array}
+     */
     getDefaultedArray(id, defaults = []) {
         const json = this.getJson(id)
         if (isArray(json)) return json
@@ -152,12 +188,22 @@ class StorageManager {
         return isArray(defaults) ? defaults : []
     }
 
+    /**
+     * Returns an object which has all key/values which are stored in the JSON with the given id and all missing key
+     * from the defaults object with their default values. If the JSON with the id does not exist and the defaults
+     * param or the stored value is no plain object, then it's passed through as return value
+     *
+     * @param {string} id
+     * @param {object|mixed} defaults
+     *
+     * @returns {object|mixed}
+     */
     getDefaultedJson(id, defaults) {
         const json = this.getJson(id)
         if (json === undefined)
             return isObject(defaults) ? { ...defaults } : defaults
 
-        return defaults === undefined ? json : { ...defaults, ...json }
+        return defaults === undefined || !isObject(json) ? json : { ...defaults, ...json }
     }
 
     /**
@@ -168,11 +214,18 @@ class StorageManager {
      * @returns {boolean}
      */
     hasResource(tid) {
-        const descriptor = this.getResourceDescriptor(tid)
+        const { extTid } = makeDescriptor.fromTid(tid)
 
-        return this.storage.has(descriptor.extTid)
+        return this.storage.has(extTid)
     }
 
+    /**
+     * Returns a boolean indicating whether a JSON is stored under the given id or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasJson(id) {
         return this.storage.has(id)
     }
@@ -211,7 +264,19 @@ class StorageManager {
     }
 
     /**
+     * Returns a boolean indicating whether the video resource with the given id is stored in this storage or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
+    hasVideoResource(id) {
+        return this.hasResource(id2tid(RESOURCE.TYPE.VIDEO, id))
+    }
+
+    /**
      * Stores the resource data for the given typed id and returns whether it could be stored or not
+     * Throws an error if no valid resource type id is given
      *
      * @param {string} tid
      * @param {mixed} value
@@ -219,16 +284,16 @@ class StorageManager {
      * @returns {boolean}
      */
     storeResource(tid, value) {
-        const { type, extTid } = this.getResourceDescriptor(tid)
+        const { type, extTid } = makeDescriptor.fromTid(tid)
 
         return this.storage.set(type, extTid, value)
     }
 
     /**
      * Stores the resource data of the given type under the id and returns whether it could be stored or not.
-     * Throws an error if the type is unknown or the data could not be encoded
+     * Throws an error if no valid resource type id is given
      *
-     * @param {number} type
+     * @param {string} type
      * @param {string} id
      * @param {mixed} value
      *
@@ -250,16 +315,34 @@ class StorageManager {
         return this.storage.set(RESOURCE.TYPE.JSON, id, value)
     }
 
+    /**
+     * Stores the json data as json resource under the given resource id and returns whether it could be stored or not
+     * Throws an error if no valid resource id is given
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {boolean}
+     */
     storeJsonResource(id, value) {
         return this.storeResource(id2tid(RESOURCE.TYPE.JSON, id), value)
     }
 
+    /**
+     * Stores the json data as core resource under the given resource id and returns whether it could be stored or not
+     * Throws an error if no valid id is given
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {boolean}
+     */
     storeCoreResource(id, value) {
         return this.storeResource(id2tid(RESOURCE.TYPE.CORE, id), value)
     }
 
     /**
-     * Stores the image data under the given id and returns whether it could be stored or not
+     * Stores the image data under the given resource id and returns whether it could be stored or not
      *
      * @param {string} id
      * @param {string} value
@@ -271,7 +354,7 @@ class StorageManager {
     }
 
     /**
-     * Stores the audio data under the given id and returns whether it could be stored or not
+     * Stores the audio data under the given resource id and returns whether it could be stored or not
      *
      * @param {string} id
      * @param {string} value
@@ -283,36 +366,34 @@ class StorageManager {
     }
 
     /**
-     * Stores all key value pairs of the given object whereas the key is the typed resource id and the value is the
-     * resource data. Returns false if all pairs could be stored otherwise false
+     * Stores the video data under the given resource id and returns whether it could be stored or not
      *
-     * @param {object} obj
+     * @param {string} id
+     * @param {string} value
      *
      * @returns {boolean}
      */
-    storeResourcesFromObject(obj) {
-        for (const [ tid, value ] of toPairs(obj)) {
-            if (!this.storeResource(tid, value)) return false
-        }
-        return true
+    storeVideoResource(id, value) {
+        return this.storeResource(id2tid(RESOURCE.TYPE.VIDEO, id), value)
     }
 
     /**
-     * Deletes the resource matching the given typed id if it exists and returns a boolean indicating whether
-     * the resource was deleted or not
+     * Deletes the resource matching the given typed resource id if it exists and returns a boolean indicating whether
+     * the resource was deleted or not. Throws an error if an invalid resource type id is given
      *
      * @param {string} tid
      *
      * @returns {boolean}
      */
     deleteResource(tid) {
-        const { extTid } = this.getResourceDescriptor(tid)
+        const { extTid } = makeDescriptor.fromTid(tid)
+
         return this.storage.delete(extTid)
     }
 
     /**
-     * Deletes the JSON resource matching the given id if it exists and returns a boolean indicating whether
-     * the resource was deleted or not
+     * Deletes the json matching the given id if it exists and returns a boolean indicating whether it could be deleted
+     * or not
      *
      * @param {string} id
      *
@@ -322,14 +403,21 @@ class StorageManager {
         return this.storage.delete(id)
     }
 
+    /**
+     * Deletes the JSON resource matching the given resource id if it exists and returns a boolean indicating whether
+     * the resource was deleted or not. Throws an error if no valid typed resource id was given
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     deleteJsonResource(id) {
         return this.deleteResource(id2tid(RESOURCE.TYPE.JSON, id))
     }
 
-
     /**
-     * Deletes the image resource matching the given id if it exists and returns a boolean indicating whether
-     * the resource was deleted or not
+     * Deletes the image resource matching the given resource id if it exists and returns a boolean indicating whether
+     * the resource was deleted or not. Throws an error if no valid resource id is given
      *
      * @param {string} id
      *
@@ -340,8 +428,8 @@ class StorageManager {
     }
 
     /**
-     * Deletes the audio resource matching the given id if it exists and returns a boolean indicating whether
-     * the resource was deleted or not
+     * Deletes the audio resource matching the given resource id if it exists and returns a boolean indicating whether
+     * the resource was deleted or not. Throws an error if no valid resource id is given
      *
      * @param {string} id
      *
@@ -352,15 +440,27 @@ class StorageManager {
     }
 
     /**
-     * Clears all entries in the storage and returns whether all entries could be deleted or not
+     * Deletes the video resource matching the given resource id if it exists and returns a boolean indicating whether
+     * the resource was deleted or not. Throws an error if no valid resource id is given
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
+    deleteVideoResource(id) {
+        return this.deleteResource(id2tid(RESOURCE.TYPE.VIDEO, id))
+    }
+
+    /**
+     * Deletes all stored resources and returns whether all entries could be deleted or not
      *
      * @return {boolean}
      */
     truncateResources() {
-        const tids = this.getTypedResourceIds()
+        const extTids = this.getTypedResourceIds()
         let success = true
-        for (const tid of tids) {
-            if (!this.deleteResource(tid)) success = false
+        for (const extTid of extTids) {
+            if (!this.deleteResource(extTid)) success = false
         }
         return success
     }

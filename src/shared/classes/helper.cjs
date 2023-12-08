@@ -1,3 +1,12 @@
+let logger = console
+
+/**
+ * Sets the logger for debug function to the given value
+ *
+ * @param {object} value
+ */
+const setLogger = value => logger = value
+
 /**
  * Debug function which logs the given parameters on the console and returns the first param
  *
@@ -29,9 +38,9 @@ function d(main, ...params) {
         const [ first ] = line.split('(')
         func.push(first.substring(6).trim())
     }
-    console.group('Debug ' + func.join(' <- '))
-    console.log(main, ...params)
-    console.groupEnd()
+    logger.group('Debug ' + func.join(' <- '))
+    logger.log(main, ...params)
+    logger.groupEnd()
 
     return main
 }
@@ -157,6 +166,7 @@ const toValues = Object.values
 const toKeys = Object.keys
 
 module.exports = {
+    setLogger,
     d,
     isNull,
     isString,

@@ -1,7 +1,7 @@
 const { isString } = require('../../shared/classes/helper.cjs')
 
 // TODO we should check the terminal support for colors here, especially for windows
-const noColor = false
+let noColor = false
 
 const FG = {
     RED: noColor ? '' : '\x1b[31m',
@@ -26,6 +26,15 @@ const BG = {
     // TODO add bg colors
 }
 
+let logger = console
+
+/**
+ * Sets the logger for colorLog to the given value
+ *
+ * @param {object} value
+ */
+const setLogger = value => logger = value
+
 /**
  * Passes the given parameters to console.log and encloses every string parameter with FG.RESET
  *
@@ -36,11 +45,12 @@ const colorLog = ( ...params ) => {
     for (const param of params) {
         cParams.push(isString(param) ? FG.RESET + param + FG.RESET : param)
     }
-    console.log( ...cParams )
+    logger.log( ...cParams )
 }
 
 module.exports = {
     FG,
     BG,
-    colorLog
+    colorLog,
+    setLogger
 }

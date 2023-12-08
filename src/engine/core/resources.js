@@ -1,74 +1,20 @@
-import { d, isNull, isObject, isUrl, isDataUrl, toPairs, toValues, without } from "helper/helper"
-import { RESOURCE, makeDescriptor, typeText2tid  } from "shared/classes/resources.cjs"
+import { d, isNull, isObject, isUrl, isDataUrl, toPairs, toValues } from "helper/helper"
+import { RESOURCE, makeDescriptor, typeText2tid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tids2extTids,
+    tid2id, text2id, tid2type } from "shared/classes/resources.cjs"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { MapStorage } from "shared/storage/mapStorage.cjs"
 import { StorageManager } from "shared/classes/storage.cjs"
-import { tids2extTids } from "shared/classes/resources.cjs"
 
-const tid2id = tid => tid.substring(1)
-
-const text2id = {}
-for (const [ id, text ] of Object.entries(RESOURCE.TEXT)) {
-    text2id[text] = id
-}
-
-const tid2type = (tid, strict = true) => {
-    const descriptor = makeDescriptor.fromTid(tid)
-
-    if (!descriptor || !descriptor.isValid()) {
-        if (strict)
-            throw Error('Empty typed resource id given')
-
-        return
-    }
-    return descriptor.type
-}
-
-const jsonPrefix = RESOURCE.PREFIX[RESOURCE.TYPE.JSON]
-const imagePrefix = RESOURCE.PREFIX[RESOURCE.TYPE.IMAGE]
-const audioPrefix = RESOURCE.PREFIX[RESOURCE.TYPE.AUDIO]
-const id2jsonTid = id => jsonPrefix + id
-const id2imageTid = id => imagePrefix + id
-const id2audioTid = id => audioPrefix + id
-
-const tid2typeText = tid => RESOURCE.TEXT[tid2type(tid)]
-
-const SyncResolver = (id2source, permId2scope) => {
-    const added = []
-    const ids = []
-
-    return {
-        add: (tid, value, origin) => {
-            ids.push(tid)
-            const type = tid2type(tid)
-            switch (type) {
-
-                case RESOURCE.TYPE.JSON:
-                    added.push({ id: tid, value, origin })
-                    break;
-
-                case RESOURCE.TYPE.IMAGE:
-                    added.push({ id: tid, value: value instanceof AppliedImage ? value.imageResource : value, origin })
-                    break;
-
-                case RESOURCE.TYPE.AUDIO:
-                    // TODO resolvedAudio?
-                    added.push({ id: tid, value, origin })
-            }
-        },
-        resolve: (resolvedResources, permScope) => {
-            for (const { id, value, origin } of added) {
-                resolvedResources.set(id, value)
-                id2source.set(id, origin + '.data')
-            }
-            if (!permScope) return
-            for (const id of ids) {
-                permId2scope.set(id, permScope)
-            }
-        }
-    }
-}
-
+/**
+ *
+ *
+ * @param tid
+ * @param value
+ * @param mainOrigin
+ * @param urlType
+ *
+ * @returns {Promise}
+ */
 const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') => {
     const descriptor = makeDescriptor.fromTid(tid)
     if (isNull(value)) {
@@ -170,6 +116,65 @@ const ResourceResolver = (id2source, permId2scope) => {
     }
 }
 
+/**
+ * This resolver is working synchronous and is only used to overwrite a stored model and its dependencies in the
+ * resource manager to avoid a full resource reload in the editor
+ *
+ * @param {Map} id2source
+ * @param {Map} permId2scope
+ *
+ * @returns {object}
+ */
+const SyncResolver = (id2source, permId2scope) => {
+    const added = []
+    const ids = []
+
+    return {
+        /**
+         * Adds the given typed resource id and its value plus origin to the resolve queue
+         *
+         * @param {string} tid
+         * @param {mixed} value
+         * @param {string} origin
+         */
+        add: (tid, value, origin) => {
+            ids.push(tid)
+            const type = tid2type(tid)
+            switch (type) {
+
+                case RESOURCE.TYPE.JSON:
+                    added.push({ id: tid, value, origin })
+                    break;
+
+                case RESOURCE.TYPE.IMAGE:
+                    added.push({ id: tid, value: value instanceof AppliedImage ? value.imageResource : value, origin })
+                    break;
+
+                case RESOURCE.TYPE.AUDIO:
+                    // TODO resolvedAudio
+                    added.push({ id: tid, value, origin })
+            }
+        },
+        /**
+         * Adds all resources and their data in the resolve queue to the given resolvedResources, id2source and the
+         * permScope of the resource manager. This method is working synchronous
+         *
+         * @param {Map} resolvedResources
+         * @param {Map} permScope
+         */
+        resolve: (resolvedResources, permScope) => {
+            for (const { id, value, origin } of added) {
+                resolvedResources.set(id, value)
+                id2source.set(id, origin + '.data')
+            }
+            if (!permScope) return
+            for (const id of ids) {
+                permId2scope.set(id, permScope)
+            }
+        }
+    }
+}
+
 const DummyResolver = (id2source, permanentIds) => {
 
     const promises = []
@@ -199,12 +204,12 @@ const getResourceProxy = (type, resources) => {
             get(target, id, receiver) {
                 if (id in target) return target[id]
 
-                const descriptor = makeDescriptor.fromTid(RESOURCE.PREFIX[type] + id)
-                if (descriptor && descriptor.isValid()) {
+                const descriptor = makeDescriptor.fromTid(RESOURCE.PREFIX[type] + id, false)
+                if (descriptor.isValid()) {
                     const extId = descriptor.extId
                     if (extId in target) return target[extId]
                 }
-                throw Error(`No ${RESOURCE.KEY[type]} resource with id "${id}" was loaded in the resource manager` + d('', resources))
+                throw Error(`No ${RESOURCE.KEY[type]} resource with id "${id}" was loaded in the resource manager`)
             },
             set( obj, id, value ) {
                 throw Error(`It's not possible to set a ${RESOURCE.KEY[type]} resource with id "${id}"`)
@@ -214,15 +219,6 @@ const getResourceProxy = (type, resources) => {
 }
 
 /**
- * Fragen:
- *   - beim Speichern werden temp-resourcen überschrieben, aber werden die wirklich mit ihren
- *     Dependencies neu geladen, wenn der Screen reloaded wird, oder spielt da die Regel rein, dass
- *     eine Resource nur neu geladen wird, wenn sie nicht schon vorher drin war?
- *
- *   - Wenn man eine globale Resource editiert, die bislang nur im Code über den Globals-Init()
- *     definiert wurde: wie kann ich dann feststellen, dass diese in den "globals"-scope gespeichert
- *     werden muss, statt dem aktuellen Screen, denn es sollte keinen Eintrag in permId2scope geben?
- *
  * The resource manager
  *
  *   Allows adding of resources which should be available in the next screen. When a resource is requested
@@ -248,36 +244,6 @@ const getResourceProxy = (type, resources) => {
  *
  *    - An image-property in a model config, must be an ImageResource instance or a string holding an id, so
  *      that the manager can be asked if he has already loaded the image.
- *
- *
- *   TODO:
- *      store
- *
- *   Resolving:
- *     a) JSON
- *          - addJson('foo', {bla: 'fasel'})
- *
- *            1. SM.hasJsonResource('foo') => SM.getJsonResource('foo')  // browserStorage converts string to JSON
- *            2. apiFetcher.load('jfoo') => ...SM.getResource('jfoo') // fileStorage converts file content to JSON
- *            3. fallback => JSON // is already a JSON
- *
- *            resolver.add('jfoo', {bla: 'fasel'}, 'code')
- *            resolver.add('jfoo', <json>, 'browser')
- *            resolver.add('jfoo', <json>, 'server')
- *
- *
- *     b) IMAGE
- *          - addImage('foo', 'data:image/png,base64...')
- *
- *            1. SM.hasImageResource('foo') => SM.getImageResource('foo')  // browserStorage converts string to image
- *            2. apiFetcher.load('jfoo') => ...SM.getResource('jfoo') // fileStorage converts file content to JSON
- *            3. fallback =>  //
- *
-             resolver.add('ifoo', 'data:...', 'code')
-             resolver.add('jfoo', 'data:...', 'browser')
-             resolver.add('jfoo', 'data:...', 'server')  // API loaded
-             resolver.add('') // static load
-             resolver.add('ifoo', 'http://...' // external load
  */
 class ResourceManager {
 
@@ -549,9 +515,10 @@ class ResourceManager {
     }
 
     add(tid, value = null) {
-        const extTid = makeDescriptor.fromTid(tid).extTid
+        const descriptor = makeDescriptor.fromTid(tid)
+        const extTid = descriptor.extTid
         if (this.requested.has(extTid))
-            throw Error(`Resource of type ${tid2typeText(tid)} with id "${tid2id(tid)}" was already requested!`)
+            throw Error(`Resource of type ${descriptor.key} with id "${tid2id(tid)}" was already requested!`)
 
         this.requested.set(extTid, value)
         return this
@@ -689,7 +656,7 @@ class ResourceManager {
             for (const tid of missing) {
                 const value = this.requested.get(tid)
                 if (!value)
-                    throw Error(`Could not resolve resource of type ${tid2typeText(tid)} with id "${tid2id(tid)}"`)
+                    throw Error(`Could not resolve resource of type ${makeDescriptor(tid).key} with id "${tid2id(tid)}"`)
 
                 resolver.add(tid, value, 'code')
             }
@@ -1257,10 +1224,6 @@ const getResourcesAndCallback = ( ...args ) => {
 export {
     ResourceManager,
     ResourceResolver,
-    id2jsonTid,
-    id2imageTid,
-    id2audioTid,
-
     ResourceProvider,
     SingleResourceProvider,
     MultiResourcesProvider,
