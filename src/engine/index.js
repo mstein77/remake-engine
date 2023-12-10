@@ -2,7 +2,7 @@ import 'core/core.css';
 
 export { InputController, AxisPath, BoundsScrollHandler, MasterSlavesScrollHandler,
     States, Position, Force, SpriteAndTilesCollider, ObjectController, Gravity, inst } from "core/classes"
-export { Resources, ImageResources, AudioResources, JsonResources } from "core/resources"
+export { Resources, ImageResources, AudioResources, JsonResources, VideoResources } from "core/resources"
 export { Plugin, RenderPlugin, TouchControlsPlugin } from "plugins/classes"
 export { Screen, SplitArea } from "core/screen"
 export { TransitionRegistry, Transition, BlendTransition, PushInTransition, LoadingTransition, FadeInOutTransition } from "core/transition"

@@ -1,17 +1,25 @@
-import { d, isNull, isObject, isUrl, isDataUrl, toPairs, toValues } from "helper/helper"
+import { d, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues } from "helper/helper"
 import { RESOURCE, makeDescriptor, typeText2tid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tids2extTids,
-    tid2id, text2id, tid2type } from "shared/classes/resources.cjs"
+    id2tid, tid2id, text2id, tid2type } from "shared/classes/resources.cjs"
 import { ImageResource, AudioResource, AppliedImage } from "./classes"
 import { MapStorage } from "shared/storage/mapStorage.cjs"
 import { StorageManager } from "shared/classes/storage.cjs"
 
 /**
+ * Returns a promise which resolves the given value of a typed resource id to a result object which holds the data
+ * which is necessary to add it to the resource manager. Depending on the value the processing will be as follows:
  *
+ *   null => build a static link to the resource (if the type allows it) and load the resource (=> staticurl)
+ *   string-url => fetch the resource from an external url (=> exturl)
+ *   data-url => create resource if the resource type is a media type and decode or load it (=> data)
+ *   json => return the json as promise if the resource type is also json (=> data)
  *
- * @param tid
- * @param value
- * @param mainOrigin
- * @param urlType
+ * Throws an error if the resource type cannot handle the value or if the given typed resource id is invalid
+ *
+ * @param {string} tid
+ * @param {mixed} value
+ * @param {string} mainOrigin
+ * @param {string} urlType
  *
  * @returns {Promise}
  */
@@ -58,6 +66,10 @@ const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') =
                         () => ({id: tid, value: audio, origin: mainOrigin + '.' + urlType})
                     )
 
+            case RESOURCE.TYPE.VIDEO:
+                // TODO implement
+                throw Error(`Missing video implementation`)
+
             default:
                 throw Error(`No ${urlType} support for ${descriptor.key} resource "${descriptor.id}"`)
         }
@@ -90,17 +102,41 @@ const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') =
     throw Error(`No data url support for ${descriptor.key} resource "${descriptor.id}"`)
 }
 
+/**
+ * The resource resolver allows to add resource values for a typed resource id to a resolve queue and this queues is
+ * processed when the resolve method is called which will resolve all values of the queue and add their resolved values
+ * to the resource manager. This resolver works asynchronously
+ *
+ * @param {Map} id2source
+ * @param {Map} permId2scope
+ *
+ * @returns {object}
+ */
 const ResourceResolver = (id2source, permId2scope) => {
     const promises = []
     const ids = []
 
     return {
 
+        /**
+         * Adds the given typed resource id and its value plus origin to the resolve queue
+         *
+         * @param {string} tid
+         * @param {mixed} value
+         * @param {string} mainOrigin
+         */
         add: (tid, value, mainOrigin) => {
             ids.push(tid)
             promises.push(getResourceResolvePromise(tid, value, mainOrigin))
         },
 
+        /**
+         * Processes the resolve queue data by resolving each resource value and adding it to the given
+         * resolvedResources, id2source and the permScope of the resource manager. This method is working asynchronous
+         *
+         * @param {Map} resolvedResources
+         * @param {Map} permScope
+         */
         resolve: (resolvedResources, permScope) => {
             return Promise.all(promises).then(resolved => {
                 for (const { id, value, origin } of resolved) {
@@ -130,6 +166,7 @@ const SyncResolver = (id2source, permId2scope) => {
     const ids = []
 
     return {
+
         /**
          * Adds the given typed resource id and its value plus origin to the resolve queue
          *
@@ -155,6 +192,7 @@ const SyncResolver = (id2source, permId2scope) => {
                     added.push({ id: tid, value, origin })
             }
         },
+
         /**
          * Adds all resources and their data in the resolve queue to the given resolvedResources, id2source and the
          * permScope of the resource manager. This method is working synchronous
@@ -175,29 +213,67 @@ const SyncResolver = (id2source, permId2scope) => {
     }
 }
 
-const DummyResolver = (id2source, permanentIds) => {
+/**
+ * This resolver is used in unit tests and is working asynchronously by just passing the given value to a promise
+ *
+ * @param {Map} id2source
+ * @param {Map} permId2scope
+ *
+ * @returns {object}
+ */
+const DummyResolver = (id2source, permId2scope) => {
 
     const promises = []
+    const ids = []
 
     return {
-        add: (tid, value, source, permanent) => {
-            if (source) id2source.set(tid, source)
-            if (permanent) permanentIds.add(tid)
+
+        /**
+         * Adds the given typed resource id and its value plus origin to the resolve queue
+         *
+         * @param {string} tid
+         * @param {mixed} value
+         * @param {string} origin
+         */
+        add: (tid, value, origin) => {
             promises.push(
-                Promise.resolve({id: tid, value: value})
-            );
+                Promise.resolve({id: tid, value, origin})
+            )
+            ids.push(tid)
         },
 
-        resolve: resolvedResources => {
+        /**
+         * Adds all resources and their data in the resolve queue to the given resolvedResources, id2source and the
+         * permScope of the resource manager. This method is working asynchronous
+         *
+         * @param {Map} resolvedResources
+         * @param {Map} permScope
+         */
+        resolve: (resolvedResources, permScope) => {
             return Promise.all(promises).then(resolved => {
-                for (const { id, value } of resolved) {
+                for (const { id, value, origin } of resolved) {
                     resolvedResources.set(id, value)
+                    id2source.set(id, origin + '.data')
+                }
+                if (!permScope) return
+
+                for (const id of ids) {
+                    permId2scope.set(id, permScope)
                 }
             })
         }
     }
 }
 
+/**
+ * Returns a proxy for the given resources object which contains ids and resolved values of a resource type.
+ * Throws an error if an unknown resource id is requested or if a setter is called
+ *
+ * @param {string} type
+ * @param {object} resources
+ *
+ * @returns {Proxy}
+ */
 const getResourceProxy = (type, resources) => {
     return (
         new Proxy(resources, {
@@ -247,6 +323,14 @@ const getResourceProxy = (type, resources) => {
  */
 class ResourceManager {
 
+    /**
+     * Constructs an new resource manager instance which uses the given apiFetcher, resolver and storage instances
+     *
+     * @param {object} apiFetcher
+     * @param {object} localStorage
+     * @param {object} sessionStorage
+     * @param {object} resolver
+     */
     constructor(apiFetcher, localStorage, sessionStorage, resolver = DummyResolver) {
 
         this.resolvedResources = new Map()
@@ -267,10 +351,20 @@ class ResourceManager {
         this.preview = false
     }
 
+    /**
+     * Returns an array holding all extended typed resource ids of permanent resources available in the manager
+     *
+     * @returns {array}
+     */
     getPermanentIds() {
         return [ ...this.permId2scope.keys() ]
     }
 
+    /**
+     * Returns an array holding all extended typed resource ids of temporary resources available in the manager
+     *
+     * @returns {array}
+     */
     getTemporaryIds() {
         const permIds = this.getPermanentIds()
         const tempIds = []
@@ -280,15 +374,31 @@ class ResourceManager {
         return tempIds
     }
 
+    /**
+     * Sets the status of the preview mode to the given boolean value
+     *
+     * @param {boolean} value
+     */
     setPreview(value) {
         this._resources = null
         this.preview = value
     }
 
+    /**
+     * Sets the disabled flag of the manager to the given boolean value
+     *
+     * @param {boolean} value
+     */
     setDisabled(value) {
         this.disabled = value
     }
 
+    /**
+     * Invalidates the given permanent scope so that the resources of this scope will be reloaded the next time a
+     * permanent load ot this scope is triggered
+     *
+     * @param {string} scope
+     */
     invalidatePermanentScope(scope) {
         const ids = this.getPermanentIds()
         for (const id of ids) {
@@ -298,32 +408,36 @@ class ResourceManager {
         this.permScopes.delete(scope)
     }
 
+    /**
+     * Returns a boolean indicating whether the given permanent scope already exists or not
+     *
+     * @param {string} scope
+     *
+     * @returns {boolean}
+     */
     hasPermanentScope(scope) {
         return this.permScopes.has(scope)
     }
 
-    delete(scope, id) {
+    /**
+     * Deletes a resource by typed resource id from the given scope
+     *
+     * @param {string} scope
+     * @param {string} tid
+     */
+    delete(scope, tid) {
         // TODO check where this is needed
         const blockedIds = this.localStorage.getJson('blocked') ?? []
-        if (blockedIds.includes(id)) return
-        blockedIds.push(id)
+        if (blockedIds.includes(tid)) return
+        blockedIds.push(tid)
         this.localStorage.storeJson('blocked', blockedIds)
     }
 
-    deployModel(model, scope = null) {
-        const { resources, dependencies } = model.getResourcesAndDependencies(true)
-
-        const lastResource = resources.at(-1)
-        const id = typeText2tid(lastResource.type, lastResource.id)
-
-        return this.apiFetcher.fetch('store', { id, resources, dependencies, scope }).then(({ stored }) => {
-            let success = stored.includes(id)
-            this.deleteIdsFromStore(stored)
-
-            return success
-		})
-	}
-
+    /**
+     * Deletes the given typed resource ids from the local storage
+     *
+     * @param {array} tids
+     */
     deleteIdsFromStore(tids) {
         const id2children = this.localStorage.getCoreResource('id2children') ?? {}
         for (const tid of tids) {
@@ -353,6 +467,91 @@ class ResourceManager {
         if (changed) this.localStorage.storeCoreResource('scope2ids', scope2ids)
     }
 
+    /**
+     * Deletes the resource given by the typed resource id from the local storage.
+     * The methods works asynchronously but if the sync flag is set to true, then the delete will be performed
+     * synchronous
+     *
+     * TODO check why also have the delete above this method
+     *
+     * @param {string} tid
+     * @param {boolean} sync
+     * @returns {Promise|undefined}
+     */
+    deleteFromStore(tid, sync = false) {
+        this.localStorage.deleteResource(tid)
+
+        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
+        let changed = false
+        for (const ids of toValues(scope2ids)) {
+            const index = ids.indexOf(tid)
+            if (index === -1) continue
+            ids.splice(index, 1)
+            changed = true
+        }
+        if (changed) this.localStorage.storeCoreResource('scope2ids', scope2ids)
+
+        const id2children = this.localStorage.getCoreResource('id2children') ?? {}
+        const deps = id2children[tid] ?? []
+        delete id2children[tid]
+
+        if (sync) {
+            for (const ids of toValues(id2children)) {
+                const index = ids.indexOf(tid)
+                if (index === -1) continue
+                ids.splice(index, 1)
+            }
+            this.localStorage.storeCoreResource('id2children', id2children)
+            return
+        }
+
+        return this.apiFetcher.fetch('has', { resources: [tid] }).then(({ found }) => {
+            if (!found.includes(tid)) {
+                for (const ids of toValues(id2children)) {
+                    const index = ids.indexOf(tid)
+                    if (index === -1) continue
+                    ids.splice(index, 1)
+                }
+                this.localStorage.storeCoreResource('id2children', id2children)
+            }
+            const promises = [];
+            for (const tid of deps) {
+                promises.push(this.deleteFromStore(tid))
+            }
+            return Promise.all(promises)
+        })
+    }
+
+    /**
+     * Deploys the given model and its dependencies to the server and deletes them from the storage. If a scope is given
+     * the model will be added as dependency to this scope.
+     *
+     * @param {object} model
+     * @param {string|null} scope
+     *
+     * @returns {Promise}
+     */
+    deployModel(model, scope = null) {
+        const { resources, dependencies } = model.getResourcesAndDependencies(true)
+
+        const lastResource = resources.at(-1)
+        const id = typeText2tid(lastResource.type, lastResource.id)
+
+        return this.apiFetcher.fetch('store', { id, resources, dependencies, scope }).then(({ stored }) => {
+            let success = stored.includes(id)
+            this.deleteIdsFromStore(stored)
+
+            return success
+		})
+	}
+
+    /**
+     * Stores the given model and its dependencies in the browser storage. If a scope is given then the model will be
+     * added as dependency to the scope
+     *
+     * @param {object} model
+     * @param {string|null} scope
+     */
     storeModel(model, scope = null) {
         const { resources, dependencies } = model.getResourcesAndDependencies()
 
@@ -388,6 +587,9 @@ class ResourceManager {
         this.localStorage.storeCoreResource('scope2ids', scope2ids)
     }
 
+    /**
+     * Clears all resolved resources and internal variables from the resource manager
+     */
     clear() {
         this.resolvedResources.clear()
         this.requested.clear()
@@ -397,12 +599,18 @@ class ResourceManager {
         this._resources = null
     }
 
+    /**
+     * Deletes all temporary resource from the manager and also invalidates the "globals" permanent scope
+     */
     clearTempAndGlobals() {
         this.invalidatePermanentScope('globals')
         this.clearTemporary()
         this._resources = null
     }
 
+    /**
+     * Deletes all temporary resources from the manager
+     */
     clearTemporary() {
         const ids = this.getTemporaryIds()
         for (const id of ids) {
@@ -410,62 +618,11 @@ class ResourceManager {
         }
     }
 
-    deleteFromStore(tid, sync = false) {
-		this.localStorage.deleteResource(tid)
-
-        const scope2ids = this.localStorage.getCoreResource('scope2ids') ?? {}
-        let changed = false
-		for (const ids of toValues(scope2ids)) {
-            const index = ids.indexOf(tid)
-			if (index === -1) continue
-			ids.splice(index, 1)
-            changed = true
-		}
-		if (changed) this.localStorage.storeCoreResource('scope2ids', scope2ids)
-			
-		const id2children = this.localStorage.getCoreResource('id2children') ?? {}
-        const deps = id2children[tid] ?? []
-		delete id2children[tid]
-
-        if (sync) {
-            for (const ids of toValues(id2children)) {
-                const index = ids.indexOf(tid)
-                if (index === -1) continue
-                ids.splice(index, 1)
-            }
-            this.localStorage.storeCoreResource('id2children', id2children)
-            return
-        }
-
-        return this.apiFetcher.fetch('has', { resources: [tid] }).then(({ found }) => {
-            if (!found.includes(tid)) {
-                for (const ids of toValues(id2children)) {
-                    const index = ids.indexOf(tid)
-                    if (index === -1) continue
-                    ids.splice(index, 1)
-                }
-                this.localStorage.storeCoreResource('id2children', id2children)
-            }
-            const promises = [];
-            for (const tid of deps) {
-                promises.push(this.deleteFromStore(tid))
-            }
-            return Promise.all(promises)
-        })
-	}
-	
-    removeJson(id) {
-        return this.remove(id2jsonTid(id))
-    }
-
-    removeImage(id) {
-        return this.remove(id2imageTid(id))
-    }
-
-    removeAudio(id) {
-        return this.remove(id2audioTid(id))
-    }
-
+    /**
+     * Removes the resource matching the given typed resource id from the manager
+     *
+     * @param {string} tid
+     */
     remove(tid) {
         const extTid = makeDescriptor.fromTid(tid).extTid
         this._resources = null
@@ -474,23 +631,113 @@ class ResourceManager {
         this.permId2scope.delete(extTid)
     }
 
+    /**
+     * Removes the json resource matching the given resource id from the manager
+     *
+     * @param {string} id
+     */
+    removeJson(id) {
+        return this.remove(id2jsonTid(id))
+    }
+
+    /**
+     * Removes the image resource matching the given resource id from the manager
+     *
+     * @param {string} id
+     */
+    removeImage(id) {
+        return this.remove(id2imageTid(id))
+    }
+
+    /**
+     * Removes the audio resource matching the given resource id from the manager
+     *
+     * @param {string} id
+     */
+    removeAudio(id) {
+        return this.remove(id2audioTid(id))
+    }
+
+    /**
+     * Removes the video resource matching the given resource id from the manager
+     *
+     * @param {string} id
+     */
+    removeVideo(id) {
+        return this.remove(id2videoTid(id))
+    }
+
+    /**
+     * Returns a boolean indicating whether a permanent resource for the given typed resource id exists in the manager
+     * or not
+     *
+     * @param {string} tid
+     *
+     * @returns {boolean}
+     */
     hasPermanent(tid) {
         const extTid = makeDescriptor.fromTid(tid).extTid
         return this.permId2scope.has(extTid)
     }
 
+    /**
+     * Returns a boolean indicating whether a permanent json resource for the given resource id exists in the manager
+     * or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasPermanentJson(id) {
         return this.hasPermanent(id2jsonTid(id))
     }
 
+
+    /**
+     * Returns a boolean indicating whether a permanent image resource for the given resource id exists in the manager
+     * or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasPermanentImage(id) {
         return this.hasPermanent(id2imageTid(id))
     }
 
+
+    /**
+     * Returns a boolean indicating whether a permanent audio resource for the given resource id exists in the manager
+     * or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasPermanentAudio(id) {
         return this.hasPermanent(id2audioTid(id))
     }
 
+
+    /**
+     * Returns a boolean indicating whether a permanent video resource for the given resource id exists in the manager
+     * or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
+    hasPermanentVideo(id) {
+        return this.hasPermanent(id2videoTid(id))
+    }
+
+    /**
+     * Returns a boolean indicating if a resource for the given typed resource id exists in the manager or not
+     *
+     * @param {string} tid
+     *
+     * @returns {boolean}
+     */
     has(tid) {
         if (this.disabled) return false;
 
@@ -498,22 +745,81 @@ class ResourceManager {
         return this.resolvedResources.has(extTid)
     }
 
+    /**
+     * Returns a boolean indicating if a json resource for the given resource id exists in the manager or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasJson(id) {
         return this.has(id2jsonTid(id))
     }
 
+    /**
+     * Returns a boolean indicating if a image resource for the given resource id exists in the manager or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasImage(id) {
         return this.has(id2imageTid(id))
     }
 
+    /**
+     * Returns a boolean indicating if an audio resource for the given resource id exists in the manager or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
     hasAudio(id) {
         return this.has(id2audioTid(id))
     }
 
+    /**
+     * Returns a boolean indicating if a video resource for the given resource id exists in the manager or not
+     *
+     * @param {string} id
+     *
+     * @returns {boolean}
+     */
+    hasVideo(id) {
+        return this.has(id2videoTid(id))
+    }
+
+    /**
+     * Returns a boolean indicating whether there are resources stored in the local storage or not
+     *
+     * @returns {boolean}
+     */
     hasBrowserResources() {
         return !this.localStorage.isEmpty()
     }
 
+    /**
+     * Deletes all resources stored in the browser and also clears all temporary resources plus the "globals" permanent
+     * scope, so that a load reloads all resources. Returns a boolean which indicates whether the deletion was
+     * successful or not
+     *
+     * @returns {boolean}
+     */
+    clearBrowserResources() {
+        this.clearTempAndGlobals()
+        return this.localStorage.truncateResources()
+    }
+
+    /**
+     * Adds a new resource given by its typed resource id to the next load request. The value given here is optional
+     * and is only used if no resource was found in the local storage and browser. The manager is returned to allow
+     * chaining
+     *
+     * @param {string} tid
+     * @param {mixed} value
+     *
+     * @returns {ResourceManager}
+     */
     add(tid, value = null) {
         const descriptor = makeDescriptor.fromTid(tid)
         const extTid = descriptor.extTid
@@ -524,52 +830,158 @@ class ResourceManager {
         return this
     }
 
+    /**
+     * Adds a new json resource given by its resource id to the next load request. The value given here is optional
+     * and is only used if no resource was found in the local storage and browser. The manager is returned to allow
+     * chaining
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {ResourceManager}
+     */
     addJson(id, value = null) {
         return this.add(id2jsonTid(id), value)
     }
 
+    /**
+     * Adds a new image resource given by its resource id to the next load request. The value given here is optional
+     * and is only used if no resource was found in the local storage and browser. The manager is returned to allow
+     * chaining
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {ResourceManager}
+     */
     addImage(id, value = null) {
         return this.add(id2imageTid(id), value)
     }
 
+    /**
+     * Adds a new audio resource given by its resource id to the next load request. The value given here is optional
+     * and is only used if no resource was found in the local storage and browser. The manager is returned to allow
+     * chaining
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {ResourceManager}
+     */
     addAudio(id, value = null) {
         return this.add(id2audioTid(id), value)
     }
 
-    clearBrowserResources() {
-        this.clearTempAndGlobals()
-        return this.localStorage.truncateResources()
+    /**
+     * Adds a new video resource given by its resource id to the next load request. The value given here is optional
+     * and is only used if no resource was found in the local storage and browser. The manager is returned to allow
+     * chaining
+     *
+     * @param {string} id
+     * @param {mixed} value
+     *
+     * @returns {ResourceManager}
+     */
+    addVideo(id, value = null) {
+        return this.add(id2videoTid(id), value)
     }
 
+    /**
+     * Returns the origin of the resolved value for the given typed resource id or returns undefined if the resource
+     * does not yet exist in the manager
+     *
+     * @param {string} tid
+     *
+     * @returns {string|undefined}
+     */
     getResourceOrigin(tid) {
         const extTid = makeDescriptor.fromTid(tid).extTid
         return this.id2origin.get(extTid)
     }
 
+    /**
+     * Returns the origin of the resolved value for the given json resource id or returns undefined if the resource
+     * does not yet exist in the manager
+     *
+     * @param {string} id
+     *
+     * @returns {string|undefined}
+     */
     getJsonOrigin(id) {
         return this.getResourceOrigin(id2jsonTid(id))
     }
 
+    /**
+     * Returns the origin of the resolved value for the given image resource id or returns undefined if the resource
+     * does not yet exist in the manager
+     *
+     * @param {string} id
+     *
+     * @returns {string|undefined}
+     */
     getImageSource(id) {
         return this.getResourceOrigin(id2imageTid(id))
     }
 
+    /**
+     * Returns the origin of the resolved value for the given audio resource id or returns undefined if the resource
+     * does not yet exist in the manager
+     *
+     * @param {string} id
+     *
+     * @returns {string|undefined}
+     */
     getAudioOrigin(id) {
         return this.getResourceOrigin(id2audioTid(id))
     }
 
+    /**
+     * Returns the origin of the resolved value for the given video resource id or returns undefined if the resource
+     * does not yet exist in the manager
+     *
+     * @param {string} id
+     *
+     * @returns {string|undefined}
+     */
+    getVideoOrigin(id) {
+        return this.getResourceOrigin(id2videoTid(id))
+    }
+
+    /**
+     * Returns an array holding all extended resource ids of the manager for the given resource type
+     *
+     * @param {string} type
+     *
+     * @returns {array}
+     */
     getAllResourceIds(type) {
         // TODO: we might also fetch the server ids here
         switch (type) {
             case RESOURCE.TYPE.JSON:
-                return this.localStorage.getJsonResourceIds();
+                return this.localStorage.getJsonResourceIds()
 
             case RESOURCE.TYPE.IMAGE:
-                return this.localStorage.getImageResourceIds();
+                return this.localStorage.getImageResourceIds()
+
+            case RESOURCE.TYPE.AUDIO:
+                return this.localStorage.getAudioResourceIds()
+
+            case RESOURCE.TYPE.VIDEO:
+                return this.localStorage.getVideoResourceIds()
         }
-        return [];
+        return []
     }
 
+    /**
+     * Returns a new image resource instance with the given id and data
+     *
+     * TODO get rid of this here
+     *
+     * @param {mixed} data
+     * @param {string} id
+     *
+     * @returns {ImageResource}
+     */
     createImageResource(data, id = null) {
         const img = new ImageResource(data)
         img.resolved = true
@@ -577,6 +989,15 @@ class ResourceManager {
         return img
     }
 
+    /**
+     * Returns the resolved value of the resource matching the given type and resource id.
+     * Throws an error if the type or resource does not exist
+     *
+     * @param {string} type
+     * @param {string} id
+     *
+     * @returns {mixed}
+     */
     getResourceById(type, id) {
         const resources = this.resources[type]
 
@@ -591,18 +1012,59 @@ class ResourceManager {
         return value
     }
 
+    /**
+     * Returns the resolved value of the json resource matching the given resource id.
+     * Throws an error if the resource does not exist
+     *
+     * @param {string} id
+     *
+     * @returns {mixed}
+     */
     getJson(id) {
         return this.getResourceById('json', id)
     }
 
+    /**
+     * Returns the resolved value of the image resource matching the given resource id.
+     * Throws an error if the resource does not exist
+     *
+     * @param {string} id
+     *
+     * @returns {mixed}
+     */
     getImage(id) {
         return this.getResourceById('image', id)
     }
 
+    /**
+     * Returns the resolved value of the audio resource matching the given resource id.
+     * Throws an error if the resource does not exist
+     *
+     * @param {string} id
+     *
+     * @returns {mixed}
+     */
     getAudio(id) {
         return this.getResourceById('audio', id)
     }
 
+    /**
+     * Returns the resolved value of the video resource matching the given resource id.
+     * Throws an error if the resource does not exist
+     *
+     * @param {string} id
+     *
+     * @returns {mixed}
+     */
+    getVideo(id) {
+        return this.getResourceById('video', id)
+    }
+
+    /**
+     * Returns an object mapping the resource keys to proxies for all resolved resources under this key
+     *
+     * @returns {object}
+     */
     get resources() {
         if (this._resources === null) {
             const resourceMaps = [this.resolvedResources.entries()]
@@ -612,10 +1074,12 @@ class ResourceManager {
             const json = {}
             const image = {}
             const audio = {}
+            const video = {}
             const map = {
                 [RESOURCE.TYPE.JSON]: json,
                 [RESOURCE.TYPE.IMAGE]: image,
                 [RESOURCE.TYPE.AUDIO]: audio,
+                [RESOURCE.TYPE.VIDEO]: video
             }
             for (const resourceMap of resourceMaps) {
                 for (const [ tid, value ] of resourceMap) {
@@ -626,12 +1090,21 @@ class ResourceManager {
             this._resources = {
                 json: getResourceProxy(RESOURCE.TYPE.JSON, json),
                 image: getResourceProxy(RESOURCE.TYPE.IMAGE, image),
-                audio: getResourceProxy(RESOURCE.TYPE.AUDIO, audio)
+                audio: getResourceProxy(RESOURCE.TYPE.AUDIO, audio),
+                video: getResourceProxy(RESOURCE.TYPE.VIDEO, video)
             }
         }
         return this._resources
     }
 
+    /**
+     * Fetches all resource and their dependencies of the given (permanent) scope and resolves their values
+     *
+     * @param {string} scope
+     * @param {boolean} permanent
+     *
+     * @returns {Promise}
+     */
     load(scope, permanent = false) {
         if (!scope)
             throw Error(`No scope given`)
@@ -683,496 +1156,219 @@ class ResourceManager {
         })
     }
 
+    /**
+     * Fetches all resource and their dependencies of the given permanent scope and resolves their values
+     *
+     * @param {string} scope
+     *
+     * @returns {Promise}
+     */
     loadPermanentScope(scope) {
         return this.load(scope, true)
     }
 
+    /**
+     * Fetches all resource and their dependencies of the given temporary scope and resolves their values
+     *
+     * @param {string} scope
+     *
+     * @returns {Promise}
+     */
     loadTemporaryScope(scope) {
         return this.load(scope, false)
     }
 }
 
-class ResourceProvider {}
-
 /**
- * @class ResourceProvider
- *
- * Base class for storing resource by passing them as JSON object to the constructor or
- * by calling one of the add methods which allow chaining. All stored resources can be returned
- * as JSON object
- *
+ * A resource collection is used to collect resource ids which are required for a scope. The collection groups all
+ * required resources under their resource key and can also store a fallback value or a lazy laoding function to
+ * retrieve this value. Furthermore resource id can also be automatically generated by using a template id and an
+ * array over fallback values. The template id must include a replace char (*) which will be replaced by the index
+ * of each fallback item.
  */
-class SingleResourceProvider extends ResourceProvider {
+class ResourceCollection {
 
     /**
-     * Creates a new provider which is initialized with the resources given in the passed JSON object.
+     * Constructs the collection and parses the resources given in the parameters after type param. If a type param
+     * other than null is given the collections parse add method will be bound to this resource type.
      *
-     * @param resources
+     * @param {string|null} type
+     * @param {mixed} args
      */
-    constructor(resources) {
-        super()
-        this.id2content = {}
-        this.addObject(resources)
+    constructor(type = null, ...args ) {
+        this.resources = {}
+        this.type = type
+        this.parseArgs( type, ...args )
     }
 
     /**
-     * Returns the key under which the resources will be returned in the resources JSON
+     * Parses the given arguments and will add all resources of the given type which are encoded in them to the
+     * collection.
+     *
+     * If null is given as type the parser only accepts objects which map resource keys to resources of this type.
+     * Otherwise a string parameter will add a static (= null as value) resource of the given type and an array will
+     * add multiple static resources of this type at once. If an object is given which maps resource ids to their
+     * fallback values, null or a function, then all of theses resources will be added.
+     *
+     * @param {string|null} type
+     * @param {mixed} args
      */
-    get key() {
-        throw Error(`No key given in ResourceProvider`)
-    }
+    parseArgs(type, ...args ) {
+        for (const arg of args) {
+            if (type === null) {
+                if (!isObject(arg))
+                    throw Error(`Expected object`)
 
-    /**
-     * Throws an error if the given id cannot be used as new id
-     *
-     * @param string id
-     */
-    validateNewId(id) {
-        if (typeof id !== 'string')
-            throw Error(`Resource id must be a string but got type "${typeof id}"`)
+                for (const [ key, resources ] of toPairs(arg)) {
+                    const subType = text2id[key]
+                    if (subType === undefined)
+                        throw Error(`Invalid key "${key}" given`)
 
-        if (id in this.id2content)
-            throw Error(`Resource id "${id}" already exists`)
+                    this.parseArgs(subType, resources)
+                }
+                continue
+            }
+            if (isString(arg)) {
+                this.addToResources(arg, type)
+            } else if (isArray(arg)) {
+                for (const id of arg) {
+                    this.addToResources(id, type)
+                }
+            } else if (isObject(arg)) {
+                for (const [ id, values ] of toPairs(arg)) {
+                    if (!isArray(values)) {
+                        this.addToResources(id, type, values)
+                        continue
+                    }
+                    if (id.indexOf('*') < 0)
+                        throw Error(`No replace char * found in resource id "${id}"`)
 
-        if (id === '')
-            throw Error('Resource id cannot be empty')
-
-        if (!id.match(/^([0-9a-z_\-]+\/)*([0-9a-z\-_]+\.)*[0-9a-z\-_]+$/i))
-            throw Error(`Invalid id "${id}" given!`)
-    }
-
-    /**
-     * Throws an error if the given content is no valid resource data
-     *
-     * @param {mixed} content
-     */
-    validateContent(content) {}
-
-    /**
-     * Validates the given resource content and returns it when the content is no function.
-     * Returns function which validates and returns the content if the argument is a function
-     *
-     * @param {mixed} content
-     * @returns {midex}
-     */
-    getValidatedContent(content) {
-        if (typeof content === 'function') return () => {
-            const value = content()
-            this.validateContent(value)
-            return value
-        }
-        this.validateContent(content)
-        return content
-    }
-
-    /**
-     * Adds the passed resource(s) to the stored resources. Depending on the type of the first parameter either a single
-     * resource (with the given id) is added to the storage or multiple resources if these are given as JSON object.
-     *
-     * The content of the resource can be
-     *  - a string representing an url to the resource
-     *  - a function which returns the content when it's needed (lazy loading for saving memory)
-     *  - content depending on the type of the resource
-     *  - an array holding multiple of the resource representations given above whose ids are automatically generated
-     *    based on the given id value (usually the id will be extended by "_<index>"
-     *
-     * Returns the instance itself for chaining
-     *
-     * @param {string|object} id
-     * @param {string|function|mixed} content
-     *
-     * @returns {ResourceProvider}
-     */
-    add(id, content) {
-        if (isObject(id)) {
-            this.addObject(id)
-        } else if (Array.isArray(content)) {
-            this.addArray(id, content)
-        } else {
-            this.validateNewId(id)
-            this.id2content[id] = this.getValidatedContent(content)
-        }
-        return this
-    }
-
-    /**
-     * Adds a resource for each resource content in the given array and generates the id for each resource automatically
-     * based on the given id by adding a "_<index>"
-     *
-     * Returns the instance itself for chaining
-     *
-     * @param {string} id
-     * @param {array} contentArray
-     *
-     * @returns {ResourceProvider}
-     */
-    addArray(id, contentArray) {
-        if (!Array.isArray(contentArray)) throw Error(`Expected second argument to be array but got "${typeof contentArray}"`)
-        let index = 0;
-        for (const content of contentArray) {
-            this.add(this.getIdWithIndex(id, index), content)
-            index++
-        }
-        return this
-    }
-
-    /**
-     * Adds each resource in the given resource JSON object, where the key is the id and the value the content
-     *
-     * Returns the instance itself for chaining
-     *
-     * @param {object} obj
-     *
-     * @returns {ResourceProvider}
-     */
-    addObject(obj = {}) {
-        if (!isObject(obj)) throw Error(`Expected argument to be an object but got ${obj === null ? 'null' : typeof obj}`)
-
-        for (const [ id, content ] of Object.entries(obj)) {
-            this.add(id, content)
-        }
-        return this
-    }
-
-    /**
-     * Returns a new id by extending it with "_<index>"
-     *
-     * @param {string} id
-     * @param {number} index
-     * @returns {string}
-     */
-    getIdWithIndex(id, index) {
-        return id + '_' + index
-    }
-
-    /**
-     * Returns a JSON object holding all resources (id and content) under a key which represents the type of the
-     * resources
-     *
-     * @returns {object}
-     */
-    get resources() {
-        return {[this.key]: { ...this.id2content }}
-    }
-}
-
-/**
- * @class ImageResourceProvider
- * @extends ResourceProvider
- *
- * A resource provider for image resources which are returned under the key "image".
- * The content of an image resource can be a data url string and ids must a file extension ".png"
- *
- */
-class ImageResourceProvider extends SingleResourceProvider {
-
-    /**
-     * @inheritDoc
-     */
-    get key() {
-        return 'image'
-    }
-
-    /**
-     * @inheritDoc
-     */
-    getIdWithIndex(id, index) {
-        const idx = id.lastIndexOf('.')
-        return id.substring(0, idx) + '_' + index + id.substring(idx)
-    }
-
-    /**
-     * @inheritDoc
-     */
-    validateContent(content) {
-        if (content === null) return
-
-        if (typeof content !== 'string') throw Error(`Image resources must be a string but got ${typeof content}`)
-
-        if (!isUrl(content) && !isDataUrl(content, 'image/png')) throw Error(`Image resource string must be an URL or data URL`)
-    }
-}
-
-/**
- * @class AudioResourceProvider
- * @extends ResourceProvider
- *
- * A resource provider for audio resources which are returned under the key "audio".
- * The content of an audio resource must be a http link to an audio file and ids must have a file extension ".wav" or
- * ".mp3"
- */
-class AudioResourceProvider extends SingleResourceProvider {
-
-    /**
-     * @inheritDoc
-     */
-    get key() {
-        return 'audio'
-    }
-
-    /**
-     * @inheritDoc
-     */
-    getIdWithIndex(id, index) {
-        const idx = id.lastIndexOf('.')
-        return id.substring(0, idx) + '_' + index + id.substring(idx)
-    }
-
-    /**
-     * @inheritDoc
-     */
-    validateContent(content) {
-        if (content === null) return
-
-        if (typeof content !== 'string') throw Error(`Audio resources must be a string but got ${typeof content}`)
-
-        return;
-        if (!isUrl(content)) throw Error(`Audio resource string must be an URL`)
-    }
-
-}
-
-/**
- * @class JsonResourceProvider
- * @extends ResourceProvider
- *
- * A resource provider for JSON resources which are returned under the key "json".
- * The content of a JSON resource can be everything which is allowed within a JSON
- *
- */
-class JsonResourceProvider extends SingleResourceProvider {
-
-    /**
-     * @inheritDoc
-     */
-    get key() {
-        return 'json'
-    }
-
-    /**
-     * @inheritDoc
-     */
-    validateContent(content) {
-        if (typeof content === 'string' && !isUrl(content)) throw Error(`Json resource string must be an URL`)
-        if (!['object', 'string'].includes(typeof content) || !content) throw Error(`Json resources must be an object or URL but got ${content === null ? 'null' : typeof content}`)
-    }
-}
-
-/**
- @class MultiResourcesProvider
- @extends ResourceProvider
-
- A resource provider which allows to add resources of the types "image", "audio" or "json". The resources of each
- type are returned under the according key in the resources JSON
- */
-class MultiResourcesProvider extends ResourceProvider {
-
-    /**
-     * Creates a new provider which is initialized with the resources given in the passed JSON object.
-     * Resources must be grouped by a resource key representing their type ("image", "audio" or "video")
-     *
-     * @param {object} resources
-     */
-    constructor(resources = {}) {
-        super()
-        this.image = new ImageResourceProvider()
-        this.audio = new AudioResourceProvider()
-        this.json = new JsonResourceProvider()
-        this.addObject(resources)
-    }
-
-    /**
-     * Throws an error if the given key is no valid resource key in resources JSON
-     *
-     * @param key
-     */
-    validateKey(key) {
-        if (!(['audio', 'json', 'image'].includes(key)))
-            throw Error(`Key "${key}" invalid for resources!`)
-    }
-
-    /**
-     * Passes the given id and content to the add method of the ResourceProvider matching the resource key.
-     *
-     * Returns the instance itself to allow chaining
-     *
-     * @param {type} key
-     * @param {string|object} id
-     * @param {mixed} content
-     *
-     * @returns {MultiResourcesProvider}
-     */
-    add(key, id, content) {
-        this.validateKey(key)
-        this[key].add(id, content)
-        return this
-    }
-
-    /**
-     * Adds all resources grouped by resource key in the given in the resource JSON object to the
-     * appropriate ResourceProvider for this type
-     *
-     * Returns the instance itself to allow chaining
-     *
-     * @param {object} obj
-     *
-     * @returns {MultiResourcesProvider}
-     */
-    addObject(obj) {
-        for (const [ key, subResources ] of Object.entries(obj)) {
-            for (const [ id, content ] of Object.entries(subResources)) {
-                this.add(key, id, content)
+                    let index = 0
+                    for (const value of values) {
+                        this.addToResources(id.replaceAll('*', index), type, value)
+                        index++
+                    }
+                }
             }
         }
-        return this
     }
 
     /**
-     * Passes the id and the content to add method of the ImageResourceProvider
+     * Invokes the parse method with the type used in the constructor for all the given parameters
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see ImageResourceProvider
-     *
-     * @param {string|object} id
-     * @param {mixed} content
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {mixed} args
      */
-    addImage(id, content) {
-        this.image.add(id, content)
-        return this
+    add( ...args ) {
+        this.parseArgs(this.type, ...args)
     }
 
     /**
-     * Passes the id and the content to addObject method of the ImageResourceProvider
+     * Adds an image resource with the given resource id and fallback value to the collection
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see ImageResourceProvider
-     *
-     * @param {object} obj
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {string} id
+     * @param {mixed} value
      */
-    addImages(obj) {
-        this.image.addObject(obj)
-        return this
+    addImage(id, value = null) {
+        this.parseArgs(RESOURCE.TYPE.IMAGE, {[id]: value})
     }
 
     /**
-     * Passes the id and the content to add method of the AudioResourceProvider
+     * Adds an audio resource with the given resource id and fallback value to the collection
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see AudioResourceProvider
-     *
-     * @param {string|object} id
-     * @param {mixed} content
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {string} id
+     * @param {mixed} value
      */
-    addAudio(id, content) {
-        this.audio.add(id, content)
-        return this
+    addAudio(id, value = null) {
+        this.parseArgs(RESOURCE.TYPE.AUDIO, {[id]: value})
     }
 
     /**
-     * Passes the id and the content to addObject method of the AudioResourceProvider
+     * Adds a json resource with the given resource id and fallback value to the collection
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see AudioResourceProvider
-     *
-     * @param {object} obj
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {string} id
+     * @param {mixed} value
      */
-    addAudios(obj) {
-        this.audio.addObject(obj)
-        return this
+    addJson(id, value = null) {
+        this.parseArgs(RESOURCE.TYPE.JSON, {[id]: value})
     }
 
     /**
-     * Passes the id and the content to add method of the JsonResourceProvider
+     * Adds a video resource with the given resource id and fallback value to the collection
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see JsonResourceProvider
-     *
-     * @param {string|object} id
-     * @param {mixed} content
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {string} id
+     * @param {mixed} value
      */
-    addJson(id, content) {
-        this.json.add(id, content)
-        return this
+    addVideo(id, value = null) {
+        this.parseArgs(RESOURCE.TYPE.VIDEO, {[id]: value})
     }
 
     /**
-     * Passes the id and the content to addObject method of the JSONResourceProvider
+     * Adds a resource with the given resource id and value to the resource collection
+     * Throws an error if a resource with the same id already exists
      *
-     * Returns the instance itself to allow chaining
-     *
-     * @see JsonResourceProvider
-     *
-     * @param {object} obj
-     *
-     * @returns {MultiResourcesProvider}
+     * @param {string} id
+     * @param {string} type
+     * @param {mixed} value
      */
-    addJsons(obj) {
-        this.json.addObject(obj)
-        return this
-    }
+    addToResources(id, type, value = null) {
+        const tid = id2tid(type, id)
+        const descriptor = makeDescriptor.fromTid(tid)
 
-    /**
-     * @inheritDoc
-     */
-    get resources() {
-        return {
-            ...this.json.resources,
-            ...this.image.resources,
-            ...this.audio.resources
-        }
+        const key = descriptor.key
+        if (!(key in this.resources)) this.resources[key] = {}
+        const target = this.resources[key]
+
+        if (id in target || descriptor.extId in target)
+            throw Error(`Resource "${descriptor.id}" of type ${descriptor.key} was already requested!`)
+
+        target[id] = value
     }
 }
 
 /**
- * Returns a new ImageResourceProvider instance initialized with the resources in the given JSON object
+ * Creates a resource collection of json resources
  *
- * @param {object} resources
+ * @param {mixed} args
  *
- * @returns {ImageResourceProvider}
+ * @returns {ResourceCollection}
  */
-const ImageResources = resources => new ImageResourceProvider(resources)
+const JsonResources = ( ...args ) => new ResourceCollection(RESOURCE.TYPE.JSON, ...args)
 
 /**
- * Returns a new AudioResourceProvider instance initialized with the resources in the given JSON object
+ * Creates a resource collection of image resources
  *
- * @param {object} resources
+ * @param {mixed} args
  *
- * @returns {AudioResourceProvider}
+ * @returns {ResourceCollection}
  */
-const AudioResources = resources => new AudioResourceProvider(resources)
+const ImageResources = ( ...args ) => new ResourceCollection(RESOURCE.TYPE.IMAGE, ...args)
 
 /**
- * Returns a new JsonResourceProvider instance initialized with the resources in the given JSON object
+ * Creates a resource collection of audio resources
  *
- * @param {object} resources
+ * @param {mixed} args
  *
- * @returns {JsonResourceProvider}
+ * @returns {ResourceCollection}
  */
-const JsonResources = resources => new JsonResourceProvider(resources)
+const AudioResources = ( ...args ) => new ResourceCollection(RESOURCE.TYPE.AUDIO, ...args)
 
 /**
- * Returns a new MultiResourcesProvider instance initialized with the given resources
+ * Creates a resource collection of video resources
  *
- * @param {object} resources
+ * @param {mixed} args
  *
- * @returns {MultiResourcesProvider}
+ * @returns {ResourceCollection}
  */
-const Resources = resources => new MultiResourcesProvider(resources)
+const VideoResources = ( ...args ) => new ResourceCollection(RESOURCE.TYPE.VIDEO, ...args)
+
+/**
+ * Creates a resource collection over multiple resource types
+ *
+ * @param {mixed} args
+ *
+ * @returns {ResourceCollection}
+ */
+const Resources = ( ...args ) => new ResourceCollection(null, ...args)
 
 /**
  * Returns an object holding all resources and a callback which were passed as arguments.
@@ -1205,7 +1401,7 @@ const getResourcesAndCallback = ( ...args ) => {
             default:
                 throw Error(`Argument of type "${type}" not allowed. Expected callback function or resources instance`)
         }
-        const provider = !(arg instanceof ResourceProvider) ? Resources(arg) : arg
+        const provider = !(arg instanceof ResourceCollection) ? Resources(arg) : arg
         for (const [ key, subResources ] of Object.entries(provider.resources)) {
             if (!resources[key]) resources[key] = {}
             for (const [ id, content ] of Object.entries(subResources)) {
@@ -1224,12 +1420,11 @@ const getResourcesAndCallback = ( ...args ) => {
 export {
     ResourceManager,
     ResourceResolver,
-    ResourceProvider,
-    SingleResourceProvider,
-    MultiResourcesProvider,
+    ResourceCollection,
     Resources,
     ImageResources,
     AudioResources,
     JsonResources,
+    VideoResources,
     getResourcesAndCallback
 }

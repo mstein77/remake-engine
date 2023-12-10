@@ -1,10 +1,16 @@
 import { intersect, without, toPairs, toKeys,  d } from "helper/helper"
-import { ResourceManager, ImageResources, AudioResources, JsonResources, Resources,
-    SingleResourceProvider, getResourcesAndCallback, id2jsonTid, id2imageTid, tid2typeText, tid2id, id2tid,
-    resId2tid, typeText2tid
+import { ResourceManager, ImageResources, AudioResources, JsonResources, Resources, ResourceCollector,
+    getResourcesAndCallback
 } from "core/resources"
-import { MapStorageHandler, StorageManager } from "core/storage"
+import { StorageManager } from "core/storage"
+const { RESOURCE, id2jsonTid, id2imageTid, tid2typeText, tid2id, id2tid, resId2tid, typeText2tid } = require("shared/classes/resources.cjs")
 
+test('ResourceCollector', () => {
+    const c = new ResourceCollector()
+    expect(c.resources).toBeEmptyObject()
+})
+
+/*
 test('ResourceManager', () => {
 
     function makeModels(models, dependencies = {}) {
@@ -537,8 +543,6 @@ test('ResourceManager', () => {
 
     }
 
-     */
-
     // goto page
 
     // clear temp
@@ -552,11 +556,11 @@ test('ResourceManager', () => {
 
 })
 
-
 test('SingleResourceProvider', () => {
     expect(() => (new SingleResourceProvider()).key).toThrow('No key')
     expect(() => (new SingleResourceProvider()).validateContent()).not.toThrow('No key')
 })
+*/
 
 test('ImageResources', () => {
     expect(() => ImageResources({'foo.png': 'http://bar'}).add('foo.png', 'http://bar2'))

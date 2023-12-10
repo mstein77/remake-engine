@@ -6,6 +6,7 @@ export default {
     moduleNameMapper: {
         '^helper/(.+)$': '<rootDir>/src/engine/helper/$1',
         '^core/(.+)$': '<rootDir>/src/engine/core/$1',
+        '^shared/(.+)$': '<rootDir>/src/shared/$1',
         '\.css$': '<rootDir>/test/mocks/empty'
     }
 }
