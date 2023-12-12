@@ -46,7 +46,9 @@ const MapStorage = limit => {
 
         size: () => storage.size,
 
-        isFull: () => isFull
+        isFull: () => isFull,
+
+        dump: () => d([ ...storage.entries() ]),
     }
 }
 

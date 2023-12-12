@@ -32,6 +32,7 @@ class StorageManager {
     getTypedResourceIdsByType(types) {
         if (!isArray(types)) types = [types]
         const extTids = this.storage.keys()
+
         const result = []
         for (const extTid of extTids) {
             const descriptor = makeDescriptor.fromTid(extTid, false)
@@ -287,6 +288,17 @@ class StorageManager {
         const { type, extTid } = makeDescriptor.fromTid(tid)
 
         return this.storage.set(type, extTid, value)
+    }
+
+    /**
+     * Stores all resources given by their typed resource id (key) and their values in the passed object
+     *
+     * @param {object} tid2value
+     */
+    storeResourcesFromObject(tid2value) {
+        for (const [ tid, value ] of toPairs(tid2value)) {
+            this.storeResource(tid, value)
+        }
     }
 
     /**

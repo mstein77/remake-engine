@@ -1,6 +1,6 @@
 import inst from "core/instances"
 import { isValidResourceId } from "./shared"
-import { AudioResource, ImageResource } from "core/classes"
+import { AudioResource, ImageResource } from "core/resources"
 import { isObject, without, d } from "./helper"
 
 const validated = {

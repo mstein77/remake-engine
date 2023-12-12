@@ -486,6 +486,19 @@ class Descriptor {
     }
 
     /**
+     * Returns a string holding the compact id which means the id without the default extension if given or
+     * undefined if the descriptor is not valid
+     *
+     *
+     * @returns {string}
+     */
+    get compactId() {
+        if (!this.isValid()) return
+
+        return this.id.endsWith(this.defaultExt) ? this.id.substring(0, this.id.length - this.defaultExt.length - 1) : this.id
+    }
+
+    /**
      * Returns a string holding the relative path to the resource of this tid on the resource
      * directory of the server. Returns undefined if no valid tid is given
      *

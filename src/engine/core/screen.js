@@ -1,7 +1,6 @@
 import inst from "./instances"
 import { RENDERER_STATE } from "./const"
-import { getResourcesAndCallback } from "./resources"
-import { ResourceRequest } from "./classes"
+import { getResourcesAndCallback, ResourceRequest } from "./resources"
 import { getContainerElem } from "../helper/dom"
 import { d } from "../helper/helper"
 
@@ -172,7 +171,7 @@ class PaneTreeRenderer {
         }
         if (this.loader) {
             return promise.then(() => {
-                this.loader.resolve()
+                this.loader.addToManager(inst.RL)
                 return inst.RL.loadTemporaryScope(this.scope).then(setNextState)
             })
         }

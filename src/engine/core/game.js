@@ -2,9 +2,8 @@ import { STATE, RENDERER_STATE, FILTER } from "core/const"
 import { Config } from "core/config"
 import { clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
-import { getResourcesAndCallback, ResourceResolver } from "./resources"
+import { getResourcesAndCallback, ResourceResolver, ResourceRequest } from "./resources"
 import { div } from "helper/dom"
-import { ResourceRequest } from "core/classes"
 import { Model, ModelFactory, SubModelFactory } from "./model"
 import { validated } from "helper/validate"
 import { ScreenRegistry } from "./screen"
@@ -526,7 +525,7 @@ class Game {
         } else if (!loaders.length) return Promise.resolve()
 
         for (const loader of loaders) {
-            loader.resolve()
+            loader.addToManager(inst.RL)
         }
         return inst.RL.loadPermanentScope('globals').then(
             responseHandler

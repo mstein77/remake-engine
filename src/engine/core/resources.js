@@ -1,9 +1,13 @@
-import { d, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues } from "helper/helper"
+import { d, toKeys, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues, getCanvasObjForDim } from "helper/helper"
 import { RESOURCE, makeDescriptor, typeText2tid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tids2extTids,
     id2tid, tid2id, text2id, tid2type } from "shared/classes/resources.cjs"
-import { ImageResource, AudioResource, AppliedImage } from "./classes"
+import { AppliedImage } from "./classes"
 import { MapStorage } from "shared/storage/mapStorage.cjs"
 import { StorageManager } from "shared/classes/storage.cjs"
+import inst from "./instances.js"
+
+let staticTypes = STATIC_TYPES === '' ? [] : STATIC_TYPES.split(',')
+const setStaticTypes = values => staticTypes = values
 
 /**
  * Returns a promise which resolves the given value of a typed resource id to a result object which holds the data
@@ -26,7 +30,7 @@ import { StorageManager } from "shared/classes/storage.cjs"
 const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') => {
     const descriptor = makeDescriptor.fromTid(tid)
     if (isNull(value)) {
-        if (!descriptor.type) // TODO implement check
+        if (!staticTypes.includes(descriptor.key))
             throw Error(`Resource with id "${descriptor.id}" was requested as static resource, but static ${descriptor.key} resources are not allowed`)
 
         const staticUrl = BASE_URL + '/' + descriptor.key + '/' + descriptor.extId
@@ -181,15 +185,21 @@ const SyncResolver = (id2source, permId2scope) => {
 
                 case RESOURCE.TYPE.JSON:
                     added.push({ id: tid, value, origin })
-                    break;
+                    break
 
                 case RESOURCE.TYPE.IMAGE:
                     added.push({ id: tid, value: value instanceof AppliedImage ? value.imageResource : value, origin })
-                    break;
+                    break
+
+                case RESOURCE.TYPE.VIDEO:
+                    // TODO resolveVideo
+                    added.push({ id: tid, value, origin })
+                    break
 
                 case RESOURCE.TYPE.AUDIO:
                     // TODO resolvedAudio
                     added.push({ id: tid, value, origin })
+                    break
             }
         },
 
@@ -198,7 +208,7 @@ const SyncResolver = (id2source, permId2scope) => {
          * permScope of the resource manager. This method is working synchronous
          *
          * @param {Map} resolvedResources
-         * @param {Map} permScope
+         * @param {string} permScope
          */
         resolve: (resolvedResources, permScope) => {
             for (const { id, value, origin } of added) {
@@ -275,17 +285,23 @@ const DummyResolver = (id2source, permId2scope) => {
  * @returns {Proxy}
  */
 const getResourceProxy = (type, resources) => {
+    const key = RESOURCE.KEY[type]
+    if (key === undefined)
+        throw Error(`Invalid type "${type}" given`)
+
     return (
         new Proxy(resources, {
             get(target, id, receiver) {
                 if (id in target) return target[id]
 
                 const descriptor = makeDescriptor.fromTid(RESOURCE.PREFIX[type] + id, false)
+                if (descriptor.compactId in target) return target[descriptor.compactId]
+
                 if (descriptor.isValid()) {
                     const extId = descriptor.extId
                     if (extId in target) return target[extId]
                 }
-                throw Error(`No ${RESOURCE.KEY[type]} resource with id "${id}" was loaded in the resource manager`)
+                throw Error(`No ${key} resource with id "${id}" was loaded in the resource manager`)
             },
             set( obj, id, value ) {
                 throw Error(`It's not possible to set a ${RESOURCE.KEY[type]} resource with id "${id}"`)
@@ -420,20 +436,6 @@ class ResourceManager {
     }
 
     /**
-     * Deletes a resource by typed resource id from the given scope
-     *
-     * @param {string} scope
-     * @param {string} tid
-     */
-    delete(scope, tid) {
-        // TODO check where this is needed
-        const blockedIds = this.localStorage.getJson('blocked') ?? []
-        if (blockedIds.includes(tid)) return
-        blockedIds.push(tid)
-        this.localStorage.storeJson('blocked', blockedIds)
-    }
-
-    /**
      * Deletes the given typed resource ids from the local storage
      *
      * @param {array} tids
@@ -442,8 +444,11 @@ class ResourceManager {
         const id2children = this.localStorage.getCoreResource('id2children') ?? {}
         for (const tid of tids) {
             this.localStorage.deleteResource(tid)
-            const extTid = makeDescriptor.fromTid(tid)
+            const extTid = makeDescriptor.fromTid(tid).extTid
             delete id2children[extTid !== tid ? extTid : tid]
+            const origin = this.id2origin.get(extTid)
+            if (!origin || !origin.startsWith('browser')) continue
+            this.id2origin.delete(extTid)
         }
         this.localStorage.storeCoreResource('id2children', id2children)
 
@@ -540,6 +545,12 @@ class ResourceManager {
         return this.apiFetcher.fetch('store', { id, resources, dependencies, scope }).then(({ stored }) => {
             let success = stored.includes(id)
             this.deleteIdsFromStore(stored)
+
+            for ( const tid of stored) {
+                const descriptor = makeDescriptor.fromTid(tid)
+                this.resolvedResources.delete(descriptor.extTid)
+            }
+            this._resources = null
 
             return success
 		})
@@ -973,23 +984,6 @@ class ResourceManager {
     }
 
     /**
-     * Returns a new image resource instance with the given id and data
-     *
-     * TODO get rid of this here
-     *
-     * @param {mixed} data
-     * @param {string} id
-     *
-     * @returns {ImageResource}
-     */
-    createImageResource(data, id = null) {
-        const img = new ImageResource(data)
-        img.resolved = true
-        img.id = id
-        return img
-    }
-
-    /**
      * Returns the resolved value of the resource matching the given type and resource id.
      * Throws an error if the type or resource does not exist
      *
@@ -1260,6 +1254,7 @@ class ResourceCollection {
      */
     add( ...args ) {
         this.parseArgs(this.type, ...args)
+        return this
     }
 
     /**
@@ -1270,6 +1265,7 @@ class ResourceCollection {
      */
     addImage(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.IMAGE, {[id]: value})
+        return this
     }
 
     /**
@@ -1280,6 +1276,7 @@ class ResourceCollection {
      */
     addAudio(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.AUDIO, {[id]: value})
+        return this
     }
 
     /**
@@ -1290,6 +1287,7 @@ class ResourceCollection {
      */
     addJson(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.JSON, {[id]: value})
+        return this
     }
 
     /**
@@ -1300,6 +1298,7 @@ class ResourceCollection {
      */
     addVideo(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.VIDEO, {[id]: value})
+        return this
     }
 
     /**
@@ -1318,7 +1317,7 @@ class ResourceCollection {
         if (!(key in this.resources)) this.resources[key] = {}
         const target = this.resources[key]
 
-        if (id in target || descriptor.extId in target)
+        if ((descriptor.compactId in target) || (descriptor.extId in target))
             throw Error(`Resource "${descriptor.id}" of type ${descriptor.key} was already requested!`)
 
         target[id] = value
@@ -1389,24 +1388,24 @@ const getResourcesAndCallback = ( ...args ) => {
     for (const arg of args) {
         if (arg === undefined || arg === null) continue
         const type = typeof arg
-        switch(type) {
-            case 'function':
-                if (callback) throw Error(`Multiple callback functions passed to method but only one allowed!`)
-                callback = arg
-                continue
-
-            case 'object':
-                break
-
-            default:
-                throw Error(`Argument of type "${type}" not allowed. Expected callback function or resources instance`)
+        if (type === 'function') {
+            if (callback) throw Error(`Multiple callback functions passed to method but only one allowed!`)
+            callback = arg
+            continue
         }
+        if (!isObject(arg))
+            throw Error(`Argument of type "${type}" not allowed. Expected callback function or resources instance`)
+
         const provider = !(arg instanceof ResourceCollection) ? Resources(arg) : arg
         for (const [ key, subResources ] of Object.entries(provider.resources)) {
             if (!resources[key]) resources[key] = {}
+            const type = text2id[key]
+            const id2resources = resources[key]
             for (const [ id, content ] of Object.entries(subResources)) {
-                const id2resources = resources[key]
-                if (id2resources[id]) throw Error(`Resource "${id}" of type ${key} already passed as argument`)
+                const descriptor = makeDescriptor.fromTypeAndId(type, id)
+                if (id2resources[descriptor.compactId] || id2resources[descriptor.extId])
+                    throw Error(`Resource "${id}" of type ${key} already passed as argument`)
+
                 id2resources[id] = content
             }
         }
@@ -1417,14 +1416,458 @@ const getResourcesAndCallback = ( ...args ) => {
     }
 }
 
+/**
+ * An ImageResource is an abstraction layer for a concrete image which is given by an url, a data-url or a canvas
+ * and a resource id. It tracks whether the image has been successfully resolved (= loaded and decoded) or not and
+ * also provides helper methods for retrieving image properties and for doing conversions.
+ *
+ * If the ImageResource is used outside browser context (e.g. unit tests) a fake image with dimension 100x100 is used
+ */
+class ImageResource {
+
+    /**
+     * Constructs a new image resource based on the given data which can be an url, a data-url or a canvas element
+     *
+     * @param {string|HTMLCanvasElement} data
+     */
+    constructor(data) {
+        this.id = null;
+        this.image = typeof Image != 'undefined' ? new Image() : {width: 100, height: 100, decode: () => Promise.resolve()}
+        this.canvas = null
+        if (typeof HTMLCanvasElement != 'undefined' && (data instanceof HTMLCanvasElement)) {
+            this.canvas = {elem: data, ctx: data.getContext('2d')}
+            data = this.getDataUrl()
+        }
+        if (data !== null)
+            this.image.src = data
+        this.resolved = false
+    }
+
+    /**
+     * Sets the id of this image resource to the given value
+     *
+     * @param {string|null} id
+     */
+    setId(id) {
+        this.id = id
+    }
+
+    /**
+     * Returns a string holding the id or null if no id was set yet
+     *
+     * @param {string|null} id
+     */
+    getId() {
+        return this.id
+    }
+
+    /**
+     * Returns the width of this image resources or null if the resource has not yet been resolved
+     *
+     * @returns {number|null}
+     */
+    get width() {
+        if (!this.resolved) return null
+
+        return this.image ? this.image.width : this.canvas.width
+    }
+
+    /**
+     * Returns the height of this image resources or null if the resource has not yet been resolved
+     *
+     * @returns {number|null}
+     */
+    get height() {
+        if (!this.resolved) return null
+
+        return this.image ? this.image.height : this.canvas.height
+    }
+
+    /**
+     * Returns the canvas object of this image resource or a clone of it if the asClone flag is set to true
+     *
+     * @param {boolean} asClone
+     *
+     * @returns {object}
+     */
+    getCanvas(asClone = false) {
+        let width = this.image.width
+        let height = this.image.height
+        let source = this.image
+        if (this.canvas === null) {
+            this.canvas = getCanvasObjForDim(width, height)
+            this.canvas.ctx.drawImage(this.image, 0, 0)
+        } else {
+            width = this.canvas.elem.width
+            height = this.canvas.elem.height
+            source = this.canvas.elem
+        }
+        if (asClone) {
+            const canvas = getCanvasObjForDim(width, height)
+            canvas.ctx.drawImage(source, 0, 0)
+            return canvas
+        }
+        return this.canvas
+    }
+
+    /**
+     * Returns the canvas elem of this image resource or the one of a clone if the asClone flag is set to true
+     *
+     * @param {boolean} asClone
+     *
+     * @returns {HTMLCanvasElement}
+     */
+    getCanvasElem(asClone = false) {
+        return this.getCanvas(asClone).elem
+    }
+
+    /**
+     * Returns a promise which resolves when the image has been decoded and returns the image itself
+     *
+     * @returns {Promise}
+     */
+    getNewDecodePromise() {
+        return this.image.decode().then(result => {this.resolved = true; return result})
+    }
+
+    /**
+     * Returns a data-url for this image resource with the given format (or default image format)
+     *
+     * @param {string|undefined} format
+     *
+     * TODO use default image subType here
+     *
+     * @returns {string}
+     */
+    getDataUrl(format = 'png') {
+        return this.getCanvasElem().toDataURL('image/' + format)
+    }
+
+    /**
+     * Returns the HTMLImageElement of this image resource or a fake object if no browser context is available
+     *
+     * @returns {HTMLImageElement|{object}}
+     */
+    getImage() {
+        return this.image
+    }
+
+    /**
+     * Returns a boolean indicating whether the image resource has already been loaded and decoded or not
+     *
+     * @returns {boolean}
+     */
+    isResolved() {
+        return this.resolved
+    }
+}
+
+/**
+ * Returns a new image resource instance with the given id and data which is directly set to resolved
+ *
+ * @param {mixed} data
+ * @param {string} id
+ *
+ * @returns {ImageResource}
+ */
+const createImageResource = (data, id = null) => {
+    const img = new ImageResource(data)
+    img.resolved = true
+    img.id = id
+
+    return img
+}
+
+/**
+ * An AudioResource is an abstraction layer for a concrete audio media which is given by an url or a data-url and a
+ * resource id. It tracks whether the image has been successfully resolved (= loaded, decoded and playable) or not
+ * and also provides helper methods for controlling the media playback
+ */
+class AudioResource {
+
+    /**
+     * Creates a new audio resource based on the given url or data-url and immediately starts the loading process
+     * which is resolved when the canplaythrough event is triggered. After resolving the readyCallback is triggered
+     * if it was passed to the constructor.
+     *
+     * If no browser context is available the resource will be automatically resolved and a fake audio object is set
+     *
+     * @param {string} url
+     * @param {function|null} readyCallback
+     */
+    constructor(url, readyCallback = null) {
+        this.audio = null
+        this.id = null
+        this.volume = 1
+        this.resolved = false
+        this.promise = new Promise(resolve => {
+            if (typeof Audio == 'undefined') {
+                this.audio = {}
+                this.resolved = true
+                resolve()
+            } else {
+                this.audio = new Audio(url)
+                this.audio.oncanplaythrough = () => {
+                    this.resolved = true
+                    resolve()
+                    if (readyCallback) {
+                        readyCallback()
+                    }
+                }
+                this.audio.onplaying = () => {
+                    if (!inst.game.audioBlocked) return
+                    inst.game.audioBlocked = false
+                }
+            }
+        })
+        this.lastAction = null
+    }
+
+    /**
+     * Sets the given value as resource id
+     *
+     * @param {string} id
+     */
+    setId(id) {
+        this.id = id
+    }
+
+    /**
+     * Returns the id of the audio resource or null if no id was set yet
+     *
+     * @returns {string|null}
+     */
+    getId() {
+        return this.id;
+    }
+
+    /**
+     * Returns a boolean indicating whether the audio has already been loaded, decoded and is playable or not
+     *
+     * @returns {boolean}
+     */
+    isResolved() {
+        return this.resolved
+    }
+
+    /**
+     * Sets the volume of this audio resource to the given value
+     *
+     * @param {number} value
+     */
+    setVolume(value) {
+        this.volume = value
+        this.updateVolume()
+    }
+
+    /**
+     * Updates the volume of this audio resource by applying the master volume of the game to it
+     */
+    updateVolume() {
+        this.audio.volume = (inst.game.masterVolume / 100) * this.volume
+    }
+
+    /**
+     * Starts the playback of this audio resource with the given volume. If the restart flag is set the audio will
+     * be rewinded before. Returns a promise which resolves when the audio starts to play
+     *
+     * @param {number} volume
+     * @param {boolean} restart
+     *
+     * @returns {Promise}
+     */
+    play(volume = 1, restart = true) {
+        this.volume = 1
+        if (restart && this.isPlaying()) {
+            this.rewind()
+        }
+        this.updateVolume()
+        this.lastAction = 'load'
+        return this.audio.play().then(() => {
+            if (this.lastAction === 'pause' || !inst.game.running) {
+                this.audio.pause();
+            } else {
+                this.lastAction = 'play';
+            }
+        })
+    }
+
+    /**
+     * Continues to play by triggering the play method if the audio was paused before
+     */
+    continue() {
+        if (this.lastAction === 'pause') {
+            this.lastAction = 'play';
+            this.play(1, false);
+        }
+    }
+
+    /**
+     * Sets the playback back to the start
+     */
+    rewind() {
+        this.audio.currentTime = 0
+    }
+
+    /**
+     * Sets looping of the audio to the given boolean value
+     *
+     * @param {boolean} value
+     */
+    setLoop(value) {
+        this.audio.loop = value
+    }
+
+    /**
+     * Sets the muting of the audio to the given boolean value
+     *
+     * @param {boolean} value
+     */
+    setMuted(value) {
+        this.audio.muted = value
+    }
+
+    /**
+     * Pauses the audio playback of this audio resource
+     */
+    pause() {
+        if (this.lastAction === 'play') {
+            this.audio.pause()
+        }
+        this.lastAction = 'pause'
+    }
+
+    /**
+     * Resets the playboack of this audio resource
+     *
+     * TODO why do we need this together with rewind?
+     */
+    reset() {
+        this.rewind()
+    }
+
+    /**
+     * Returns a boolean indicating whether the audio is currenly playing or not
+     *
+     * @returns {boolean}
+     */
+    isPlaying() {
+        return !(this.audio.ended || this.lastAction === 'pause')
+    }
+
+    /**
+     * Returns a boolean indicating whether the audio is currently looped or not
+     *
+     * @returns {boolean}
+     */
+    isLooping() {
+        return this.audio.loop
+    }
+
+    /**
+     * Returns a promise which is resolved when the audio of this resource is loaded, decoded and playable
+     *
+     * @returns {Promise}
+     */
+    getNewLoadingPromise() {
+        return this.promise
+    }
+}
+
+/**
+ * When an init-handler is registered, a callback function and some resource providers which are called directly to
+ * get all necessary resources, but some values can be given as functions so that the value can be called
+ * lazy. The purpose of the is class is to collect all required resource for the init handler from the providers and
+ * to add these values the ResourceManager
+ */
+class ResourceRequest {
+
+    /**
+     * Constructs a new resource request which is initialized with the given resource object which maps
+     * resource keys to ids and there values (or lazy loading function to retrieve the value when its needed)
+     *
+     * @param {object} resources
+     */
+    constructor(resources) {
+        this.resources = resources || {}
+    }
+
+    /**
+     * Returns a boolean indicating whether any resources were passed to the constructor or not
+     *
+     * @returns {boolean}
+     */
+    isEmpty() {
+        const { image, audio, json, video } = this.resources
+
+        if (json && toKeys(json).length) return false
+        if (image && toKeys(image).length) return false
+        if (audio && toKeys(audio).length) return false
+
+        return !(video && toKeys(video).length)
+    }
+
+    /**
+     * Adds all resources and their fallback values to the given resource manager so that these get requested
+     * with the next load. If the values or given as lazy loading functions then the function is called to get
+     * the fallback value
+     *
+     * @param {ResourceManager} manager
+     */
+    addToManager(manager) {
+        if (!manager)
+            throw Error(`No resource manager given as parameter`)
+
+        const { json, image, audio, video } = this.resources
+
+        if (json) {
+            for (const [ id, content ] of toPairs(json)) {
+                manager.addJson(
+                    id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+        if (image) {
+            for (const [ id, content ] of toPairs(image)) {
+                manager.addImage(
+                    id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+        if (audio) {
+            for (const [ id, content ] of toPairs(audio)) {
+                manager.addAudio(
+                    id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+        if (video) {
+            for (const [ id, content ] of toPairs(video)) {
+                manager.addVideo(
+                    id, typeof content === 'function' ? content() : content
+                )
+            }
+        }
+    }
+}
+
 export {
+    setStaticTypes,
     ResourceManager,
     ResourceResolver,
+    SyncResolver,
+    DummyResolver,
+    getResourceProxy,
+    getResourceResolvePromise,
     ResourceCollection,
     Resources,
+    ImageResource,
     ImageResources,
+    AudioResource,
     AudioResources,
     JsonResources,
     VideoResources,
-    getResourcesAndCallback
+    getResourcesAndCallback,
+    createImageResource,
+    ResourceRequest
 }

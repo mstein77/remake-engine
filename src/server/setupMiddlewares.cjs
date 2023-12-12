@@ -8,7 +8,7 @@ const express = require("express")
 
 const { d } = require('../shared/classes/helper.cjs')
 const { RESOURCE_LOADING } = require('../build/classes/const.cjs')
-const resourcesController = require('./controller/resources.cjs')
+const { resourcesController } = require('./controller/resources.cjs')
 
 
 const setupAppMiddlewares = (app, config = null) => {

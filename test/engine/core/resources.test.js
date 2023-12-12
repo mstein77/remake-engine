@@ -1,16 +1,317 @@
-import { intersect, without, toPairs, toKeys,  d } from "helper/helper"
-import { ResourceManager, ImageResources, AudioResources, JsonResources, Resources, ResourceCollector,
-    getResourcesAndCallback
+import { toPairs,  d } from "helper/helper"
+import { ResourceManager, VideoResources, ImageResources, AudioResources, JsonResources, Resources, ResourceCollection,
+    getResourcesAndCallback, setStaticTypes
 } from "core/resources"
-import { StorageManager } from "core/storage"
-const { RESOURCE, id2jsonTid, id2imageTid, tid2typeText, tid2id, id2tid, resId2tid, typeText2tid } = require("shared/classes/resources.cjs")
+import { StorageManager } from "shared/classes/storage"
+import { MapStorage } from "shared/storage/mapStorage"
+import { RESOURCE, makeDescriptor, id2coreTid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tid2id, id2tid, typeText2tid } from "shared/classes/resources.cjs"
+import { createImageResource, ResourceRequest, AudioResource, ImageResource, getResourceResolvePromise, getResourceProxy, ResourceResolver, SyncResolver, DummyResolver } from "core/resources"
+import jest from 'jest-mock'
+import { processResourceRequest, processStoreRequest } from "../../../src/server/controller/resources.cjs"
 
-test('ResourceCollector', () => {
-    const c = new ResourceCollector()
-    expect(c.resources).toBeEmptyObject()
+test('getResourceResolvePromise', () => {
+    expect(() => getResourceResolvePromise()).toThrow()
+    expect(() => getResourceResolvePromise(id2coreTid('foo'), 'http://foo.bar', 'foo')).toThrow()
+    expect(() => getResourceResolvePromise(id2imageTid('foo'), {bar: 'foo2'})).toThrow()
+    expect(() => getResourceResolvePromise(id2coreTid('foo'), 'data:text/json;base64,Zbsdhwe', 'bar2')).toThrow()
+    expect(() => getResourceResolvePromise(id2jsonTid('foo'), null)).toThrow()
+    // TODO this one should not throw once we have a VideoResource implementation
+    expect(() => getResourceResolvePromise(id2videoTid('foo'), null)).toThrow()
+
+    getResourceResolvePromise(id2jsonTid('foo'), {bar: 'foo2'}, 'bar2').then(data => {
+        expect(data).toContainAllEntries([['id', id2jsonTid('foo')], ['value', {bar: 'foo2'}], ['origin', 'bar2.data']])
+    })
+    getResourceResolvePromise(id2audioTid('foo'), null, 'bar').then(
+        data => {
+            expect(data.id).toBe(id2audioTid('foo'))
+            expect(data.value).toBeInstanceOf(AudioResource)
+            expect(data.value.id).toBe('foo')
+            expect(data.origin).toBe('bar.staticurl')
+        }
+    )
+    getResourceResolvePromise(id2audioTid('foo'), 'data:audio/wav;base64,Abc', 'bar').then(
+        data => {
+            expect(data.id).toBe(id2audioTid('foo'))
+            expect(data.value).toBeInstanceOf(AudioResource)
+            expect(data.value.id).toBe('foo')
+            expect(data.origin).toBe('bar.data')
+        }
+    )
+    getResourceResolvePromise(id2imageTid('foo'), 'data:image/png;base64,Abc', 'bar').then(
+        data => {
+            expect(data.id).toBe(id2imageTid('foo'))
+            expect(data.value).toBeInstanceOf(ImageResource)
+            expect(data.value.id).toBe('foo')
+            expect(data.origin).toBe('bar.data')
+        }
+    )
+    // TODO video dataurl
+
+    setStaticTypes(['image', 'json', 'audio', 'video'])
+    getResourceResolvePromise(id2imageTid('foo'), null, 'bar').then(
+        data => {
+            expect(data.id).toBe(id2imageTid('foo'))
+            expect(data.value).toBeInstanceOf(ImageResource)
+            expect(data.value.id).toBe('foo')
+            expect(data.origin).toBe('bar.staticurl')
+            setStaticTypes(['audio', 'video'])
+        }
+    )
+    global.fetch = jest.fn(
+        () => Promise.resolve({ok: true, json: () => ({foo: 'bar'})}))
+
+    getResourceResolvePromise(id2jsonTid('foo'), null, 'bar').then(
+        data => {
+            expect(data.id).toBe(id2jsonTid('foo'))
+            expect(data.origin).toBe('bar.staticurl')
+            expect(data.value).toContainAllEntries([['foo', 'bar']])
+        }
+    )
 })
 
-/*
+const map2object = map => Object.fromEntries(map.entries())
+
+test('ResourceResolver', () => {
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resources = new Map()
+        const r = ResourceResolver(id2source, permId2scope)
+        r.resolve(resources).then(() => {
+            expect(map2object(id2source)).toContainAllEntries([])
+            expect(map2object(permId2scope)).toContainAllEntries([])
+            expect(map2object(resources)).toContainAllEntries([])
+        })
+    }
+
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resources = new Map()
+        const r = ResourceResolver(id2source, permId2scope)
+        r.add(id2imageTid('foo'), 'data:image/png;base64,Abc', 'bar')
+        r.resolve(resources, 'foo2').then(() => {
+            expect(map2object(id2source)).toContainAllEntries([
+                [id2imageTid('foo'), 'bar.data']
+            ])
+            expect(map2object(permId2scope)).toContainAllEntries([
+                [id2imageTid('foo'), 'foo2']
+            ])
+            expect(map2object(resources)).toContainAllKeys([id2imageTid('foo')])
+        })
+    }
+
+})
+
+test('getResourceProxy', () => {
+    expect(() => getResourceProxy()).toThrow()
+    expect(() => getResourceProxy('foo', {})).toThrow()
+
+    expect(() => getResourceProxy(RESOURCE.TYPE.IMAGE, {}).set('foo', 'bar')).toThrow()
+    expect(() => getResourceProxy(RESOURCE.TYPE.IMAGE, {}).foo = 'bar').toThrow()
+    expect(() => getResourceProxy(RESOURCE.TYPE.IMAGE, {}).foo).toThrow()
+    expect(() => getResourceProxy(RESOURCE.TYPE.IMAGE, {foo: 'bar2'}).foo = 'bar').toThrow()
+
+    expect(getResourceProxy(RESOURCE.TYPE.IMAGE, {'foo': 'xy'}).foo).toBe('xy')
+    expect(getResourceProxy(RESOURCE.TYPE.IMAGE, {'foo.png': 'xy'})['foo']).toBe('xy')
+    expect(getResourceProxy(RESOURCE.TYPE.IMAGE, {'foo': 'xy'})['foo.png']).toBe('xy')
+})
+
+test('SyncResolver', () => {
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resolvedResources = new Map()
+        const r = SyncResolver(id2source, permId2scope)
+        r.add(id2jsonTid('foo'), 'bar', 'foo2')
+        r.resolve(resolvedResources, 'testScope')
+        expect(map2object(resolvedResources)).toContainAllEntries([[id2jsonTid('foo'), 'bar']])
+        expect(map2object(id2source)).toContainAllEntries([[id2jsonTid('foo'), 'foo2.data']])
+        expect(map2object(permId2scope)).toContainAllEntries([[id2jsonTid('foo'), 'testScope']])
+    }
+
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resolvedResources = new Map()
+        const r = SyncResolver(id2source, permId2scope)
+        r.add(id2jsonTid('foo'), 'bar', 'foo2')
+        r.add(id2imageTid('foo.png'), 'bar2', 'foo2')
+        r.add(id2audioTid('foo'), 'bar3', 'foo2')
+        r.add(id2videoTid('foo'), 'bar4', 'foo2')
+        r.resolve(resolvedResources)
+        expect(map2object(resolvedResources)).toContainAllEntries([
+            [id2jsonTid('foo'), 'bar'],
+            [id2imageTid('foo.png'), 'bar2'],
+            [id2audioTid('foo'), 'bar3'],
+            [id2videoTid('foo'), 'bar4']
+        ])
+        expect(map2object(id2source)).toContainAllEntries([
+            [id2jsonTid('foo'), 'foo2.data'],
+            [id2imageTid('foo.png'), 'foo2.data'],
+            [id2audioTid('foo'), 'foo2.data'],
+            [id2videoTid('foo'), 'foo2.data']
+        ])
+        expect(map2object(permId2scope)).toContainAllEntries([])
+    }
+})
+
+test('DummyResolver', () => {
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resolvedResources = new Map()
+        const r = DummyResolver(id2source, permId2scope)
+        r.add(id2jsonTid('foo'), 'bar', 'foo2')
+        r.resolve(resolvedResources, 'testScope').then(() => {
+            expect(map2object(resolvedResources)).toContainAllEntries([[id2jsonTid('foo'), 'bar']])
+            expect(map2object(id2source)).toContainAllEntries([[id2jsonTid('foo'), 'foo2.data']])
+            expect(map2object(permId2scope)).toContainAllEntries([[id2jsonTid('foo'), 'testScope']])
+        })
+    }
+
+    {
+        const id2source = new Map()
+        const permId2scope = new Map()
+        const resolvedResources = new Map()
+        const r = DummyResolver(id2source, permId2scope)
+        r.add(id2jsonTid('foo'), 'bar', 'foo2')
+        r.add(id2imageTid('foo.png'), 'bar2', 'foo2')
+        r.add(id2audioTid('foo'), 'bar3', 'foo2')
+        r.add(id2videoTid('foo'), 'bar4', 'foo2')
+        r.resolve(resolvedResources).then(() => {
+            expect(map2object(resolvedResources)).toContainAllEntries([
+                [id2jsonTid('foo'), 'bar'],
+                [id2imageTid('foo.png'), 'bar2'],
+                [id2audioTid('foo'), 'bar3'],
+                [id2videoTid('foo'), 'bar4']
+            ])
+            expect(map2object(id2source)).toContainAllEntries([
+                [id2jsonTid('foo'), 'foo2.data'],
+                [id2imageTid('foo.png'), 'foo2.data'],
+                [id2audioTid('foo'), 'foo2.data'],
+                [id2videoTid('foo'), 'foo2.data']
+            ])
+            expect(map2object(permId2scope)).toContainAllEntries([])
+        })
+    }
+})
+
+test('ResourceCollection', () => {
+
+    function n( ...args ) {
+        return new ResourceCollection( ...args )
+    }
+
+    function c( ...args ) {
+        return Resources(null, ...args )
+    }
+
+    function i( ...args ) {
+        return ImageResources( ...args )
+    }
+
+    function iRes( ...args ) {
+        return i(...args).resources.image
+    }
+
+    expect(n().resources).toBeEmptyObject()
+    expect(iRes('foo')).toContainAllEntries([['foo', null]])
+    expect(iRes('foo', 'bar')).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(iRes('foo', null, 'bar')).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(iRes(['foo', 'bar'])).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(iRes({foo: null}, {bar: null})).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(iRes({foo: null}, 'bar')).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i('foo').addImage('bar').resources.image).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i('foo').add('bar').resources.image).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i().addImage('foo').add('bar').resources.image).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i().add(['foo', 'bar']).resources.image).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i().add({foo: 'fval', bar: 'bval'}).resources.image).toContainAllEntries([['foo', 'fval'], ['bar', 'bval']])
+    expect(iRes({'foo*': ['bar1', 'bar2']})).toContainAllEntries([['foo0', 'bar1'], ['foo1', 'bar2']])
+
+    expect(() => iRes({'foo': ['bar1', 'bar2']})).toThrow('No replace char')
+    expect(() => i('foo', 'foo')).toThrow('already')
+    expect(() => i('foo', 'foo.png')).toThrow('already')
+    expect(() => i('foo.png', 'foo')).toThrow('already')
+    expect(i().addAudio('foo').resources.audio).toContainAllEntries([['foo', null]])
+    expect(i().addVideo('foo', null).addVideo('bar').resources.video).toContainAllEntries([['foo', null], ['bar', null]])
+    expect(i().addJson('foo', {}).addJson('bar').resources.json).toContainAllEntries([['foo', {}], ['bar', null]])
+
+    expect(JsonResources('foo').resources).toContainAllKeys(['json'])
+    expect(AudioResources('foo').resources).toContainAllKeys(['audio'])
+    expect(VideoResources('foo').resources).toContainAllKeys(['video'])
+
+    expect(Resources({json: ['foo'], image: ['bar']}).resources).toContainAllKeys(['json', 'image'])
+    expect(Resources().add({json: ['foo'], image: ['bar']}).resources).toContainAllKeys(['json', 'image'])
+    expect(() => Resources('foo')).toThrow()
+    expect(() => Resources().add('foo')).toThrow()
+    expect(() => Resources({foo: 'bar'})).toThrow()
+
+})
+
+test('getResourcesAndCallback', () => {
+    expect(getResourcesAndCallback()).toContainAllEntries([
+        ['callback', undefined], ['resources', {}]
+    ])
+    const testCallback = () => {}
+    expect(getResourcesAndCallback(null, testCallback)).toContainAllEntries([
+        ['callback', testCallback], ['resources', {}]
+    ])
+
+    expect(() => getResourcesAndCallback(testCallback, testCallback)).toThrow()
+
+    expect(getResourcesAndCallback({json: ['foo']}, testCallback)).toContainAllEntries([
+        ['callback', testCallback],
+        ['resources', {json: {foo: null}}]
+    ])
+
+    expect(getResourcesAndCallback(testCallback, {json: ['foo'], image: {bar2: 'foo2'}}, ImageResources('bar'))).toContainAllEntries([
+        ['callback', testCallback],
+        ['resources', {json: {foo: null}, image: {bar: null, bar2: 'foo2'}}]
+    ])
+
+    expect(() => getResourcesAndCallback(testCallback, 'foo')).toThrow()
+
+    expect(() => getResourcesAndCallback({json: {foo: 'bar'}}, {json: {foo: 'bar2'}})).toThrow()
+    expect(() => getResourcesAndCallback({json: {foo: 'bar'}}, {json: {'foo.json': 'bar2'}})).toThrow()
+    expect(() => getResourcesAndCallback({json: {'foo.json': 'bar'}}, {json: {foo: 'bar2'}})).toThrow()
+
+})
+
+const newResourceManager = (server = {}, local = {}, session = {}) => {
+    const apiFetcher = getApiResponse(server)
+    const localStorage = new StorageManager(MapStorage())
+    localStorage.storeResourcesFromObject(local)
+    const sessionStorage = new StorageManager(MapStorage())
+    sessionStorage.storeResourcesFromObject(session)
+    return new ResourceManager(apiFetcher, localStorage, sessionStorage)
+}
+
+const getApiResponse = serverResourcesObj => {
+    const storage = MapStorage()
+    const SM = new StorageManager(storage)
+    SM.storeResourcesFromObject(serverResourcesObj)
+
+    const routes = {
+        has: ({ resources }) => {
+            const found = []
+            for (const tid of resources) {
+                if (SM.hasResource(tid)) found.push(tid)
+            }
+            return Promise.resolve({ found })
+        },
+
+        store: body => {
+            return Promise.resolve(processStoreRequest(body, SM))
+        },
+        resources: body => Promise.resolve(processResourceRequest(body, SM))
+    }
+
+    return {
+        fetch: (name, json) => routes[name](json)
+    }
+}
+
 test('ResourceManager', () => {
 
     function makeModels(models, dependencies = {}) {
@@ -18,8 +319,9 @@ test('ResourceManager', () => {
             getResourcesAndDependencies: () => {
                 const resources = []
                 for (const [ tid, data ] of toPairs(models)) {
-                    const type = tid2typeText(tid)
-                    const id = tid2id(tid)
+                    const descriptor = makeDescriptor.fromTid(tid)
+                    const type = descriptor.key
+                    const id = descriptor.id
                     resources.unshift({ id, data, type })
                 }
                 return {
@@ -30,96 +332,135 @@ test('ResourceManager', () => {
         }
     }
 
-    const getApiResponse = serverResourcesObj => {
-        const map =  new Map()
-        for (const [ key, value ] of Object.entries(serverResourcesObj)) map.set(key, value)
-
-        const scope2ids = map.get(id2jsonTid('scope2ids')) ?? {}
-        const id2children = map.get(id2jsonTid('id2children')) ?? {}
-
-        const routes = {
-            has: ({ resources }) => {
-                const found = []
-                for (const tid of resources) {
-                    if (map.has(tid)) found.push(tid)
-                }
-                return Promise.resolve({ found })
-            },
-
-            store: ({ resources, dependencies, scope = null }) => {
-                const stored = []
-                for (const { id, type, data } of resources) {
-                    const tid = typeText2tid(type, id)
-                    map.set(tid, data)
-                    stored.push(tid)
-                }
-                for (const [ resId, resIds ] of toPairs(dependencies)) {
-                    id2children[resId] = resIds
-                }
-                if (scope !== null) {
-                    const scopeIds = scope2ids[scope] ?? []
-                    const tid = typeText2tid(resources[0].type, resources[0].id)
-                    if (!scopeIds.includes(tid)) scopeIds.push(tid)
-                    scope2ids[scope] = scopeIds
-                }
-                return Promise.resolve({ stored })
-            },
-
-            resources: ({ scope, resources, storeInfo }) => {
-
-                const requestedTids = [ ...resources ]
-                const found = {}
-                const add = []
-                const missing = []
-                const { id2resolved, id2children: storeId2children } = storeInfo
-                const storedTids = toKeys(id2resolved)
-
-                const scopeIds = scope2ids[scope] ?? []
-                for (const tid of scopeIds) {
-                    if (!requestedTids.includes(tid)) requestedTids.push(tid)
-                }
-
-                for (const tid of requestedTids) {
-                    if (storedTids.includes(tid)) {
-                        if (!id2resolved[tid]) {
-                            add.push(tid)
-                        }
-                        const children = storeId2children[tid] ?? []
-                        for (const child of children) {
-                            if (requestedTids.includes(child)) continue
-                            requestedTids.push(child)
-                        }
-                        continue
-                    }
-
-                    const value = map.get(tid)
-                    if (value) {
-                        found[tid] = value
-                        const children = id2children[tid] ?? []
-                        for (const child of children) {
-                            if (requestedTids.includes(child)) continue
-                            requestedTids.push(child)
-                        }
-                    } else {
-                        missing.push(tid)
-                    }
-                }
-                return Promise.resolve({ found, missing, add })
-            }
-        }
-
-        return {
-            fetch: (name, json) => routes[name](json)
-        }
+    // test flags
+    {
+        const r = newResourceManager()
+        expect(r.disabled).toBeFalse()
+        expect(r.preview).toBeFalse()
+        r.setDisabled(true)
+        expect(r.disabled).toBeTrue()
+        r.setPreview(true)
+        expect(r.preview).toBeTrue()
     }
 
-    const newResourceManager = (server = {}, local = {}, session = {}) => {
-        const apiFetcher = getApiResponse(server)
-        const localStorage = new StorageManager(MapStorageHandler())
-        localStorage.storeFromObject(local)
-        const sessionStorage = new StorageManager(MapStorageHandler())
-        sessionStorage.storeFromObject(session)
-        return new ResourceManager(apiFetcher, localStorage, sessionStorage)
+    {
+        const r = newResourceManager({[id2coreTid('id2scope')]: 'bar'})
+        expect(() => r.loadPermanentScope()).toThrow()
+        expect(() => r.loadTemporaryScope()).toThrow()
+        r.loadTemporaryScope('test').then(() => {
+            expect(() => r.getResourceById(RESOURCE.TYPE.CORE, 'id2scope')).toThrow()
+            expect(() => r.getResourceById(RESOURCE.TYPE.JSON, 'id2scope')).toThrow()
+        })
+    }
+
+    {
+        const r = newResourceManager({[id2coreTid('id2scope')]: 'bar'})
+        r.addImage('foo')
+        // TODO find a way to catch this correctly
+        // expect(() => r.loadTemporaryScope('bar')).toThrow()
+    }
+
+    {
+        const r = newResourceManager()
+        expect(r.hasImage('foo')).toBeFalse()
+        expect(r.hasAudio('foo')).toBeFalse()
+        expect(r.hasVideo('foo')).toBeFalse()
+        expect(r.hasPermanentImage('foo')).toBeFalse()
+        expect(r.hasPermanentAudio('foo')).toBeFalse()
+        expect(r.hasPermanentVideo('foo')).toBeFalse()
+        expect(r.getAllResourceIds(RESOURCE.TYPE.IMAGE)).toBeEmpty()
+        expect(r.getAllResourceIds(RESOURCE.TYPE.AUDIO)).toBeEmpty()
+        expect(r.getAllResourceIds(RESOURCE.TYPE.VIDEO)).toBeEmpty()
+    }
+
+    {
+        const r = newResourceManager()
+        r.addImage('foo', 'bar1')
+        r.addAudio('foo', 'bar2')
+        r.addVideo('foo', 'bar3')
+        r.loadTemporaryScope('test').then(() => {
+            expect(r.hasImage('foo')).toBeTrue()
+            expect(r.hasAudio('foo')).toBeTrue()
+            expect(r.hasVideo('foo')).toBeTrue()
+            expect(r.hasPermanentImage('foo')).toBeFalse()
+            expect(r.hasPermanentAudio('foo')).toBeFalse()
+            expect(r.hasPermanentVideo('foo')).toBeFalse()
+            expect(r.getImage('foo')).toBe('bar1')
+            expect(r.getAudio('foo')).toBe('bar2')
+            expect(r.getVideo('foo')).toBe('bar3')
+
+            // TODO this is not correct
+            expect(r.getAllResourceIds(RESOURCE.TYPE.JSON)).toBeEmpty()
+            expect(r.getAllResourceIds(RESOURCE.TYPE.IMAGE)).toBeEmpty()
+            expect(r.getAllResourceIds(RESOURCE.TYPE.AUDIO)).toBeEmpty()
+            expect(r.getAllResourceIds(RESOURCE.TYPE.VIDEO)).toBeEmpty()
+
+            r.setDisabled(true)
+            expect(r.hasImage('foo')).toBeFalse()
+            r.setDisabled(false)
+            expect(r.hasImage('foo')).toBeTrue()
+            r.clearTemporary()
+            expect(r.hasImage('foo')).toBeFalse()
+        })
+    }
+
+    {
+        const r = newResourceManager()
+        r.addImage('foo', 'bar1')
+        r.addAudio('foo', 'bar2')
+        r.addVideo('foo', 'bar3')
+        r.loadTemporaryScope('test').then(() => {
+            expect(r.getAudioOrigin('foo')).toBe('code.data')
+            expect(r.getVideoOrigin('foo')).toBe('code.data')
+            r.removeImage('foo')
+            r.removeAudio('foo')
+            r.removeVideo('foo')
+            expect(r.hasImage('foo')).toBeFalse()
+            expect(r.hasAudio('foo')).toBeFalse()
+            expect(r.hasVideo('foo')).toBeFalse()
+        })
+    }
+
+    {
+        const r = newResourceManager({}, {[id2imageTid('foo')]: 'bar'})
+        expect(r.hasBrowserResources()).toBeTrue()
+        r.clearBrowserResources()
+        expect(r.hasBrowserResources()).toBeFalse()
+    }
+
+    {
+        const r = newResourceManager()
+        r.addImage('foo', 'bar1')
+        r.loadPermanentScope('test').then(() => {
+            r.addImage('foo2', 'bar2')
+            r.loadPermanentScope('globals').then(() => {
+                r.addImage('foo3', 'bar3')
+                r.loadTemporaryScope('temp').then(() => {
+                    r.clearTempAndGlobals()
+                    expect(r.hasImage('foo2')).toBeFalse()
+                    expect(r.hasImage('foo3')).toBeFalse()
+                    expect(r.hasImage('foo')).toBeTrue()
+                })
+            })
+        })
+    }
+
+    {
+        const r = newResourceManager()
+        r.addImage('foo', 'bar1')
+        r.loadPermanentScope('test').then(() => {
+            r.addImage('foo2', 'bar2')
+            r.loadPermanentScope('globals').then(() => {
+                r.addImage('foo3', 'bar3')
+                r.loadTemporaryScope('temp').then(() => {
+                    expect(r.getImageSource('foo')).toBe('code.data')
+                    r.clear()
+                    expect(r.hasImage('foo2')).toBeFalse()
+                    expect(r.hasImage('foo3')).toBeFalse()
+                    expect(r.hasImage('foo')).toBeFalse()
+                })
+            })
+        })
     }
 
     // browser override
@@ -129,11 +470,11 @@ test('ResourceManager', () => {
         expect(RB.resources.json).toBeEmptyObject()
         RB.addJson('test', 'xy')
         expect(RB.resources.json).toBeEmptyObject()
-
-        RB.load().then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['test', 'z']])
-            expect(RB.getJsonOrigin('test')).toEqual('browser')
+        RB.loadTemporaryScope('bar').then(() => {
+            expect(RB.resources.json.test).toBe('z')
+            expect(RB.resources.json['test.json']).toBe('z')
+            expect(RB.getJsonOrigin('test')).toEqual('browser.data')
+            expect(RB.getJsonOrigin('test.json')).toEqual('browser.data')
         })
     }
 
@@ -143,11 +484,11 @@ test('ResourceManager', () => {
         expect(RB.resources.json).toBeEmptyObject()
 
         RB.addJson('foo', 'bar')
-        RB.load().then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar']])
+        RB.loadTemporaryScope('testScope').then(() => {
+            expect(RB.resources.json.foo)
+                .toBe('bar')
             expect(RB.getJsonOrigin('foo'))
-                .toEqual('code')
+                .toBe('code.data')
         })
     }
 
@@ -157,11 +498,10 @@ test('ResourceManager', () => {
         expect(RB.resources.json).toBeEmptyObject()
 
         RB.addJson('foo', 'bar')
-        RB.load().then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar2']])
+        RB.loadTemporaryScope('testScope').then(() => {
+            expect(RB.resources.json.foo).toBe('bar2')
             expect(RB.getJsonOrigin('foo'))
-                .toEqual('server')
+                .toEqual('server.data')
         })
     }
 
@@ -177,9 +517,9 @@ test('ResourceManager', () => {
         RB.addJson('a', '_a')
         RB.addJson('b', '_b')
         RB.addJson('c', '_c')
-        RB.load().then(() => {
+        RB.loadTemporaryScope('testScope').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['a', 'A'], ['b', '_b'], ['c', 'C']])
+                .toContainAllEntries([['a.json', 'A'], ['b.json', '_b'], ['c.json', 'C']])
         })
     }
 
@@ -187,19 +527,28 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager({}, {[id2jsonTid('x')]: 'perm', [id2jsonTid('y')]: 'temp1', [id2jsonTid('z')]: 'temp2'});
         RB.addJson('x');
-        RB.load('myScope', true).then(() => {
+        RB.loadPermanentScope('myScope').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['x', 'perm']])
+                .toContainAllEntries([['x.json', 'perm']])
 
             RB.addJson('y')
-            RB.load('myScope', false).then(() => {
+            RB.loadTemporaryScope('myScope').then(() => {
                 expect(RB.resources.json)
-                    .toContainAllEntries([['x', 'perm'], ['y', 'temp1']])
+                    .toContainAllEntries([['x.json', 'perm'], ['y.json', 'temp1']])
 
+                expect(RB.hasPermanentJson('y')).toBeFalse()
+                expect(RB.hasPermanentJson('x.json')).toBeTrue()
+                expect(RB.hasJson('x')).toBeTrue()
+                expect(RB.hasJson('y')).toBeTrue()
                 RB.addJson('z')
-                RB.load('myScope', false).then(() => {
+                RB.loadTemporaryScope('myScope').then(() => {
                     expect(RB.resources.json)
-                        .toContainAllEntries([['x', 'perm'], ['z', 'temp2']])
+                        .toContainAllEntries([['x.json', 'perm'], ['z.json', 'temp2']])
+                    expect(RB.hasPermanentScope('xScope')).toBeFalse()
+                    expect(RB.hasPermanentScope('myScope')).toBeTrue()
+                    RB.invalidatePermanentScope('myScope')
+                    expect(RB.hasPermanentScope('myScope')).toBeFalse()
+                    expect(RB.getJson('z')).toBe('temp2')
                 })
             })
         })
@@ -211,29 +560,29 @@ test('ResourceManager', () => {
         RB.addJson('game', 'myConfig')
         RB.load('game', true).then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['game', 'myConfig']])
+                .toContainAllEntries([['game.json', 'myConfig']])
 
             // globals
             RB.addJson('perm', 'perm1')
             RB.load('global', true).then(() => {
                 expect(RB.resources.json)
-                    .toContainAllEntries([['game', 'myConfig'], ['perm', 'perm1']])
+                    .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1']])
 
                 RB.addJson('temp', 'temp1')
                 RB.load('screen1').then(() => {
                     expect(RB.resources.json)
-                        .toContainAllEntries([['game', 'myConfig'], ['perm', 'perm1'], ['temp', 'temp1']])
+                        .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1'], ['temp.json', 'temp1']])
 
                     RB.addJson('temp2', 'temp2')
                     RB.load('screen2').then(() => {
                         expect(RB.resources.json)
-                            .toContainAllEntries([['game', 'myConfig'], ['perm', 'perm1'], ['temp2', 'temp2']])
+                            .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1'], ['temp2.json', 'temp2']])
 
                         expect(RB.hasPermanentJson('game')).toBeTrue()
                         RB.removeJson('game')
                         expect(RB.hasPermanentJson('game')).toBeFalse()
                         expect(RB.resources.json)
-                            .toContainAllEntries([['perm', 'perm1'], ['temp2', 'temp2']])
+                            .toContainAllEntries([['perm.json', 'perm1'], ['temp2.json', 'temp2']])
                     })
                 })
             })
@@ -242,39 +591,39 @@ test('ResourceManager', () => {
 
     // global server dependencies
     {
-        const RB = newResourceManager({[id2jsonTid('scope2ids')]: {'': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar'})
-        RB.load('', true).then(() => {
+        const RB = newResourceManager({[id2coreTid('scope2ids')]: {'test': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar'})
+        RB.load('test', true).then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar']])
+                .toContainAllEntries([['foo.json', 'bar']])
         })
     }
 
     // global server dependencies
     {
         const RB = newResourceManager(
-            {[id2jsonTid('scope2ids')]: {'': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2', [id2jsonTid('id2children')]: {[id2jsonTid('foo')]: [id2jsonTid('foo2')]}})
-        RB.load('', true).then(() => {
+            {[id2coreTid('scope2ids')]: {globals: [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2', [id2coreTid('id2children')]: {[id2jsonTid('foo')]: [id2jsonTid('foo2')]}})
+        RB.loadPermanentScope('globals').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar'], ['foo2', 'bar2']])
+                .toContainAllEntries([['foo.json', 'bar'], ['foo2.json', 'bar2']])
         })
     }
 
     // page server dependencies
     {
-        const RB = newResourceManager({[id2jsonTid('scope2ids')]: {'screen1': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2'})
+        const RB = newResourceManager({[id2coreTid('scope2ids')]: {'screen1': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2'})
         RB.addJson('foo2')
-        RB.load('screen1', false).then(() => {
+        RB.loadTemporaryScope('screen1').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar'], ['foo2', 'bar2']])
+                .toContainAllEntries([['foo.json', 'bar'], ['foo2.json', 'bar2']])
         })
     }
 
     // server dep overwritten by local store
     {
-        const RB = newResourceManager({[id2jsonTid('scope2ids')]: {'': [id2jsonTid('foo'), id2jsonTid('foo2')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bars'}, {[id2jsonTid('scope2ids')]: {'': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar2'})
-        RB.load('', true).then(() => {
+        const RB = newResourceManager({[id2coreTid('scope2ids')]: {'globals': [id2jsonTid('foo'), id2jsonTid('foo2')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bars'}, {[id2coreTid('scope2ids')]: {'globals': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar2'})
+        RB.loadPermanentScope('globals').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar2'], ['foo2', 'bars']])
+                .toContainAllEntries([['foo.json', 'bar2'], ['foo2.json', 'bars']])
         })
     }
 
@@ -282,28 +631,28 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager(
             {
-                [id2jsonTid('scope2ids')]: {
+                [id2coreTid('scope2ids')]: {
                     screen: [id2jsonTid('b')]
                 },
-                [id2jsonTid('id2children')]: {
+                [id2coreTid('id2children')]: {
                     [id2jsonTid('b')]: [id2jsonTid('c')]
                 },
                 [id2jsonTid('b')]: 'foo2'
             },
             {
-                [id2jsonTid('scope2ids')]: {
+                [id2coreTid('scope2ids')]: {
                     screen: [id2jsonTid('a')]
                 },
-                [id2jsonTid('id2children')]: {
+                [id2coreTid('id2children')]: {
                     [id2jsonTid('a')]: [id2jsonTid('b')]
                 },
                 [id2jsonTid('a')]: 'foo1',
                 [id2jsonTid('c')]: 'foo3'
             }
         )
-        RB.load('screen').then(() => {
+        RB.loadTemporaryScope('screen').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['a', 'foo1'], ['b', 'foo2'], ['c', 'foo3']])
+                .toContainAllEntries([['a.json', 'foo1'], ['b.json', 'foo2'], ['c.json', 'foo3']])
         })
     }
 
@@ -311,113 +660,114 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager(
             {
-                [id2jsonTid('scope2ids')]: {
+                [id2coreTid('scope2ids')]: {
                     screen: [id2jsonTid('a')]
                 },
-                [id2jsonTid('id2children')]: {
+                [id2coreTid('id2children')]: {
                     [id2jsonTid('a')]: [id2jsonTid('b')]
                 },
                 [id2jsonTid('a')]: 'foo1',
                 [id2jsonTid('c')]: 'foo3'
             },
             {
-                [id2jsonTid('scope2ids')]: {
+                [id2coreTid('scope2ids')]: {
                     screen: [id2jsonTid('b')]
                 },
-                [id2jsonTid('id2children')]: {
+                [id2coreTid('id2children')]: {
                     [id2jsonTid('b')]: [id2jsonTid('c')]
                 },
                 [id2jsonTid('b')]: 'foo2'
             }
         )
-        RB.load('screen').then(() => {
+        RB.loadTemporaryScope('screen').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['a', 'foo1'], ['b', 'foo2'], ['c', 'foo3']])
+                .toContainAllEntries([['a.json', 'foo1'], ['b.json', 'foo2'], ['c.json', 'foo3']])
         })
     }
 
-    // check clear of store-only dependence
-    {
-        const RB = newResourceManager({},{
-            [id2jsonTid('scope2ids')]: {
-                'testScreen': [id2jsonTid('font')]
-            },
-            [id2jsonTid('id2children')]: {
-                [id2jsonTid('font')]: [id2imageTid('myFont')]
-            },
-            [id2jsonTid('font')]: 'foo',
-            [id2imageTid('myFont')]: 'fooimg'
-        })
-        RB.load('testScreen').then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['font', 'foo']])
-            expect(RB.resources.image)
-                .toContainAllEntries([['myFont', 'fooimg']])
+        // check clear of store-only dependence
+        {
+            const RB = newResourceManager({},{
+                [id2coreTid('scope2ids')]: {
+                    'testScreen': [id2jsonTid('font')]
+                },
+                [id2coreTid('id2children')]: {
+                    [id2jsonTid('font')]: [id2imageTid('myFont')]
+                },
+                [id2jsonTid('font')]: 'foo',
+                [id2imageTid('myFont')]: 'fooimg'
+            })
 
-            RB.deleteFromStore(id2imageTid('myFont')).then(() => {
-                RB.load('testScreen').then(() => {
-                    expect(RB.resources.json)
-                        .toContainAllEntries([['font', 'foo']])
-                    expect(RB.resources.image)
-                        .toBeEmptyObject()
+            RB.loadTemporaryScope('testScreen').then(() => {
+                expect(RB.resources.json)
+                    .toContainAllEntries([['font.json', 'foo']])
+                expect(RB.resources.image)
+                    .toContainAllEntries([['myFont.png', 'fooimg']])
+
+                RB.deleteFromStore(id2imageTid('myFont')).then(() => {
+                    RB.load('testScreen').then(() => {
+                        expect(RB.resources.json)
+                            .toContainAllEntries([['font.json', 'foo']])
+                        expect(RB.resources.image)
+                            .toBeEmptyObject()
+                    })
                 })
             })
-        })
-    }
+        }
 
-    // check clear of store-only resource + dependence
-    {
-        const RB = newResourceManager({}, {
-            [id2jsonTid('scope2ids')]: {
-                'testScreen': [id2jsonTid('font')]
-            },
-            [id2jsonTid('id2children')]: {
-                [id2jsonTid('font')]: [id2imageTid('myFont')]
-            },
-            [id2jsonTid('font')]: 'foo',
-            [id2imageTid('myFont')]: 'fooimg'
-        })
-        RB.load('testScreen').then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['font', 'foo']])
-            expect(RB.resources.image)
-                .toContainAllEntries([['myFont', 'fooimg']])
+        // check clear of store-only resource + dependence
+        {
+            const RB = newResourceManager({}, {
+                [id2coreTid('scope2ids')]: {
+                    'testScreen': [id2jsonTid('font')]
+                },
+                [id2coreTid('id2children')]: {
+                    [id2jsonTid('font')]: [id2imageTid('myFont')]
+                },
+                [id2jsonTid('font')]: 'foo',
+                [id2imageTid('myFont')]: 'fooimg'
+            })
+            RB.loadTemporaryScope('testScreen').then(() => {
+                expect(RB.resources.json)
+                    .toContainAllEntries([['font.json', 'foo']])
+                expect(RB.resources.image)
+                    .toContainAllEntries([['myFont.png', 'fooimg']])
 
-            RB.deleteFromStore(id2jsonTid('font')).then(() => {
-                RB.load('testScreen').then(() => {
-                    expect(RB.resources.json)
-                        .toBeEmptyObject()
-                    expect(RB.resources.image)
-                        .toBeEmptyObject()
+                RB.deleteFromStore(id2jsonTid('font')).then(() => {
+                    RB.loadTemporaryScope('testScreen').then(() => {
+                        expect(RB.resources.json)
+                            .toBeEmptyObject()
+                        expect(RB.resources.image)
+                            .toBeEmptyObject()
+                    })
                 })
             })
-        })
-    }
+        }
 
-    // simple json store
-    {
-        const RB = newResourceManager()
-        RB.storeModel(makeModels({[id2jsonTid('foo')]: 'bar'}), 'test')
-        RB.load('test').then(() => {
-            expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar']])
-            expect(RB.resources.image)
-                .toBeEmptyObject()
-            expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser')
-        })
-    }
+        // simple json store
+        {
+            const RB = newResourceManager()
+            RB.storeModel(makeModels({[id2jsonTid('foo')]: 'bar'}), 'test')
+            RB.loadTemporaryScope('test').then(() => {
+                expect(RB.resources.json)
+                    .toContainAllEntries([['foo.json', 'bar']])
+                expect(RB.resources.image)
+                    .toBeEmptyObject()
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser.data')
+            })
+        }
 
     // simple json store & deploy
     {
         const RB = newResourceManager()
-        RB.storeModel(makeModels({[id2jsonTid('foo')]: 'bar'}), 'test')
-        RB.deployModel(makeModels({[id2jsonTid('foo')]: 'bar2'}), 'test').then(() => {
-            RB.load('test').then(() => {
+        RB.storeModel(makeModels({[id2jsonTid('foo')]: 'bar'}), 'testfoo')
+        RB.deployModel(makeModels({[id2jsonTid('foo')]: 'bar2'}), 'testfoo').then(() => {
+            RB.loadTemporaryScope('testfoo').then(() => {
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
                 expect(RB.resources.json)
-                    .toContainAllEntries([['foo', 'bar2']])
+                    .toContainAllEntries([['foo.json', 'bar2']])
                 expect(RB.resources.image)
                     .toBeEmptyObject()
-                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
             })
         })
     }
@@ -430,11 +780,11 @@ test('ResourceManager', () => {
             [id2imageTid('barimg')]: 'myImg'
         }, {[id2jsonTid('foo')]: [id2imageTid('barimg')]})
         RB.storeModel(models, 'test')
-        RB.load('test').then(() => {
+        RB.loadTemporaryScope('test').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar']])
+                .toContainAllEntries([['foo.json', 'bar']])
             expect(RB.resources.image)
-                .toContainAllEntries([['barimg', 'myImg']])
+                .toContainAllEntries([['barimg.png', 'myImg']])
         })
     }
 
@@ -447,13 +797,13 @@ test('ResourceManager', () => {
         }, {[id2jsonTid('foo')]: [id2imageTid('barimg')]})
         RB.storeModel(model, 'test')
         RB.deployModel(model, 'test').then(() => {
-            RB.load('test').then(() => {
+            RB.loadTemporaryScope('test').then(() => {
                 expect(RB.resources.json)
-                    .toContainAllEntries([['foo', 'bar']])
+                    .toContainAllEntries([['foo.json', 'bar']])
                 expect(RB.resources.image)
-                    .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
-                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
+                    .toContainAllEntries([['barimg.png', 'myImg']])
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server.data')
             })
         })
     }
@@ -466,11 +816,11 @@ test('ResourceManager', () => {
             [id2jsonTid('foo')]: 'bar',
             [id2imageTid('barimg')]: 'myImg'
         }, {[id2jsonTid('foo')]: [id2imageTid('barimg')], [id2jsonTid('font')]: [id2jsonTid('foo')]}), 'test')
-        RB.load('test').then(() => {
+        RB.loadTemporaryScope('test').then(() => {
             expect(RB.resources.json)
-                .toContainAllEntries([['foo', 'bar'], ['font', 'myFont']])
+                .toContainAllEntries([['foo.json', 'bar'], ['font.json', 'myFont']])
             expect(RB.resources.image)
-                .toContainAllEntries([['barimg', 'myImg']])
+                .toContainAllEntries([['barimg.png', 'myImg']])
         })
     }
 
@@ -485,14 +835,14 @@ test('ResourceManager', () => {
         )
         RB.storeModel(model, 'test')
         RB.deployModel(model, 'test').then(() => {
-            RB.load('test').then(() => {
+            RB.loadTemporaryScope('test').then(() => {
                 expect(RB.resources.json)
-                    .toContainAllEntries([['foo', 'bar'], ['font', 'myFont']])
+                    .toContainAllEntries([['foo.json', 'bar'], ['font.json', 'myFont']])
                 expect(RB.resources.image)
-                    .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server')
-                expect(RB.getResourceOrigin(id2jsonTid('font'))).toEqual('server')
-                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
+                    .toContainAllEntries([['barimg.png', 'myImg']])
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
+                expect(RB.getResourceOrigin(id2jsonTid('font'))).toEqual('server.data')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server.data')
             })
         })
     }
@@ -510,13 +860,13 @@ test('ResourceManager', () => {
             // deployment of "ibarimg"
             // => abhängigkeit von foo im store muss erhalten bleiben
             //    content muss aber vom server statt
-            RB.load('test').then(() => {
+            RB.loadTemporaryScope('test').then(() => {
                 expect(RB.resources.json)
-                    .toContainAllEntries([['foo', 'bar']])
+                    .toContainAllEntries([['foo.json', 'bar']])
                 expect(RB.resources.image)
-                    .toContainAllEntries([['barimg', 'myImg']])
-                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser')
-                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server')
+                    .toContainAllEntries([['barimg.png', 'myImg']])
+                expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser.data')
+                expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server.data')
             })
         })
     }
@@ -553,275 +903,79 @@ test('ResourceManager', () => {
 
     // deploy model
 
+    */
+})
+
+test('createImageResource', () => {
+    {
+        const res = createImageResource(undefined, 'foo')
+        expect(res).toBeInstanceOf(ImageResource)
+        expect(res.isResolved()).toBeTrue()
+        expect(res.getId()).toBe('foo')
+        expect(res.width).toBe(100)
+        expect(res.height).toBe(100)
+        expect(res.getImage()).toContainAnyEntries([['width', 100], ['height', 100]])
+    }
+
+    {
+        const res = createImageResource(null)
+        expect(res).toBeInstanceOf(ImageResource)
+        expect(res.isResolved()).toBeTrue()
+        expect(res.getId()).toBe(null)
+    }
+
 
 })
 
-test('SingleResourceProvider', () => {
-    expect(() => (new SingleResourceProvider()).key).toThrow('No key')
-    expect(() => (new SingleResourceProvider()).validateContent()).not.toThrow('No key')
-})
-*/
+test('ResourceRequest', () => {
 
-test('ImageResources', () => {
-    expect(() => ImageResources({'foo.png': 'http://bar'}).add('foo.png', 'http://bar2'))
-        .toThrow('already exists')
-    expect(() => ImageResources({'foo.jpg': 'http://bar'}))
-        .toThrow('.png')
-    expect(() => ImageResources({'foo.jpeg': 'http://bar'}))
-        .toThrow('.png')
-    expect(() => ImageResources({'foo.gif': 'http://bar'}))
-        .toThrow('.png')
+    const req = resources => new ResourceRequest(resources)
+    {
+        const r = req()
+        r.addToManager(newResourceManager())
+        expect(r.isEmpty()).toBeTrue()
+    }
 
-    expect(() => ImageResources().add(false, 'foo'))
-        .toThrow('type')
-    expect(() => ImageResources().add(null, 'foo'))
-        .toThrow('type')
-    expect(() => ImageResources().add(undefined, 'foo'))
-        .toThrow('type')
-    expect(() => ImageResources().addArray('foo.png', null))
-        .toThrow('array')
-    expect(() => ImageResources().addArray('foo.png', {}))
-        .toThrow('array')
-    expect(() => ImageResources().addArray('foo.png', 'http://bar'))
-        .toThrow('array')
-    expect(() => ImageResources().addObject(null))
-        .toThrow('object')
-    expect(() => ImageResources().addObject('foo'))
-        .toThrow('object')
+    {
+        const r = req()
+        expect(() => r.addToManager()).toThrow()
+    }
 
-    expect(() => ImageResources().add('foo.png', null))
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', 666))
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', {}))
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', 'xy'))
-        .toThrow('URL')
-    expect(() => ImageResources().add('foo.png', () => null).resources.image['foo.png']())
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', () => 666).resources.image['foo.png']())
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', () => ({})).resources.image['foo.png']())
-        .toThrow('string')
-    expect(() => ImageResources().add('foo.png', () => (() => {})).resources.image['foo.png']())
-        .toThrow('string')
+    {
+        const r = req({image: {}})
+        expect(r.isEmpty()).toBeTrue()
+    }
 
-    expect(ImageResources().resources)
-        .toMatchObject({image: {}})
+    {
+        const r = req({image: {foo: 'bar'}})
+        expect(r.isEmpty()).toBeFalse()
+    }
 
-    expect(ImageResources({'foo.png': 'http://bar'}).resources)
-        .toMatchObject({image: {'foo.png': 'http://bar'}})
+    {
+        const r = req({image: {}, audio: {foo: 'bar'}})
+        expect(r.isEmpty()).toBeFalse()
+    }
 
-    expect(ImageResources().add('foo.png', () => 'http://bar').resources.image['foo.png']())
-        .toEqual('http://bar')
+    {
+        const r = req({image: {}, audio: {}, video: {foo: 'bar'}})
+        expect(r.isEmpty()).toBeFalse()
+    }
 
-    expect(ImageResources().add('foo.png', 'http://bar').resources)
-        .toMatchObject({image: {'foo.png': 'http://bar'}})
+    {
+        const r = req({
+            json: {foo: 'bar', 'f.json': () => 'ok'},
+            image: {foo2: 'bar2', 'f2.png': () => 'ok2'},
+            audio: {foo3: 'bar3', 'f3.wav': () => 'ok3'},
+            video: {foo4: 'bar4', 'f4.mp4': () => 'ok4'}
+        })
+        expect(r.isEmpty()).toBeFalse()
 
-    expect(ImageResources().add('foo.png', 'data:image/png;base64,XCD').resources)
-        .toMatchObject({image: {'foo.png': 'data:image/png;base64,XCD'}})
-
-    expect(ImageResources({'foo.png': 'http://bar'}).add('foo2.png', 'http://bar2').resources)
-        .toMatchObject({image: {'foo.png': 'http://bar', 'foo2.png': 'http://bar2'}})
-
-    expect(ImageResources({'foo.png': 'http://bar', 'foo2.png': 'http://bar2'}).resources)
-        .toMatchObject({image: {'foo.png': 'http://bar', 'foo2.png': 'http://bar2'}})
-
-    expect(ImageResources().add({'foo.png': 'http://bar', 'foo2.png': 'http://bar2'}).resources)
-        .toMatchObject({image: {'foo.png': 'http://bar', 'foo2.png': 'http://bar2'}})
-
-    expect(ImageResources({'foo.png': ['http://bar', 'http://bar2']}).resources)
-        .toMatchObject({image: {'foo_0.png': 'http://bar', 'foo_1.png': 'http://bar2'}})
-
-    expect(ImageResources({'My_home/Img_files/Foo.bar_img.png': 'https://foo'}).resources)
-        .toMatchObject({image: {'My_home/Img_files/Foo.bar_img.png': 'https://foo'}})
-})
-
-test('AudioResources', () => {
-    expect(() => AudioResources({'foo.mp3': 'http://bar'}).add('foo.mp3', 'http://bar2').resources)
-        .toThrow('already exists')
-    expect(() => AudioResources({'foo': 'http://bar'}))
-        .toThrow('.wav')
-    expect(() => AudioResources({'foo.ogg': 'http://bar'}))
-        .toThrow('.mp3')
-    expect(() => AudioResources().add(false, 'foo'))
-        .toThrow('type')
-    expect(() => AudioResources().add(null, 'foo'))
-        .toThrow('type')
-    expect(() => AudioResources().add(undefined, 'foo'))
-        .toThrow('type')
-    expect(() => AudioResources().addArray('foo.mp3', null))
-        .toThrow('array')
-    expect(() => AudioResources().addArray('foo.mp3', {}))
-        .toThrow('array')
-    expect(() => AudioResources().addArray('foo.mp3', 'http://bar'))
-        .toThrow('array')
-    expect(() => AudioResources().addObject(null))
-        .toThrow('object')
-    expect(() => AudioResources().addObject('foo'))
-        .toThrow('object')
-    expect(() => AudioResources().add('foo.mp3', null))
-        .toThrow('string')
-    expect(() => AudioResources().add('foo.wav', 666))
-        .toThrow('string')
-    expect(() => AudioResources().add('foo.mp3', {}))
-        .toThrow('string')
-    expect(() => AudioResources().add('foo.wav', 'xy'))
-        .toThrow('URL')
-
-    expect(AudioResources().resources)
-        .toMatchObject({audio: {}})
-
-    expect(AudioResources({'foo.mp3': 'http://bar'}).resources)
-        .toMatchObject({audio: {'foo.mp3': 'http://bar'}})
-
-    expect(AudioResources().add('foo.mp3', () => 'http://bar').resources.audio['foo.mp3']())
-        .toEqual('http://bar')
-
-    expect(AudioResources().add('foo.mp3', 'http://bar').resources)
-        .toMatchObject({audio: {'foo.mp3': 'http://bar'}})
-
-    expect(AudioResources({'foo.mp3': 'http://bar'}).add('foo2.mp3', 'http://bar2').resources)
-        .toMatchObject({audio: {'foo.mp3': 'http://bar', 'foo2.mp3': 'http://bar2'}})
-
-    expect(AudioResources({'foo.mp3': 'http://bar', 'foo2.mp3': 'http://bar2'}).resources)
-        .toMatchObject({audio: {'foo.mp3': 'http://bar', 'foo2.mp3': 'http://bar2'}})
-
-    expect(AudioResources().add({'foo.mp3': 'http://bar', 'foo2.mp3': 'http://bar2'}).resources)
-        .toMatchObject({audio: {'foo.mp3': 'http://bar', 'foo2.mp3': 'http://bar2'}})
-
-    expect(AudioResources({'foo.mp3': ['http://bar', 'http://bar2']}).resources)
-        .toMatchObject({audio: {'foo_0.mp3': 'http://bar', 'foo_1.mp3': 'http://bar2'}})
-
-    expect(AudioResources({'My_home/Audio_files/Foo.bar_audio.mp3': 'http://foo'}).resources)
-        .toMatchObject({audio: {'My_home/Audio_files/Foo.bar_audio.mp3': 'http://foo'}})
-})
-
-test('JsonResources', () => {
-    expect(() => JsonResources({'foo': 'http://bar'}).add('foo', 'http://bar2').resources)
-        .toThrow('already exists')
-    expect(() => JsonResources().add(false, 'foo')).toThrow('type')
-    expect(() => JsonResources().add(false, 'foo'))
-        .toThrow('type')
-    expect(() => JsonResources().add(null, 'foo'))
-        .toThrow('type')
-    expect(() => JsonResources().add(undefined, 'foo'))
-        .toThrow('type')
-    expect(() => JsonResources().addArray('foo', null))
-        .toThrow('array')
-    expect(() => JsonResources().addArray('foo', {}))
-        .toThrow('array')
-    expect(() => JsonResources().addArray('foo', 'http://bar'))
-        .toThrow('array')
-    expect(() => JsonResources().addObject(null))
-        .toThrow('object')
-    expect(() => JsonResources().addObject('foo'))
-        .toThrow('object')
-    expect(() => JsonResources().add('foo', null))
-        .toThrow('object')
-    expect(() => JsonResources().add('foo', 666))
-        .toThrow('object')
-    expect(() => JsonResources().add('foo', undefined))
-        .toThrow('object')
-    expect(() => JsonResources().add('foo', 'xy'))
-        .toThrow('URL')
-
-    expect(JsonResources().resources)
-        .toMatchObject({json: {}})
-
-    expect(JsonResources({'foo': 'http://bar'}).resources)
-        .toMatchObject({json: {'foo': 'http://bar'}})
-
-    expect(JsonResources().add('foo', 'http://bar').resources)
-        .toMatchObject({json: {'foo': 'http://bar'}})
-
-    expect(JsonResources().add('foo', () => ({hello: 'kitty'})).resources.json['foo']())
-        .toMatchObject({hello: 'kitty'})
-
-    expect(JsonResources({'foo': 'http://bar'}).add('foo2', 'http://bar2').resources)
-        .toMatchObject({json: {'foo': 'http://bar', 'foo2': 'http://bar2'}})
-
-    expect(JsonResources({'foo': 'http://bar', 'foo2': 'http://bar2'}).resources)
-        .toMatchObject({json: {'foo': 'http://bar', 'foo2': 'http://bar2'}})
-
-    expect(JsonResources().add({'foo': 'http://bar', 'foo2': 'http://bar2'}).resources)
-        .toMatchObject({json: {'foo': 'http://bar', 'foo2': 'http://bar2'}})
-
-    expect(JsonResources({'foo': ['http://bar', 'http://bar2']}).resources)
-        .toMatchObject({json: {'foo_0': 'http://bar', 'foo_1': 'http://bar2'}})
-
-    expect(JsonResources({'My_home/Json_files/Foo.bar_json': {bla: 'boo'}}).resources)
-        .toMatchObject({json: {'My_home/Json_files/Foo.bar_json': {bla: 'boo'}}})
-})
-
-test('Resources', () => {
-    expect(() => Resources().add('foo', 'http://bar', 'xx')).toThrow('foo')
-    expect(() => Resources({foo: 'http://bar'})).toThrow('foo')
-    expect(() => Resources({foo: {foo2: 'http://bar'}})).toThrow('foo')
-    expect(() => Resources({image: {'foo.png': 'https://bar'}}).addImage('foo.png', 'https://bar2')).toThrow('already exists')
-    expect(() => Resources().addImage(false, 'https://foo')).toThrow('type')
-    expect(() => Resources().addAudio(null, 'foo')).toThrow('type')
-    expect(() => Resources().addJson('', 'foo')).toThrow('empty')
-    expect(() => Resources().addJson('.', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addImage('äüö.png', 'https://foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('/hey.mp3', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('hey/.mp3', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('hey//.mp3', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('hey/./mp3', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('hey.mp3/', 'foo')).toThrow('Invalid')
-    expect(() => Resources().addAudio('hey\\foo.mp3', 'foo')).toThrow('Invalid')
-
-    expect(Resources().resources)
-        .toMatchObject({image: {}, audio: {}, json: {}})
-
-    expect(Resources({image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo3': 'http://bar3'}}).resources)
-        .toMatchObject({image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo3': 'http://bar3'}})
-
-    expect(Resources().add('image', 'foo.png', 'https://bar').add('audio', 'foo.wav', 'http://bar2').add('json', 'foo3', 'http://bar3').resources)
-        .toMatchObject({image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo3': 'http://bar3'}})
-
-    expect(Resources().addImage('foo.png', 'https://bar').addAudio('foo.wav', 'http://bar2').addJson('foo3', 'http://bar3').resources)
-        .toMatchObject({image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo3': 'http://bar3'}})
-
-    expect(Resources().addImages({'foo.png': 'https://bar'}).addAudios({'foo.wav': 'http://bar2'}).addJsons({'foo3': 'http://bar3'}).resources)
-        .toMatchObject({image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo3': 'http://bar3'}})
-
-})
-
-test('getResourcesAndCallback', () => {
-    const callback = () => false
-    expect(() => getResourcesAndCallback(callback, callback)).toThrow('Multiple callback')
-    expect(() => getResourcesAndCallback(false)).toThrow('not allowed')
-    expect(() => getResourcesAndCallback(0)).toThrow('not allowed')
-    expect(() => getResourcesAndCallback({image: {'foo.png': 'https://bar'}}, ImageResources({'foo.png': 'https://bar2'}))).toThrow('already passed')
-
-    expect(getResourcesAndCallback())
-        .toMatchObject({callback: undefined, resources: {}})
-
-    expect(getResourcesAndCallback(undefined, null))
-        .toMatchObject({callback: undefined, resources: {}})
-
-    expect(getResourcesAndCallback(callback))
-        .toMatchObject({callback, resources: {}})
-
-    expect(getResourcesAndCallback({image: {'foo.png': 'https://bar'}}, callback))
-        .toMatchObject({callback, resources: {image: {'foo.png': 'https://bar'}}})
-
-    expect(getResourcesAndCallback(ImageResources({'foo.png': 'https://bar'}), callback))
-        .toMatchObject({callback, resources: {image: {'foo.png': 'https://bar'}}})
-
-    expect(getResourcesAndCallback(callback, {image: {'foo.png': 'https://bar'}}))
-        .toMatchObject({callback, resources: {image: {'foo.png': 'https://bar'}}})
-
-    expect(getResourcesAndCallback(callback, {image: {'foo.png': 'https://bar'}}, {audio: {'foo.wav': 'http://bar2'}}, {json: {'foo': 'http://bar3'}}))
-        .toMatchObject({callback, resources: {image: {'foo.png': 'https://bar'}, audio: {'foo.wav': 'http://bar2'}, json: {'foo': 'http://bar3'}}})
-
-    expect(getResourcesAndCallback({image: {'foo.png': 'https://bar'}}, ImageResources({'foo2.png': 'https://bar2'})))
-        .toMatchObject({callback: undefined, resources: {image: {'foo.png': 'https://bar', 'foo2.png': 'https://bar2'}}})
-
-    expect(getResourcesAndCallback({audio: {'foo.mp3': 'http://bar'}}, AudioResources({'foo2.wav': 'http://bar2'})))
-        .toMatchObject({callback: undefined, resources: {audio: {'foo.mp3': 'http://bar', 'foo2.wav': 'http://bar2'}}})
-
-    expect(getResourcesAndCallback({json: {'foo': 'http://bar'}}, JsonResources({'foo2': 'http://bar2'})))
-        .toMatchObject({callback: undefined, resources: {json: {'foo': 'http://bar', 'foo2': 'http://bar2'}}})
+        const RB = newResourceManager()
+        r.addToManager(RB)
+        RB.loadTemporaryScope('foo').then(() => {
+            expect(RB.resources.json).toContainAllEntries([['foo.json', 'bar'], ['f.json', 'ok']])
+            expect(RB.resources.image).toContainAllEntries([['foo2.png', 'bar2'], ['f2.png', 'ok2']])
+            expect(RB.resources.audio).toContainAllEntries([['foo3.wav', 'bar3'], ['f3.wav', 'ok3']])
+        })
+    }
 })

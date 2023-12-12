@@ -1,7 +1,8 @@
 import inst from "./instances"
 import { INPUT, PATH, DEGREE_90 } from "core/const"
-import {d, isValidResourceId, BitmapPlayer, getCanvasForDim, getCanvasObjForDim, toValues} from "helper/helper"
-import { getContainerElem } from "../helper/dom";
+import { d, BitmapPlayer, getCanvasForDim, getCanvasObjForDim, toValues } from "helper/helper"
+import { getContainerElem } from "../helper/dom"
+import { createImageResource, ImageResource } from "./resources"
 
 /**
  *
@@ -107,7 +108,7 @@ class AppliedImage {
 
 class RawAppliedImage extends AppliedImage {
     constructor(id = null) {
-        super(inst.RL.createImageResource(null, id));
+        super(createImageResource(null, id))
     }
 }
 
@@ -422,199 +423,6 @@ class InputController {
     }
 }
 
-class AudioResource {
-
-    constructor(url, readyCallback = null) {
-        this.audio = null
-        this.id = null
-        this.volume = 1
-        this.resolved = false
-        this.promise = new Promise(resolve => {
-            if (typeof Audio == 'undefined') {
-                this.audio = {}
-                this.resolved = true
-                resolve()
-            } else {
-                this.audio = new Audio(url)
-                this.audio.oncanplaythrough = () => {
-                    this.resolved = true
-                    resolve()
-                    if (readyCallback) {
-                        readyCallback()
-                    }
-                }
-                this.audio.onplaying = () => {
-                    if (!inst.game.audioBlocked) return
-                    inst.game.audioBlocked = false
-                }
-            }
-        })
-        this.lastAction = null
-    }
-
-    setId(id) {
-        this.id = id;
-    }
-
-    getId() {
-        return this.id;
-    }
-
-    isResolved() {
-        return this.resolved
-    }
-
-    setVolume(value) {
-        this.volume = value
-        this.updateVolume()
-    }
-
-    updateVolume() {
-        this.audio.volume = (inst.game.masterVolume / 100) * this.volume
-    }
-
-    play(volume = 1, restart = true) {
-        this.volume = 1
-        if (restart && this.isPlaying()) {
-            this.rewind()
-        }
-        this.updateVolume()
-        this.lastAction = 'load'
-        return this.audio.play().then(() => {
-            if (this.lastAction === 'pause' || !inst.game.running) {
-                this.audio.pause();
-            } else {
-                this.lastAction = 'play';
-            }
-        })
-    }
-
-    continue() {
-        if (this.lastAction === 'pause') {
-            this.lastAction = 'play';
-            this.play(1, false);
-        }
-    }
-
-    rewind() {
-        this.audio.currentTime = 0
-    }
-
-    setLoop(value) {
-        this.audio.loop = value
-    }
-
-    setMuted(value) {
-        this.audio.muted = value
-    }
-
-    pause() {
-        if (this.lastAction === 'play') {
-            this.audio.pause();
-        }
-        this.lastAction = 'pause';
-    }
-
-    reset() {
-        this.rewind();
-    }
-
-    isPlaying() {
-        return !(this.audio.ended || this.lastAction === 'pause');
-    }
-
-    isLooping() {
-        return this.audio.loop;
-    }
-
-    getNewLoadingPromise() {
-        return this.promise;
-    }
-}
-
-/**
- * When an init-handler is registered, a callback function and some resource providers which are called directly to
- * get all necessary resources, but some values can be given as functions so that the value can be called
- * lazy. The purpose of the is class is to collect all required resource for the init handler from the providers and
- * to resolve its values and to request them from the ResourceManager
- */
-class ResourceRequest {
-
-    constructor(resources) {
-        this.resources = resources
-    }
-
-    resolve() {
-        if (!this.resources) return
-
-        const { image, audio, json } = this.resources
-
-        if (image) {
-            for(const [ id, content ] of Object.entries(image)) {
-                inst.RL.addImage(
-                    id, typeof content === 'function' ? content() : content
-                )
-            }
-        }
-        if (audio) {
-            for(const [ id, content ] of Object.entries(audio)) {
-                inst.RL.addAudio(
-                    id, typeof content === 'function' ? content() : content
-                )
-            }
-        }
-        if (json) {
-            for(const [ id, content ] of Object.entries(json)) {
-                inst.RL.addJson(
-                    id, typeof content === 'function' ? content() : content
-                )
-            }
-        }
-    }
-
-    isEmpty() {
-        if (!this.resources) return true
-
-        const { image, audio, json } = this.resources
-
-        return !(image || audio || json)
-    }
-
-    addImageResource(id, data) {
-        if (Array.isArray(data)) {
-            if (!isValidResourceId('image', id)) {
-                throw Error('TODO');
-            }
-            for (let index = 0; index < data.length; index++) {
-                const parts = id.split('.');
-                inst.RL.addImage(parts[0] + '_' + index + '.' + parts[1], data[index]);
-            }
-        } else {
-            inst.RL.addImage(id, data);
-        }
-    }
-
-    addImageResources(dataObj) {
-        for (let id in dataObj) {
-            this.addImageResource(id, dataObj[id]);
-        }
-    }
-
-    addAudioResource(id, url) {
-        inst.RL.addAudio(id, url);
-    }
-
-    addAudioResources(dataObj) {
-        for (let id in dataObj) {
-            inst.RL.addAudio(id, dataObj[id]);
-        }
-    }
-
-    addJsonResource(id, json) {
-        inst.RL.addJson(id, json);
-    }
-}
-
 // #####################################
 //   DOM Container
 // #####################################
@@ -856,82 +664,6 @@ class CanvasContainer {
 
     getCanvasElem() {
         return this.canvas.elem;
-    }
-}
-
-class ImageResource {
-
-    constructor(data) {
-        this.id = null;
-        this.image = typeof Image != 'undefined' ? new Image() : {width: 100, height: 100, decode: () => Promise.resolve()};
-        this.canvas = null;
-        if (typeof HTMLCanvasElement != 'undefined' && (data instanceof HTMLCanvasElement)) {
-            this.canvas = {elem: data, ctx: data.getContext('2d')};
-            data = this.getDataUrl();
-        }
-        if (data !== null)
-            this.image.src = data;
-        this.resolved = false;
-    }
-
-    setId(id) {
-        this.id = id;
-    }
-
-    getId() {
-        return this.id;
-    }
-
-    get width() {
-        if (!this.resolved) return null
-        if (this.image) return this.image.width
-        return this.canvas.width
-    }
-
-    get height() {
-        if (!this.resolved) return null
-        if (this.image) return this.image.height
-        return this.canvas.height
-    }
-
-    getCanvas(asClone = false) {
-        let width = this.image.width
-        let height = this.image.height
-        let source = this.image
-        if (this.canvas === null) {
-            this.canvas = getCanvasObjForDim(width, height)
-            this.canvas.ctx.drawImage(this.image, 0, 0)
-        } else {
-            width = this.canvas.elem.width
-            height = this.canvas.elem.height
-            source = this.canvas.elem
-        }
-        if (asClone) {
-            const canvas = getCanvasObjForDim(width, height)
-            canvas.ctx.drawImage(source, 0, 0)
-            return canvas
-        }
-        return this.canvas;
-    }
-
-    getCanvasElem(asClone = false) {
-        return this.getCanvas(asClone).elem;
-    }
-
-    getNewDecodePromise() {
-        return this.image.decode().then(result => {this.resolved = true; return result});
-    }
-
-    getDataUrl(format = 'png') {
-        return this.getCanvasElem().toDataURL('image/' + format);
-    }
-
-    getImage() {
-        return this.image;
-    }
-
-    isResolved() {
-        return this.resolved;
     }
 }
 
@@ -2209,8 +1941,6 @@ class Gravity {
 
 export {
     inst,
-    ImageResource,
-    AudioResource,
     AppliedImage,
     RawAppliedImage,
     InputController,
@@ -2225,7 +1955,6 @@ export {
     PlayerProxy,
     Position,
     Force,
-    ResourceRequest,
     Gravity,
     SpriteAndTilesCollider,
     ObjectController

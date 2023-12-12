@@ -128,6 +128,7 @@ module.exports = {
                 VERSION_GAME: JSON.stringify(gamePackageJson.version),
                 GAME_ID: JSON.stringify(gameId),
                 IS_DIST: JSON.stringify(isDistBuild),
+                STATIC_TYPES: JSON.stringify(hosting.getStaticTypes().join(',')),
                 RESOURCES_API: JSON.stringify(!isDistBuild || requiresApi(config.resourceLoading))
             }),
             new HtmlWebpackPlugin({

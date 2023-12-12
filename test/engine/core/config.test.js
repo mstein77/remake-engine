@@ -1,6 +1,5 @@
 import { Config } from "core/config"
 import { validated } from "helper/validate"
-import { AppliedImage, ImageResource, AudioResource } from "core/classes"
 import { Model } from "core/model"
 import inst from "core/instances"
 
