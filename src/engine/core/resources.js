@@ -301,6 +301,11 @@ const getResourceProxy = (type, resources) => {
                     const extId = descriptor.extId
                     if (extId in target) return target[extId]
                 }
+                // only allow object retrieval in unit tests
+                if (typeof window === 'undefined' && id === 'toObject') {
+                    return () => ({ ...target })
+                }
+
                 throw Error(`No ${key} resource with id "${id}" was loaded in the resource manager`)
             },
             set( obj, id, value ) {
@@ -1202,7 +1207,7 @@ class ResourceCollection {
      * If null is given as type the parser only accepts objects which map resource keys to resources of this type.
      * Otherwise a string parameter will add a static (= null as value) resource of the given type and an array will
      * add multiple static resources of this type at once. If an object is given which maps resource ids to their
-     * fallback values, null or a function, then all of theses resources will be added.
+     * fallback values, null or a function, then all of these resources will be added.
      *
      * @param {string|null} type
      * @param {mixed} args
@@ -1249,8 +1254,11 @@ class ResourceCollection {
 
     /**
      * Invokes the parse method with the type used in the constructor for all the given parameters
+     * Returns the collection itself to allow chaining
      *
      * @param {mixed} args
+     *
+     * @return {ResourceCollection}
      */
     add( ...args ) {
         this.parseArgs(this.type, ...args)
@@ -1259,9 +1267,12 @@ class ResourceCollection {
 
     /**
      * Adds an image resource with the given resource id and fallback value to the collection
+     * Returns the collection itself to allow chaining
      *
      * @param {string} id
      * @param {mixed} value
+     *
+     * @return {ResourceCollection}
      */
     addImage(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.IMAGE, {[id]: value})
@@ -1270,9 +1281,12 @@ class ResourceCollection {
 
     /**
      * Adds an audio resource with the given resource id and fallback value to the collection
+     * Returns the collection itself to allow chaining
      *
      * @param {string} id
      * @param {mixed} value
+     *
+     * @return {ResourceCollection}
      */
     addAudio(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.AUDIO, {[id]: value})
@@ -1281,9 +1295,12 @@ class ResourceCollection {
 
     /**
      * Adds a json resource with the given resource id and fallback value to the collection
+     * Returns the collection itself to allow chaining
      *
      * @param {string} id
      * @param {mixed} value
+     *
+     * @return {ResourceCollection}
      */
     addJson(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.JSON, {[id]: value})
@@ -1292,9 +1309,12 @@ class ResourceCollection {
 
     /**
      * Adds a video resource with the given resource id and fallback value to the collection
+     * Returns the collection itself to allow chaining
      *
      * @param {string} id
      * @param {mixed} value
+     *
+     * @return {ResourceCollection}
      */
     addVideo(id, value = null) {
         this.parseArgs(RESOURCE.TYPE.VIDEO, {[id]: value})

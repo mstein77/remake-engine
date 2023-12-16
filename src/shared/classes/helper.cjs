@@ -12,6 +12,7 @@ const setLogger = value => logger = value
  *
  * @param {mixed} main
  * @param {mixed} params
+ *
  * @returns {mixed}
  */
 function d(main, ...params) {
@@ -133,6 +134,7 @@ const ucfirst = (value) => {
  *
  * @param {array} a
  * @param {array} b
+ *
  * @returns {array}
  */
 const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
@@ -155,14 +157,27 @@ const without = (source, remove) => {
  *
  * @param {array} a
  * @param {array} b
+ *
  * @returns {array}
  */
 const intersect = (a, b) => {
     return [ ...new Set([ ...a ]) ].filter(x => b.includes(x))
 }
 
+/**
+ * Returns an array holding the entries (= array with id and value) of a given object
+ *
+ */
 const toPairs = Object.entries
+
+/**
+ * Returns an array holding the values of a given object
+ */
 const toValues = Object.values
+
+/**
+ * Returns an array holding the keys of a given object
+ */
 const toKeys = Object.keys
 
 module.exports = {
