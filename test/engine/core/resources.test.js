@@ -467,9 +467,9 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager({}, {[id2jsonTid('test')]: 'z'})
 
-        expect(RB.resources.json).toBeEmptyObject()
+        expect(RB.resources.json.toObject()).toBeEmptyObject()
         RB.addJson('test', 'xy')
-        expect(RB.resources.json).toBeEmptyObject()
+        expect(RB.resources.json.toObject()).toBeEmptyObject()
         RB.loadTemporaryScope('bar').then(() => {
             expect(RB.resources.json.test).toBe('z')
             expect(RB.resources.json['test.json']).toBe('z')
@@ -481,7 +481,7 @@ test('ResourceManager', () => {
     // code fallback
     {
         const RB = newResourceManager({}, {[id2jsonTid('x')]: 'y'})
-        expect(RB.resources.json).toBeEmptyObject()
+        expect(RB.resources.json.toObject()).toBeEmptyObject()
 
         RB.addJson('foo', 'bar')
         RB.loadTemporaryScope('testScope').then(() => {
@@ -495,7 +495,7 @@ test('ResourceManager', () => {
     // remote override
     {
         const RB = newResourceManager({[id2jsonTid('foo')]: 'bar2'}, {[id2jsonTid('x')]: 'y'})
-        expect(RB.resources.json).toBeEmptyObject()
+        expect(RB.resources.json.toObject()).toBeEmptyObject()
 
         RB.addJson('foo', 'bar')
         RB.loadTemporaryScope('testScope').then(() => {
@@ -512,13 +512,13 @@ test('ResourceManager', () => {
             {[id2jsonTid('a')]: 'A'},
             {}
         )
-        expect(RB.resources.json).toBeEmptyObject()
+        expect(RB.resources.json.toObject()).toBeEmptyObject()
 
         RB.addJson('a', '_a')
         RB.addJson('b', '_b')
         RB.addJson('c', '_c')
         RB.loadTemporaryScope('testScope').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['a.json', 'A'], ['b.json', '_b'], ['c.json', 'C']])
         })
     }
@@ -528,12 +528,12 @@ test('ResourceManager', () => {
         const RB = newResourceManager({}, {[id2jsonTid('x')]: 'perm', [id2jsonTid('y')]: 'temp1', [id2jsonTid('z')]: 'temp2'});
         RB.addJson('x');
         RB.loadPermanentScope('myScope').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['x.json', 'perm']])
 
             RB.addJson('y')
             RB.loadTemporaryScope('myScope').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['x.json', 'perm'], ['y.json', 'temp1']])
 
                 expect(RB.hasPermanentJson('y')).toBeFalse()
@@ -542,7 +542,7 @@ test('ResourceManager', () => {
                 expect(RB.hasJson('y')).toBeTrue()
                 RB.addJson('z')
                 RB.loadTemporaryScope('myScope').then(() => {
-                    expect(RB.resources.json)
+                    expect(RB.resources.json.toObject())
                         .toContainAllEntries([['x.json', 'perm'], ['z.json', 'temp2']])
                     expect(RB.hasPermanentScope('xScope')).toBeFalse()
                     expect(RB.hasPermanentScope('myScope')).toBeTrue()
@@ -559,29 +559,29 @@ test('ResourceManager', () => {
         const RB = newResourceManager()
         RB.addJson('game', 'myConfig')
         RB.load('game', true).then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['game.json', 'myConfig']])
 
             // globals
             RB.addJson('perm', 'perm1')
             RB.load('global', true).then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1']])
 
                 RB.addJson('temp', 'temp1')
                 RB.load('screen1').then(() => {
-                    expect(RB.resources.json)
+                    expect(RB.resources.json.toObject())
                         .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1'], ['temp.json', 'temp1']])
 
                     RB.addJson('temp2', 'temp2')
                     RB.load('screen2').then(() => {
-                        expect(RB.resources.json)
+                        expect(RB.resources.json.toObject())
                             .toContainAllEntries([['game.json', 'myConfig'], ['perm.json', 'perm1'], ['temp2.json', 'temp2']])
 
                         expect(RB.hasPermanentJson('game')).toBeTrue()
                         RB.removeJson('game')
                         expect(RB.hasPermanentJson('game')).toBeFalse()
-                        expect(RB.resources.json)
+                        expect(RB.resources.json.toObject())
                             .toContainAllEntries([['perm.json', 'perm1'], ['temp2.json', 'temp2']])
                     })
                 })
@@ -593,7 +593,7 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager({[id2coreTid('scope2ids')]: {'test': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar'})
         RB.load('test', true).then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar']])
         })
     }
@@ -603,7 +603,7 @@ test('ResourceManager', () => {
         const RB = newResourceManager(
             {[id2coreTid('scope2ids')]: {globals: [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2', [id2coreTid('id2children')]: {[id2jsonTid('foo')]: [id2jsonTid('foo2')]}})
         RB.loadPermanentScope('globals').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar'], ['foo2.json', 'bar2']])
         })
     }
@@ -613,7 +613,7 @@ test('ResourceManager', () => {
         const RB = newResourceManager({[id2coreTid('scope2ids')]: {'screen1': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bar2'})
         RB.addJson('foo2')
         RB.loadTemporaryScope('screen1').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar'], ['foo2.json', 'bar2']])
         })
     }
@@ -622,7 +622,7 @@ test('ResourceManager', () => {
     {
         const RB = newResourceManager({[id2coreTid('scope2ids')]: {'globals': [id2jsonTid('foo'), id2jsonTid('foo2')]}, [id2jsonTid('foo')]: 'bar', [id2jsonTid('foo2')]: 'bars'}, {[id2coreTid('scope2ids')]: {'globals': [id2jsonTid('foo')]}, [id2jsonTid('foo')]: 'bar2'})
         RB.loadPermanentScope('globals').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar2'], ['foo2.json', 'bars']])
         })
     }
@@ -651,7 +651,7 @@ test('ResourceManager', () => {
             }
         )
         RB.loadTemporaryScope('screen').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['a.json', 'foo1'], ['b.json', 'foo2'], ['c.json', 'foo3']])
         })
     }
@@ -680,7 +680,7 @@ test('ResourceManager', () => {
             }
         )
         RB.loadTemporaryScope('screen').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['a.json', 'foo1'], ['b.json', 'foo2'], ['c.json', 'foo3']])
         })
     }
@@ -699,16 +699,16 @@ test('ResourceManager', () => {
             })
 
             RB.loadTemporaryScope('testScreen').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['font.json', 'foo']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toContainAllEntries([['myFont.png', 'fooimg']])
 
                 RB.deleteFromStore(id2imageTid('myFont')).then(() => {
                     RB.load('testScreen').then(() => {
-                        expect(RB.resources.json)
+                        expect(RB.resources.json.toObject())
                             .toContainAllEntries([['font.json', 'foo']])
-                        expect(RB.resources.image)
+                        expect(RB.resources.image.toObject())
                             .toBeEmptyObject()
                     })
                 })
@@ -728,16 +728,16 @@ test('ResourceManager', () => {
                 [id2imageTid('myFont')]: 'fooimg'
             })
             RB.loadTemporaryScope('testScreen').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['font.json', 'foo']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toContainAllEntries([['myFont.png', 'fooimg']])
 
                 RB.deleteFromStore(id2jsonTid('font')).then(() => {
                     RB.loadTemporaryScope('testScreen').then(() => {
-                        expect(RB.resources.json)
+                        expect(RB.resources.json.toObject())
                             .toBeEmptyObject()
-                        expect(RB.resources.image)
+                        expect(RB.resources.image.toObject())
                             .toBeEmptyObject()
                     })
                 })
@@ -749,9 +749,9 @@ test('ResourceManager', () => {
             const RB = newResourceManager()
             RB.storeModel(makeModels({[id2jsonTid('foo')]: 'bar'}), 'test')
             RB.loadTemporaryScope('test').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['foo.json', 'bar']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toBeEmptyObject()
                 expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser.data')
             })
@@ -764,9 +764,9 @@ test('ResourceManager', () => {
         RB.deployModel(makeModels({[id2jsonTid('foo')]: 'bar2'}), 'testfoo').then(() => {
             RB.loadTemporaryScope('testfoo').then(() => {
                 expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['foo.json', 'bar2']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toBeEmptyObject()
             })
         })
@@ -781,9 +781,9 @@ test('ResourceManager', () => {
         }, {[id2jsonTid('foo')]: [id2imageTid('barimg')]})
         RB.storeModel(models, 'test')
         RB.loadTemporaryScope('test').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar']])
-            expect(RB.resources.image)
+            expect(RB.resources.image.toObject())
                 .toContainAllEntries([['barimg.png', 'myImg']])
         })
     }
@@ -798,9 +798,9 @@ test('ResourceManager', () => {
         RB.storeModel(model, 'test')
         RB.deployModel(model, 'test').then(() => {
             RB.loadTemporaryScope('test').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['foo.json', 'bar']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toContainAllEntries([['barimg.png', 'myImg']])
                 expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
                 expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server.data')
@@ -817,9 +817,9 @@ test('ResourceManager', () => {
             [id2imageTid('barimg')]: 'myImg'
         }, {[id2jsonTid('foo')]: [id2imageTid('barimg')], [id2jsonTid('font')]: [id2jsonTid('foo')]}), 'test')
         RB.loadTemporaryScope('test').then(() => {
-            expect(RB.resources.json)
+            expect(RB.resources.json.toObject())
                 .toContainAllEntries([['foo.json', 'bar'], ['font.json', 'myFont']])
-            expect(RB.resources.image)
+            expect(RB.resources.image.toObject())
                 .toContainAllEntries([['barimg.png', 'myImg']])
         })
     }
@@ -836,9 +836,9 @@ test('ResourceManager', () => {
         RB.storeModel(model, 'test')
         RB.deployModel(model, 'test').then(() => {
             RB.loadTemporaryScope('test').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['foo.json', 'bar'], ['font.json', 'myFont']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toContainAllEntries([['barimg.png', 'myImg']])
                 expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('server.data')
                 expect(RB.getResourceOrigin(id2jsonTid('font'))).toEqual('server.data')
@@ -861,9 +861,9 @@ test('ResourceManager', () => {
             // => abhängigkeit von foo im store muss erhalten bleiben
             //    content muss aber vom server statt
             RB.loadTemporaryScope('test').then(() => {
-                expect(RB.resources.json)
+                expect(RB.resources.json.toObject())
                     .toContainAllEntries([['foo.json', 'bar']])
-                expect(RB.resources.image)
+                expect(RB.resources.image.toObject())
                     .toContainAllEntries([['barimg.png', 'myImg']])
                 expect(RB.getResourceOrigin(id2jsonTid('foo'))).toEqual('browser.data')
                 expect(RB.getResourceOrigin(id2imageTid('barimg'))).toEqual('server.data')
@@ -892,6 +892,7 @@ test('ResourceManager', () => {
         })
 
     }
+    */
 
     // goto page
 
@@ -903,7 +904,6 @@ test('ResourceManager', () => {
 
     // deploy model
 
-    */
 })
 
 test('createImageResource', () => {
@@ -923,8 +923,6 @@ test('createImageResource', () => {
         expect(res.isResolved()).toBeTrue()
         expect(res.getId()).toBe(null)
     }
-
-
 })
 
 test('ResourceRequest', () => {
@@ -973,9 +971,9 @@ test('ResourceRequest', () => {
         const RB = newResourceManager()
         r.addToManager(RB)
         RB.loadTemporaryScope('foo').then(() => {
-            expect(RB.resources.json).toContainAllEntries([['foo.json', 'bar'], ['f.json', 'ok']])
-            expect(RB.resources.image).toContainAllEntries([['foo2.png', 'bar2'], ['f2.png', 'ok2']])
-            expect(RB.resources.audio).toContainAllEntries([['foo3.wav', 'bar3'], ['f3.wav', 'ok3']])
+            expect(RB.resources.json.toObject()).toContainAllEntries([['foo.json', 'bar'], ['f.json', 'ok']])
+            expect(RB.resources.image.toObject()).toContainAllEntries([['foo2.png', 'bar2'], ['f2.png', 'ok2']])
+            expect(RB.resources.audio.toObject()).toContainAllEntries([['foo3.wav', 'bar3'], ['f3.wav', 'ok3']])
         })
     }
 })
