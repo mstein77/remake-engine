@@ -2,6 +2,7 @@
 const path = require('path')
 const express = require('express')
 const cors = require('cors')
+const { csv2values } = require('../shared/classes/helper.cjs')
 
 const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
 
@@ -31,7 +32,7 @@ if (setupAppMiddlewares) {
         API_MAX_JSON_SIZE
     })
 } else if (STATIC_TYPES !== '') {
-    for (const type of STATIC_TYPES.split(',')) {
+    for (const type of csv2values(STATIC_TYPES)) {
         app.use('/' + type, express.static(STATIC_DIR + '/' + type))
     }
 }

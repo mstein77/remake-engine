@@ -1,4 +1,5 @@
-const { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect } = require('../../../src/shared/classes/helper.cjs')
+const { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect,
+    trim, simpleType } = require('../../../src/shared/classes/helper.cjs')
 
 const allTrue = (func, ...params ) => {
     for (const param of params) {
@@ -89,4 +90,37 @@ test('intersect', () => {
     expect(intersect([1, 2], [2])).toIncludeSameMembers([2])
     expect(intersect([1, 2], [2, 3])).toIncludeSameMembers([2])
     expect(intersect([1, 2, 3, 3], [2, 3, 3])).toIncludeSameMembers([2, 3])
+})
+
+test('simpleType', () => {
+    expect(simpleType()).toBe('undefined')
+    expect(simpleType(undefined)).toBe('undefined')
+    expect(simpleType(null)).toBe('null')
+    expect(simpleType(true)).toBe('boolean')
+    expect(simpleType(false)).toBe('boolean')
+    expect(simpleType(0)).toBe('number')
+    expect(simpleType(0.1)).toBe('number')
+    expect(simpleType(-1000)).toBe('number')
+    expect(simpleType('undefined')).toBe('string')
+    expect(simpleType(new String('foo'))).toBe('string')
+    expect(simpleType([])).toBe('array')
+    expect(simpleType(new Array(1))).toBe('array')
+    expect(simpleType({})).toBe('object')
+    expect(simpleType(new Object())).toBe('object')
+    expect(simpleType(() => null)).toBe('function')
+    expect(simpleType(function() {})).toBe('function')
+})
+
+test('trim', () => {
+    expect(trim('', '')).toBe('')
+    expect(trim('', 'ab')).toBe('')
+    expect(trim('a', 'a')).toBe('')
+    expect(trim('aaaa', 'ab')).toBe('')
+    expect(trim('ab', '')).toBe('ab')
+    expect(trim('ab', 'c')).toBe('ab')
+    expect(trim('ab', 'ba')).toBe('')
+    expect(trim('ab', 'a')).toBe('b')
+    expect(trim('aaaccaaa', 'a')).toBe('cc')
+    expect(trim('baaccbba', 'ab')).toBe('cc')
+    expect(trim('baacacbba', 'ab')).toBe('cac')
 })

@@ -97,10 +97,9 @@ const syncFs = {
     },
 
     readJson: filePath => {
-        if (!syncFs.fileExists(filePath)) throw Error(`File not found: ${filePath}`);
-        const rawdata = fs.readFileSync(filePath);
-        const json = JSON.parse(rawdata);
-        return json
+        if (!syncFs.fileExists(filePath)) throw Error(`File not found: ${filePath}`)
+        const rawdata = fs.readFileSync(filePath)
+        return JSON.parse(rawdata)
     },
 
     readFile: ( ...args ) => fs.readFileSync( ...args ),

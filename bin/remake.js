@@ -3,9 +3,10 @@ import * as dotenv from 'dotenv'
 import { execSync } from 'child_process'
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
-const { colorLog, FG } = require('../src/shared/classes/color.cjs')
+const { colorLog, FG } = require('../src/shared/classes/console.cjs')
 const { syncFs } = require('../src/shared/classes/syncFs.cjs')
 const { d, toPairs } = require('../src/shared/classes/helper.cjs')
+const { getDefaultConfig } = require('../src/build/classes/const.cjs')
 
 const __dirname = syncFs.realpath(dirname(fileURLToPath(import.meta.url)) + '/../')
 const dotenvPath = __dirname + '/.env'
@@ -89,6 +90,8 @@ try {
         packageJson = syncFs.readJson(packageJsonPath)
     }
 
+    const baseConfig = getDefaultConfig()
+    /*
     let baseConfig = {
         title: 'Remake Engine Game V0.1',
         browsers: '>2.25%, not ie 11, not op_mini all',
@@ -121,7 +124,8 @@ try {
             sourceMaps: false,
             eslint: false
         }
-    };
+    }
+     */
     addMissingDirsAndFiles({
         resources: {
             json: {},

@@ -1,6 +1,11 @@
-const { Hosting } = require('../classes.cjs')
+const { Hosting } = require('../hosting.cjs')
 
 class ServerWithoutNodejsHosting extends Hosting {
+
+    prepare( ...args ) {
+        super.prepare( ...args )
+        this.addInstruction(`Upload the content of ${this.publicDir} to a target directory on your webserver`)
+    }
 
     getSupport(config) {
         return {
@@ -8,9 +13,6 @@ class ServerWithoutNodejsHosting extends Hosting {
             checkout: false,
             nodejs: false
         }
-    }
-    get postBuildMessage() {
-        return `Upload the content of ${this.publicDir} to a target directory on your webserver`
     }
 }
 

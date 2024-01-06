@@ -165,6 +165,108 @@ const intersect = (a, b) => {
 }
 
 /**
+ * Returns a string which is trimmed of all enclosing chars which are given in the chars string.
+ *
+ * @param {string} value
+ * @param {string} chars
+ *
+ * @returns {string}
+ */
+const trim = (value, chars) => {
+    if (!chars.length) return value
+
+    let start = 0
+    while (start < value.length && chars.indexOf(value[start]) > -1) start++
+    if (start === value.length) return ''
+
+    let end = value.length - 1;
+    while (end > start && chars.indexOf(value[end]) > -1) end--
+    if (end < start) return ''
+
+    return value.substring(start, end + 1)
+}
+
+/**
+ * Returns a string which describes the given parameters simple type. Simple type means that instances of String or
+ * Array will be not be returned as "object" lime typeof does but as "string" or "array"
+ *
+ * @param {mixed} value
+ *
+ * @returns {string}
+ */
+const simpleType = value => {
+    if (value === undefined) return 'undefined'
+    if (value === null) return 'null'
+    const type = typeof value
+    if (type !== 'object') return type
+    if (Array.isArray(value)) return 'array'
+    if (value instanceof String) return 'string'
+
+    return 'object'
+}
+
+/**
+ * Returns an array which holds all trimmed values of the given csv line which are seperated by a comma
+ *
+ * @param {string} csv
+ *
+ * @returns {array}
+ */
+const csv2values = csv => {
+    if (csv.trim() === '') return []
+    const values = []
+    const items = csv.split(',')
+    for (const item of items) {
+        values.push(item.trim())
+    }
+    return values
+
+}
+
+const getVersionParts = version => {
+    const parts = trim(version, 'v').split('.')
+    const result = []
+    for (const part of parts) {
+        let digits = ''
+        let appendix = ''
+        let isAppendix = false
+        for (const char of part) {
+            if (char < '0' || char > '9') isAppendix = true
+            if (isAppendix) {
+                appendix += char
+            } else {
+                digits += char
+            }
+
+        }
+        result.push({number: parseInt(digits, 10), appendix})
+    }
+    return result
+}
+
+/**
+ * Returns whether the given version number is higher or equal to the required version number
+ *
+ * @param actual
+ * @param required
+ * @returns {boolean}
+ */
+const matchesRequiredVersion = (actual, required) => {
+    const actualParts = getVersionParts(actual)
+    const requiredParts = getVersionParts(required)
+    const iMax = Math.min(actualParts.length, requiredParts.length)
+    for (let i = 0; i < iMax; i++) {
+        const actElem = actualParts[i]
+        const reqElem = requiredParts[i]
+        if (actElem.number < reqElem.number) return false
+        if (actElem.number > reqElem.number) return true
+        if (actElem.appendix === reqElem.appendix) continue
+        return actElem.appendix === ''
+    }
+    return true
+}
+
+/**
  * Returns an array holding the entries (= array with id and value) of a given object
  *
  */
@@ -193,6 +295,10 @@ module.exports = {
     union,
     without,
     intersect,
+    trim,
+    simpleType,
+    csv2values,
+    matchesRequiredVersion,
     toPairs,
     toValues,
     toKeys

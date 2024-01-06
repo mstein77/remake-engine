@@ -6,10 +6,9 @@ const morgan = require('morgan')
 const { isValidResourceId, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
 
-const { d } = require('../shared/classes/helper.cjs')
-const { RESOURCE_LOADING } = require('../build/classes/const.cjs')
+const { d, csv2values } = require('../shared/classes/helper.cjs')
+const { RESOURCE_LOADING } = require('../build/const.cjs')
 const { resourcesController } = require('./controller/resources.cjs')
-
 
 const setupAppMiddlewares = (app, config = null) => {
 
@@ -125,7 +124,7 @@ const setupAppMiddlewares = (app, config = null) => {
             fs.writeFileSync(indirectFilePath, JSON.stringify(content), 'utf8')
         },
         deleteResource
-    );
+    )
 
     if (config.serverLogging !== 'none') {
         const options = {}
@@ -147,7 +146,7 @@ const setupAppMiddlewares = (app, config = null) => {
 
     const staticTypes = [];
     if (config.resourceLoading !== RESOURCE_LOADING.API_ALL && config.staticTypes !== '') {
-        staticTypes.push( ...config.staticTypes.split(',') )
+        staticTypes.push( ...csv2values(config.staticTypes) )
     }
     for (const type of staticTypes) {
         app.use('/' + type, express.static(absDir.static(type)))

@@ -1,17 +1,6 @@
-const absPath = require('../../shared/classes/absPath.cjs')
-const { d, intersect, isArray } = require("../../shared/classes/helper.cjs")
-const { DEPLOY_METHOD, RESOURCE_LOADING } = require('../classes/const.cjs')
-const { colorLog, FG } = require("../../shared/classes/color.cjs")
-
-const heroku = require("../hosting/heroku.cjs")
-const serverWithNode = require("../hosting/server-with-nodejs.cjs")
-const serverWithoutNode = require("../hosting/server-without-nodejs.cjs")
-
-const hosting2cls = {
-    'heroku': heroku,
-    'server-with-nodejs': serverWithNode,
-    'server-without-nodejs': serverWithoutNode
-}
+const absPath = require('../shared/classes/absPath.cjs')
+const { d, toPairs, intersect, isArray, csv2values} = require("../shared/classes/helper.cjs")
+const { getResolvedDefaultConfig, key2params, DEPLOY_METHOD, RESOURCE_LOADING } = require('./const.cjs')
 
 const MSG = {
     noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
@@ -23,29 +12,8 @@ const MSG = {
     noServerNodejs: `Enabling of "server" not possible because your hosting is set to "server-without-nodejs" and does not support nodejs`
 }
 
-const key2params = {
-    title: {type: 'string'},
-    browsers: {type: 'string'},
-    editor: {type: 'bool'},
-    gzip: {type: 'bool'},
-    resourceLoading: {type: 'string', values: Object.values(RESOURCE_LOADING)},
-    apiMaxJsonSize: {type: 'string'},
-    deployMethod: {type: 'string', values: Object.values(DEPLOY_METHOD)},
-    hosting: {type: 'string'},
-    minimize: {type: 'bool'},
-    server: {type: 'bool'},
-    baseUrl: {type: 'string'},
-    sourceMaps: {type: 'bool'},
-    sourceMapType: {type: 'string'},
-    openBrowser: {type: 'string'},
-    port: {type: 'uint'},
-    staticTypes: {type: 'string'},
-    logging: {type: 'string'},
-    stats: {type: 'string'},
-    envPrefix: {type: 'string'}
-}
 const configParams = {}
-for (const [ key, params ] of Object.entries(key2params)) {
+for (const [ key, params ] of toPairs(key2params)) {
     const lcKey = key.toLowerCase()
     if (lcKey !== key) params.key = key
     configParams[lcKey] = params
@@ -69,22 +37,32 @@ const configJson = () => {
  *
  * @returns {object}
  */
-const applyConfigIntegrityChecks = (config, isDist) => {
+const applyConfigIntegrityChecks = (config, hosting, isDist) => {
+
     const warnings = []
 
     if (config.editor && !config.server)
         throw Error(MSG.noServer)
 
-    if (!isDist && config.editor === false) {
+    if (!isDist && !config.editor) {
         warnings.push(MSG.enableEditor)
         config.editor = true
     }
 
-    if (isDist && config.server && !(new hosting2cls[config.hosting]()).supportsNodejs)
+    if (isDist && config.server && !hosting.supportsNodejs)
         throw Error(MSG.noServerNodejs)
 
-    const staticTypes = config.staticTypes === '' ? [] : config.staticTypes.split(',')
-    const allStaticTypes = intersect(['json', 'audio', 'image', 'video'], staticTypes).length === 4
+    const currStaticTypes = csv2values(config.staticTypes)
+    const staticTypes = []
+    if (![RESOURCE_LOADING.LOCAL_ALL, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
+        if (!config.server || config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
+            staticTypes.push( ...['json', 'image', 'audio', 'video'] )
+        } else if (config.staticTypes !== '') {
+            staticTypes.push( ...currStaticTypes )
+        }
+    }
+    config.staticTypes = staticTypes.join(',')
+    const allStaticTypes = intersect(['json', 'image', 'audio', 'video'], staticTypes).length === 4
     if (allStaticTypes && config.resourceLoading === RESOURCE_LOADING.API) {
         warnings.push(MSG.allStaticApi)
         config.resourceLoading = RESOURCE_LOADING.STATIC_ALL
@@ -99,11 +77,19 @@ const applyConfigIntegrityChecks = (config, isDist) => {
         warnings.push(MSG.simStaticAll)
     }
 
+    if (isDist) {
+        if ([DEPLOY_METHOD.UPLOAD_PUBLIC, DEPLOY_METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !hosting.supportsManualUpload)
+            throw Error(`You selected "${config.deployMethod}" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!`)
+
+        if (config.deployMethod === DEPLOY_METHOD.CHECKOUT && !hosting.supportsCheckout)
+            throw Error('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
+    }
     return {
         config,
         warnings
     }
 }
+
 
 /**
  * Casts an environment string value to the given type representation and returns it
@@ -213,24 +199,26 @@ function extractAppEnvOverwrites(config, env) {
  *
  * @param {object} json The content of the config.cjs
  * @param {object} env The environment variables
+ * @param {object} overwrites The dist overwrites
  * @param {boolean} isDistBuild
  *
  * @returns {object}
  */
-const buildConfig = (json, env, isDistBuild) => {
+const buildConfig = (json, env, overwrites, isDistBuild) => {
     const { dist, ...config } = json
     const envOverwrites = extractEnvOverwrites(config, env)
     const appEnvOverwrites = extractAppEnvOverwrites(config, env)
 
     let ctxConfig
+    const defaultConfig = getResolvedDefaultConfig(isDistBuild)
     if (!isDistBuild || !dist) {
-        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
+        ctxConfig = { ...defaultConfig, ...config, ...appEnvOverwrites, ...envOverwrites }
     } else {
         for (let [key, value] of Object.entries(dist)) {
             if (key === 'envPrefix') continue
             config[key] = value
         }
-        ctxConfig = { ...config, ...appEnvOverwrites, ...envOverwrites }
+        ctxConfig = { ...defaultConfig, ...config, ...appEnvOverwrites, ...envOverwrites, ...overwrites }
     }
 
     // validation
@@ -250,26 +238,9 @@ const getConfigForCtx = args => {
     if (ctxConfig === null) {
         const configArg = args && args.config
         const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
-        const rawConfig = buildConfig(configJson(), process.env, isDistBuild)
-        console.log()
-        console.log('Checking integrity of config...')
-        const { config, error, warnings} = applyConfigIntegrityChecks(rawConfig, isDistBuild)
-        if (warnings.length) {
-            colorLog(FG.YELLOW + `...there are warnings:`);
-            console.log()
-            while (warnings.length) {
-                colorLog(FG.L_YELLOW + ` WARNING ` + FG.WHITE + warnings.pop())
-            }
-        } else {
-            colorLog(FG.GREEN + `...ok!`)
-        }
-        console.log()
-        console.log(
-            `Building game in ` + (isDistBuild ? 'dist folder' : 'develop mode') +
-            ` with the following config:`,
-            config
-        )
-        console.log()
+
+        return buildConfig(configJson(), process.env, isDistBuild)
+
         ctxConfig = config
     }
     return ctxConfig
@@ -277,13 +248,12 @@ const getConfigForCtx = args => {
 
 const internal = process.env.NODE_ENV === 'test' ? {
     MSG,
-    buildConfig,
-    applyConfigIntegrityChecks,
     extractEnvOverwrites,
     castEnvValue,
     extractAppEnvOverwrites } : {}
 
 module.exports = {
+    buildConfig,
     applyConfigIntegrityChecks,
     getConfigForCtx,
     configJson,

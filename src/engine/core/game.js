@@ -8,7 +8,7 @@ import { Model, ModelFactory, SubModelFactory } from "./model"
 import { validated } from "helper/validate"
 import { ScreenRegistry } from "./screen"
 import { BlendTransition, FadeInOutTransition, LoadingTransition, PushInTransition, TransitionRegistry } from "./transition"
-import { BrowserStorage } from "./storage/browserStorage"
+import { BrowserStorage } from "./storages/browserStorage"
 import { StorageManager } from "shared/classes/storage.cjs"
 import inst from "core/instances"
 

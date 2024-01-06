@@ -1,16 +1,16 @@
 const absPath = require('../src/shared/classes/absPath.cjs')
 const syncFs = require('../src/shared/classes/syncFs.cjs')
+const { mainSection } = require('../src/shared/classes/console.cjs')
 
 const instructionsPath = absPath.tmp('instructions.txt')
 
 if (syncFs.fileExists(instructionsPath)) {
+    mainSection('3. Build successfully finished...')
     const instructions = syncFs.readFile(instructionsPath, {encoding: 'utf8', flag: 'r'})
     if (instructions) {
-        console.log()
-        console.log(`Build to dist folder was successful!  please follow these instructions:`)
+        console.log(`Please follow these instructions:`)
         console.log()
         console.log(instructions)
     }
 }
-
 syncFs.clearDir(absPath.tmp())

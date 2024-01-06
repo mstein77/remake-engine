@@ -3,16 +3,15 @@ const absPath = require('../../shared/classes/absPath.cjs')
 
 class PostBuildMessagePlugin {
 
-    constructor(hosting) {
-        this.hosting = hosting
+    constructor(messages) {
+        this.messages = messages
     }
 
     apply(compiler) {
         compiler.hooks.done.tap(
             'PostBuildMessagePlugin',
             () => {
-                const msg = this.hosting.postBuildMessage
-                if (!msg) return
+                const msg = this.messages.join("\n")
                 syncFs.writeContent(absPath.tmp('instructions.txt'), msg)
             }
         )

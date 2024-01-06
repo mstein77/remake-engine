@@ -97,8 +97,6 @@ const FileStorage = (absDir, staticTypes) => {
             handler.register(descriptor.extTid, true)
         }
     }
-    handler.dump()
-
     return handler
 }
 

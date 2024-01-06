@@ -1,3 +1,3 @@
 const { generateWebpackConfigs } = require("./src/build/build.cjs")
 
-module.exports = (env, args) => generateWebpackConfigs(false)
+module.exports = (env, args) => generateWebpackConfigs(true, true)

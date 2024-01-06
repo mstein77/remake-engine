@@ -6,7 +6,7 @@ import { Button, Color, Submit, OkCancelForm, useTooltip } from "./FormComponent
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
 import { defaultValues } from "../settings"
 import { CellValue, CellSelection } from "../classes"
-import { BrowserStorage } from "core/storage/browserStorage"
+import { BrowserStorage } from "core/storages/browserStorage"
 import { StorageManager } from "shared/classes/storage.cjs"
 import { createImageResource } from "core/resources"
 import { RESOURCE } from "shared/classes/resources.cjs"

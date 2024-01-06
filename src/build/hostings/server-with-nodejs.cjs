@@ -1,4 +1,4 @@
-const { Hosting } = require('../classes.cjs')
+const { Hosting } = require('../hosting.cjs')
 
 class ServerWithNodejsHosting extends Hosting {
 
