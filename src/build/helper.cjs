@@ -1,5 +1,5 @@
-const syncFs = require("../shared/classes/syncFs.cjs");
-const { isObject, simpleType, toPairs} = require("../shared/classes/helper.cjs");
+const syncFs = require("../shared/syncFs.cjs");
+const { isObject, simpleType, toPairs} = require("../shared/helper.cjs");
 
 /**
  * Returns the object of the given json file path. Throws an error if the file does not exist, if the JSON is invalid

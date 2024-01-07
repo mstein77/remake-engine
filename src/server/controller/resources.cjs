@@ -1,7 +1,7 @@
-const { d, csv2values } = require('../../shared/classes/helper.cjs')
-const { StorageManager } = require('../../shared/classes/storage.cjs')
+const { d, csv2values } = require('../../shared/helper.cjs')
+const { StorageManager } = require('../../shared/storage.cjs')
 const { FileStorage } = require('../../shared/storages/fileStorage.cjs')
-const { tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/classes/resources.cjs")
+const { tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/resources.cjs")
 const path = require('path')
 
 const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../../'

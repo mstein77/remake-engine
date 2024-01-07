@@ -1,7 +1,7 @@
-const { d } = require("../classes/helper.cjs")
-const { makeDescriptor, RESOURCE } = require("../classes/resources.cjs")
-const { FileCodec } = require("../classes/fileCodec.cjs")
-const syncFs = require("../classes/syncFs.cjs")
+const { d } = require("../helper.cjs")
+const { makeDescriptor, RESOURCE } = require("../resources.cjs")
+const { FileCodec } = require("../fileCodec.cjs")
+const syncFs = require("../syncFs.cjs")
 
 const FileStorage = (absDir, staticTypes) => {
 

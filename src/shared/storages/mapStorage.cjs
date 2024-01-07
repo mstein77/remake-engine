@@ -1,4 +1,4 @@
-const { d } = require('../../../src/shared/classes/helper.cjs')
+const { d } = require('../../../src/shared/helper.cjs')
 
 /**
  * A factory method which returns a storage handler which is based on a Map. Since a map is not persisted this

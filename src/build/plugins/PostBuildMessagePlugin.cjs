@@ -1,5 +1,5 @@
-const syncFs = require('../../shared/classes/syncFs.cjs')
-const absPath = require('../../shared/classes/absPath.cjs')
+const syncFs = require('../../shared/syncFs.cjs')
+const absPath = require('../../shared/absPath.cjs')
 
 class PostBuildMessagePlugin {
 

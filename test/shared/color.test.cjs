@@ -1,4 +1,4 @@
-const { setLogger, FG, colorLog } = require('../../../src/shared/classes/console.cjs')
+const { setLogger, FG, colorLog } = require('../../src/shared/console.cjs')
 
 test('colorLog', () => {
     const out = []

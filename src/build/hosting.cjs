@@ -1,6 +1,6 @@
 const { RESOURCE_LOADING, DEPLOY_METHOD } = require('./const.cjs')
-const { d, csv2values } = require('../shared/classes/helper.cjs')
-const { bold } = require('../shared/classes/console.cjs')
+const { d, csv2values } = require('../shared/helper.cjs')
+const { bold } = require('../shared/console.cjs')
 
 /**
  *  hosting: gibt den Hosting-Anbieter bzw. die Art des hostings

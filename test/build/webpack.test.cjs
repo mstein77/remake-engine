@@ -1,7 +1,7 @@
 const { getTargetWebpackConfigs } = require('../../src/build/webpack.cjs')
 const ServerWithNodeHosting = require('../../src/build/hostings/server-with-nodejs.cjs')
 const { getResolvedDefaultConfig } = require("../../src/build/const.cjs")
-const { d, toPairs } = require("../../src/shared/classes/helper.cjs")
+const { d, toPairs } = require("../../src/shared/helper.cjs")
 const path = require("path")
 const { FileOpQueue }  = require("../../src/build/fileOps.cjs")
 

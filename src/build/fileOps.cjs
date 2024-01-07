@@ -1,4 +1,4 @@
-const syncFs = require("../shared/classes/syncFs.cjs")
+const syncFs = require("../shared/syncFs.cjs")
 
 const FILE_OP = {
     CLEAR: 'clear',

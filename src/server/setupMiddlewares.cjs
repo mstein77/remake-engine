@@ -6,7 +6,7 @@ const morgan = require('morgan')
 const { isValidResourceId, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
 
-const { d, csv2values } = require('../shared/classes/helper.cjs')
+const { d, csv2values } = require('../shared/helper.cjs')
 const { RESOURCE_LOADING } = require('../build/const.cjs')
 const { resourcesController } = require('./controller/resources.cjs')
 

@@ -1,5 +1,5 @@
-const absPath = require("../src/shared/classes/absPath.cjs")
-const syncFs = require("../src/shared/classes/syncFs.cjs")
+const absPath = require("../src/shared/absPath.cjs")
+const syncFs = require("../src/shared/syncFs.cjs")
 const { spawn, spawnSync } = require('child_process')
 
 if (syncFs.isEmptyDir(absPath.dist())) {

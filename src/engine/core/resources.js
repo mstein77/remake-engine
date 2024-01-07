@@ -1,9 +1,9 @@
 import { d, csv2values, toKeys, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues, getCanvasObjForDim } from "helper/helper"
 import { RESOURCE, makeDescriptor, typeText2tid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tids2extTids,
-    id2tid, tid2id, text2id, tid2type } from "shared/classes/resources.cjs"
+    id2tid, tid2id, text2id, tid2type } from "shared/resources.cjs"
 import { AppliedImage } from "./classes"
 import { MapStorage } from "shared/storages/mapStorage.cjs"
-import { StorageManager } from "shared/classes/storage.cjs"
+import { StorageManager } from "shared/storage.cjs"
 import inst from "./instances.js"
 
 let staticTypes = csv2values(STATIC_TYPES)

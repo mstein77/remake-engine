@@ -1,5 +1,5 @@
-const { toValues, toPairs } = require("../shared/classes/helper.cjs");
-const { buildLogLevels } = require("../shared/classes/console.cjs")
+const { toValues, toPairs } = require("../shared/helper.cjs");
+const { buildLogLevels } = require("../shared/console.cjs")
 
 const DEPLOY_METHOD = {
     UPLOAD_ROOT: 'upload-dist-to-root',

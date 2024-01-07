@@ -7,9 +7,9 @@ import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
 import { defaultValues } from "../settings"
 import { CellValue, CellSelection } from "../classes"
 import { BrowserStorage } from "core/storages/browserStorage"
-import { StorageManager } from "shared/classes/storage.cjs"
+import { StorageManager } from "shared/storage.cjs"
 import { createImageResource } from "core/resources"
-import { RESOURCE } from "shared/classes/resources.cjs"
+import { RESOURCE } from "shared/resources.cjs"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();

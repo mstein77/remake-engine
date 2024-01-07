@@ -7,7 +7,7 @@ import { Block, Stack } from 'editor/components/LayoutComponents'
 import { d, getEmptyImageData, getUniqueName } from "helper/helper"
 import { EntityPicker } from "editor/components/EntityComponents"
 import { ImageBlockIndex } from "./classes"
-import { RESOURCE } from "shared/classes/resources.cjs"
+import { RESOURCE } from "shared/resources.cjs"
 
 function BackgroundPreview({ model, imageIndex, newImage, width, height, active, setActive, fieldProps }) {
     const eContext = useContext(EditorContext);

@@ -2,7 +2,7 @@
 const path = require('path')
 const express = require('express')
 const cors = require('cors')
-const { csv2values } = require('../shared/classes/helper.cjs')
+const { csv2values } = require('../shared/helper.cjs')
 
 const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
 

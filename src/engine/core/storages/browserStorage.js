@@ -1,4 +1,4 @@
-import { RESOURCE } from "shared/classes/resources.cjs"
+import { RESOURCE } from "shared/resources.cjs"
 import { d } from "helper/helper"
 
 /**

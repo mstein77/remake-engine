@@ -1,8 +1,8 @@
-import { StorageManager } from "shared/classes/storage.cjs"
+import { StorageManager } from "shared/storage.cjs"
 import { BrowserStorage } from "core/storages/browserStorage"
 import { d } from "helper/helper"
 import jest from 'jest-mock'
-import { RESOURCE, id2jsonTid, id2imageTid, id2audioTid } from '../../../src/shared/classes/resources.cjs'
+import { RESOURCE, id2jsonTid, id2imageTid, id2audioTid } from '../../../src/shared/resources.cjs'
 
 test('BrowserStorage', () => {
 

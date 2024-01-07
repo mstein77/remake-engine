@@ -2,9 +2,9 @@ import { toPairs,  d } from "helper/helper"
 import { ResourceManager, VideoResources, ImageResources, AudioResources, JsonResources, Resources, ResourceCollection,
     getResourcesAndCallback, setStaticTypes
 } from "core/resources"
-import { StorageManager } from "shared/classes/storage"
+import { StorageManager } from "shared/storage"
 import { MapStorage } from "shared/storages/mapStorage"
-import { RESOURCE, makeDescriptor, id2coreTid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tid2id, id2tid, typeText2tid } from "shared/classes/resources.cjs"
+import { RESOURCE, makeDescriptor, id2coreTid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tid2id, id2tid, typeText2tid } from "shared/resources.cjs"
 import { createImageResource, ResourceRequest, AudioResource, ImageResource, getResourceResolvePromise, getResourceProxy, ResourceResolver, SyncResolver, DummyResolver } from "core/resources"
 import jest from 'jest-mock'
 import { processResourceRequest, processStoreRequest } from "../../../src/server/controller/resources.cjs"

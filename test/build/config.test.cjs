@@ -1,7 +1,7 @@
 const { internal, applyConfigIntegrityChecks } = require('../../src/build/config.cjs')
 const { MSG, extractEnvOverwrites, castEnvValue, extractAppEnvOverwrites } = internal
 const { RESOURCE_LOADING, getResolvedDefaultConfig } = require('../../src/build/const.cjs')
-const { d, toValues, toKeys } = require('../../src/shared/classes/helper.cjs')
+const { d, toValues, toKeys } = require('../../src/shared/helper.cjs')
 const ServerWithNodejs = require('../../src/build/hostings/server-with-nodejs.cjs')
 const ServerWithoutNodeJs = require('../../src/build/hostings/server-without-nodejs.cjs')
 test('castEnvValue', () => {

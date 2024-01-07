@@ -1,5 +1,5 @@
 const util = require('node:util')
-const { d, isString, toValues } = require('../../shared/classes/helper.cjs')
+const { d, isString } = require('./helper.cjs')
 
 // TODO we should check the terminal support for colors here, especially for windows
 let noColor = false

@@ -9,7 +9,7 @@ import { validated } from "helper/validate"
 import { ScreenRegistry } from "./screen"
 import { BlendTransition, FadeInOutTransition, LoadingTransition, PushInTransition, TransitionRegistry } from "./transition"
 import { BrowserStorage } from "./storages/browserStorage"
-import { StorageManager } from "shared/classes/storage.cjs"
+import { StorageManager } from "shared/storage.cjs"
 import inst from "core/instances"
 
 class Game {

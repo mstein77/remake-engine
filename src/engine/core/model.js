@@ -1,6 +1,6 @@
 import { d, isString, isEqual, isObject } from "helper/helper"
 import inst from "./instances"
-import { id2audioTid, id2imageTid, id2jsonTid } from "shared/classes/resources.cjs"
+import { id2audioTid, id2imageTid, id2jsonTid } from "shared/resources.cjs"
 
 /**
  * A model is a class which is constructed using a corresponding config instance. It can be linked to dependant models

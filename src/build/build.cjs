@@ -1,8 +1,8 @@
-const absPath = require("../shared/classes/absPath.cjs")
-const syncFs = require("../shared/classes/syncFs.cjs")
+const absPath = require("../shared/absPath.cjs")
+const syncFs = require("../shared/syncFs.cjs")
 const { runWebpackConfigGeneration } = require("./webpack.cjs")
-const { d, isObject, simpleType, toPairs, isVersionEqualOrHigher} = require("../shared/classes/helper.cjs")
-const { errorSection, setBuildLogLevel } = require("../shared/classes/console.cjs")
+const { d, isObject, simpleType, toPairs, isVersionEqualOrHigher} = require("../shared/helper.cjs")
+const { errorSection, setBuildLogLevel } = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile } = require("./helper.cjs")
 

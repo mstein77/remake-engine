@@ -1,5 +1,5 @@
-const absPath = require('../shared/classes/absPath.cjs')
-const { d, toPairs, intersect, isArray, csv2values} = require("../shared/classes/helper.cjs")
+const absPath = require('../shared/absPath.cjs')
+const { d, toPairs, intersect, isArray, csv2values} = require("../shared/helper.cjs")
 const { getResolvedDefaultConfig, key2params, DEPLOY_METHOD, RESOURCE_LOADING } = require('./const.cjs')
 
 const MSG = {
