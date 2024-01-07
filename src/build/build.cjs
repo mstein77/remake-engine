@@ -1,10 +1,10 @@
 const absPath = require("../shared/classes/absPath.cjs")
 const syncFs = require("../shared/classes/syncFs.cjs")
 const { runWebpackConfigGeneration } = require("./webpack.cjs")
-const { d, isObject, simpleType, toPairs, matchesRequiredVersion} = require("../shared/classes/helper.cjs")
+const { d, isObject, simpleType, toPairs, isVersionEqualOrHigher} = require("../shared/classes/helper.cjs")
 const { errorSection, setBuildLogLevel } = require("../shared/classes/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
-const { getJsonFromModule, getJsonObject } = require("./helper.cjs")
+const { getDefaultFromModule, getJsonObjectFromFile } = require("./helper.cjs")
 
 const minNodeVersion = 'v16'
 
@@ -22,10 +22,10 @@ const minNodeVersion = 'v16'
  */
 const generateWebpackConfigs = (isDist, all = false, info = false) => {
     try {
-        if (!matchesRequiredVersion(process.version, minNodeVersion))
+        if (!isVersionEqualOrHigher(process.version, minNodeVersion))
             throw Error(`Your node version is ${process.version} but ${minNodeVersion} or above is required `)
 
-        const configJson = getJsonFromModule(absPath.game('config.cjs'))
+        const configJson = getDefaultFromModule(absPath.game('config.cjs'))
         const buildLogLevel = configJson.buildLogging
         if (buildLogLevel) setBuildLogLevel(buildLogLevel)
 
@@ -36,12 +36,12 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
         }
         const configs = {
             configJson,
-            enginePackageJson: getJsonObject(absPath.engine('package.json')),
-            gamePackageJson: getJsonObject(absPath.game('package.json'))
+            enginePackageJson: getJsonObjectFromFile(absPath.engine('package.json')),
+            gamePackageJson: getJsonObjectFromFile(absPath.game('package.json'))
         }
         if (isDist && all) {
             const buildsPath = absPath.game('builds.cjs')
-            configs.buildsJson = getJsonFromModule(buildsPath)
+            configs.buildsJson = getDefaultFromModule(buildsPath)
             const pairs = toPairs(configs.buildsJson)
             const matchRegExp = new RegExp('^[a-z1-9\-\_]+$', 'i')
             for (const [ key, value ] of pairs) {
@@ -52,7 +52,7 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
                     throw Error(`Value of key "${key}" in ${buildsPath}. Must be an object but got ${simpleType(value)}`)
             }
         }
-        return runWebpackConfigGeneration(configs, fileDeps, isDist, info)
+        return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info })
 
     } catch (e) {
         errorSection(e)

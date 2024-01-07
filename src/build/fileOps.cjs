@@ -35,8 +35,8 @@ class FileOpQueue {
      *
      * @param {string} path
      */
-    addClear(path) {
-        this.queue.push({ op: FILE_OP.CLEAR, path })
+    addClear(path, createIfNotExists = false) {
+        this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists })
     }
 
     /**
@@ -125,7 +125,8 @@ class FileOpQueue {
                     break
                 }
                 case FILE_OP.CLEAR: {
-                    const { path } = params
+                    const { path, createIfNotExists } = params
+                    if (createIfNotExists) syncFs.createPathTo(path + '/')
                     syncFs.clearDir(path)
                     break
                 }

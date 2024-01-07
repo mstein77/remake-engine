@@ -1,5 +1,5 @@
 import { StorageManager } from "shared/classes/storage.cjs"
-import { BrowserStorage } from "core/storage/browserStorage"
+import { BrowserStorage } from "core/storages/browserStorage"
 import { d } from "helper/helper"
 import jest from 'jest-mock'
 import { RESOURCE, id2jsonTid, id2imageTid, id2audioTid } from '../../../src/shared/classes/resources.cjs'

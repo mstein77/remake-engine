@@ -51,6 +51,11 @@ const key2params = {
     esLint: {type: 'bool', default: false}
 }
 
+/**
+ * Returns an unresolved config object with default values for dev and dist environment
+ *
+ * @returns {object}
+ */
 const getDefaultConfig = () => {
     const json = {}
     const dist = {}
@@ -63,6 +68,13 @@ const getDefaultConfig = () => {
     return json
 }
 
+/**
+ * Returns a resolved config object with default values for dist or dev environment
+ *
+ * @param {boolean} isDist
+ *
+ * @returns {object}
+ */
 const getResolvedDefaultConfig = isDist => {
     const json = {}
     for (const [ key, params ] of toPairs(key2params)) {

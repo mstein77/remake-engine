@@ -1,5 +1,5 @@
 const { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect,
-    trim, simpleType } = require('../../../src/shared/classes/helper.cjs')
+    trim, simpleType, csv2values, isVersionEqualOrHigher } = require('../../../src/shared/classes/helper.cjs')
 
 const allTrue = (func, ...params ) => {
     for (const param of params) {
@@ -123,4 +123,33 @@ test('trim', () => {
     expect(trim('aaaccaaa', 'a')).toBe('cc')
     expect(trim('baaccbba', 'ab')).toBe('cc')
     expect(trim('baacacbba', 'ab')).toBe('cac')
+})
+
+test('csv2values', () => {
+    expect(csv2values('')).toEqual([])
+    expect(csv2values('   ')).toEqual([])
+    expect(csv2values('a')).toEqual(['a'])
+    expect(csv2values('  a ')).toEqual(['a'])
+    expect(csv2values('a,b')).toEqual(['a', 'b'])
+    expect(csv2values('  a ,  b ')).toEqual(['a', 'b'])
+})
+
+test('isVersionEqualOrHigher', () => {
+    expect(isVersionEqualOrHigher('1', '1')).toBeTrue()
+    expect(isVersionEqualOrHigher('v1', '1')).toBeTrue()
+    expect(isVersionEqualOrHigher('1', 'v1')).toBeTrue()
+    expect(isVersionEqualOrHigher('v1', 'v1')).toBeTrue()
+    expect(isVersionEqualOrHigher('2', '1')).toBeTrue()
+    expect(isVersionEqualOrHigher('1', '2')).toBeFalse()
+    expect(isVersionEqualOrHigher('1.0', '1')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.1', '1.1')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.2', '1.1')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.2', '1.3')).toBeFalse()
+    expect(isVersionEqualOrHigher('1.2a', '1.3')).toBeFalse()
+    expect(isVersionEqualOrHigher('1.2', '1.2a')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.3', '1.2a')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.2a', '1.2')).toBeFalse()
+    expect(isVersionEqualOrHigher('1.2a', '1.2a')).toBeTrue()
+    expect(isVersionEqualOrHigher('1.2a', '1.2b')).toBeFalse()
+    expect(isVersionEqualOrHigher('1.2b', '1.2a')).toBeFalse()
 })

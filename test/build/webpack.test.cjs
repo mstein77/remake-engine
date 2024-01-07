@@ -1,9 +1,9 @@
-const { getWebpackConfigs } = require('../../src/build/webpack.cjs')
+const { getTargetWebpackConfigs } = require('../../src/build/webpack.cjs')
 const ServerWithNodeHosting = require('../../src/build/hostings/server-with-nodejs.cjs')
 const { getResolvedDefaultConfig } = require("../../src/build/const.cjs")
 const { d, toPairs } = require("../../src/shared/classes/helper.cjs")
 const path = require("path")
-const DummyQueue = require("../../src/build/queues/DummyQueue.cjs")
+const { FileOpQueue }  = require("../../src/build/fileOps.cjs")
 
 describe('getWebpackConfigs', () => {
 
@@ -51,31 +51,28 @@ describe('getWebpackConfigs', () => {
         version: '1.0.0a'
     }
 
-    const fileDeps = {
+    const getFileDeps = () => ({
         absPath,
-        exists: () => true,
-        queue: new DummyQueue(),
-        resourceFiles: []
-    }
+        queue: new FileOpQueue(true),
+        syncFs: {}
+    })
 
     const buildDev = (config, name = 'game') => {
-        fileDeps.queue.clear()
-        const matches = getWebpackConfigs(
+        const matches = getTargetWebpackConfigs(
             {config: getConfig(false, config), gamePackageJson, enginePackageJson},
-            fileDeps,
+            getFileDeps(),
             new ServerWithNodeHosting(),
-            false
-        ).webpackConfigs.filter(obj => obj.name === name)
+            {isDist: false}
+        ).filter(obj => obj.name === name)
         return matches.length ? matches[0] : undefined
     }
     const buildDist = (config, name = 'game') => {
-        fileDeps.queue.clear()
-        const matches = getWebpackConfigs(
+        const matches = getTargetWebpackConfigs(
             {config: getConfig(true, config), gamePackageJson, enginePackageJson},
-            fileDeps,
+            getFileDeps(),
             new ServerWithNodeHosting(),
-            true
-        ).webpackConfigs.filter(obj => obj.name === name)
+            {isDist: true}
+        ).filter(obj => obj.name === name)
         return matches.length ? matches[0] : undefined
     }
 

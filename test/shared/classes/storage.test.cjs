@@ -1,5 +1,5 @@
 const { StorageManager } = require('../../../src/shared/classes/storage.cjs')
-const { MapStorage } = require('../../../src/shared/storage/mapStorage.cjs')
+const { MapStorage } = require('../../../src/shared/storages/mapStorage.cjs')
 const { id2imageTid, id2jsonTid, id2audioTid, id2videoTid, RESOURCE, id2coreTid} = require('../../../src/shared/classes/resources.cjs')
 const { d } = require('../../../src/shared/classes/helper.cjs')
 

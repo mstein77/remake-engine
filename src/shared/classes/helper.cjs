@@ -220,9 +220,17 @@ const csv2values = csv => {
         values.push(item.trim())
     }
     return values
-
 }
 
+/**
+ * Returns an array with information objects for each part of the given version string.
+ * The information object includes the "number" as integer and also an "appendix" string, which contains all characters
+ * following the number
+ *
+ * @param {string} version
+ *
+ * @returns {array}
+ */
 const getVersionParts = version => {
     const parts = trim(version, 'v').split('.')
     const result = []
@@ -247,11 +255,12 @@ const getVersionParts = version => {
 /**
  * Returns whether the given version number is higher or equal to the required version number
  *
- * @param actual
- * @param required
+ * @param {string} actual
+ * @param {string} required
+ *
  * @returns {boolean}
  */
-const matchesRequiredVersion = (actual, required) => {
+const isVersionEqualOrHigher = (actual, required) => {
     const actualParts = getVersionParts(actual)
     const requiredParts = getVersionParts(required)
     const iMax = Math.min(actualParts.length, requiredParts.length)
@@ -298,7 +307,7 @@ module.exports = {
     trim,
     simpleType,
     csv2values,
-    matchesRequiredVersion,
+    isVersionEqualOrHigher,
     toPairs,
     toValues,
     toKeys

@@ -112,7 +112,7 @@ const newLine = () => { logger.log() }
 const errorSection = error => {
     colorLog(`\n${BG.L_RED + FG.BLACK} BUILD ${BG.RED + FG.WHITE} Failed with the following error... `)
     colorLog( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
-    if (error instanceof TypeError || error.printStack) {
+    if (error instanceof TypeError || error instanceof SyntaxError) {
         console.error(error.stack)
     } else if (hasLogLevel('detailed')) {
         console.error(error)

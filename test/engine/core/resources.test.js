@@ -3,7 +3,7 @@ import { ResourceManager, VideoResources, ImageResources, AudioResources, JsonRe
     getResourcesAndCallback, setStaticTypes
 } from "core/resources"
 import { StorageManager } from "shared/classes/storage"
-import { MapStorage } from "shared/storage/mapStorage"
+import { MapStorage } from "shared/storages/mapStorage"
 import { RESOURCE, makeDescriptor, id2coreTid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tid2id, id2tid, typeText2tid } from "shared/classes/resources.cjs"
 import { createImageResource, ResourceRequest, AudioResource, ImageResource, getResourceResolvePromise, getResourceProxy, ResourceResolver, SyncResolver, DummyResolver } from "core/resources"
 import jest from 'jest-mock'

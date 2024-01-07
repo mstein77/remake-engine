@@ -3,10 +3,10 @@ const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
 const { RESOURCE_LOADING} = require("./const.cjs")
 const { makeDescriptor} = require("../shared/classes/resources.cjs")
 const { FileCodec} = require("../shared/classes/fileCodec.cjs")
-const { d, csv2values, trim, toPairs } = require("../shared/classes/helper.cjs")
+const { d, isArray, csv2values, trim, toPairs, simpleType } = require("../shared/classes/helper.cjs")
 const { newLine, subSectionWarning, mainSection, subSectionOk, subSection, dumpJson, bold, colorLog, hasLogLevel } = require("../shared/classes/console.cjs")
 const { buildConfig, applyConfigIntegrityChecks } = require("./config.cjs")
-const { stringifyValues } = require("./helper.cjs")
+const { stringifyValues, getDefaultFromModule } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -69,6 +69,11 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
         RESOURCES_API: !isDist || requiresApi
     }
 
+    /**
+     * Returns an object holding the webpack config for building the game frontend
+     *
+     * @returns {object}
+     */
     const getEngineWebpackConfig = () => {
         const webpackConfig = {}
 
@@ -335,6 +340,11 @@ export default resourceInfo`
         }
     }
 
+    /**
+     * Returns an object holding the webpack config for building the server
+     *
+     * @returns {object}
+     */
     const getServerWebpackConfig = () => {
 
         const port = config.port
@@ -409,30 +419,29 @@ export default resourceInfo`
 
 /**
  * Runs the generation of all webpack configs which are necessary for dev or production build according to the given
- * build config and returns them either as array or object.
- * If a buildsJson is given in the configs parameter then all webpack configs described in the json will be generated
- * instead.
+ * build config and returns them either as array or object. If a buildsJson is given in the configs parameter then all
+ * webpack configs described in the json will be generated instead.
  *
  * @param {object} configs
  * @param {object} fileDeps
- * @param {boolean} isDist
- * @param {boolean} info
+ * @param {boolean} options
  *
  * @returns {object|array}
  */
-const runWebpackConfigGeneration = (configs, fileDeps, isDist, info) => {
+const runWebpackConfigGeneration = (configs, fileDeps, options) => {
 
+    const { isDist, info } = options
     const buildsJson = configs.buildsJson
     const distTargets = []
     const { absPath, queue } = fileDeps
-    queue.addClear(absPath.tmp())
+    queue.addClear(absPath.tmp(), true)
     if (buildsJson) {
-        queue.addClear(absPath.dists())
+        queue.addClear(absPath.dists(), true)
         for (const [ target, config ] of toPairs(buildsJson)) {
             distTargets.push({ target, path: absPath.dists(target), config })
         }
     } else {
-        if (isDist) queue.addClear(absPath.dist())
+        if (isDist) queue.addClear(absPath.dist(), true)
         distTargets.push({config: {}})
     }
 
@@ -440,7 +449,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, isDist, info) => {
 
     queue.process()
     let lastEngineConfig = null
-    const resultConfigs = []
+    let resultConfigs = []
     const buildInstructions = []
 
     for (const { target, path, ...distTarget } of distTargets) {
@@ -476,12 +485,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, isDist, info) => {
         subSectionOk()
 
         subSection(`Generate webpack config`)
-        const webpackConfigs = getTargetWebpackConfigs(
-            { config, ...configs },
-            fileDeps,
-            hosting,
-            { isDist, target, info }
-        )
+        configs.config = config
+        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, hosting, { isDist, target, info })
         subSectionOk()
         lastEngineConfig = webpackConfigs[0]
 
@@ -500,6 +505,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, isDist, info) => {
         resultConfigs.push( ...webpackConfigs )
     }
 
+    const webpackHook = getDefaultFromModule(absPath.game('webpack-hook.cjs'), 'function', false)
+    if (webpackHook) {
+        subSection('Passing all generated webpack configs to webpack hook')
+        resultConfigs = webpackHook(resultConfigs, configs.config, options)
+        if (!isArray(resultConfigs))
+            throw Error(`Webpack hook result must be of type array but got ${simpleType(resultConfigs)}`)
+
+        subSectionOk()
+    }
     if (!info && isDist && hasLogLevel('minimal')) {
         lastEngineConfig.plugins.push(
             new PostBuildMessagePlugin([
@@ -507,9 +521,9 @@ const runWebpackConfigGeneration = (configs, fileDeps, isDist, info) => {
             ])
         )
     }
-    mainSection(`2. Execute webpack configs...`)
+    let result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
 
-    const result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
+    mainSection(`2. Execute webpack configs...`)
 
     if (hasLogLevel('detailed')) {
         subSection('Generated webpack config')
