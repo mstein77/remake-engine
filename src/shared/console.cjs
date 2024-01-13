@@ -50,6 +50,8 @@ let buildLogLevel = 'normal'
 
 const buildLogLevels = ['none', 'minimal', 'normal', 'detailed', 'verbose']
 
+const getBuildLogLevel = () => buildLogLevel
+
 const setBuildLogLevel = value => buildLogLevel = value
 
 /**
@@ -146,6 +148,7 @@ module.exports = {
     colorLog,
     colorMsg,
     setLogger,
+    getBuildLogLevel,
     setBuildLogLevel,
     buildLogLevels,
     hasLogLevel,

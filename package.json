@@ -11,9 +11,9 @@
     "start-server": "node ../../dist/server.cjs",
     "start": "node bin/serve.cjs",
     "build-game-dev": "node bin/dev-server.cjs",
-    "build-game-dist": "webpack --config webpack.build-dist.cjs && node bin/cleanup.cjs",
-    "build-info-dist": "webpack --env info --config webpack.build-dist.cjs && node bin/cleanup.cjs",
-    "build-game-dists": "webpack --config webpack.build-dists.cjs && node bin/cleanup.cjs",
+    "build-game-dist": "webpack --config webpack.build-dist.cjs && node bin/post-build.cjs",
+    "build-info-dist": "webpack --env info --config webpack.build-dist.cjs && node bin/post-build.cjs",
+    "build-game-dists": "webpack --config webpack.build-dists.cjs && node bin/post-build.cjs",
     "postinstall": "echo \"Thanks for installing ReMake Engine...\""
   },
   "engines": {

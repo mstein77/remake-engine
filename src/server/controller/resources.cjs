@@ -1,8 +1,7 @@
 const { d, csv2values } = require('../../shared/helper.cjs')
 const { StorageManager } = require('../../shared/storage.cjs')
 const { FileStorage } = require('../../shared/storages/fileStorage.cjs')
-const { tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/resources.cjs")
-const path = require('path')
+const { ResourceTypeRegistry, tids2extTids, map2extMap, typeText2tid, text2id, makeDescriptor} = require("../../shared/resources.cjs")
 
 const RMK_GAME_DIR = process.env.RMK_GAME_DIR || '../../../../../'
 let SM = null
@@ -106,6 +105,7 @@ const processStoreRequest = (body, SM) => {
 const controller = {
 
     init: (config, absDir) => {
+        ResourceTypeRegistry.fromJson(config.resourceTypes)
         const staticTypes = []
         if (config.staticTypes !== '') {
             staticTypes.push( ...csv2values(config.staticTypes))

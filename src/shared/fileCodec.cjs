@@ -7,6 +7,7 @@ const FileCodec = {
     init: _absPath => {
         absPath = _absPath
     },
+
     // writes an api-encoded resource to the file given in the descriptor
     encode: (apiEncoded, descriptor) => {
         const path = absPath.resources(descriptor.file)

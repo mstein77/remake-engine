@@ -27,6 +27,7 @@ if (setupAppMiddlewares) {
         serverLogging: LOGGING,
         serverLoggingFormat: LOGGING_FORMAT,
         staticTypes: STATIC_TYPES,
+        resourceTypes: RESOURCE_TYPES,
         resourceLoading: 'api',
         IS_DIST: true,
         API_MAX_JSON_SIZE

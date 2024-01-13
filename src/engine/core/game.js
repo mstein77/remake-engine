@@ -100,7 +100,7 @@ class Game {
                             if (this.keyActions[key](e)) return
                         }
                     }
-                    if (key === EDITOR_KEY && this.hasEditor) {
+                    if (key === 'Dead' && this.hasEditor) {
                         e.preventDefault()
                         this.openEditorMode()
                         return

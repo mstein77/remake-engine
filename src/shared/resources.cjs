@@ -195,24 +195,48 @@ const map2extMap = map => {
     return extMap
 }
 
-const ext2type = {}
-const ext2info = {}
-const type2exts = {
-    [RESOURCE.TYPE.JSON]: [],
-    [RESOURCE.TYPE.IMAGE]: [],
-    [RESOURCE.TYPE.AUDIO]: [],
-    [RESOURCE.TYPE.VIDEO]: [],
-    [RESOURCE.TYPE.CORE]: ['json']
+let ext2type = {}
+let ext2info = {}
+let type2exts = {}
+
+const getExtsForType = type => {
+    const exts = type2exts[type]
+    if (!exts)
+        throw Error(`Invalid resource type id "${type}" given!`)
+
+    return exts
 }
 
 /**
  * The resource type registry allows the registration of resource types to id extensions and mime sub types.
  * Id extensions are used like a file extension. The first registered extension of a resource type is used as default
  * extension in case an id has no extension.
- *
- * TODO allow registration or overwrite of types from outside, make setter for defaultExt
  */
 const ResourceTypeRegistry = {
+
+    /**
+     * Returns an object holding all internal variables
+     *
+     * @returns {object}
+     */
+    toJson: () => {
+        return {
+            ext2type,
+            ext2info,
+            type2exts
+        }
+    },
+
+    /**
+     * Initializes all internal variables with the ones from the given json
+     *
+     * @param json
+     */
+    fromJson: json => {
+        ext2type = json.ext2type
+        ext2info = json.ext2info
+        type2exts = json.type2exts
+    },
 
     /**
      * Returns the default extension for the given resource type
@@ -221,8 +245,9 @@ const ResourceTypeRegistry = {
      *
      * @returns {string}
      */
-    getDefaultExt: type => {
-        const exts = type2exts[type]
+    getDefaultExtension: type => {
+        const exts = getExtsForType(type)
+
         return exts.length ? exts[0] : undefined
     },
 
@@ -231,16 +256,14 @@ const ResourceTypeRegistry = {
      * If no mime subtype is given, a subtype with the same name as the extension is used
      * The method returns the ResourceTypeRegistry to allow chaining
      *
-     * @param {string} ext
      * @param {string} type
-     * @param {string} subType
+     * @param {string} ext
+     * @param {string|undefined} subType
      *
-     * @returns {object}
+     * @returns {ResourceTypeRegistry}
      */
-    register: (ext, type, subType = ext) => {
-        const exts = type2exts[type]
-        if (!exts)
-            throw Error(`Invalid type "${type}" for resource type registration given!`)
+    register: (type, ext, subType = ext) => {
+        const exts = getExtsForType(type)
 
         if (!exts.includes(ext)) exts.push(ext)
 
@@ -248,39 +271,175 @@ const ResourceTypeRegistry = {
         ext2info[ext] = { type, subType }
 
         return ResourceTypeRegistry
-    }
+    },
+
+    /**
+     * Registers a new image resource type with the given extension and mime subtype.
+     * If no mime subtype is given, a subtype with the same name as the extension is used
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     * @param {string|undefined} subType
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    registerImage(ext, subType = ext) {
+        return ResourceTypeRegistry.register(RESOURCE.TYPE.IMAGE, ext, subType)
+    },
+
+    /**
+     * Registers a new audio resource type with the given extension and mime subtype.
+     * If no mime subtype is given, a subtype with the same name as the extension is used
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     * @param {string|undefined} subType
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    registerAudio(ext, subType = ext) {
+        return ResourceTypeRegistry.register(RESOURCE.TYPE.AUDIO, ext, subType)
+    },
+
+    /**
+     * Registers a new video resource type with the given extension and mime subtype.
+     * If no mime subtype is given, a subtype with the same name as the extension is used
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     * @param {string|undefined} subType
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    registerVideo(ext, subType = ext) {
+        return ResourceTypeRegistry.register(RESOURCE.TYPE.VIDEO, ext, subType)
+    },
+
+    /**
+     * Removes all registered resource types except the internal json based types.
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    clear() {
+        ext2type = {}
+        ext2info = {}
+        type2exts = {
+            [RESOURCE.TYPE.JSON]: [],
+            [RESOURCE.TYPE.IMAGE]: [],
+            [RESOURCE.TYPE.AUDIO]: [],
+            [RESOURCE.TYPE.VIDEO]: [],
+            [RESOURCE.TYPE.CORE]: ['json']
+        }
+        return ResourceTypeRegistry.register(RESOURCE.TYPE.JSON, 'json')
+    },
+
+    /**
+     * Returns an array with all registered extensions for the given resource type id
+     *
+     * @param {string} type
+     *
+     * @returns {array}
+     */
+    getTypeExtensions: type => {
+        const exts = getExtsForType(type)
+
+        return [ ...exts ]
+    },
+
+    /**
+     * Returns an array with all registered extensions for image resources
+     *
+     * @returns {array}
+     */
+    getImageExtensions: () => ResourceTypeRegistry.getTypeExtensions(RESOURCE.TYPE.IMAGE),
+
+    /**
+     * Returns an array with all registered extensions for audio resources
+     *
+     * @returns {array}
+     */
+    getAudioExtensions: () => ResourceTypeRegistry.getTypeExtensions(RESOURCE.TYPE.AUDIO),
+
+    /**
+     * Returns an array with all registered extensions for video resources
+     *
+     * @returns {array}
+     */
+    getVideoExtensions: () => ResourceTypeRegistry.getTypeExtensions(RESOURCE.TYPE.VIDEO),
+
+    /**
+     * Sets the given extension as default for the resource type. Throw an error if the extension is not registered
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} type
+     * @param {string} ext
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    setDefaultExtension: (type, ext) => {
+        const exts = getExtsForType(type)
+        const idx = exts.indexOf(ext)
+        if (idx === -1)
+            throw Error(`Cannot set "${ext}" as default extension because it was not yet registered for the ${RESOURCE.TEXT[type]} type`)
+
+        exts.splice(idx, 1);
+        exts.unshift(ext)
+
+        return ResourceTypeRegistry
+    },
+
+    /**
+     * Sets the given extension as default for the image resource type. Throw an error if the extension is not registered
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    setDefaultImageExtension: ext => ResourceTypeRegistry.setDefaultExtension(RESOURCE.TYPE.IMAGE, ext),
+
+    /**
+     * Sets the given extension as default for the audio resource type. Throw an error if the extension is not registered
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    setDefaultAudioExtension: ext => ResourceTypeRegistry.setDefaultExtension(RESOURCE.TYPE.AUDIO, ext),
+
+    /**
+     * Sets the given extension as default for the video resource type. Throw an error if the extension is not registered
+     * The method returns the ResourceTypeRegistry to allow chaining
+     *
+     * @param {string} ext
+     *
+     * @returns {ResourceTypeRegistry}
+     */
+    setDefaultVideoExtension: ext => ResourceTypeRegistry.setDefaultExtension(RESOURCE.TYPE.VIDEO, ext)
 }
 
 // register the default extension for each media type
 ResourceTypeRegistry
-    .register(
-        'json',
-        RESOURCE.TYPE.JSON
+    .clear()
+    .registerImage(
+        'png'
     )
-    .register(
-        'png',
-        RESOURCE.TYPE.IMAGE
+    .registerImage(
+        'jpg', 'jpeg'
     )
-    .register(
-        'jpg',
-        RESOURCE.TYPE.IMAGE,
-        'jpeg'
+    .registerAudio(
+        'wav'
     )
-    .register(
-        'wav',
-        RESOURCE.TYPE.AUDIO
+    .registerAudio(
+        'mp3'
     )
-    .register(
-        'mp3',
-        RESOURCE.TYPE.AUDIO
+    .registerVideo(
+        'mp4'
     )
-    .register(
-        'mp4',
-        RESOURCE.TYPE.VIDEO
-    )
-    .register(
-        'webm',
-        RESOURCE.TYPE.VIDEO
+    .registerVideo(
+        'webm'
     )
 
 /**
@@ -643,7 +802,7 @@ const makeDescriptor = {
         if (dir) {
             if (dir !== RESOURCE.KEY[type]) return InvalidDescriptor
             id = relPath.substring(idx + 1)
-            let defExt = ResourceTypeRegistry.getDefaultExt(type)
+            let defExt = ResourceTypeRegistry.getDefaultExtension(type)
             if (defExt) {
                 defExt = '.' + defExt
                 if (id.endsWith(defExt)) id = id.substring(0, id.length - defExt.length)

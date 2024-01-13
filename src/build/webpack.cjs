@@ -1,12 +1,10 @@
 const setupAppMiddlewares = require("../server/setupMiddlewares.cjs")
 const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
 const { RESOURCE_LOADING} = require("./const.cjs")
-const { makeDescriptor} = require("../shared/resources.cjs")
+const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
-const { d, isArray, csv2values, trim, toPairs, simpleType } = require("../shared/helper.cjs")
-const { newLine, subSectionWarning, mainSection, subSectionOk, subSection, dumpJson, bold, colorLog, hasLogLevel } = require("../shared/console.cjs")
-const { buildConfig, applyConfigIntegrityChecks } = require("./config.cjs")
-const { stringifyValues, getDefaultFromModule } = require("./helper.cjs")
+const { d, csv2values, trim } = require("../shared/helper.cjs")
+const { stringifyValues } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -15,7 +13,6 @@ const MiniCssExtractPlugin = require("mini-css-extract-plugin")
 const ESLintPlugin = require("eslint-webpack-plugin")
 const TerserPlugin = require("terser-webpack-plugin")
 const CopyWebpackPlugin = require("copy-webpack-plugin")
-const PostBuildMessagePlugin = require("./plugins/PostBuildMessagePlugin.cjs")
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
 
 /**
@@ -65,6 +62,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
         VERSION_GAME: gamePackageJson.version,
         GAME_ID: gameId,
         IS_DIST: isDist,
+        RESOURCE_TYPES: ResourceTypeRegistry.toJson(),
         STATIC_TYPES: staticTypes,
         RESOURCES_API: !isDist || requiresApi
     }
@@ -74,7 +72,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
      *
      * @returns {object}
      */
-    const getEngineWebpackConfig = () => {
+    const getGameWebpackConfig = () => {
         const webpackConfig = {}
 
         // add dev-server if we are in dev environment
@@ -103,7 +101,11 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
                     if (!devServer)
                         throw new Error('webpack-dev-server is not defined!')
 
-                    setupAppMiddlewares(devServer.app, { ...config, staticTypes: config.staticTypes, IS_DIST: false })
+                    setupAppMiddlewares(devServer.app, {
+                        ...config,
+                        resourceTypes: ResourceTypeRegistry.toJson(),
+                        IS_DIST: false
+                    })
 
                     return middlewares
                 },
@@ -116,12 +118,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
 
         const plugins = [
             new DefinePlugin(
-                stringifyValues({
-                    ...defines,
-                    ...{
-                        EDITOR_KEY: config.editorKey // TODO: remove
-                    }
-                })
+                stringifyValues(defines)
             ),
             new HtmlWebpackPlugin({
                 filename: 'index.html',
@@ -410,132 +407,13 @@ export default resourceInfo`
         }
     }
 
-    const webpackConfigs = [getEngineWebpackConfig()]
+    const webpackConfigs = [getGameWebpackConfig()]
     if (useServer) {
         webpackConfigs.push(getServerWebpackConfig())
     }
     return webpackConfigs
 }
 
-/**
- * Runs the generation of all webpack configs which are necessary for dev or production build according to the given
- * build config and returns them either as array or object. If a buildsJson is given in the configs parameter then all
- * webpack configs described in the json will be generated instead.
- *
- * @param {object} configs
- * @param {object} fileDeps
- * @param {boolean} options
- *
- * @returns {object|array}
- */
-const runWebpackConfigGeneration = (configs, fileDeps, options) => {
-
-    const { isDist, info } = options
-    const buildsJson = configs.buildsJson
-    const distTargets = []
-    const { absPath, queue } = fileDeps
-    queue.addClear(absPath.tmp(), true)
-    if (buildsJson) {
-        queue.addClear(absPath.dists(), true)
-        for (const [ target, config ] of toPairs(buildsJson)) {
-            distTargets.push({ target, path: absPath.dists(target), config })
-        }
-    } else {
-        if (isDist) queue.addClear(absPath.dist(), true)
-        distTargets.push({config: {}})
-    }
-
-    mainSection(`1. Generate webpack configs...`)
-
-    queue.process()
-    let lastEngineConfig = null
-    let resultConfigs = []
-    const buildInstructions = []
-
-    for (const { target, path, ...distTarget } of distTargets) {
-        queue.clear()
-        if (path) absPath.setCurrDist(path)
-
-        hasLogLevel('normal') && colorLog(
-            target ? `Build "${bold(target)}":\n` : `Starting ${bold(isDist ? 'dist' : 'dev')} build:\n`
-        )
-
-        subSection('Validating build config')
-        const rawConfig = buildConfig(configs.configJson, process.env, distTarget.config, isDist)
-        subSectionOk()
-
-        subSection('Checking integrity of config')
-        const Hosting = require(`./hostings/${rawConfig.hosting}.cjs`)
-        const hosting = new Hosting()
-        const { config, warnings } = applyConfigIntegrityChecks(rawConfig, hosting, isDist)
-        if (warnings.length) {
-            while (warnings.length) {
-                subSectionWarning(warnings.pop())
-            }
-        } else {
-            subSectionOk()
-        }
-        if (hasLogLevel('detailed')) {
-            subSection('Result config')
-            dumpJson(config, 4)
-        }
-
-        subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        hosting.prepare(config, fileDeps, isDist)
-        subSectionOk()
-
-        subSection(`Generate webpack config`)
-        configs.config = config
-        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, hosting, { isDist, target, info })
-        subSectionOk()
-        lastEngineConfig = webpackConfigs[0]
-
-        subSection(`Prepare files in dist folder ${bold(absPath.dist())} `)
-        queue.process()
-        subSectionOk('\n')
-
-        if (hasLogLevel('normal') && hosting.messages) {
-            if (target) {
-                buildInstructions.push(`Build ` + bold(target) + ':')
-                buildInstructions.push('')
-            }
-            buildInstructions.push( ...hosting.messages )
-            buildInstructions.push('')
-        }
-        resultConfigs.push( ...webpackConfigs )
-    }
-
-    const webpackHook = getDefaultFromModule(absPath.game('webpack-hook.cjs'), 'function', false)
-    if (webpackHook) {
-        subSection('Passing all generated webpack configs to webpack hook')
-        resultConfigs = webpackHook(resultConfigs, configs.config, options)
-        if (!isArray(resultConfigs))
-            throw Error(`Webpack hook result must be of type array but got ${simpleType(resultConfigs)}`)
-
-        subSectionOk()
-    }
-    if (!info && isDist && hasLogLevel('minimal')) {
-        lastEngineConfig.plugins.push(
-            new PostBuildMessagePlugin([
-                ...buildInstructions
-            ])
-        )
-    }
-    let result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
-
-    mainSection(`2. Execute webpack configs...`)
-
-    if (hasLogLevel('detailed')) {
-        subSection('Generated webpack config')
-        dumpJson(result, 4)
-        newLine()
-        subSection('Starting webpack')
-        newLine()
-    }
-    return result
-}
-
 module.exports = {
-    getTargetWebpackConfigs,
-    runWebpackConfigGeneration
+    getTargetWebpackConfigs
 }
