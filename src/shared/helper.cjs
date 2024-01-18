@@ -275,6 +275,8 @@ const isVersionEqualOrHigher = (actual, required) => {
     return true
 }
 
+const regexpEscape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 /**
  * Returns an array holding the entries (= array with id and value) of a given object
  *
@@ -308,6 +310,7 @@ module.exports = {
     simpleType,
     csv2values,
     isVersionEqualOrHigher,
+    regexpEscape,
     toPairs,
     toValues,
     toKeys

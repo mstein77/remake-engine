@@ -79,9 +79,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection('Checking integrity of config')
+        const Deliverable = require(`./deliverables/${rawConfig.deliverable}.cjs`)
+        const deliverable = new Deliverable()
+        const requiredPlatforms = deliverable.getRequiredPlatforms()
+        if (requiredPlatforms.length && !requiredPlatforms.includes(process.platform))
+            throw Error(`Build was triggered on platform ${process.platform} but requires ${requiredPlatforms.join(', ')}`)
+
         const Hosting = require(`./hostings/${rawConfig.hosting}.cjs`)
         const hosting = new Hosting()
-        const { config, warnings } = applyConfigIntegrityChecks(rawConfig, hosting, isDist)
+        const { config, warnings } = applyConfigIntegrityChecks(rawConfig, deliverable, hosting, isDist)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -102,7 +108,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
 
         subSection(`Generate webpack config`)
         configs.config = config
-        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, hosting, { isDist, target, info })
+        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, deliverable, hosting, { isDist, target, info })
 
         subSectionOk()
         lastEngineConfig = webpackConfigs[0]
@@ -172,14 +178,22 @@ const showInstructions = instructions => {
  */
 const runPostBuildProcessing = ({ distTargets, buildLogLevel }) => {
 
+    const { config } =
+
     setBuildLogLevel(buildLogLevel)
 
     mainSection('3. Post build processing...')
 
     const postBuildHook = getBuildHook('post-build')
-    if (postBuildHook) {
-        for (const distTarget of distTargets) {
-            const { target = 'dist build' } = distTarget
+    for (const distTarget of distTargets) {
+        const { target = 'dist build', config } = distTarget
+        const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
+        const deliverable = new Deliverable()
+        subSection(`Run post build processing`)
+        deliverable.processPostBuild()
+        subSectionOk()
+
+        if (postBuildHook) {
             subSection(`Trigger post-build-hook for ${bold(target)}`)
             postBuildHook(distTarget)
             subSectionOk()

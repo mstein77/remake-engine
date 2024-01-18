@@ -33,11 +33,13 @@ const configJson = () => {
  * warnings which happened during the check
  *
  * @param {object} config
+ * @param {Deliverable} deliverable
+ * @param {Hosting} hosting
  * @param {boolean} isDist
  *
  * @returns {object}
  */
-const applyConfigIntegrityChecks = (config, hosting, isDist) => {
+const applyConfigIntegrityChecks = (config, deliverable, hosting, isDist) => {
 
     const warnings = []
 

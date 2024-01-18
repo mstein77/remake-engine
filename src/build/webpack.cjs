@@ -3,7 +3,7 @@ const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
 const { RESOURCE_LOADING} = require("./const.cjs")
 const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
-const { d, csv2values, trim } = require("../shared/helper.cjs")
+const { d, csv2values, trim, toKeys, regexpEscape} = require("../shared/helper.cjs")
 const { stringifyValues } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 
@@ -15,18 +15,27 @@ const TerserPlugin = require("terser-webpack-plugin")
 const CopyWebpackPlugin = require("copy-webpack-plugin")
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
 
+const fontExt2mimeType = {
+    ttf: 'font/ttf',
+    eot: 'application/vnd.ms-fontobject',
+    otf: 'font/otf',
+    woff: 'font/woff',
+    woff2: 'font/woff2'
+}
+
 /**
  * Returns an array holding all webpack configs for building the dist target with the given hosting, configs
  * and options
  *
  * @param {object} configs
  * @param {object} fileDeps
+ * @param {Deliverable} deliverable
  * @param {Hosting} hosting
  * @param {object} options
  *
  * @returns {array}
  */
-const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
+const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, options) => {
 
     const { target, info, isDist } = options
     const { config, enginePackageJson, gamePackageJson } = configs
@@ -116,16 +125,76 @@ const getTargetWebpackConfigs = (configs, fileDeps, hosting, options) => {
 
         const pubPrefix = config.server ? 'public' : ''
 
+        const cleanUpAssets = assets => {
+            for (const key of toKeys(assets)) {
+                if (key === 'index.html') continue
+                delete assets[key]
+            }
+            return ''
+        }
+
+        const getCssFromAssets = assets => {
+            let css = assets['index.css'].source()
+
+            for (const key of toKeys(assets)) {
+                if (!key.startsWith('font_')) continue
+
+                const ext = key.substring(key.lastIndexOf('.') + 1)
+
+                const matchFontFaceSrcUrl = new RegExp('(@font-face[^{]*{[^}]+url\\()(?![\'"]?(https?):).*' +
+                    regexpEscape(key) + '[^)]*(\\)[^}]*})', 'mg')
+
+                const font = assets[key]
+                const mimeType = fontExt2mimeType[ext]
+                if (!mimeType)
+                    throw Error(`Could not determine mime type of font "${key}"`)
+
+                const dataUrl = 'data:' + mimeType + ';charset=utf-8;base64,' + font.source().toString('base64')
+
+                css = css.replace(matchFontFaceSrcUrl, '$1' + dataUrl + '$3')
+            }
+            return css
+        }
+
+        const viewPortContent = "width=device-width, initial-scale=1, shrink-to-fit=no"
         const plugins = [
             new DefinePlugin(
                 stringifyValues(defines)
             ),
-            new HtmlWebpackPlugin({
-                filename: 'index.html',
-                inject: 'body',
-                title: config.title,
-                meta: {viewport: 'width=device-width, initial-scale=1, shrink-to-fit=no'}
-            })
+            new HtmlWebpackPlugin(
+                deliverable.isAllInOne ?
+                    {
+                        title: config.title,
+                        filename: 'index.html',
+                        chunks: [],
+                        cache: false,
+                        inject: false,
+                        templateContent: ({htmlWebpackPlugin, compilation}) => `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+          <style>
+            ${getCssFromAssets(compilation.assets)}          
+          </style>
+          <title>${htmlWebpackPlugin.options.title}</title>
+        </head>
+        <body>
+          <div id="app"></div>
+          <script>
+            ${compilation.assets['index.js'].source()}${cleanUpAssets(compilation.assets)}
+          </script>
+        </body>
+        </html>`
+                    } :
+                    {
+                        filename: 'index.html',
+                        inject: isDist ? 'head' : 'body',
+                        title: config.title,
+                        meta: {viewport: viewPortContent}
+                    }
+            )
         ]
 
         const entryParts = [absPath.game('src/index.js')]
@@ -181,9 +250,9 @@ export default resourceInfo`
                 )
             }
         }
-        if (true || isDist) {
-            plugins.push(new CssMinimizerPlugin());
-            plugins.push(new MiniCssExtractPlugin({filename: 'css/[name].[contenthash].css'}))
+        if (isDist) {
+            // plugins.push(new CssMinimizerPlugin());
+            plugins.push(new MiniCssExtractPlugin({filename: deliverable.isAllInOne ? 'index.css' : 'css/[name].[contenthash].css'}))
         }
         if (config.eslint) {
             plugins.push(
@@ -198,7 +267,7 @@ export default resourceInfo`
                 new BundleAnalyzerPlugin()
             )
         }
-        const minimizer = [
+        const minimizer = !config.minimize ? [] : [
             new TerserPlugin({
                 terserOptions: {
                     format: {
@@ -206,10 +275,8 @@ export default resourceInfo`
                     }
                 },
                 extractComments: true
-            })
-        ]
-        if (true || isDist) {
-            minimizer.push(new CssMinimizerPlugin({
+            }),
+            new CssMinimizerPlugin({
                 minimizerOptions: {
                     preset: [
                         "default",
@@ -218,8 +285,8 @@ export default resourceInfo`
                         },
                     ],
                 },
-            }))
-        }
+            })
+        ]
         const copyOps = queue.extract(FILE_OP.COPY)
         const patterns = []
         for (const { from , to } of copyOps) {
@@ -231,6 +298,7 @@ export default resourceInfo`
             }))
         }
         const dependencies = useServer ? [targetPrefix + 'server'] : []
+        const engineNodeModulesMatcher = `[\\\\/]${regexpEscape(enginePackageJson.name)}[\\\\/]node_modules[\\\\/]`
 
         return {
             ...common,
@@ -244,24 +312,22 @@ export default resourceInfo`
             output: {
                 path: absPath.dist(pubPrefix),
                 clean: true,
-                filename: 'js/[' + (isDist ? 'contenthash' : 'name') + '].js',
+                filename: deliverable.isAllInOne ? 'index.js' : 'js/[' + (isDist ? 'contenthash' : 'name') + '].js',
                 publicPath: '/'
             },
             optimization: {
                 minimize: config.minimize,
                 minimizer,
-                splitChunks: {
+                splitChunks: deliverable.isAllInOne ? false : {
                     chunks: 'all',
                     minSize: 0,
                     cacheGroups: {
                         vendors: {
-                            test: new RegExp(`/\\/${enginePackageJson.name}\\/node_modules\\//`),
+                            test: new RegExp(`/${engineNodeModulesMatcher}/`),
                             reuseExistingChunk: true,
                             name(module, chunks, cacheGroupKey) {
                                 const packageName = module.context.match(
-                                    new RegExp(
-                                        `/[\\/]${enginePackageJson.name}[\\/]node_modules[\\/](.*?)([\\/]|$)/`
-                                    )
+                                    new RegExp(`/${engineNodeModulesMatcher}(.*?)([\\\\/]|$)/`)
                                 )[1]
                                 return `${cacheGroupKey}.${packageName.replace("@", "")}`
                             },
@@ -274,7 +340,7 @@ export default resourceInfo`
                         }
                     }
                 },
-                runtimeChunk: "single"
+                runtimeChunk: deliverable.isAllInOne ? false : "single"
             },
             module: {
                 rules: [
@@ -302,7 +368,7 @@ export default resourceInfo`
                     {
                         test: /\.(css)$/,
                         use: [
-                            true || isDist ? MiniCssExtractPlugin.loader : 'style-loader',
+                            isDist ? MiniCssExtractPlugin.loader : 'style-loader',
                             {loader: 'css-loader', options: {sourceMap: config.sourceMaps}}
                         ]
                     },
@@ -310,7 +376,7 @@ export default resourceInfo`
                         test: /\.(woff|woff2|eot|ttf|otf)$/i,
                         type: 'asset/resource',
                         generator: {
-                            filename: 'css/[' + (isDist ? 'contenthash' : 'name') + '][ext]',
+                            filename: deliverable.isAllInOne ? 'font_[name][ext]' : 'css/[' + (isDist ? 'contenthash' : 'name') + '][ext]',
                         }
                     },
                     {

@@ -16,8 +16,8 @@ const RESOURCE_LOADING = {
 const DELIVERABLE = {
     WEBAPP: 'webapp',
     PWA: 'pwa',
-    HTML: 'html',
-    EXE_WINDOWS: 'exe.windows',
+    HTML_FILE: 'html-file',
+    EXE_WINDOWS: 'windows-exe',
     EXE_JAVA: 'exe.java',
     APP_ANDROID: 'app.android',
     APP_APPLE: 'app.apple'
