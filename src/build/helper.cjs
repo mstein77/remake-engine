@@ -1,5 +1,6 @@
-const syncFs = require("../shared/syncFs.cjs");
-const { isObject, simpleType, toPairs} = require("../shared/helper.cjs");
+const syncFs = require("../shared/syncFs.cjs")
+const { d, isObject, simpleType, toPairs} = require("../shared/helper.cjs")
+const { execSync } = require('child_process')
 
 /**
  * Returns the object of the given json file path. Throws an error if the file does not exist, if the JSON is invalid
@@ -62,7 +63,29 @@ const stringifyValues = obj => {
     return stringified
 }
 
+/**
+ * Executes the given command and returns an object holding the output, the exit code and failed flag which is set
+ * when the execution failed. In this case the output will be the error message.
+ *
+ * @param {string} cmd
+ *
+ * @returns {object}
+ */
+const exec = cmd => {
+    let exitCode = 0
+    let output = ''
+    let failed = false
+    try {
+        output = execSync(cmd, { encoding: 'utf-8' })
+    } catch (error) {
+        output = error.message
+        failed = true
+    }
+    return { output, exitCode, failed }
+}
+
 module.exports = {
+    exec,
     stringifyValues,
     getJsonObjectFromFile,
     getDefaultFromModule

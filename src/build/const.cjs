@@ -1,7 +1,7 @@
 const { toValues, toPairs } = require("../shared/helper.cjs");
 const { buildLogLevels } = require("../shared/console.cjs")
 
-const DEPLOY_METHOD = {
+const DEPLOYMENT_METHOD = {
     UPLOAD_ROOT: 'upload-dist-to-root',
     UPLOAD_PUBLIC: 'upload-dist-to-public',
     CHECKOUT: 'checkout'
@@ -17,10 +17,17 @@ const DELIVERABLE = {
     WEBAPP: 'webapp',
     PWA: 'pwa',
     HTML_FILE: 'html-file',
+    APP_MAC: 'mac-app',
     EXE_WINDOWS: 'windows-exe',
     EXE_JAVA: 'exe.java',
     APP_ANDROID: 'app.android',
     APP_APPLE: 'app.apple'
+}
+const HOSTING = {
+    AWS: 'aws',
+    HEROKU: 'heroku',
+    SERVER_WITH_NODEJS: 'server-with-nodejs',
+    SERVER_WITHOUT_NODEJS: 'server-without-nodejs'
 }
 
 const key2params = {
@@ -30,8 +37,8 @@ const key2params = {
     gzip: {type: 'bool', default: true},
     resourceLoading: {type: 'string', values: toValues(RESOURCE_LOADING), default: RESOURCE_LOADING.API},
     apiMaxJsonSize: {type: 'string', default: '10mb'},
-    deployMethod: {type: 'string', values: toValues(DEPLOY_METHOD), default: DEPLOY_METHOD.CHECKOUT},
-    hosting: {type: 'string', default: 'server-with-node-js', values: ['aws', 'heroku', 'server-with-nodejs', 'server-without-nodejs']},
+    deploymentMethod: {type: 'string', values: toValues(DEPLOYMENT_METHOD), default: DEPLOYMENT_METHOD.CHECKOUT},
+    hosting: {type: 'string', default: HOSTING.SERVER_WITH_NODEJS, values: toValues(HOSTING)},
     deliverable: {type: 'string', default: DELIVERABLE.WEBAPP, values: toValues(DELIVERABLE)},
     minimize: {type: 'bool', default: false, distDefault: true},
     server: {type: 'bool', default: true},
@@ -84,8 +91,10 @@ const getResolvedDefaultConfig = isDist => {
 }
 
 module.exports = {
-    DEPLOY_METHOD,
+    HOSTING,
+    DEPLOYMENT_METHOD,
     RESOURCE_LOADING,
+    DELIVERABLE,
     key2params,
     getResolvedDefaultConfig,
     getDefaultConfig

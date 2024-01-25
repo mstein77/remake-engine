@@ -277,6 +277,17 @@ const isVersionEqualOrHigher = (actual, required) => {
 
 const regexpEscape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+const stringList = values => {
+    if (!values.length) return ''
+
+    const items = [ ...values ]
+    const last = items.pop()
+
+    const result = items.length ? '"' + items.join('", "') + '" or ' : ''
+
+    return result + `"${last}"`
+}
+
 /**
  * Returns an array holding the entries (= array with id and value) of a given object
  *
@@ -311,6 +322,7 @@ module.exports = {
     csv2values,
     isVersionEqualOrHigher,
     regexpEscape,
+    stringList,
     toPairs,
     toValues,
     toKeys

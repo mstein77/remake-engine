@@ -1,8 +1,14 @@
 const { Hosting } = require('../hosting.cjs')
 
+/**
+ * Represents a hosting on a web server which support nodejs
+ */
 class ServerWithNodejsHosting extends Hosting {
 
-    getSupport(config) {
+    /**
+     * @inheritDoc
+     */
+    getSupport() {
         return {
             ...super.getSupport(),
             checkout: true,

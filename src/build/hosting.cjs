@@ -1,116 +1,212 @@
-const { RESOURCE_LOADING, DEPLOY_METHOD } = require('./const.cjs')
+const { RESOURCE_LOADING, DEPLOYMENT_METHOD } = require('./const.cjs')
 const { d, csv2values } = require('../shared/helper.cjs')
 const { bold } = require('../shared/console.cjs')
 
 /**
- *  hosting: gibt den Hosting-Anbieter bzw. die Art des hostings
- *  deploy: gibt an auf welchen weg, die dist-dateien auf dem server ausgerollt werden soll (upload, checkout)
- *  server: gibt an, ob ein eigener node-js server gestartet werden soll (benötigt nodejs)
- *    - wird kein server gestartet, wird der http server des hosters verwendet
- *      und alle resourcen werden direkt von diesem geladen
- *  editor: gib an, ob ein editor mitgeliefert werden soll (deployment ist immer nur im DEV-Modus möglich)
- *  packageType: "webapp", "bundle", "pwa"
- *  resourceType: "raw", "base64"
- *
- *
+ * A class representing the hosting of the game. Depending on the hoster certain features and deploy methods may be
+ * available. The hosting is prepared by this class by copying resource files and adding files which are required
+ * by the hoster. The class will also store instructions which should be followed by the user after the build to
+ * deploy and start the game and a server.
  */
 class Hosting {
 
+    /**
+     * Creates a new hosting instance
+     */
     constructor() {
         this.supports = this.getSupport()
-        this.messages = []
+        this.instructions = []
     }
 
-    addInstruction(msg) {
-        this.messages.push(`  - ${msg}`)
-    }
-
+    /**
+     * Returns an object mapping features to a value indicating whether it is supported or not
+     *
+     * @returns {object}
+     */
     getSupport() {
         return {
             nodejs: true,
             manualUpload: true,
-            checkout: true,
-            pwa: true
+            checkout: true
         }
     }
 
+    /**
+     * Returns either a boolean indicating whether this hosting supports the given deployment method or a string holding
+     * the deployment method which should be used because the given method is not supported.
+     *
+     * @param {string} value
+     *
+     * @returns {boolean|string}
+     */
+    supportsDeploymentMethod(value) {
+        switch (value) {
+            case DEPLOYMENT_METHOD.UPLOAD_ROOT:
+            case DEPLOYMENT_METHOD.UPLOAD_PUBLIC:
+                return this.supportsManualUpload
+
+            case DEPLOYMENT_METHOD.CHECKOUT:
+                return this.supportsCheckout
+        }
+        return true
+    }
+
+    /**
+     * Returns a boolean indicating whether this hosting supports nodejs or not
+     *
+     * @returns {boolean}
+     */
     get supportsNodejs() {
         return this.supports.nodejs
     }
 
+    /**
+     * Returns a boolean indicating whether this hosting supports a manual upload or not
+     *
+     * @returns {boolean}
+     */
     get supportsManualUpload() {
         return this.supports.manualUpload
     }
 
+    /**
+     * Returns a boolean indicating whether this hosting supports a checkout or not
+     *
+     * @returns {boolean}
+     */
     get supportsCheckout() {
         return this.supports.checkout
     }
 
-    prepare(config, fileDeps, isDist) {
+    /**
+     * Generates files which should be added to the game repository
+     *
+     * @param {object} config
+     * @param {object} fileDeps
+     */
+    generateRepoFiles(config, fileDeps) {}
+
+    /**
+     * Prepares the hosting in the development mode. Although there is no hosting required in the development mode
+     * because it's all handled by the webpack dev-server, it can be used to generate repository files which are
+     * required for the hosting
+     *
+     * @param {object} config
+     * @param {object} fileDeps
+     */
+    prepareDev(config, fileDeps) {
+        // TODO: only generate to game repo if deploymentMethod is checkout? Upload root may also need this in dist folder
+        this.generateRepoFiles(config, fileDeps)
+    }
+
+    /**
+     * Prepares the hosting in the dist folder and also adds instructions for the user to deploy the game and server
+     *
+     * @param {object} config
+     * @param {object} fileDeps
+     */
+    prepareDist(config, fileDeps) {
         const { queue, absPath, syncFs } = fileDeps
 
-        const deployMethod = config.deployMethod
+        const deploymentMethod = config.deploymentMethod
         const server = config.server
-        this.publicDir = absPath.dist(server ? 'public' : '')
 
-        if (isDist) {
-            const resourceDirs = ['json', 'image', 'audio', 'video']
-            const staticTypes = csv2values(config.staticTypes)
-            const isLocal = [RESOURCE_LOADING.LOCAL, RESOURCE_LOADING.LOCAL_ALL].includes(config.resourceLoading)
+        const resourceDirs = ['json', 'image', 'audio', 'video']
+        const staticTypes = csv2values(config.staticTypes)
+        const isLocal = [RESOURCE_LOADING.LOCAL, RESOURCE_LOADING.LOCAL_ALL].includes(config.resourceLoading)
 
-            for (const dir of resourceDirs) {
-                const from = absPath.resources(dir)
-                // if (syncFs.isEmptyDir(from)) continue
+        for (const dir of resourceDirs) {
+            const from = absPath.resources(dir)
+            // if (syncFs.isEmptyDir(from)) continue
 
-                if (isLocal && !staticTypes.includes(dir)) continue
-                // copy the static resources directories to the public folder of the dist
+            if (isLocal && !staticTypes.includes(dir)) continue
+            // copy the static resources directories to the public folder of the dist
 
-                queue.addCopy(from, staticTypes.includes(dir) ? this.publicDir + '/' + dir : absPath.dist('resources', dir))
-            }
-            if ([RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
-                // TODO: get rid of hardcoded files
-                // api loading still requires the core files
-                for (const file of ['scope2ids.json', 'id2children.json']) {
-                    const from = absPath.resources(file)
-                    if (!syncFs.fileExists(from)) continue
-                    queue.addCopy(from, absPath.dist('resources', file))
-                }
-            }
-            if (deployMethod === DEPLOY_METHOD.UPLOAD_PUBLIC) {
-                this.addInstruction(`Upload the content of "${absPath.dist()}" to the public folder of your http web-server`)
-            }
-            if (server && [DEPLOY_METHOD.UPLOAD_ROOT, DEPLOY_METHOD.CHECKOUT].includes(deployMethod)) {
-                const distPackageJsonPath = absPath.tmp('package.json')
-                queue.addWriteJson(distPackageJsonPath, {
-                        name: 'game',
-                        version: '1.0.0',
-                        scripts: {
-                            start: 'node server.cjs'
-                        },
-                        dependencies: {
-                            express: '^4.18.2'
-                        }
-                    }
-                )
-                queue.addCopy(distPackageJsonPath, absPath.dist('package.json'))
-                if (deployMethod === DEPLOY_METHOD.UPLOAD_ROOT) {
-                    this.addInstruction(`Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`)
-                    this.addInstruction(`Afterwards execute "npm install" in this directory`)
-                } else {
-                    this.addInstruction(`Checkout your game repo on your web server manually or automatically`)
-                    this.addInstruction(`Afterwards execute "${bold('npm start')}" in the root directory of your web server`)
-                }
-            }
-            return
+            queue.addCopy(from, staticTypes.includes(dir) ? this.publicPath + '/' + dir : absPath.dist('resources', dir))
         }
-        if (deployMethod === 'checkout') {
-            this.generateRepoFiles(config, fileDeps, isDist)
+        if ([RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
+            const files = syncFs.readFiles(absPath.resources())
+            for (const file of files) {
+                if (!file.endsWith('.json')) continue
+
+                queue.addCopy(absPath.resources(file), absPath.dist('resources', file))
+            }
+        }
+        if (server && [DEPLOYMENT_METHOD.UPLOAD_ROOT, DEPLOYMENT_METHOD.CHECKOUT].includes(deploymentMethod)) {
+            const distPackageJsonPath = absPath.tmp('package.json')
+            queue.addWriteJson(distPackageJsonPath, {
+                    name: 'game',
+                    version: '1.0.0',
+                    scripts: {
+                        start: 'node server.cjs'
+                    },
+                    dependencies: {
+                        express: '^4.18.2'
+                    }
+                }
+            )
+            queue.addCopy(distPackageJsonPath, absPath.dist('package.json'))
         }
     }
 
-    generateBuildFiles() {}
+    /**
+     * Adds the given message to the instructions
+     *
+     * @param {string} msg
+     */
+    addInstruction(msg) {
+        this.instructions.push(msg)
+    }
 
-    generateRepoFiles(config, fileDeps, isDist) {}
+    /**
+     * Adds all necessary instructions for the user to deploy and start the server
+     *
+     * @param {object} config
+     * @param {object} fileDeps
+     */
+    addDeploymentInstructions(config, fileDeps) {
+        const { server, deploymentMethod } = config
+        const { absPath } = fileDeps
+
+        if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
+            this.addInstruction(`Upload the content of "${absPath.dist()}" to the public folder of your http web-server`)
+        }
+        if (!server) return
+
+        if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_ROOT) {
+            this.addInstruction(`Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`)
+            this.addInstruction(`Afterwards execute "npm install" in this directory`)
+        }
+        if (deploymentMethod === DEPLOYMENT_METHOD.CHECKOUT) {
+            this.addInstruction(`Checkout your game repo on your web server manually or automatically`)
+            this.addInstruction(`Afterwards execute "${bold('npm start')}" in the root directory of your web server`)
+        }
+    }
+
+    /**
+     * Prepares the distribution for the hosting and adds instructions for the user to deploy the game deliverable and
+     * start the server. Returns the relative path in the dist folder where the public files and dirs are located
+     *
+     * @param {object} config
+     * @param {object} fileDeps
+     * @param {boolean} isDist
+     *
+     * @returns {string}
+     */
+    prepare(config, fileDeps, isDist) {
+        const { absPath } = fileDeps
+
+        const publicDir = config.server ? 'public' : ''
+        this.publicPath = absPath.dist(publicDir)
+
+        if (isDist) {
+            this.prepareDist(config, fileDeps)
+            this.addDeploymentInstructions(config, fileDeps)
+        } else {
+            this.prepareDev(config, fileDeps)
+        }
+        return publicDir
+    }
 }
 
 module.exports = {

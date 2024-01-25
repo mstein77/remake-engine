@@ -26,6 +26,17 @@ const syncFs = {
         return files
     },
 
+    readFiles: dirPath => {
+        const files = []
+        const items = syncFs.readdir(dirPath, {withFileTypes: true})
+        for (let item of items) {
+            if (item.isDirectory()) continue
+
+            files.push(item.name)
+        }
+        return files
+    },
+
     readdir: ( ...args ) => {
         return fs.readdirSync( ...args )
     },
@@ -34,10 +45,12 @@ const syncFs = {
 
     rmDir: ( ...args ) => fs.rmSync( ...args ),
 
-    clearDir: dirPath => {
+    clearDir: (dirPath, except = []) => {
         if (!syncFs.dirExists(dirPath)) return
         const items = syncFs.readdir(dirPath, {withFileTypes: true})
         for (let item of items) {
+            if (except.includes(item.name)) continue
+
             const currPath = path.resolve(dirPath, item.name)
             if (item.isDirectory()) {
                 syncFs.rmDir(currPath, {recursive: true, force: true})
@@ -45,7 +58,6 @@ const syncFs = {
                 syncFs.unlink(currPath)
             }
         }
-
     },
 
     isEmptyDir: dirPath => {
@@ -74,9 +86,9 @@ const syncFs = {
         }
     },
 
-    mkdir: ( ...args ) => {
-        return fs.mkdirSync( ...args )
-    },
+    mkdir: ( ...args ) => fs.mkdirSync( ...args ),
+
+    copyFile: ( ...args ) => fs.copyFileSync( ...args ),
 
     createPathTo: filePath => {
         const index = filePath.lastIndexOf('/')

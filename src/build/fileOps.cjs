@@ -1,9 +1,12 @@
 const syncFs = require("../shared/syncFs.cjs")
+const { exec } = require("./helper.cjs")
+const { d, toPairs } = require("../shared/helper.cjs")
 
 const FILE_OP = {
     CLEAR: 'clear',
     COPY: 'copy',
-    WRITE: 'write'
+    WRITE: 'write',
+    EXEC: 'exec'
 }
 
 /**
@@ -35,8 +38,8 @@ class FileOpQueue {
      *
      * @param {string} path
      */
-    addClear(path, createIfNotExists = false) {
-        this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists })
+    addClear(path, createIfNotExists = false, except = []) {
+        this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists, except })
     }
 
     /**
@@ -65,12 +68,24 @@ class FileOpQueue {
 
     /**
      * Adds a copy operation for the given file resources under the given path to the destination path
+     * If the replace object is given then all keys which are found in the content of the source file will be
+     * replaced by their values
      *
      * @param {string} from
      * @param {string} to
+     * @param {object|undefined} replace
      */
-    addCopy(from, to) {
-        this.queue.push({ op: FILE_OP.COPY, from, to })
+    addCopy(from, to, replace) {
+        this.queue.push({ op: FILE_OP.COPY, from, to, replace })
+    }
+
+    /**
+     * Adds a execution operation for the given command
+     *
+     * @param {string} cmd
+     */
+    addExec(cmd) {
+        this.queue.push({ op: FILE_OP.EXEC, cmd })
     }
 
     /**
@@ -109,8 +124,21 @@ class FileOpQueue {
             switch (op) {
 
                 case FILE_OP.COPY: {
-                    const { from, to } = params
+                    const { from, to, replace } = params
                     if (!syncFs.exists(from)) continue
+
+                    if (syncFs.fileExists(from)) {
+                        if (!replace) {
+                            syncFs.copyFile(from, to)
+                        } else {
+                            let content = syncFs.readFile(from).toString()
+                            for (const [ tag, value ] of toPairs(replace)) {
+                                content = content.replaceAll(tag, value)
+                            }
+                            syncFs.writeContent(to, content)
+                        }
+
+                    }
                     break
                 }
                 case FILE_OP.WRITE: {
@@ -125,10 +153,18 @@ class FileOpQueue {
                     break
                 }
                 case FILE_OP.CLEAR: {
-                    const { path, createIfNotExists } = params
+                    const { path, createIfNotExists, except } = params
                     if (createIfNotExists) syncFs.createPathTo(path + '/')
-                    syncFs.clearDir(path)
+                    syncFs.clearDir(path, except)
                     break
+                }
+                case FILE_OP.EXEC: {
+                    const { cmd } = params
+                    const { failed, output} = exec(cmd)
+                    if (failed)
+                        throw Error(`Failed executing "${cmd}": ${output}`)
+
+                    break;
                 }
                 default:
                     throw Error(`Unknown file operation "${op}" given`)

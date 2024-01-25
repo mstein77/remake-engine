@@ -1,6 +1,6 @@
 const absPath = require('../shared/absPath.cjs')
-const { d, toPairs, intersect, isArray, csv2values} = require("../shared/helper.cjs")
-const { getResolvedDefaultConfig, key2params, DEPLOY_METHOD, RESOURCE_LOADING } = require('./const.cjs')
+const { d, stringList, toPairs, intersect, isArray, csv2values } = require("../shared/helper.cjs")
+const { getResolvedDefaultConfig, key2params, DEPLOYMENT_METHOD, HOSTING, DELIVERABLE, RESOURCE_LOADING } = require('./const.cjs')
 
 const MSG = {
     noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
@@ -23,75 +23,125 @@ require('dotenv').config({path: absPath.game('.env')})
 
 let configJsonContent = null
 
+/**
+ * Returns an object contained in the config.cjs of the game directory
+ *
+ * @returns {object}
+ */
 const configJson = () => {
     if (!configJsonContent) configJsonContent = require(absPath.game('config.cjs'))
+
     return configJsonContent
 }
 
 /**
- * Returns an object holding the config after applying all integrity checks and all errors and
- * warnings which happened during the check
+ * Runs integrity checks for production or development environment on the given config and might change config
+ * settings in this process. Also instantiates the hosting and deliverable classes which are given in the resulting
+ * config before all of these are returned in a json object which also holds all warnings which happened during the
+ * checks. Throws an error if a failed integrity check could not be resolved
  *
  * @param {object} config
- * @param {Deliverable} deliverable
- * @param {Hosting} hosting
  * @param {boolean} isDist
  *
  * @returns {object}
  */
-const applyConfigIntegrityChecks = (config, deliverable, hosting, isDist) => {
+const applyConfigIntegrityChecks = (config, isDist) => {
 
     const warnings = []
 
-    if (config.editor && !config.server)
-        throw Error(MSG.noServer)
-
-    if (!isDist && !config.editor) {
-        warnings.push(MSG.enableEditor)
-        config.editor = true
+    if (!isDist) {
+        // in development mode
+        if (!config.server) {
+            warnings.push(`Requested no server but the server is required in dev environment, using server instead`)
+            config.server = true
+        }
+        const key2devValue = {
+            deliverable: DELIVERABLE.WEBAPP,
+            hosting: HOSTING.SERVER_WITH_NODEJS,
+            resourceLoading: RESOURCE_LOADING.API,
+            deploymentMethod: DEPLOYMENT_METHOD.CHECKOUT
+        }
+        for (const [ key, value ] of toPairs(key2devValue)) {
+            if (config[key] === value) continue
+            warnings.push(`Requested ${key} "${config.deliverable}" not supported in dev environment, using "${value}" instead`)
+            config[key] = value
+        }
     }
+    const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
+    const deliverable = new Deliverable()
+    const Hosting = require(`./hostings/${config.hosting}.cjs`)
+    const hosting = new Hosting()
 
-    if (isDist && config.server && !hosting.supportsNodejs)
+    if (config.server && !hosting.supportsNodejs)
         throw Error(MSG.noServerNodejs)
 
+    let supported = deliverable.supportsResourceLoading(config.resourceLoading)
+    if (supported === false)
+        throw Error(
+            `Requested resourceLoading "${config.resourceLoading}" is not supported by deliverable "${config.deliverable}"`
+        )
+
+    if (supported !== true) {
+        warnings.push(
+            `Requested resourceLoading "${config.resourceLoading}" is not supported by deliverable "` +
+            `${config.deliverable}", using "${supported}" instead`
+        )
+        config.resourceLoading = supported
+    }
+    supported = hosting.supportsDeploymentMethod(config.deploymentMethod)
+    if (supported === false)
+        throw Error(`Requested deploymentMethod "${config.deploymentMethod}" is not supported by hosting "${config.hosting}",` +
+            `please change the hosting or deploymentMethod`
+        )
+    if (supported !== true) {
+        warnings.push(`Requested deploymentMethod "${config.deploymentMethod}" is not supported by hosting "${config.hosting}",` +
+            `using "${supported}" instead`
+        )
+        config.deploymentMethod = supported
+    }
+
+    const allTypes = ['json', 'image', 'audio', 'video']
     const currStaticTypes = csv2values(config.staticTypes)
     const staticTypes = []
     if (![RESOURCE_LOADING.LOCAL_ALL, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)) {
         if (!config.server || config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
-            staticTypes.push( ...['json', 'image', 'audio', 'video'] )
+            staticTypes.push( ...allTypes )
         } else if (config.staticTypes !== '') {
             staticTypes.push( ...currStaticTypes )
         }
     }
     config.staticTypes = staticTypes.join(',')
-    const allStaticTypes = intersect(['json', 'image', 'audio', 'video'], staticTypes).length === 4
+
+    // TODO check the following staticTypes checks
+    const allStaticTypes = intersect(allTypes, staticTypes).length === allTypes.length
     if (allStaticTypes && config.resourceLoading === RESOURCE_LOADING.API) {
         warnings.push(MSG.allStaticApi)
         config.resourceLoading = RESOURCE_LOADING.STATIC_ALL
     }
-
     if (config.editor && [RESOURCE_LOADING.LOCAL, RESOURCE_LOADING.LOCAL_ALL].includes(config.resourceLoading)) {
         warnings.push(config.resourceLoading === RESOURCE_LOADING.LOCAL ? MSG.localToApi : MSG.localAllToApi)
         config.resourceLoading = RESOURCE_LOADING.API
     }
-
     if (config.editor && config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
         warnings.push(MSG.simStaticAll)
     }
+    // end
 
-    if (isDist) {
-        if ([DEPLOY_METHOD.UPLOAD_PUBLIC, DEPLOY_METHOD.UPLOAD_ROOT].includes(config.deployMethod) && !hosting.supportsManualUpload)
-            throw Error(`You selected "${config.deployMethod}" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!`)
+    /*
+    if ([DEPLOYMENT_METHOD.UPLOAD_PUBLIC, DEPLOYMENT_METHOD.UPLOAD_ROOT].includes(config.deploymentMethod) && !hosting.supportsManualUpload)
+        throw Error(`Requested deploymentMethod "${config.deploymentMethod}" is not supported by hosting "${config.hosting}", please change the hosting or deploymentMethod!`)
 
-        if (config.deployMethod === DEPLOY_METHOD.CHECKOUT && !hosting.supportsCheckout)
-            throw Error('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deployMethod!')
+        if (config.deploymentMethod === DEPLOYMENT_METHOD.CHECKOUT && !hosting.supportsCheckout)
+            throw Error('You selected "checkout" as deployment method, but your hosting does not support it, please change the hosting or deploymentMethod!')
     }
+     */
     return {
         config,
-        warnings
+        warnings,
+        deliverable,
+        hosting
     }
 }
-
 
 /**
  * Casts an environment string value to the given type representation and returns it
@@ -228,7 +278,7 @@ const buildConfig = (json, env, overwrites, isDistBuild) => {
         const { type, values, key = name } = info
         if (!values) continue
         const value = ctxConfig[key]
-        if (!values.includes(value)) throw Error(`Value "${value}" not allowed for config key "${key}"! Allowed values: "${values.join('", "')}"`)
+        if (!values.includes(value)) throw Error(`Value "${value}" not allowed for config key "${key}"! Allowed values: ${stringList(values)}`)
     }
 
     return ctxConfig
@@ -248,11 +298,12 @@ const getConfigForCtx = args => {
     return ctxConfig
 }
 
-const internal = process.env.NODE_ENV === 'test' ? {
+const internal = process.env.NODE_ENV !== 'test' ? {} : {
     MSG,
     extractEnvOverwrites,
     castEnvValue,
-    extractAppEnvOverwrites } : {}
+    extractAppEnvOverwrites
+}
 
 module.exports = {
     buildConfig,

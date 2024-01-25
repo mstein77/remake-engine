@@ -55,7 +55,7 @@ const getBuildLogLevel = () => buildLogLevel
 const setBuildLogLevel = value => buildLogLevel = value
 
 /**
- * Sets the logger for colorLog to the given value
+ * Sets the logger for log to the given value
  *
  * @param {object} value
  */
@@ -73,7 +73,7 @@ const colorMsg = msg => FG.RESET + msg + FG.RESET
  *
  * @param params
  */
-const colorLog = ( ...params ) => {
+const log = ( ...params ) => {
     const cParams = []
     for (const param of params) {
         cParams.push(isString(param) ? colorMsg(param) : param)
@@ -105,15 +105,15 @@ const hasLogLevel = name => {
 const mainSection = name => {
     if (!hasLogLevel('minimal')) return
 
-    colorLog(`\n${BG.GREEN + FG.BLACK} BUILD ${BG.BLUE + FG.L_CYAN} ${name} `)
-    colorLog()
+    log(`\n${BG.GREEN + FG.BLACK} BUILD ${BG.BLUE + FG.L_CYAN} ${name} `)
+    log()
 }
 
 const newLine = () => { logger.log() }
 
 const errorSection = error => {
-    colorLog(`\n${BG.L_RED + FG.BLACK} BUILD ${BG.RED + FG.WHITE} Failed with the following error... `)
-    colorLog( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
+    log(`\n${BG.L_RED + FG.BLACK} BUILD ${BG.RED + FG.WHITE} Failed with the following error... `)
+    log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
     if (error instanceof TypeError || error instanceof SyntaxError) {
         console.error(error.stack)
     } else if (hasLogLevel('detailed')) {
@@ -125,19 +125,23 @@ const errorSection = error => {
 const subSection = name => {
     if (!hasLogLevel('normal')) return
 
-    colorLog(` - ` + name + '...')
+    log(` - ` + name + '...')
 }
 
 const subSectionOk = (msg = '') => {
     if (!hasLogLevel('normal')) return
 
-    colorLog(FG.GREEN + `   ✓` + FG.RESET + ` OK ` + msg)
+    log(FG.GREEN + `   ✓` + FG.RESET + ` OK ` + msg)
+}
+
+const subSectionError = msg => {
+    log( FG.RED + '   ✕' + FG.RESET + ' ' + bold(msg) + '\n')
 }
 
 const subSectionWarning = msg => {
     if (!hasLogLevel('normal')) return
 
-    colorLog(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
+    log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
 }
 
 module.exports = {
@@ -145,7 +149,7 @@ module.exports = {
     BG,
     newLine,
     bold,
-    colorLog,
+    log,
     colorMsg,
     setLogger,
     getBuildLogLevel,
@@ -157,5 +161,6 @@ module.exports = {
     errorSection,
     subSection,
     subSectionOk,
+    subSectionError,
     subSectionWarning
 }

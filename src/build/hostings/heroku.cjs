@@ -1,8 +1,14 @@
 const { Hosting } = require('../hosting.cjs')
 
+/**
+ * Represents a hosting on the cloud hoster heroku
+ */
 class HerokuHosting extends Hosting {
 
-    getSupport(config) {
+    /**
+     * @inheritDoc
+     */
+    getSupport() {
         return {
             ...super.getSupport(),
             checkout: true,
@@ -10,12 +16,12 @@ class HerokuHosting extends Hosting {
         }
     }
 
-    generateRepoFiles(config, fileDeps, isDist) {
-        const { syncFs, absPath, queue } = fileDeps
-
+    /**
+     * @inheritDoc
+     */
+    generateRepoFiles(config, fileDeps) {
+        const { absPath, queue } = fileDeps
         const procFilePath = absPath.game('Procfile')
-        if (isDist || syncFs.fileExists(procFilePath)) return
-
         queue.addWriteContent(procFilePath,"web: npm start", true)
     }
 }

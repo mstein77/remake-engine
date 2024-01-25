@@ -1,15 +1,16 @@
 const absPath = require("../shared/absPath.cjs")
 const syncFs = require("../shared/syncFs.cjs")
 const { d, isArray, toPairs, simpleType, isObject, isVersionEqualOrHigher } = require("../shared/helper.cjs")
-const {
-    getBuildLogLevel, subSectionWarning, dumpJson,
-    bold, colorLog, errorSection, setBuildLogLevel, mainSection, hasLogLevel, newLine, subSection, subSectionOk} = require("../shared/console.cjs")
+const { getBuildLogLevel, subSectionWarning, dumpJson,
+    bold, log, errorSection, setBuildLogLevel, mainSection,
+    hasLogLevel, newLine, subSection, subSectionOk, subSectionError} = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
 const { buildConfig, applyConfigIntegrityChecks } = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile } = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
-const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
 const { ResourceTypeRegistry } = require("../shared/resources.cjs")
+const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
+
 const minNodeVersion = 'v16'
 
 /**
@@ -36,20 +37,20 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
 
     const { isDist, info } = options
     const buildsJson = configs.buildsJson
-    const distTargets = []
+    let distTargets = []
     const { absPath, queue } = fileDeps
     queue.addClear(absPath.tmp(), true)
     if (buildsJson) {
         queue.addClear(absPath.dists(), true)
         for (const [ target, overwrites ] of toPairs(buildsJson)) {
-            distTargets.push({ target, path: absPath.dists(target), overwrites })
+            distTargets.push({ target, path: absPath.dists(target), overwrites, skip: false })
         }
     } else {
         if (isDist) queue.addClear(absPath.dist(), true)
-        distTargets.push({overwrites: {}})
+        distTargets.push({overwrites: {}, skip: false})
     }
 
-    mainSection(`1. Generate webpack configs...`)
+    mainSection(`Generate webpack configs...`)
 
     queue.process()
     let lastEngineConfig = null
@@ -70,7 +71,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         queue.clear()
         if (path) absPath.setCurrDist(path)
 
-        hasLogLevel('normal') && colorLog(
+        hasLogLevel('normal') && log(
             target ? `Build "${bold(target)}":\n` : `Starting ${bold(isDist ? 'dist' : 'dev')} build:\n`
         )
 
@@ -79,15 +80,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection('Checking integrity of config')
-        const Deliverable = require(`./deliverables/${rawConfig.deliverable}.cjs`)
-        const deliverable = new Deliverable()
-        const requiredPlatforms = deliverable.getRequiredPlatforms()
-        if (requiredPlatforms.length && !requiredPlatforms.includes(process.platform))
-            throw Error(`Build was triggered on platform ${process.platform} but requires ${requiredPlatforms.join(', ')}`)
-
-        const Hosting = require(`./hostings/${rawConfig.hosting}.cjs`)
-        const hosting = new Hosting()
-        const { config, warnings } = applyConfigIntegrityChecks(rawConfig, deliverable, hosting, isDist)
+        const { config, warnings, deliverable, hosting } = applyConfigIntegrityChecks(rawConfig, isDist)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -102,8 +95,20 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
             dumpJson(config, 4)
         }
 
+        subSection(`Checking build requirements`)
+        const missing = deliverable.getMissingRequirements()
+        if (missing) {
+            if (target) {
+                subSectionError(missing)
+                distTarget.skip = true
+                continue
+            }
+            throw Error(missing)
+        }
+        subSectionOk()
+
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        hosting.prepare(config, fileDeps, isDist)
+        distTarget.publicDir = hosting.prepare(config, fileDeps, isDist)
         subSectionOk()
 
         subSection(`Generate webpack config`)
@@ -117,12 +122,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         queue.process()
         subSectionOk('\n')
 
-        if (hasLogLevel('normal') && hosting.messages) {
-            distTarget.instructions = [ ...hosting.messages ]
+        if (hasLogLevel('normal') && hosting.instructions) {
+            distTarget.instructions = [ ...hosting.instructions ]
         }
         resultConfigs.push( ...webpackConfigs )
         while (buildConfigs.length < resultConfigs.length) buildConfigs.push(config)
     }
+    distTargets = distTargets.filter(item => !item.skip)
+    if (!distTargets.length)
+        throw Error('No build is fulfilling the requirements. Aborting...')
 
     const webpackHook = getBuildHook('webpack')
     if (webpackHook) {
@@ -136,7 +144,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     if (!info && isDist) {
         const params = {
             distTargets,
-            buildLogLevel: getBuildLogLevel()
+            buildLogLevel: getBuildLogLevel(),
+            configs
         }
         lastEngineConfig.plugins.push(
             new PostBuildPlugin(params)
@@ -144,7 +153,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     }
     let result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
 
-    mainSection(`2. Execute webpack configs...`)
+    mainSection(`Execute webpack configs...`)
 
     if (hasLogLevel('detailed')) {
         subSection('Generated webpack config')
@@ -162,57 +171,12 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
  * @param {array} instructions
  */
 const showInstructions = instructions => {
-    colorLog(`  Please follow these instructions:`)
+    log(`  Please follow these instructions:`)
     newLine()
-
     for (const line of instructions) {
-        colorLog(line)
+        log(`  - ${line}`)
     }
     newLine()
-}
-/**
- * Runs the post build processing for the given dist targets and build log level
- *
- * @param {array} distTargets
- * @param {string} buildLogLevel
- */
-const runPostBuildProcessing = ({ distTargets, buildLogLevel }) => {
-
-    const { config } =
-
-    setBuildLogLevel(buildLogLevel)
-
-    mainSection('3. Post build processing...')
-
-    const postBuildHook = getBuildHook('post-build')
-    for (const distTarget of distTargets) {
-        const { target = 'dist build', config } = distTarget
-        const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
-        const deliverable = new Deliverable()
-        subSection(`Run post build processing`)
-        deliverable.processPostBuild()
-        subSectionOk()
-
-        if (postBuildHook) {
-            subSection(`Trigger post-build-hook for ${bold(target)}`)
-            postBuildHook(distTarget)
-            subSectionOk()
-        }
-    }
-
-    mainSection('4. Build successfully finished...')
-
-    for (const { target, instructions, path } of distTargets) {
-        if (!hasLogLevel('normal') || !instructions) continue
-
-        if (target) {
-            colorLog(`Build ${bold(target)} in ${bold(path)}:`)
-            newLine()
-            showInstructions(instructions)
-        } else {
-            showInstructions(instructions)
-        }
-    }
 }
 
 /**
@@ -263,6 +227,86 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
 
     } catch (e) {
         errorSection(e)
+    }
+}
+
+/**
+ * Runs the post build processing for the given dist targets and build log level
+ *
+ * @param {array} distTargets
+ * @param {string} buildLogLevel
+ * @param {object} configs
+ */
+const runPostBuildProcessing = ({ distTargets, buildLogLevel, configs }) => {
+
+    setBuildLogLevel(buildLogLevel)
+    mainSection('Post build processing...')
+
+    const postBuildHook = getBuildHook('post-build')
+    const fileDeps = {
+        absPath,
+        syncFs,
+        queue: new FileOpQueue()
+    }
+
+    let index = 0
+    for (const distTarget of distTargets) {
+        let { target, config, path } = distTarget
+        if (path) absPath.setCurrDist(path)
+
+        if (target) {
+            hasLogLevel('normal') && log(`Build "${bold(target)}":\n`)
+        } else {
+            target = 'dist build'
+        }
+        const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
+        const deliverable = new Deliverable()
+
+        const params = [distTarget, { ...configs, config }, fileDeps]
+
+        if (deliverable.hasCompiler) {
+            subSection(`Prepare compilation`)
+            deliverable.prepareCompile( ...params )
+            subSectionOk()
+
+            let skipCompile = false
+            const compileHook = getBuildHook('compile')
+            if (compileHook) {
+                subSection(`Trigger compile-hook`)
+                skipCompile = compileHook( ...params )
+                subSectionOk()
+            }
+            if (!skipCompile) {
+                subSection(`Execute compiler`)
+                deliverable.compile( ...params )
+                subSectionOk()
+            }
+        }
+        subSection(`Run post build processing`)
+        deliverable.processPostBuild( ...params )
+        subSectionOk()
+
+        if (postBuildHook) {
+            subSection(`Trigger post-build-hook`)
+            postBuildHook( ...params )
+            subSectionOk()
+        }
+        index++
+        if (index !== distTargets.length) newLine()
+    }
+
+    mainSection('Build successfully finished...')
+
+    for (const { target, instructions, path } of distTargets) {
+        if (!hasLogLevel('normal') || !instructions) continue
+
+        if (target) {
+            log(`Build ${bold(target)} in ${bold(path)}:`)
+            newLine()
+            showInstructions(instructions)
+        } else {
+            showInstructions(instructions)
+        }
     }
 }
 

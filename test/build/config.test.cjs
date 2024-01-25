@@ -95,15 +95,15 @@ test('extractEnvOverwrites', () => {
         .toContainEntry(['editor', true])
 
     // check camel-cased return
-    expect(extractEnvOverwrites({envPrefix: 'foo_'}, {FOO_DEPLOYMETHOD: 'bar'}))
-        .toContainEntry(['deployMethod', 'bar'])
+    expect(extractEnvOverwrites({envPrefix: 'foo_'}, {FOO_DEPLOYMENTMETHOD: 'bar'}))
+        .toContainEntry(['deploymentMethod', 'bar'])
 
     // check underscore removal
     expect(extractEnvOverwrites({envPrefix: 'foo_'}, {FOO_DEPLOY_METHOD: 'bar'}))
-        .toContainEntry(['deployMethod', 'bar'])
+        .toContainEntry(['deploymentMethod', 'bar'])
 
     expect(extractEnvOverwrites({envPrefix: 'foo_'}, {FOO_DE__PLOY_METHOD: 'bar'}))
-        .toContainEntry(['deployMethod', 'bar'])
+        .toContainEntry(['deploymentMethod', 'bar'])
 })
 
 test('extractAppEnvOverwrites', () => {

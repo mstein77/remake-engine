@@ -3,14 +3,14 @@ import * as dotenv from 'dotenv'
 import { execSync } from 'child_process'
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
-const { colorLog, FG } = require('../src/shared/console.cjs')
+const { log, FG } = require('../src/shared/console.cjs')
 const { syncFs } = require('../src/shared/syncFs.cjs')
 const { d, toPairs } = require('../src/shared/helper.cjs')
 const { getDefaultConfig } = require('../src/build/const.cjs')
 
 const __dirname = syncFs.realpath(dirname(fileURLToPath(import.meta.url)) + '/../')
 const dotenvPath = __dirname + '/.env'
-colorLog(dotenvPath)
+log(dotenvPath)
 dotenv.config({path: dotenvPath})
 
 const enginePackage = '2dfireengine'
@@ -18,9 +18,9 @@ const packageJsonPath = './package.json'
 const engineBasePath = './node_modules/' + enginePackage
 
 function exec(cmd, expectedStatus = 0) {
-    colorLog()
-    colorLog(FG.YELLOW + `Executing: ${FG.WHITE + cmd}`)
-    colorLog()
+    log()
+    log(FG.YELLOW + `Executing: ${FG.WHITE + cmd}`)
+    log()
     try {
         const stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'})
         return stdout !== null ? stdout.toString() : null
