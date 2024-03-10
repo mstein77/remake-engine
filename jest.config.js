@@ -6,7 +6,8 @@ export default {
     globals: {
         IS_DIST: false,
         BASE_URL: 'http://localhost:8080',
-        STATIC_TYPES: 'audio,video'
+        STATIC_TYPES: 'audio,video',
+        RESOURCE_TYPES: ''
     },
     moduleNameMapper: {
         '^helper/(.+)$': '<rootDir>/src/engine/helper/$1',

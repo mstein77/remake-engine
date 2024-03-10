@@ -3,14 +3,14 @@ const Deliverable = require("../deliverable.cjs")
 /**
  * A class for building a web application which is delivered by a web server
  */
-class Webapp extends Deliverable {
+class WebApp extends Deliverable {
 
     /**
      * @inheritDoc
      */
     getSupport() {
-        return { ...super.getSupport(), isAllInOne: false };
+        return { ...super.getSupport(), isAllInOne: false, favIcon: true };
     }
 }
 
-module.exports = Webapp
+module.exports = WebApp

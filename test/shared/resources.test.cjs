@@ -102,7 +102,7 @@ test('map2extMap', () => {
 test('ResourceTypeRegistry::register', () => {
     expect(() => ResourceTypeRegistry.register('foo', 'bar')).toThrow('Invalid')
 
-    expect(ResourceTypeRegistry.register('json', RESOURCE.TYPE.JSON)).toBe(ResourceTypeRegistry)
+    expect(ResourceTypeRegistry.register(RESOURCE.TYPE.JSON,'json')).toBe(ResourceTypeRegistry)
 })
 test('makeDescriptor.fromJsonId', () => {
 

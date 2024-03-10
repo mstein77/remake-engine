@@ -1,6 +1,7 @@
 const { getTargetWebpackConfigs } = require('../../src/build/webpack.cjs')
 const ServerWithNodeHosting = require('../../src/build/hostings/server-with-nodejs.cjs')
-const { getResolvedDefaultConfig } = require("../../src/build/const.cjs")
+const WebApp = require('../../src/build/deliverables/web-app.cjs')
+const { getResolvedDefaultConfig } = require("../../src/build/config.cjs")
 const { d, toPairs } = require("../../src/shared/helper.cjs")
 const path = require("path")
 const { FileOpQueue }  = require("../../src/build/fileOps.cjs")
@@ -37,7 +38,9 @@ describe('getWebpackConfigs', () => {
     const absPath = {
         engine: ( ...relPath ) => path.resolve( deps.dirname, '../../../', ...relPath ),
         src: ( ...relPath ) => path.resolve(absPath.engine('src'), ...relPath ),
-        game: ( ...relPath ) => path.resolve(absPath.engine(deps.RMK_GAME_DIR ? deps.RMK_GAME_DIR : '../../../'), ...relPath ),
+        game: ( ...relPath ) => path.resolve(absPath.engine(
+            deps.RMK_GAME_DIR ? deps.RMK_GAME_DIR : '../../../'), ...relPath
+        ),
         resources: ( ...relPath ) => path.resolve(absPath.game( 'resources'), ...relPath ),
         dist: ( ...relPath ) => path.resolve(absPath.game('dist'), ...relPath ),
         tmp: ( ...relPath ) => path.resolve(absPath.engine('tmp'), ...relPath )
@@ -61,6 +64,7 @@ describe('getWebpackConfigs', () => {
         const matches = getTargetWebpackConfigs(
             {config: getConfig(false, config), gamePackageJson, enginePackageJson},
             getFileDeps(),
+            new WebApp(),
             new ServerWithNodeHosting(),
             {isDist: false}
         ).filter(obj => obj.name === name)
@@ -70,6 +74,7 @@ describe('getWebpackConfigs', () => {
         const matches = getTargetWebpackConfigs(
             {config: getConfig(true, config), gamePackageJson, enginePackageJson},
             getFileDeps(),
+            new WebApp(),
             new ServerWithNodeHosting(),
             {isDist: true}
         ).filter(obj => obj.name === name)

@@ -12,16 +12,11 @@ const app = express()
 
 app.use(cors())
 
-app.use('/js', express.static(STATIC_DIR + '/js'))
-app.use('/css', express.static(STATIC_DIR + '/css'))
-
+if (!RESOURCES_API) {
+    app.use(express.static(STATIC_DIR))
+}
 app.options('*', cors())
 
-app.get('/', function(req, res) {
-    res.sendFile(
-        path.join(STATIC_DIR, "index.html")
-    )
-})
 if (setupAppMiddlewares) {
     setupAppMiddlewares(app, {
         serverLogging: LOGGING,

@@ -2,6 +2,13 @@ const syncFs = require("../shared/syncFs.cjs")
 const { d, isObject, simpleType, toPairs} = require("../shared/helper.cjs")
 const { execSync } = require('child_process')
 
+const NoStackError = msg => {
+    const e = Error(msg)
+    e.noStack = true
+
+    return e
+}
+
 /**
  * Returns the object of the given json file path. Throws an error if the file does not exist, if the JSON is invalid
  * or if the json is not of type object
@@ -13,7 +20,7 @@ const { execSync } = require('child_process')
 const getJsonObjectFromFile = path => {
     const json = syncFs.readJson(path)
     if (!isObject(json))
-        throw Error(`Json in file ${path} must be an object but got ${typeof json}`)
+        throw NoStackError(`Json in file ${path} must be an object but got ${typeof json}`)
 
     return json
 }
@@ -31,7 +38,7 @@ const getJsonObjectFromFile = path => {
 const getDefaultFromModule = (path, expectedType = 'object', required = true) => {
     if (!syncFs.fileExists(path)) {
         if (!required) return
-        throw Error(`Missing required file ${path}`)
+        throw NoStackError(`Missing required file ${path}`)
     }
     let json
     try {
@@ -43,7 +50,7 @@ const getDefaultFromModule = (path, expectedType = 'object', required = true) =>
         throw e
     }
     if (simpleType(json) !== expectedType)
-        throw Error(`The file ${path} must return an ${expectedType} in module.exports but got ${simpleType(json)}`)
+        throw NoStackError(`The file ${path} must return an ${expectedType} in module.exports but got ${simpleType(json)}`)
 
     return json
 }
@@ -84,9 +91,76 @@ const exec = cmd => {
     return { output, exitCode, failed }
 }
 
+getReplaceMetaVars = (metaVars, configVars = {}) => {
+    return value => {
+        for (let [ key, replacement ] of toPairs(configVars)) {
+            value = value.replaceAll(`{${'config.' + key}}`, replacement)
+        }
+        for (let [ key, replacement ] of toPairs(metaVars)) {
+            value = value.replaceAll(`{${key}}`, replacement)
+        }
+        return value
+    }
+}
+
+getHtmlTags = (elem, props) => {
+    tags = []
+    for (const prop of props) {
+        const attr = []
+        for (const [ name, value ] of toPairs(prop)) {
+            attr.push(`${name}="${value}"`)
+        }
+        tags.push(`<${elem} ${attr.join(' ')} />`)
+    }
+    return tags.join('')
+}
+
+const ext2mime = {
+    png: 'image/png',
+    gif: 'image/gif',
+    ico: 'image/x-icon',
+    svg: 'image/svg+xml',
+    jpg: 'image/jpeg',
+    webp: 'image/webp'
+}
+
+getIconMimeType = ext => {
+    return ext2mime[ext]
+}
+
+id2name = id => {
+    let result = ''
+    let last = 0
+    for (const char of id) {
+        if (/[a-z]/.test(char)) {
+            if (last <= 1) {
+                result += last === 0 ? char.toUpperCase() : char
+            } else {
+                result += ' ' + char.toUpperCase()
+            }
+            last = 1
+        } else if (/[0-9]/.test(char)) {
+            if (last === 0 || last === 2) {
+                result += char
+            } else {
+                result += ' ' + char
+            }
+            last = 2
+        } else {
+            last = 3
+        }
+    }
+    return result
+}
+
 module.exports = {
     exec,
+    getHtmlTags,
+    getReplaceMetaVars,
     stringifyValues,
     getJsonObjectFromFile,
-    getDefaultFromModule
+    getDefaultFromModule,
+    getIconMimeType,
+    id2name,
+    NoStackError
 }

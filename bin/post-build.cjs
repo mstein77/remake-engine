@@ -7,10 +7,7 @@ const { runPostBuildProcessing } = require('../src/build/build.cjs')
 const paramsPath = absPath.tmp('post-build-params.json')
 
 if (syncFs.fileExists(paramsPath)) {
-    try {
-        runPostBuildProcessing(syncFs.readJson(paramsPath))
-    } catch (e) {
-        errorSection(e)
-    }
+    runPostBuildProcessing(syncFs.readJson(paramsPath))
+        .catch(e => errorSection(e))
+        .finally(() => syncFs.clearDir(absPath.tmp()))
 }
-syncFs.clearDir(absPath.tmp())

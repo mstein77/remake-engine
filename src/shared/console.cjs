@@ -114,11 +114,9 @@ const newLine = () => { logger.log() }
 const errorSection = error => {
     log(`\n${BG.L_RED + FG.BLACK} BUILD ${BG.RED + FG.WHITE} Failed with the following error... `)
     log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
-    if (error instanceof TypeError || error instanceof SyntaxError) {
+    if (!error.noStack)
         console.error(error.stack)
-    } else if (hasLogLevel('detailed')) {
-        console.error(error)
-    }
+
     process.exit(1)
 }
 

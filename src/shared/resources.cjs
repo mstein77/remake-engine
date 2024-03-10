@@ -233,6 +233,8 @@ const ResourceTypeRegistry = {
      * @param json
      */
     fromJson: json => {
+        if (!json) return
+
         ext2type = json.ext2type
         ext2info = json.ext2info
         type2exts = json.type2exts

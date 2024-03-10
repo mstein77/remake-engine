@@ -1,4 +1,4 @@
-const { RESOURCE_LOADING, DEPLOYMENT_METHOD } = require('./const.cjs')
+const { RESOURCE_LOADING, DEPLOYMENT_METHOD } = require('./config.cjs')
 const { d, csv2values } = require('../shared/helper.cjs')
 const { bold } = require('../shared/console.cjs')
 

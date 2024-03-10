@@ -5,8 +5,8 @@ const { getBuildLogLevel, subSectionWarning, dumpJson,
     bold, log, errorSection, setBuildLogLevel, mainSection,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError} = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
-const { buildConfig, applyConfigIntegrityChecks } = require("./config.cjs")
-const { getDefaultFromModule, getJsonObjectFromFile } = require("./helper.cjs")
+const { buildConfig, runConfigIntegrityChecks } = require("./config.cjs")
+const { getDefaultFromModule, getJsonObjectFromFile, id2name } = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
 const { ResourceTypeRegistry } = require("../shared/resources.cjs")
 const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
@@ -34,7 +34,7 @@ const getBuildHook = name => getDefaultFromModule(absPath.game(name + '-hook.cjs
  * @returns {object|array}
  */
 const runWebpackConfigGeneration = (configs, fileDeps, options) => {
-
+    const { gamePackageJson } = configs
     const { isDist, info } = options
     const buildsJson = configs.buildsJson
     let distTargets = []
@@ -48,6 +48,16 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     } else {
         if (isDist) queue.addClear(absPath.dist(), true)
         distTargets.push({overwrites: {}, skip: false})
+    }
+    const gameId = gamePackageJson.name
+    configs.metaVars = {
+        'game.id': gameId,
+        'game.name': gamePackageJson.displayName || id2name(gameId),
+        'game.version': gamePackageJson.version,
+        'game.buildtime': Date.now(),
+        'game.author': gamePackageJson.author,
+        'game.description': gamePackageJson.description,
+        'game.keywords': gamePackageJson.keywords.join(',')
     }
 
     mainSection(`Generate webpack configs...`)
@@ -80,7 +90,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection('Checking integrity of config')
-        const { config, warnings, deliverable, hosting } = applyConfigIntegrityChecks(rawConfig, isDist)
+        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, isDist)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -111,9 +121,13 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         distTarget.publicDir = hosting.prepare(config, fileDeps, isDist)
         subSectionOk()
 
+        subSection(`Add application assets`)
+        deliverable.prepareAppAssets(distTarget, configs, fileDeps)
+        subSectionOk()
+
         subSection(`Generate webpack config`)
         configs.config = config
-        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, deliverable, hosting, { isDist, target, info })
+        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, deliverable, hosting, { isDist, target, info, distTarget })
 
         subSectionOk()
         lastEngineConfig = webpackConfigs[0]
@@ -237,7 +251,7 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
  * @param {string} buildLogLevel
  * @param {object} configs
  */
-const runPostBuildProcessing = ({ distTargets, buildLogLevel, configs }) => {
+const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) => {
 
     setBuildLogLevel(buildLogLevel)
     mainSection('Post build processing...')
@@ -260,9 +274,13 @@ const runPostBuildProcessing = ({ distTargets, buildLogLevel, configs }) => {
             target = 'dist build'
         }
         const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
-        const deliverable = new Deliverable()
+        const deliverable = new Deliverable(config.deliverableConfig)
 
-        const params = [distTarget, { ...configs, config }, fileDeps]
+        const params = [ distTarget, { ...configs, config }, fileDeps ]
+
+        subSection(`Generate assets`)
+        await deliverable.generateAssets( ...params )
+        subSectionOk()
 
         if (deliverable.hasCompiler) {
             subSection(`Prepare compilation`)

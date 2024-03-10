@@ -7,7 +7,6 @@ import { StorageManager } from "shared/storage.cjs"
 import inst from "./instances.js"
 
 ResourceTypeRegistry.fromJson(RESOURCE_TYPES)
-
 let staticTypes = csv2values(STATIC_TYPES)
 const setStaticTypes = values => staticTypes = values
 

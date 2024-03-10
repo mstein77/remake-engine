@@ -275,6 +275,11 @@ const isVersionEqualOrHigher = (actual, required) => {
     return true
 }
 
+const push2key = (obj, key, value) => {
+    if (!obj[key]) obj[key] = []
+    obj[key].push(value)
+}
+
 const regexpEscape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const stringList = values => {
@@ -287,6 +292,14 @@ const stringList = values => {
 
     return result + `"${last}"`
 }
+
+const sortAsc = (a, b) => a === b ? 0 : (a < b ? -1 : 1)
+
+const sortDesc = (a, b) => a === b ? 0 : (a > b ? -1 : 1)
+
+const sortPropAsc = prop => (a, b) => a[prop] === b[prop] ? 0 : (a[prop] < b[prop] ? -1 : 1)
+
+const sortPropDesc = prop => (a, b) => a[prop] === b[prop] ? 0 : (a[prop] > b[prop] ? -1 : 1)
 
 /**
  * Returns an array holding the entries (= array with id and value) of a given object
@@ -323,6 +336,11 @@ module.exports = {
     isVersionEqualOrHigher,
     regexpEscape,
     stringList,
+    sortAsc,
+    sortDesc,
+    sortPropAsc,
+    sortPropDesc,
+    push2key,
     toPairs,
     toValues,
     toKeys

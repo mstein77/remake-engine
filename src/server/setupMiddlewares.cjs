@@ -7,7 +7,7 @@ const { isValidResourceId, ResourceDependencies } = require('../engine/helper/sh
 const express = require("express")
 
 const { d, csv2values } = require('../shared/helper.cjs')
-const { RESOURCE_LOADING } = require('../build/const.cjs')
+const { RESOURCE_LOADING } = require('../build/config.cjs')
 const { resourcesController } = require('./controller/resources.cjs')
 
 const setupAppMiddlewares = (app, config = null) => {
@@ -148,9 +148,6 @@ const setupAppMiddlewares = (app, config = null) => {
     if (config.resourceLoading !== RESOURCE_LOADING.API_ALL && config.staticTypes !== '') {
         staticTypes.push( ...csv2values(config.staticTypes) )
     }
-    for (const type of staticTypes) {
-        app.use('/' + type, express.static(absDir.static(type)))
-    }
     app.post('/has', resourcesController.has)
     app.post('/resources', resourcesController.resources)
     app.post('/store', resourcesController.store)
@@ -183,68 +180,10 @@ const setupAppMiddlewares = (app, config = null) => {
         res.json({found, notFound, invalid})
     });
 
-    app.post('/resources2', (req, res) => {
-        const found = []
-        const notFound = []
-        const invalid = []
-
-        const resources = req.body.resources ? req.body.resources : []
-        const relevant = dependencies.getRelevantScreenResources(req.body.screen, req.body.resolved, req.body.overwrites, req.body.remotes)
-        for (let resId of relevant.found) {
-            const [type, id] = resId.split(':')
-            resources.push({id, type})
-        }
-        for (let resId of relevant.notFound) {
-            const [type, id] = resId.split(':')
-            notFound.push({id, type})
-        }
-
-        for (let resource of resources) {
-            if (!isValidResourceId(resource.type, resource.id)) {
-                invalid.push(resource)
-                continue
-            }
-            let data = null
-            const filePath = getResourceFilePath(resource.type, resource.id)
-            if (fs.existsSync(filePath)) {
-                switch (resource.type) {
-                    case 'image':
-                        const imgContent = fs.readFileSync(filePath)
-                        const imgType = path.extname(filePath)
-                        const base64Image = Buffer.from(imgContent, 'binary').toString('base64')
-                        data = `data:image/${imgType.split('.').pop()};base64,${base64Image}`
-                        break
-
-                    case 'audio':
-                        const content = fs.readFileSync(filePath)
-                        const extensionName = path.extname(filePath)
-                        const base64Audio = Buffer.from(content, 'binary').toString('base64')
-                        data = `data:audio/${extensionName.split('.').pop()};base64,${base64Audio}`
-                        break
-
-                    case 'json':
-                        try {
-                            data = JSON.parse(
-                                fs.readFileSync(
-                                    filePath,
-                                    'utf8'
-                                )
-                            );
-                        } catch (e) {
-                            console.error(`Could not parse json resource "${resource.id}"`)
-                        }
-                        break;
-                }
-            }
-            if (data !== null) {
-                resource.data = data
-                found.push(resource)
-            } else {
-                notFound.push(resource)
-            }
-        }
-        res.json({ found, notFound, invalid })
-    })
+    for (const type of staticTypes) {
+        app.use('/' + type, express.static(absDir.static(type)))
+    }
+    app.use(express.static(absDir.static()))
 
     if (config.IS_DIST) return
 

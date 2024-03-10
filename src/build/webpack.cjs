@@ -1,10 +1,10 @@
 const setupAppMiddlewares = require("../server/setupMiddlewares.cjs")
 const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
-const { RESOURCE_LOADING} = require("./const.cjs")
+const { RESOURCE_LOADING} = require("./config.cjs")
 const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
-const { d, csv2values, trim, toKeys, regexpEscape} = require("../shared/helper.cjs")
-const { stringifyValues } = require("./helper.cjs")
+const { d, isArray, toPairs, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
+const { stringifyValues, getReplaceMetaVars, getHtmlTags } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")
@@ -36,15 +36,16 @@ const fontExt2mimeType = {
  * @returns {array}
  */
 const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, options) => {
-
-    const { target, info, isDist } = options
-    const { config, enginePackageJson, gamePackageJson } = configs
+    const { target, info, isDist, distTarget } = options
+    const { config, enginePackageJson, gamePackageJson, metaVars } = configs
     const { absPath, queue, syncFs } = fileDeps
 
     const targetPrefix = target ? target + '-' : ''
     FileCodec.init(absPath)
 
     const gameId = gamePackageJson.name
+    const replaceMetaVars = getReplaceMetaVars(metaVars)
+
     const staticTypes = config.staticTypes
     const requiresApi =
         [RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)
@@ -133,7 +134,9 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
             return ''
         }
 
-        const getCssFromAssets = assets => {
+        const getCssFromAssets = ({ assets }) => {
+            if (!isDist || !deliverable.isAllInOne) return ''
+
             let css = assets['index.css'].source()
 
             for (const key of toKeys(assets)) {
@@ -153,48 +156,50 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
 
                 css = css.replace(matchFontFaceSrcUrl, '$1' + dataUrl + '$3')
             }
-            return css
+            return `<style>${css}</style>`
+        }
+        const linkTags = getHtmlTags('link', deliverable.getMetaLinks(distTarget, configs, fileDeps))
+        const metaTags = getHtmlTags('meta', deliverable.getMeta(distTarget, configs, fileDeps))
+
+        let scriptTags = ''
+        const scripts = deliverable.getScriptTags(distTarget, configs, fileDeps)
+        for (let script of scripts) {
+            scriptTags += `<script>${isArray(script) ? script.join('\n') : script}</script>`
+        }
+        const generateScriptTags = compilation => {
+            if (!deliverable.isAllInOne) return ''
+
+            let html = ''
+            html += `<script>${compilation.assets['index.js'].source()}</script>`
+            cleanUpAssets(compilation.assets)
+            html += scriptTags
+
+            return html
         }
 
-        const viewPortContent = "width=device-width, initial-scale=1, shrink-to-fit=no"
+        const htmlOptions = {
+            filename: 'index.html',
+            cache: false,
+            inject: isDist && deliverable.isAllInOne ? false : 'body',
+            templateContent: ({ compilation }) => `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <title>${replaceMetaVars(config.name)}</title>
+              ${metaTags}
+              ${linkTags}
+              ${getCssFromAssets(compilation)}
+            </head>
+            <body>
+              ${generateScriptTags(compilation)}
+            </body>
+            </html>`
+        }
         const plugins = [
             new DefinePlugin(
                 stringifyValues(defines)
             ),
-            new HtmlWebpackPlugin(
-                deliverable.isAllInOne ?
-                    {
-                        title: config.title,
-                        filename: 'index.html',
-                        chunks: [],
-                        cache: false,
-                        inject: false,
-                        templateContent: ({htmlWebpackPlugin, compilation}) => `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-          <style>
-            ${getCssFromAssets(compilation.assets)}          
-          </style>
-          <title>${htmlWebpackPlugin.options.title}</title>
-        </head>
-        <body>
-          <div id="app"></div>
-          <script>
-            ${compilation.assets['index.js'].source()}${cleanUpAssets(compilation.assets)}
-          </script>
-        </body>
-        </html>`
-                    } :
-                    {
-                        filename: 'index.html',
-                        inject: isDist ? 'head' : 'body',
-                        title: config.title,
-                        meta: {viewport: viewPortContent}
-                    }
-            )
+            new HtmlWebpackPlugin(htmlOptions)
         ]
 
         const entryParts = [absPath.game('src/index.js')]
@@ -251,7 +256,7 @@ export default resourceInfo`
             }
         }
         if (isDist) {
-            // plugins.push(new CssMinimizerPlugin());
+            plugins.push(new CssMinimizerPlugin());
             plugins.push(new MiniCssExtractPlugin({filename: deliverable.isAllInOne ? 'index.css' : 'css/[name].[contenthash].css'}))
         }
         if (config.eslint) {

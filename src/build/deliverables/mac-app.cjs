@@ -1,6 +1,6 @@
 const Deliverable = require("../deliverable.cjs")
 const { d } = require("../../shared/helper.cjs")
-const { RESOURCE_LOADING} = require("../const.cjs");
+const { RESOURCE_LOADING} = require("../config.cjs");
 
 /**
  * A class for building the game as an executable on MacOS using swift. Requires the swiftc compiler and the MacOS
@@ -52,7 +52,7 @@ class MacApp extends Deliverable {
 
         const distSourcePath = absPath.dist(publicDir, 'main.swift')
         const indexHtml = syncFs.readFile(absPath.dist(publicDir, 'index.html')).toString().replace('\'', '\\\\')
-        queue.addCopy(absPath.src('build/compile/mac-app/main.swift'), distSourcePath, {'[[INDEX.HTML]]': indexHtml})
+        queue.addCopy(absPath.src('build/assets/mac-app/main.swift'), distSourcePath, {'[[INDEX.HTML]]': indexHtml})
         queue.process()
     }
 

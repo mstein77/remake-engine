@@ -22,7 +22,6 @@ class Game {
      * @param {function|undefined} initHandler
      */
     constructor(input, initHandler) {
-
         this.currState = STATE.CONSTRUCT
 
         inst.setGame(this)

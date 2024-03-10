@@ -1,6 +1,7 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { exec } = require("./helper.cjs")
 const { d, toPairs } = require("../shared/helper.cjs")
+const { hasLogLevel, bold, log } = require("../shared/console.cjs");
 
 const FILE_OP = {
     CLEAR: 'clear',
@@ -8,6 +9,8 @@ const FILE_OP = {
     WRITE: 'write',
     EXEC: 'exec'
 }
+
+const detail = msg => hasLogLevel('detailed') && log(msg)
 
 /**
  * A queue implementation over file operations which can be added as objects and processed later
@@ -37,6 +40,8 @@ class FileOpQueue {
      * Adds a clear directory operation for the given directory to the queue
      *
      * @param {string} path
+     * @param {boolean|undefined} createIfNotExists
+     * @param {array|undefined} except
      */
     addClear(path, createIfNotExists = false, except = []) {
         this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists, except })
@@ -119,13 +124,20 @@ class FileOpQueue {
             this.clear()
             return
         }
+
+        detail(`\n Processing file op queue...`)
         while (this.queue.length) {
             const { op, ...params } = this.queue.shift()
             switch (op) {
 
                 case FILE_OP.COPY: {
                     const { from, to, replace } = params
-                    if (!syncFs.exists(from)) continue
+
+                    detail(` ${bold('COPY')} ${from} ${to}`)
+                    if (!syncFs.exists(from)) {
+                        detail(` ...skipped because source does not exist`)
+                        continue
+                    }
 
                     if (syncFs.fileExists(from)) {
                         if (!replace) {
@@ -133,6 +145,7 @@ class FileOpQueue {
                         } else {
                             let content = syncFs.readFile(from).toString()
                             for (const [ tag, value ] of toPairs(replace)) {
+                                detail(` ...replacing string "${tag}" in target`)
                                 content = content.replaceAll(tag, value)
                             }
                             syncFs.writeContent(to, content)
@@ -143,8 +156,12 @@ class FileOpQueue {
                 }
                 case FILE_OP.WRITE: {
                     const { path, type, content, skipIfExists = false } = params
-                    if (skipIfExists && syncFs.fileExists(path)) continue
+                    detail(` ${bold('WRITE')} ${path}`)
 
+                    if (skipIfExists && syncFs.fileExists(path)) {
+                        detail(` ...skipped because file already exists`)
+                        continue
+                    }
                     if (type === 'json') {
                         syncFs.writeJson(path, content, 4)
                         break
@@ -154,22 +171,28 @@ class FileOpQueue {
                 }
                 case FILE_OP.CLEAR: {
                     const { path, createIfNotExists, except } = params
+                    detail(` ${bold('CLEAR')} ${path}`)
+
                     if (createIfNotExists) syncFs.createPathTo(path + '/')
                     syncFs.clearDir(path, except)
                     break
                 }
                 case FILE_OP.EXEC: {
                     const { cmd } = params
+                    detail(` ${bold('EXEC')} ${cmd}`)
+
                     const { failed, output} = exec(cmd)
                     if (failed)
                         throw Error(`Failed executing "${cmd}": ${output}`)
 
+                    detail(output)
                     break;
                 }
                 default:
                     throw Error(`Unknown file operation "${op}" given`)
             }
         }
+        detail('')
     }
 }
 
