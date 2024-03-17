@@ -1,13 +1,16 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { exec } = require("./helper.cjs")
-const { d, toPairs } = require("../shared/helper.cjs")
+const { d, stringList, toPairs } = require("../shared/helper.cjs")
 const { hasLogLevel, bold, log } = require("../shared/console.cjs");
 
 const FILE_OP = {
     CLEAR: 'clear',
     COPY: 'copy',
     WRITE: 'write',
-    EXEC: 'exec'
+    EXEC: 'exec',
+    REDUCE: 'reduce',
+    COND_START: 'cond_start',
+    COND_END: 'cond_end'
 }
 
 const detail = msg => hasLogLevel('detailed') && log(msg)
@@ -36,6 +39,16 @@ class FileOpQueue {
         this.queue = []
     }
 
+    startConditional(cmd, check, cwd) {
+        this.queue.push({ op: FILE_OP.COND_START, cmd, check, cwd })
+        return this
+    }
+
+    endConditional() {
+        this.queue.push({ op: FILE_OP.COND_END })
+        return this
+    }
+
     /**
      * Adds a clear directory operation for the given directory to the queue
      *
@@ -45,6 +58,7 @@ class FileOpQueue {
      */
     addClear(path, createIfNotExists = false, except = []) {
         this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists, except })
+        return this
     }
 
     /**
@@ -57,6 +71,7 @@ class FileOpQueue {
      */
     addWriteContent(path, content, skipIfExists = false) {
         this.queue.push({ op: FILE_OP.WRITE, path, content, skipIfExists })
+        return this
     }
 
     /**
@@ -69,6 +84,7 @@ class FileOpQueue {
      */
     addWriteJson(path, content, skipIfExists = false) {
         this.queue.push({ op: FILE_OP.WRITE, path, content, skipIfExists, type: 'json' })
+        return this
     }
 
     /**
@@ -82,6 +98,7 @@ class FileOpQueue {
      */
     addCopy(from, to, replace) {
         this.queue.push({ op: FILE_OP.COPY, from, to, replace })
+        return this
     }
 
     /**
@@ -89,8 +106,14 @@ class FileOpQueue {
      *
      * @param {string} cmd
      */
-    addExec(cmd) {
-        this.queue.push({ op: FILE_OP.EXEC, cmd })
+    addExec(cmd, cwd) {
+        this.queue.push({ op: FILE_OP.EXEC, cmd, cwd })
+        return this
+    }
+
+    addReduce(path, exts, target) {
+        this.queue.push({ op: FILE_OP.REDUCE, path, exts, target })
+        return this
     }
 
     /**
@@ -126,10 +149,32 @@ class FileOpQueue {
         }
 
         detail(`\n Processing file op queue...`)
+
+        let condLevel = 0
+        let skipLevel = -1
         while (this.queue.length) {
             const { op, ...params } = this.queue.shift()
+
+            if (op === FILE_OP.COND_START) {
+                condLevel++
+            } else if (op === FILE_OP.COND_END) {
+                condLevel--
+            }
+            if (skipLevel >= condLevel) continue
+
             switch (op) {
 
+                case FILE_OP.COND_START: {
+                    const { cmd, check, cwd } = params
+
+                    const result = exec(cmd, cwd)
+                    if (!check(result)) skipLevel = condLevel
+                    break
+                }
+                case FILE_OP.COND_END: {
+                    if (skipLevel > condLevel) skipLevel = -1
+                    break
+                }
                 case FILE_OP.COPY: {
                     const { from, to, replace } = params
 
@@ -178,20 +223,44 @@ class FileOpQueue {
                     break
                 }
                 case FILE_OP.EXEC: {
-                    const { cmd } = params
+                    const { cmd, cwd } = params
                     detail(` ${bold('EXEC')} ${cmd}`)
 
-                    const { failed, output} = exec(cmd)
+                    const { failed, output} = exec(cmd, cwd)
                     if (failed)
                         throw Error(`Failed executing "${cmd}": ${output}`)
 
                     detail(output)
-                    break;
+                    break
+                }
+                case FILE_OP.REDUCE: {
+                    let { path, exts, target } = params
+                    detail(` ${bold('REDUCE')} ${path} to ${stringList(exts)}`)
+
+                    if (!syncFs.dirExists(target)) {
+                        syncFs.mkdir(target)
+                    }
+                    const files = syncFs.readFilesRec(path).filter(name => {
+                        for (const ext of exts) {
+                            if (name.endsWith('.' + ext)) return true
+                        }
+                        return false
+                    })
+
+                    for (const file of files) {
+                        const from = syncFs.absPath(path, file)
+                        const to = syncFs.absPath(target, syncFs.basename(file))
+                        syncFs.copyFile(from, to)
+                    }
+
+                    if (path !== target) syncFs.rmDir(path, {recursive: true, force: true})
+                    break
                 }
                 default:
                     throw Error(`Unknown file operation "${op}" given`)
             }
         }
+        if (condLevel > 0) throw Error(`Unclosed condition found!`)
         detail('')
     }
 }

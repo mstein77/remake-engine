@@ -3,7 +3,7 @@ const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
 const { RESOURCE_LOADING} = require("./config.cjs")
 const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
-const { d, isArray, toPairs, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
+const { d, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
 const { stringifyValues, getReplaceMetaVars, getHtmlTags } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 
@@ -14,6 +14,11 @@ const ESLintPlugin = require("eslint-webpack-plugin")
 const TerserPlugin = require("terser-webpack-plugin")
 const CopyWebpackPlugin = require("copy-webpack-plugin")
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin
+
+let crypto
+try {
+    crypto = require('node:crypto')
+} catch (err) {}
 
 const fontExt2mimeType = {
     ttf: 'font/ttf',
@@ -51,6 +56,9 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         [RESOURCE_LOADING.API, RESOURCE_LOADING.API_ALL].includes(config.resourceLoading)
     const useServer = isDist && config.server
 
+    const certFilePath = absPath.game('.ssl', 'cert.pem')
+    const keyFilePath = absPath.game('.ssl', 'key.pem')
+
     const common = {
         mode: isDist ? 'production' : 'development',
         stats: {
@@ -63,11 +71,14 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         }
     }
 
+    const getBaseUrl = (host, path) => (
+        (config.https ? 'https' : 'http') + `://${host}${port !== (config.https ? 443 : 80) ? ':' + port : ''}` +
+        `${path ? '/' + trim(path, '/') : ''}`
+    )
+    const port = config.https ? config.httpsPort : config.httpPort;
     const defines = {
-        BASE_URL: (
-            (config.https ? 'https' : 'http') + `://${config.host}${config.port !== 80 ? ':' + config.port : ''}` +
-            `${config.path ? '/' + trim(config.path, '/') : ''}`
-        ),
+        BASE_URL: getBaseUrl(config.host, config.path),
+        PREVIEW_URL: getBaseUrl('localhost', ''),
         VERSION_ENGINE: enginePackageJson.version,
         VERSION_GAME: gamePackageJson.version,
         GAME_ID: gameId,
@@ -75,6 +86,54 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         RESOURCE_TYPES: ResourceTypeRegistry.toJson(),
         STATIC_TYPES: staticTypes,
         RESOURCES_API: !isDist || requiresApi
+    }
+
+    // TODO add CssMinimizer only in game context
+    const minimizer = !config.minimize ? [] : [
+        new TerserPlugin({
+            terserOptions: {
+                format: {
+                    comments: /@license/i
+                }
+            },
+            extractComments: true
+        }),
+        new CssMinimizerPlugin({
+            minimizerOptions: {
+                preset: [
+                    "default",
+                    {
+                        discardComments: { removeAll: true },
+                    },
+                ],
+            },
+        })
+    ]
+
+    const ensureDevCertificates = () => {
+        if (crypto) {
+            let generate = true
+            if (syncFs.fileExists(certFilePath) && syncFs.fileExists(keyFilePath)) {
+                const cert = syncFs.readFile(certFilePath)
+                const parsedCert = new crypto.X509Certificate(cert)
+                const validFrom = (new Date(parsedCert.validFrom)).getTime()
+                const validTo = (new Date(parsedCert.validTo)).getTime()
+                const currentDate = new Date().getTime()
+                generate = !!(currentDate < validFrom && currentDate > validTo)
+            }
+            if (generate) {
+                const sslPath = absPath.game('.ssl')
+                queue
+                    .startConditional(`openssl version`, result => !result.failed)
+                    .addClear(sslPath, true)
+                    .addExec(
+                        `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem ` +
+                        `-subj "/C=DE/ST=State/L=Location/O=Organization/OU=Organizational Unit/CN=example.com"`,
+                        sslPath
+                    )
+                    .endConditional()
+            }
+        }
     }
 
     /**
@@ -85,6 +144,9 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
     const getGameWebpackConfig = () => {
         const webpackConfig = {}
 
+        if (config.https) {
+            ensureDevCertificates()
+        }
         // add dev-server if we are in dev environment
         if (!isDist) {
             let open = false
@@ -99,7 +161,19 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
                     }
                 }
             }
+            let server = undefined
+            if (config.https) {
+                server = {
+                    type: 'https',
+                    options: {
+                        cert: certFilePath,
+                        key: keyFilePath
+
+                    }
+                }
+            }
             webpackConfig.devServer = {
+                server,
                 client: {
                     progress: true,
                     overlay: true,
@@ -120,7 +194,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
                     return middlewares
                 },
                 static: absPath.dist(config.server ? 'public' : ''),
-                port: config.port
+                port: config.https ? config.httpsPort : config.httpPort
             }
         }
 
@@ -128,7 +202,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
 
         const cleanUpAssets = assets => {
             for (const key of toKeys(assets)) {
-                if (key === 'index.html') continue
+                if (key === 'index.html' || key.endsWith('package.json')) continue
                 delete assets[key]
             }
             return ''
@@ -272,30 +346,11 @@ export default resourceInfo`
                 new BundleAnalyzerPlugin()
             )
         }
-        const minimizer = !config.minimize ? [] : [
-            new TerserPlugin({
-                terserOptions: {
-                    format: {
-                        comments: /@license/i
-                    }
-                },
-                extractComments: true
-            }),
-            new CssMinimizerPlugin({
-                minimizerOptions: {
-                    preset: [
-                        "default",
-                        {
-                            discardComments: { removeAll: true },
-                        },
-                    ],
-                },
-            })
-        ]
         const copyOps = queue.extract(FILE_OP.COPY)
         const patterns = []
         for (const { from , to } of copyOps) {
-            if (syncFs.exists(from) && !syncFs.isEmptyDir(from)) patterns.push({ from, to })
+            if (syncFs.fileExists(from) || (syncFs.dirExists(from) && !syncFs.isEmptyDir(from)))
+                patterns.push({ from, to })
         }
         if (patterns.length) {
             plugins.push(new CopyWebpackPlugin({
@@ -415,17 +470,29 @@ export default resourceInfo`
      */
     const getServerWebpackConfig = () => {
 
-        const port = config.port
+        const sslProps = {}
+        if (config.https) {
+            const sslEnvs = ['SSL_CA', 'SSL_KEY', 'SSL_CERT', 'SSL_PFX', 'SSL_PASSPHRASE']
+            for (const env of sslEnvs) {
+                const envKey = config.envPrefix + env
+                sslProps[env] = envKey in process.env ? process.env[envKey] : ''
+            }
+        }
+        const ssl = !!(config.https && (sslProps['SSL_KEY'] || sslProps['SSL_CERT'] || sslProps['SSL_PFX']))
+        const port = ssl ? config.httpsPort : config.httpPort
         const plugins = [
             new DefinePlugin(
                 stringifyValues({
                     ...defines,
                     ...{
                         PORT: port,
+                        OPEN_BROWSER: config.openBrowser,
+                        SSL: ssl,
                         LOGGING: config.serverLogging,
                         LOGGING_FORMAT: config.serverLoggingFormat,
-                        API_MAX_JSON_SIZE: config.apiMaxJsonSize
-                    }
+                        API_MAX_JSON_SIZE: config.apiMaxJsonSize,
+                    },
+                    ...sslProps
                 })
             )
         ];
@@ -440,8 +507,9 @@ export default resourceInfo`
                 filename: 'server.cjs',
                 clean: true
             },
-            externals: {
-                express: 'commonjs express',
+            optimization: {
+                minimize: config.minimize,
+                minimizer
             },
             module: {
                 rules: [

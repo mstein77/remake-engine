@@ -19,6 +19,7 @@ const absPath = {
     setCurrDist: path => {
         currDist = path
     },
+    make: path.resolve,
     setDeps: (dirname, gameDir) => {
         deps.dirname = dirname
         deps.RMK_GAME_DIR = gameDir

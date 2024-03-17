@@ -1,6 +1,6 @@
 import { STATE, RENDERER_STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
+import { getBaseUrl, clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
 import { getResourcesAndCallback, ResourceResolver, ResourceRequest } from "./resources"
 import { div } from "helper/dom"
@@ -36,7 +36,7 @@ class Game {
         const resourceSessionStorage = new StorageManager(
             BrowserStorage(sessionStorage)
         )
-        inst.setRL(BASE_URL + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
+        inst.setRL(getBaseUrl() + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
         this.engineStorage = new StorageManager(BrowserStorage(localStorage, 'remake-engine.'))
 
         // TODO get from plugin-registry

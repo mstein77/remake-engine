@@ -1,5 +1,5 @@
-const path = require("path");
-const fs = require("fs");
+const path = require("path")
+const fs = require("fs")
 
 const syncFs = {
 
@@ -127,7 +127,11 @@ const syncFs = {
 
     realpath: ( ...args ) => {
         return fs.realpathSync( ...args )
-    }
+    },
+
+    absPath: path.resolve,
+
+    basename: path.basename
 }
 
 module.exports = syncFs

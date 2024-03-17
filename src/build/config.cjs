@@ -1,7 +1,7 @@
 const absPath = require('../shared/absPath.cjs')
 const { d, simpleType, toValues, stringList, toPairs, intersect, isArray, csv2values } = require("../shared/helper.cjs")
 const { buildLogLevels } = require("../shared/console.cjs")
-const { NoStackError } = require("./helper.cjs")
+const { NoStackError } = require("../shared/console.cjs")
 
 const MSG = {
     noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
@@ -33,7 +33,8 @@ const DELIVERABLE = {
     EXE_WINDOWS: 'windows-exe',
     EXE_JAVA: 'exe.java',
     APP_ANDROID: 'app.android',
-    APP_APPLE: 'app.apple'
+    APP_APPLE: 'app.apple',
+    APP_ELECTRON: 'electron-app'
 }
 const HOSTING = {
     AWS: 'aws',
@@ -91,7 +92,7 @@ const configKey2params = {
     server: {type: 'bool', default: true},
     https: {type: 'bool', default: false, distDefault: true},
     host: {type: 'string', default: 'localhost'},
-    port: {type: 'uint', default: 8080},
+    httpPort: {type: 'uint', default: 8080},
     httpsPort: {type: 'uint', default: 443},
     certificate: {type: 'string', default: ''},
     path: {type: 'string', default: ''},
@@ -266,6 +267,10 @@ const runConfigIntegrityChecks = (config, isDist) => {
             warnings.push(`Requested ${key} "${config.deliverable}" not supported in dev environment, using "${value}" instead`)
             config[key] = value
         }
+    }
+    if (config.deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_PUBLIC && config.server) {
+        warnings.push(`Requested server "true" but is not supported by the deployment method "${DEPLOYMENT_METHOD.UPLOAD_PUBLIC}", using "false" instead`)
+        config.server = false
     }
     if (config.editor && !config.server)
         throw NoStackError(MSG.enableEditor)
@@ -498,8 +503,6 @@ const buildConfig = (json, env, overwrites, isDistBuild) => {
     return ctxConfig
 }
 
-let ctxConfig = null
-
 /**
  * Returns the game config for production or development environment depending on the given webpack arguments
  *
@@ -508,12 +511,23 @@ let ctxConfig = null
  * @returns {object}
  */
 const getConfigForCtx = args => {
-    if (ctxConfig === null) {
-        const configArg = args && args.config
-        const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
-        ctxConfig = buildConfig(configJson(), process.env, isDistBuild)
+    const configArg = args && args.config
+    const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
+    return buildConfig(configJson(), process.env, {}, isDistBuild)
+}
+
+const getPreviewConfigs = () => {
+    const distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']})
+    const { deliverable, hosting } = runConfigIntegrityChecks(distConfig, true)
+    const devConfig = getConfigForCtx()
+    runConfigIntegrityChecks(devConfig, false)
+
+    return {
+        distConfig,
+        devConfig,
+        deliverable,
+        hosting
     }
-    return ctxConfig
 }
 
 const internal = process.env.NODE_ENV !== 'test' ? {} : {
@@ -525,11 +539,11 @@ const internal = process.env.NODE_ENV !== 'test' ? {} : {
 
 module.exports = {
     buildConfig,
+    getPreviewConfigs,
     validateConfig,
     buildDefaults,
     runConfigIntegrityChecks,
     getConfigForCtx,
-    configJson,
     ASSET_TYPE,
     HOSTING,
     PLATFORMS,

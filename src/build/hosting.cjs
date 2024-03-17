@@ -94,7 +94,9 @@ class Hosting {
      * @param {object} config
      * @param {object} fileDeps
      */
-    prepareDev(config, fileDeps) {
+    prepareDev(distTarget, configs, fileDeps) {
+        const { config } = distTarget
+
         // TODO: only generate to game repo if deploymentMethod is checkout? Upload root may also need this in dist folder
         this.generateRepoFiles(config, fileDeps)
     }
@@ -105,7 +107,9 @@ class Hosting {
      * @param {object} config
      * @param {object} fileDeps
      */
-    prepareDist(config, fileDeps) {
+    prepareDist(distTarget, configs, fileDeps) {
+        const { config } = distTarget
+        const { gamePackageJson } = configs
         const { queue, absPath, syncFs } = fileDeps
 
         const deploymentMethod = config.deploymentMethod
@@ -134,15 +138,14 @@ class Hosting {
         }
         if (server && [DEPLOYMENT_METHOD.UPLOAD_ROOT, DEPLOYMENT_METHOD.CHECKOUT].includes(deploymentMethod)) {
             const distPackageJsonPath = absPath.tmp('package.json')
-            queue.addWriteJson(distPackageJsonPath, {
-                    name: 'game',
-                    version: '1.0.0',
+            syncFs.writeJson(distPackageJsonPath, {
+                    name: gamePackageJson.name,
+                    version: gamePackageJson.version,
                     scripts: {
-                        start: 'node server.cjs'
+                        start: 'node server.cjs',
+                        preview: 'node server.cjs --preview'
                     },
-                    dependencies: {
-                        express: '^4.18.2'
-                    }
+                    dependencies: {}
                 }
             )
             queue.addCopy(distPackageJsonPath, absPath.dist('package.json'))
@@ -193,17 +196,18 @@ class Hosting {
      *
      * @returns {string}
      */
-    prepare(config, fileDeps, isDist) {
+    prepare(distTarget, configs, fileDeps, isDist) {
         const { absPath } = fileDeps
+        const { config } = distTarget
 
         const publicDir = config.server ? 'public' : ''
         this.publicPath = absPath.dist(publicDir)
 
         if (isDist) {
-            this.prepareDist(config, fileDeps)
+            this.prepareDist(distTarget, configs, fileDeps)
             this.addDeploymentInstructions(config, fileDeps)
         } else {
-            this.prepareDev(config, fileDeps)
+            this.prepareDev(distTarget, configs, fileDeps)
         }
         return publicDir
     }

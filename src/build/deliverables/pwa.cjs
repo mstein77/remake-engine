@@ -1,8 +1,9 @@
 const { d, sortPropAsc } = require("../../shared/helper.cjs")
 const Deliverable = require("../deliverable.cjs")
 const { ASSET_GENERATION, RESOURCE_LOADING} = require("../config.cjs")
-const { getReplaceMetaVars, getIconMimeType, NoStackError } = require("../helper.cjs")
+const { getReplaceMetaVars, getIconMimeType } = require("../helper.cjs")
 const sizeOf = require("image-size")
+const { NoStackError } = require("../../shared/console.cjs")
 
 /**
  * A class for building the game as a progressive web app (PWA)
@@ -177,7 +178,7 @@ class Pwa extends Deliverable {
         const short_name = replaceMetaVars(this.config.short_name)
         queue.addCopy(
             absPath.src('build', 'assets', 'pwa', 'service-worker.js'),
-            absPath.dist('public', 'service-worker.js'),
+            absPath.dist(publicDir, 'service-worker.js'),
             {'[[shortname]]': short_name, '[[version]]': metaVars['game.version'], '[[buildtime]]': metaVars['game.buildtime']}
         )
         const manifest = {

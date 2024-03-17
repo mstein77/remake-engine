@@ -29,18 +29,12 @@ if (syncFs.fileExists(absPath.dist('package.json')) && syncFs.isEmptyDir(absPath
 const serverPath = absPath.dist('server.cjs')
 if (syncFs.fileExists(serverPath)) {
     console.log(`Starting server in dist folder...`)
-    spawn('node', [serverPath], {
-        stdio: 'inherit',
-        cwd: absPath.dist()
-    })
-} else {
-    console.log(`Starting static file server in dist folder...`)
     const args = ['run']
     args.push(
-        'start-static'
+        'start'
     )
     spawn('npm', args, {
         stdio: 'inherit',
-        cwd: absPath.engine()
+        cwd: absPath.dist()
     })
 }

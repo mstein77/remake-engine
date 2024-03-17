@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 const { log, FG } = require('../src/shared/console.cjs')
 const { syncFs } = require('../src/shared/syncFs.cjs')
 const { d, toPairs } = require('../src/shared/helper.cjs')
-const { getDefaultConfig } = require('../src/build/const.cjs')
+const { getDefaultConfig } = require('../src/build/config.cjs')
 
 const __dirname = syncFs.realpath(dirname(fileURLToPath(import.meta.url)) + '/../')
 const dotenvPath = __dirname + '/.env'
@@ -111,7 +111,7 @@ try {
         },
         dist: {},
         '.npmrc': "loglevel=silent%",
-        '.gitignore': ["dist/", "dists/", "node_modules/", ".env"].join("\n"),
+        '.gitignore': ["dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
         'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2)
     });
 

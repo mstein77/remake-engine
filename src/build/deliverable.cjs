@@ -1,9 +1,10 @@
 const { d, isArray, sortPropAsc, stringList, union, toValues, toKeys, csv2values, toPairs, isVersionEqualOrHigher, without } = require('../shared/helper.cjs')
-const { exec, getReplaceMetaVars, getIconMimeType, NoStackError } = require('./helper.cjs')
+const { exec, getReplaceMetaVars, getIconMimeType } = require('./helper.cjs')
 const sizeOf = require("image-size")
 const Jimp = require("jimp")
 const { validateConfig, ASSET_GENERATION, PLATFORMS, buildDefaults } = require("./config.cjs")
 const scope2assets = require('./asset.cjs')
+const { NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
 
 const generatorFormats = ['png', 'gif']
 
@@ -354,7 +355,8 @@ class Deliverable {
      *
      * @returns {string|undefined}
      */
-    getMissingRequirements() {
+    getMissingRequirements(fileDeps) {
+        const { absPath } = fileDeps
         const requiredPlatforms = this.getRequiredPlatforms()
         const platform = process.platform
         if (requiredPlatforms.length && !requiredPlatforms.includes(platform))
@@ -362,9 +364,23 @@ class Deliverable {
 
         const which = platform === 'win32' ? 'where' : 'which'
         const requiredPrograms = this.getRequiredPrograms()
+        const programsInstaller = this.getProgramsInstaller()
         for (const [ program, minVersion ] of toPairs(requiredPrograms)) {
             {
-                const { failed } = exec(`${which} ${program}`)
+                let { failed } = exec(`${which} ${program}`)
+                if (failed) {
+                    let install = programsInstaller[program]
+                    if (install) {
+                        install = install.replace('[[path]]', absPath.game())
+                        subSectionWarning(`   Could not find ${program}, trying to install by executing "${install}"...`)
+                        const installation = exec(install)
+                        if (installation.output) log(installation.output)
+                        if (!installation.failed) {
+                            const checkProgram = exec(`${which} ${program}`)
+                            failed = checkProgram.failed
+                        }
+                    }
+                }
                 if (failed)
                     return `Build requires "${program}" but could not be found`
             }
@@ -399,6 +415,10 @@ class Deliverable {
      * @returns {object}
      */
     getRequiredPrograms() {
+        return {}
+    }
+
+    getProgramsInstaller() {
         return {}
     }
 

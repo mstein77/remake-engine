@@ -106,7 +106,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         }
 
         subSection(`Checking build requirements`)
-        const missing = deliverable.getMissingRequirements()
+        const missing = deliverable.getMissingRequirements(fileDeps)
         if (missing) {
             if (target) {
                 subSectionError(missing)
@@ -118,7 +118,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        distTarget.publicDir = hosting.prepare(config, fileDeps, isDist)
+        distTarget.publicDir = hosting.prepare(distTarget, configs, fileDeps, isDist)
         subSectionOk()
 
         subSection(`Add application assets`)
@@ -240,7 +240,7 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
         return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info })
 
     } catch (e) {
-        errorSection(e)
+        errorSection(e, 'BUILD')
     }
 }
 

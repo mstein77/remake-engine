@@ -1,4 +1,4 @@
-import { d, csv2values, toKeys, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues, getCanvasObjForDim } from "helper/helper"
+import { d, getBaseUrl, csv2values, toKeys, isNull, isObject, isUrl, isString, isDataUrl, isArray, toPairs, toValues, getCanvasObjForDim } from "helper/helper"
 import { RESOURCE, ResourceTypeRegistry, makeDescriptor, typeText2tid, id2jsonTid, id2imageTid, id2audioTid, id2videoTid, tids2extTids,
     id2tid, tid2id, text2id, tid2type } from "shared/resources.cjs"
 import { AppliedImage } from "./classes"
@@ -34,7 +34,7 @@ const getResourceResolvePromise = (tid, value, mainOrigin, urlType = 'exturl') =
         if (!staticTypes.includes(descriptor.key))
             throw Error(`Resource with id "${descriptor.id}" was requested as static resource, but static ${descriptor.key} resources are not allowed`)
 
-        const staticUrl = BASE_URL + '/' + descriptor.key + '/' + descriptor.extId
+        const staticUrl = getBaseUrl() + '/' + descriptor.key + '/' + descriptor.extId
 
         return getResourceResolvePromise(tid, staticUrl, mainOrigin, 'staticurl')
     }

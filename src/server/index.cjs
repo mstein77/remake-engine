@@ -2,35 +2,88 @@
 const path = require('path')
 const express = require('express')
 const cors = require('cors')
-const { csv2values } = require('../shared/helper.cjs')
+const { csv2values, d } = require('../shared/helper.cjs')
+const syncFs = require("../shared/syncFs.cjs")
 
-const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
+const open = require("open")
+const { errorSection } = require("../shared/console.cjs")
 
-const STATIC_DIR = path.resolve(__dirname, "public")
+const isPreview = process.argv.includes('--preview')
 
-const app = express()
+try {
+    const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
+    const STATIC_DIR = path.resolve(__dirname, "public")
+    const app = express()
+    app.use(cors())
 
-app.use(cors())
-
-if (!RESOURCES_API) {
-    app.use(express.static(STATIC_DIR))
-}
-app.options('*', cors())
-
-if (setupAppMiddlewares) {
-    setupAppMiddlewares(app, {
-        serverLogging: LOGGING,
-        serverLoggingFormat: LOGGING_FORMAT,
-        staticTypes: STATIC_TYPES,
-        resourceTypes: RESOURCE_TYPES,
-        resourceLoading: 'api',
-        IS_DIST: true,
-        API_MAX_JSON_SIZE
-    })
-} else if (STATIC_TYPES !== '') {
-    for (const type of csv2values(STATIC_TYPES)) {
-        app.use('/' + type, express.static(STATIC_DIR + '/' + type))
+    if (!RESOURCES_API) {
+        app.get('/', (req, res) => {
+            const indexHtmlPath = path.resolve(STATIC_DIR, 'index.html')
+            if (syncFs.fileExists(indexHtmlPath)) {
+                res.sendFile(
+                    indexHtmlPath
+                )
+                return res
+            }
+            const files = syncFs.readFiles(path.resolve(STATIC_DIR))
+            res.send(`<h1>Available files:</h1><ul>${files.map(file => `<li><a href="${file}">${file}</a></li>`).join('')}</ul>`)
+            return res
+        })
+        app.use(express.static(STATIC_DIR))
     }
-}
+    app.options('*', cors())
 
-app.listen(PORT)
+    if (setupAppMiddlewares) {
+        setupAppMiddlewares(app, {
+            serverLogging: LOGGING,
+            serverLoggingFormat: LOGGING_FORMAT,
+            staticTypes: STATIC_TYPES,
+            resourceTypes: RESOURCE_TYPES,
+            resourceLoading: 'api',
+            IS_DIST: true,
+            API_MAX_JSON_SIZE
+        })
+    } else if (STATIC_TYPES !== '') {
+        for (const type of csv2values(STATIC_TYPES)) {
+            app.use('/' + type, express.static(STATIC_DIR + '/' + type))
+        }
+    }
+
+    const getFileContent = path => {
+        if (!path) return ''
+
+        if (!syncFs.fileExists(path))
+            throw Error(`File "${path}" does not exist!`)
+
+        return syncFs.readFile(path).toString()
+    }
+
+    let server = app
+    if (SSL) {
+        const https = require('https')
+        const absPath = require('../shared/absPath.cjs')
+        const options = {
+            key: getFileContent(isPreview ? absPath.game('.ssl', 'key.pem') : SSL_KEY),
+            cert: getFileContent(isPreview ? absPath.game('.ssl', 'cert.pem') : SSL_CERT),
+            ca: isPreview ? '' : SSL_CA,
+            pfx: isPreview ? '' : SSL_PFX,
+            passphrase: isPreview ? '' : SSL_PASSPHRASE
+        }
+        server = https.createServer(options, app);
+    }
+    server.listen(PORT)
+
+    const openAsync = async (url) => {
+        const options = {wait: true}
+        if (OPEN_BROWSER !== 'default') {
+            options.app = {
+                name: OPEN_BROWSER
+            }
+        }
+        await open(url, options)
+    }
+    if (isPreview) openAsync(PREVIEW_URL)
+
+} catch (e) {
+    errorSection(e, isPreview ? 'PREVIEW' : 'SERVER')
+}

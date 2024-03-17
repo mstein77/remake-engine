@@ -68,6 +68,13 @@ const bold = msg => noColor ? msg : '\x1b[1m' + msg + '\x1b[0m'
  */
 const colorMsg = msg => FG.RESET + msg + FG.RESET
 
+const NoStackError = msg => {
+    const e = Error(msg)
+    e.noStack = true
+
+    return e
+}
+
 /**
  * Passes the given parameters to console.log and encloses every string parameter with FG.RESET
  *
@@ -111,8 +118,8 @@ const mainSection = name => {
 
 const newLine = () => { logger.log() }
 
-const errorSection = error => {
-    log(`\n${BG.L_RED + FG.BLACK} BUILD ${BG.RED + FG.WHITE} Failed with the following error... `)
+const errorSection = (error, scope) => {
+    log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... `)
     log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
     if (!error.noStack)
         console.error(error.stack)
@@ -129,11 +136,11 @@ const subSection = name => {
 const subSectionOk = (msg = '') => {
     if (!hasLogLevel('normal')) return
 
-    log(FG.GREEN + `   ✓` + FG.RESET + ` OK ` + msg)
+    log(FG.GREEN + `   ${bold('✓')}` + FG.RESET + ` OK ` + msg)
 }
 
 const subSectionError = msg => {
-    log( FG.RED + '   ✕' + FG.RESET + ' ' + bold(msg) + '\n')
+    log( FG.RED + `   ${bold('✕')}` + FG.RESET + ' ' + bold(msg) + '\n')
 }
 
 const subSectionWarning = msg => {
@@ -160,5 +167,6 @@ module.exports = {
     subSection,
     subSectionOk,
     subSectionError,
-    subSectionWarning
+    subSectionWarning,
+    NoStackError
 }
