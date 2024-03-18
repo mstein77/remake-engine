@@ -5,13 +5,14 @@ const { getBuildLogLevel, subSectionWarning, dumpJson,
     bold, log, errorSection, setBuildLogLevel, mainSection,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError} = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
-const { buildConfig, runConfigIntegrityChecks } = require("./config.cjs")
+const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile, id2name } = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
 const { ResourceTypeRegistry } = require("../shared/resources.cjs")
 const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
 
 const minNodeVersion = 'v16'
+const BUILD_TEMP_DIR = '.dist'
 
 /**
  * Returns the function for the build hook with the given name if its available otherwise undefined
@@ -41,13 +42,13 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     const { absPath, queue } = fileDeps
     queue.addClear(absPath.tmp(), true)
     if (buildsJson) {
-        queue.addClear(absPath.dists(), true)
+        queue.addPath(absPath.dists())
         for (const [ target, overwrites ] of toPairs(buildsJson)) {
-            distTargets.push({ target, path: absPath.dists(target), overwrites, skip: false })
+            distTargets.push({ target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false })
         }
     } else {
-        if (isDist) queue.addClear(absPath.dist(), true)
-        distTargets.push({overwrites: {}, skip: false})
+        if (isDist) queue.addPath(absPath.dist())
+        distTargets.push({overwrites: {}, root: absPath.game(), dir: 'dist', tmpDir: BUILD_TEMP_DIR, skip: false})
     }
     const gameId = gamePackageJson.name
     configs.metaVars = {
@@ -76,14 +77,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     }
 
     for (const distTarget of distTargets) {
-        const { target, path, overwrites } = distTarget
-
-        queue.clear()
-        if (path) absPath.setCurrDist(path)
+        const { root, tmpDir, target, overwrites } = distTarget
 
         hasLogLevel('normal') && log(
             target ? `Build "${bold(target)}":\n` : `Starting ${bold(isDist ? 'dist' : 'dev')} build:\n`
         )
+        queue.clear()
+        const path = absPath.make(root, tmpDir)
+        queue.addClear(path, true).process()
+        absPath.setCurrDist(path)
 
         subSection('Validating build config')
         const rawConfig = buildConfig(configs.configJson, process.env, overwrites, isDist)
@@ -257,18 +259,22 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
     mainSection('Post build processing...')
 
     const postBuildHook = getBuildHook('post-build')
+    const queue = new FileOpQueue()
     const fileDeps = {
         absPath,
         syncFs,
-        queue: new FileOpQueue()
+        queue
     }
 
+    const exceptDirs = []
     let index = 0
     for (const distTarget of distTargets) {
-        let { target, config, path } = distTarget
-        if (path) absPath.setCurrDist(path)
+        let { target, config, root, dir, tmpDir } = distTarget
+        const path = absPath.make(root, tmpDir)
+        absPath.setCurrDist(path)
 
         if (target) {
+            exceptDirs.push(dir)
             hasLogLevel('normal') && log(`Build "${bold(target)}":\n`)
         } else {
             target = 'dist build'
@@ -309,17 +315,22 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
             postBuildHook( ...params )
             subSectionOk()
         }
+        queue.addReplace(path, absPath.make(root, dir)).process()
+
         index++
         if (index !== distTargets.length) newLine()
+    }
+    if (exceptDirs.length) {
+        queue.addClear(absPath.dists(), false, exceptDirs).process()
     }
 
     mainSection('Build successfully finished...')
 
-    for (const { target, instructions, path } of distTargets) {
+    for (const { target, instructions, root, dir } of distTargets) {
         if (!hasLogLevel('normal') || !instructions) continue
 
         if (target) {
-            log(`Build ${bold(target)} in ${bold(path)}:`)
+            log(`Build ${bold(target)} in ${bold(absPath.make(root, dir))}:`)
             newLine()
             showInstructions(instructions)
         } else {

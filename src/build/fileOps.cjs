@@ -9,6 +9,8 @@ const FILE_OP = {
     WRITE: 'write',
     EXEC: 'exec',
     REDUCE: 'reduce',
+    REPLACE: 'replace',
+    PATH: 'path',
     COND_START: 'cond_start',
     COND_END: 'cond_end'
 }
@@ -105,14 +107,25 @@ class FileOpQueue {
      * Adds a execution operation for the given command
      *
      * @param {string} cmd
+     * @param {object} options
      */
-    addExec(cmd, cwd) {
-        this.queue.push({ op: FILE_OP.EXEC, cmd, cwd })
+    addExec(cmd, options) {
+        this.queue.push({ op: FILE_OP.EXEC, cmd, options })
         return this
     }
 
     addReduce(path, exts, target) {
         this.queue.push({ op: FILE_OP.REDUCE, path, exts, target })
+        return this
+    }
+
+    addReplace(from, to) {
+        this.queue.push({ op: FILE_OP.REPLACE, from, to })
+        return this
+    }
+
+    addPath(path) {
+        this.queue.push({ op: FILE_OP.PATH, path })
         return this
     }
 
@@ -222,15 +235,24 @@ class FileOpQueue {
                     syncFs.clearDir(path, except)
                     break
                 }
+                case FILE_OP.PATH: {
+                    const { path } = params
+                    detail(` ${bold('PATH')} ${path}`)
+
+                    syncFs.createPathTo(path + '/')
+                    break
+                }
                 case FILE_OP.EXEC: {
-                    const { cmd, cwd } = params
+                    const { cmd, options } = params
                     detail(` ${bold('EXEC')} ${cmd}`)
 
-                    const { failed, output} = exec(cmd, cwd)
+                    const { failed, output} = exec(cmd, options)
                     if (failed)
                         throw Error(`Failed executing "${cmd}": ${output}`)
 
-                    detail(output)
+                    if (output !== null) {
+                        detail(output)
+                    }
                     break
                 }
                 case FILE_OP.REDUCE: {
@@ -253,7 +275,23 @@ class FileOpQueue {
                         syncFs.copyFile(from, to)
                     }
 
-                    if (path !== target) syncFs.rmDir(path, {recursive: true, force: true})
+                    if (path !== target) syncFs.rmdir(path, {recursive: true, force: true})
+                    break
+                }
+                case FILE_OP.REPLACE: {
+                    let { from, to } = params
+                    detail(` ${bold('REPLACE')} ${from} to ${to}`)
+
+                    if (!syncFs.exists(from)) break
+
+                    if (syncFs.exists(to)) {
+                        if (syncFs.dirExists(to)) {
+                            syncFs.rmdir(to)
+                        } else {
+                            syncFs.unlink(to)
+                        }
+                    }
+                    syncFs.rename(from, to)
                     break
                 }
                 default:

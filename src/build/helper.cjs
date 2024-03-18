@@ -1,7 +1,7 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { d, isObject, simpleType, toPairs} = require("../shared/helper.cjs")
 const { execSync } = require('child_process')
-const { NoStackError } = require("../shared/console.cjs")
+const { NoStackError, hasLogLevel } = require("../shared/console.cjs")
 
 /**
  * Returns the object of the given json file path. Throws an error if the file does not exist, if the JSON is invalid
@@ -69,17 +69,22 @@ const stringifyValues = obj => {
  * when the execution failed. In this case the output will be the error message.
  *
  * @param {string} cmd
- * @param {string} cwd
+ * @param {object} options
  *
  * @returns {object}
  */
-const exec = (cmd, cwd) => {
+const exec = (cmd, options = {}) => {
+    const { cwd, print } = options
     let exitCode = 0
     let output = ''
     let failed = false
-    console.log(cmd)
+    const execOptions = { cwd, encoding: 'utf-8' }
+    if (print || hasLogLevel('detailed')) {
+        console.log(cmd)
+        execOptions.stdio = 'inherit'
+    }
     try {
-        output = execSync(cmd, { cwd, encoding: 'utf-8', stdio: 'inherit' })
+        output = execSync(cmd, execOptions)
         if (output !== null)
             output = output.toString()
     } catch (error) {

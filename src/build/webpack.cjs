@@ -64,6 +64,11 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         stats: {
             preset: config.buildLogging
         },
+        ignoreWarnings: [
+            {
+                message: /Critical dependency/,
+            }
+        ],
         performance: {
             hints: isDist ? 'warning' : false,
             assetFilter: file => file.endsWith('.js'),
@@ -88,7 +93,6 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         RESOURCES_API: !isDist || requiresApi
     }
 
-    // TODO add CssMinimizer only in game context
     const minimizer = !config.minimize ? [] : [
         new TerserPlugin({
             terserOptions: {
@@ -97,16 +101,6 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
                 }
             },
             extractComments: true
-        }),
-        new CssMinimizerPlugin({
-            minimizerOptions: {
-                preset: [
-                    "default",
-                    {
-                        discardComments: { removeAll: true },
-                    },
-                ],
-            },
         })
     ]
 
@@ -360,6 +354,19 @@ export default resourceInfo`
         const dependencies = useServer ? [targetPrefix + 'server'] : []
         const engineNodeModulesMatcher = `[\\\\/]${regexpEscape(enginePackageJson.name)}[\\\\/]node_modules[\\\\/]`
 
+        const minimizers = [ ...minimizer ]
+        if (config.minimize) {
+            minimizers.push(new CssMinimizerPlugin({
+                minimizerOptions: {
+                    preset: [
+                        "default",
+                        {
+                            discardComments: { removeAll: true },
+                        },
+                    ],
+                },
+            }))
+        }
         return {
             ...common,
             name: targetPrefix + 'game',
@@ -377,7 +384,7 @@ export default resourceInfo`
             },
             optimization: {
                 minimize: config.minimize,
-                minimizer,
+                minimizer: minimizers,
                 splitChunks: deliverable.isAllInOne ? false : {
                     chunks: 'all',
                     minSize: 0,

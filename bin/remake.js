@@ -111,7 +111,7 @@ try {
         },
         dist: {},
         '.npmrc': "loglevel=silent%",
-        '.gitignore': ["dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
+        '.gitignore': ["dist/", ".dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
         'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2)
     });
 

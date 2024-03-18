@@ -43,7 +43,7 @@ const syncFs = {
 
     unlink: filePath => fs.unlinkSync(filePath),
 
-    rmDir: ( ...args ) => fs.rmSync( ...args ),
+    rmdir: ( path ) => fs.rmSync( path, { recursive: true } ),
 
     clearDir: (dirPath, except = []) => {
         if (!syncFs.dirExists(dirPath)) return
@@ -53,7 +53,7 @@ const syncFs = {
 
             const currPath = path.resolve(dirPath, item.name)
             if (item.isDirectory()) {
-                syncFs.rmDir(currPath, {recursive: true, force: true})
+                syncFs.rmdir(currPath, {recursive: true, force: true})
             } else {
                 syncFs.unlink(currPath)
             }
@@ -127,6 +127,10 @@ const syncFs = {
 
     realpath: ( ...args ) => {
         return fs.realpathSync( ...args )
+    },
+
+    rename: ( ...args ) => {
+        return fs.renameSync( ...args )
     },
 
     absPath: path.resolve,

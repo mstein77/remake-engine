@@ -130,15 +130,15 @@ class ElectronApp extends Deliverable {
 
         // pre-compile
         queue
-            .addExec(`npm install`, targetPath)
-            .addExec(`npm install --save-dev @electron-forge/plugin-fuses`, targetPath)
-            .addExec(`npm exec --package=@electron-forge/cli -c "electron-forge import"`, targetPath)
+            .addExec(`npm install`, {cwd: targetPath})
+            .addExec(`npm install --save-dev @electron-forge/plugin-fuses`, {cwd: targetPath})
+            .addExec(`npm exec --package=@electron-forge/cli -c "electron-forge import"`, {cwd: targetPath})
 
         // prepare assets
 
 
         queue
-            .addExec(`npm run make`, targetPath)
+            .addExec(`npm run make`, {cwd: targetPath})
             .addClear(targetPath, false, ['out'])
             .addReduce(syncFs.absPath(targetPath, 'out'), makers, targetPath)
             .process()
