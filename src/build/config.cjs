@@ -96,6 +96,7 @@ const configKey2params = {
     httpsPort: {type: 'uint', default: 443},
     certificate: {type: 'string', default: ''},
     path: {type: 'string', default: ''},
+    restrictedCors: {type: 'boolean', default: false},
     sourceMaps: {type: 'bool', default: true, distDefault: false},
     sourceMapType: {type: 'string', default: 'eval-cheap-source-map'},
     openBrowser: {type: 'string', default: 'default'},
@@ -510,18 +511,22 @@ const buildConfig = (json, env, overwrites, isDistBuild) => {
  *
  * @returns {object}
  */
-const getConfigForCtx = args => {
+const getConfigForCtx = (args, overwrites = {}) => {
     const configArg = args && args.config
     const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
-    return buildConfig(configJson(), process.env, {}, isDistBuild)
+    return buildConfig(configJson(), process.env, overwrites, isDistBuild)
 }
 
-const getPreviewConfigs = () => {
-    const distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']})
-    const { deliverable, hosting } = runConfigIntegrityChecks(distConfig, true)
-    const devConfig = getConfigForCtx()
-    runConfigIntegrityChecks(devConfig, false)
+const getPreviewConfigs = (overwrites = {}) => {
+    let distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']}, overwrites)
+    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, true)
+    distConfig = config
 
+    let devConfig = getConfigForCtx()
+    {
+        const { config } = runConfigIntegrityChecks(devConfig, false)
+        devConfig = config
+    }
     return {
         distConfig,
         devConfig,

@@ -20,7 +20,7 @@ const setupAppMiddlewares = (app, config = null) => {
         static: ( ...relPath ) => path.resolve( config.IS_DIST ? absDir.public() : absDir.resources(), ...relPath ),
         resources: ( ...relPath ) => path.resolve(absDir.root('resources'), ...relPath )
     }
-
+    app.disable('x-powered-by')
     resourcesController.init(config, absDir)
 
     const getFilesFromDir = dir => fs.readdirSync(dir, {withFileTypes: true})
@@ -177,13 +177,34 @@ const setupAppMiddlewares = (app, config = null) => {
                 notFound.push(info)
             }
         }
-        res.json({found, notFound, invalid})
+        res.json({ found, notFound, invalid })
     });
 
-    for (const type of staticTypes) {
-        app.use('/' + type, express.static(absDir.static(type)))
+    const cacheBustingOptions = {
+        setHeaders: res => {
+            res.setHeader('Cache-Control', 'max-age=604800, immutable')
+        }
     }
-    app.use(express.static(absDir.static()))
+    const cacheValidationOptions = {
+        setHeaders: res => {
+            res.setHeader('Cache-Control', 'no-cache')
+        }
+    }
+    for (const type of staticTypes) {
+        app.use('/' + type, express.static(
+            absDir.static(type), cacheValidationOptions)
+        )
+    }
+    const cacheBustingDirs = ['js', 'css']
+    for (const dir of cacheBustingDirs) {
+        if (fs.existsSync(absDir.static(dir))) {
+            app.use('/' + dir, express.static(absDir.static(dir), cacheBustingOptions))
+        }
+    }
+    app.use(express.static(
+        absDir.static(),
+        cacheValidationOptions
+    ))
 
     if (config.IS_DIST) return
 

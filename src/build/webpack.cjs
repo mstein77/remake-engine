@@ -3,9 +3,10 @@ const { DefinePlugin, NormalModuleReplacementPlugin} = require("webpack")
 const { RESOURCE_LOADING} = require("./config.cjs")
 const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
-const { d, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
+const { d, isObject, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
 const { stringifyValues, getReplaceMetaVars, getHtmlTags } = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
+const { NoStackError } = require("../shared/console.cjs")
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin")
@@ -477,6 +478,16 @@ export default resourceInfo`
      */
     const getServerWebpackConfig = () => {
 
+        const httpAuthCredentials = process.env[config.envPrefix + 'HTTP_AUTH_CREDENTIALS']
+        let httpAuthJson = null
+        if (httpAuthCredentials) {
+            try {
+                httpAuthJson = JSON.parse(httpAuthCredentials)
+            } catch (e) {}
+            if (!isObject(httpAuthJson))
+                throw NoStackError(`Environment variable ${config.envPrefix + 'HTTP_AUTH_CREDENTIALS'} must be a serialized JSON object`)
+
+        }
         const sslProps = {}
         if (config.https) {
             const sslEnvs = ['SSL_CA', 'SSL_KEY', 'SSL_CERT', 'SSL_PFX', 'SSL_PASSPHRASE']
@@ -493,11 +504,13 @@ export default resourceInfo`
                     ...defines,
                     ...{
                         PORT: port,
+                        RESTRICTED_CORS: config.restrictedCors,
                         OPEN_BROWSER: config.openBrowser,
                         SSL: ssl,
                         LOGGING: config.serverLogging,
                         LOGGING_FORMAT: config.serverLoggingFormat,
                         API_MAX_JSON_SIZE: config.apiMaxJsonSize,
+                        HTTP_AUTH_JSON: httpAuthJson
                     },
                     ...sslProps
                 })

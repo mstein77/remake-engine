@@ -14,8 +14,22 @@ try {
     const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
     const STATIC_DIR = path.resolve(__dirname, "public")
     const app = express()
-    app.use(cors())
+    corsOptions = {}
+    if (RESTRICTED_CORS) {
+        const baseUrl = new URL(isPreview ? PREVIEW_URL : BASE_URL)
+        corsOptions.origin = baseUrl.protocol + '://' + baseUrl.hostname
+    }
+    app.use(cors(corsOptions))
 
+    const httpAuthUsers = HTTP_AUTH_JSON
+    if (httpAuthUsers) {
+        const basicAuth = require('express-basic-auth')
+        app.use(basicAuth({
+            users: httpAuthUsers,
+            challenge: true,
+            realm: GAME_ID
+        }))
+    }
     if (!RESOURCES_API) {
         app.get('/', (req, res) => {
             const indexHtmlPath = path.resolve(STATIC_DIR, 'index.html')
@@ -23,6 +37,7 @@ try {
                 res.sendFile(
                     indexHtmlPath
                 )
+                res.set('Cache-Control', 'no-cache')
                 return res
             }
             const files = syncFs.readFiles(path.resolve(STATIC_DIR))
