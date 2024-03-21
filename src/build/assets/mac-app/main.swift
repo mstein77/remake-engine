@@ -3,17 +3,20 @@ import WebKit
 
 struct ContentView: View {
     var body: some View {
-        let htmlString = """
-            Hello again!
-            """
+        let url = Bundle.main.url(forResource: "index", withExtension: "html")!
 
-
-        return AnyView(WebView(htmlString: htmlString))
+        return AnyView(WebView(url: url)
+                        .focusable(true)
+                        .onAppear {
+                            DispatchQueue.main.async {
+                                NSApplication.shared.windows.first?.makeFirstResponder(nil)
+                            }
+                        })
     }
 }
 
 struct WebView: NSViewRepresentable {
-    let htmlString: String
+    let url: URL
 
     func makeNSView(context: Context) -> WKWebView {
         let preferences = WKPreferences()
@@ -24,7 +27,8 @@ struct WebView: NSViewRepresentable {
         configuration.defaultWebpagePreferences = webPageDefaultPrefs
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.loadHTMLString(htmlString, baseURL: nil)
+        let request = URLRequest(url: url)
+        webView.load(request)
 
         return webView
     }

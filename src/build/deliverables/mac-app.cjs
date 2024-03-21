@@ -47,12 +47,11 @@ class MacApp extends Deliverable {
      * @inheritDoc
      */
     prepareCompile(distTarget, configs, fileDeps) {
-        const { queue, absPath, syncFs } = fileDeps
+        const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
         const distSourcePath = absPath.dist(publicDir, 'main.swift')
-        const indexHtml = syncFs.readFile(absPath.dist(publicDir, 'index.html')).toString().replace('\'', '\\\\')
-        queue.addCopy(absPath.src('build/assets/mac-app/main.swift'), distSourcePath, {'[[INDEX.HTML]]': indexHtml})
+        queue.addCopy(absPath.src('build/assets/mac-app/main.swift'), distSourcePath)
         queue.process()
     }
 
@@ -61,7 +60,7 @@ class MacApp extends Deliverable {
      */
     compile(distTarget, configs, fileDeps) {
         const { gamePackageJson } = configs
-        const { queue, absPath, syncFs } = fileDeps
+        const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
         const gameFileName = gamePackageJson.name
@@ -72,7 +71,7 @@ class MacApp extends Deliverable {
         queue.addExec(`swiftc -import-objc-header /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/WebKit.framework/Headers/WebKit.h -o ${distFile} ${sourcePath}`)
 
         // post-compile
-        queue.addClear(absPath.dist(publicDir), false, [gameFileName])
+        queue.addClear(absPath.dist(publicDir), false, [gameFileName, 'index.html'])
         queue.process()
     }
 }

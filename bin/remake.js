@@ -78,13 +78,13 @@ try {
         if (packageJson.scripts === undefined) {
             packageJson.scripts = {}
         }
-        const engineRelPath = './node_modules/2dfireengine'
-        const setGameDir = 'RMK_GAME_DIR=$(pwd) '
-        packageJson.scripts.game = setGameDir + 'npm run build-game-dev --prefix ' + engineRelPath
-        packageJson.scripts.build = setGameDir + 'npm run build-game-dist --prefix ' + engineRelPath
-        packageJson.scripts.build = setGameDir + 'npm run build-info-dist --prefix ' + engineRelPath
-        packageJson.scripts.builds = setGameDir + 'npm run build-game-dists --prefix ' + engineRelPath
-        packageJson.scripts.start = setGameDir + 'npm run start --prefix ' + engineRelPath
+        const run = 'node run.cjs '
+
+        packageJson.scripts.game = run + 'build-game-dev'
+        packageJson.scripts.build = run + 'build-game-dist'
+        packageJson.scripts.build = run + 'build-info-dist'
+        packageJson.scripts.builds = run + 'build-game-dists'
+        packageJson.scripts.start = run + 'start'
         if (packageJson.type === undefined) {
             packageJson.type = 'module'
         }
@@ -112,7 +112,24 @@ try {
         dist: {},
         '.npmrc': "loglevel=silent%",
         '.gitignore': ["dist/", ".dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
-        'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2)
+        'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2),
+        'run.cjs': `const path = require('node:path')
+const { spawn } = require('node:child_process')
+
+process.env.RMK_GAME_DIR = __dirname
+
+const cwd = path.resolve(__dirname, 'node_modules/2dfireengine')
+
+const params = process.argv.splice(2)
+
+const args = ['run']
+args.push(
+    ...params
+)
+spawn('npm', args, {
+    stdio: 'inherit',
+    cwd
+})`
     });
 
     // trigger install of engine dependencies
