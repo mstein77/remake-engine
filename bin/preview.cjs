@@ -1,10 +1,17 @@
-const { spawn} = require("child_process")
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
 const { NoStackError, errorSection } = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
+const { spawnSync } = require('node:child_process')
+
+function xSpawnSync(cmd, args, options) {
+    if (process.platform !== 'win32') {
+        return spawnSync(cmd, args, options)
+    }
+    return spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
+}
 
 try {
     if (!process.env.RMK_GAME_DIR)
@@ -33,7 +40,7 @@ try {
             'run',
             'preview'
         )
-        spawn('npm', args, {
+        xSpawnSync('npm', args, {
             stdio: 'inherit',
             cwd
         })
@@ -42,7 +49,7 @@ try {
         'run',
             'start-static-preview'
         )
-        spawn('npm', args, {
+        xSpawnSync('npm', args, {
             stdio: 'inherit',
             cwd: absPath.engine()
         })
