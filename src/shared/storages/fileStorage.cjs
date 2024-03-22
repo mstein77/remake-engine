@@ -79,7 +79,7 @@ const FileStorage = (absDir, staticTypes) => {
         dump: () => d([ ...storage.entries() ]),
     }
     {
-        const files = syncFs.readFilesRec(baseDir)
+        const files = syncFs.dirExists(baseDir) ? syncFs.readFilesRec(baseDir) : []
         for (const file of files) {
             const descriptor = makeDescriptor.fromFile(file)
             if (!descriptor.isValid() || staticTypes.includes(descriptor.key)) continue
