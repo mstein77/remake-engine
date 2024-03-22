@@ -113,23 +113,19 @@ try {
         '.npmrc': "loglevel=silent%",
         '.gitignore': ["dist/", ".dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
         'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2),
-        'run.cjs': `const path = require('node:path')
-const { spawn } = require('node:child_process')
+        'run.cjs': `const enginePackage = '${enginePackage}'
+const path = require('node:path')
+const { xSpawnSync } = require(\`./node_modules/\${enginePackage}/src/shared/console.cjs\`)
 
 process.env.RMK_GAME_DIR = __dirname
-
-const cwd = path.resolve(__dirname, 'node_modules/2dfireengine')
-
-const params = process.argv.splice(2)
-
-const args = ['run']
-args.push(
-    ...params
-)
-spawn('npm', args, {
-    stdio: 'inherit',
-    cwd
-})`
+xSpawnSync(
+    'npm',
+    ['run', ...process.argv.splice(2)],
+    {
+        stdio: 'inherit',
+        cwd: path.resolve(__dirname, 'node_modules/' + enginePackage)
+    }
+)`
     });
 
     // trigger install of engine dependencies

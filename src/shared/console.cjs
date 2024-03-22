@@ -1,5 +1,6 @@
 const util = require('node:util')
 const { d, isString } = require('./helper.cjs')
+const { spawnSync } = require('node:child_process')
 
 // TODO we should check the terminal support for colors here, especially for windows
 let noColor = false
@@ -109,10 +110,10 @@ const hasLogLevel = name => {
     }
     return false
 }
-const mainSection = name => {
+const mainSection = (name, scope) => {
     if (!hasLogLevel('minimal')) return
 
-    log(`\n${BG.GREEN + FG.BLACK} BUILD ${BG.BLUE + FG.L_CYAN} ${name} `)
+    log(`\n${BG.GREEN + FG.BLACK} ${scope} ${BG.BLUE + FG.L_CYAN} ${name} `)
     log()
 }
 
@@ -149,6 +150,15 @@ const subSectionWarning = msg => {
     log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
 }
 
+function xSpawnSync(cmd, args, options) {
+    if (process.platform !== 'win32') {
+        return spawnSync(cmd, args, options)
+    }
+    return spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
+}
+
+const quoteArg = arg => process.platform !== 'win32' ? `'${arg}'` : `"${arg}"`
+
 module.exports = {
     FG,
     BG,
@@ -168,5 +178,7 @@ module.exports = {
     subSectionOk,
     subSectionError,
     subSectionWarning,
-    NoStackError
+    NoStackError,
+    xSpawnSync,
+    quoteArg
 }

@@ -61,7 +61,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         'game.keywords': gamePackageJson.keywords.join(',')
     }
 
-    mainSection(`Generate webpack configs...`)
+    mainSection(`Generate webpack configs...`, 'BUILD')
 
     queue.process()
     let lastEngineConfig = null
@@ -92,7 +92,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection('Checking integrity of config')
-        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, isDist)
+        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, fileDeps, isDist)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -169,7 +169,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     }
     let result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
 
-    mainSection(`Execute webpack configs...`)
+    mainSection(`Execute webpack configs...`, 'BUILD')
 
     if (hasLogLevel('detailed')) {
         subSection('Generated webpack config')
@@ -256,7 +256,7 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
 const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) => {
 
     setBuildLogLevel(buildLogLevel)
-    mainSection('Post build processing...')
+    mainSection('Post build processing...', 'BUILD')
 
     const postBuildHook = getBuildHook('post-build')
     const queue = new FileOpQueue()
@@ -324,7 +324,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
         queue.addClear(absPath.dists(), false, exceptDirs).process()
     }
 
-    mainSection('Build successfully finished...')
+    mainSection('Build successfully finished...', 'BUILD')
 
     for (const { target, instructions, root, dir } of distTargets) {
         if (!hasLogLevel('normal') || !instructions) continue

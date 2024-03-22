@@ -1,17 +1,9 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { NoStackError, errorSection } = require("../src/shared/console.cjs")
+const { xSpawnSync, NoStackError, errorSection } = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
-const { spawnSync } = require('node:child_process')
-
-function xSpawnSync(cmd, args, options) {
-    if (process.platform !== 'win32') {
-        return spawnSync(cmd, args, options)
-    }
-    return spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
-}
 
 try {
     if (!process.env.RMK_GAME_DIR)
@@ -33,7 +25,7 @@ try {
         args.push(target)
     }
 
-    const { distConfig } = getPreviewConfigs(overwrites)
+    const { distConfig } = getPreviewConfigs({ absPath, syncFs }, overwrites)
 
     if (distConfig.server && distConfig.deploymentMethod !== DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
         args.unshift(

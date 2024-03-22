@@ -4,7 +4,7 @@ const { RESOURCE_LOADING} = require("./config.cjs")
 const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs")
 const { FileCodec} = require("../shared/fileCodec.cjs")
 const { d, isObject, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
-const { stringifyValues, getReplaceMetaVars, getHtmlTags } = require("./helper.cjs")
+const { stringifyValues, getReplaceMetaVars, getHtmlTags, exec} = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
 const { NoStackError } = require("../shared/console.cjs")
 
@@ -105,32 +105,6 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
         })
     ]
 
-    const ensureDevCertificates = () => {
-        if (crypto) {
-            let generate = true
-            if (syncFs.fileExists(certFilePath) && syncFs.fileExists(keyFilePath)) {
-                const cert = syncFs.readFile(certFilePath)
-                const parsedCert = new crypto.X509Certificate(cert)
-                const validFrom = (new Date(parsedCert.validFrom)).getTime()
-                const validTo = (new Date(parsedCert.validTo)).getTime()
-                const currentDate = new Date().getTime()
-                generate = !!(currentDate < validFrom && currentDate > validTo)
-            }
-            if (generate) {
-                const sslPath = absPath.game('.ssl')
-                queue
-                    .startConditional(`openssl version`, result => !result.failed)
-                    .addClear(sslPath, true)
-                    .addExec(
-                        `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem ` +
-                        `-subj "/C=DE/ST=State/L=Location/O=Organization/OU=Organizational Unit/CN=example.com"`,
-                        sslPath
-                    )
-                    .endConditional()
-            }
-        }
-    }
-
     /**
      * Returns an object holding the webpack config for building the game frontend
      *
@@ -139,9 +113,6 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
     const getGameWebpackConfig = () => {
         const webpackConfig = {}
 
-        if (config.https) {
-            ensureDevCertificates()
-        }
         // add dev-server if we are in dev environment
         if (!isDist) {
             let open = false
@@ -504,9 +475,11 @@ export default resourceInfo`
                     ...defines,
                     ...{
                         PORT: port,
+                        HTTPS_PORT: config.httpsPort,
                         RESTRICTED_CORS: config.restrictedCors,
                         OPEN_BROWSER: config.openBrowser,
                         SSL: ssl,
+                        HTTPS: config.https,
                         LOGGING: config.serverLogging,
                         LOGGING_FORMAT: config.serverLoggingFormat,
                         API_MAX_JSON_SIZE: config.apiMaxJsonSize,

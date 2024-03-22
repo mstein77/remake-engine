@@ -1,14 +1,7 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { NoStackError, errorSection} = require("../src/shared/console.cjs")
-const { spawnSync } = require('node:child_process')
+const { xSpawnSync, NoStackError, errorSection} = require("../src/shared/console.cjs")
 
-function xSpawnSync(cmd, args, options) {
-    if (process.platform !== 'win32') {
-        return spawnSync(cmd, args, options)
-    }
-    return spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
-}
 
 try {
     let cwd = absPath.dist()

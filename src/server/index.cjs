@@ -6,7 +6,7 @@ const { csv2values, d } = require('../shared/helper.cjs')
 const syncFs = require("../shared/syncFs.cjs")
 
 const open = require("open")
-const { errorSection } = require("../shared/console.cjs")
+const { mainSection, errorSection } = require("../shared/console.cjs")
 
 const isPreview = process.argv.includes('--preview')
 
@@ -74,19 +74,23 @@ try {
     }
 
     let server = app
-    if (SSL) {
+    let port = PORT
+    if ((!isPreview && SSL) || (isPreview && HTTPS)) {
         const https = require('https')
         const absPath = require('../shared/absPath.cjs')
-        const options = {
+        const options = d({
             key: getFileContent(isPreview ? absPath.game('.ssl', 'key.pem') : SSL_KEY),
             cert: getFileContent(isPreview ? absPath.game('.ssl', 'cert.pem') : SSL_CERT),
             ca: isPreview ? '' : SSL_CA,
             pfx: isPreview ? '' : SSL_PFX,
             passphrase: isPreview ? '' : SSL_PASSPHRASE
-        }
-        server = https.createServer(options, app);
+        })
+        port
+        server = https.createServer(options, app)
+        port = HTTPS_PORT
     }
-    server.listen(PORT)
+    server.listen(port)
+    mainSection(`Listening on port ${port}...`, isPreview ? 'PREVIEW' : 'SERVER')
 
     const openAsync = async (url) => {
         const options = {wait: true}

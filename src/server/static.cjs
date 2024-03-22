@@ -20,7 +20,7 @@ if (target) {
     overwrites = buildsJson[target]
 }
 
-const { distConfig, devConfig } = getPreviewConfigs(overwrites)
+const { distConfig, devConfig } = getPreviewConfigs({ absPath, syncFs }, overwrites)
 
 const { host } = devConfig
 const { https, httpPort, httpsPort  } = distConfig

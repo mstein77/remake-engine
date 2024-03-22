@@ -79,7 +79,7 @@ const exec = (cmd, options = {}) => {
     let output = ''
     let failed = false
     const execOptions = { cwd, encoding: 'utf-8' }
-    if (print || hasLogLevel('detailed')) {
+    if (print || (hasLogLevel('detailed') && print !== false)) {
         console.log(cmd)
         execOptions.stdio = 'inherit'
     }

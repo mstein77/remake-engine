@@ -2,6 +2,11 @@ const absPath = require('../shared/absPath.cjs')
 const { d, simpleType, toValues, stringList, toPairs, intersect, isArray, csv2values } = require("../shared/helper.cjs")
 const { buildLogLevels } = require("../shared/console.cjs")
 const { NoStackError } = require("../shared/console.cjs")
+const { exec } = require("./helper.cjs");
+let crypto
+try {
+    crypto = require('node:crypto')
+} catch (e) {}
 
 const MSG = {
     noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
@@ -239,12 +244,14 @@ const configJson = () => {
  * checks. Throws an error if a failed integrity check could not be resolved
  *
  * @param {object} config
+ * @param {object} fileDeps
  * @param {boolean} isDist
  *
  * @returns {object}
  */
-const runConfigIntegrityChecks = (config, isDist) => {
+const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
 
+    const { absPath, syncFs } = fileDeps
     const warnings = []
 
     if (!isDist) {
@@ -343,6 +350,41 @@ const runConfigIntegrityChecks = (config, isDist) => {
     if (config.editor && config.resourceLoading === RESOURCE_LOADING.STATIC_ALL) {
         warnings.push(MSG.simStaticAll)
     }
+    if (!isDist && config.https) {
+        const sslPath = absPath.game('.ssl')
+        const certFilePath = absPath.make(sslPath, 'cert.pem')
+        const keyFilePath = absPath.make(sslPath, 'key.pem')
+        const hasCertFiles = syncFs.fileExists(certFilePath) && syncFs.fileExists(keyFilePath)
+        let generate = !hasCertFiles
+        if (hasCertFiles && crypto) {
+            const cert = syncFs.readFile(certFilePath)
+            const parsedCert = new crypto.X509Certificate(cert)
+            const validFrom = (new Date(parsedCert.validFrom)).getTime()
+            const validTo = (new Date(parsedCert.validTo)).getTime()
+            const currentDate = new Date().getTime()
+            if (currentDate < validFrom || currentDate > validTo) generate = true
+        }
+        if (generate) {
+            // check for open-ssl
+            const hasOpenSsl = exec(`openssl version`, {print: false}).failed === false
+            let useHttp = !hasOpenSsl
+            if (hasOpenSsl) {
+                // generate
+                syncFs.createPathTo(sslPath)
+                const makeCert = exec(
+                    `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem ` +
+                    `-subj "/C=DE/ST=State/L=Location/O=Organization/OU=Organizational Unit/CN=example.com"`,
+                    {cwd: sslPath}
+                )
+                if (makeCert.failed) useHttp = true
+            }
+            if (useHttp) {
+                warnings.push(`No open-ssl could be found to generate certificates for https, please install. Falling back to http`)
+                config.https = false
+            }
+        }
+    }
+
     // end
 
     /*
@@ -517,14 +559,14 @@ const getConfigForCtx = (args, overwrites = {}) => {
     return buildConfig(configJson(), process.env, overwrites, isDistBuild)
 }
 
-const getPreviewConfigs = (overwrites = {}) => {
+const getPreviewConfigs = (fileDeps, overwrites = {}) => {
     let distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']}, overwrites)
-    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, true)
+    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, fileDeps, true)
     distConfig = config
 
     let devConfig = getConfigForCtx()
     {
-        const { config } = runConfigIntegrityChecks(devConfig, false)
+        const { config } = runConfigIntegrityChecks(devConfig, fileDeps, false)
         devConfig = config
     }
     return {
