@@ -46,19 +46,19 @@ class MacApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    prepareCompile(distTarget, configs, fileDeps) {
+    async prepareCompile(distTarget, configs, fileDeps) {
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
         const distSourcePath = absPath.dist(publicDir, 'main.swift')
         queue.addCopy(absPath.src('build/assets/mac-app/main.swift'), distSourcePath)
-        queue.process()
+        await queue.processAsync()
     }
 
     /**
      * @inheritDoc
      */
-    compile(distTarget, configs, fileDeps) {
+    async compile(distTarget, configs, fileDeps) {
         const { gamePackageJson } = configs
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
@@ -72,7 +72,7 @@ class MacApp extends Deliverable {
 
         // post-compile
         queue.addClear(absPath.dist(publicDir), false, [gameFileName, 'index.html'])
-        queue.process()
+        await queue.processAsync()
     }
 }
 

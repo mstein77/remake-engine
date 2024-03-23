@@ -290,7 +290,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
 
         if (deliverable.hasCompiler) {
             subSection(`Prepare compilation`)
-            deliverable.prepareCompile( ...params )
+            await deliverable.prepareCompile( ...params )
             subSectionOk()
 
             let skipCompile = false
@@ -302,7 +302,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
             }
             if (!skipCompile) {
                 subSection(`Execute compiler`)
-                deliverable.compile( ...params )
+                await deliverable.compile( ...params )
                 subSectionOk()
             }
         }

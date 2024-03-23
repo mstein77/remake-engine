@@ -78,14 +78,13 @@ try {
     if ((!isPreview && SSL) || (isPreview && HTTPS)) {
         const https = require('https')
         const absPath = require('../shared/absPath.cjs')
-        const options = d({
+        const options = {
             key: getFileContent(isPreview ? absPath.game('.ssl', 'key.pem') : SSL_KEY),
             cert: getFileContent(isPreview ? absPath.game('.ssl', 'cert.pem') : SSL_CERT),
             ca: isPreview ? '' : SSL_CA,
             pfx: isPreview ? '' : SSL_PFX,
             passphrase: isPreview ? '' : SSL_PASSPHRASE
-        })
-        port
+        }
         server = https.createServer(options, app)
         port = HTTPS_PORT
     }

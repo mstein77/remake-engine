@@ -1,6 +1,6 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { d, isObject, simpleType, toPairs} = require("../shared/helper.cjs")
-const { execSync } = require('child_process')
+const { exec: execLib, execSync } = require('child_process')
 const { NoStackError, hasLogLevel } = require("../shared/console.cjs")
 
 /**
@@ -62,6 +62,32 @@ const stringifyValues = obj => {
         stringified[id] = JSON.stringify(value)
     }
     return stringified
+}
+
+async function execAsync(cmd, options = {}) {
+    return new Promise((resolve, reject) => {
+        const { cwd, print } = options;
+        let exitCode = 0;
+        let output = '';
+        let failed = false;
+        const execOptions = { cwd, encoding: 'utf-8' };
+
+        if (print || (hasLogLevel('detailed') && print !== false)) {
+            console.log(cmd);
+            execOptions.stdio = 'inherit';
+        }
+
+        execLib(cmd, execOptions, (error, stdout, stderr) => {
+            if (error) {
+                output = stderr || error.message;
+                failed = true;
+                reject({ output, exitCode: error.code || 1, failed });
+            } else {
+                output = stdout || '';
+                resolve({ output, exitCode, failed });
+            }
+        });
+    });
 }
 
 /**
@@ -158,6 +184,7 @@ id2name = id => {
 
 module.exports = {
     exec,
+    execAsync,
     getHtmlTags,
     getReplaceMetaVars,
     stringifyValues,

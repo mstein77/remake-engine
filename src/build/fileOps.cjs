@@ -1,7 +1,7 @@
 const syncFs = require("../shared/syncFs.cjs")
-const { exec } = require("./helper.cjs")
+const { exec, execAsync } = require("./helper.cjs")
 const { d, stringList, toPairs } = require("../shared/helper.cjs")
-const { hasLogLevel, bold, log } = require("../shared/console.cjs");
+const { hasLogLevel, bold, log, setSpinnerInfo} = require("../shared/console.cjs");
 
 const FILE_OP = {
     CLEAR: 'clear',
@@ -151,6 +151,124 @@ class FileOpQueue {
         return extracted
     }
 
+    async processTask(obj, async = false) {
+        const { op, ...params } = obj
+
+        switch (op) {
+
+            case FILE_OP.COPY: {
+                const { from, to, replace } = params
+
+                detail(` ${bold('COPY')} ${from} ${to}`)
+                if (!syncFs.exists(from)) {
+                    detail(` ...skipped because source does not exist`)
+                    return Promise.resolve()
+                }
+
+                if (syncFs.fileExists(from)) {
+                    if (!replace) {
+                        syncFs.copyFile(from, to)
+                    } else {
+                        let content = syncFs.readFile(from).toString()
+                        for (const [ tag, value ] of toPairs(replace)) {
+                            detail(` ...replacing string "${tag}" in target`)
+                            content = content.replaceAll(tag, value)
+                        }
+                        syncFs.writeContent(to, content)
+                    }
+
+                }
+                break
+            }
+            case FILE_OP.WRITE: {
+                const { path, type, content, skipIfExists = false } = params
+                detail(` ${bold('WRITE')} ${path}`)
+
+                if (skipIfExists && syncFs.fileExists(path)) {
+                    detail(` ...skipped because file already exists`)
+                    return Promise.resolve()
+                }
+                if (type === 'json') {
+                    syncFs.writeJson(path, content, 4)
+                    break
+                }
+                syncFs.writeContent(path, content)
+                break
+            }
+            case FILE_OP.CLEAR: {
+                const { path, createIfNotExists, except } = params
+                detail(` ${bold('CLEAR')} ${path}`)
+
+                if (createIfNotExists) syncFs.createPathTo(path + '/')
+                syncFs.clearDir(path, except)
+                break
+            }
+            case FILE_OP.PATH: {
+                const { path } = params
+                detail(` ${bold('PATH')} ${path}`)
+
+                syncFs.createPathTo(path + '/')
+                break
+            }
+            case FILE_OP.EXEC: {
+                const { cmd, options } = params
+                detail(` ${bold('EXEC')} ${cmd}`)
+
+                setSpinnerInfo(cmd)
+                const { failed, output} = async ? await execAsync(cmd, options) : exec(cmd, options)
+                if (failed)
+                    throw Error(`Failed executing "${cmd}": ${output}`)
+
+                if (output !== null) {
+                    detail(output)
+                }
+                break
+            }
+            case FILE_OP.REDUCE: {
+                let { path, exts, target } = params
+                detail(` ${bold('REDUCE')} ${path} to ${stringList(exts)}`)
+
+                if (!syncFs.dirExists(target)) {
+                    syncFs.mkdir(target)
+                }
+                const files = syncFs.readFilesRec(path).filter(name => {
+                    for (const ext of exts) {
+                        if (name.endsWith('.' + ext)) return true
+                    }
+                    return false
+                })
+
+                for (const file of files) {
+                    const from = syncFs.absPath(path, file)
+                    const to = syncFs.absPath(target, syncFs.basename(file))
+                    syncFs.copyFile(from, to)
+                }
+
+                if (path !== target) syncFs.rmdir(path, {recursive: true, force: true})
+                break
+            }
+            case FILE_OP.REPLACE: {
+                let { from, to } = params
+                detail(` ${bold('REPLACE')} ${from} to ${to}`)
+
+                if (!syncFs.exists(from)) break
+
+                if (syncFs.exists(to)) {
+                    if (syncFs.dirExists(to)) {
+                        syncFs.rmdir(to)
+                    } else {
+                        syncFs.unlink(to)
+                    }
+                }
+                syncFs.rename(from, to)
+                break
+            }
+            default:
+                throw Error(`Unknown file operation "${op}" given`)
+        }
+
+    }
+
     /**
      * Pops all file operations from the queue and processes them (in simulation mode they are not executed on the
      * file system)
@@ -160,145 +278,24 @@ class FileOpQueue {
             this.clear()
             return
         }
-
         detail(`\n Processing file op queue...`)
 
-        let condLevel = 0
-        let skipLevel = -1
         while (this.queue.length) {
-            const { op, ...params } = this.queue.shift()
-
-            if (op === FILE_OP.COND_START) {
-                condLevel++
-            } else if (op === FILE_OP.COND_END) {
-                condLevel--
-            }
-            if (skipLevel >= condLevel) continue
-
-            switch (op) {
-
-                case FILE_OP.COND_START: {
-                    const { cmd, check, cwd } = params
-
-                    const result = exec(cmd, cwd)
-                    if (!check(result)) skipLevel = condLevel
-                    break
-                }
-                case FILE_OP.COND_END: {
-                    if (skipLevel > condLevel) skipLevel = -1
-                    break
-                }
-                case FILE_OP.COPY: {
-                    const { from, to, replace } = params
-
-                    detail(` ${bold('COPY')} ${from} ${to}`)
-                    if (!syncFs.exists(from)) {
-                        detail(` ...skipped because source does not exist`)
-                        continue
-                    }
-
-                    if (syncFs.fileExists(from)) {
-                        if (!replace) {
-                            syncFs.copyFile(from, to)
-                        } else {
-                            let content = syncFs.readFile(from).toString()
-                            for (const [ tag, value ] of toPairs(replace)) {
-                                detail(` ...replacing string "${tag}" in target`)
-                                content = content.replaceAll(tag, value)
-                            }
-                            syncFs.writeContent(to, content)
-                        }
-
-                    }
-                    break
-                }
-                case FILE_OP.WRITE: {
-                    const { path, type, content, skipIfExists = false } = params
-                    detail(` ${bold('WRITE')} ${path}`)
-
-                    if (skipIfExists && syncFs.fileExists(path)) {
-                        detail(` ...skipped because file already exists`)
-                        continue
-                    }
-                    if (type === 'json') {
-                        syncFs.writeJson(path, content, 4)
-                        break
-                    }
-                    syncFs.writeContent(path, content)
-                    break
-                }
-                case FILE_OP.CLEAR: {
-                    const { path, createIfNotExists, except } = params
-                    detail(` ${bold('CLEAR')} ${path}`)
-
-                    if (createIfNotExists) syncFs.createPathTo(path + '/')
-                    syncFs.clearDir(path, except)
-                    break
-                }
-                case FILE_OP.PATH: {
-                    const { path } = params
-                    detail(` ${bold('PATH')} ${path}`)
-
-                    syncFs.createPathTo(path + '/')
-                    break
-                }
-                case FILE_OP.EXEC: {
-                    const { cmd, options } = params
-                    detail(` ${bold('EXEC')} ${cmd}`)
-
-                    const { failed, output} = exec(cmd, options)
-                    if (failed)
-                        throw Error(`Failed executing "${cmd}": ${output}`)
-
-                    if (output !== null) {
-                        detail(output)
-                    }
-                    break
-                }
-                case FILE_OP.REDUCE: {
-                    let { path, exts, target } = params
-                    detail(` ${bold('REDUCE')} ${path} to ${stringList(exts)}`)
-
-                    if (!syncFs.dirExists(target)) {
-                        syncFs.mkdir(target)
-                    }
-                    const files = syncFs.readFilesRec(path).filter(name => {
-                        for (const ext of exts) {
-                            if (name.endsWith('.' + ext)) return true
-                        }
-                        return false
-                    })
-
-                    for (const file of files) {
-                        const from = syncFs.absPath(path, file)
-                        const to = syncFs.absPath(target, syncFs.basename(file))
-                        syncFs.copyFile(from, to)
-                    }
-
-                    if (path !== target) syncFs.rmdir(path, {recursive: true, force: true})
-                    break
-                }
-                case FILE_OP.REPLACE: {
-                    let { from, to } = params
-                    detail(` ${bold('REPLACE')} ${from} to ${to}`)
-
-                    if (!syncFs.exists(from)) break
-
-                    if (syncFs.exists(to)) {
-                        if (syncFs.dirExists(to)) {
-                            syncFs.rmdir(to)
-                        } else {
-                            syncFs.unlink(to)
-                        }
-                    }
-                    syncFs.rename(from, to)
-                    break
-                }
-                default:
-                    throw Error(`Unknown file operation "${op}" given`)
-            }
+            this.processTask(this.queue.shift())
         }
-        if (condLevel > 0) throw Error(`Unclosed condition found!`)
+        detail('')
+    }
+
+    async processAsync() {
+        if (this.simulate) {
+            this.clear()
+            return
+        }
+        detail(`\n Processing file op queue...`)
+
+        while (this.queue.length) {
+            await this.processTask(this.queue.shift(), true)
+        }
         detail('')
     }
 }

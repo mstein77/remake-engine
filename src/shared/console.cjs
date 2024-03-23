@@ -5,6 +5,8 @@ const { spawnSync } = require('node:child_process')
 // TODO we should check the terminal support for colors here, especially for windows
 let noColor = false
 
+const spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
 const FG = {
     BLACK: noColor ? '' : '\x1b[30m',
     RED: noColor ? '' : '\x1b[31m',
@@ -120,6 +122,8 @@ const mainSection = (name, scope) => {
 const newLine = () => { logger.log() }
 
 const errorSection = (error, scope) => {
+    endSpinner()
+
     log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... `)
     log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
     if (!error.noStack)
@@ -132,22 +136,72 @@ const subSection = name => {
     if (!hasLogLevel('normal')) return
 
     log(` - ` + name + '...')
+    startSpinner(`  `)
 }
 
 const subSectionOk = (msg = '') => {
     if (!hasLogLevel('normal')) return
 
+    endSpinner()
     log(FG.GREEN + `   ${bold('✓')}` + FG.RESET + ` OK ` + msg)
 }
 
 const subSectionError = msg => {
+    endSpinner()
     log( FG.RED + `   ${bold('✕')}` + FG.RESET + ' ' + bold(msg) + '\n')
 }
 
 const subSectionWarning = msg => {
     if (!hasLogLevel('normal')) return
 
+    endSpinner()
     log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
+}
+
+let activeSpinner = null
+const endSpinner = () => {
+    if (!activeSpinner) return
+
+    clearInterval(activeSpinner.id)
+    let clearMsg = '';
+    while (clearMsg.length < (activeSpinner.length + activeSpinner.prefix.length + 3)) clearMsg += ' '
+    process.stdout.write(`\r${clearMsg}\r`)
+    activeSpinner = null
+}
+
+const writeSpinner = () => {
+    if (!activeSpinner) return
+
+    const msg = `${activeSpinner.prefix} ${bold(spinner[activeSpinner.index])} ${activeSpinner.postfix}`
+    process.stdout.write(`\r${msg}`)
+}
+
+const updateSpinner = () => {
+    writeSpinner()
+    activeSpinner.index++
+    activeSpinner.index %= spinner.length
+}
+
+const setSpinnerInfo = msg => {
+    if (!activeSpinner) return
+
+    if (msg.length > 70) msg = msg.substring(0, 50) + '...'
+    while (msg.length < activeSpinner.length) msg += ' '
+    activeSpinner.postfix = msg
+    activeSpinner.length = msg.length
+    writeSpinner()
+}
+
+const startSpinner = (prefix = '', postfix = '') => {
+    endSpinner()
+    activeSpinner = {
+        prefix,
+        postfix,
+        index: 0,
+        length: postfix.length,
+        id: setInterval(updateSpinner, 100)
+    }
+    updateSpinner()
 }
 
 function xSpawnSync(cmd, args, options) {
@@ -180,5 +234,8 @@ module.exports = {
     subSectionWarning,
     NoStackError,
     xSpawnSync,
-    quoteArg
+    quoteArg,
+    startSpinner,
+    endSpinner,
+    setSpinnerInfo
 }

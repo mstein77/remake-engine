@@ -445,7 +445,7 @@ class Deliverable {
      * @param {object} configs
      * @param {object} fileDeps
      */
-    prepareCompile(distTarget, configs, fileDeps) {}
+    async prepareCompile(distTarget, configs, fileDeps) {}
 
     /**
      * Compiles the prepared build files in the given distTarget
@@ -454,7 +454,7 @@ class Deliverable {
      * @param {object} configs
      * @param {object} fileDeps
      */
-    compile(distTarget, configs, fileDeps) {}
+    async compile(distTarget, configs, fileDeps) {}
 
     /**
      * Runs the post build processing which is executed after webpack build and compilation

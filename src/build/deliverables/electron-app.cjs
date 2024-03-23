@@ -62,7 +62,7 @@ class ElectronApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    prepareCompile(distTarget, configs, fileDeps) {
+    async prepareCompile(distTarget, configs, fileDeps) {
         const { metaVars, config } = configs
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
@@ -117,16 +117,15 @@ class ElectronApp extends Deliverable {
                 devDependencies
             }
         )
-        queue.process()
+        await queue.processAsync()
     }
 
-    compile(distTarget, configs, fileDeps) {
+    async compile(distTarget, configs, fileDeps) {
         const { queue, absPath, syncFs } = fileDeps
         const { publicDir, assets } = distTarget
 
         const targetPath = absPath.dist(publicDir)
         const makers = csv2values(this.config.makers)
-
 
         // pre-compile
         queue
@@ -141,7 +140,8 @@ class ElectronApp extends Deliverable {
             .addExec(`npm run make`, {cwd: targetPath})
             .addClear(targetPath, false, ['out'])
             .addReduce(syncFs.absPath(targetPath, 'out'), makers, targetPath)
-            .process()
+
+        await queue.processAsync()
     }
 }
 
