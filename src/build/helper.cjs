@@ -1,7 +1,6 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { d, isObject, simpleType, toPairs} = require("../shared/helper.cjs")
-const { exec: execLib, execSync } = require('child_process')
-const { NoStackError, hasLogLevel } = require("../shared/console.cjs")
+const { NoStackError } = require("../shared/console.cjs")
 
 /**
  * Returns the object of the given json file path. Throws an error if the file does not exist, if the JSON is invalid
@@ -62,63 +61,6 @@ const stringifyValues = obj => {
         stringified[id] = JSON.stringify(value)
     }
     return stringified
-}
-
-const preCmd = process.platform === 'win32' ? 'cmd /c chcp 65001>nul && ' : ''
-
-async function execAsync(cmd, options = {}) {
-    return new Promise(resolve => {
-        const { cwd, print } = options
-        let exitCode = 0
-        let output = ''
-        let failed = false
-        const execOptions = { cwd, encoding: 'utf-8' }
-
-        if (print || (hasLogLevel('detailed') && print !== false)) {
-            console.log(cmd)
-            execOptions.stdio = 'inherit'
-        }
-        execLib(preCmd + cmd, execOptions, (error, stdout) => {
-            if (error) {
-                output = error.message + ': ' + stdout.toString() // || error.message
-                failed = true
-                resolve({ output, exitCode: error.code || 1, failed })
-            } else {
-                output = stdout || ''
-                resolve({ output, exitCode, failed });
-            }
-        });
-    });
-}
-
-/**
- * Executes the given command and returns an object holding the output, the exit code and failed flag which is set
- * when the execution failed. In this case the output will be the error message.
- *
- * @param {string} cmd
- * @param {object} options
- *
- * @returns {object}
- */
-const exec = (cmd, options = {}) => {
-    const { cwd, print } = options
-    let exitCode = 0
-    let output = ''
-    let failed = false
-    const execOptions = { cwd, encoding: 'utf-8' }
-    if (print || (hasLogLevel('detailed') && print !== false)) {
-        console.log(cmd)
-        execOptions.stdio = 'inherit'
-    }
-    try {
-        output = execSync(preCmd + cmd, execOptions)
-        if (output !== null)
-            output = output.toString()
-    } catch (error) {
-        output = error.message
-        failed = true
-    }
-    return { output, exitCode, failed }
 }
 
 getReplaceMetaVars = (metaVars, configVars = {}) => {
@@ -184,8 +126,6 @@ id2name = id => {
 }
 
 module.exports = {
-    exec,
-    execAsync,
     getHtmlTags,
     getReplaceMetaVars,
     stringifyValues,

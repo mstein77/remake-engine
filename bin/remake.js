@@ -112,13 +112,13 @@ try {
         dist: {},
         '.npmrc': "loglevel=silent%",
         '.gitignore': ["dist/", ".dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
-        'config.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2),
+        'build.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2),
         'run.cjs': `const enginePackage = '${enginePackage}'
 const path = require('node:path')
-const { xSpawnSync } = require(\`./node_modules/\${enginePackage}/src/shared/console.cjs\`)
+const { spawnSync } = require(\`./node_modules/\${enginePackage}/src/shared/console.cjs\`)
 
 process.env.RMK_GAME_DIR = __dirname
-xSpawnSync(
+spawnSync(
     'npm',
     ['run', ...process.argv.splice(2)],
     {
@@ -130,7 +130,7 @@ xSpawnSync(
 
     // trigger install of engine dependencies
     if (!syncFs.dirExists( + engineBasePath + '/node_modules')) {
-        exec('npm install --prefix=' + engineBasePath)
+        exec('npm install', { cwd: engineBasePath })
     }
     process.exit(0)
 } catch (err) {

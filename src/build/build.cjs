@@ -88,7 +88,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         absPath.setCurrDist(path)
 
         subSection('Validating build config')
-        const rawConfig = buildConfig(configs.configJson, process.env, overwrites, isDist)
+        const rawConfig = buildConfig(configs.buildJson, process.env, overwrites, isDist)
         subSectionOk()
 
         subSection('Checking integrity of config')
@@ -212,8 +212,8 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
         if (!isVersionEqualOrHigher(process.version, minNodeVersion))
             throw Error(`Your node version is ${process.version} but ${minNodeVersion} or above is required `)
 
-        const configJson = getDefaultFromModule(absPath.game('config.cjs'))
-        const buildLogLevel = configJson.buildLogging
+        const buildJson = getDefaultFromModule(absPath.game('build.cjs'))
+        const buildLogLevel = buildJson.buildLogging
         if (buildLogLevel) setBuildLogLevel(buildLogLevel)
 
         const fileDeps = {
@@ -222,7 +222,7 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
             syncFs
         }
         const configs = {
-            configJson,
+            buildJson,
             enginePackageJson: getJsonObjectFromFile(absPath.engine('package.json')),
             gamePackageJson: getJsonObjectFromFile(absPath.game('package.json'))
         }

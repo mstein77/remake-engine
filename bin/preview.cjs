@@ -1,6 +1,6 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { xSpawnSync, NoStackError, errorSection } = require("../src/shared/console.cjs")
+const { spawnSync, NoStackError, errorSection, getParsedArguments} = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
@@ -9,11 +9,17 @@ try {
     if (!process.env.RMK_GAME_DIR)
         throw NoStackError(`Command "npm run preview" must be called from the game directory`)
 
+    const { arguments } = getParsedArguments({
+        flags: {},
+        options: {
+            preview: {}
+        }
+    })
     const args = []
     let overwrites = {}
     let cwd = absPath.dist()
-    if (process.argv.length > 2) {
-        const target = process.argv[2]
+    if (arguments.length) {
+        const target = arguments[0]
         const targetPath = absPath.dists(target)
         if (!syncFs.dirExists(targetPath))
             throw NoStackError(`The target build "${target}" does not exists in ${absPath.dists()}`)
@@ -32,7 +38,7 @@ try {
             'run',
             'preview'
         )
-        xSpawnSync('npm', args, {
+        spawnSync('npm', args, {
             stdio: 'inherit',
             cwd
         })
@@ -41,7 +47,7 @@ try {
         'run',
             'start-static-preview'
         )
-        xSpawnSync('npm', args, {
+        spawnSync('npm', args, {
             stdio: 'inherit',
             cwd: absPath.engine()
         })

@@ -1,6 +1,6 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { xSpawnSync, NoStackError, errorSection} = require("../src/shared/console.cjs")
+const { spawnSync, NoStackError, errorSection} = require("../src/shared/console.cjs")
 
 
 try {
@@ -19,11 +19,10 @@ try {
     if (!target) {
         if (syncFs.isEmptyDir(absPath.dist())) {
             console.log(`Executing "npm install" in dist folder...`)
-            const build = xSpawnSync('npm', ['run', 'build'], {
+            const build = spawnSync('npm', ['run', 'build'], {
                 stdio: 'inherit',
                 cwd: absPath.game()
             })
-            // console.log(build.output.toString('utf8'))
             if (build.status !== 0) {
                 process.exit(build.status)
             }
@@ -31,11 +30,10 @@ try {
 
         if (syncFs.fileExists(absPath.dist('package.json')) && syncFs.isEmptyDir(absPath.dist('node_modules'))) {
             console.log(`Executing "npm install" in dist folder...`)
-            const install = xSpawnSync('npm', ['install'], {
+            const install = spawnSync('npm', ['install'], {
                 stdio: 'inherit',
                 cwd: absPath.dist()
             })
-            // console.log(install.output.toString('utf8'))
             if (install.status !== 0) {
                 process.exit(install.status)
             }
@@ -49,7 +47,7 @@ try {
         args.push(
             'start'
         )
-        xSpawnSync('npm', args, {
+        spawnSync('npm', args, {
             stdio: 'inherit',
             cwd
         })

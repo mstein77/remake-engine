@@ -1,4 +1,3 @@
-// this index file is the entry point for the server when the game was not started via `npm run game`
 const path = require('path')
 const express = require('express')
 const cors = require('cors')

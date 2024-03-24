@@ -1,11 +1,11 @@
 const util = require('node:util')
 const { d, isString } = require('./helper.cjs')
-const { spawnSync } = require('node:child_process')
+const child_process = require("node:child_process")
 
 // TODO we should check the terminal support for colors here, especially for windows
 let noColor = false
 
-const spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+const spinner = ['⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', '⠋']
 
 const FG = {
     BLACK: noColor ? '' : '\x1b[30m',
@@ -219,14 +219,146 @@ const startSpinner = (prefix = '', postfix = '') => {
     updateSpinner()
 }
 
-function xSpawnSync(cmd, args, options) {
-    if (process.platform !== 'win32') {
-        return spawnSync(cmd, args, options)
+const preCmd = process.platform === 'win32' ? 'cmd /c chcp 65001>nul && ' : ''
+
+async function exec(cmd, options = {}) {
+    return new Promise(resolve => {
+        const { cwd, print } = options
+        let exitCode = 0
+        let output = ''
+        let failed = false
+        const execOptions = { cwd, encoding: 'utf-8' }
+
+        if (print || (hasLogLevel('detailed') && print !== false)) {
+            console.log(cmd)
+            execOptions.stdio = 'inherit'
+        }
+        child_process.exec(preCmd + cmd, execOptions, (error, stdout) => {
+            if (error) {
+                output = error.message + ': ' + stdout.toString() // || error.message
+                failed = true
+                resolve({ output, exitCode: error.code || 1, failed })
+            } else {
+                output = stdout || ''
+                resolve({ output, exitCode, failed });
+            }
+        });
+    });
+}
+
+/**
+ * Executes the given command and returns an object holding the output, the exit code and failed flag which is set
+ * when the execution failed. In this case the output will be the error message.
+ *
+ * @param {string} cmd
+ * @param {object} options
+ *
+ * @returns {object}
+ */
+const execSync = (cmd, options = {}) => {
+    const { cwd, print } = options
+    let exitCode = 0
+    let output = ''
+    let failed = false
+    const execOptions = { cwd, encoding: 'utf-8' }
+    if (print || (hasLogLevel('detailed') && print !== false)) {
+        console.log(cmd)
+        execOptions.stdio = 'inherit'
     }
-    return spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
+    try {
+        output = child_process.execSync(preCmd + cmd, execOptions)
+        if (output !== null)
+            output = output.toString()
+    } catch (error) {
+        output = error.message
+        failed = true
+    }
+    return { output, exitCode, failed }
+}
+
+function spawnSync(cmd, args, options) {
+    if (process.platform !== 'win32') {
+        return child_process.spawnSync(cmd, args, options)
+    }
+    return child_process.spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
 }
 
 const quoteArg = arg => process.platform !== 'win32' ? `'${arg}'` : `"${arg}"`
+
+const getParsedArguments = info => {
+    const options = {}
+    const arguments = []
+
+    const args = process.argv.slice(2)
+    let optionArg = null
+    let expectedOptionArgs = 0
+    let argNo = 0
+    for (const arg of args) {
+        const hasAssignment = arg.indexOf('=') !== -1
+        const hasDash = arg.startsWith('-')
+        const hasPlus = arg.startsWith('+')
+        if (!hasDash && !hasAssignment && !hasPlus) {
+            if (expectedOptionArgs) {
+                options[optionArg].push(arg)
+                argNo++
+                if (argNo === expectedOptionArgs) {
+                    optionArg = null
+                    expectedOptionArgs = 0
+                }
+            } else {
+                arguments.push(arg)
+            }
+            continue
+        }
+        if (expectedOptionArgs !== argNo) break
+
+        const [ part, value ] = arg.split('=')
+        let long = null
+        if (hasPlus || (!hasPlus && (hasDash && !part.startsWith('--')))) {
+            const flags = part.substring(1)
+            const singleFlag = flags.length === 1
+            if (!singleFlag && hasAssignment)
+                throw NoStackError(`Flags argument ${arg} is not allowed to have an assignment`)
+
+            for (const flag of flags) {
+                long = info.flags[flag]
+                if (!long)
+                    throw NoStackError(`Unknown argument flag ${flag} given`)
+
+                options[long] = true
+            }
+            if (!singleFlag || !hasAssignment) continue
+        } else {
+            long = part.substring(part.startsWith('-') ? 1 : 0)
+        }
+        const option = info.options[long]
+        if (!option)
+            throw NoStackError(`Unknown argument "${long}" given.`)
+
+        if (!option.argc) {
+            if (value)
+                throw NoStackError(`Argument ${long} cannot have a value, but you assigned "${value}"`)
+
+            options[long] = true
+            continue
+        }
+        if (value && option.argc === 1) {
+            options[long] = value
+            continue
+        }
+        options[long] = value ? [value] : []
+        expectedOptionArgs = option.argc
+        argNo = value ? 1 : 0
+        optionArg = long
+    }
+    if (expectedOptionArgs > argNo)
+        throw NoStackError(`Argument "${optionArg}" is expected to have ${expectedOptionArgs} values but got only ${argNo}`)
+
+    return {
+        options,
+        arguments
+    }
+}
 
 module.exports = {
     FG,
@@ -248,9 +380,12 @@ module.exports = {
     subSectionError,
     subSectionWarning,
     NoStackError,
-    xSpawnSync,
+    spawnSync,
     quoteArg,
     startSpinner,
     endSpinner,
-    setSpinnerInfo
+    setSpinnerInfo,
+    getParsedArguments,
+    exec,
+    execSync
 }

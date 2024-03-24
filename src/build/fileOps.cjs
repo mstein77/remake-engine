@@ -1,7 +1,6 @@
 const syncFs = require("../shared/syncFs.cjs")
-const { exec, execAsync } = require("./helper.cjs")
 const { d, stringList, toPairs } = require("../shared/helper.cjs")
-const { NoStackError, hasLogLevel, bold, log, setSpinnerInfo} = require("../shared/console.cjs");
+const { exec, execSync, NoStackError, hasLogLevel, bold, log, setSpinnerInfo} = require("../shared/console.cjs");
 
 const FILE_OP = {
     CLEAR: 'clear',
@@ -203,7 +202,7 @@ class FileOpQueue {
                 detail(` ${bold('EXEC')} ${cmd}`)
 
                 setSpinnerInfo(cmd)
-                const { failed, output, exitCode } = async ? await execAsync(cmd, options) : exec(cmd, options)
+                const { failed, output, exitCode } = async ? await exec(cmd, options) : execSync(cmd, options)
                 if (failed)
                     throw NoStackError(
                         `Failed executing "${cmd}"${options.cwd ? ` in ${options.cwd}`: ''} (ExitCode: ${exitCode})`,

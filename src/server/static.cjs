@@ -1,18 +1,21 @@
 const absPath = require("../shared/absPath.cjs")
 const { getPreviewConfigs } = require('../build/config.cjs')
+const { getParsedArguments } = require("../shared/console.cjs")
 const { d } = require('../shared/helper.cjs')
 const express = require('express')
 const cors = require('cors')
 const syncFs = require('../shared/syncFs.cjs')
 const open = require('open')
 
-const isPreview = process.argv.includes('--preview') && 'RMK_GAME_DIR' in process.env
-let target = null
-if (process.argv.length > 2) {
-    let i = 2
-    while (i < process.argv.length && process.argv[i].startsWith('-')) i++
-    if (i < process.argv.length) target = process.argv[i]
-}
+const args = getParsedArguments({
+    flags: {},
+    options: {
+        preview: {}
+    }
+})
+const isPreview = args.options.preview && 'RMK_GAME_DIR' in process.env
+const [ target ] = args.arguments
+
 let overwrites = {}
 if (target) {
     absPath.setCurrDist(absPath.dists(target))

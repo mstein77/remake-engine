@@ -1,10 +1,10 @@
 const { d, isArray, sortPropAsc, stringList, union, toValues, toKeys, csv2values, toPairs, isVersionEqualOrHigher, without } = require('../shared/helper.cjs')
-const { exec, getReplaceMetaVars, getIconMimeType } = require('./helper.cjs')
+const { getReplaceMetaVars, getIconMimeType } = require('./helper.cjs')
 const sizeOf = require("image-size")
 const Jimp = require("jimp")
 const { validateConfig, ASSET_GENERATION, PLATFORMS, buildDefaults } = require("./config.cjs")
 const scope2assets = require('./asset.cjs')
-const { NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
+const { execSync, NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
 
 const generatorFormats = ['png', 'gif']
 
@@ -367,16 +367,16 @@ class Deliverable {
         const programsInstaller = this.getProgramsInstaller()
         for (const [ program, minVersion ] of toPairs(requiredPrograms)) {
             {
-                let { failed } = exec(`${which} ${program}`)
+                let { failed } = execSync(`${which} ${program}`)
                 if (failed) {
                     let install = programsInstaller[program]
                     if (install) {
                         install = install.replace('[[path]]', absPath.game())
                         subSectionWarning(`   Could not find ${program}, trying to install by executing "${install}"...`)
-                        const installation = exec(install)
+                        const installation = execSync(install)
                         if (installation.output) log(installation.output)
                         if (!installation.failed) {
-                            const checkProgram = exec(`${which} ${program}`)
+                            const checkProgram = execSync(`${which} ${program}`)
                             failed = checkProgram.failed
                         }
                     }
@@ -386,7 +386,7 @@ class Deliverable {
             }
             if (minVersion === '*') continue
             {
-                const { failed, output } = exec(`${program} -version`)
+                const { failed, output } = execSync(`${program} -version`)
                 if (failed) continue
 
                 const versionRegExp = /(?:version:|v|version)\s*([0-9]+\.[0-9]+\.[0-9]+)/i

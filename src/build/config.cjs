@@ -1,8 +1,7 @@
 const absPath = require('../shared/absPath.cjs')
 const { d, simpleType, toValues, stringList, toPairs, intersect, isArray, csv2values } = require("../shared/helper.cjs")
 const { buildLogLevels } = require("../shared/console.cjs")
-const { NoStackError } = require("../shared/console.cjs")
-const { exec } = require("./helper.cjs");
+const { execSync, NoStackError } = require("../shared/console.cjs")
 let crypto
 try {
     crypto = require('node:crypto')
@@ -83,7 +82,7 @@ const configKey2params = {
     apiMaxJsonSize: {type: 'string', default: '10mb'},
     deploymentMethod: {type: 'string', values: toValues(DEPLOYMENT_METHOD), default: DEPLOYMENT_METHOD.CHECKOUT},
     hosting: {type: 'string', default: HOSTING.SERVER_WITH_NODEJS, values: toValues(HOSTING)},
-    deliverable: {type: 'string', default: DELIVERABLE.WEBAPP, values: toValues(DELIVERABLE)},
+    deliverable: {type: 'string', default: DELIVERABLE.APP_WEB, values: toValues(DELIVERABLE)},
     deliverableConfig: {type: 'json', default: {}},
     targetPlatforms: {type: 'csv', default: `${PLATFORMS.WINDOWS},${PLATFORMS.ANDROID},${PLATFORMS.APPLE}`, values: toValues(PLATFORMS)},
     targetServers: {type: 'csv', default: 'express'},
@@ -222,17 +221,17 @@ for (const [ key, params ] of toPairs(configKey2params)) {
 
 require('dotenv').config({path: absPath.game('.env')})
 
-let configJsonContent = null
+let buildJsonContent = null
 
 /**
- * Returns an object contained in the config.cjs of the game directory
+ * Returns an object contained in the build.cjs of the game directory
  *
  * @returns {object}
  */
-const configJson = () => {
-    if (!configJsonContent) configJsonContent = require(absPath.game('config.cjs'))
+const buildJson = () => {
+    if (!buildJsonContent) buildJsonContent = require(absPath.game('build.cjs'))
 
-    return configJsonContent
+    return buildJsonContent
 }
 
 /**
@@ -263,7 +262,7 @@ const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
             config.editor = true
         }
         const key2devValue = {
-            deliverable: DELIVERABLE.WEBAPP,
+            deliverable: DELIVERABLE.APP_WEB,
             hosting: HOSTING.SERVER_WITH_NODEJS,
             resourceLoading: RESOURCE_LOADING.API,
             deploymentMethod: DEPLOYMENT_METHOD.CHECKOUT
@@ -364,12 +363,12 @@ const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
         }
         if (generate) {
             // check for open-ssl
-            const hasOpenSsl = exec(`openssl version`, {print: false}).failed === false
+            const hasOpenSsl = execSync(`openssl version`, {print: false}).failed === false
             let useHttp = !hasOpenSsl
             if (hasOpenSsl) {
                 // generate
                 syncFs.createPathTo(sslPath + '/')
-                const makeCert = exec(
+                const makeCert = execSync(
                     `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem ` +
                     `-subj "/C=DE/ST=State/L=Location/O=Organization/OU=Organizational Unit/CN=example.com"`,
                     {cwd: sslPath}
@@ -516,7 +515,7 @@ function extractAppEnvOverwrites(config, env) {
 /**
  * Returns a config object with all resolved config keys and values either for a dev or a dist build
  *
- * @param {object} json The content of the config.cjs
+ * @param {object} json The content of the build.cjs
  * @param {object} env The environment variables
  * @param {object} overwrites The dist overwrites
  * @param {boolean} isDistBuild
@@ -548,13 +547,14 @@ const buildConfig = (json, env, overwrites, isDistBuild) => {
  * Returns the game config for production or development environment depending on the given webpack arguments
  *
  * @param {object|array} args
+ * @param {object} overwrites
  *
  * @returns {object}
  */
 const getConfigForCtx = (args, overwrites = {}) => {
     const configArg = args && args.config
     const isDistBuild = isArray(configArg) && configArg.includes('webpack.build-dist.cjs')
-    return buildConfig(configJson(), process.env, overwrites, isDistBuild)
+    return buildConfig(buildJson(), process.env, overwrites, isDistBuild)
 }
 
 const getPreviewConfigs = (fileDeps, overwrites = {}) => {
