@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetPlatformVersion>10.0.18362.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.16299.0</TargetPlatformMinVersion>
+    <OutputType>Appx</OutputType>
+    <TargetFramework>net5.0-windows10.0.18362.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon />
+    <StartupObject />
+    <RootNamespace>YourNamespace</RootNamespace>
+    <AssemblyName>YourAssemblyName</AssemblyName>
+    <PackageId>YourPackageId</PackageId>
+    <PackageDisplayName>YourPackageDisplayName</PackageDisplayName>
+    <PackageVersion>1.0.0.0</PackageVersion>
+    <PackagePublisherDisplayName>YourPublisherDisplayName</PackagePublisherDisplayName>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+    <UseIncrementalRazorCompile>false</UseIncrementalRazorCompile>
+    <UseRazorBuildServer>false</UseRazorBuildServer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform" Version="6.2.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest" />
+    <None Include="assets\**" />
+  </ItemGroup>
+
+</Project>

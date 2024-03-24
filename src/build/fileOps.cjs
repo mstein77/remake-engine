@@ -1,7 +1,7 @@
 const syncFs = require("../shared/syncFs.cjs")
 const { exec, execAsync } = require("./helper.cjs")
 const { d, stringList, toPairs } = require("../shared/helper.cjs")
-const { hasLogLevel, bold, log, setSpinnerInfo} = require("../shared/console.cjs");
+const { NoStackError, hasLogLevel, bold, log, setSpinnerInfo} = require("../shared/console.cjs");
 
 const FILE_OP = {
     CLEAR: 'clear',
@@ -10,9 +10,7 @@ const FILE_OP = {
     EXEC: 'exec',
     REDUCE: 'reduce',
     REPLACE: 'replace',
-    PATH: 'path',
-    COND_START: 'cond_start',
-    COND_END: 'cond_end'
+    PATH: 'path'
 }
 
 const detail = msg => hasLogLevel('detailed') && log(msg)
@@ -39,16 +37,6 @@ class FileOpQueue {
      */
     clear() {
         this.queue = []
-    }
-
-    startConditional(cmd, check, cwd) {
-        this.queue.push({ op: FILE_OP.COND_START, cmd, check, cwd })
-        return this
-    }
-
-    endConditional() {
-        this.queue.push({ op: FILE_OP.COND_END })
-        return this
     }
 
     /**
@@ -215,10 +203,12 @@ class FileOpQueue {
                 detail(` ${bold('EXEC')} ${cmd}`)
 
                 setSpinnerInfo(cmd)
-                const { failed, output} = async ? await execAsync(cmd, options) : exec(cmd, options)
+                const { failed, output, exitCode } = async ? await execAsync(cmd, options) : exec(cmd, options)
                 if (failed)
-                    throw Error(`Failed executing "${cmd}": ${output}`)
-
+                    throw NoStackError(
+                        `Failed executing "${cmd}"${options.cwd ? ` in ${options.cwd}`: ''} (ExitCode: ${exitCode})`,
+                        output
+                    )
                 if (output !== null) {
                     detail(output)
                 }

@@ -71,9 +71,11 @@ const bold = msg => noColor ? msg : '\x1b[1m' + msg + '\x1b[0m'
  */
 const colorMsg = msg => FG.RESET + msg + FG.RESET
 
-const NoStackError = msg => {
+const NoStackError = (msg, output) => {
     const e = Error(msg)
     e.noStack = true
+    if (output)
+        e.output = output
 
     return e
 }
@@ -122,13 +124,17 @@ const mainSection = (name, scope) => {
 const newLine = () => { logger.log() }
 
 const errorSection = (error, scope) => {
-    endSpinner()
-
+    if (stopSpinner()) {
+        writeSpinner(FG.RED + '✕ ' + FG.RESET)
+        newLine()
+    }
     log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... `)
     log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
-    if (!error.noStack)
+    if (!error.noStack) {
         console.error(error.stack)
-
+    } else if (error.output) {
+        console.log(error.output)
+    }
     process.exit(1)
 }
 
@@ -162,17 +168,24 @@ let activeSpinner = null
 const endSpinner = () => {
     if (!activeSpinner) return
 
-    clearInterval(activeSpinner.id)
+    stopSpinner()
     let clearMsg = '';
     while (clearMsg.length < (activeSpinner.length + activeSpinner.prefix.length + 3)) clearMsg += ' '
     process.stdout.write(`\r${clearMsg}\r`)
     activeSpinner = null
 }
 
-const writeSpinner = () => {
+const stopSpinner = () => {
+    if (!activeSpinner) return false
+
+    clearInterval(activeSpinner.id)
+    return true
+}
+
+const writeSpinner = overwrite => {
     if (!activeSpinner) return
 
-    const msg = `${activeSpinner.prefix} ${bold(spinner[activeSpinner.index])} ${activeSpinner.postfix}`
+    const msg = `${activeSpinner.prefix} ${bold(overwrite ? overwrite : spinner[activeSpinner.index])} ${activeSpinner.postfix}`
     process.stdout.write(`\r${msg}`)
 }
 
@@ -193,6 +206,8 @@ const setSpinnerInfo = msg => {
 }
 
 const startSpinner = (prefix = '', postfix = '') => {
+    if (hasLogLevel('detailed')) return
+
     endSpinner()
     activeSpinner = {
         prefix,

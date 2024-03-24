@@ -64,26 +64,27 @@ const stringifyValues = obj => {
     return stringified
 }
 
+const preCmd = process.platform === 'win32' ? 'cmd /c chcp 65001>nul && ' : ''
+
 async function execAsync(cmd, options = {}) {
-    return new Promise((resolve, reject) => {
-        const { cwd, print } = options;
-        let exitCode = 0;
-        let output = '';
-        let failed = false;
-        const execOptions = { cwd, encoding: 'utf-8' };
+    return new Promise(resolve => {
+        const { cwd, print } = options
+        let exitCode = 0
+        let output = ''
+        let failed = false
+        const execOptions = { cwd, encoding: 'utf-8' }
 
         if (print || (hasLogLevel('detailed') && print !== false)) {
-            console.log(cmd);
-            execOptions.stdio = 'inherit';
+            console.log(cmd)
+            execOptions.stdio = 'inherit'
         }
-
-        execLib(cmd, execOptions, (error, stdout, stderr) => {
+        execLib(preCmd + cmd, execOptions, (error, stdout) => {
             if (error) {
-                output = stderr || error.message;
-                failed = true;
-                reject({ output, exitCode: error.code || 1, failed });
+                output = error.message + ': ' + stdout.toString() // || error.message
+                failed = true
+                resolve({ output, exitCode: error.code || 1, failed })
             } else {
-                output = stdout || '';
+                output = stdout || ''
                 resolve({ output, exitCode, failed });
             }
         });
@@ -110,7 +111,7 @@ const exec = (cmd, options = {}) => {
         execOptions.stdio = 'inherit'
     }
     try {
-        output = execSync(cmd, execOptions)
+        output = execSync(preCmd + cmd, execOptions)
         if (output !== null)
             output = output.toString()
     } catch (error) {

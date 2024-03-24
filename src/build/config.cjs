@@ -31,14 +31,12 @@ const RESOURCE_LOADING = {
     STATIC_ALL: 'static-all'
 }
 const DELIVERABLE = {
-    WEBAPP: 'web-app',
     PWA: 'pwa',
     HTML_FILE: 'html-file',
     APP_MAC: 'mac-app',
-    EXE_WINDOWS: 'windows-exe',
     EXE_JAVA: 'exe.java',
-    APP_ANDROID: 'app.android',
-    APP_APPLE: 'app.apple',
+    APP_WEB: 'web-app',
+    APP_UWP: 'uwp-app',
     APP_ELECTRON: 'electron-app'
 }
 const HOSTING = {
@@ -370,7 +368,7 @@ const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
             let useHttp = !hasOpenSsl
             if (hasOpenSsl) {
                 // generate
-                syncFs.createPathTo(sslPath)
+                syncFs.createPathTo(sslPath + '/')
                 const makeCert = exec(
                     `openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem ` +
                     `-subj "/C=DE/ST=State/L=Location/O=Organization/OU=Organizational Unit/CN=example.com"`,
@@ -379,7 +377,7 @@ const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
                 if (makeCert.failed) useHttp = true
             }
             if (useHttp) {
-                warnings.push(`No open-ssl could be found to generate certificates for https, please install. Falling back to http`)
+                warnings.push(`No openssl could be found to generate certificates for https, please install. Falling back to http`)
                 config.https = false
             }
         }
