@@ -125,6 +125,23 @@ id2name = id => {
     return result
 }
 
+const argInfoGame = {
+    flags: { i: 'info', d: 'detailed', m: 'minimal', n: 'normal', q: 'quiet', h: 'help', v: 'verbose', a: 'all'},
+    options: {
+        info: {desc: 'Build but only show package information in the browser'},
+        quiet: {desc: 'Build with no logging'},
+        minimal: {desc: 'Build with minimal logging'},
+        normal: {desc: 'Build with normal logging'},
+        detailed: {desc: 'Build with detailed logging'},
+        verbose: {desc: 'Build with verbose logging'},
+        all: {desc: 'Apply buildLogging to serverLogging'},
+        help: {desc: 'Show help'}
+    },
+    matchers: [
+        /^[a-z0-9_]+$/i
+    ]
+}
+
 module.exports = {
     getHtmlTags,
     getReplaceMetaVars,
@@ -132,5 +149,6 @@ module.exports = {
     getJsonObjectFromFile,
     getDefaultFromModule,
     getIconMimeType,
-    id2name
+    id2name,
+    argInfoGame
 }

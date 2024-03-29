@@ -1,6 +1,6 @@
 const absPath = require('../shared/absPath.cjs')
 const { d, simpleType, toValues, stringList, toPairs, intersect, isArray, csv2values } = require("../shared/helper.cjs")
-const { buildLogLevels } = require("../shared/console.cjs")
+const { buildLogLevels, getBuildLogLevel} = require("../shared/console.cjs")
 const { execSync, NoStackError } = require("../shared/console.cjs")
 let crypto
 try {
@@ -16,7 +16,6 @@ const MSG = {
     simStaticAll: `Requested resourceLoading "static-all" not supported in dev or editor environment, switching to simulation using "api"`,
     noServerNodejs: `Enabling of "server" not possible because your hosting is set to "server-without-nodejs" and does not support nodejs`
 }
-
 const DEPLOYMENT_METHOD = {
     UPLOAD_ROOT: 'upload-dist-to-root',
     UPLOAD_PUBLIC: 'upload-dist-to-public',
@@ -54,21 +53,18 @@ const PLATFORMS = {
     MACOS: 'apple.macos',
     ALL: 'all'
 }
-
 const ASSET_GENERATION = {
     NONE: 'none',
     MINIMAL: 'minimal',
     RECOMMENDED: 'recommended',
     ALL: 'all'
 }
-
 const ASSET_TYPE = {
     ICON: 'icon',
     TILE: 'tile',
     STORE: 'store',
     SPLASH: 'splash'
 }
-
 const configKey2params = {
     name: {type: 'string', default: '{game.name} v{game.version}'},
     shortName: {type: 'string', default: '{game.id}'},
@@ -105,7 +101,7 @@ const configKey2params = {
     staticTypes: {type: 'string', default: 'audio,video'},
     buildLogging: {type: 'string', default: 'normal', values: buildLogLevels},
     clientLogging: {type: 'string', default: 'info'},
-    serverLogging: {type: 'string', default: 'info'},
+    serverLogging: {type: 'string', default: 'normal', values: buildLogLevels},
     serverLoggingFormat: {type: 'string', default: 'dev'},
     stats: {type: 'string', default: 'normal'},
     envPrefix: {type: 'string', default: 'RMK_'},
@@ -242,12 +238,12 @@ const buildJson = () => {
  *
  * @param {object} config
  * @param {object} fileDeps
- * @param {boolean} isDist
+ * @param {object} options
  *
  * @returns {object}
  */
-const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
-
+const runConfigIntegrityChecks = (config, fileDeps, options) => {
+    const { isDist, all } = options
     const { absPath, syncFs } = fileDeps
     const warnings = []
 
@@ -380,6 +376,14 @@ const runConfigIntegrityChecks = (config, fileDeps, isDist) => {
                 config.https = false
             }
         }
+    }
+    if (config.buildLogging !== getBuildLogLevel()) {
+        warnings.push(`Requested buildLogging "${config.buildLogging}" but logging was overwritten, so using "${getBuildLogLevel()}" instead`)
+        config.buildLogging = getBuildLogLevel()
+    }
+    if (all && config.serverLogging !== config.buildLogging) {
+        warnings.push(`Requested serverLogging "${config.serverLogging}" but cli flag "all" was set, so using "${config.buildLogging}" instead`)
+        config.serverLogging = config.buildLogging
     }
 
     // end
@@ -559,12 +563,12 @@ const getConfigForCtx = (args, overwrites = {}) => {
 
 const getPreviewConfigs = (fileDeps, overwrites = {}) => {
     let distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']}, overwrites)
-    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, fileDeps, true)
+    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, fileDeps, {isDist: true})
     distConfig = config
 
     let devConfig = getConfigForCtx()
     {
-        const { config } = runConfigIntegrityChecks(devConfig, fileDeps, false)
+        const { config } = runConfigIntegrityChecks(devConfig, fileDeps, {idDist: false})
         devConfig = config
     }
     return {

@@ -6,7 +6,7 @@ const { FileCodec} = require("../shared/fileCodec.cjs")
 const { d, isObject, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
 const { stringifyValues, getReplaceMetaVars, getHtmlTags, exec} = require("./helper.cjs")
 const { FILE_OP } = require('./fileOps.cjs')
-const { NoStackError } = require("../shared/console.cjs")
+const { NoStackError, getBuildLogLevel} = require("../shared/console.cjs")
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 const CssMinimizerPlugin = require("css-minimizer-webpack-plugin")
@@ -63,7 +63,7 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
     const common = {
         mode: isDist ? 'production' : 'development',
         stats: {
-            preset: config.buildLogging
+            preset: getBuildLogLevel()
         },
         ignoreWarnings: [
             {

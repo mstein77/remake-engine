@@ -1,21 +1,30 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { spawnSync, NoStackError, errorSection} = require("../src/shared/console.cjs")
-
+const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments } = require("../src/shared/console.cjs")
 
 try {
+    const { arguments } = extractOptionsAndArguments(
+        {
+            flags: {h: 'help'},
+            options: {
+                help: {desc: 'Show help'}
+            }
+        },
+        'npm run start [target]',
+        [
+            'Tries to start the server of the dist build (or the given target in the dists folder)'
+        ]
+    )
     let cwd = absPath.dist()
-
     let target = null
-    if (process.argv.length > 2) {
-        target = process.argv[2]
+    if (arguments.length) {
+        target = arguments[0]
         const targetPath = absPath.dists(target)
         if (!syncFs.dirExists(targetPath))
             throw NoStackError(`The target build "${target}" does not exists in ${absPath.dists()}`)
 
         cwd = targetPath
     }
-
     if (!target) {
         if (syncFs.isEmptyDir(absPath.dist())) {
             console.log(`Executing "npm install" in dist folder...`)
@@ -51,6 +60,8 @@ try {
             stdio: 'inherit',
             cwd
         })
+    } else {
+        console.log(`Build in ${cwd} was build without server...aborting`)
     }
 } catch (e) {
     errorSection(e, 'SERVER')

@@ -1,6 +1,9 @@
 const util = require('node:util')
-const { d, isString } = require('./helper.cjs')
+const { d, isRegExp, isFunction, isArray, isString, toKeys, toPairs, isVersionEqualOrHigher} = require('./helper.cjs')
 const child_process = require("node:child_process")
+const os = require('node:os')
+
+const minNodeVersion = 'v16'
 
 // TODO we should check the terminal support for colors here, especially for windows
 let noColor = false
@@ -123,19 +126,27 @@ const mainSection = (name, scope) => {
 
 const newLine = () => { logger.log() }
 
-const errorSection = (error, scope) => {
+const errorSection = (error, scope, exitCode = 1) => {
     if (stopSpinner()) {
         writeSpinner(FG.RED + '✕ ' + FG.RESET)
         newLine()
     }
-    log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... `)
-    log( FG.RED + ' ✕' + FG.RESET + ' ' + bold(error.message) + '\n')
+    const details = [
+        `platform: ${process.platform} ${os.release}`,
+        `node: ${process.version}`
+    ]
+    const rmkVersion = process.env.RMK_ENGINE_VERSION
+    if (rmkVersion) details.push(`engine: ${rmkVersion}`)
+
+    const detailsBox = FG.L_GRAY + `[${details.join('|')}] `
+    log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
+    log( FG.RED + bold(' ✕') + FG.RESET + ' ' + bold(error.message) + '\n')
     if (!error.noStack) {
         console.error(error.stack)
     } else if (error.output) {
         console.log(error.output)
     }
-    process.exit(1)
+    process.exit(exitCode)
 }
 
 const subSection = name => {
@@ -285,19 +296,90 @@ function spawnSync(cmd, args, options) {
 
 const quoteArg = arg => process.platform !== 'win32' ? `'${arg}'` : `"${arg}"`
 
-const getParsedArguments = info => {
+const extractOptionsAndArguments = (info, usage = '', description = '') => {
+    const isNpmRun = usage.startsWith('npm run')
+
+    if (isNpmRun && !process.env.RMK_GAME_DIR)
+        throw NoStackError(`Command "${usage}" must be called from the game directory`)
+
+    if (!isVersionEqualOrHigher(process.version, minNodeVersion))
+        throw NoStackError(`Your node version is ${process.version} but ${minNodeVersion} or above is required `)
+
+    const { RMK_SCRIPT_ARGS } = process.env
+    const hasEnvArgs = RMK_SCRIPT_ARGS !== undefined
+    const args =  hasEnvArgs ? RMK_SCRIPT_ARGS.split('\t') : process.argv.slice(2)
+
+    if (!hasEnvArgs)
+        process.env.RMK_SCRIPT_ARGS = process.argv.slice(2).join('\t')
+
+    const { options, arguments } = getParsedArguments(info, args)
+
+    if (!options.help) return { options, arguments }
+
+    const name2option = []
+    let maxLenName = 0
+    for (const [ name, props ] of toPairs(info.options)) {
+        if (props.hidden) continue
+
+        name2option[name] = { desc: props.desc }
+        maxLenName = Math.max(maxLenName, name.length)
+    }
+    for (const [ flag, name ] of toPairs(info.flags)) {
+        const optionElem = name2option[name]
+        if (!optionElem)
+            throw Error(`Option "${name}" for flag "${flag}" does not exist`)
+
+        optionElem.flag = flag
+    }
+    const hasOptions = toKeys(name2option).length > 0
+    log()
+    log(`USAGE:`);
+    log()
+    log(bold(`  ${usage}` + (hasOptions ? ` ${isNpmRun ? '[--] ' : ''}[options]` : '')))
+    log()
+    const lines = isArray(description) ? description : [description]
+    for (const line of lines) {
+        log(`  ${line}`)
+    }
+    log()
+    if (hasOptions) {
+        log('OPTIONS:')
+        log()
+        for (const [ name, option ] of toPairs(name2option)) {
+            const { flag, desc } = option
+            const versions = []
+            if (flag) versions.push('-' + flag)
+            versions.push('--' + name)
+            const line = '  ' + (versions.length === 1 ? '    ' : '') + versions.join(', ')
+            log(line.padEnd(11 + maxLenName, ' ') + desc)
+        }
+        if (isNpmRun) {
+            log()
+            log('  A block of double or single dash options must be prefixed by -- due to npm run:')
+            log(`    ${usage} -- -h`)
+            log()
+            log(`  You can also use + instead of dashes if you don't want to use the -- prefix:`)
+            log(`    ${usage} +h`)
+            log()
+        }
+    }
+    process.exit(0)
+}
+
+const getParsedArguments = (info, args) => {
+    const { matchers = [] } = info
     const options = {}
     const arguments = []
 
-    const args = process.argv.slice(2)
     let optionArg = null
     let expectedOptionArgs = 0
     let argNo = 0
     for (const arg of args) {
-        const hasAssignment = arg.indexOf('=') !== -1
-        const hasDash = arg.startsWith('-')
-        const hasPlus = arg.startsWith('+')
-        if (!hasDash && !hasAssignment && !hasPlus) {
+        if (arg === '') continue
+
+        const dash = ['-', '+'].includes(arg[0]) ? arg[0] : ''
+        const hasDash = dash !== ''
+        if (!hasDash) {
             if (expectedOptionArgs) {
                 options[optionArg].push(arg)
                 argNo++
@@ -306,6 +388,14 @@ const getParsedArguments = info => {
                     expectedOptionArgs = 0
                 }
             } else {
+                const matcher = matchers[arguments.length]
+                if (matcher) {
+                    if (
+                        (isRegExp(matcher) && !arg.match(matcher)) ||
+                        (isFunction(matcher) && !matcher(arg))
+                    )
+                        throw NoStackError(`Invalid argument "${arg}" given`)
+                }
                 arguments.push(arg)
             }
             continue
@@ -313,8 +403,9 @@ const getParsedArguments = info => {
         if (expectedOptionArgs !== argNo) break
 
         const [ part, value ] = arg.split('=')
+        const hasAssignment = arg.indexOf('=') > -1
         let long = null
-        if (hasPlus || (!hasPlus && (hasDash && !part.startsWith('--')))) {
+        if (!part.startsWith(dash + dash)) {
             const flags = part.substring(1)
             const singleFlag = flags.length === 1
             if (!singleFlag && hasAssignment)
@@ -329,7 +420,7 @@ const getParsedArguments = info => {
             }
             if (!singleFlag || !hasAssignment) continue
         } else {
-            long = part.substring(part.startsWith('-') ? 1 : 0)
+            long = part.substring(2)
         }
         const option = info.options[long]
         if (!option)
@@ -385,7 +476,7 @@ module.exports = {
     startSpinner,
     endSpinner,
     setSpinnerInfo,
-    getParsedArguments,
+    extractOptionsAndArguments,
     exec,
     execSync
 }

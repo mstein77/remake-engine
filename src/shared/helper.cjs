@@ -117,6 +117,14 @@ function isDataUrl(value, type = null) {
         value.startsWith('data:' + type + ';base64,')
 }
 
+function isRegExp(value) {
+    return value instanceof RegExp || value.constructor === RegExp
+}
+
+function isFunction(value) {
+    return typeof value === 'function'
+}
+
 /**
  * Returns the given string with the first character converted to uppercase (if not empty)
  *
@@ -326,6 +334,8 @@ module.exports = {
     isObject,
     isUrl,
     isDataUrl,
+    isRegExp,
+    isFunction,
     ucfirst,
     union,
     without,

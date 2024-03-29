@@ -3,15 +3,16 @@ const syncFs = require("../shared/syncFs.cjs")
 const { d, isArray, toPairs, simpleType, isObject, isVersionEqualOrHigher } = require("../shared/helper.cjs")
 const { getBuildLogLevel, subSectionWarning, dumpJson,
     bold, log, errorSection, setBuildLogLevel, mainSection,
-    hasLogLevel, newLine, subSection, subSectionOk, subSectionError} = require("../shared/console.cjs")
+    hasLogLevel, newLine, subSection, subSectionOk, subSectionError,
+    extractOptionsAndArguments, NoStackError
+} = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
 const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
-const { getDefaultFromModule, getJsonObjectFromFile, id2name } = require("./helper.cjs")
+const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame} = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
 const { ResourceTypeRegistry } = require("../shared/resources.cjs")
 const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
 
-const minNodeVersion = 'v16'
 const BUILD_TEMP_DIR = '.dist'
 
 /**
@@ -30,13 +31,13 @@ const getBuildHook = name => getDefaultFromModule(absPath.game(name + '-hook.cjs
  *
  * @param {object} configs
  * @param {object} fileDeps
- * @param {boolean} options
+ * @param {object} options
  *
  * @returns {object|array}
  */
 const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     const { gamePackageJson } = configs
-    const { isDist, info } = options
+    const { isDist, info, all } = options
     const buildsJson = configs.buildsJson
     let distTargets = []
     const { absPath, queue } = fileDeps
@@ -44,7 +45,9 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     if (buildsJson) {
         queue.addPath(absPath.dists())
         for (const [ target, overwrites ] of toPairs(buildsJson)) {
-            distTargets.push({ target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false })
+            distTargets.push(
+                { target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false }
+            )
         }
     } else {
         if (isDist) queue.addPath(absPath.dist())
@@ -92,7 +95,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection('Checking integrity of config')
-        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, fileDeps, isDist)
+        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, fileDeps, options)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -115,7 +118,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
                 distTarget.skip = true
                 continue
             }
-            throw Error(missing)
+            throw NoStackError(missing)
         }
         subSectionOk()
 
@@ -146,14 +149,14 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     }
     distTargets = distTargets.filter(item => !item.skip)
     if (!distTargets.length)
-        throw Error('No build is fulfilling the requirements. Aborting...')
+        throw NoStackError('No build is fulfilling the requirements. Aborting...')
 
     const webpackHook = getBuildHook('webpack')
     if (webpackHook) {
         subSection('Passing all generated webpack configs to webpack hook')
         resultConfigs = webpackHook(resultConfigs, buildConfigs, options)
         if (!isArray(resultConfigs))
-            throw Error(`Webpack hook result must be of type array but got ${simpleType(resultConfigs)}`)
+            throw NoStackError(`Webpack hook result must be of type array but got ${simpleType(resultConfigs)}`)
 
         subSectionOk()
     }
@@ -203,17 +206,29 @@ const showInstructions = instructions => {
  *
  * @param {boolean} isDist
  * @param {boolean} all
- * @param {boolean} info
  *
  * @returns {array|object}
  */
-const generateWebpackConfigs = (isDist, all = false, info = false) => {
-    try {
-        if (!isVersionEqualOrHigher(process.version, minNodeVersion))
-            throw Error(`Your node version is ${process.version} but ${minNodeVersion} or above is required `)
+const generateWebpackConfigs = (isDist, all = false) => {
+  try {
+        const { options, arguments } = extractOptionsAndArguments(argInfoGame)
+
+        const target = isDist && arguments.length ? arguments[0] : null
+        const info = options.info === true
 
         const buildJson = getDefaultFromModule(absPath.game('build.cjs'))
-        const buildLogLevel = buildJson.buildLogging
+        let buildLogLevel = buildJson.buildLogging
+        if (options.quiet) {
+            buildLogLevel = 'none'
+        } else if (options.minimal) {
+            buildLogLevel = 'minimal'
+        } else if (options.normal) {
+            buildLogLevel = 'normal'
+        } else if (options.detailed) {
+            buildLogLevel = 'detailed'
+        } else if (options.verbose) {
+            buildLogLevel = 'verbose'
+        }
         if (buildLogLevel) setBuildLogLevel(buildLogLevel)
 
         const fileDeps = {
@@ -226,23 +241,30 @@ const generateWebpackConfigs = (isDist, all = false, info = false) => {
             enginePackageJson: getJsonObjectFromFile(absPath.engine('package.json')),
             gamePackageJson: getJsonObjectFromFile(absPath.game('package.json'))
         }
-        if (isDist && all) {
+        if (isDist && (all || target)) {
             const buildsPath = absPath.game('builds.cjs')
             configs.buildsJson = getDefaultFromModule(buildsPath)
             const pairs = toPairs(configs.buildsJson)
             const matchRegExp = new RegExp('^[a-z1-9\-\_]+$', 'i')
             for (const [ key, value ] of pairs) {
                 if (!key.match(matchRegExp))
-                    throw Error(`Invalid build name "${key}" in ${buildsPath}. Must match RegExp ${matchRegExp.toString()}`)
+                    throw NoStackError(`Invalid build name "${key}" in ${buildsPath}. Must match RegExp ${matchRegExp.toString()}`)
 
                 if (!isObject(value))
-                    throw Error(`Value of key "${key}" in ${buildsPath}. Must be an object but got ${simpleType(value)}`)
+                    throw NoStackError(`Value of key "${key}" in ${buildsPath}. Must be an object but got ${simpleType(value)}`)
+            }
+            if (target) {
+                const def = configs.buildsJson[target]
+                if (!def)
+                    throw NoStackError(`Build target "${target}" no found in builds.cjs`)
+
+                configs.buildsJson = { [target]: def }
             }
         }
-        return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info })
+        return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info, all: options.all })
 
     } catch (e) {
-        errorSection(e, 'BUILD')
+        errorSection(e, 'BUILD', 0)
     }
 }
 

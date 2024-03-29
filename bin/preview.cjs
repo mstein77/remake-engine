@@ -1,20 +1,25 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { spawnSync, NoStackError, errorSection, getParsedArguments} = require("../src/shared/console.cjs")
+const { spawnSync, NoStackError, errorSection, getParsedArguments, extractOptionsAndArguments} = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
 
 try {
-    if (!process.env.RMK_GAME_DIR)
-        throw NoStackError(`Command "npm run preview" must be called from the game directory`)
-
-    const { arguments } = getParsedArguments({
-        flags: {},
-        options: {
-            preview: {}
-        }
-    })
+    const { arguments } = extractOptionsAndArguments(
+        {
+            flags: {h: 'help'},
+            options: {
+                help: {desc: 'Show help'},
+                preview: {hidden: true}
+            }
+        },
+        'npm run preview [target]',
+        [
+            'Tries to run the dist build (or the given target in the dists folder) locally.',
+            'Depending on the deliverable either in the browser or directly'
+        ]
+    )
     const args = []
     let overwrites = {}
     let cwd = absPath.dist()
@@ -33,6 +38,7 @@ try {
 
     const { distConfig } = getPreviewConfigs({ absPath, syncFs }, overwrites)
 
+    process.env.RMK_SCRIPT_ARGS += '\t--preview'
     if (distConfig.server && distConfig.deploymentMethod !== DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
         args.unshift(
             'run',

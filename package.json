@@ -11,11 +11,10 @@
     "start-static-preview": "node src/server/static.cjs --preview",
     "start": "node bin/serve.cjs",
     "preview": "node bin/preview.cjs",
+    "preview-build": "node bin/preview-build.cjs",
     "build-game-dev": "node bin/dev-server.cjs",
-    "build-game-dist": "webpack --config webpack.build-dist.cjs && node bin/post-build.cjs",
-    "build-info-dist": "webpack --env info --config webpack.build-dist.cjs && node bin/post-build.cjs",
-    "build-game-dists": "webpack --config webpack.build-dists.cjs && node bin/post-build.cjs",
-    "postinstall": "echo \"Thanks for installing ReMake Engine...\""
+    "build-game-dist": "node bin/build.cjs",
+    "build-game-dists": "node bin/builds.cjs"
   },
   "engines": {
     "node": "16.17.0"

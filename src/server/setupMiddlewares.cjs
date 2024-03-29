@@ -9,6 +9,7 @@ const express = require("express")
 const { d, csv2values } = require('../shared/helper.cjs')
 const { RESOURCE_LOADING } = require('../build/config.cjs')
 const { resourcesController } = require('./controller/resources.cjs')
+const { mainSection } = require('../shared/console.cjs')
 
 const setupAppMiddlewares = (app, config = null) => {
 
@@ -125,13 +126,12 @@ const setupAppMiddlewares = (app, config = null) => {
         },
         deleteResource
     )
-
     if (config.serverLogging !== 'none') {
         const options = {}
         let minCode = null
-        if (config.serverLogging === 'error') {
+        if (config.serverLogging === 'minimal') {
             minCode = 500
-        } else if (config.serverLogging === 'warning') {
+        } else if (config.serverLogging === 'normal') {
             minCode = 400
         }
         if (minCode) {
@@ -207,6 +207,8 @@ const setupAppMiddlewares = (app, config = null) => {
     ))
 
     if (config.IS_DIST) return
+
+    mainSection('Listening...', 'DEV-SERVER')
 
     app.post('/delete', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []

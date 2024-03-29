@@ -88,7 +88,7 @@ try {
         port = HTTPS_PORT
     }
     server.listen(port)
-    mainSection(`Listening on port ${port}...`, isPreview ? 'PREVIEW' : 'SERVER')
+    mainSection(`Listening on port ${port}${isPreview ? `. Game is available in your browser under ` + PREVIEW_URL : '..'}`, isPreview ? 'PREVIEW' : 'SERVER')
 
     const openAsync = async (url) => {
         const options = {wait: true}
