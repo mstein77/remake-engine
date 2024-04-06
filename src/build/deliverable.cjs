@@ -12,7 +12,7 @@ const generatorFormats = ['png', 'gif']
  * A class used to build a deliverable of a certain type. Depending on the deliverable this could mean that for instance
  * a compilation step is required to build an executable for the target system. Such a step could require special
  * programs and might only run on certain platforms, that's why this class allows to specify such requirements besides
- * implementing the actual compile and cleanup process
+ * implementing the actual make and cleanup process
  */
 class Deliverable {
 
@@ -47,7 +47,7 @@ class Deliverable {
      */
     getSupport() {
         return {
-            hasCompiler: false,
+            hasMakeStep: false,
             isAllInOne: true,
             appIcon: false,
             favIcon: true
@@ -69,8 +69,8 @@ class Deliverable {
      *
      * @returns {boolean|*}
      */
-    get hasCompiler() {
-        return this.supports.hasCompiler
+    get hasMakeStep() {
+        return this.supports.hasMakeStep
     }
 
     get hasAppIcon() {
@@ -445,7 +445,7 @@ class Deliverable {
      * @param {object} configs
      * @param {object} fileDeps
      */
-    async prepareCompile(distTarget, configs, fileDeps) {}
+    async prepareMake(distTarget, configs, fileDeps) {}
 
     /**
      * Compiles the prepared build files in the given distTarget
@@ -454,7 +454,12 @@ class Deliverable {
      * @param {object} configs
      * @param {object} fileDeps
      */
-    async compile(distTarget, configs, fileDeps) {}
+    async make(distTarget, configs, fileDeps) {}
+
+
+    async finishMake(distTarget, configs, fileDeps) {}
+
+    async open(distTarget, configs, fileDeps) {}
 
     /**
      * Runs the post build processing which is executed after webpack build and compilation

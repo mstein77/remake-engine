@@ -1,10 +1,11 @@
 const absPath = require('../src/shared/absPath.cjs')
-const { quoteArg, extractOptionsAndArguments, errorSection} = require('../src/shared/console.cjs')
+const { quoteArg, extractOptionsAndArguments, errorSection, setCliScript} = require('../src/shared/console.cjs')
 const { argInfoGame } = require('../src/build/helper.cjs')
 const { d } = require('../src/shared/helper.cjs')
 const { execSync } = require('child_process')
 
 try {
+    setCliScript('DEV-SERVER')
     extractOptionsAndArguments(
         argInfoGame,
         'npm run dev|game',
@@ -15,5 +16,5 @@ try {
         cwd: absPath.engine()
     })
 } catch (e) {
-    errorSection(e, 'GAME')
+    errorSection(e)
 }

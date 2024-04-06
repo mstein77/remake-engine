@@ -5,11 +5,12 @@ const { csv2values, d } = require('../shared/helper.cjs')
 const syncFs = require("../shared/syncFs.cjs")
 
 const open = require("open")
-const { mainSection, errorSection } = require("../shared/console.cjs")
+const { mainSection, errorSection, setCliScript} = require("../shared/console.cjs")
 
 const isPreview = process.argv.includes('--preview')
 
 try {
+    setCliScript(isPreview ? 'PREVIEW' : 'SERVER')
     const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
     const STATIC_DIR = path.resolve(__dirname, "public")
     const app = express()
@@ -88,7 +89,7 @@ try {
         port = HTTPS_PORT
     }
     server.listen(port)
-    mainSection(`Listening on port ${port}${isPreview ? `. Game is available in your browser under ` + PREVIEW_URL : '..'}`, isPreview ? 'PREVIEW' : 'SERVER')
+    mainSection(`Listening on port ${port}${isPreview ? `. Game is available in your browser under ` + PREVIEW_URL : '..'}`)
 
     const openAsync = async (url) => {
         const options = {wait: true}
@@ -102,5 +103,5 @@ try {
     if (isPreview) openAsync(PREVIEW_URL)
 
 } catch (e) {
-    errorSection(e, isPreview ? 'PREVIEW' : 'SERVER')
+    errorSection(e)
 }

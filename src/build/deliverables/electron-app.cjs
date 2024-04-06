@@ -2,6 +2,7 @@ const Deliverable = require("../deliverable.cjs")
 const { RESOURCE_LOADING} = require("../config.cjs")
 const { getReplaceMetaVars } = require("../helper.cjs")
 const { d, csv2values, toValues } = require('../../shared/helper.cjs')
+const { exec } = require("../../shared/console.cjs");
 
 const MAKERS = {
     DMG: 'dmg',
@@ -28,7 +29,7 @@ class ElectronApp extends Deliverable {
     getSupport() {
         return {
             ...super.getSupport(),
-            hasCompiler: true
+            hasMakeStep: true
         }
     }
 
@@ -62,16 +63,16 @@ class ElectronApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async prepareCompile(distTarget, configs, fileDeps) {
+    async prepareMake(distTarget, configs, fileDeps) {
         const { metaVars, config } = configs
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
+        queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
+        queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
+
         const { name, description, shortName } = config
         const replaceMetaVars = getReplaceMetaVars(metaVars, { name, description, shortName })
-
-        const distSourcePath = absPath.dist(publicDir, 'main.cjs')
-        queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), distSourcePath)
 
         const reqMakers = csv2values(this.config.makers)
         const makers = []
@@ -91,7 +92,7 @@ class ElectronApp extends Deliverable {
             }
         }
         queue.addWriteJson(
-            absPath.dist(publicDir, 'package.json'),
+            absPath.artifactsIn('package.json'),
             {
                 name: replaceMetaVars(this.config.name),
                 version: metaVars['game.version'],
@@ -107,6 +108,7 @@ class ElectronApp extends Deliverable {
                 license: 'ISC',
                 "config": {
                     "forge": {
+                        "outDir": absPath.artifactsOut(),
                         "packagerConfig": {},
                         "makers": makers
                     }
@@ -117,31 +119,41 @@ class ElectronApp extends Deliverable {
                 devDependencies
             }
         )
+        const cwd = absPath.artifactsIn()
+        queue
+            .addExec(`npm install`, { cwd })
+            .addExec(`npm install --save-dev @electron-forge/plugin-fuses`, { cwd })
+            .addExec(`npm exec --package=@electron-forge/cli -c "electron-forge import"`, { cwd })
         await queue.processAsync()
     }
 
-    async compile(distTarget, configs, fileDeps) {
-        const { queue, absPath, syncFs } = fileDeps
-        const { publicDir, assets } = distTarget
-
-        const targetPath = absPath.dist(publicDir)
-        const makers = csv2values(this.config.makers)
-
-        // pre-compile
+    async make(distTarget, configs, fileDeps) {
+        const { queue, absPath } = fileDeps
         queue
-            .addExec(`npm install`, {cwd: targetPath})
-            .addExec(`npm install --save-dev @electron-forge/plugin-fuses`, {cwd: targetPath})
-            .addExec(`npm exec --package=@electron-forge/cli -c "electron-forge import"`, {cwd: targetPath})
-
-        // prepare assets
-
-
-        queue
-            .addExec(`npm run make`, {cwd: targetPath})
-            .addClear(targetPath, false, ['out'])
-            .addReduce(syncFs.absPath(targetPath, 'out'), makers, targetPath)
+            .addExec(`npm run make`, { cwd: absPath.artifactsIn() })
 
         await queue.processAsync()
+    }
+
+    async finishMake(distTarget, configs, fileDeps) {
+        const { queue, absPath } = fileDeps
+
+        const { publicDir } = distTarget
+        const targetPath = absPath.dist(publicDir)
+        const makers = csv2values(this.config.makers)
+        queue
+            .addClear(targetPath, false)
+            .addReduce(absPath.artifactsOut(), makers, targetPath)
+
+        await queue.processAsync()
+    }
+
+    async open(distTarget, configs, fileDeps) {
+        const { absPath } = fileDeps
+
+        const result = await exec('npm run start', { cwd: absPath.artifactsIn() })
+        if (result.failed)
+            throw Error(`Could not open electron app: ` + result.output)
     }
 }
 

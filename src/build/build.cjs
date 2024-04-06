@@ -4,7 +4,7 @@ const { d, isArray, toPairs, simpleType, isObject, isVersionEqualOrHigher } = re
 const { getBuildLogLevel, subSectionWarning, dumpJson,
     bold, log, errorSection, setBuildLogLevel, mainSection,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError,
-    extractOptionsAndArguments, NoStackError
+    extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
 const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
@@ -45,13 +45,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     if (buildsJson) {
         queue.addPath(absPath.dists())
         for (const [ target, overwrites ] of toPairs(buildsJson)) {
-            distTargets.push(
-                { target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false }
-            )
+            distTargets.push({
+                target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false
+            })
         }
     } else {
         if (isDist) queue.addPath(absPath.dist())
-        distTargets.push({overwrites: {}, root: absPath.game(), dir: 'dist', tmpDir: BUILD_TEMP_DIR, skip: false})
+        distTargets.push({
+            overwrites: {}, root: absPath.game(), dir: 'dist', tmpDir: BUILD_TEMP_DIR, skip: false
+        })
     }
     const gameId = gamePackageJson.name
     configs.metaVars = {
@@ -64,7 +66,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         'game.keywords': gamePackageJson.keywords.join(',')
     }
 
-    mainSection(`Generate webpack configs...`, 'BUILD')
+    mainSection(`Generate webpack configs...`)
 
     queue.process()
     let lastEngineConfig = null
@@ -172,7 +174,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
     }
     let result = resultConfigs.length === 1 ? resultConfigs[0] : resultConfigs
 
-    mainSection(`Execute webpack configs...`, 'BUILD')
+    mainSection(`Execute webpack configs...`)
 
     if (hasLogLevel('detailed')) {
         subSection('Generated webpack config')
@@ -264,7 +266,7 @@ const generateWebpackConfigs = (isDist, all = false) => {
         return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info, all: options.all })
 
     } catch (e) {
-        errorSection(e, 'BUILD', 0)
+        errorSection(e)
     }
 }
 
@@ -278,7 +280,7 @@ const generateWebpackConfigs = (isDist, all = false) => {
 const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) => {
 
     setBuildLogLevel(buildLogLevel)
-    mainSection('Post build processing...', 'BUILD')
+    mainSection('Post build processing...')
 
     const postBuildHook = getBuildHook('post-build')
     const queue = new FileOpQueue()
@@ -287,7 +289,6 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
         syncFs,
         queue
     }
-
     const exceptDirs = []
     let index = 0
     for (const distTarget of distTargets) {
@@ -298,55 +299,81 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
         if (target) {
             exceptDirs.push(dir)
             hasLogLevel('normal') && log(`Build "${bold(target)}":\n`)
-        } else {
-            target = 'dist build'
         }
         const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
         const deliverable = new Deliverable(config.deliverableConfig)
-
         const params = [ distTarget, { ...configs, config }, fileDeps ]
 
-        subSection(`Generate assets`)
-        await deliverable.generateAssets( ...params )
-        subSectionOk()
+        await asyncSubSection(
+            `Generate assets`,
+            [deliverable, 'generateAssets'],
+             ...params
+        )
 
-        if (deliverable.hasCompiler) {
-            subSection(`Prepare compilation`)
-            await deliverable.prepareCompile( ...params )
-            subSectionOk()
+        if (deliverable.hasMakeStep) {
+            absPath.setCurrArtifact(absPath.artifacts(target ? 'dists/' + target : 'dist'))
+            queue.addPath(absPath.artifactsIn())
 
-            let skipCompile = false
-            const compileHook = getBuildHook('compile')
-            if (compileHook) {
-                subSection(`Trigger compile-hook`)
-                skipCompile = compileHook( ...params )
-                subSectionOk()
+            await asyncSubSection(
+                `Prepare make`,
+                [deliverable, 'prepareMake'],
+                ...params
+            )
+            queue.addPath(absPath.artifactsOut())
+            let skipMake = false
+            const makeHook = getBuildHook('make')
+            if (makeHook) {
+                skipMake = await asyncSubSection(
+                    `Trigger make-hook`,
+                    makeHook,
+                    params
+                )
             }
-            if (!skipCompile) {
-                subSection(`Execute compiler`)
-                await deliverable.compile( ...params )
-                subSectionOk()
+            if (!skipMake) {
+                await asyncSubSection(
+                `Execute make`,
+                    [deliverable, 'make'],
+                    ...params
+                )
+                await asyncSubSection(
+                    `Publish make results`,
+                    [deliverable, 'finishMake'],
+                    ...params
+                )
+            }
+            if (!config.keepArtifacts) {
+                queue.addClear(absPath.artifacts())
+                await queue.processAsync()
             }
         }
-        subSection(`Run post build processing`)
-        deliverable.processPostBuild( ...params )
-        subSectionOk()
+        await asyncSubSection(
+            `Run post build processing`,
+            [deliverable, 'processPostBuild'],
+            ...params
+        )
 
         if (postBuildHook) {
-            subSection(`Trigger post-build-hook`)
-            postBuildHook( ...params )
-            subSectionOk()
+            await asyncSubSection(
+                `Trigger post-build-hook`,
+                postBuildHook,
+                ...params
+            )
         }
         queue.addReplace(path, absPath.make(root, dir)).process()
 
         index++
-        if (index !== distTargets.length) newLine()
+        if (index !== distTargets.length) {
+            newLine()
+        } else if (!config.keepArtifacts) {
+            queue.addDelete(absPath.artifacts())
+        }
     }
     if (exceptDirs.length) {
-        queue.addClear(absPath.dists(), false, exceptDirs).process()
+        queue.addClear(absPath.dists(), false, exceptDirs)
     }
+    queue.process()
 
-    mainSection('Build successfully finished...', 'BUILD')
+    mainSection('Build successfully finished...')
 
     for (const { target, instructions, root, dir } of distTargets) {
         if (!hasLogLevel('normal') || !instructions) continue

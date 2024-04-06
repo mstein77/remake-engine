@@ -3,6 +3,7 @@ const { d, isRegExp, isFunction, isArray, isString, toKeys, toPairs, isVersionEq
 const child_process = require("node:child_process")
 const os = require('node:os')
 
+const ERROR_STATUS_HANDLED = 2307
 const minNodeVersion = 'v16'
 
 // TODO we should check the terminal support for colors here, especially for windows
@@ -48,6 +49,19 @@ const BG = {
     L_GRAY:  noColor ? '' : '\x1b[47m',
     WHITE: noColor ? '' : '\x1b[107m',
     RESET: noColor ? '' :  '\x1b[49m'
+}
+
+let cliScript = null
+const setCliScript = (script, force = false) => {
+    if (process.env.RMK_SCRIPT && !force) return
+
+    process.env.RMK_SCRIPT = script
+}
+
+const getCliScript = () => {
+    if (!cliScript) cliScript = process.env.RMK_SCRIPT
+
+    return cliScript
 }
 
 let logger = console
@@ -117,20 +131,16 @@ const hasLogLevel = name => {
     }
     return false
 }
-const mainSection = (name, scope) => {
+const mainSection = name => {
     if (!hasLogLevel('minimal')) return
 
-    log(`\n${BG.GREEN + FG.BLACK} ${scope} ${BG.BLUE + FG.L_CYAN} ${name} `)
+    log(`\n${BG.GREEN + FG.BLACK} ${getCliScript()} ${BG.BLUE + FG.L_CYAN} ${name} `)
     log()
 }
 
 const newLine = () => { logger.log() }
 
-const errorSection = (error, scope, exitCode = 1) => {
-    if (stopSpinner()) {
-        writeSpinner(FG.RED + '✕ ' + FG.RESET)
-        newLine()
-    }
+const errorSection = error => {
     const details = [
         `platform: ${process.platform} ${os.release}`,
         `node: ${process.version}`
@@ -139,39 +149,72 @@ const errorSection = (error, scope, exitCode = 1) => {
     if (rmkVersion) details.push(`engine: ${rmkVersion}`)
 
     const detailsBox = FG.L_GRAY + `[${details.join('|')}] `
-    log(`\n${BG.L_RED + FG.BLACK} ${scope} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
+    log(`\n${BG.L_RED + FG.BLACK} ${getCliScript()} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
     log( FG.RED + bold(' ✕') + FG.RESET + ' ' + bold(error.message) + '\n')
     if (!error.noStack) {
         console.error(error.stack)
     } else if (error.output) {
         console.log(error.output)
     }
-    process.exit(exitCode)
+    process.exit(ERROR_STATUS_HANDLED)
 }
+
+async function asyncSubSection(name, func, ...params) {
+    subSection(name)
+    startSpinner(`  `)
+    try {
+        let response
+        if (isArray(func)) {
+            if (func.length !== 2)
+                throw Error(`Expected array with 2 items in func-parameter of asyncSubSection`)
+
+            response = await func[0][func[1]](...params)
+        } else {
+            response = await func( ...params )
+        }
+        endSpinner()
+        if (!response) response = {}
+        const { warnings = [], result } = response
+
+        if (!warnings || !warnings.length) {
+            subSectionOk()
+            return result
+        }
+        for (const warning of warnings) {
+            subSectionWarning(warning)
+        }
+        return result
+
+    } catch (e) {
+        if (stopSpinner()) {
+            writeSpinner(FG.RED + '✕ Failed!' + FG.RESET)
+            newLine()
+        }
+        endSpinner()
+        throw e
+    }
+}
+
 
 const subSection = name => {
     if (!hasLogLevel('normal')) return
 
     log(` - ` + name + '...')
-    startSpinner(`  `)
 }
 
 const subSectionOk = (msg = '') => {
     if (!hasLogLevel('normal')) return
 
-    endSpinner()
     log(FG.GREEN + `   ${bold('✓')}` + FG.RESET + ` OK ` + msg)
 }
 
 const subSectionError = msg => {
-    endSpinner()
     log( FG.RED + `   ${bold('✕')}` + FG.RESET + ' ' + bold(msg) + '\n')
 }
 
 const subSectionWarning = msg => {
     if (!hasLogLevel('normal')) return
 
-    endSpinner()
     log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
 }
 
@@ -452,6 +495,7 @@ const getParsedArguments = (info, args) => {
 }
 
 module.exports = {
+    ERROR_STATUS_HANDLED,
     FG,
     BG,
     newLine,
@@ -459,6 +503,7 @@ module.exports = {
     log,
     colorMsg,
     setLogger,
+    setCliScript,
     getBuildLogLevel,
     setBuildLogLevel,
     buildLogLevels,
@@ -466,6 +511,7 @@ module.exports = {
     dumpJson,
     mainSection,
     errorSection,
+    asyncSubSection,
     subSection,
     subSectionOk,
     subSectionError,

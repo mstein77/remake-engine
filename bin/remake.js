@@ -142,5 +142,5 @@ spawnSync(
         }
         process.exit(0)
 } catch (e) {
-    errorSection(e, 'REMAKE-START')
+    errorSection(e)
 }

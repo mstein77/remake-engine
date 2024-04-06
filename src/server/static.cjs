@@ -1,6 +1,6 @@
 const absPath = require("../shared/absPath.cjs")
 const { getPreviewConfigs } = require('../build/config.cjs')
-const { extractOptionsAndArguments, errorSection, mainSection} = require("../shared/console.cjs")
+const { extractOptionsAndArguments, errorSection, mainSection, setCliScript} = require("../shared/console.cjs")
 const { d } = require('../shared/helper.cjs')
 const express = require('express')
 const cors = require('cors')
@@ -8,6 +8,7 @@ const syncFs = require('../shared/syncFs.cjs')
 const open = require('open')
 
 try {
+    setCliScript('STATIC-SERVER')
     const { options, arguments } = extractOptionsAndArguments({
         flags: {},
         options: {
@@ -64,7 +65,7 @@ try {
     if (isPreview) {
         const url = `${https ? 'https' : 'http'}://${host}:${port}/`
 
-        mainSection(`Listening on port ${port}. Preview is available in your browser under ${url}`, 'PREVIEW')
+        mainSection(`Listening on port ${port}. Preview is available in your browser under ${url}`)
 
         const openAsync = async () => {
             const options = {wait: true}
@@ -78,6 +79,6 @@ try {
         openAsync()
     }
 } catch (e) {
-    errorSection(e, 'SERVER')
+    errorSection(e)
 }
 

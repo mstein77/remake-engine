@@ -94,6 +94,7 @@ const configKey2params = {
     httpsPort: {type: 'uint', default: 443},
     certificate: {type: 'string', default: ''},
     path: {type: 'string', default: ''},
+    keepArtifacts: {type: 'bool', default: true},
     restrictedCors: {type: 'boolean', default: false},
     sourceMaps: {type: 'bool', default: true, distDefault: false},
     sourceMapType: {type: 'string', default: 'eval-cheap-source-map'},

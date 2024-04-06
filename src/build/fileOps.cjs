@@ -9,6 +9,7 @@ const FILE_OP = {
     EXEC: 'exec',
     REDUCE: 'reduce',
     REPLACE: 'replace',
+    DELETE: 'delete',
     PATH: 'path'
 }
 
@@ -47,6 +48,11 @@ class FileOpQueue {
      */
     addClear(path, createIfNotExists = false, except = []) {
         this.queue.push({ op: FILE_OP.CLEAR, path, createIfNotExists, except })
+        return this
+    }
+
+    addDelete(path) {
+        this.queue.push({ op: FILE_OP.DELETE, path })
         return this
     }
 
@@ -182,6 +188,15 @@ class FileOpQueue {
                 syncFs.writeContent(path, content)
                 break
             }
+            case FILE_OP.DELETE: {
+                const { path } = params
+                detail(` ${bold('DELETE')} ${path}`)
+
+                if (!syncFs.exists(path)) break
+
+                syncFs.dirExists(path) ? syncFs.rmdir(path) : syncFs.unlink(path)
+                break
+            }
             case FILE_OP.CLEAR: {
                 const { path, createIfNotExists, except } = params
                 detail(` ${bold('CLEAR')} ${path}`)
@@ -232,8 +247,6 @@ class FileOpQueue {
                     const to = syncFs.absPath(target, syncFs.basename(file))
                     syncFs.copyFile(from, to)
                 }
-
-                if (path !== target) syncFs.rmdir(path, {recursive: true, force: true})
                 break
             }
             case FILE_OP.REPLACE: {

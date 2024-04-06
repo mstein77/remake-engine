@@ -7,6 +7,7 @@ const deps = {
 }
 
 let currDist = null
+let currArtifact = null
 
 const absPath = {
     engine: ( ...relPath ) => path.resolve( deps.dirname, '../../', ...relPath ),
@@ -15,9 +16,15 @@ const absPath = {
     resources: ( ...relPath ) => path.resolve(absPath.game( 'resources'), ...relPath ),
     dist: ( ...relPath ) => path.resolve(currDist ? currDist : absPath.game('dist'), ...relPath ),
     dists: ( ...relPath ) => path.resolve(absPath.game('dists'), ...relPath ),
+    artifacts: ( ...relPath ) => path.resolve(absPath.game('.artifacts'), ...relPath),
     tmp: ( ...relPath ) => path.resolve(absPath.engine('tmp'), ...relPath ),
+    artifactsIn: ( ...relPath ) => path.resolve(currArtifact, 'in', ...relPath),
+    artifactsOut: ( ...relPath ) => path.resolve(currArtifact, 'out', ...relPath),
     setCurrDist: path => {
         currDist = path
+    },
+    setCurrArtifact: path => {
+        currArtifact = path
     },
     make: path.resolve,
     setDeps: (dirname, gameDir) => {

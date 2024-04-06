@@ -13,7 +13,7 @@ class UwpApp extends Deliverable {
     getSupport() {
         return {
             ...super.getSupport(),
-            hasCompiler: true,
+            hasMakeStep: true,
             appIcon: true
         }
     }
@@ -46,7 +46,7 @@ class UwpApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async prepareCompile(distTarget, configs, fileDeps) {
+    async prepareMake(distTarget, configs, fileDeps) {
         const { gamePackageJson } = configs
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
@@ -63,7 +63,7 @@ class UwpApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async compile(distTarget, configs, fileDeps) {
+    async make(distTarget, configs, fileDeps) {
         const { gamePackageJson } = configs
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
