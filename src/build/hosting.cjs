@@ -1,6 +1,7 @@
 const { RESOURCE_LOADING, DEPLOYMENT_METHOD } = require('./config.cjs')
 const { d, csv2values } = require('../shared/helper.cjs')
 const { bold } = require('../shared/console.cjs')
+const { TASK, Tasks } = require("./tasks.cjs");
 
 /**
  * A class representing the hosting of the game. Depending on the hoster certain features and deploy methods may be
@@ -15,7 +16,6 @@ class Hosting {
      */
     constructor() {
         this.supports = this.getSupport()
-        this.instructions = []
     }
 
     /**
@@ -83,31 +83,36 @@ class Hosting {
      *
      * @param {object} config
      * @param {object} fileDeps
+     * @param {Tasks} tasks
      */
-    generateRepoFiles(config, fileDeps) {}
+    generateRepoFiles(config, fileDeps, tasks) {}
 
     /**
      * Prepares the hosting in the development mode. Although there is no hosting required in the development mode
      * because it's all handled by the webpack dev-server, it can be used to generate repository files which are
      * required for the hosting
      *
-     * @param {object} config
+     * @param {object} distTarget
+     * @param {object} configs
      * @param {object} fileDeps
+     * @param {Tasks} tasks
      */
-    prepareDev(distTarget, configs, fileDeps) {
+    prepareDev(distTarget, configs, fileDeps, tasks) {
         const { config } = distTarget
 
         // TODO: only generate to game repo if deploymentMethod is checkout? Upload root may also need this in dist folder
-        this.generateRepoFiles(config, fileDeps)
+        this.generateRepoFiles(config, fileDeps, tasks)
     }
 
     /**
      * Prepares the hosting in the dist folder and also adds instructions for the user to deploy the game and server
      *
-     * @param {object} config
+     * @param {object} distTarget
+     * @param {object} configs
      * @param {object} fileDeps
+     * @param {Tasks} tasks
      */
-    prepareDist(distTarget, configs, fileDeps) {
+    prepareDist(distTarget, configs, fileDeps, tasks) {
         const { config } = distTarget
         const { gamePackageJson } = configs
         const { queue, absPath, syncFs } = fileDeps
@@ -153,36 +158,45 @@ class Hosting {
     }
 
     /**
-     * Adds the given message to the instructions
-     *
-     * @param {string} msg
-     */
-    addInstruction(msg) {
-        this.instructions.push(msg)
-    }
-
-    /**
      * Adds all necessary instructions for the user to deploy and start the server
      *
      * @param {object} config
      * @param {object} fileDeps
+     * @param {Tasks} tasks
      */
-    addDeploymentInstructions(config, fileDeps) {
+    addDeploymentInstructions(config, fileDeps, tasks) {
         const { server, deploymentMethod } = config
         const { absPath } = fileDeps
 
         if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
-            this.addInstruction(`Upload the content of "${absPath.dist()}" to the public folder of your http web-server`)
+            tasks.add(
+                TASK.SOURCE_TO_SERVER,
+                `Upload the content of "${absPath.dist()}" to the public folder of your http web-server`
+            )
         }
         if (!server) return
 
         if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_ROOT) {
-            this.addInstruction(`Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`)
-            this.addInstruction(`Afterwards execute "npm install" in this directory`)
+            tasks
+                .add(
+                    TASK.SOURCE_TO_SERVER,
+                    `Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`
+                )
+                .add(
+                    TASK.TRIGGER_INSTALL,
+                    `Afterwards execute "npm install" in this directory`
+                )
         }
         if (deploymentMethod === DEPLOYMENT_METHOD.CHECKOUT) {
-            this.addInstruction(`Checkout your game repo on your web server manually or automatically`)
-            this.addInstruction(`Afterwards execute "${bold('npm start')}" in the root directory of your web server`)
+            tasks
+                .add(
+                    TASK.SOURCE_TO_SERVER,
+                    `Checkout your game repo on your web server manually or automatically`
+                )
+                .add(
+                    TASK.TRIGGER_START,
+                    `Afterwards execute "${bold('npm start')}" in the root directory of your web server`
+                )
         }
     }
 
@@ -199,17 +213,17 @@ class Hosting {
     prepare(distTarget, configs, fileDeps, isDist) {
         const { absPath } = fileDeps
         const { config } = distTarget
-
+        const tasks = new Tasks()
         const publicDir = config.server ? 'public' : ''
         this.publicPath = absPath.dist(publicDir)
 
         if (isDist) {
-            this.prepareDist(distTarget, configs, fileDeps)
-            this.addDeploymentInstructions(config, fileDeps)
+            this.prepareDist(distTarget, configs, fileDeps, tasks)
+            this.addDeploymentInstructions(config, fileDeps, tasks)
         } else {
-            this.prepareDev(distTarget, configs, fileDeps)
+            this.prepareDev(distTarget, configs, fileDeps, tasks)
         }
-        return publicDir
+        return { publicDir, tasks }
     }
 }
 

@@ -6,6 +6,7 @@ const { getBuildLogLevel, subSectionWarning, dumpJson,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError,
     extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
+const { Tasks } = require("./tasks.cjs")
 const { FileOpQueue } = require("./fileOps.cjs")
 const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame} = require("./helper.cjs")
@@ -125,7 +126,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        distTarget.publicDir = hosting.prepare(distTarget, configs, fileDeps, isDist)
+        const { publicDir, tasks } = hosting.prepare(distTarget, configs, fileDeps, isDist)
+        distTarget.publicDir = publicDir
         subSectionOk()
 
         subSection(`Add application assets`)
@@ -143,8 +145,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         queue.process()
         subSectionOk('\n')
 
-        if (hasLogLevel('normal') && hosting.instructions) {
-            distTarget.instructions = [ ...hosting.instructions ]
+        if (hasLogLevel('normal')) {
+            distTarget.instructions = tasks.toJson()
         }
         resultConfigs.push( ...webpackConfigs )
         while (buildConfigs.length < resultConfigs.length) buildConfigs.push(config)
@@ -192,9 +194,13 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
  * @param {array} instructions
  */
 const showInstructions = instructions => {
+    const tasks = new Tasks(instructions)
+    const lines = tasks.getFlat()
+    if (!lines.length) return
+
     log(`  Please follow these instructions:`)
     newLine()
-    for (const line of instructions) {
+    for (const line of lines) {
         log(`  - ${line}`)
     }
     newLine()
