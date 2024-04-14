@@ -10,6 +10,16 @@ const { NoStackError } = require("../../shared/console.cjs")
  */
 class Pwa extends Deliverable {
 
+    /**
+     * @inheritDoc
+     */
+    setFlags() {
+        this.hasMakeStep = false
+        this.isAllInOne = true
+        this.hasAppIcon = true
+        this.hasFavIcon = true
+    }
+
     getConfigKeys() {
         return {
             name: {type: 'string', default: '{config.name}'},
@@ -24,14 +34,6 @@ class Pwa extends Deliverable {
             display: {type: 'string', default: 'standalone', values: ['fullscreen', 'standalone', 'minimal-ui', 'browser']},
             labels: {type: 'array', subType: 'string', default: []}
         }
-    }
-
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            favIcon: true,
-            appIcon: true
-        };
     }
 
     supportsResourceLoading(value) {

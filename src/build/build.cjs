@@ -7,7 +7,7 @@ const { getBuildLogLevel, subSectionWarning, dumpJson,
     extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
 const { Tasks } = require("./tasks.cjs")
-const { FileOpQueue } = require("./fileOps.cjs")
+const { FileOpQueue } = require("./queue.cjs")
 const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame} = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")

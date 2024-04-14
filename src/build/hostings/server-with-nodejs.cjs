@@ -8,12 +8,10 @@ class ServerWithNodejsHosting extends Hosting {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            checkout: true,
-            nodejs: true
-        }
+    setFlags() {
+        this.supportsNodeJs = true
+        this.supportsManualUpload = true
+        this.supportsCheckout = true
     }
 }
 

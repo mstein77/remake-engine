@@ -10,12 +10,11 @@ class UwpApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            hasMakeStep: true,
-            appIcon: true
-        }
+    setFlags() {
+        this.hasMakeStep = true
+        this.isAllInOne = true
+        this.hasAppIcon = true
+        this.hasFavIcon = true
     }
 
     /**

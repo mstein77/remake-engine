@@ -14,22 +14,22 @@ const MAKERS = {
  */
 class ElectronApp extends Deliverable {
 
+    /**
+     * @inheritDoc
+     */
+    setFlags() {
+        this.hasMakeStep = true
+        this.isAllInOne = true
+        this.hasAppIcon = false
+        this.hasFavIcon = true
+    }
+
     getConfigKeys() {
         return {
             name: {type: 'string', default: '{config.shortName}'},
             description: {type: 'string', default: '{config.description}'},
             background_color: {type: 'string', default: ''},
             makers: {type: 'csv', values: toValues(MAKERS), default: [MAKERS.ZIP].join(',')}
-        }
-    }
-
-    /**
-     * @inheritDoc
-     */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            hasMakeStep: true
         }
     }
 

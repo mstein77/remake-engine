@@ -15,20 +15,17 @@ class Hosting {
      * Creates a new hosting instance
      */
     constructor() {
-        this.supports = this.getSupport()
+        this.setFlags()
     }
 
     /**
-     * Returns an object mapping features to a value indicating whether it is supported or not
-     *
-     * @returns {object}
+     * Sets the following flags on this:
+     *  - supportsNodeJs
+     *  - supportsManualUpload
+     *  - supportsCheckout
      */
-    getSupport() {
-        return {
-            nodejs: true,
-            manualUpload: true,
-            checkout: true
-        }
+    setFlags() {
+        throw Error('Implement me')
     }
 
     /**
@@ -49,33 +46,6 @@ class Hosting {
                 return this.supportsCheckout
         }
         return true
-    }
-
-    /**
-     * Returns a boolean indicating whether this hosting supports nodejs or not
-     *
-     * @returns {boolean}
-     */
-    get supportsNodejs() {
-        return this.supports.nodejs
-    }
-
-    /**
-     * Returns a boolean indicating whether this hosting supports a manual upload or not
-     *
-     * @returns {boolean}
-     */
-    get supportsManualUpload() {
-        return this.supports.manualUpload
-    }
-
-    /**
-     * Returns a boolean indicating whether this hosting supports a checkout or not
-     *
-     * @returns {boolean}
-     */
-    get supportsCheckout() {
-        return this.supports.checkout
     }
 
     /**

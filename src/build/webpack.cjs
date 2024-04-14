@@ -5,7 +5,7 @@ const { makeDescriptor, ResourceTypeRegistry} = require("../shared/resources.cjs
 const { FileCodec} = require("../shared/fileCodec.cjs")
 const { d, isObject, isArray, csv2values, trim, toKeys, regexpEscape } = require("../shared/helper.cjs")
 const { stringifyValues, getReplaceMetaVars, getHtmlTags, exec} = require("./helper.cjs")
-const { FILE_OP } = require('./fileOps.cjs')
+const { FILE_OP } = require('./queue.cjs')
 const { NoStackError, getBuildLogLevel} = require("../shared/console.cjs")
 
 const HtmlWebpackPlugin = require("html-webpack-plugin")

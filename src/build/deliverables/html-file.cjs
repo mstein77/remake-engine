@@ -9,6 +9,16 @@ class HtmlFile extends Deliverable {
     /**
      * @inheritDoc
      */
+    setFlags() {
+        this.hasMakeStep = false
+        this.isAllInOne = true
+        this.hasAppIcon = false
+        this.hasFavIcon = true
+    }
+
+    /**
+     * @inheritDoc
+     */
     supportsResourceLoading(value) {
         if (value === RESOURCE_LOADING.LOCAL_ALL) return true
 

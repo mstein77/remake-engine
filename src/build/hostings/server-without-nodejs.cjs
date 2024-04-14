@@ -9,12 +9,10 @@ class ServerWithoutNodejsHosting extends Hosting {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            checkout: false,
-            nodejs: false
-        }
+    setFlags() {
+        this.supportsNodeJs = false
+        this.supportsManualUpload = true
+        this.supportsCheckout = false
     }
 
     /**

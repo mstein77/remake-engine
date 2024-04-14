@@ -21,7 +21,18 @@ class Deliverable {
      */
     constructor(config = {}) {
         this.config = this.getParsedConfig(config)
-        this.supports = this.getSupport()
+        this.setFlags()
+    }
+
+    /**
+     * Sets the following flags on this:
+     *  - hasMakeStep
+     *  - isAllInOne
+     *  - hasAppIcon
+     *  - hasFavIcon
+     */
+    setFlags() {
+        throw Error(`Implement me!`)
     }
 
     getConfigKeys() {
@@ -38,47 +49,6 @@ class Deliverable {
         }
         validateConfig(result, configKeys, 'deliverable config')
         return result
-    }
-
-    /**
-     * Returns an object mapping features to a value indicating whether it is supported or not
-     *
-     * @returns {object}
-     */
-    getSupport() {
-        return {
-            hasMakeStep: false,
-            isAllInOne: true,
-            appIcon: false,
-            favIcon: true
-        }
-    }
-
-    /**
-     * Returns whether this deliverable requires a webpack build which is only single html file with all resources,
-     * styles and scripts inside or not
-     *
-     * @returns {boolean}
-     */
-    get isAllInOne() {
-        return this.supports.isAllInOne
-    }
-
-    /**
-     * Returns whether this deliverable requires a compilation or not
-     *
-     * @returns {boolean|*}
-     */
-    get hasMakeStep() {
-        return this.supports.hasMakeStep
-    }
-
-    get hasAppIcon() {
-        return this.supports.appIcon
-    }
-
-    get hasFavIcon() {
-        return this.supports.favIcon
     }
 
     prepareAppAssets(distTarget, configs, fileDeps) {

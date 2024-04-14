@@ -8,8 +8,11 @@ class WebApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return { ...super.getSupport(), isAllInOne: false, favIcon: true };
+    setFlags() {
+        this.hasMakeStep = false
+        this.isAllInOne = false
+        this.hasAppIcon = false
+        this.hasFavIcon = true
     }
 }
 

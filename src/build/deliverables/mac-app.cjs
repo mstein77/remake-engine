@@ -12,11 +12,11 @@ class MacApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            hasMakeStep: true
-        }
+    setFlags() {
+        this.hasMakeStep = true
+        this.isAllInOne = true
+        this.hasAppIcon = false
+        this.hasFavIcon = true
     }
 
     /**
