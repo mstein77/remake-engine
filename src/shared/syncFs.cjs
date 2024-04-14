@@ -45,6 +45,8 @@ const syncFs = {
 
     rmdir: ( path ) => fs.rmSync( path, { recursive: true } ),
 
+    stat: ( ...args ) => fs.statSync( ...args ),
+
     clearDir: (dirPath, except = []) => {
         if (!syncFs.dirExists(dirPath)) return
         const items = syncFs.readdir(dirPath, {withFileTypes: true})

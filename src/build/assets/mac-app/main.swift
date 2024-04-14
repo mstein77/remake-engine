@@ -3,7 +3,7 @@ import WebKit
 
 struct ContentView: View {
     var body: some View {
-        let url = Bundle.main.url(forResource: "index", withExtension: "html")!
+        let url = Bundle.main.url(forResource: "assets/index", withExtension: "html")!
 
         return AnyView(WebView(url: url)
                         .focusable(true)

@@ -1,6 +1,6 @@
 const { execSync} = require("child_process")
 const absPath = require("../src/shared/absPath.cjs")
-const { ERROR_STATUS_HANDLED, extractOptionsAndArguments, log, bold, errorSection, setCliScript} = require("../src/shared/console.cjs");
+const { EXIT_CODE_HANDLED, extractOptionsAndArguments, log, bold, errorSection, setCliScript} = require("../src/shared/console.cjs");
 const { argInfoGame} = require("../src/build/helper.cjs");
 const { d } = require("../src/shared/helper.cjs")
 
@@ -17,7 +17,7 @@ try {
             cwd: absPath.engine()
         })
     } catch (e) {
-        if (e.status !== ERROR_STATUS_HANDLED) throw e
+        if (e.status !== EXIT_CODE_HANDLED) throw e
     }
 } catch (e) {
     errorSection(e)

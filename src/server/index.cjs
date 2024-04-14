@@ -7,14 +7,32 @@ const syncFs = require("../shared/syncFs.cjs")
 const open = require("open")
 const { mainSection, errorSection, setCliScript} = require("../shared/console.cjs")
 
-const isPreview = process.argv.includes('--preview')
-
 try {
+    const isPreview = process.argv.includes('--preview')
     setCliScript(isPreview ? 'PREVIEW' : 'SERVER')
     const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
     const STATIC_DIR = path.resolve(__dirname, "public")
     const app = express()
     corsOptions = {}
+
+    let downloadsHtml = null
+    const getDownloadsHtml = () => {
+        if (downloadsHtml === null) {
+            const pluginPath = path.resolve(__dirname, 'DownloadsPlugin.cjs')
+            if (syncFs.fileExists(pluginPath)) {
+                const plugin = eval('require("' + pluginPath + '")')
+                const files = []
+                const filesDir = path.resolve(STATIC_DIR)
+                const names = syncFs.readFiles(filesDir)
+                for (const name of names) {
+                    const { size, mtime, ctime } = syncFs.stat(path.join(filesDir, name))
+                    files.push({ name, size, mtime, ctime })
+                }
+                downloadsHtml = plugin(files)
+            }
+        }
+        return downloadsHtml
+    }
     if (RESTRICTED_CORS) {
         const baseUrl = new URL(isPreview ? PREVIEW_URL : BASE_URL)
         corsOptions.origin = baseUrl.protocol + '://' + baseUrl.hostname
@@ -40,8 +58,8 @@ try {
                 res.set('Cache-Control', 'no-cache')
                 return res
             }
-            const files = syncFs.readFiles(path.resolve(STATIC_DIR))
-            res.send(`<h1>Available files:</h1><ul>${files.map(file => `<li><a href="${file}">${file}</a></li>`).join('')}</ul>`)
+            res.set('Cache-Control', 'no-cache')
+            res.send(getDownloadsHtml())
             return res
         })
         app.use(express.static(STATIC_DIR))

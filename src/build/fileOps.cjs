@@ -117,8 +117,8 @@ class FileOpQueue {
         return this
     }
 
-    addPath(path) {
-        this.queue.push({ op: FILE_OP.PATH, path })
+    addPath(path, clearIfExists = false) {
+        this.queue.push({ op: FILE_OP.PATH, path, clearIfExists })
         return this
     }
 
@@ -206,14 +206,15 @@ class FileOpQueue {
                 break
             }
             case FILE_OP.PATH: {
-                const { path } = params
+                const { path, clearIfExists } = params
                 detail(` ${bold('PATH')} ${path}`)
 
                 syncFs.createPathTo(path + '/')
+                if (clearIfExists) syncFs.clearDir(path)
                 break
             }
             case FILE_OP.EXEC: {
-                const { cmd, options } = params
+                const { cmd, options = {} } = params
                 detail(` ${bold('EXEC')} ${cmd}`)
 
                 setSpinnerInfo(cmd)

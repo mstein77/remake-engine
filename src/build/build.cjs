@@ -298,7 +298,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
     const exceptDirs = []
     let index = 0
     for (const distTarget of distTargets) {
-        let { target, config, root, dir, tmpDir } = distTarget
+        let { target, config, root, dir, tmpDir, publicDir } = distTarget
         const path = absPath.make(root, tmpDir)
         absPath.setCurrDist(path)
 
@@ -318,14 +318,14 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
 
         if (deliverable.hasMakeStep) {
             absPath.setCurrArtifact(absPath.artifacts(target ? 'dists/' + target : 'dist'))
-            queue.addPath(absPath.artifactsIn())
+            queue.addPath(absPath.artifactsIn(), true)
 
             await asyncSubSection(
                 `Prepare make`,
                 [deliverable, 'prepareMake'],
                 ...params
             )
-            queue.addPath(absPath.artifactsOut())
+            queue.addPath(absPath.artifactsOut(), true)
             let skipMake = false
             const makeHook = getBuildHook('make')
             if (makeHook) {
@@ -364,6 +364,13 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
                 postBuildHook,
                 ...params
             )
+        }
+        if (config.server && deliverable.hasMakeStep) {
+            const pluginFileName = 'DownloadsPlugin.cjs'
+            const gamePluginPath = absPath.game(pluginFileName)
+            const pluginPath = syncFs.fileExists(gamePluginPath) ?
+                gamePluginPath : absPath.src('build', 'plugins', pluginFileName)
+            queue.addCopy(pluginPath, absPath.make(path, pluginFileName))
         }
         queue.addReplace(path, absPath.make(root, dir)).process()
 

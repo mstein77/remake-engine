@@ -1,6 +1,6 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, ERROR_STATUS_HANDLED,
+const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_CODE_HANDLED,
     setCliScript, mainSection
 } = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
@@ -79,7 +79,7 @@ try {
             }
         }
     } catch (e) {
-        if (e.status !== ERROR_STATUS_HANDLED) throw e
+        if (e.status !== EXIT_CODE_HANDLED) throw e
     }
 } catch (e) {
     errorSection(e)

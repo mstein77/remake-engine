@@ -3,7 +3,7 @@ const { d, isRegExp, isFunction, isArray, isString, toKeys, toPairs, isVersionEq
 const child_process = require("node:child_process")
 const os = require('node:os')
 
-const ERROR_STATUS_HANDLED = 2307
+const EXIT_CODE_HANDLED = 27
 const minNodeVersion = 'v16'
 
 // TODO we should check the terminal support for colors here, especially for windows
@@ -156,7 +156,7 @@ const errorSection = error => {
     } else if (error.output) {
         console.log(error.output)
     }
-    process.exit(ERROR_STATUS_HANDLED)
+    process.exit(EXIT_CODE_HANDLED)
 }
 
 async function asyncSubSection(name, func, ...params) {
@@ -495,7 +495,7 @@ const getParsedArguments = (info, args) => {
 }
 
 module.exports = {
-    ERROR_STATUS_HANDLED,
+    EXIT_CODE_HANDLED,
     FG,
     BG,
     newLine,
