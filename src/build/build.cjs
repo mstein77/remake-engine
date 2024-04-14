@@ -6,7 +6,8 @@ const { getBuildLogLevel, subSectionWarning, dumpJson,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError,
     extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
-const { FileOpQueue } = require("./fileOps.cjs")
+const { Tasks } = require("./tasks.cjs")
+const { FileOpQueue } = require("./queue.cjs")
 const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame} = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
@@ -125,7 +126,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        distTarget.publicDir = hosting.prepare(distTarget, configs, fileDeps, isDist)
+        const { publicDir, tasks } = hosting.prepare(distTarget, configs, fileDeps, isDist)
+        distTarget.publicDir = publicDir
         subSectionOk()
 
         subSection(`Add application assets`)
@@ -143,8 +145,8 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         queue.process()
         subSectionOk('\n')
 
-        if (hasLogLevel('normal') && hosting.instructions) {
-            distTarget.instructions = [ ...hosting.instructions ]
+        if (hasLogLevel('normal')) {
+            distTarget.instructions = tasks.toJson()
         }
         resultConfigs.push( ...webpackConfigs )
         while (buildConfigs.length < resultConfigs.length) buildConfigs.push(config)
@@ -192,9 +194,13 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
  * @param {array} instructions
  */
 const showInstructions = instructions => {
+    const tasks = new Tasks(instructions)
+    const lines = tasks.getFlat()
+    if (!lines.length) return
+
     log(`  Please follow these instructions:`)
     newLine()
-    for (const line of instructions) {
+    for (const line of lines) {
         log(`  - ${line}`)
     }
     newLine()
@@ -302,7 +308,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
         }
         const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
         const deliverable = new Deliverable(config.deliverableConfig)
-        const params = [ distTarget, { ...configs, config }, fileDeps ]
+        const params = [ distTarget, { ...configs }, fileDeps ]
 
         await asyncSubSection(
             `Generate assets`,
@@ -312,14 +318,14 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
 
         if (deliverable.hasMakeStep) {
             absPath.setCurrArtifact(absPath.artifacts(target ? 'dists/' + target : 'dist'))
-            queue.addPath(absPath.artifactsIn())
+            queue.addPath(absPath.artifactsIn(), true)
 
             await asyncSubSection(
                 `Prepare make`,
                 [deliverable, 'prepareMake'],
                 ...params
             )
-            queue.addPath(absPath.artifactsOut())
+            queue.addPath(absPath.artifactsOut(), true)
             let skipMake = false
             const makeHook = getBuildHook('make')
             if (makeHook) {
@@ -358,6 +364,13 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
                 postBuildHook,
                 ...params
             )
+        }
+        if (config.server && deliverable.hasMakeStep) {
+            const pluginFileName = 'DownloadsPlugin.cjs'
+            const gamePluginPath = absPath.game(pluginFileName)
+            const pluginPath = syncFs.fileExists(gamePluginPath) ?
+                gamePluginPath : absPath.src('build', 'plugins', pluginFileName)
+            queue.addCopy(pluginPath, absPath.make(path, pluginFileName))
         }
         queue.addReplace(path, absPath.make(root, dir)).process()
 

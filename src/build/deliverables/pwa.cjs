@@ -10,6 +10,16 @@ const { NoStackError } = require("../../shared/console.cjs")
  */
 class Pwa extends Deliverable {
 
+    /**
+     * @inheritDoc
+     */
+    setFlags() {
+        this.hasMakeStep = false
+        this.isAllInOne = true
+        this.hasAppIcon = true
+        this.hasFavIcon = true
+    }
+
     getConfigKeys() {
         return {
             name: {type: 'string', default: '{config.name}'},
@@ -24,14 +34,6 @@ class Pwa extends Deliverable {
             display: {type: 'string', default: 'standalone', values: ['fullscreen', 'standalone', 'minimal-ui', 'browser']},
             labels: {type: 'array', subType: 'string', default: []}
         }
-    }
-
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            favIcon: true,
-            appIcon: true
-        };
     }
 
     supportsResourceLoading(value) {
@@ -148,9 +150,9 @@ class Pwa extends Deliverable {
      * @inheritDoc
      */
     processPostBuild(distTarget, configs, fileDeps) {
-        const { metaVars, config } = configs
+        const { metaVars } = configs
         const { queue, absPath } = fileDeps
-        const { publicDir, assets = [], screenshots = [] } = distTarget
+        const { publicDir, config, assets = [], screenshots = [] } = distTarget
 
         const pwaScreenshots = []
         for (const { filePath, file, dim, ext, label, form_factor } of screenshots) {

@@ -14,22 +14,22 @@ const MAKERS = {
  */
 class ElectronApp extends Deliverable {
 
+    /**
+     * @inheritDoc
+     */
+    setFlags() {
+        this.hasMakeStep = true
+        this.isAllInOne = true
+        this.hasAppIcon = false
+        this.hasFavIcon = true
+    }
+
     getConfigKeys() {
         return {
             name: {type: 'string', default: '{config.shortName}'},
             description: {type: 'string', default: '{config.description}'},
             background_color: {type: 'string', default: ''},
             makers: {type: 'csv', values: toValues(MAKERS), default: [MAKERS.ZIP].join(',')}
-        }
-    }
-
-    /**
-     * @inheritDoc
-     */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            hasMakeStep: true
         }
     }
 
@@ -64,9 +64,9 @@ class ElectronApp extends Deliverable {
      * @inheritDoc
      */
     async prepareMake(distTarget, configs, fileDeps) {
-        const { metaVars, config } = configs
+        const { metaVars } = configs
         const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+        const { publicDir, config } = distTarget
 
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))

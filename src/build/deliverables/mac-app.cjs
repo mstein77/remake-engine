@@ -12,11 +12,11 @@ class MacApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    getSupport() {
-        return {
-            ...super.getSupport(),
-            hasMakeStep: true
-        }
+    setFlags() {
+        this.hasMakeStep = true
+        this.isAllInOne = true
+        this.hasAppIcon = false
+        this.hasFavIcon = true
     }
 
     /**
@@ -51,7 +51,8 @@ class MacApp extends Deliverable {
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
-        queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
+        queue.addClear(absPath.artifactsIn('assets'), true)
+        queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('assets', 'index.html'))
         queue.addCopy(absPath.src('build/assets/mac-app/main.swift'), absPath.artifactsIn('main.swift'))
         await queue.processAsync()
     }
@@ -79,7 +80,8 @@ class MacApp extends Deliverable {
 
         const outFile = absPath.artifactsOut(gamePackageJson.name)
         queue.addCopy(outFile, absPath.dist(publicDir, gamePackageJson.name))
-        queue.addClear(absPath.dist(publicDir), false, [gamePackageJson.name, 'index.html'])
+        queue.addCopy(absPath.artifactsIn('assets', 'index.html'), absPath.dist(publicDir, 'assets', 'index.html'))
+        queue.addClear(absPath.dist(publicDir), false, [gamePackageJson.name, 'assets'])
         await queue.processAsync()
     }
 

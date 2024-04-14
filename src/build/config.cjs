@@ -282,7 +282,7 @@ const runConfigIntegrityChecks = (config, fileDeps, options) => {
     const Hosting = require(`./hostings/${config.hosting}.cjs`)
     const hosting = new Hosting()
 
-    if (config.server && !hosting.supportsNodejs)
+    if (config.server && !hosting.supportsNodeJs)
         throw NoStackError(MSG.noServerNodejs)
 
     let supported = deliverable.supportsResourceLoading(config.resourceLoading)
