@@ -51,10 +51,11 @@ class UwpApp extends Deliverable {
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
+        queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         for (const filename of ['MainPage.xaml', 'MainPage.xaml.cs', 'Package.appxmanifest']) {
-            queue.addCopy(absPath.src(`build/assets/uwp-app/${filename}`), absPath.dist(publicDir, filename))
+            queue.addCopy(absPath.src(`build/assets/uwp-app/${filename}`), absPath.artifactsIn(filename))
         }
-        const csprojPath = absPath.dist(publicDir, `${gamePackageJson.name}.csproj`)
+        const csprojPath = absPath.artifactsIn(`${gamePackageJson.name}.csproj`)
         queue.addCopy(absPath.src('build/assets/uwp-app/example.csproj'), csprojPath)
 
         await queue.processAsync()
@@ -68,9 +69,9 @@ class UwpApp extends Deliverable {
         const { queue, absPath } = fileDeps
         const { publicDir } = distTarget
 
-        const cwd = absPath.dist(publicDir)
+        const cwd = absPath.dist(absPath.artifactsIn())
         queue.addExec(`dotnet restore`, { cwd })
-        queue.addExec(`msbuild ${gamePackageJson.name}.csproj /t:build /p:Configuration=Release`, { cwd })
+        queue.addExec(`msbuild ${gamePackageJson.name}.csproj /t:build /p:Configuration=Release /p:OutputPath=${absPath.artifactsOut()}` , { cwd })
         // queue.addClear(cwd, ['index.html', ])
 
         await queue.processAsync()
