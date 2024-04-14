@@ -150,9 +150,9 @@ class Pwa extends Deliverable {
      * @inheritDoc
      */
     processPostBuild(distTarget, configs, fileDeps) {
-        const { metaVars, config } = configs
+        const { metaVars } = configs
         const { queue, absPath } = fileDeps
-        const { publicDir, assets = [], screenshots = [] } = distTarget
+        const { publicDir, config, assets = [], screenshots = [] } = distTarget
 
         const pwaScreenshots = []
         for (const { filePath, file, dim, ext, label, form_factor } of screenshots) {

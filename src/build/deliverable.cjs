@@ -32,7 +32,7 @@ class Deliverable {
      *  - hasFavIcon
      */
     setFlags() {
-        throw Error(`Implement me!`)
+        throw Error(`Implement me`)
     }
 
     getConfigKeys() {
@@ -278,7 +278,8 @@ class Deliverable {
     }
 
     getMeta(distTarget, configs, fileDeps) {
-        const { metaVars, config } = configs
+        const { config } = distTarget
+        const { metaVars } = configs
 
         const replaceMetaVars = getReplaceMetaVars(metaVars)
 

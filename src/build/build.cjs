@@ -298,7 +298,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
     const exceptDirs = []
     let index = 0
     for (const distTarget of distTargets) {
-        let { target, config, root, dir, tmpDir, publicDir } = distTarget
+        let { target, config, root, dir, tmpDir } = distTarget
         const path = absPath.make(root, tmpDir)
         absPath.setCurrDist(path)
 
@@ -308,7 +308,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
         }
         const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
         const deliverable = new Deliverable(config.deliverableConfig)
-        const params = [ distTarget, { ...configs, config }, fileDeps ]
+        const params = [ distTarget, { ...configs }, fileDeps ]
 
         await asyncSubSection(
             `Generate assets`,

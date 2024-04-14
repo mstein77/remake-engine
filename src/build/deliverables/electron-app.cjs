@@ -64,9 +64,9 @@ class ElectronApp extends Deliverable {
      * @inheritDoc
      */
     async prepareMake(distTarget, configs, fileDeps) {
-        const { metaVars, config } = configs
+        const { metaVars } = configs
         const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+        const { publicDir, config } = distTarget
 
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
