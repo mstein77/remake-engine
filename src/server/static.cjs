@@ -1,6 +1,6 @@
 const absPath = require("../shared/absPath.cjs")
 const { getPreviewConfigs } = require('../build/config.cjs')
-const { extractOptionsAndArguments, errorSection, mainSection, setCliScript} = require("../shared/console.cjs")
+const { extractOptionsAndArguments, errorSection, mainSection, setCliScript } = require("../shared/console.cjs")
 const { d } = require('../shared/helper.cjs')
 const express = require('express')
 const cors = require('cors')
@@ -48,6 +48,7 @@ try {
             return
         }
         const files = syncFs.readFiles(absPath.dist(pubPrefix))
+        // TODO use default-plugin here
         res.send(`<h1>Available files:</h1><ul>${files.map(file => `<li><a href="${file}">${file}</a></li>`).join('')}</ul>`)
     })
     const port = https ? httpsPort : httpPort

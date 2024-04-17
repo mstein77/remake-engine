@@ -2,7 +2,8 @@ const Deliverable = require("../deliverable.cjs")
 const { RESOURCE_LOADING} = require("../config.cjs")
 const { getReplaceMetaVars } = require("../helper.cjs")
 const { d, csv2values, toValues } = require('../../shared/helper.cjs')
-const { exec } = require("../../shared/console.cjs");
+const { exec, NoStackError } = require("../../shared/console.cjs")
+const pngToIco = require('png-to-ico')
 
 const MAKERS = {
     DMG: 'dmg',
@@ -20,7 +21,7 @@ class ElectronApp extends Deliverable {
     setFlags() {
         this.hasMakeStep = true
         this.isAllInOne = true
-        this.hasAppIcon = false
+        this.hasAppIcon = true
         this.hasFavIcon = true
     }
 
@@ -60,6 +61,25 @@ class ElectronApp extends Deliverable {
         }
     }
 
+    async buildIconSetFromPath(path, fileDeps) {
+        const { syncFs, absPath, queue } = fileDeps
+        const icons = []
+        if (process.platform === 'win32') {
+            const iconRegexp = /^icon\-[0-9]+\.png$/
+            const files = syncFs.readFiles(path).filter(item => iconRegexp.test(item))
+            const buffer = await pngToIco(files.map(name => absPath.make(path, name)))
+
+            const assetsPath = absPath.artifactsIn('assets')
+            queue.addClear(assetsPath, true)
+            await queue.processAsync()
+            const icoFile = absPath.make(assetsPath, 'icon.ico')
+            syncFs.writeContent(icoFile, buffer)
+
+            icons.push(icoFile)
+        }
+        return icons
+    }
+
     /**
      * @inheritDoc
      */
@@ -68,6 +88,7 @@ class ElectronApp extends Deliverable {
         const { queue, absPath } = fileDeps
         const { publicDir, config } = distTarget
 
+        const icons = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'), fileDeps)
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
 
@@ -108,8 +129,10 @@ class ElectronApp extends Deliverable {
                 license: 'ISC',
                 "config": {
                     "forge": {
+                        packagerConfig: {
+                            icon: icons[0].substring(0, icons[0].length - 4)
+                        },
                         "outDir": absPath.artifactsOut(),
-                        "packagerConfig": {},
                         "makers": makers
                     }
                 },

@@ -1,15 +1,13 @@
 const absPath = require("../shared/absPath.cjs")
 const syncFs = require("../shared/syncFs.cjs")
-const { d, isArray, toPairs, simpleType, isObject, isVersionEqualOrHigher } = require("../shared/helper.cjs")
-const { getBuildLogLevel, subSectionWarning, dumpJson,
-    bold, log, errorSection, setBuildLogLevel, mainSection,
-    hasLogLevel, newLine, subSection, subSectionOk, subSectionError,
-    extractOptionsAndArguments, NoStackError, asyncSubSection
+const { d, isArray, toPairs, simpleType, isObject } = require("../shared/helper.cjs")
+const { getBuildLogLevel, subSectionWarning, dumpJson, bold, log, errorSection, setBuildLogLevel, mainSection,
+    hasLogLevel, newLine, subSection, subSectionOk, subSectionError, extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
 const { Tasks } = require("./tasks.cjs")
 const { FileOpQueue } = require("./queue.cjs")
-const { buildConfig, runConfigIntegrityChecks, DEPLOYMENT_METHOD} = require("./config.cjs")
-const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame} = require("./helper.cjs")
+const { buildConfig, runConfigIntegrityChecks } = require("./config.cjs")
+const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame } = require("./helper.cjs")
 const { getTargetWebpackConfigs } = require("./webpack.cjs")
 const { ResourceTypeRegistry } = require("../shared/resources.cjs")
 const PostBuildPlugin = require("./plugins/PostBuildPlugin.cjs")
@@ -244,11 +242,13 @@ const generateWebpackConfigs = (isDist, all = false) => {
             queue: new FileOpQueue(),
             syncFs
         }
+        const enginePackageJson = getJsonObjectFromFile(absPath.engine('package.json'))
         const configs = {
             buildJson,
-            enginePackageJson: getJsonObjectFromFile(absPath.engine('package.json')),
+            enginePackageJson,
             gamePackageJson: getJsonObjectFromFile(absPath.game('package.json'))
         }
+        process.env.RMK_ENGINE_VERSION = enginePackageJson.version
         if (isDist && (all || target)) {
             const buildsPath = absPath.game('builds.cjs')
             configs.buildsJson = getDefaultFromModule(buildsPath)
@@ -288,7 +288,8 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
     setBuildLogLevel(buildLogLevel)
     mainSection('Post build processing...')
 
-    const postBuildHook = getBuildHook('post-build')
+    const { enginePackageJson } = configs
+    process.env.RMK_ENGINE_VERSION = enginePackageJson.version
     const queue = new FileOpQueue()
     const fileDeps = {
         absPath,
@@ -358,6 +359,7 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
             ...params
         )
 
+        const postBuildHook = getBuildHook('post-build')
         if (postBuildHook) {
             await asyncSubSection(
                 `Trigger post-build-hook`,

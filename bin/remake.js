@@ -89,7 +89,7 @@ try {
             packageJson.scripts.dev = run + 'build-game-dev'
             packageJson.scripts.game = run + 'build-game-dev'
             packageJson.scripts.build = run + 'build-game-dist'
-            packageJson.scripts.pbuild = run + 'build-game-dist'
+            packageJson.scripts.pbuild = run + 'preview-build'
             packageJson.scripts.builds = run + 'build-game-dists'
             packageJson.scripts.start = run + 'start'
             packageJson.scripts.preview = run + 'preview'

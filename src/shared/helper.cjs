@@ -39,7 +39,9 @@ function d(main, ...params) {
         const [ first ] = line.split('(')
         func.push(first.substring(6).trim())
     }
-    logger.group('Debug ' + func.join(' <- '))
+    const gray = typeof window !== 'undefined' ? '' : '\x1b[90m'
+    const noCol = typeof window !== 'undefined' ? '' : '\x1b[0m'
+    logger.group(gray + 'Debug ' + func.join(' <- ') + noCol)
     logger.log(main, ...params)
     logger.groupEnd()
 

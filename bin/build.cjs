@@ -1,7 +1,7 @@
 const { execSync} = require("child_process")
 const absPath = require("../src/shared/absPath.cjs")
-const { EXIT_CODE_HANDLED, extractOptionsAndArguments, log, bold, errorSection, setCliScript} = require("../src/shared/console.cjs");
-const { argInfoGame} = require("../src/build/helper.cjs");
+const { EXIT_CODE_HANDLED, extractOptionsAndArguments, errorSection, setCliScript } = require("../src/shared/console.cjs")
+const { argInfoGame} = require("../src/build/helper.cjs")
 const { d } = require("../src/shared/helper.cjs")
 
 try {

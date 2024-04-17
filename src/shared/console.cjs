@@ -150,7 +150,7 @@ const errorSection = error => {
 
     const detailsBox = FG.L_GRAY + `[${details.join('|')}] `
     log(`\n${BG.L_RED + FG.BLACK} ${getCliScript()} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
-    log( FG.RED + bold(' ✕') + FG.RESET + ' ' + bold(error.message) + '\n')
+    log( FG.RED + bold(' ✕ ') + FG.RESET + bold(error.message) + '\n')
     if (!error.noStack) {
         console.error(error.stack)
     } else if (error.output) {

@@ -2,7 +2,7 @@ const { d, isArray, sortPropAsc, stringList, union, toValues, toKeys, csv2values
 const { getReplaceMetaVars, getIconMimeType } = require('./helper.cjs')
 const sizeOf = require("image-size")
 const Jimp = require("jimp")
-const { validateConfig, ASSET_GENERATION, PLATFORMS, buildDefaults } = require("./config.cjs")
+const { validateConfig, ASSET_GENERATION, buildDefaults } = require("./config.cjs")
 const scope2assets = require('./asset.cjs')
 const { execSync, NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
 
@@ -289,7 +289,7 @@ class Deliverable {
             const content = replaceMetaVars(config[name])
             if (content) meta.push({ name, content })
         }
-        meta.push({name: "viewport", content: "width=device-width, initial-scale=1, shrink-to-fit=no"})
+        meta.push({ name: "viewport", content: "width=device-width, initial-scale=1, shrink-to-fit=no" })
 
         return meta
     }
@@ -303,7 +303,7 @@ class Deliverable {
     getMetaLinks(distTarget, configs, fileDeps) {
         const metaLinks = []
         const { assets } = distTarget
-        if (!this.hasFavIcon || !assets) return links
+        if (!this.hasFavIcon || !assets) return metaLinks
 
         for (const asset of assets) {
             const { scope, dim, relPath, ext, links } = asset

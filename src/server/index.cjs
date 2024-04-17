@@ -10,6 +10,8 @@ const { mainSection, errorSection, setCliScript} = require("../shared/console.cj
 try {
     const isPreview = process.argv.includes('--preview')
     setCliScript(isPreview ? 'PREVIEW' : 'SERVER')
+    process.env.RMK_ENGINE_VERSION = VERSION_ENGINE
+
     const setupAppMiddlewares = RESOURCES_API && require('./setupMiddlewares.cjs')
     const STATIC_DIR = path.resolve(__dirname, "public")
     const app = express()
@@ -20,7 +22,7 @@ try {
         if (downloadsHtml === null) {
             const pluginPath = path.resolve(__dirname, 'DownloadsPlugin.cjs')
             if (syncFs.fileExists(pluginPath)) {
-                const plugin = eval('require("' + pluginPath + '")')
+                const plugin = eval('require("' + pluginPath.replaceAll('\\', '\\\\') + '")')
                 const files = []
                 const filesDir = path.resolve(STATIC_DIR)
                 const names = syncFs.readFiles(filesDir)

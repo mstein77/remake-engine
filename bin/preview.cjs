@@ -1,8 +1,6 @@
 const absPath = require("../src/shared/absPath.cjs")
 const syncFs = require("../src/shared/syncFs.cjs")
-const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_CODE_HANDLED,
-    setCliScript, mainSection
-} = require("../src/shared/console.cjs")
+const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_CODE_HANDLED, setCliScript, mainSection } = require("../src/shared/console.cjs")
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
