@@ -1,8 +1,8 @@
 const Deliverable = require("../deliverable.cjs")
-const { RESOURCE_LOADING} = require("../config.cjs")
+const { RESOURCE_LOADING, PLATFORMS} = require("../config.cjs")
 const { getReplaceMetaVars } = require("../helper.cjs")
 const { d, csv2values, toValues } = require('../../shared/helper.cjs')
-const { exec, NoStackError } = require("../../shared/console.cjs")
+const { exec } = require("../../shared/console.cjs")
 const pngToIco = require('png-to-ico')
 
 const MAKERS = {
@@ -43,6 +43,19 @@ class ElectronApp extends Deliverable {
         return RESOURCE_LOADING.LOCAL_ALL
     }
 
+    getAllowedPlatforms(platforms) {
+        switch (process.platform) {
+            case 'darwin':
+                return [PLATFORMS.MACOS]
+
+            case 'win32':
+                return [PLATFORMS.WINDOWS]
+
+            default:
+                return [PLATFORMS.LINUX]
+        }
+    }
+
     /**
      * @inheritDoc
      */
@@ -63,21 +76,45 @@ class ElectronApp extends Deliverable {
 
     async buildIconSetFromPath(path, fileDeps) {
         const { syncFs, absPath, queue } = fileDeps
-        const icons = []
-        if (process.platform === 'win32') {
-            const iconRegexp = /^icon\-[0-9]+\.png$/
-            const files = syncFs.readFiles(path).filter(item => iconRegexp.test(item))
-            const buffer = await pngToIco(files.map(name => absPath.make(path, name)))
+        let icon
+        const assetsPath = absPath.artifactsIn('assets')
+        queue.addClear(assetsPath, true)
+        await queue.processAsync()
 
-            const assetsPath = absPath.artifactsIn('assets')
-            queue.addClear(assetsPath, true)
-            await queue.processAsync()
-            const icoFile = absPath.make(assetsPath, 'icon.ico')
-            syncFs.writeContent(icoFile, buffer)
+        switch (process.platform) {
 
-            icons.push(icoFile)
+            case 'win32': {
+                // generate ico file
+                const iconRegexp = /^icon\-[0-9]+\.png$/
+                const files = syncFs.readFiles(path)
+                    .filter(item => iconRegexp.test(item))
+                    .map(name => absPath.make(path, name))
+                const buffer = await pngToIco(files)
+                const icoFile = absPath.make(assetsPath, 'icon.ico')
+                syncFs.writeContent(icoFile, buffer)
+                icon = icoFile
+                break
+            }
+            case 'darwin': {
+                // generate icns file
+                const iconRegexp = /^icon\-[0-9]+x[0-9]+\.png$/
+                const files = syncFs.readFiles(path)
+                    .filter(item => iconRegexp.test(item))
+                const iconsetPath = absPath.make(assetsPath, 'icon.iconset')
+                queue.addClear(iconsetPath, true)
+                for (const file of files) {
+                    queue.addMove(absPath.make(path, file), absPath.make(iconsetPath, file))
+                }
+                const icnsFile = absPath.make(assetsPath, 'icon.icns')
+                queue.addExec(`iconutil -c icns ${iconsetPath}`)
+                icon = icnsFile
+                break
+            }
+            default:
+                // TODO use png file
+                return
         }
-        return icons
+        return syncFs.withoutExt(icon)
     }
 
     /**
@@ -88,7 +125,7 @@ class ElectronApp extends Deliverable {
         const { queue, absPath } = fileDeps
         const { publicDir, config } = distTarget
 
-        const icons = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'), fileDeps)
+        const icon = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'), fileDeps)
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
 
@@ -130,7 +167,7 @@ class ElectronApp extends Deliverable {
                 "config": {
                     "forge": {
                         packagerConfig: {
-                            icon: icons[0].substring(0, icons[0].length - 4)
+                            icon
                         },
                         "outDir": absPath.artifactsOut(),
                         "makers": makers

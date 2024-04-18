@@ -51,6 +51,10 @@ class Deliverable {
         return result
     }
 
+    getAllowedPlatforms(platforms) {
+        return platforms
+    }
+
     prepareAppAssets(distTarget, configs, fileDeps) {
         const { config } = distTarget
         const { syncFs, absPath } = fileDeps
@@ -58,7 +62,7 @@ class Deliverable {
         const userAssetsDirPath = absPath.game('assets')
         const exampleAssetsDirPath = absPath.src('build', 'assets', 'icons')
 
-        const targetPlatforms = csv2values(config.targetPlatforms)
+        const targetPlatforms = this.getAllowedPlatforms(csv2values(config.targetPlatforms))
         const userAssetFiles = syncFs.readFiles(userAssetsDirPath)
         const exampleAssetFiles = syncFs.readFiles(exampleAssetsDirPath)
 
@@ -269,7 +273,6 @@ class Deliverable {
                         bgColor
                     )
                     await newImage.composite(baseImage, paddingPixels / 2, paddingPixels / 2);
-
                     await newImage.writeAsync(path)
                     break;
             }

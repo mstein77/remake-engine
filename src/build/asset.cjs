@@ -5,6 +5,10 @@ const iconTransparent = {
     template: 'icon-[d]',
     base: true
 }
+const icnsAppIcon = {
+    padding: null,
+    template: 'icon-[d]x[d]'
+}
 const faviconTransparent = {
     padding: 0,
     template: 'favicon-[d]'
@@ -56,6 +60,10 @@ const windowsScaleSizes = {
     all: [ 100, 125, 150, 200, 400 ]
 }
 
+const macPlatformAppSizes = [
+    16, 32, 48, 128, 256, 512
+]
+
 const scope2assets = {
     appIcon: [
         {
@@ -71,6 +79,21 @@ const scope2assets = {
             links: ['pwa-manifest'],
             modes: [
                 iconTransparent
+            ]
+        },
+        {
+            platforms: [PLATFORMS.MACOS],
+            type: ASSET_TYPE.ICNS,
+            square: true,
+            formats: ['png'],
+            sizes: {
+                minimal: macPlatformAppSizes,
+                recommended: macPlatformAppSizes,
+                all: macPlatformAppSizes
+            },
+            links: [],
+            modes: [
+                icnsAppIcon
             ]
         },
         {

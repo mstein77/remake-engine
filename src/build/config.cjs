@@ -51,6 +51,7 @@ const PLATFORMS = {
     APPLE: 'apple',
     IOS: 'apple.ios',
     MACOS: 'apple.macos',
+    LINUX: 'linux',
     ALL: 'all'
 }
 const ASSET_GENERATION = {
@@ -63,7 +64,8 @@ const ASSET_TYPE = {
     ICON: 'icon',
     TILE: 'tile',
     STORE: 'store',
-    SPLASH: 'splash'
+    SPLASH: 'splash',
+    ICNS: 'icons'
 }
 const configKey2params = {
     name: {type: 'string', default: '{game.name} v{game.version}'},

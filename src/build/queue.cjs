@@ -10,6 +10,7 @@ const FILE_OP = {
     REDUCE: 'reduce',
     REPLACE: 'replace',
     DELETE: 'delete',
+    MOVE: 'move',
     PATH: 'path'
 }
 
@@ -96,6 +97,11 @@ class FileOpQueue {
         return this
     }
 
+    addMove(from, to) {
+        this.queue.push({ op: FILE_OP.MOVE, from, to })
+        return this
+    }
+
     /**
      * Adds a execution operation for the given command
      *
@@ -171,6 +177,20 @@ class FileOpQueue {
                     }
 
                 }
+                break
+            }
+            case FILE_OP.MOVE: {
+                const { from, to } = params
+                detail(` ${bold('MOVE')} ${from} ${to}`)
+                if (!syncFs.exists(from)) {
+                    detail(` ...skipped because source does not exist`)
+                    return Promise.resolve()
+                }
+                if (syncFs.exists(to)) {
+                    detail(` ...skipped because target does exist`)
+                    return Promise.resolve()
+                }
+                syncFs.rename(from, to)
                 break
             }
             case FILE_OP.WRITE: {
