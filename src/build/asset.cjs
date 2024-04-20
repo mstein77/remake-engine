@@ -9,6 +9,16 @@ const icnsAppIcon = {
     padding: null,
     template: 'icon-[d]x[d]'
 }
+const icnsAppIconScale2 = {
+    padding: null,
+    template: 'icon-[d]x[d]@2x',
+    scale: 2
+}
+const icnsAppIconScale3 = {
+    padding: null,
+    template: 'icon-[d]x[d]@3x',
+    scale: 3
+}
 const faviconTransparent = {
     padding: 0,
     template: 'favicon-[d]'
