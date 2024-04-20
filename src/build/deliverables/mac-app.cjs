@@ -47,9 +47,9 @@ class MacApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async prepareMake(distTarget, configs, fileDeps) {
-        const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+    async prepareMake() {
+        const { queue, absPath } = this.fileDeps
+        const { publicDir } = this.distTarget
 
         queue.addClear(absPath.artifactsIn('assets'), true)
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('assets', 'index.html'))
@@ -60,9 +60,9 @@ class MacApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async make(distTarget, configs, fileDeps) {
-        const { gamePackageJson } = configs
-        const { queue, absPath } = fileDeps
+    async make() {
+        const { gamePackageJson } = this.contents
+        const { queue, absPath } = this.fileDeps
 
         const outFile = absPath.artifactsOut(gamePackageJson.name)
         const sourcePath = absPath.artifactsIn('main.swift')
@@ -73,10 +73,10 @@ class MacApp extends Deliverable {
         await queue.processAsync()
     }
 
-    async finishMake(distTarget, configs, fileDeps) {
-        const { gamePackageJson } = configs
-        const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+    async finishMake() {
+        const { gamePackageJson } = this.contents
+        const { queue, absPath } = this.fileDeps
+        const { publicDir } = this.distTarget
 
         const outFile = absPath.artifactsOut(gamePackageJson.name)
         queue.addCopy(outFile, absPath.dist(publicDir, gamePackageJson.name))
@@ -85,11 +85,11 @@ class MacApp extends Deliverable {
         await queue.processAsync()
     }
 
-    async open(distTarget, configs, fileDeps) {
+    async open() {
 
-        const { config, target } = distTarget
-        const { gamePackageJson } = configs
-        const { absPath } = fileDeps
+        const { config, target } = this.distTarget
+        const { gamePackageJson } = this.contents
+        const { absPath } = this.fileDeps
 
         const publicDir = config.server ? 'public' : ''
         const publicPath = target ? absPath.dists(target, publicDir) : absPath.dist(publicDir)

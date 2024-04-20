@@ -19,7 +19,10 @@ class Deliverable {
     /**
      * Constructs a new deliverable
      */
-    constructor(config = {}) {
+    constructor(config = {}, distTarget, contents, fileDeps) {
+        this.distTarget = distTarget
+        this.contents = contents
+        this.fileDeps = fileDeps
         this.config = this.getParsedConfig(config)
         this.setFlags()
     }
@@ -55,9 +58,9 @@ class Deliverable {
         return platforms
     }
 
-    prepareAppAssets(distTarget, configs, fileDeps) {
-        const { config } = distTarget
-        const { syncFs, absPath } = fileDeps
+    prepareAppAssets() {
+        const { config } = this.distTarget
+        const { syncFs, absPath } = this.fileDeps
 
         const userAssetsDirPath = absPath.game('assets')
         const exampleAssetsDirPath = absPath.src('build', 'assets', 'icons')
@@ -232,12 +235,12 @@ class Deliverable {
                 }
             }
         }
-        distTarget.assets = assets
+        this.distTarget.assets = assets
     }
 
-    async generateAssets(distTarget, configs, fileDeps) {
-        const { absPath, queue } = fileDeps
-        const { assets = [], publicDir, config } = distTarget
+    async generateAssets() {
+        const { absPath, queue } = this.fileDeps
+        const { assets = [], publicDir, config } = this.distTarget
 
         queue.addClear(absPath.dist(publicDir, 'assets'), true)
         queue.process()
@@ -280,9 +283,9 @@ class Deliverable {
         queue.process()
     }
 
-    getMeta(distTarget, configs, fileDeps) {
-        const { config } = distTarget
-        const { metaVars } = configs
+    getMeta() {
+        const { config } = this.distTarget
+        const { metaVars } = this.contents
 
         const replaceMetaVars = getReplaceMetaVars(metaVars)
 
@@ -303,9 +306,9 @@ class Deliverable {
      *
      * @returns {array}
      */
-    getMetaLinks(distTarget, configs, fileDeps) {
+    getMetaLinks() {
         const metaLinks = []
-        const { assets } = distTarget
+        const { assets } = this.distTarget
         if (!this.hasFavIcon || !assets) return metaLinks
 
         for (const asset of assets) {
@@ -319,7 +322,7 @@ class Deliverable {
         return metaLinks
     }
 
-    getScriptTags(distTarget, configs, fileDeps) {
+    getScriptTags() {
         return []
     }
 
@@ -329,8 +332,8 @@ class Deliverable {
      *
      * @returns {string|undefined}
      */
-    getMissingRequirements(fileDeps) {
-        const { absPath } = fileDeps
+    getMissingRequirements() {
+        const { absPath } = this.fileDeps
         const requiredPlatforms = this.getRequiredPlatforms()
         const platform = process.platform
         if (requiredPlatforms.length && !requiredPlatforms.includes(platform))
@@ -414,35 +417,23 @@ class Deliverable {
 
     /**
      * Prepares the webpack build in the given distTarget for the compilation process
-     *
-     * @param {object} distTarget
-     * @param {object} configs
-     * @param {object} fileDeps
      */
-    async prepareMake(distTarget, configs, fileDeps) {}
+    async prepareMake() {}
 
     /**
-     * Compiles the prepared build files in the given distTarget
-     *
-     * @param {object} distTarget
-     * @param {object} configs
-     * @param {object} fileDeps
+     * Compiles the prepared build files in the current distTarget
      */
-    async make(distTarget, configs, fileDeps) {}
+    async make() {}
 
 
-    async finishMake(distTarget, configs, fileDeps) {}
+    async finishMake() {}
 
-    async open(distTarget, configs, fileDeps) {}
+    async open() {}
 
     /**
      * Runs the post build processing which is executed after webpack build and compilation
-     *
-     * @param {object} distTarget
-     * @param {object} configs
-     * @param {object} fileDeps
      */
-    processPostBuild(distTarget, configs, fileDeps) {}
+    processPostBuild() {}
 }
 
 module.exports = Deliverable

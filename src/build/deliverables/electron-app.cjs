@@ -74,8 +74,8 @@ class ElectronApp extends Deliverable {
         }
     }
 
-    async buildIconSetFromPath(path, fileDeps) {
-        const { syncFs, absPath, queue } = fileDeps
+    async buildIconSetFromPath(path) {
+        const { syncFs, absPath, queue } = this.fileDeps
         let icon
         const assetsPath = absPath.artifactsIn('assets')
         queue.addClear(assetsPath, true)
@@ -107,6 +107,7 @@ class ElectronApp extends Deliverable {
                 }
                 const icnsFile = absPath.make(assetsPath, 'icon.icns')
                 queue.addExec(`iconutil -c icns ${iconsetPath}`)
+                queue.addDelete(iconsetPath)
                 icon = icnsFile
                 break
             }
@@ -120,12 +121,12 @@ class ElectronApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async prepareMake(distTarget, configs, fileDeps) {
-        const { metaVars } = configs
-        const { queue, absPath } = fileDeps
-        const { publicDir, config } = distTarget
+    async prepareMake() {
+        const { metaVars } = this.contents
+        const { queue, absPath } = this.fileDeps
+        const { publicDir, config } = this.distTarget
 
-        const icon = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'), fileDeps)
+        const icon = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'))
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
 
@@ -187,18 +188,18 @@ class ElectronApp extends Deliverable {
         await queue.processAsync()
     }
 
-    async make(distTarget, configs, fileDeps) {
-        const { queue, absPath } = fileDeps
+    async make() {
+        const { queue, absPath } = this.fileDeps
         queue
             .addExec(`npm run make`, { cwd: absPath.artifactsIn() })
 
         await queue.processAsync()
     }
 
-    async finishMake(distTarget, configs, fileDeps) {
-        const { queue, absPath } = fileDeps
+    async finishMake() {
+        const { queue, absPath } = this.fileDeps
 
-        const { publicDir } = distTarget
+        const { publicDir } = this.distTarget
         const targetPath = absPath.dist(publicDir)
         const makers = csv2values(this.config.makers)
         queue
@@ -208,8 +209,8 @@ class ElectronApp extends Deliverable {
         await queue.processAsync()
     }
 
-    async open(distTarget, configs, fileDeps) {
-        const { absPath } = fileDeps
+    async open() {
+        const { absPath } = this.fileDeps
 
         const result = await exec('npm run start', { cwd: absPath.artifactsIn() })
         if (result.failed)

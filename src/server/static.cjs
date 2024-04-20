@@ -40,16 +40,21 @@ try {
     app.options('*', cors())
 
     app.get('/', (req, res) => {
-        const indexHtmlPath = absPath.dist(pubPrefix + 'index.html')
+        const indexHtmlPath = absPath.dist(pubPrefix, 'index.html')
         if (syncFs.fileExists(indexHtmlPath)) {
             res.sendFile(
                 indexHtmlPath
             )
             return
         }
-        const files = syncFs.readFiles(absPath.dist(pubPrefix))
-        // TODO use default-plugin here
-        res.send(`<h1>Available files:</h1><ul>${files.map(file => `<li><a href="${file}">${file}</a></li>`).join('')}</ul>`)
+        const plugin = require(absPath.src('build', 'plugins', 'DownloadsPlugin.cjs'))
+        const files = []
+        const names = syncFs.readFiles(absPath.dist(pubPrefix))
+        for (const name of names) {
+            const { size, mtime, ctime } = syncFs.stat(absPath.dist(pubPrefix, name))
+            files.push({ name, size, mtime, ctime })
+        }
+        res.send(plugin(files))
     })
     const port = https ? httpsPort : httpPort
     let server = app
@@ -69,7 +74,7 @@ try {
         mainSection(`Listening on port ${port}. Preview is available in your browser under ${url}`)
 
         const openAsync = async () => {
-            const options = {wait: true}
+            const options = { wait: true }
             if (distConfig.openBrowser !== 'default') {
                 options.app = {
                     name: distConfig.openBrowser

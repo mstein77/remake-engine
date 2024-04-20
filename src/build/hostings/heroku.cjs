@@ -18,8 +18,8 @@ class HerokuHosting extends Hosting {
     /**
      * @inheritDoc
      */
-    generateRepoFiles(config, fileDeps, tasks) {
-        const { absPath, queue } = fileDeps
+    generateRepoFiles(tasks) {
+        const { absPath, queue } = this.fileDeps
         const procFilePath = absPath.game('Procfile')
         queue.addWriteContent(procFilePath,"web: npm start", true)
         tasks.add(TASK.PREPARE_SOURCE, `Make sure that the file "Procfile" is committed`)

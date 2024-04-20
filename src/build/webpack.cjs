@@ -33,7 +33,7 @@ const fontExt2mimeType = {
  * Returns an array holding all webpack configs for building the dist target with the given hosting, configs
  * and options
  *
- * @param {object} configs
+ * @param {object} contents
  * @param {object} fileDeps
  * @param {Deliverable} deliverable
  * @param {Hosting} hosting
@@ -41,9 +41,10 @@ const fontExt2mimeType = {
  *
  * @returns {array}
  */
-const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, options) => {
+const getTargetWebpackConfigs = (contents, fileDeps, deliverable, hosting, options) => {
     const { target, info, isDist, distTarget } = options
-    const { config, enginePackageJson, gamePackageJson, metaVars } = configs
+    const { config } = distTarget
+    const { enginePackageJson, gamePackageJson, metaVars } = contents
     const { absPath, queue, syncFs } = fileDeps
 
     const targetPrefix = target ? target + '-' : ''
@@ -198,11 +199,11 @@ const getTargetWebpackConfigs = (configs, fileDeps, deliverable, hosting, option
             }
             return `<style>${css}</style>`
         }
-        const linkTags = getHtmlTags('link', deliverable.getMetaLinks(distTarget, configs, fileDeps))
-        const metaTags = getHtmlTags('meta', deliverable.getMeta(distTarget, configs, fileDeps))
+        const linkTags = getHtmlTags('link', deliverable.getMetaLinks(distTarget, contents, fileDeps))
+        const metaTags = getHtmlTags('meta', deliverable.getMeta(distTarget, contents, fileDeps))
 
         let scriptTags = ''
-        const scripts = deliverable.getScriptTags(distTarget, configs, fileDeps)
+        const scripts = deliverable.getScriptTags(distTarget, contents, fileDeps)
         for (let script of scripts) {
             scriptTags += `<script>${isArray(script) ? script.join('\n') : script}</script>`
         }

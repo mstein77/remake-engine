@@ -13,8 +13,12 @@ class Hosting {
 
     /**
      * Creates a new hosting instance
+     *
      */
-    constructor() {
+    constructor(distTarget, contents, fileDeps) {
+        this.distTarget = distTarget
+        this.contents = contents
+        this.fileDeps = fileDeps
         this.setFlags()
     }
 
@@ -51,41 +55,34 @@ class Hosting {
     /**
      * Generates files which should be added to the game repository
      *
-     * @param {object} config
-     * @param {object} fileDeps
      * @param {Tasks} tasks
      */
-    generateRepoFiles(config, fileDeps, tasks) {}
+    generateRepoFiles(tasks) {}
 
     /**
      * Prepares the hosting in the development mode. Although there is no hosting required in the development mode
      * because it's all handled by the webpack dev-server, it can be used to generate repository files which are
      * required for the hosting
      *
-     * @param {object} distTarget
-     * @param {object} configs
-     * @param {object} fileDeps
      * @param {Tasks} tasks
      */
-    prepareDev(distTarget, configs, fileDeps, tasks) {
-        const { config } = distTarget
+    prepareDev(tasks) {
+        const { config } = this.distTarget
 
         // TODO: only generate to game repo if deploymentMethod is checkout? Upload root may also need this in dist folder
-        this.generateRepoFiles(config, fileDeps, tasks)
+        this.generateRepoFiles(config, tasks)
     }
 
     /**
      * Prepares the hosting in the dist folder and also adds instructions for the user to deploy the game and server
      *
      * @param {object} distTarget
-     * @param {object} configs
-     * @param {object} fileDeps
      * @param {Tasks} tasks
      */
-    prepareDist(distTarget, configs, fileDeps, tasks) {
-        const { config } = distTarget
-        const { gamePackageJson } = configs
-        const { queue, absPath, syncFs } = fileDeps
+    prepareDist( tasks) {
+        const { config } = this.distTarget
+        const { gamePackageJson } = this.contents
+        const { queue, absPath, syncFs } = this.fileDeps
 
         const deploymentMethod = config.deploymentMethod
         const server = config.server
@@ -130,13 +127,12 @@ class Hosting {
     /**
      * Adds all necessary instructions for the user to deploy and start the server
      *
-     * @param {object} config
-     * @param {object} fileDeps
      * @param {Tasks} tasks
      */
-    addDeploymentInstructions(config, fileDeps, tasks) {
+    addDeploymentInstructions(tasks) {
+        const { config } = this.distTarget
+        const { absPath } = this.fileDeps
         const { server, deploymentMethod } = config
-        const { absPath } = fileDeps
 
         if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
             tasks.add(
@@ -174,26 +170,25 @@ class Hosting {
      * Prepares the distribution for the hosting and adds instructions for the user to deploy the game deliverable and
      * start the server. Returns the relative path in the dist folder where the public files and dirs are located
      *
-     * @param {object} config
-     * @param {object} fileDeps
      * @param {boolean} isDist
      *
-     * @returns {string}
+     * @returns {object}
      */
-    prepare(distTarget, configs, fileDeps, isDist) {
-        const { absPath } = fileDeps
-        const { config } = distTarget
+    prepare(isDist) {
+        const { absPath } = this.fileDeps
+        const { config } = this.distTarget
         const tasks = new Tasks()
         const publicDir = config.server ? 'public' : ''
+        this.distTarget.publicDir = publicDir
         this.publicPath = absPath.dist(publicDir)
 
         if (isDist) {
-            this.prepareDist(distTarget, configs, fileDeps, tasks)
-            this.addDeploymentInstructions(config, fileDeps, tasks)
+            this.prepareDist(tasks)
+            this.addDeploymentInstructions(tasks)
         } else {
-            this.prepareDev(distTarget, configs, fileDeps, tasks)
+            this.prepareDev(tasks)
         }
-        return { publicDir, tasks }
+        return { tasks }
     }
 }
 

@@ -28,16 +28,15 @@ const getBuildHook = name => getDefaultFromModule(absPath.game(name + '-hook.cjs
  * build config and returns them either as array or object. If a buildsJson is given in the configs parameter then all
  * webpack configs described in the json will be generated instead.
  *
- * @param {object} configs
+ * @param {object} contents
  * @param {object} fileDeps
  * @param {object} options
  *
  * @returns {object|array}
  */
-const runWebpackConfigGeneration = (configs, fileDeps, options) => {
-    const { gamePackageJson } = configs
-    const { isDist, info, all } = options
-    const buildsJson = configs.buildsJson
+const runWebpackConfigGeneration = (contents, fileDeps, options) => {
+    const { gamePackageJson, buildJson, buildsJson } = contents
+    const { isDist, info } = options
     let distTargets = []
     const { absPath, queue } = fileDeps
     queue.addClear(absPath.tmp(), true)
@@ -55,7 +54,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         })
     }
     const gameId = gamePackageJson.name
-    configs.metaVars = {
+    contents.metaVars = {
         'game.id': gameId,
         'game.name': gamePackageJson.displayName || id2name(gameId),
         'game.version': gamePackageJson.version,
@@ -92,11 +91,11 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         absPath.setCurrDist(path)
 
         subSection('Validating build config')
-        const rawConfig = buildConfig(configs.buildJson, process.env, overwrites, isDist)
+        const rawConfig = buildConfig(buildJson, process.env, overwrites, isDist)
         subSectionOk()
 
         subSection('Checking integrity of config')
-        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, fileDeps, options)
+        const { config, warnings, deliverable, hosting } = runConfigIntegrityChecks(rawConfig, distTarget, contents, fileDeps, options)
         if (warnings.length) {
             while (warnings.length) {
                 subSectionWarning(warnings.pop())
@@ -112,7 +111,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         }
 
         subSection(`Checking build requirements`)
-        const missing = deliverable.getMissingRequirements(fileDeps)
+        const missing = deliverable.getMissingRequirements()
         if (missing) {
             if (target) {
                 subSectionError(missing)
@@ -124,17 +123,15 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         subSectionOk()
 
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        const { publicDir, tasks } = hosting.prepare(distTarget, configs, fileDeps, isDist)
-        distTarget.publicDir = publicDir
+        const { tasks } = hosting.prepare(isDist)
         subSectionOk()
 
         subSection(`Add application assets`)
-        deliverable.prepareAppAssets(distTarget, configs, fileDeps)
+        deliverable.prepareAppAssets()
         subSectionOk()
 
         subSection(`Generate webpack config`)
-        configs.config = config
-        const webpackConfigs = getTargetWebpackConfigs(configs, fileDeps, deliverable, hosting, { isDist, target, info, distTarget })
+        const webpackConfigs = getTargetWebpackConfigs(contents, fileDeps, deliverable, hosting, { isDist, target, info, distTarget })
 
         subSectionOk()
         lastEngineConfig = webpackConfigs[0]
@@ -166,7 +163,7 @@ const runWebpackConfigGeneration = (configs, fileDeps, options) => {
         const params = {
             distTargets,
             buildLogLevel: getBuildLogLevel(),
-            configs
+            contents
         }
         lastEngineConfig.plugins.push(
             new PostBuildPlugin(params)
@@ -243,7 +240,7 @@ const generateWebpackConfigs = (isDist, all = false) => {
             syncFs
         }
         const enginePackageJson = getJsonObjectFromFile(absPath.engine('package.json'))
-        const configs = {
+        const contents = {
             buildJson,
             enginePackageJson,
             gamePackageJson: getJsonObjectFromFile(absPath.game('package.json'))
@@ -251,8 +248,8 @@ const generateWebpackConfigs = (isDist, all = false) => {
         process.env.RMK_ENGINE_VERSION = enginePackageJson.version
         if (isDist && (all || target)) {
             const buildsPath = absPath.game('builds.cjs')
-            configs.buildsJson = getDefaultFromModule(buildsPath)
-            const pairs = toPairs(configs.buildsJson)
+            contents.buildsJson = getDefaultFromModule(buildsPath)
+            const pairs = toPairs(contents.buildsJson)
             const matchRegExp = new RegExp('^[a-z1-9\-\_]+$', 'i')
             for (const [ key, value ] of pairs) {
                 if (!key.match(matchRegExp))
@@ -262,14 +259,14 @@ const generateWebpackConfigs = (isDist, all = false) => {
                     throw NoStackError(`Value of key "${key}" in ${buildsPath}. Must be an object but got ${simpleType(value)}`)
             }
             if (target) {
-                const def = configs.buildsJson[target]
+                const def = contents.buildsJson[target]
                 if (!def)
                     throw NoStackError(`Build target "${target}" no found in builds.cjs`)
 
-                configs.buildsJson = { [target]: def }
+                contents.buildsJson = { [target]: def }
             }
         }
-        return runWebpackConfigGeneration(configs, fileDeps,{ isDist, info, all: options.all })
+        return runWebpackConfigGeneration(contents, fileDeps,{ isDist, info, all: options.all })
 
     } catch (e) {
         errorSection(e)
@@ -281,14 +278,14 @@ const generateWebpackConfigs = (isDist, all = false) => {
  *
  * @param {array} distTargets
  * @param {string} buildLogLevel
- * @param {object} configs
+ * @param {object} contents
  */
-const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) => {
+const runPostBuildProcessing = async ({ distTargets, buildLogLevel, contents }) => {
 
     setBuildLogLevel(buildLogLevel)
     mainSection('Post build processing...')
 
-    const { enginePackageJson } = configs
+    const { enginePackageJson } = contents
     process.env.RMK_ENGINE_VERSION = enginePackageJson.version
     const queue = new FileOpQueue()
     const fileDeps = {
@@ -308,8 +305,8 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, configs }) =
             hasLogLevel('normal') && log(`Build "${bold(target)}":\n`)
         }
         const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
-        const deliverable = new Deliverable(config.deliverableConfig)
-        const params = [ distTarget, { ...configs }, fileDeps ]
+        const deliverable = new Deliverable(config.deliverableConfig, distTarget, contents, fileDeps)
+        const params = []
 
         await asyncSubSection(
             `Generate assets`,

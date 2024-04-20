@@ -240,12 +240,14 @@ const buildJson = () => {
  * checks. Throws an error if a failed integrity check could not be resolved
  *
  * @param {object} config
+ * @param {object} distTarget
+ * @param {object} contents
  * @param {object} fileDeps
  * @param {object} options
  *
  * @returns {object}
  */
-const runConfigIntegrityChecks = (config, fileDeps, options) => {
+const runConfigIntegrityChecks = (config, distTarget, contents, fileDeps, options) => {
     const { isDist, all } = options
     const { absPath, syncFs } = fileDeps
     const warnings = []
@@ -280,9 +282,9 @@ const runConfigIntegrityChecks = (config, fileDeps, options) => {
         throw NoStackError(MSG.enableEditor)
 
     const Deliverable = require(`./deliverables/${config.deliverable}.cjs`)
-    const deliverable = new Deliverable(config.deliverableConfig)
+    const deliverable = new Deliverable(config.deliverableConfig, distTarget, contents, fileDeps)
     const Hosting = require(`./hostings/${config.hosting}.cjs`)
-    const hosting = new Hosting()
+    const hosting = new Hosting(distTarget, contents, fileDeps)
 
     if (config.server && !hosting.supportsNodeJs)
         throw NoStackError(MSG.noServerNodejs)
@@ -566,12 +568,12 @@ const getConfigForCtx = (args, overwrites = {}) => {
 
 const getPreviewConfigs = (fileDeps, overwrites = {}) => {
     let distConfig = getConfigForCtx({config: ['webpack.build-dist.cjs']}, overwrites)
-    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig, fileDeps, {isDist: true})
+    const { deliverable, hosting, config } = runConfigIntegrityChecks(distConfig,  {},{}, fileDeps, {isDist: true})
     distConfig = config
 
     let devConfig = getConfigForCtx()
     {
-        const { config } = runConfigIntegrityChecks(devConfig, fileDeps, {idDist: false})
+        const { config } = runConfigIntegrityChecks(devConfig,  {},{}, fileDeps, {idDist: false})
         devConfig = config
     }
     return {

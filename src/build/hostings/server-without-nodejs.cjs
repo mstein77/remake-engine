@@ -18,8 +18,8 @@ class ServerWithoutNodejsHosting extends Hosting {
     /**
      * @inheritDoc
      */
-    addDeploymentInstructions(config, fileDeps, tasks) {
-        super.addDeploymentInstructions(config, fileDeps, tasks)
+    addDeploymentInstructions(tasks) {
+        super.addDeploymentInstructions(tasks)
         tasks.add(
             TASK.SOURCE_TO_SERVER,
             `Upload the content of ${this.publicPath} to a target directory on your webserver`

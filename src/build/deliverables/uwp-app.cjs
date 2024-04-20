@@ -45,10 +45,10 @@ class UwpApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async prepareMake(distTarget, configs, fileDeps) {
-        const { gamePackageJson } = configs
-        const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+    async prepareMake() {
+        const { gamePackageJson } = this.contents
+        const { queue, absPath } = this.fileDeps
+        const { publicDir } = this.distTarget
 
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         for (const filename of ['MainPage.xaml', 'MainPage.xaml.cs', 'Package.appxmanifest']) {
@@ -63,10 +63,10 @@ class UwpApp extends Deliverable {
     /**
      * @inheritDoc
      */
-    async make(distTarget, configs, fileDeps) {
-        const { gamePackageJson } = configs
-        const { queue, absPath } = fileDeps
-        const { publicDir } = distTarget
+    async make() {
+        const { gamePackageJson } = this.contents
+        const { queue, absPath } = this.fileDeps
+        const { publicDir } = this.distTarget
 
         const cwd = absPath.dist(absPath.artifactsIn())
         queue.addExec(`dotnet restore`, { cwd })

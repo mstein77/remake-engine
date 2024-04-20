@@ -47,9 +47,9 @@ class Pwa extends Deliverable {
     /**
      * @inheritDoc
      */
-    getMetaLinks(distTarget, configs, fileDeps) {
+    getMetaLinks() {
         return [
-            ...super.getMetaLinks(distTarget, configs, fileDeps),
+            ...super.getMetaLinks(),
             {rel: 'manifest', href: "manifest.json"}
         ]
     }
@@ -57,10 +57,10 @@ class Pwa extends Deliverable {
     /**
      * @inheritDoc
      */
-    getScriptTags(distTarget, configs, fileDeps) {
-        const { metaVars } = configs
+    getScriptTags() {
+        const { metaVars } = this.contents
         return [
-            ...super.getScriptTags(distTarget, configs, fileDeps),
+            ...super.getScriptTags(),
             [
                 `
                 if ('serviceWorker' in navigator) {
@@ -102,9 +102,9 @@ class Pwa extends Deliverable {
         ]
     }
 
-    prepareAppAssets(distTarget, configs, fileDeps) {
-        super.prepareAppAssets(distTarget, configs, fileDeps)
-        const { syncFs, absPath } = fileDeps
+    prepareAppAssets() {
+        super.prepareAppAssets()
+        const { syncFs, absPath } = this.fileDeps
         const files = syncFs.readFiles(absPath.game('assets'))
         const matchRegexp = /^screenshot[1-8](_(wide|narrow))?\.(png|jpg)$/
 
@@ -149,10 +149,10 @@ class Pwa extends Deliverable {
     /**
      * @inheritDoc
      */
-    processPostBuild(distTarget, configs, fileDeps) {
-        const { metaVars } = configs
-        const { queue, absPath } = fileDeps
-        const { publicDir, config, assets = [], screenshots = [] } = distTarget
+    processPostBuild() {
+        const { metaVars } = this.contents
+        const { queue, absPath } = this.fileDeps
+        const { publicDir, config, assets = [], screenshots = [] } = this.distTarget
 
         const pwaScreenshots = []
         for (const { filePath, file, dim, ext, label, form_factor } of screenshots) {
