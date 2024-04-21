@@ -12,11 +12,13 @@ const icnsAppIcon = {
 const icnsAppIconScale2 = {
     padding: null,
     template: 'icon-[d]x[d]@2x',
+    only: ['all'],
     scale: 2
 }
 const icnsAppIconScale3 = {
     padding: null,
     template: 'icon-[d]x[d]@3x',
+    only: ['all'],
     scale: 3
 }
 const faviconTransparent = {
@@ -70,9 +72,20 @@ const windowsScaleSizes = {
     all: [ 100, 125, 150, 200, 400 ]
 }
 
+const winIconSizes = {
+    minimum: [ 256 ],
+    recommended: [ 16, 24, 32, 48, 256 ],
+    all: [ 16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256 ]
+}
+
 const macPlatformAppSizes = [
     16, 32, 48, 128, 256, 512
 ]
+
+const fallbackModes = {
+    appIcon: iconTransparent,
+    favIcon: iconTransparent
+}
 
 const scope2assets = {
     appIcon: [
@@ -97,13 +110,41 @@ const scope2assets = {
             square: true,
             formats: ['png'],
             sizes: {
-                minimal: macPlatformAppSizes,
+                minimal: [512],
                 recommended: macPlatformAppSizes,
                 all: macPlatformAppSizes
             },
-            links: [],
+            links: ['packagerConfig.icon', 'maker-dmg'],
             modes: [
-                icnsAppIcon
+                icnsAppIcon,
+                icnsAppIconScale2,
+                icnsAppIconScale3
+            ]
+        },
+        {
+            platforms: [PLATFORMS.WINDOWS],
+            type: ASSET_TYPE.ICNS,
+            square: true,
+            formats: ['png'],
+            sizes: winIconSizes,
+            links: ['packagerConfig.icon', 'maker-wix'],
+            modes: [
+                iconTransparent
+            ]
+        },
+        {
+            platforms: [PLATFORMS.LINUX],
+            type: ASSET_TYPE.ICNS,
+            square: true,
+            formats: ['png'],
+            sizes: {
+                minimal: [512],
+                recommended: [512],
+                all: [512]
+            },
+            links: ['maker-deb'],
+            modes: [
+                iconTransparent
             ]
         },
         {
@@ -225,11 +266,7 @@ const scope2assets = {
             type: ASSET_TYPE.ICON,
             square: true,
             formats: ['png', 'ico'],
-            sizes: {
-                minimum: [256],
-                recommended: [16, 24, 32, 48, 256],
-                all: [16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256]
-            },
+            sizes: winIconSizes,
             links: ['pwa-manifest', 'win-app-manifest'],
             modes: [
                 square44logo,
@@ -242,11 +279,7 @@ const scope2assets = {
             type: ASSET_TYPE.ICON,
             square: true,
             formats: ['png', 'ico'],
-            sizes: {
-                minimum: [ 256 ],
-                recommended: [ 16, 24, 32, 48, 256 ],
-                all: [ 16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256 ]
-            },
+            sizes: winIconSizes,
             links: ['pwa-manifest', 'win-app-manifest'],
             modes: [
                 iconTransparent
@@ -287,4 +320,7 @@ const scope2assets = {
     ]
 }
 
-module.exports = scope2assets
+module.exports = {
+    fallbackModes,
+    scope2assets
+}

@@ -1,5 +1,5 @@
 const Deliverable = require("../deliverable.cjs")
-const { RESOURCE_LOADING, PLATFORMS} = require("../config.cjs")
+const { RESOURCE_LOADING, PLATFORMS, ASSET_TYPE} = require("../config.cjs")
 const { getReplaceMetaVars } = require("../helper.cjs")
 const { d, csv2values, toValues } = require('../../shared/helper.cjs')
 const { exec } = require("../../shared/console.cjs")
@@ -7,7 +7,9 @@ const pngToIco = require('png-to-ico')
 
 const MAKERS = {
     DMG: 'dmg',
-    ZIP: 'zip'
+    ZIP: 'zip',
+    DEB: 'deb',
+    WIX: 'wix'
 }
 
 /**
@@ -43,7 +45,9 @@ class ElectronApp extends Deliverable {
         return RESOURCE_LOADING.LOCAL_ALL
     }
 
-    getAllowedPlatforms(platforms) {
+    getAssetTypePlatforms(assetType, platforms) {
+        if (assetType !== 'appIcon') return platforms
+
         switch (process.platform) {
             case 'darwin':
                 return [PLATFORMS.MACOS]
@@ -54,6 +58,10 @@ class ElectronApp extends Deliverable {
             default:
                 return [PLATFORMS.LINUX]
         }
+    }
+
+    getAssetTypeSubTypes(type, subTypes) {
+        return (type !== 'appIcon') ? subTypes : [ASSET_TYPE.ICNS]
     }
 
     /**
@@ -89,6 +97,8 @@ class ElectronApp extends Deliverable {
                 const files = syncFs.readFiles(path)
                     .filter(item => iconRegexp.test(item))
                     .map(name => absPath.make(path, name))
+                if (!files.length) return
+
                 const buffer = await pngToIco(files)
                 const icoFile = absPath.make(assetsPath, 'icon.ico')
                 syncFs.writeContent(icoFile, buffer)
@@ -97,9 +107,11 @@ class ElectronApp extends Deliverable {
             }
             case 'darwin': {
                 // generate icns file
-                const iconRegexp = /^icon\-[0-9]+x[0-9]+\.png$/
+                const iconRegexp = /^icon\-[0-9]+x[0-9]+(@[0-9]+x)?\.png$/
                 const files = syncFs.readFiles(path)
                     .filter(item => iconRegexp.test(item))
+                if (!files.length) return
+
                 const iconsetPath = absPath.make(assetsPath, 'icon.iconset')
                 queue.addClear(iconsetPath, true)
                 for (const file of files) {
@@ -112,8 +124,17 @@ class ElectronApp extends Deliverable {
                 break
             }
             default:
-                // TODO use png file
-                return
+                // use png file
+                const iconRegexp = /^icon\-[0-9]+\.png$/
+                const files = syncFs.readFiles(path)
+                    .filter(item => iconRegexp.test(item))
+                if (!files.length) return
+
+                const file = files[0]
+                icon = absPath.make(assetsPath, file)
+                queue.addMove(absPath.make(path, file), icon)
+
+                return icon
         }
         return syncFs.withoutExt(icon)
     }
@@ -124,9 +145,28 @@ class ElectronApp extends Deliverable {
     async prepareMake() {
         const { metaVars } = this.contents
         const { queue, absPath } = this.fileDeps
-        const { publicDir, config } = this.distTarget
+        const { publicDir, config, assets } = this.distTarget
 
+        let add2packagerConfig = false
+        let add2makerDeb = false
+        let add2makerWix = false
+        for (const { scope, links } of assets) {
+            if (scope !== 'appIcon') continue
+
+            if (links.includes('packagerConfig.icon')) {
+                add2packagerConfig = true
+            }
+            if (links.includes('maker-deb')) {
+                add2makerDeb = true
+            }
+            if (links.includes('maker-wix')) {
+                add2makerWix = true
+            }
+        }
         const icon = await this.buildIconSetFromPath(absPath.dist(publicDir, 'assets'))
+        const packagerConfig = {}
+        if (add2packagerConfig) packagerConfig.icon = icon
+
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
         queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
 
@@ -138,17 +178,32 @@ class ElectronApp extends Deliverable {
         const devDependencies = {
             "@electron-forge/cli": "^7.3.0"
         }
-        for (const maker of reqMakers) {
-            switch (maker) {
+        for (const reqMaker of reqMakers) {
+            let maker = null
+            switch (reqMaker) {
+                case MAKERS.WIX:
+                case MAKERS.DEB:
                 case MAKERS.DMG:
                 case MAKERS.ZIP:
-                    const name = `@electron-forge/maker-${maker}`
-                    makers.push({
-                        name
-                    })
+                    const name = `@electron-forge/maker-${reqMaker}`
+                    maker = { name }
                     devDependencies[name] = '*'
-                    break;
+                    break
             }
+            if (!maker) continue
+
+            const config = {}
+            switch (reqMaker) {
+                case MAKERS.DEB:
+                    if (add2makerDeb) config.options = { icon }
+                    break
+
+                case MAKERS.WIX:
+                    if (add2makerWix) config.icon = icon
+                    break
+            }
+            maker.config = config
+            makers.push(maker)
         }
         queue.addWriteJson(
             absPath.artifactsIn('package.json'),
@@ -167,9 +222,7 @@ class ElectronApp extends Deliverable {
                 license: 'ISC',
                 "config": {
                     "forge": {
-                        packagerConfig: {
-                            icon
-                        },
+                        packagerConfig,
                         "outDir": absPath.artifactsOut(),
                         "makers": makers
                     }

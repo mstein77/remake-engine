@@ -143,7 +143,7 @@ class Pwa extends Deliverable {
                 ext
             })
         }
-        distTarget.screenshots = screenshots
+        this.distTarget.screenshots = screenshots
     }
 
     /**

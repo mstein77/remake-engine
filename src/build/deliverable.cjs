@@ -2,8 +2,8 @@ const { d, isArray, sortPropAsc, stringList, union, toValues, toKeys, csv2values
 const { getReplaceMetaVars, getIconMimeType } = require('./helper.cjs')
 const sizeOf = require("image-size")
 const Jimp = require("jimp")
-const { validateConfig, ASSET_GENERATION, buildDefaults } = require("./config.cjs")
-const scope2assets = require('./asset.cjs')
+const { validateConfig, ASSET_GENERATION, buildDefaults, ASSET_TYPE} = require("./config.cjs")
+const { fallbackModes, scope2assets } = require('./asset.cjs')
 const { execSync, NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
 
 const generatorFormats = ['png', 'gif']
@@ -54,8 +54,20 @@ class Deliverable {
         return result
     }
 
-    getAllowedPlatforms(platforms) {
+    getAssetTypePlatforms(assetType, platforms) {
         return platforms
+    }
+
+    getAssetTypeSubTypes(type, subTypes) {
+        if (type !== 'appIcon') return subTypes
+
+        const idx = subTypes.indexOf(ASSET_TYPE.ICNS)
+        if (idx === -1) return subTypes
+
+        const allowedTypes = [ ...subTypes ]
+        allowedTypes.splice(idx, 1)
+
+        return allowedTypes
     }
 
     prepareAppAssets() {
@@ -65,7 +77,7 @@ class Deliverable {
         const userAssetsDirPath = absPath.game('assets')
         const exampleAssetsDirPath = absPath.src('build', 'assets', 'icons')
 
-        const targetPlatforms = this.getAllowedPlatforms(csv2values(config.targetPlatforms))
+        const targetPlatforms = csv2values(config.targetPlatforms)
         const userAssetFiles = syncFs.readFiles(userAssetsDirPath)
         const exampleAssetFiles = syncFs.readFiles(exampleAssetsDirPath)
 
@@ -81,10 +93,13 @@ class Deliverable {
             if (!assetScopes.includes(scope)) continue
 
             // get relevant type details
+            const allowedSubTypes = this.getAssetTypeSubTypes(scope, assetSubTypes)
             const matchingDetails = infos.filter(detail => {
-                if (!assetSubTypes.includes(detail.type)) return false
-                for (const targetPlatform of targetPlatforms) {
-                    if (!detail.platforms.some(name => name.startsWith(targetPlatform))) continue
+                if (!allowedSubTypes.includes(detail.type)) return false
+
+                const allowedPlatforms = this.getAssetTypePlatforms(scope, targetPlatforms)
+                for (const platform of allowedPlatforms) {
+                    if (!detail.platforms.some(name => name.startsWith(platform))) continue
                     return true
                 }
                 return false
@@ -99,40 +114,55 @@ class Deliverable {
             let ext2baseFiles = {}
             const targets = {}
 
+            const getFileMatcher = mode => new RegExp('^' + mode.template.replaceAll('[d]', '([0-9]+)') + '\\.([a-z]{3})$', 'i')
+
+            const getMatchDetails = (fileMatcher, baseDir, file, detail) => {
+                const { formats, square } = detail
+                const matches = file.match(fileMatcher)
+                if (matches === null) {
+                    return null
+                }
+                const ext = matches[matches.length - 1]
+                if (!formats.includes(ext)) return null
+
+                const filePath = baseDir + '/' + file
+                const parsedWidth = parseInt(matches[1], 10)
+                // last match is ext
+                const parsedHeight = matches[3] === undefined ? parsedWidth : parseInt(matches[2], 10)
+
+                if (square && parsedWidth !== parsedHeight) return null
+                const dim = sizeOf(filePath)
+
+                return {
+                    dim,
+                    ext,
+                    filePath,
+                    parsedWidth,
+                    parsedHeight
+                }
+            }
+
             const addMatchingFiles = (baseDir, assetFiles) => {
                 for (const { detail, mode2files } of jobs) {
-                    const { modes, links, formats, square, scale100pixels } = detail
+                    const { modes, links, scale100pixels } = detail
 
                     const scaleDim = !scale100pixels || !isArray(scale100pixels) ? scale100pixels : [scale100pixels, scale100pixels]
 
-                    let no = -1
                     for (const mode of modes) {
-                        no++
-                        const { template, base } = mode
+                        const { base } = mode
+                        if (!onlyUserFiles && mode.only && !mode.only.includes(config.assetGeneration)) continue
 
-                        const fileMatcher =
-                            new RegExp('^' + template.replaceAll('[d]', '([0-9]+)') + '\\.([a-z]{3})$', 'i')
-
+                        const fileMatcher = getFileMatcher(mode)
                         const files = []
                         for (const file of assetFiles) {
 
-                            const matches = file.match(fileMatcher)
-                            if (matches === null) continue
+                            const matchDetails = getMatchDetails(fileMatcher, baseDir, file, detail)
+                            if (matchDetails === null) continue
 
-                            const ext = matches[matches.length - 1]
-                            if (!formats.includes(ext)) continue
-
-                            const filePath = baseDir + '/' + file
+                            const { ext, filePath, dim, parsedWidth, parsedHeight, parsedScale } = matchDetails
                             const relPath = relDir + file
-
-                            const parsedWidth = parseInt(matches[1], 10)
-                            const parsedHeight = matches.length === 3 ? parsedWidth : parseInt(matches[2], 10)
-
-                            if (square && parsedWidth !== parsedHeight) continue
-
-                            const dim = sizeOf(filePath)
-                            const width = scale100pixels ? Math.round(scaleDim[0] * width / 100) : parsedWidth
-                            const height = scale100pixels ? Math.round(scaleDim[1] * height / 100) : parsedHeight
+                            const width = scale100pixels ? Math.round(scaleDim[0] * parsedWidth / 100) : parsedWidth
+                            const height = scale100pixels ? Math.round(scaleDim[1] * parsedHeight / 100) : parsedHeight
                             if (dim.width !== width || dim.height !== height)
                                 throw NoStackError(`Asset image ${filePath} must have dimension ${width}x${height} but got ${dim.width}x${dim.height}`)
 
@@ -160,7 +190,22 @@ class Deliverable {
 
             // now find matching files for each detail
             addMatchingFiles(userAssetsDirPath, userAssetFiles)
-            if (!hasFiles) addMatchingFiles(exampleAssetsDirPath, exampleAssetFiles)
+            // no files found? use fallback example
+            if (!hasFiles) {
+                const mode = fallbackModes[scope]
+                const fileMatcher = getFileMatcher(mode)
+                for (const file of exampleAssetFiles) {
+                    const matchDetails = getMatchDetails(fileMatcher, exampleAssetsDirPath, file, {
+                        formats: generatorFormats, square: true
+                    })
+                    if (!matchDetails) continue
+                    const { ext, dim, filePath } = matchDetails
+                    if (!ext2baseFiles[ext]) ext2baseFiles[ext] = []
+                    if (ext2baseFiles[ext].length === 0) ext2baseFiles[ext].push({
+                        ext, dim, filePath, relPath: relDir + file
+                    })
+                }
+            }
 
             // add base mode files to each empty first mode
             // add first mode files to all empty follow-up modes
@@ -205,7 +250,7 @@ class Deliverable {
             for (const [ mode, resize ] of mode2jobs.entries()) {
 
                 const { size2links, ext2files, scale100pixels } = resize
-                const { template, padding } = mode
+                const { template, padding, scale = 1 } = mode
 
                 const allSizes = toKeys(size2links).map(size => parseInt(size, 10))
                 for (const [ ext, file2size ] of toPairs(ext2files)) {
@@ -224,7 +269,7 @@ class Deliverable {
                         if (targets[relPath]) continue
 
                         const links = size2links[size]
-                        let dim = [size, size]
+                        let dim = [size * scale, size * scale]
                         if (scale100pixels) {
                             const scaleDim = isArray(scale100pixels) ? scale100pixels : [scale100pixels, scale100pixels]
                             const factor = size / 100
