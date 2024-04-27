@@ -134,7 +134,7 @@ const hasLogLevel = name => {
 const mainSection = name => {
     if (!hasLogLevel('minimal')) return
 
-    log(`\n${BG.L_GRAY + FG.BLACK} ${getCliScript()} ${BG.GRAY + FG.WHITE} ${name} `)
+    log(`\n${BG.BLUE + FG.L_CYAN} ${getCliScript()} ${BG.CYAN + FG.BLACK} ${name} `)
     log()
 }
 
@@ -149,7 +149,7 @@ const errorSection = error => {
     if (rmkVersion) details.push(`engine: ${rmkVersion}`)
 
     const detailsBox = FG.L_GRAY + `[${details.join('|')}] `
-    log(`\n${BG.L_GRAY + FG.RED} ${getCliScript()} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
+    log(`\n${BG.GRAY + FG.WHITE} ${getCliScript()} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
     log( FG.RED + bold(' ✕ ') + FG.RESET + bold(error.message) + '\n')
     if (!error.noStack) {
         console.error(error.stack)

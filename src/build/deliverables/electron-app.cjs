@@ -31,8 +31,8 @@ class ElectronApp extends Deliverable {
         return {
             name: {type: 'string', default: '{config.shortName}'},
             description: {type: 'string', default: '{config.description}'},
-            background_color: {type: 'string', default: ''},
-            makers: {type: 'csv', values: toValues(MAKERS), default: [MAKERS.ZIP].join(',')}
+            makers: {type: 'csv', values: toValues(MAKERS), default: [MAKERS.ZIP].join(',')},
+            windowConfig: {type: 'json', default: {}}
         }
     }
 
@@ -168,7 +168,31 @@ class ElectronApp extends Deliverable {
         if (add2packagerConfig) packagerConfig.icon = icon
 
         queue.addCopy(absPath.dist(publicDir, 'index.html'), absPath.artifactsIn('index.html'))
-        queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'))
+        const defaultWinConfig = {
+            width: 800,
+            height: 600,
+            autoHideMenuBar: true,
+            webPreferences: {}
+        }
+        const windowConfig = {
+            ...defaultWinConfig,
+            ...this.config.windowConfig
+        }
+        windowConfig.webPreferences = {
+            ...{
+                nodeIntegration: true,
+                devTools: false
+            },
+            ...windowConfig.webPreferences
+        }
+        if (!windowConfig.width) windowConfig.width = 800
+        if (!windowConfig.height) windowConfig.height = 600
+        if (icon && icon.endsWith('.png')) {
+            windowConfig.icon = icon
+        }
+        queue.addCopy(absPath.src('build/assets/electron-app/main.cjs'), absPath.artifactsIn('main.cjs'), {
+            '[[WINDOW_CONFIG]]': JSON.stringify(windowConfig)
+        })
 
         const { name, description, shortName } = config
         const replaceMetaVars = getReplaceMetaVars(metaVars, { name, description, shortName })
