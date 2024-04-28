@@ -1,5 +1,5 @@
-const { id2jsonTid, id2coreTid, id2imageTid, id2audioTid, id2videoTid, id2tid, typeText2tid, tid2id,
-    tid2type, tids2extTids, map2extMap, makeDescriptor, ResourceTypeRegistry, RESOURCE } = require('../../src/shared/resources.cjs')
+import { id2jsonTid, id2coreTid, id2imageTid, id2audioTid, id2videoTid, id2tid, typeText2tid, tid2id,
+    tid2type, tids2extTids, map2extMap, makeDescriptor, ResourceTypeRegistry, RESOURCE } from '../../src/shared/resources.cjs'
 
 const jType = RESOURCE.TYPE.JSON
 const jTid = id => RESOURCE.PREFIX[jType] + id

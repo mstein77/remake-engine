@@ -11,9 +11,9 @@ const MSG = {
     noServer: `The editor was enabled but requires a server build, please enable "server" or disable "editor"`,
     enableEditor: `Editor was deactivated in the config, but is required in the dev build, that's why "editor" was set to true`,
     allStaticApi: `Requested resourceLoading "api" replaced with "static-all" because "staticTypes" include all types`,
-    localToApi: `Requested resourceLoading "local" not supported in dev or editor environment, using "api" instead`,
-    localAllToApi: `Requested resourceLoading "local-all" not supported in dev or editor environment, using "api" instead`,
-    simStaticAll: `Requested resourceLoading "static-all" not supported in dev or editor environment, switching to simulation using "api"`,
+    localToApi: `Requested resourceLoading "local" not supported in dev environment, using "api" instead`,
+    localAllToApi: `Requested resourceLoading "local-all" not supported in dev environment, using "api" instead`,
+    simStaticAll: `Requested resourceLoading "static-all" not supported in dev environment, switching to simulation using "api"`,
     noServerNodejs: `Enabling of "server" not possible because your hosting is set to "server-without-nodejs" and does not support nodejs`
 }
 const DEPLOYMENT_METHOD = {
@@ -270,7 +270,7 @@ const runConfigIntegrityChecks = (config, distTarget, contents, fileDeps, option
         }
         for (const [ key, value ] of toPairs(key2devValue)) {
             if (config[key] === value) continue
-            warnings.push(`Requested ${key} "${config.deliverable}" not supported in dev environment, using "${value}" instead`)
+            warnings.push(`Requested ${key} "${config[key]}" not supported in dev environment, using "${value}" instead`)
             config[key] = value
         }
     }

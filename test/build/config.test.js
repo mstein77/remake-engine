@@ -1,9 +1,9 @@
-const { internal, runConfigIntegrityChecks } = require('../../src/build/config.cjs')
+import { internal, runConfigIntegrityChecks } from '../../src/build/config.cjs'
 const { MSG, extractEnvOverwrites, castEnvValue, extractAppEnvOverwrites } = internal
-const { RESOURCE_LOADING, getResolvedDefaultConfig } = require('../../src/build/config.cjs')
-const { d, toValues, toKeys } = require('../../src/shared/helper.cjs')
-const ServerWithNodejs = require('../../src/build/hostings/server-with-nodejs.cjs')
-const ServerWithoutNodeJs = require('../../src/build/hostings/server-without-nodejs.cjs')
+import { RESOURCE_LOADING, getResolvedDefaultConfig } from '../../src/build/config.cjs'
+import { d, toValues, toKeys } from '../../src/shared/helper.cjs'
+import ServerWithNodejs from '../../src/build/hostings/server-with-nodejs.cjs'
+import ServerWithoutNodeJs from '../../src/build/hostings/server-without-nodejs.cjs'
 test('castEnvValue', () => {
     // unknown type
     expect(() => castEnvValue('', '')).toThrow()
@@ -155,11 +155,6 @@ test('extractAppEnvOverwrites', () => {
 })
 
 test('runConfigIntegrityChecks', () => {
-    /**
-     *
-     * @param overwrite
-     * @returns {object}
-     */
     const getTestConfig = (isDist, overwrite = {}) => {
         return { ...getResolvedDefaultConfig(isDist), ...overwrite }
     }
@@ -174,11 +169,15 @@ test('runConfigIntegrityChecks', () => {
         return Object.entries({ ...checkConfig, ...overwrites })
     }
 
+    const runIntegrityChecks = (config, isDist) => runConfigIntegrityChecks(config, {}, {}, {}, { isDist })
+
     const allIntegrityChecksOk = (overwrites, isDist) => {
         for (const overwrite of overwrites) {
             const rawConfig = getTestConfig(isDist, overwrite)
             const rawPairs = getPairs(rawConfig)
-            const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), isDist)
+            const { config, warnings } = runIntegrityChecks(
+                rawConfig, {}, {}, {}, { isDist }
+            )
             expect(config)
                 .toContainAllEntries(rawPairs)
             expect(warnings)
@@ -202,8 +201,7 @@ test('runConfigIntegrityChecks', () => {
     allIntegrityChecksOk(
         [
             {},
-            {resourceLoading: RESOURCE_LOADING.API},
-            {resourceLoading: RESOURCE_LOADING.API_ALL},
+            {resourceLoading: RESOURCE_LOADING.API}
         ],
         false
     )
@@ -213,7 +211,7 @@ test('runConfigIntegrityChecks', () => {
             server: false,
             editor: true
         })
-        expect(() => runConfigIntegrityChecks(rawConfig, true))
+        expect(() => runIntegrityChecks(rawConfig, true))
             .toThrow(MSG.enableEditor)
     }
     {
@@ -221,7 +219,7 @@ test('runConfigIntegrityChecks', () => {
             hosting: 'server-without-nodejs',
             server: true
         })
-        expect(() => runConfigIntegrityChecks(rawConfig, true))
+        expect(() => runIntegrityChecks(rawConfig, true))
             .toThrow(MSG.noServerNodejs)
     }
     {
@@ -229,7 +227,7 @@ test('runConfigIntegrityChecks', () => {
             editor: false
         })
         const rawPairs = getPairs(rawConfig, {editor: true})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, false)
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
@@ -241,7 +239,7 @@ test('runConfigIntegrityChecks', () => {
             resourceLoading: RESOURCE_LOADING.API
         })
         const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.STATIC_ALL})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
@@ -253,7 +251,7 @@ test('runConfigIntegrityChecks', () => {
             resourceLoading: RESOURCE_LOADING.LOCAL
         })
         const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
@@ -264,7 +262,7 @@ test('runConfigIntegrityChecks', () => {
             resourceLoading: RESOURCE_LOADING.LOCAL
         })
         const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
@@ -275,8 +273,9 @@ test('runConfigIntegrityChecks', () => {
             editor: true,
             resourceLoading: RESOURCE_LOADING.LOCAL_ALL
         })
-        const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
+        const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API, staticTypes: 'audio,video'})
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
+
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
@@ -286,24 +285,13 @@ test('runConfigIntegrityChecks', () => {
         const rawConfig = getTestConfig(false,{
             resourceLoading: RESOURCE_LOADING.LOCAL_ALL
         })
-        const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API})
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
+        const rawPairs = getPairs(rawConfig, {resourceLoading: RESOURCE_LOADING.API,             staticTypes: 'audio,video'
+        })
+        const { config, warnings } = runIntegrityChecks(rawConfig, false)
         expect(config)
             .toContainAllEntries(rawPairs)
         expect(warnings)
             .toInclude(MSG.localAllToApi)
 
     }
-    {
-        const rawConfig = getTestConfig(false,{
-            resourceLoading: RESOURCE_LOADING.STATIC_ALL
-        })
-        const rawPairs = getPairs(rawConfig)
-        const { config, warnings } = runConfigIntegrityChecks(rawConfig, new ServerWithNodejs(), false)
-        expect(config)
-            .toContainAllEntries(rawPairs)
-        expect(warnings)
-            .toInclude(MSG.simStaticAll)
-    }
-
 })

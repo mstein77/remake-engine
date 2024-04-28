@@ -1,4 +1,4 @@
-const { stringifyValues } = require('../../src/build/helper.cjs')
+import { stringifyValues } from '../../src/build/helper.cjs'
 
 test('stringifyValues', () => {
     expect(stringifyValues({})).toBeEmptyObject()

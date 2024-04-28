@@ -350,14 +350,13 @@ const extractOptionsAndArguments = (info, usage = '', description = '') => {
 
     const { RMK_SCRIPT_ARGS } = process.env
     const hasEnvArgs = RMK_SCRIPT_ARGS !== undefined
-    const args =  hasEnvArgs ? RMK_SCRIPT_ARGS.split('\t') : process.argv.slice(2)
+    const rawArgs =  hasEnvArgs ? RMK_SCRIPT_ARGS.split('\t') : process.argv.slice(2)
 
     if (!hasEnvArgs)
         process.env.RMK_SCRIPT_ARGS = process.argv.slice(2).join('\t')
 
-    const { options, arguments } = getParsedArguments(info, args)
-
-    if (!options.help) return { options, arguments }
+    const { options, args } = getParsedArguments(info, rawArgs)
+    if (!options.help) return { options, args }
 
     const name2option = []
     let maxLenName = 0
@@ -409,15 +408,15 @@ const extractOptionsAndArguments = (info, usage = '', description = '') => {
     process.exit(0)
 }
 
-const getParsedArguments = (info, args) => {
+const getParsedArguments = (info, rawArgs) => {
     const { matchers = [] } = info
     const options = {}
-    const arguments = []
+    const args = []
 
     let optionArg = null
     let expectedOptionArgs = 0
     let argNo = 0
-    for (const arg of args) {
+    for (const arg of rawArgs) {
         if (arg === '') continue
 
         const dash = ['-', '+'].includes(arg[0]) ? arg[0] : ''
@@ -431,7 +430,7 @@ const getParsedArguments = (info, args) => {
                     expectedOptionArgs = 0
                 }
             } else {
-                const matcher = matchers[arguments.length]
+                const matcher = matchers[args.length]
                 if (matcher) {
                     if (
                         (isRegExp(matcher) && !arg.match(matcher)) ||
@@ -439,7 +438,7 @@ const getParsedArguments = (info, args) => {
                     )
                         throw NoStackError(`Invalid argument "${arg}" given`)
                 }
-                arguments.push(arg)
+                args.push(arg)
             }
             continue
         }
@@ -490,7 +489,7 @@ const getParsedArguments = (info, args) => {
 
     return {
         options,
-        arguments
+        args
     }
 }
 

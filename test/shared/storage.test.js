@@ -1,7 +1,7 @@
-const { StorageManager } = require('../../src/shared/storage.cjs')
-const { MapStorage } = require('../../src/shared/storages/mapStorage.cjs')
-const { id2imageTid, id2jsonTid, id2audioTid, id2videoTid, RESOURCE, id2coreTid} = require('../../src/shared/resources.cjs')
-const { d } = require('../../src/shared/helper.cjs')
+import { StorageManager } from '../../src/shared/storage.cjs'
+import { MapStorage } from '../../src/shared/storages/mapStorage.cjs'
+import { id2imageTid, id2jsonTid, id2audioTid, id2videoTid, RESOURCE, id2coreTid } from '../../src/shared/resources.cjs'
+import { d } from '../../src/shared/helper.cjs'
 
 test('StorageManager.construct', () => {
     expect(() => new StorageManager({isAvailable: () => false})).toThrow('not available')

@@ -4,7 +4,7 @@ import { flattenResources, ResourceDependencies, isValidResourceId } from "./sha
 import { d, csv2values, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/helper.cjs"
 import { typeText2tid } from "../../shared/resources.cjs"
 
-const getBaseUrl = () => window.location.hostname === 'localhost' ? PREVIEW_URL : BASE_URL
+const getBaseUrl = () => typeof window !== 'undefined' && window.location.hostname === 'localhost' ? PREVIEW_URL : BASE_URL
 
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
     const newItems = [...oldItems];

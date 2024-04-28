@@ -9,14 +9,14 @@ const open = require('open')
 
 try {
     setCliScript('STATIC-SERVER')
-    const { options, arguments } = extractOptionsAndArguments({
+    const { options, args } = extractOptionsAndArguments({
         flags: {},
         options: {
             preview: {hidden: true}
         }
     })
     const isPreview = !!(options.preview && 'RMK_GAME_DIR' in process.env)
-    const [ target ] = arguments
+    const [ target ] = args
 
     let overwrites = {}
     if (target) {

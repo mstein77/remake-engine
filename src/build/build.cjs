@@ -214,9 +214,9 @@ const showInstructions = instructions => {
  */
 const generateWebpackConfigs = (isDist, all = false) => {
   try {
-        const { options, arguments } = extractOptionsAndArguments(argInfoGame)
+        const { options, args } = extractOptionsAndArguments(argInfoGame)
 
-        const target = isDist && arguments.length ? arguments[0] : null
+        const target = isDist && args.length ? args[0] : null
         const info = options.info === true
 
         const buildJson = getDefaultFromModule(absPath.game('build.cjs'))

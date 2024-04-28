@@ -1,5 +1,5 @@
-const { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect,
-    trim, simpleType, csv2values, isVersionEqualOrHigher } = require('../../src/shared/helper.cjs')
+import { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect,
+    trim, simpleType, csv2values, isVersionEqualOrHigher } from '../../src/shared/helper.cjs'
 
 const allTrue = (func, ...params ) => {
     for (const param of params) {

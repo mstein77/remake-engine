@@ -1,4 +1,4 @@
-const { setLogger, FG, log } = require('../../src/shared/console.cjs')
+import { setLogger, FG, log } from '../../src/shared/console.cjs'
 
 test('log', () => {
     const out = []

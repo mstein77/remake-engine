@@ -1,10 +1,14 @@
-const { getTargetWebpackConfigs } = require('../../src/build/webpack.cjs')
-const ServerWithNodeHosting = require('../../src/build/hostings/server-with-nodejs.cjs')
-const WebApp = require('../../src/build/deliverables/web-app.cjs')
-const { getResolvedDefaultConfig } = require("../../src/build/config.cjs")
-const { d, toPairs } = require("../../src/shared/helper.cjs")
-const path = require("path")
-const { FileOpQueue }  = require("../../src/build/fileOps.cjs")
+import { getTargetWebpackConfigs } from '../../src/build/webpack.cjs'
+import ServerWithNodeHosting from '../../src/build/hostings/server-with-nodejs.cjs'
+import WebApp from '../../src/build/deliverables/web-app.cjs'
+import { getResolvedDefaultConfig } from "../../src/build/config.cjs"
+import { d, toPairs } from "../../src/shared/helper.cjs"
+import path from "path"
+import { FileOpQueue } from "../../src/build/queue.cjs"
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 describe('getWebpackConfigs', () => {
 
@@ -61,22 +65,30 @@ describe('getWebpackConfigs', () => {
     })
 
     const buildDev = (config, name = 'game') => {
+        const rawConfig = getConfig(false, config)
+        const distTarget = {config: rawConfig, assets: []}
+        const fileDeps = getFileDeps(distTarget)
+        const contents = {gamePackageJson, enginePackageJson, metaVars: {}}
         const matches = getTargetWebpackConfigs(
-            {config: getConfig(false, config), gamePackageJson, enginePackageJson},
-            getFileDeps(),
-            new WebApp(),
-            new ServerWithNodeHosting(),
-            {isDist: false}
+            contents,
+            fileDeps,
+            new WebApp({}, distTarget, contents, fileDeps),
+            new ServerWithNodeHosting(distTarget, contents, fileDeps),
+            {isDist: false, distTarget}
         ).filter(obj => obj.name === name)
         return matches.length ? matches[0] : undefined
     }
     const buildDist = (config, name = 'game') => {
+        const rawConfig = getConfig(true, config)
+        const distTarget = {config: rawConfig, assets: []}
+        const fileDeps = getFileDeps(distTarget)
+        const contents = {gamePackageJson, enginePackageJson, metaVars: {}}
         const matches = getTargetWebpackConfigs(
-            {config: getConfig(true, config), gamePackageJson, enginePackageJson},
-            getFileDeps(),
-            new WebApp(),
-            new ServerWithNodeHosting(),
-            {isDist: true}
+            contents,
+            fileDeps,
+            new WebApp({}, distTarget, contents, fileDeps),
+            new ServerWithNodeHosting(distTarget, contents, fileDeps),
+            {isDist: true, distTarget}
         ).filter(obj => obj.name === name)
         return matches.length ? matches[0] : undefined
     }

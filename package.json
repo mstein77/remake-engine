@@ -5,8 +5,7 @@
   "exports": "./src/engine/index.js",
   "type": "module",
   "scripts": {
-    "test-cjs": "jest --config jest.config.cjs --coverage",
-    "test-js": "node --experimental-vm-modules ./node_modules/.bin/jest --config jest.config.js --coverage",
+    "test": "node --experimental-vm-modules ./node_modules/.bin/jest --config jest.config.js --coverage",
     "start-static": "node src/server/static.cjs",
     "start-static-preview": "node src/server/static.cjs --preview",
     "start": "node bin/serve.cjs",
