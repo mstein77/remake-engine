@@ -82,6 +82,7 @@ function isArray(value) {
 
 /**
  * Returns whether the argument is an object or not
+ * Array instances are not regarded as objects
  *
  * @param {mixed} obj
  *
@@ -119,10 +120,24 @@ function isDataUrl(value, type = null) {
         value.startsWith('data:' + type + ';base64,')
 }
 
+/**
+ * Returns whether the given value is a RegExp or not
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
 function isRegExp(value) {
-    return value instanceof RegExp || value.constructor === RegExp
+    return !!value && (value instanceof RegExp || value.constructor === RegExp)
 }
 
+/**
+ * Returns whether the given value is a function or not
+ *
+ * @param {mixed} value
+ *
+ * @returns {boolean}
+ */
 function isFunction(value) {
     return typeof value === 'function'
 }
@@ -135,8 +150,9 @@ function isFunction(value) {
  * @returns {string}
  */
 const ucfirst = (value) => {
-    if (value === '') return '';
-    return value[0].toUpperCase() + value.substring(1);
+    if (value === '') return ''
+
+    return value[0].toUpperCase() + value.substring(1)
 }
 
 /**
@@ -147,7 +163,7 @@ const ucfirst = (value) => {
  *
  * @returns {array}
  */
-const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
+const union = (a, b) => [ ...new Set([ ...a, ...b ]) ]
 
 /**
  * Returns the given array without the given element or elements (if an array)
@@ -158,7 +174,8 @@ const union = (a, b) => [ ...new Set([ ...a, ...b ]) ];
  * @returns {array}
  */
 const without = (source, remove) => {
-    if (!Array.isArray(remove)) remove = [remove];
+    if (!Array.isArray(remove)) remove = [remove]
+
     return (remove.length ? source.filter(x => !remove.includes(x)) : [ ...source ])
 }
 
@@ -191,7 +208,6 @@ const trim = (value, chars) => {
 
     let end = value.length - 1;
     while (end > start && chars.indexOf(value[end]) > -1) end--
-    if (end < start) return ''
 
     return value.substring(start, end + 1)
 }
@@ -285,30 +301,69 @@ const isVersionEqualOrHigher = (actual, required) => {
     return true
 }
 
-const push2key = (obj, key, value) => {
-    if (!obj[key]) obj[key] = []
-    obj[key].push(value)
-}
-
+/**
+ * Returns the given string with all special chars of a regexp escaped
+ *
+ * @param {string} value
+ *
+ * @returns {string}
+ */
 const regexpEscape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/**
+ * Returns a string with all items of the given array enclosed by quotes and comma separated. If more than 1 element
+ * is in the array, the last element will be prefixed with an "or"
+ *
+ * @param {array} values
+ *
+ * @returns {string}
+ */
 const stringList = values => {
     if (!values.length) return ''
 
     const items = [ ...values ]
     const last = items.pop()
-
     const result = items.length ? '"' + items.join('", "') + '" or ' : ''
 
     return result + `"${last}"`
 }
 
+/**
+ * Returns a sort function which sorts the elements ascending
+ *
+ * @param {mixed} a
+ * @param {mixed} b
+ *
+ * @returns {number}
+ */
 const sortAsc = (a, b) => a === b ? 0 : (a < b ? -1 : 1)
 
+/**
+ * Returns a sort function which sorts the elements descending
+ *
+ * @param {mixed} a
+ * @param {mixed} b
+ *
+ * @returns {number}
+ */
 const sortDesc = (a, b) => a === b ? 0 : (a > b ? -1 : 1)
 
+/**
+ * Returns a sort function which sorts objects by the given property ascending
+ *
+ * @param {string} prop
+ *
+ * @returns {function}
+ */
 const sortPropAsc = prop => (a, b) => a[prop] === b[prop] ? 0 : (a[prop] < b[prop] ? -1 : 1)
 
+/**
+ * Returns a sort function which sorts objects by the given property descending
+ *
+ * @param {string} prop
+ *
+ * @returns {function}
+ */
 const sortPropDesc = prop => (a, b) => a[prop] === b[prop] ? 0 : (a[prop] > b[prop] ? -1 : 1)
 
 /**
@@ -352,7 +407,6 @@ module.exports = {
     sortDesc,
     sortPropAsc,
     sortPropDesc,
-    push2key,
     toPairs,
     toValues,
     toKeys

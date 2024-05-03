@@ -4,7 +4,7 @@ const { d, isArray, toPairs, simpleType, isObject } = require("../shared/helper.
 const { getBuildLogLevel, subSectionWarning, dumpJson, bold, log, errorSection, setBuildLogLevel, mainSection,
     hasLogLevel, newLine, subSection, subSectionOk, subSectionError, extractOptionsAndArguments, NoStackError, asyncSubSection
 } = require("../shared/console.cjs")
-const { Tasks } = require("./tasks.cjs")
+const { DistTarget } = require("./target.cjs")
 const { FileOpQueue } = require("./queue.cjs")
 const { buildConfig, runConfigIntegrityChecks } = require("./config.cjs")
 const { getDefaultFromModule, getJsonObjectFromFile, id2name, argInfoGame } = require("./helper.cjs")
@@ -43,15 +43,19 @@ const runWebpackConfigGeneration = (contents, fileDeps, options) => {
     if (buildsJson) {
         queue.addPath(absPath.dists())
         for (const [ target, overwrites ] of toPairs(buildsJson)) {
-            distTargets.push({
-                target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites, skip: false
-            })
+            distTargets.push(
+                new DistTarget({
+                    target, root: absPath.dists(), dir: target, tmpDir: BUILD_TEMP_DIR + '-' + target, overwrites
+                })
+            )
         }
     } else {
         if (isDist) queue.addPath(absPath.dist())
-        distTargets.push({
-            overwrites: {}, root: absPath.game(), dir: 'dist', tmpDir: BUILD_TEMP_DIR, skip: false
-        })
+        distTargets.push(
+            new DistTarget({
+                root: absPath.game(), dir: 'dist', tmpDir: BUILD_TEMP_DIR
+            })
+        )
     }
     const gameId = gamePackageJson.name
     contents.metaVars = {
@@ -123,7 +127,7 @@ const runWebpackConfigGeneration = (contents, fileDeps, options) => {
         subSectionOk()
 
         subSection(`Prepare hosting for ${bold(config.hosting)}`)
-        const { tasks } = hosting.prepare(isDist)
+        hosting.prepare(isDist)
         subSectionOk()
 
         subSection(`Add application assets`)
@@ -140,9 +144,6 @@ const runWebpackConfigGeneration = (contents, fileDeps, options) => {
         queue.process()
         subSectionOk('\n')
 
-        if (hasLogLevel('normal')) {
-            distTarget.instructions = tasks.toJson()
-        }
         resultConfigs.push( ...webpackConfigs )
         while (buildConfigs.length < resultConfigs.length) buildConfigs.push(config)
     }
@@ -161,7 +162,7 @@ const runWebpackConfigGeneration = (contents, fileDeps, options) => {
     }
     if (!info && isDist) {
         const params = {
-            distTargets,
+            distTargets: distTargets.map(distTarget => distTarget.toJson()),
             buildLogLevel: getBuildLogLevel(),
             contents
         }
@@ -189,13 +190,11 @@ const runWebpackConfigGeneration = (contents, fileDeps, options) => {
  * @param {array} instructions
  */
 const showInstructions = instructions => {
-    const tasks = new Tasks(instructions)
-    const lines = tasks.getFlat()
-    if (!lines.length) return
+    if (!instructions || !instructions.length) return
 
     log(`  Please follow these instructions:`)
     newLine()
-    for (const line of lines) {
+    for (const line of instructions) {
         log(`  - ${line}`)
     }
     newLine()
@@ -288,13 +287,10 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, contents }) 
     const { enginePackageJson } = contents
     process.env.RMK_ENGINE_VERSION = enginePackageJson.version
     const queue = new FileOpQueue()
-    const fileDeps = {
-        absPath,
-        syncFs,
-        queue
-    }
+    const fileDeps = { absPath, syncFs, queue }
     const exceptDirs = []
     let index = 0
+    distTargets = distTargets.map(json => new DistTarget(json))
     for (const distTarget of distTargets) {
         let { target, config, root, dir, tmpDir } = distTarget
         const path = absPath.make(root, tmpDir)
@@ -387,7 +383,9 @@ const runPostBuildProcessing = async ({ distTargets, buildLogLevel, contents }) 
 
     mainSection('Build successfully finished...')
 
-    for (const { target, instructions, root, dir } of distTargets) {
+    for (const distTarget of distTargets) {
+        const { target, root, dir } = distTarget
+        const instructions = distTarget.getFlatTaskMessages()
         if (!hasLogLevel('normal') || !instructions) continue
 
         if (target) {

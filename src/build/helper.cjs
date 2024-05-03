@@ -63,6 +63,15 @@ const stringifyValues = obj => {
     return stringified
 }
 
+/**
+ * Returns a function which replaces metaVars which are given as "{<name>}" or "{config.<name>>}" for config vars in
+ * the argument string with corresponding meta or config value
+ *
+ * @param {object} metaVars
+ * @param {object|undefined} configVars
+ *
+ * @returns {function}
+ */
 getReplaceMetaVars = (metaVars, configVars = {}) => {
     return value => {
         for (let [ key, replacement ] of toPairs(configVars)) {
@@ -75,18 +84,32 @@ getReplaceMetaVars = (metaVars, configVars = {}) => {
     }
 }
 
+/**
+ * Returns a string holding a html tag of the given element for each property mapping given in the props array
+ *
+ * @param {string} elem
+ * @param {array} props
+ *
+ * @returns {string}
+ */
 getHtmlTags = (elem, props) => {
-    tags = []
+    const tags = []
     for (const prop of props) {
         const attr = []
         for (const [ name, value ] of toPairs(prop)) {
             attr.push(`${name}="${value}"`)
         }
-        tags.push(`<${elem} ${attr.join(' ')} />`)
+        const space = attr.length ? ' ' : ''
+        tags.push(`<${elem}${space}${attr.join(' ')}>`)
     }
     return tags.join('')
 }
 
+/**
+ * Maps image file extensions to their mime type
+ *
+ * @type {object}
+ */
 const ext2mime = {
     png: 'image/png',
     gif: 'image/gif',
@@ -96,35 +119,70 @@ const ext2mime = {
     webp: 'image/webp'
 }
 
+/**
+ * Returns the mime type for the given file extension or undefined if its not supported
+ *
+ * @param {string} ext
+ *
+ * @returns {string}
+ */
 getIconMimeType = ext => {
     return ext2mime[ext]
 }
 
+/**
+ * Returns a string holding a name representation of the given id
+ * This means that a camel-cased id will be split into words starting with a capital letter. Numbers will also be
+ * regarded as a word
+ *
+ * @param {string} id
+ *
+ * @returns {string}
+ */
 id2name = id => {
     let result = ''
     let last = 0
     for (const char of id) {
         if (/[a-z]/.test(char)) {
+            // current char is lowercased letter
             if (last <= 1) {
-                result += last === 0 ? char.toUpperCase() : char
-            } else {
+                // last was lowercased or nothing
+                result += last === 0 ? char.toUpperCase() : char // add capital if nothing, otherwise append
+            } else if (last === 2) {
                 result += ' ' + char.toUpperCase()
+            } else {
+                // last was capital or number
+                result += char // start new word with capital variant
             }
-            last = 1
+            last = 1  // = last letter was lower cased
         } else if (/[0-9]/.test(char)) {
+            // current char is number
             if (last === 0 || last === 2) {
+                // last was beginning or number => append
+                result += char
+            } else {
+                // last was letter => append number as new word
+                result += ' ' + char
+            }
+            last = 2 // = last letter was digit
+        } else {
+            // current char is capital letter
+            if (last === 0 || last === 3) {
                 result += char
             } else {
                 result += ' ' + char
             }
-            last = 2
-        } else {
-            last = 3
+            last = 3 // last letter was capital letter
         }
     }
     return result
 }
 
+/**
+ * Holds the shared argument description for build scripts
+ *
+ * @type {{matchers: RegExp[], flags: {q: string, a: string, d: string, v: string, h: string, i: string, m: string, n: string}, options: {all: {desc: string}, normal: {desc: string}, help: {desc: string}, minimal: {desc: string}, detailed: {desc: string}, quiet: {desc: string}, info: {desc: string}, verbose: {desc: string}}}}
+ */
 const argInfoGame = {
     flags: { i: 'info', d: 'detailed', m: 'minimal', n: 'normal', q: 'quiet', h: 'help', v: 'verbose', a: 'all'},
     options: {

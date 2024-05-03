@@ -1,5 +1,5 @@
 const { Hosting } = require('../hosting.cjs')
-const { TASK } = require("../tasks.cjs");
+const { TASK } = require("../target.cjs");
 
 /**
  * Represents a hosting on the cloud hoster heroku
@@ -18,7 +18,7 @@ class HerokuHosting extends Hosting {
     /**
      * @inheritDoc
      */
-    generateRepoFiles(tasks) {
+    generateRepoFiles() {
         const { absPath, queue } = this.fileDeps
         const procFilePath = absPath.game('Procfile')
         queue.addWriteContent(procFilePath,"web: npm start", true)

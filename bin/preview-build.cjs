@@ -6,7 +6,7 @@ const { d } = require("../src/shared/helper.cjs")
 
 try {
     setCliScript('BUILD')
-    const { arguments } = extractOptionsAndArguments(
+    const { args } = extractOptionsAndArguments(
         { ...argInfoGame, matches: [/^[a-z0-9_]+$/] },
         'npm run pbuild [target]',
         [
@@ -19,7 +19,7 @@ try {
             stdio: 'inherit',
             cwd: absPath.engine()
         })
-        execSync("npm run preview" + (arguments.length ? ' ' + arguments[0] : ''), {
+        execSync("npm run preview" + (args.length ? ' ' + args[0] : ''), {
             stdio: 'inherit',
             cwd: absPath.engine()
         })

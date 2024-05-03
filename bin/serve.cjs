@@ -5,7 +5,7 @@ const { d } = require("../src/shared/helper.cjs")
 
 try {
     setCliScript('SERVER')
-    const { arguments } = extractOptionsAndArguments(
+    const { args } = extractOptionsAndArguments(
         {
             flags: {h: 'help'},
             options: {
@@ -21,15 +21,15 @@ try {
         let cwd = absPath.dist()
         let targetPath = absPath.dist()
         let target = null
-        if (arguments.length) {
-            target = arguments[0]
+        if (args.length) {
+            target = args[0]
             targetPath = absPath.dists(target)
             cwd = targetPath
         }
         if (!syncFs.dirExists(targetPath) || syncFs.isEmptyDir(targetPath)) {
-            const args = ['run', 'build']
-            if (target) args.push(target)
-            const build = spawnSync('npm', args, {
+            const rawArgs = ['run', 'build']
+            if (target) rawArgs.push(target)
+            const build = spawnSync('npm', rawArgs, {
                 stdio: 'inherit',
                 cwd: absPath.game()
             })
@@ -39,11 +39,11 @@ try {
         }
         const serverPath = absPath.make(cwd, 'server.cjs')
         if (syncFs.fileExists(serverPath)) {
-            const args = ['run']
-            args.push(
+            const rawArgs = ['run']
+            rawArgs.push(
                 'start'
             )
-            spawnSync('npm', args, {
+            spawnSync('npm', rawArgs, {
                 stdio: 'inherit',
                 cwd
             })

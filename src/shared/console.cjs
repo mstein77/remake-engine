@@ -3,91 +3,110 @@ const { d, isRegExp, isFunction, isArray, isString, toKeys, toPairs, isVersionEq
 const child_process = require("node:child_process")
 const os = require('node:os')
 
+/**
+ * Process exit code which should be used if the error was already communicated to the user via the
+ * errorSection
+ *
+ * @type {number}
+ */
 const EXIT_CODE_HANDLED = 27
+
+/**
+ * The minimum required version for the build process
+ *
+ * @type {string}
+ */
 const minNodeVersion = 'v16'
 
-// TODO we should check the terminal support for colors here, especially for windows
-let noColor = false
-
+/**
+ * An array holding the sequence of loading spinner frames
+ *
+ * @type {array}
+ */
 const spinner = ['⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏', '⠋']
 
-const FG = {
-    BLACK: noColor ? '' : '\x1b[30m',
-    RED: noColor ? '' : '\x1b[31m',
-    L_RED: noColor ? '' : '\x1b[91m',
-    GREEN: noColor ? '' : '\x1b[32m',
-    L_GREEN: noColor ? '' : '\x1b[92m',
-    YELLOW: noColor ? '' : '\x1b[33m',
-    L_YELLOW: noColor ? '' : '\x1b[93m',
-    BLUE: noColor ? '' : '\x1b[34m',
-    L_BLUE: noColor ? '' : '\x1b[94m',
-    MAGENTA: noColor ? '' : '\x1b[35m',
-    L_MAGENTA: noColor ? '' : '\x1b[95m',
-    CYAN: noColor ? '' : '\x1b[36m',
-    L_CYAN: noColor ? '' : '\x1b[96m',
-    GRAY: noColor ? '' : '\x1b[90m',
-    L_GRAY: noColor ? '' : '\x1b[37m',
-    WHITE: noColor ? '' : '\x1b[97m',
-    RESET: noColor ? '' : '\x1b[0m',
-}
-
-const BG = {
-    BLACK: noColor ? '' : '\x1b[40m',
-    RED: noColor ? '' : '\x1b[41m',
-    L_RED: noColor ? '' : '\x1b[101m',
-    GREEN: noColor ? '' : '\x1b[42m',
-    L_GREEN: noColor ? '' : '\x1b[102m',
-    YELLOW: noColor ? '' : '\x1b[43m',
-    L_YELLOW: noColor ? '' : '\x1b[103m',
-    BLUE: noColor ? '' : '\x1b[44m',
-    L_BLUE: noColor ? '' :  '\x1b[104m',
-    MAGENTA: noColor ? '' : '\x1b[45m',
-    L_MAGENTA: noColor ? '' : '\x1b[105m',
-    CYAN: noColor ? '' : '\x1b[46m',
-    L_CYAN: noColor ? '' : '\x1b[106m',
-    GRAY: noColor ? '' : '\x1b[100m',
-    L_GRAY:  noColor ? '' : '\x1b[47m',
-    WHITE: noColor ? '' : '\x1b[107m',
-    RESET: noColor ? '' :  '\x1b[49m'
-}
-
-let cliScript = null
-const setCliScript = (script, force = false) => {
-    if (process.env.RMK_SCRIPT && !force) return
-
-    process.env.RMK_SCRIPT = script
-}
-
-const getCliScript = () => {
-    if (!cliScript) cliScript = process.env.RMK_SCRIPT
-
-    return cliScript
-}
-
-let logger = console
-
-let buildLogLevel = 'normal'
-
-const buildLogLevels = ['none', 'minimal', 'normal', 'detailed', 'verbose']
-
-const getBuildLogLevel = () => buildLogLevel
-
-const setBuildLogLevel = value => buildLogLevel = value
-
 /**
- * Sets the logger for log to the given value
+ * A boolean indicating of color in log messages is supported or not
  *
- * @param {object} value
+ * @type {boolean}
  */
-const setLogger = value => logger = value
-
-const bold = msg => noColor ? msg : '\x1b[1m' + msg + '\x1b[0m'
+let supportsColor = true
 
 /**
- * Returns the given string with FG.RESET enclosed
+ * Maps colors to their ANSI foreground color code
+ *
+ * @type {object}
  */
-const colorMsg = msg => FG.RESET + msg + FG.RESET
+const color2code = {
+    BLACK: 30,
+    RED: 31,
+    L_RED: 91,
+    GREEN: 32,
+    L_GREEN: 92,
+    YELLOW: 33,
+    L_YELLOW: 93,
+    BLUE: 34,
+    L_BLUE: 94,
+    MAGENTA: 35,
+    L_MAGENTA: 95,
+    CYAN: 36,
+    L_CYAN: 96,
+    GRAY: 90,
+    L_GRAY: 37,
+    WHITE: 97,
+    RESET: 0
+}
 
+/**
+ * Maps foreground colors to their ANSI escape code sequence
+ *
+ * @type {object}
+ */
+const FG = {}
+
+/**
+ * Maps background colors to their ANSI escape code sequence
+ *
+ * @type {object}
+ */
+const BG = {}
+
+/**
+ * Enable or disables ANSI color support in build messages
+ *
+ * @param {boolean} value
+ */
+const setColorSupport = value => {
+    for (const [key, code] of toPairs(color2code)) {
+        FG[key] = value ? `\x1b[${code}m` : ''
+        BG[key] = value ? `\x1b[${code === 0 ? 49 : code + 10}m` : ''
+    }
+    supportsColor = value
+}
+
+// trigger to generate ANSI color sequences
+setColorSupport(supportsColor)
+
+let allowExit = true
+
+/**
+ * Sets the allowExit flag to the given value. Only used in unit-tests for
+ * deactivating exits
+ *
+ * @param value
+ */
+const setAllowExit = value => {
+    allowExit = value
+}
+
+/**
+ * Returns an error instance which will not dump the stack trace but can dump a cli output if given
+ *
+ * @param {string} msg
+ * @param {string|undefined} output
+ *
+ * @returns {Error}
+ */
 const NoStackError = (msg, output) => {
     const e = Error(msg)
     e.noStack = true
@@ -98,6 +117,81 @@ const NoStackError = (msg, output) => {
 }
 
 /**
+ * Sets the environment variable which identifies the start script if it was not set before (or if force is true)
+ *
+ * @param {string} script
+ * @param {bool} force
+ */
+const setCliScript = (script, force = false) => {
+    if (process.env.RMK_SCRIPT && !force) return
+
+    process.env.RMK_SCRIPT = script
+}
+
+/**
+ * Returns a string describing the starting script or "unknown" if no cli script was set before
+ *
+ * @returns {string}
+ */
+const getCliScript = () => process.env.RMK_SCRIPT ? process.env.RMK_SCRIPT : 'unknown'
+
+let buildLogLevel = 'normal'
+
+/**
+ * The available build log levels in ascending order
+ *
+ * @type {array}
+ */
+const buildLogLevels = ['none', 'minimal', 'normal', 'detailed', 'verbose']
+
+/**
+ * Returns the current build log level as string
+ *
+ * @returns {string}
+ */
+const getBuildLogLevel = () => buildLogLevel
+
+/**
+ * Sets the given build log level if it exists or throws an exception
+ *
+ * @param {string} value
+ */
+const setBuildLogLevel = value => {
+    if (!buildLogLevels.includes(value))
+        throw Error(`Invalid build log level "${value}" requested`)
+
+    buildLogLevel = value
+}
+
+/**
+ * Returns whether the given log level or a level above it is set
+ *
+ * @param {string} name
+ *
+ * @returns {boolean}
+ */
+const hasLogLevel = name => {
+    if (name === buildLogLevel) return true
+
+    for (const level of buildLogLevels) {
+        if (level === name) {
+            return true
+        }
+        if (level === buildLogLevel) break
+    }
+    return false
+}
+
+let logger = console
+
+/**
+ * Sets the logger for log to the given value
+ *
+ * @param {object} value
+ */
+const setLogger = value => logger = value
+
+/**
  * Passes the given parameters to console.log and encloses every string parameter with FG.RESET
  *
  * @param params
@@ -105,13 +199,28 @@ const NoStackError = (msg, output) => {
 const log = ( ...params ) => {
     const cParams = []
     for (const param of params) {
-        cParams.push(isString(param) ? colorMsg(param) : param)
+        cParams.push(isString(param) ? FG.RESET + param + FG.RESET : param)
     }
     logger.log( ...cParams )
 }
 
+/**
+ * Returns the given string enclosed with ANSI escape sequences for making it bold (if color is supported)
+ *
+ * @param {string} msg
+ *
+ * @returns {string}
+ */
+const bold = msg => supportsColor ? '\x1b[1m' + msg + '\x1b[0m' : msg
+
+/**
+ * Dumps the given json to the console while using the given indentation
+ *
+ * @param {mixed} json
+ * @param {number} indentation
+ */
 const dumpJson = (json, indentation = 0) => {
-    let dump = util.inspect(json, false, 10, !noColor)
+    let dump = util.inspect(json, false, 10, supportsColor)
     if (indentation) {
         let prefix = ''
         while (indentation--) prefix += ' '
@@ -120,17 +229,16 @@ const dumpJson = (json, indentation = 0) => {
     logger.log(dump)
 }
 
-const hasLogLevel = name => {
-    if (name === buildLogLevel) return true
+/**
+ * Logs a new line
+ */
+const newLine = () => { logger.log() }
 
-    for (const level of buildLogLevels) {
-        if (level === name) {
-            return true
-        }
-        if (level === buildLogLevel) return false
-    }
-    return false
-}
+/**
+ * Logs a main section with the given name if allowed
+ *
+ * @param {string} name
+ */
 const mainSection = name => {
     if (!hasLogLevel('minimal')) return
 
@@ -138,8 +246,11 @@ const mainSection = name => {
     log()
 }
 
-const newLine = () => { logger.log() }
-
+/**
+ * Logs an error section with the given error and exits with an error code
+ *
+ * @param {Error} error
+ */
 const errorSection = error => {
     const details = [
         `platform: ${process.platform} ${os.release}`,
@@ -152,13 +263,68 @@ const errorSection = error => {
     log(`\n${BG.GRAY + FG.WHITE} ${getCliScript()} ${BG.RED + FG.WHITE} Failed with the following error... ${detailsBox} `)
     log( FG.RED + bold(' ✕ ') + FG.RESET + bold(error.message) + '\n')
     if (!error.noStack) {
-        console.error(error.stack)
+        logger.error(error.stack)
     } else if (error.output) {
-        console.log(error.output)
+        log(error.output)
     }
-    process.exit(EXIT_CODE_HANDLED)
+
+   if (allowExit) process.exit(EXIT_CODE_HANDLED)
 }
 
+/**
+ * Logs a subsection with the given name if allowed
+ *
+ * @param {string} name
+ */
+const subSection = name => {
+    if (!hasLogLevel('normal')) return
+
+    log(` - ` + name + '...')
+}
+
+/**
+ * Logs an ok message under the current subsection if allowed
+ *
+ * @param {string} msg
+ */
+const subSectionOk = (msg = '') => {
+    if (!hasLogLevel('normal')) return
+
+    log(FG.GREEN + `   ${bold('✓')}` + FG.RESET + ` OK ` + msg)
+}
+
+/**
+ * Logs an error message under the current subsection if allowed
+ *
+ * @param {string} msg
+ */
+const subSectionError = msg => {
+    log( FG.RED + `   ${bold('✕')}` + FG.RESET + ' ' + bold(msg) + '\n')
+}
+
+/**
+ * Logs a warning message under the current subsection if allowed
+ *
+ * @param {string} msg
+ */
+const subSectionWarning = msg => {
+    if (!hasLogLevel('normal')) return
+
+    log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
+}
+
+/**
+ * Logs a new subsection with the given name and shows loading spinner while the given
+ * async function is processed. Instead of a function an array with 2 elements can be
+ * given where the first item is the object and the second the key where the async
+ * function which should be called exists.
+ *
+ * @param {string} name
+ * @param {function|array} func
+ * @param {mixed} params
+ *
+ * @returns {Promise}
+ */
 async function asyncSubSection(name, func, ...params) {
     subSection(name)
     startSpinner(`  `)
@@ -195,30 +361,12 @@ async function asyncSubSection(name, func, ...params) {
     }
 }
 
-
-const subSection = name => {
-    if (!hasLogLevel('normal')) return
-
-    log(` - ` + name + '...')
-}
-
-const subSectionOk = (msg = '') => {
-    if (!hasLogLevel('normal')) return
-
-    log(FG.GREEN + `   ${bold('✓')}` + FG.RESET + ` OK ` + msg)
-}
-
-const subSectionError = msg => {
-    log( FG.RED + `   ${bold('✕')}` + FG.RESET + ' ' + bold(msg) + '\n')
-}
-
-const subSectionWarning = msg => {
-    if (!hasLogLevel('normal')) return
-
-    log(`   ${BG.YELLOW + FG.BLACK} WARNING ${FG.RESET} ${bold(msg)}\n`)
-}
-
+// holds the current loading spinner
 let activeSpinner = null
+
+/**
+ * Deletes the current spinner (if active) and clears the last spinner message on the console
+ */
 const endSpinner = () => {
     if (!activeSpinner) return
 
@@ -229,6 +377,12 @@ const endSpinner = () => {
     activeSpinner = null
 }
 
+/**
+ * Clears the interval which updates the active spinner (if available) and returns whether a
+ * spinner was active or not
+ *
+ * @returns {boolean}
+ */
 const stopSpinner = () => {
     if (!activeSpinner) return false
 
@@ -236,6 +390,11 @@ const stopSpinner = () => {
     return true
 }
 
+/**
+ * Overwrites the active spinner (if available) with the given spinner message
+ *
+ * @param {string} overwrite
+ */
 const writeSpinner = overwrite => {
     if (!activeSpinner) return
 
@@ -243,12 +402,20 @@ const writeSpinner = overwrite => {
     process.stdout.write(`\r${msg}`)
 }
 
+/**
+ * Updates the current spinner by writing the new state and incrementing the frame
+ */
 const updateSpinner = () => {
     writeSpinner()
     activeSpinner.index++
     activeSpinner.index %= spinner.length
 }
 
+/**
+ * Sets a new message on the active spinner (if available) and writes it to the console
+ *
+ * @param {string} msg
+ */
 const setSpinnerInfo = msg => {
     if (!activeSpinner) return
 
@@ -259,6 +426,12 @@ const setSpinnerInfo = msg => {
     writeSpinner()
 }
 
+/**
+ * Starts a new spinner with the given prefix and postfix if allowed
+ *
+ * @param {string} prefix
+ * @param {string} postfix
+ */
 const startSpinner = (prefix = '', postfix = '') => {
     if (hasLogLevel('detailed')) return
 
@@ -273,8 +446,33 @@ const startSpinner = (prefix = '', postfix = '') => {
     updateSpinner()
 }
 
+/**
+ * Holds a prefix for all executed commands on the CLI
+ * Required to solve encoding problems on the windows platform
+ *
+ * @type {string}
+ */
 const preCmd = process.platform === 'win32' ? 'cmd /c chcp 65001>nul && ' : ''
 
+/**
+ * Quotes the given argument for the CLI on the target platform
+ *
+ * @param {string} arg
+ *
+ * @returns {string}
+ */
+const quoteArg = arg => process.platform !== 'win32' ? `'${arg}'` : `"${arg}"`
+
+/**
+ * Executes the given command with the options asynchronously and resolves to an object
+ * which hold the output string, the exit code and a failed flag which is set when the
+ * execution failed with an error
+ *
+ * @param {string} cmd
+ * @param {object} options
+ *
+ * @returns {Promise}
+ */
 async function exec(cmd, options = {}) {
     return new Promise(resolve => {
         const { cwd, print } = options
@@ -284,12 +482,14 @@ async function exec(cmd, options = {}) {
         const execOptions = { cwd, encoding: 'utf-8' }
 
         if (print || (hasLogLevel('detailed') && print !== false)) {
-            console.log(cmd)
-            execOptions.stdio = 'inherit'
+            log(cmd)
+            if (!execOptions.stdio) {
+                execOptions.stdio = 'inherit'
+            }
         }
         child_process.exec(preCmd + cmd, execOptions, (error, stdout) => {
             if (error) {
-                output = error.message + ': ' + stdout.toString() // || error.message
+                output = error.message + ': ' + stdout.toString()
                 failed = true
                 resolve({ output, exitCode: error.code || 1, failed })
             } else {
@@ -316,8 +516,10 @@ const execSync = (cmd, options = {}) => {
     let failed = false
     const execOptions = { cwd, encoding: 'utf-8' }
     if (print || (hasLogLevel('detailed') && print !== false)) {
-        console.log(cmd)
-        execOptions.stdio = 'inherit'
+        log(cmd)
+        if (!execOptions.stdio) {
+            execOptions.stdio = 'inherit'
+        }
     }
     try {
         output = child_process.execSync(preCmd + cmd, execOptions)
@@ -325,11 +527,22 @@ const execSync = (cmd, options = {}) => {
             output = output.toString()
     } catch (error) {
         output = error.message
+        exitCode = error.status
         failed = true
     }
     return { output, exitCode, failed }
 }
 
+/**
+ * Spawns the given command synchronously with its arguments and options and returns a buffer with the output.
+ * This method should work on all platforms automatically
+ *
+ * @param {string} cmd
+ * @param {array} args
+ * @param {object} options
+ *
+ * @returns {Buffer}
+ */
 function spawnSync(cmd, args, options) {
     if (process.platform !== 'win32') {
         return child_process.spawnSync(cmd, args, options)
@@ -337,8 +550,18 @@ function spawnSync(cmd, args, options) {
     return child_process.spawnSync(process.env.comspec || 'cmd.exe', [ '/c', cmd, ...args ], options)
 }
 
-const quoteArg = arg => process.platform !== 'win32' ? `'${arg}'` : `"${arg}"`
-
+/**
+ * Returns an object holding the arguments and options of the current script call which are specified in
+ * the given CLI info structure. If the help option was requested, a help based on the info structure is
+ * is printed out followed by an exit. The help describing the usage, a description and an overview over
+ * the supported flags and options.
+ *
+ * @param {object} info
+ * @param {string} usage
+ * @param {description} description
+ *
+ * @returns {object}
+ */
 const extractOptionsAndArguments = (info, usage = '', description = '') => {
     const isNpmRun = usage.startsWith('npm run')
 
@@ -360,20 +583,24 @@ const extractOptionsAndArguments = (info, usage = '', description = '') => {
 
     const name2option = []
     let maxLenName = 0
+    let hasOptions = false
     for (const [ name, props ] of toPairs(info.options)) {
         if (props.hidden) continue
 
+        hasOptions = true
         name2option[name] = { desc: props.desc }
         maxLenName = Math.max(maxLenName, name.length)
     }
     for (const [ flag, name ] of toPairs(info.flags)) {
         const optionElem = name2option[name]
-        if (!optionElem)
-            throw Error(`Option "${name}" for flag "${flag}" does not exist`)
+        if (!optionElem) {
+            const infoOption = info.options[name]
+            if (infoOption && infoOption.hidden) continue
 
+            throw Error(`Option "${name}" for flag "${flag}" does not exist`)
+        }
         optionElem.flag = flag
     }
-    const hasOptions = toKeys(name2option).length > 0
     log()
     log(`USAGE:`);
     log()
@@ -405,12 +632,21 @@ const extractOptionsAndArguments = (info, usage = '', description = '') => {
             log()
         }
     }
-    process.exit(0)
+    if (allowExit) process.exit(0)
 }
 
+/**
+ * Returns an object holding all arguments and options of the given rawArgs which are supporting according
+ * to the info structure
+ *
+ * @param {object} info
+ * @param {array} rawArgs
+ *
+ * @returns {object}
+ */
 const getParsedArguments = (info, rawArgs) => {
-    const { matchers = [] } = info
-    const options = {}
+    const { matchers = [], options = {}, flags = {} } = info
+    const reqOptions = {}
     const args = []
 
     let optionArg = null
@@ -423,11 +659,16 @@ const getParsedArguments = (info, rawArgs) => {
         const hasDash = dash !== ''
         if (!hasDash) {
             if (expectedOptionArgs) {
-                options[optionArg].push(arg)
+                if (expectedOptionArgs === 1) {
+                    reqOptions[optionArg] = arg
+                } else {
+                    reqOptions[optionArg].push(arg)
+                }
                 argNo++
                 if (argNo === expectedOptionArgs) {
                     optionArg = null
                     expectedOptionArgs = 0
+                    argNo = 0
                 }
             } else {
                 const matcher = matchers[args.length]
@@ -447,24 +688,28 @@ const getParsedArguments = (info, rawArgs) => {
         const [ part, value ] = arg.split('=')
         const hasAssignment = arg.indexOf('=') > -1
         let long = null
+        let expectsParams = false
         if (!part.startsWith(dash + dash)) {
-            const flags = part.substring(1)
-            const singleFlag = flags.length === 1
+            const reqFlags = part.substring(1)
+            const singleFlag = reqFlags.length === 1
             if (!singleFlag && hasAssignment)
                 throw NoStackError(`Flags argument ${arg} is not allowed to have an assignment`)
 
-            for (const flag of flags) {
-                long = info.flags[flag]
+            for (const flag of reqFlags) {
+                long = flags[flag]
                 if (!long)
                     throw NoStackError(`Unknown argument flag ${flag} given`)
 
-                options[long] = true
+                reqOptions[long] = true
+                if (singleFlag) {
+                    expectsParams = (options[long].argc && options[long].argc > 0)
+                }
             }
-            if (!singleFlag || !hasAssignment) continue
+            if (!singleFlag || !(hasAssignment || expectsParams)) continue
         } else {
             long = part.substring(2)
         }
-        const option = info.options[long]
+        const option = options[long]
         if (!option)
             throw NoStackError(`Unknown argument "${long}" given.`)
 
@@ -472,14 +717,14 @@ const getParsedArguments = (info, rawArgs) => {
             if (value)
                 throw NoStackError(`Argument ${long} cannot have a value, but you assigned "${value}"`)
 
-            options[long] = true
+            reqOptions[long] = true
             continue
         }
         if (value && option.argc === 1) {
-            options[long] = value
+            reqOptions[long] = value
             continue
         }
-        options[long] = value ? [value] : []
+        reqOptions[long] = value ? [value] : []
         expectedOptionArgs = option.argc
         argNo = value ? 1 : 0
         optionArg = long
@@ -488,7 +733,7 @@ const getParsedArguments = (info, rawArgs) => {
         throw NoStackError(`Argument "${optionArg}" is expected to have ${expectedOptionArgs} values but got only ${argNo}`)
 
     return {
-        options,
+        options: reqOptions,
         args
     }
 }
@@ -498,11 +743,13 @@ module.exports = {
     FG,
     BG,
     newLine,
+    setColorSupport,
+    setAllowExit,
     bold,
     log,
-    colorMsg,
     setLogger,
     setCliScript,
+    getCliScript,
     getBuildLogLevel,
     setBuildLogLevel,
     buildLogLevels,
@@ -522,6 +769,7 @@ module.exports = {
     endSpinner,
     setSpinnerInfo,
     extractOptionsAndArguments,
+    getParsedArguments,
     exec,
     execSync
 }

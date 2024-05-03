@@ -1,7 +1,7 @@
 const { RESOURCE_LOADING, DEPLOYMENT_METHOD } = require('./config.cjs')
 const { d, csv2values } = require('../shared/helper.cjs')
 const { bold } = require('../shared/console.cjs')
-const { TASK, Tasks } = require("./tasks.cjs");
+const { TASK, Tasks } = require("./target.cjs");
 
 /**
  * A class representing the hosting of the game. Depending on the hoster certain features and deploy methods may be
@@ -57,29 +57,24 @@ class Hosting {
      *
      * @param {Tasks} tasks
      */
-    generateRepoFiles(tasks) {}
+    generateRepoFiles() {}
 
     /**
      * Prepares the hosting in the development mode. Although there is no hosting required in the development mode
      * because it's all handled by the webpack dev-server, it can be used to generate repository files which are
      * required for the hosting
-     *
-     * @param {Tasks} tasks
      */
-    prepareDev(tasks) {
+    prepareDev() {
         const { config } = this.distTarget
 
         // TODO: only generate to game repo if deploymentMethod is checkout? Upload root may also need this in dist folder
-        this.generateRepoFiles(config, tasks)
+        this.generateRepoFiles(config)
     }
 
     /**
      * Prepares the hosting in the dist folder and also adds instructions for the user to deploy the game and server
-     *
-     * @param {object} distTarget
-     * @param {Tasks} tasks
      */
-    prepareDist( tasks) {
+    prepareDist() {
         const { config } = this.distTarget
         const { gamePackageJson } = this.contents
         const { queue, absPath, syncFs } = this.fileDeps
@@ -126,16 +121,15 @@ class Hosting {
 
     /**
      * Adds all necessary instructions for the user to deploy and start the server
-     *
-     * @param {Tasks} tasks
      */
-    addDeploymentInstructions(tasks) {
-        const { config } = this.distTarget
+    addDeploymentInstructions() {
+        const distTarget = this.distTarget
+        const { config } = distTarget
         const { absPath } = this.fileDeps
         const { server, deploymentMethod } = config
 
         if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
-            tasks.add(
+            distTarget.addTaskMessage(
                 TASK.SOURCE_TO_SERVER,
                 `Upload the content of "${absPath.dist()}" to the public folder of your http web-server`
             )
@@ -143,23 +137,23 @@ class Hosting {
         if (!server) return
 
         if (deploymentMethod === DEPLOYMENT_METHOD.UPLOAD_ROOT) {
-            tasks
-                .add(
+            distTarget
+                .addTaskMessage(
                     TASK.SOURCE_TO_SERVER,
                     `Upload the content of "${absPath.dist()}" to the document root folder of your http web-server`
                 )
-                .add(
+                .addTaskMessage(
                     TASK.TRIGGER_INSTALL,
                     `Afterwards execute "npm install" in this directory`
                 )
         }
         if (deploymentMethod === DEPLOYMENT_METHOD.CHECKOUT) {
-            tasks
-                .add(
+            distTarget
+                .addTaskMessage(
                     TASK.SOURCE_TO_SERVER,
                     `Checkout your game repo on your web server manually or automatically`
                 )
-                .add(
+                .addTaskMessage(
                     TASK.TRIGGER_START,
                     `Afterwards execute "${bold('npm start')}" in the root directory of your web server`
                 )
@@ -168,27 +162,23 @@ class Hosting {
 
     /**
      * Prepares the distribution for the hosting and adds instructions for the user to deploy the game deliverable and
-     * start the server. Returns the relative path in the dist folder where the public files and dirs are located
+     * start the server
      *
      * @param {boolean} isDist
-     *
-     * @returns {object}
      */
     prepare(isDist) {
         const { absPath } = this.fileDeps
         const { config } = this.distTarget
-        const tasks = new Tasks()
         const publicDir = config.server ? 'public' : ''
         this.distTarget.publicDir = publicDir
         this.publicPath = absPath.dist(publicDir)
 
         if (isDist) {
-            this.prepareDist(tasks)
-            this.addDeploymentInstructions(tasks)
+            this.prepareDist()
+            this.addDeploymentInstructions()
         } else {
-            this.prepareDev(tasks)
+            this.prepareDev()
         }
-        return { tasks }
     }
 }
 

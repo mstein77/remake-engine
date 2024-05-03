@@ -1,5 +1,5 @@
 import { setLogger, d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect,
-    trim, simpleType, csv2values, isVersionEqualOrHigher } from '../../src/shared/helper.cjs'
+    isRegExp, isFunction, stringList, sortAsc, sortDesc, sortPropDesc, sortPropAsc, trim, simpleType, csv2values, isVersionEqualOrHigher } from '../../src/shared/helper.cjs'
 
 const allTrue = (func, ...params ) => {
     for (const param of params) {
@@ -53,6 +53,17 @@ test('isDataUrl', () => {
     expect(isDataUrl('data:image/png;base64,x', 'audio/wav')).toBeFalse()
     expect(isDataUrl('data:image/png;base64,x', 'image/png')).toBeTrue()
     expect(isDataUrl('data:foo;base64,x', 'foo')).toBeTrue()
+})
+
+test('isRegExp', () => {
+    allTrue(isRegExp, new RegExp('/[0-9]/'), /[0-9]/)
+    allFalse(isRegExp, undefined, null, false, true, 0, 0.0, '', '/[0-9]/', {foo: 'bar'}, () => true)
+})
+
+test('isFunction', () => {
+    const x = () => false
+    allTrue(isFunction, () => true, function () {return true}, x)
+    allFalse(isFunction, undefined, null, false, true, 0, 0.0, '', '/[0-9]/', {foo: 'bar'})
 })
 
 test('ucfirst', () => {
@@ -117,9 +128,11 @@ test('trim', () => {
     expect(trim('a', 'a')).toBe('')
     expect(trim('aaaa', 'ab')).toBe('')
     expect(trim('ab', '')).toBe('ab')
+    expect(trim('ab', 'a')).toBe('b')
     expect(trim('ab', 'c')).toBe('ab')
     expect(trim('ab', 'ba')).toBe('')
     expect(trim('ab', 'a')).toBe('b')
+    expect(trim('abbbxabxbaa', 'ba')).toBe('xabx')
     expect(trim('aaaccaaa', 'a')).toBe('cc')
     expect(trim('baaccbba', 'ab')).toBe('cc')
     expect(trim('baacacbba', 'ab')).toBe('cac')
@@ -152,4 +165,43 @@ test('isVersionEqualOrHigher', () => {
     expect(isVersionEqualOrHigher('1.2a', '1.2a')).toBeTrue()
     expect(isVersionEqualOrHigher('1.2a', '1.2b')).toBeFalse()
     expect(isVersionEqualOrHigher('1.2b', '1.2a')).toBeFalse()
+})
+
+test('stringList', () => {
+    expect(stringList([])).toEqual('')
+    expect(stringList([1])).toEqual('"1"')
+    expect(stringList([1, 2])).toEqual('"1" or "2"')
+    expect(stringList(["", "foo", "bar"])).toEqual('"", "foo" or "bar"')
+})
+
+test('sortAsc', () => {
+    expect(sortAsc(0, 0)).toEqual(0)
+    expect(sortAsc(1, 0)).toEqual(1)
+    expect(sortAsc(0, 2)).toEqual(-1)
+    expect(sortAsc('foo', 'foo')).toEqual(0)
+    expect(sortAsc('ab', 'aa')).toEqual(1)
+    expect(sortAsc('aa', 'ab')).toEqual(-1)
+})
+
+test('sortDesc', () => {
+    expect(sortDesc(0, 0)).toEqual(0)
+    expect(sortDesc(1, 0)).toEqual(-1)
+    expect(sortDesc(0, 2)).toEqual(1)
+    expect(sortDesc('foo', 'foo')).toEqual(0)
+    expect(sortDesc('ab', 'aa')).toEqual(-1)
+    expect(sortDesc('aa', 'ab')).toEqual(1)
+})
+
+test('sortPropAsc', () => {
+    const sorter = sortPropAsc('foo')
+    expect(sorter({foo: 0}, {foo: 0})).toEqual(0)
+    expect(sorter({foo: 1}, {foo: 0})).toEqual(1)
+    expect(sorter({foo: 1}, {foo: 2})).toEqual(-1)
+})
+
+test('sortPropDesc', () => {
+    const sorter = sortPropDesc('foo')
+    expect(sorter({foo: 0}, {foo: 0})).toEqual(0)
+    expect(sorter({foo: 1}, {foo: 0})).toEqual(-1)
+    expect(sorter({foo: 1}, {foo: 2})).toEqual(1)
 })

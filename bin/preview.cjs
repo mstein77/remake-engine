@@ -4,10 +4,11 @@ const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
+const { DistTarget } = require("../src/build/tasks.cjs");
 
 try {
     setCliScript('PREVIEW', true)
-    const { arguments } = extractOptionsAndArguments(
+    const { args } = extractOptionsAndArguments(
         {
             flags: {h: 'help'},
             options: {
@@ -22,13 +23,12 @@ try {
         ]
     )
     try {
-        const args = []
+        const rawArgs = []
         let overwrites = {}
         let cwd = absPath.dist()
+        const target = args[0]
 
-        const target = arguments[0]
-
-        if (arguments.length) {
+        if (args.length) {
             const targetPath = absPath.dists(target)
             if (!syncFs.dirExists(targetPath))
                 throw NoStackError(`The target build "${target}" does not exists in ${absPath.dists()}`)
@@ -37,7 +37,7 @@ try {
             overwrites = buildsJson[target]
 
             cwd = targetPath
-            args.push(target)
+            rawArgs.push(target)
         }
 
         const fileDeps = { absPath, syncFs }
@@ -47,30 +47,30 @@ try {
             const configs = {
                 gamePackageJson: syncFs.readJson(absPath.game('package.json'))
             }
-            const distTarget = {
+            const distTarget = new DistTarget({
                 target,
                 config: distConfig
-            }
+            })
             const openApp = async () => await deliverable.open(distTarget, configs, fileDeps)
             mainSection(`Opening deliverable...`)
             openApp()
         } else {
             process.env.RMK_SCRIPT_ARGS += '\t--preview'
             if (distConfig.server && distConfig.deploymentMethod !== DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
-                args.unshift(
+                rawArgs.unshift(
                     'run',
                     'preview'
                 )
-                spawnSync('npm', args, {
+                spawnSync('npm', rawArgs, {
                     stdio: 'inherit',
                     cwd
                 })
             } else {
-                args.unshift(
+                rawArgs.unshift(
                     'run',
                     'start-static-preview'
                 )
-                spawnSync('npm', args, {
+                spawnSync('npm', rawArgs, {
                     stdio: 'inherit',
                     cwd: absPath.engine()
                 })
