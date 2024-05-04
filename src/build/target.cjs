@@ -9,10 +9,15 @@ const TASK = {
 }
 
 /**
- * A tasks object allows to add messages to tasks of the deployment process
+ * A dist target holds all information regarding a distribution target
  */
 class DistTarget {
 
+    /**
+     * Constructs or restores a distribution target from the given Json properties
+     *
+     * @param {object} props
+     */
     constructor(props = {}) {
         const defaultProps = { target: '', overwrites: {}, config: {}, skip: false }
         const { tasks = {}, ...rawProps } = props
@@ -25,58 +30,128 @@ class DistTarget {
         }
     }
 
+    /**
+     * A string holding the name which is used for this target in the builds.cjs
+     *
+     * @returns {string}
+     */
     get target() {
         return this.props.target
     }
 
+    /**
+     * An object which holds the config overwrites of the target used in the builds.cjs
+     *
+     * @returns {object}
+     */
     get overwrites() {
         return this.props.overwrites
     }
 
+    /**
+     * A string holding the root build folder where this target should be build
+     *
+     * @returns {string}
+     */
     get root() {
         return this.props.root
     }
 
+    /**
+     * A string holding the path to the temporary build folder
+     *
+     * @returns {string}
+     */
     get tmpDir() {
         return this.props.tmpDir
     }
 
+    /**
+     * A string holding the name of the public directory of the server (if a server is used)
+     *
+     * @returns {string}
+     */
     get publicDir() {
         return this.props.publicDir
     }
 
+    /**
+     * Sets the name of the public directory of the server
+     *
+     * @param {string} value
+     */
     set publicDir(value) {
         this.props.publicDir = value
     }
 
+    /**
+     * A string holding the name of build directory in the build root
+     *
+     * @returns {string}
+     */
     get dir() {
         return this.props.dir
     }
 
+    /**
+     * The final config which was used to build the target
+     *
+     * @returns {object}
+     */
     get config() {
         return this.props.config
     }
 
+    /**
+     * Sets the config for building the target
+     *
+     * @param {object} value
+     */
     set config(value) {
         this.props.config = value
     }
 
+    /**
+     * A boolean indicating whether this dist target was skipped or not
+     *
+     * @returns {boolean}
+     */
     get skip() {
         return this.props.skip
     }
 
+    /**
+     * Sets whether this dist build should be skipped or not
+     *
+     * @param {boolean} value
+     */
     set skip(value) {
         this.props.skip = value
     }
 
+    /**
+     * An array which holds all asset objects which should be generated
+     *
+     * @returns {array}
+     */
     get assets() {
         return this.props.assets
     }
 
+    /**
+     * Sets an array holding all assets objects which should be generated
+     *
+     * @param {array} value
+     */
     set assets(value) {
         this.props.assets = value
     }
 
+    /**
+     * Returns a JSON object which can be used to restore the current distribution target
+     *
+     * @returns {object}
+     */
     toJson() {
         return {
             ...this.props,
