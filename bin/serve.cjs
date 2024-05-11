@@ -1,46 +1,61 @@
-const absPath = require("../src/shared/classes/absPath.cjs")
-const syncFs = require("../src/shared/classes/syncFs.cjs")
-const { spawn, spawnSync } = require('child_process')
+const absPath = require("../src/shared/absPath.cjs")
+const syncFs = require("../src/shared/syncFs.cjs")
+const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_CODE_HANDLED, setCliScript } = require("../src/shared/console.cjs")
+const { d } = require("../src/shared/helper.cjs")
 
-if (syncFs.isEmptyDir(absPath.dist())) {
-    console.log(`Executing "npm install" in dist folder...`)
-    const build = spawnSync('npm', ['run', 'build'], {
-        stdio: 'inherit',
-        cwd: absPath.game()
-    })
-    console.log(build.output.toString('utf8'))
-    if (build.status !== 0) {
-        process.exit(build.status)
-    }
-}
-
-if (syncFs.fileExists(absPath.dist('package.json')) && syncFs.isEmptyDir(absPath.dist('node_modules'))) {
-    console.log(`Executing "npm install" in dist folder...`)
-    const install = spawnSync('npm', ['install'], {
-        stdio: 'inherit',
-        cwd: absPath.dist()
-    })
-    console.log(install.output.toString('utf8'))
-    if (install.status !== 0) {
-        process.exit(install.status)
-    }
-}
-
-const serverPath = absPath.dist('server.cjs')
-if (syncFs.fileExists(serverPath)) {
-    console.log(`Starting server in dist folder...`)
-    spawn('node', [serverPath], {
-        stdio: 'inherit',
-        cwd: absPath.dist()
-    })
-} else {
-    console.log(`Starting static file server in dist folder...`)
-    const args = ['run']
-    args.push(
-        'start-static'
+try {
+    setCliScript('SERVER')
+    const { args } = extractOptionsAndArguments(
+        {
+            flags: {h: 'help'},
+            options: {
+                help: {desc: 'Show help'}
+            }
+        },
+        'npm run start [target]',
+        [
+            'Tries to start the server of the dist build (or the given target in the dists folder)'
+        ]
     )
-    spawn('npm', args, {
-        stdio: 'inherit',
-        cwd: absPath.engine()
-    })
+    try {
+        let cwd = absPath.dist()
+        let targetPath = absPath.dist()
+        let target = null
+        if (args.length) {
+            target = args[0]
+            targetPath = absPath.dists(target)
+            cwd = targetPath
+        }
+        if (!syncFs.dirExists(targetPath) || syncFs.isEmptyDir(targetPath)) {
+            const rawArgs = ['run', 'build']
+            if (target) rawArgs.push(target)
+            const build = spawnSync('npm', rawArgs, {
+                stdio: 'inherit',
+                cwd: absPath.game()
+            })
+            if (build.status !== 0) {
+                process.exit(build.status)
+            }
+        }
+        const serverPath = absPath.make(cwd, 'server.cjs')
+        if (syncFs.fileExists(serverPath)) {
+            const rawArgs = ['run']
+            rawArgs.push(
+                'start'
+            )
+            const result = spawnSync('npm', rawArgs, {
+                stdio: 'inherit',
+                cwd
+            })
+            if (result.status) {
+                process.exit(result.status)
+            }
+        } else {
+            throw NoStackError(`Build in ${cwd} was build without server...aborting`)
+        }
+    } catch (e) {
+        if (e.status !== EXIT_CODE_HANDLED) throw e
+    }
+} catch (e) {
+    errorSection(e)
 }

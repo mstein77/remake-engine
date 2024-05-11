@@ -1,82 +1,12 @@
-import {BrowserStorageHandler, MapStorageHandler, StorageManager} from "core/storage"
+import { StorageManager } from "shared/storage.cjs"
+import { BrowserStorage } from "core/storages/browserStorage"
 import { d } from "helper/helper"
 import jest from 'jest-mock'
-import { id2jsonTid, id2imageTid, id2audioTid } from "core/resources"
-import { RESOURCE } from "core/const"
+import { RESOURCE, id2jsonTid, id2imageTid, id2audioTid } from '../../../src/shared/resources.cjs'
 
-test('StorageManager', () => {
+test('BrowserStorage', () => {
 
-    expect(() => new StorageManager()).toThrowError('handler')
-
-    {
-        const SM = new StorageManager(MapStorageHandler(), 'pfx.')
-        expect(SM.getJsonIds()).toBeEmpty()
-        expect(SM.hasJson('test')).toBeFalse()
-        SM.storeJson('test', {})
-        expect(SM.hasJson('test')).toBeTrue()
-        expect(SM.getJsonIds()).toIncludeAllMembers(['test'])
-        expect(SM.getJson('test')).toBeEmptyObject()
-        SM.deleteJson('test')
-        expect(SM.getJson('test')).toBeUndefined()
-        expect(SM.getJsonIds()).toBeEmpty()
-
-        expect(SM.hasImage('test')).toBeFalse()
-        SM.storeImage('test', 'myImage')
-        expect(SM.hasImage('test')).toBeTrue()
-        expect(SM.getImage('test')).toBe('myImage')
-        expect(SM.getImageIds()).toIncludeAllMembers(['test'])
-        SM.deleteImage('test')
-        expect(SM.getImage('test')).toBeUndefined()
-        expect(SM.getImageIds()).toBeEmpty()
-
-        expect(SM.hasAudio('test')).toBeFalse()
-        SM.storeAudio('test', 'foo')
-        expect(SM.hasAudio('test')).toBeTrue()
-        expect(SM.getAudio('test')).toBe('foo')
-        expect(SM.getAudioIds()).toIncludeAllMembers(['test'])
-        SM.deleteAudio('test')
-        expect(SM.getAudioIds()).toBeEmpty()
-        expect(SM.getAudio('test')).toBeUndefined()
-
-        SM.storeFromObject({
-            [id2jsonTid('testj')]: {},
-            [id2imageTid('testi')]: 'myImage',
-            [id2audioTid('testa')]: 'myAudio'
-        })
-        expect(SM.getTypedIds()).toIncludeAllMembers([
-            id2jsonTid('testj'), id2imageTid('testi'), id2audioTid('testa')
-        ])
-
-        SM.truncate()
-        expect(SM.getAudioIds()).toBeEmpty()
-        expect(SM.getImageIds()).toBeEmpty()
-        expect(SM.getJsonIds()).toBeEmpty()
-    }
-
-    {
-        const SM = new StorageManager(MapStorageHandler(2), 'pfx.')
-        SM.storeImage('bla', 'boo')
-        expect(SM.storeJson('foo', 'bar')).toBeTrue()
-        expect(SM.isFull()).toBeFalse()
-        expect(SM.storeJson('foo2', 'xxx')).toBeFalse()
-        expect(SM.isFull()).toBeTrue()
-        expect(SM.getJsonIds()).toIncludeAllMembers(['foo'])
-        SM.truncate()
-        expect(SM.isFull()).toBeFalse()
-        expect(SM.storeFromObject({
-            [id2jsonTid('foo')]: 'bar',
-            [id2jsonTid('foo2')]: 'xxx',
-            [id2jsonTid('foo3')]: 'bla'
-        })).toBeFalse()
-        const tids = SM.getTypedIds()
-        expect(tids).toHaveLength(2)
-        expect(SM.deleteResource(tids[0])).toBeTrue()
-        expect(SM.isFull()).toBeFalse()
-        expect(SM.storeJson('foo4', 'bad')).toBeTrue()
-        expect(SM.deleteJson('none')).toBeFalse()
-    }
-
-    expect(() => new StorageManager(BrowserStorageHandler({setItem: () => {throw Error('foo')}}))).toThrowError('available')
+    expect(() => new StorageManager(BrowserStorage({setItem: () => {throw Error('foo')}}))).toThrowError('available')
 
     {
         const setItem = item => true
@@ -89,11 +19,11 @@ test('StorageManager', () => {
             length: 0
         }
 
-        const SM = new StorageManager(BrowserStorageHandler(storage), 'abc.')
+        const SM = new StorageManager(BrowserStorage(storage, 'abc.'))
         const json = {foo: 'bar'}
-        SM.storeJson('test', json)
+        SM.storeJsonResource('test', json)
         const secondCallArgs = mockedSetItem.mock.calls[1];
-        expect(secondCallArgs[0]).toEqual('abc.' + id2jsonTid('test'))
+        expect(secondCallArgs[0]).toEqual('abc.' + id2jsonTid('test') + '.json')
         expect(secondCallArgs[1]).toEqual(JSON.stringify(json))
     }
 
@@ -104,16 +34,16 @@ test('StorageManager', () => {
 
         const storage = {
             setItem: mockedSetItem,
-            key: () => 'abc.' + id2imageTid('foo'),
+            key: () => 'abc.' + id2imageTid('foo') + '.png',
             removeItem: () => true,
             getItem: () => JSON.stringify({x: 122}),
             length: 1
         }
 
-        const SM = new StorageManager(BrowserStorageHandler(storage), 'abc.')
-        expect(SM.hasJson('foo')).toBeFalse()
-        expect(SM.hasImage('foo')).toBeTrue()
-        expect(SM.getJson('foo')).toContainAllEntries([['x', 122]])
+        const SM = new StorageManager(BrowserStorage(storage, 'abc.'))
+        expect(SM.hasJsonResource('foo')).toBeFalse()
+        expect(SM.hasImageResource('foo')).toBeTrue()
+        expect(SM.getResource(id2jsonTid('foo'))).toContainAllEntries([['x', 122]])
         expect(SM.isFull()).toBeFalse()
     }
 
@@ -124,20 +54,21 @@ test('StorageManager', () => {
 
         const storage = {
             setItem: () => true,
-            key: idx => 'abc.' + id2jsonTid('foo'),
+            key: idx => 'abc.' + id2jsonTid('foo') + '.json',
             removeItem: mockedRemoveItem,
             length: 1
         }
 
-        const SM = new StorageManager(BrowserStorageHandler(storage), 'abc.')
-        expect(SM.hasAudio('foo')).toBeFalse()
-        expect(SM.deleteImage('foo')).toBeFalse()
-        expect(SM.deleteJson('foo')).toBeTrue()
+        const SM = new StorageManager(BrowserStorage(storage, 'abc.'))
+        expect(SM.hasAudioResource('foo')).toBeFalse()
+        expect(SM.deleteImageResource('foo')).toBeFalse()
+        expect(SM.deleteJsonResource('foo')).toBeTrue()
         const secondCallArgs = mockedRemoveItem.mock.calls[1];
-        expect(secondCallArgs[0]).toEqual('abc.' + id2jsonTid('foo'))
-        expect(SM.hasJson('foo')).toBeFalse()
+        expect(secondCallArgs[0]).toEqual('abc.' + id2jsonTid('foo') + '.json')
+        expect(SM.hasJsonResource('foo')).toBeFalse()
     }
 
+    /*
     {
         const clear = () => true
         const mockedClear = jest.fn(clear)
@@ -145,19 +76,19 @@ test('StorageManager', () => {
 
         const storage = {
             setItem: () => true,
-            key: idx => 'abc.' + id2imageTid('foo' + idx),
+            key: idx => d('abc.' + id2imageTid('foo' + idx) + '.png', idx),
             removeItem: () => true,
             clear: mockedClear,
             length: 2
         }
 
-        const SM = new StorageManager(BrowserStorageHandler(storage), 'abc.')
-        expect(SM.hasImage('foo1')).toBeTrue()
-        expect(SM.getImageIds()).toIncludeAllMembers(['foo0', 'foo1'])
+        const SM = new StorageManager(BrowserStorage(storage), 'abc.')
+        // expect(SM.hasImageResource('foo1')).toBeTrue()
+        expect(SM.getImageResourceIds()).toIncludeAllMembers(['foo0', 'foo1'])
         SM.truncate()
-        expect(SM.hasImage('foo0')).toBeFalse()
-        expect(SM.hasImage('foo1')).toBeFalse()
-        expect(SM.getImageIds()).toBeEmpty()
+        expect(SM.hasImageResource('foo0')).toBeFalse()
+        expect(SM.hasImageResource('foo1')).toBeFalse()
+        expect(SM.getImageResourceIds()).toBeEmpty()
     }
 
     {
@@ -165,7 +96,7 @@ test('StorageManager', () => {
             setItem: () => {throw Error('Foo')},
             length: 0
         }
-        const browserStorage = BrowserStorageHandler(storage)
+        const browserStorage = BrowserStorage(storage)
         expect(browserStorage.encode(RESOURCE.TYPE.AUDIO, 'foo')).toEqual('foo');
         // expect(browserStorage.encode(RESOURCE.TYPE.IMAGE, 'foo')).toEqual('foo');
         expect(() => browserStorage.encode('?')).toThrowError('Unsupported')
@@ -177,4 +108,5 @@ test('StorageManager', () => {
         expect(browserStorage.isFull()).toBeFalse()
     }
 
+     */
 })

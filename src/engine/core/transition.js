@@ -1,6 +1,6 @@
 import inst from "./instances"
 import { PaneTreeProvider, PaneTreeRenderer } from "./screen"
-import { ResourceRequest } from "./classes"
+import { ResourceRequest } from "./resources"
 import { getCosinePath, getSinePath, isObject, isString, toPairs, d } from "helper/helper"
 import { HtmlPane } from "../index"
 import { BackgroundPane } from "../index"

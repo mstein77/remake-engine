@@ -1,25 +1,4 @@
-const merge = require('webpack-merge')
-const { getConfigForCtx, getCommonWebpackConfig, getServerWebpackConfig } = require('./webpack.build-common.cjs')
+const { d } = require("./src/shared/helper.cjs")
+const { generateWebpackConfigs } = require("./src/build/build.cjs")
 
-module.exports = (env, args) => {
-    const config = getConfigForCtx(args)
-    frontendWebpackConfig =
-        merge(
-            getCommonWebpackConfig(args),
-            {
-                mode: 'production'
-            }
-        )
-
-    if (!config.server) return frontendWebpackConfig
-
-    return [
-        frontendWebpackConfig,
-        merge(
-            getServerWebpackConfig(args),
-            {
-                mode: 'production'
-            }
-        )
-    ]
-}
+module.exports = (env, args) => generateWebpackConfigs(true, false)

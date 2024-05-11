@@ -1,8 +1,10 @@
 import inst from "core/instances"
 import { ANIMATION } from "core/const"
 import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
-import { d, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/classes/helper.cjs"
-import { typeText2tid } from "../../shared/classes/resources.cjs"
+import { d, csv2values, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/helper.cjs"
+import { typeText2tid } from "../../shared/resources.cjs"
+
+const getBaseUrl = () => typeof window !== 'undefined' && window.location.hostname === 'localhost' ? PREVIEW_URL : BASE_URL
 
 function getItemsCloneWithUpdatedItem(oldItems, index, props) {
     const newItems = [...oldItems];
@@ -1070,6 +1072,7 @@ function findSameRefs(a, b, path = '', pathElems = []) {
 }
 
 export {
+    getBaseUrl,
     d,
     ts,
     td,
@@ -1134,5 +1137,6 @@ export {
     ANIMATION,
     Players,
     RelativeBlock,
-    findSameRefs
+    findSameRefs,
+    csv2values
 };

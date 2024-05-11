@@ -6,10 +6,10 @@ const morgan = require('morgan')
 const { isValidResourceId, ResourceDependencies } = require('../engine/helper/shared.cjs')
 const express = require("express")
 
-const { d } = require('../shared/classes/helper.cjs')
-const { RESOURCE_LOADING } = require('../build/classes/const.cjs')
-const resourcesController = require('./controller/resources.cjs')
-
+const { d, csv2values } = require('../shared/helper.cjs')
+const { RESOURCE_LOADING } = require('../build/config.cjs')
+const { resourcesController } = require('./controller/resources.cjs')
+const { mainSection } = require('../shared/console.cjs')
 
 const setupAppMiddlewares = (app, config = null) => {
 
@@ -21,7 +21,7 @@ const setupAppMiddlewares = (app, config = null) => {
         static: ( ...relPath ) => path.resolve( config.IS_DIST ? absDir.public() : absDir.resources(), ...relPath ),
         resources: ( ...relPath ) => path.resolve(absDir.root('resources'), ...relPath )
     }
-
+    app.disable('x-powered-by')
     resourcesController.init(config, absDir)
 
     const getFilesFromDir = dir => fs.readdirSync(dir, {withFileTypes: true})
@@ -125,14 +125,13 @@ const setupAppMiddlewares = (app, config = null) => {
             fs.writeFileSync(indirectFilePath, JSON.stringify(content), 'utf8')
         },
         deleteResource
-    );
-
+    )
     if (config.serverLogging !== 'none') {
         const options = {}
         let minCode = null
-        if (config.serverLogging === 'error') {
+        if (config.serverLogging === 'minimal') {
             minCode = 500
-        } else if (config.serverLogging === 'warning') {
+        } else if (config.serverLogging === 'normal') {
             minCode = 400
         }
         if (minCode) {
@@ -147,10 +146,7 @@ const setupAppMiddlewares = (app, config = null) => {
 
     const staticTypes = [];
     if (config.resourceLoading !== RESOURCE_LOADING.API_ALL && config.staticTypes !== '') {
-        staticTypes.push( ...config.staticTypes.split(',') )
-    }
-    for (const type of staticTypes) {
-        app.use('/' + type, express.static(absDir.static(type)))
+        staticTypes.push( ...csv2values(config.staticTypes) )
     }
     app.post('/has', resourcesController.has)
     app.post('/resources', resourcesController.resources)
@@ -181,73 +177,38 @@ const setupAppMiddlewares = (app, config = null) => {
                 notFound.push(info)
             }
         }
-        res.json({found, notFound, invalid})
+        res.json({ found, notFound, invalid })
     });
 
-    app.post('/resources2', (req, res) => {
-        const found = []
-        const notFound = []
-        const invalid = []
-
-        const resources = req.body.resources ? req.body.resources : []
-        const relevant = dependencies.getRelevantScreenResources(req.body.screen, req.body.resolved, req.body.overwrites, req.body.remotes)
-        for (let resId of relevant.found) {
-            const [type, id] = resId.split(':')
-            resources.push({id, type})
+    const cacheBustingOptions = {
+        setHeaders: res => {
+            res.setHeader('Cache-Control', 'max-age=604800, immutable')
         }
-        for (let resId of relevant.notFound) {
-            const [type, id] = resId.split(':')
-            notFound.push({id, type})
+    }
+    const cacheValidationOptions = {
+        setHeaders: res => {
+            res.setHeader('Cache-Control', 'no-cache')
         }
-
-        for (let resource of resources) {
-            if (!isValidResourceId(resource.type, resource.id)) {
-                invalid.push(resource)
-                continue
-            }
-            let data = null
-            const filePath = getResourceFilePath(resource.type, resource.id)
-            if (fs.existsSync(filePath)) {
-                switch (resource.type) {
-                    case 'image':
-                        const imgContent = fs.readFileSync(filePath)
-                        const imgType = path.extname(filePath)
-                        const base64Image = Buffer.from(imgContent, 'binary').toString('base64')
-                        data = `data:image/${imgType.split('.').pop()};base64,${base64Image}`
-                        break
-
-                    case 'audio':
-                        const content = fs.readFileSync(filePath)
-                        const extensionName = path.extname(filePath)
-                        const base64Audio = Buffer.from(content, 'binary').toString('base64')
-                        data = `data:audio/${extensionName.split('.').pop()};base64,${base64Audio}`
-                        break
-
-                    case 'json':
-                        try {
-                            data = JSON.parse(
-                                fs.readFileSync(
-                                    filePath,
-                                    'utf8'
-                                )
-                            );
-                        } catch (e) {
-                            console.error(`Could not parse json resource "${resource.id}"`)
-                        }
-                        break;
-                }
-            }
-            if (data !== null) {
-                resource.data = data
-                found.push(resource)
-            } else {
-                notFound.push(resource)
-            }
+    }
+    for (const type of staticTypes) {
+        app.use('/' + type, express.static(
+            absDir.static(type), cacheValidationOptions)
+        )
+    }
+    const cacheBustingDirs = ['js', 'css']
+    for (const dir of cacheBustingDirs) {
+        if (fs.existsSync(absDir.static(dir))) {
+            app.use('/' + dir, express.static(absDir.static(dir), cacheBustingOptions))
         }
-        res.json({ found, notFound, invalid })
-    })
+    }
+    app.use(express.static(
+        absDir.static(),
+        cacheValidationOptions
+    ))
 
     if (config.IS_DIST) return
+
+    mainSection('Listening...', 'DEV-SERVER')
 
     app.post('/delete', (req, res) => {
         const resources = req.body.resources ? req.body.resources : []

@@ -1,6 +1,7 @@
 import { d, isObject, without, toKeys, toPairs, isArray } from "helper/helper"
 import { validated } from "helper/validate"
-import { AppliedImage, ImageResource } from "./classes"
+import { AppliedImage } from "core/classes"
+import { ImageResource } from "core/resources"
 import inst from "./instances"
 
 const getClonedProp = (value, parent) => {

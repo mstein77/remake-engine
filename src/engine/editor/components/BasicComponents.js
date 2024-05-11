@@ -6,9 +6,10 @@ import { Button, Color, Submit, OkCancelForm, useTooltip } from "./FormComponent
 import { ImageIndex, ColorIndex } from "../classes/EntityIndex"
 import { defaultValues } from "../settings"
 import { CellValue, CellSelection } from "../classes"
-import { BrowserStorage } from "core/storage/browserStorage"
-import { StorageManager } from "shared/classes/storage.cjs"
-import { RESOURCE } from "shared/classes/resources.cjs"
+import { BrowserStorage } from "core/storages/browserStorage"
+import { StorageManager } from "shared/storage.cjs"
+import { createImageResource } from "core/resources"
+import { RESOURCE } from "shared/resources.cjs"
 
 const WindowContext = React.createContext();
 const EditorContext = React.createContext();
@@ -2403,7 +2404,7 @@ function WindowCtx({ imageResources, filters, children, game }) {
 
             getNewImageResource: (template, width, height) => {
                 return (
-                    resourceLoader.createImageResource(
+                    createImageResource(
                         getCanvasForDim(width, height),
                         getUniqueName(template, resourceLoader.getAllResourceIds(RESOURCE.TYPE.IMAGE))
                     )

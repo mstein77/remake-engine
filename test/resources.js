@@ -1,5 +1,5 @@
-const {DependencyManager, StorageManager, ResourceLoader} = require('../src/app/engine');
-const {ResourceDependencies, getFlatObjectResources} =require('../src/app/helper/helper');
+const { DependencyManager, StorageManager, ResourceLoader } = require('../src/app/engine');
+const { ResourceDependencies } =require('../src/app/helper/helper');
 const assert = require('chai').assert;
 
 class FetcherMock {

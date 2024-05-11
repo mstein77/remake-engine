@@ -1,0 +1,127 @@
+import { StorageManager } from '../../src/shared/storage.cjs'
+import { MapStorage } from '../../src/shared/storages/mapStorage.cjs'
+import { id2imageTid, id2jsonTid, id2audioTid, id2videoTid, RESOURCE, id2coreTid } from '../../src/shared/resources.cjs'
+import { d } from '../../src/shared/helper.cjs'
+
+test('StorageManager.construct', () => {
+    expect(() => new StorageManager({isAvailable: () => false})).toThrow('not available')
+    expect(() => new StorageManager(MapStorage())).not.toThrow()
+})
+
+test('StorageManager.getDefaultedArray', () => {
+    const SM = new StorageManager(MapStorage())
+    expect(SM.getDefaultedArray('foo')).toBeEmpty()
+    expect(SM.getDefaultedArray('foo', [111])).toIncludeAllMembers([111])
+    expect(SM.storeJson('foo', [666, 777])).toBeTrue()
+    expect(SM.getDefaultedArray('foo', [111])).toIncludeAllMembers([666, 777])
+    expect(SM.storeJson('foo', null)).toBeTrue()
+    expect(SM.getDefaultedArray('foo', [111])).toIncludeAllMembers([111])
+    expect(SM.getDefaultedArray('foo', 111)).toBeEmpty()
+})
+
+test('StorageManager.getDefaultedJson', () => {
+    const SM = new StorageManager(MapStorage())
+    expect(SM.getDefaultedJson('foo')).toBeUndefined()
+    expect(SM.getDefaultedJson('foo', null)).toBeNull()
+    expect(SM.getDefaultedJson('foo', {})).toBeEmptyObject()
+    expect(SM.getDefaultedJson('foo', {foo: 'bar'})).toContainAllEntries([['foo', 'bar']])
+    expect(SM.storeJson('foo', null)).toBeTrue()
+    expect(SM.getDefaultedJson('foo')).toBeNull()
+    expect(SM.getDefaultedJson('foo', {foo: 'bar'})).toBeNull()
+    expect(SM.storeJson('foo', {foo: 666, bar2: 'foo2'})).toBeTrue()
+    expect(SM.getDefaultedJson('foo', {foo: 777, bar: true})).toContainAllEntries([['foo', 666], ['bar', true], ['bar2', 'foo2']])
+})
+
+test('StorageManager Integration Tests', () => {
+
+    expect(() => new StorageManager()).toThrowError('handler')
+
+    {
+        const SM = new StorageManager(MapStorage())
+        expect(SM.getJsonResourceIds()).toBeEmpty()
+        expect(SM.isEmpty()).toBeTrue()
+        expect(SM.hasJsonResource('test')).toBeFalse()
+        SM.storeJsonResource('test', {})
+        expect(SM.hasJsonResource('test')).toBeTrue()
+        expect(SM.hasJsonResource('test.json')).toBeTrue()
+        expect(SM.getJsonResourceIds()).toIncludeAllMembers(['test.json'])
+        expect(SM.getResource(id2jsonTid('test'))).toBeEmptyObject()
+        SM.deleteJsonResource('test')
+        expect(SM.getResource(id2jsonTid('test'))).toBeUndefined()
+        expect(SM.getJsonIds()).toBeEmpty()
+
+        expect(SM.hasImageResource('test')).toBeFalse()
+        SM.storeImageResource('test', 'myImage')
+        expect(SM.hasImageResource('test')).toBeTrue()
+        expect(SM.getResource(id2imageTid('test'))).toBe('myImage')
+        expect(SM.getImageResourceIds()).toIncludeAllMembers(['test.png'])
+        SM.deleteImageResource('test')
+        expect(SM.getResource(id2imageTid('test'))).toBeUndefined()
+        expect(SM.getImageResourceIds()).toBeEmpty()
+
+        expect(SM.hasAudioResource('test')).toBeFalse()
+        SM.storeAudioResource('test', 'foo')
+        expect(SM.hasAudioResource('test')).toBeTrue()
+        expect(SM.getResource(id2audioTid('test'))).toBe('foo')
+        expect(SM.getAudioResourceIds()).toIncludeAllMembers(['test.wav'])
+        SM.deleteAudioResource('test')
+        expect(SM.getAudioResourceIds()).toBeEmpty()
+        expect(SM.getResource(id2audioTid('test'))).toBeUndefined()
+
+        expect(SM.hasJson('foo')).toBeFalse()
+        SM.storeJson('foo', 'bar')
+        SM.storeResource(id2jsonTid('testj'), {})
+        expect(SM.storeResourceById(RESOURCE.TYPE.IMAGE, 'testi', 'myImage')).toBeTrue()
+        SM.storeResource(id2audioTid('testa'), 'myAudio')
+        expect(SM.getTypedResourceIds()).toIncludeAllMembers([
+            id2jsonTid('testj.json'), id2imageTid('testi.png'), id2audioTid('testa.wav')
+        ])
+        expect(SM.getTypedResourceIdsByType(RESOURCE.TYPE.JSON)).toIncludeAllMembers(
+            [id2jsonTid('testj.json')]
+        )
+        expect(SM.getTypedResourceIdsByType([RESOURCE.TYPE.IMAGE, RESOURCE.TYPE.VIDEO])).toIncludeAllMembers(
+            [id2imageTid('testi.png')]
+        )
+        SM.storeCoreResource('foo', 'bar')
+        expect(SM.getPublicTypedResourceIds()).toIncludeAllMembers([
+            id2jsonTid('testj.json'), id2imageTid('testi.png'), id2audioTid('testa.wav')
+        ])
+        expect(SM.getCoreResource('foo')).toBe('bar')
+        expect(SM.getJson('foo')).toBe('bar')
+        SM.truncateResources()
+        expect(SM.getAudioResourceIds()).toBeEmpty()
+        expect(SM.getImageResourceIds()).toBeEmpty()
+        expect(SM.getJsonResourceIds()).toBeEmpty()
+        expect(SM.getVideoResourceIds()).toBeEmpty()
+        expect(SM.hasJson('foo')).toBeTrue()
+        expect(SM.isEmpty()).toBeFalse()
+        expect(SM.deleteJson('foo')).toBeTrue()
+        expect(SM.deleteJson('foo')).toBeFalse()
+        expect(SM.hasVideoResource('foo2')).toBeFalse()
+        expect(SM.storeVideoResource('foo2', 'bar')).toBeTrue()
+        expect(SM.hasVideoResource('foo2')).toBeTrue()
+        expect(SM.getResource(id2videoTid('foo2'))).toBe('bar')
+        expect(SM.deleteVideoResource('foo2')).toBeTrue()
+    }
+
+    {
+        const SM = new StorageManager(MapStorage(2))
+        SM.storeImageResource('bla', 'boo')
+        expect(SM.storeJsonResource('foo', 'bar')).toBeTrue()
+        expect(SM.isFull()).toBeFalse()
+        expect(SM.storeJsonResource('foo2', 'xxx')).toBeFalse()
+        expect(SM.isFull()).toBeTrue()
+        expect(SM.getJsonResourceIds()).toIncludeAllMembers(['foo.json'])
+        SM.truncateResources()
+        expect(SM.isFull()).toBeFalse()
+        expect(SM.storeJsonResource('foo', 'bar')).toBeTrue()
+        expect(SM.storeJsonResource('foo2', 'xxx')).toBeTrue()
+        expect(SM.storeResource(id2jsonTid('foo3'), 'bla')).toBeFalse()
+        const tids = SM.getTypedResourceIds()
+        expect(tids).toHaveLength(2)
+        expect(SM.deleteResource(tids[0])).toBeTrue()
+        expect(SM.isFull()).toBeFalse()
+        expect(SM.storeJsonResource('foo4', 'bad')).toBeTrue()
+        expect(SM.deleteJsonResource('none')).toBeFalse()
+    }
+})

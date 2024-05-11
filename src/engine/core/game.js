@@ -1,16 +1,15 @@
 import { STATE, RENDERER_STATE, FILTER } from "core/const"
 import { Config } from "core/config"
-import { clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
+import { getBaseUrl, clamp, ucfirst, toKeys, toPairs, d, without, getCanvasObjForDim } from "helper/helper"
 import { setStyleConstByKey, getCssPxValue } from "helper/css"
-import { getResourcesAndCallback, ResourceResolver } from "./resources"
+import { getResourcesAndCallback, ResourceResolver, ResourceRequest } from "./resources"
 import { div } from "helper/dom"
-import { ResourceRequest } from "core/classes"
 import { Model, ModelFactory, SubModelFactory } from "./model"
 import { validated } from "helper/validate"
 import { ScreenRegistry } from "./screen"
 import { BlendTransition, FadeInOutTransition, LoadingTransition, PushInTransition, TransitionRegistry } from "./transition"
-import { BrowserStorage } from "./storage/browserStorage"
-import { StorageManager } from "shared/classes/storage.cjs"
+import { BrowserStorage } from "./storages/browserStorage"
+import { StorageManager } from "shared/storage.cjs"
 import inst from "core/instances"
 
 class Game {
@@ -23,7 +22,6 @@ class Game {
      * @param {function|undefined} initHandler
      */
     constructor(input, initHandler) {
-
         this.currState = STATE.CONSTRUCT
 
         inst.setGame(this)
@@ -38,7 +36,7 @@ class Game {
         const resourceSessionStorage = new StorageManager(
             BrowserStorage(sessionStorage)
         )
-        inst.setRL(BASE_URL + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
+        inst.setRL(getBaseUrl() + '/', resourceLocalStorage, resourceSessionStorage, ResourceResolver)
         this.engineStorage = new StorageManager(BrowserStorage(localStorage, 'remake-engine.'))
 
         // TODO get from plugin-registry
@@ -101,7 +99,7 @@ class Game {
                             if (this.keyActions[key](e)) return
                         }
                     }
-                    if (key === EDITOR_KEY && this.hasEditor) {
+                    if (key === 'Dead' && this.hasEditor) {
                         e.preventDefault()
                         this.openEditorMode()
                         return
@@ -325,6 +323,8 @@ class Game {
         this.log(`Booting game "${GAME_ID}"...`)
         // build game dom structure
 
+        TransitionRegistry.clear()
+        ScreenRegistry.clear()
         this.registerDefaultTransitions()
         const { game, globals } = this
         let startScreen = this.initHandler({ game, globals })
@@ -526,7 +526,7 @@ class Game {
         } else if (!loaders.length) return Promise.resolve()
 
         for (const loader of loaders) {
-            loader.resolve()
+            loader.addToManager(inst.RL)
         }
         return inst.RL.loadPermanentScope('globals').then(
             responseHandler

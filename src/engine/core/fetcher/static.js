@@ -1,7 +1,7 @@
 import resourceInfo from "../../../../tmp/resources-info"
-import { RESOURCE } from "shared/classes/resources.cjs"
+import { RESOURCE } from "shared/resources.cjs"
 import { d } from "helper/helper"
-import { tids2extTids, map2extMap } from "shared/classes/resources.cjs"
+import { tids2extTids, map2extMap } from "shared/resources.cjs"
 
 const cache = resourceInfo.cache || {}
 const scope2ids = cache[RESOURCE.PREFIX[RESOURCE.TYPE.CORE] + 'scope2ids.json'] || {}
