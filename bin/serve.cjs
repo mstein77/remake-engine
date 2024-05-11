@@ -43,10 +43,13 @@ try {
             rawArgs.push(
                 'start'
             )
-            spawnSync('npm', rawArgs, {
+            const result = spawnSync('npm', rawArgs, {
                 stdio: 'inherit',
                 cwd
             })
+            if (result.status) {
+                process.exit(result.status)
+            }
         } else {
             throw NoStackError(`Build in ${cwd} was build without server...aborting`)
         }

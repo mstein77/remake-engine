@@ -66,6 +66,7 @@ try {
         }
         server = httpsModule.createServer(options, app)
     }
+    process.on('uncaughtException', e => errorSection(e))
     server.listen(port)
 
     if (isPreview) {

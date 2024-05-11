@@ -126,14 +126,18 @@ const path = require('node:path')
 const { spawnSync } = require(\`./node_modules/\${enginePackage}/src/shared/console.cjs\`)
 
 process.env.RMK_GAME_DIR = __dirname
-spawnSync(
+const result = spawnSync(
     'npm',
     ['run', '--', ...process.argv.splice(2)],
     {
         stdio: 'inherit',
         cwd: path.resolve(__dirname, 'node_modules/' + enginePackage)
     }
-)`
+)
+if (result.status) {
+    process.exit(result.status)
+}
+`
         });
 
         // trigger install of engine dependencies

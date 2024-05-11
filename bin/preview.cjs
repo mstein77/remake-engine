@@ -4,7 +4,7 @@ const { spawnSync, NoStackError, errorSection, extractOptionsAndArguments, EXIT_
 const { getPreviewConfigs, DEPLOYMENT_METHOD } = require("../src/build/config.cjs")
 const { d } = require("../src/shared/helper.cjs")
 const { getDefaultFromModule } = require("../src/build/helper.cjs")
-const { DistTarget } = require("../src/build/tasks.cjs");
+const { DistTarget } = require("../src/build/target.cjs")
 
 try {
     setCliScript('PREVIEW', true)
@@ -56,12 +56,13 @@ try {
             openApp()
         } else {
             process.env.RMK_SCRIPT_ARGS += '\t--preview'
+            let result
             if (distConfig.server && distConfig.deploymentMethod !== DEPLOYMENT_METHOD.UPLOAD_PUBLIC) {
                 rawArgs.unshift(
                     'run',
                     'preview'
                 )
-                spawnSync('npm', rawArgs, {
+                result = spawnSync('npm', rawArgs, {
                     stdio: 'inherit',
                     cwd
                 })
@@ -70,10 +71,13 @@ try {
                     'run',
                     'start-static-preview'
                 )
-                spawnSync('npm', rawArgs, {
+                result = spawnSync('npm', rawArgs, {
                     stdio: 'inherit',
                     cwd: absPath.engine()
                 })
+            }
+            if (result.status) {
+                process.exit(result.status)
             }
         }
     } catch (e) {

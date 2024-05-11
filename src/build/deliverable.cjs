@@ -70,6 +70,150 @@ class Deliverable {
         return allowedTypes
     }
 
+    isSupportedAssetScope(scope) {
+        switch (scope) {
+            case 'appIcon':
+                return this.hasAppIcon
+
+            case 'favIcon':
+                return this.hasFavIcon
+        }
+        return false
+    }
+
+    getAssetsForScope(scope, config, fileDeps) {
+
+        const { userAssetsDirPath, userAssetFiles, sizeOf } = fileDeps
+        const targetPlatforms = csv2values(config.targetPlatforms)
+
+        const assetSubTypes = csv2values(config.assetTypes)
+
+        const allowedSubTypes = this.getAssetTypeSubTypes(scope, assetSubTypes)
+        const infos = scope2assets[scope]
+        if (!infos)
+            throw Error(`Invalid asset scope "${scope}" given`)
+
+        const matchingDetails = infos.filter(detail => {
+            if (!allowedSubTypes.includes(detail.type)) return false
+
+            const allowedPlatforms = this.getAssetTypePlatforms(scope, targetPlatforms)
+            for (const platform of allowedPlatforms) {
+                if (!detail.platforms.some(name => name.startsWith(platform))) continue
+                return true
+            }
+            return false
+        })
+        const assets = []
+        const jobs = []
+        let hasFiles = false
+        let ext2baseFiles = {}
+
+        if (!this.isSupportedAssetScope(scope)) return { assets, jobs, hasFiles, ext2baseFiles }
+
+        const onlyUserFiles = config.assetGeneration === ASSET_GENERATION.NONE
+        const targets = {}
+        for (const detail of matchingDetails) {
+            jobs.push({ detail, mode2files: new Map()})
+        }
+        const getFileMatcher = mode => new RegExp('^' + mode.template.replaceAll('[d]', '([0-9]+)') + '\\.([a-z]{3})$', 'i')
+
+        const getMatchDetails = (fileMatcher, baseDir, file, detail) => {
+            const { formats, square } = detail
+            const matches = file.match(fileMatcher)
+            if (matches === null) {
+                return null
+            }
+            const ext = matches[matches.length - 1]
+            if (!formats.includes(ext)) return null
+
+            const filePath = baseDir + '/' + file
+            const parsedWidth = parseInt(matches[1], 10)
+            // last match is ext
+            const parsedHeight = matches[3] === undefined ? parsedWidth : parseInt(matches[2], 10)
+
+            if (square && parsedWidth !== parsedHeight) return null
+            const dim = sizeOf(filePath)
+
+            return {
+                dim,
+                ext,
+                filePath,
+                parsedWidth,
+                parsedHeight
+            }
+        }
+
+        for (const { detail, mode2files } of jobs) {
+            const { modes, links, scale100pixels } = detail
+
+            const scaleDim = !scale100pixels || isArray(scale100pixels) ? scale100pixels : [scale100pixels, scale100pixels]
+
+            for (const mode of modes) {
+                const { base } = mode
+                if (!onlyUserFiles && mode.only && !mode.only.includes(config.assetGeneration)) continue
+
+                const fileMatcher = getFileMatcher(mode)
+                const files = []
+                for (const file of userAssetFiles) {
+
+                    const matchDetails = getMatchDetails(fileMatcher, userAssetsDirPath, file, detail)
+                    if (matchDetails === null) continue
+
+                    const { ext, filePath, dim, parsedWidth, parsedHeight } = matchDetails
+                    const relPath = 'assets/' + file
+                    const width = scale100pixels ? Math.round(scaleDim[0] * parsedWidth / 100) : parsedWidth
+                    const height = scale100pixels ? Math.round(scaleDim[1] * parsedHeight / 100) : parsedHeight
+                    if (dim.width !== width || dim.height !== height)
+                        throw NoStackError(`Asset image ${filePath} must have dimension ${width}x${height} but got ${dim.width}x${dim.height}`)
+
+                    hasFiles = true
+
+                    if (onlyUserFiles) {
+                        let target = targets[relPath]
+                        if (!target) {
+                            targets[relPath] = { scope, action: 'copy', from: filePath, relPath, ext, links, dim: [width, height] }
+                        } else {
+                            target.links = union(target.links, links)
+                        }
+                    }
+                    if (!generatorFormats.includes(ext)) continue
+
+                    files.push({ filePath, relPath, dim, ext })
+
+                    // make no sense, we should always use the file with the max-dim
+                    if (base && !ext2baseFiles[ext]) ext2baseFiles[ext] = files.filter(file => file.ext === ext)
+                }
+                mode2files.set(mode, files)
+            }
+        }
+        assets.push( ...toValues(targets) )
+
+        return { assets, jobs, hasFiles, ext2baseFiles }
+    }
+
+    newPrepareAppAssets() {
+        const { config } = this.distTarget
+        const { syncFs, absPath } = this.fileDeps
+
+        const userAssetsDirPath = absPath.game('assets')
+        const exampleAssetsDirPath = absPath.src('build', 'assets', 'icons')
+        const userAssetFiles = syncFs.readFiles(userAssetsDirPath)
+
+        const fileDeps = { sizeOf, userAssetsDirPath, userAssetFiles }
+
+        const assetScopes = []
+        if (this.hasAppIcon) assetScopes.push('appIcon')
+        if (this.hasFavIcon) assetScopes.push('favIcon')
+
+        for (const scope of assetScopes) {
+            const { assets, jobs } = this.getAssetsForScope(scope, config, fileDeps)
+            // ergänze base-images bei leeren modes
+
+
+            // generiere für die modes resizes in assets
+        }
+    }
+
     prepareAppAssets() {
         const { config } = this.distTarget
         const { syncFs, absPath } = this.fileDeps
@@ -108,6 +252,7 @@ class Deliverable {
             for (const detail of matchingDetails) {
                 jobs.push({ detail, mode2files: new Map()})
             }
+            // ein job ist ein asset-detail und eine Map, welche modes auf user-files abbildet
 
             const onlyUserFiles = config.assetGeneration === ASSET_GENERATION.NONE
             let hasFiles = false
@@ -190,6 +335,7 @@ class Deliverable {
 
             // now find matching files for each detail
             addMatchingFiles(userAssetsDirPath, userAssetFiles)
+
             // no files found? use fallback example
             if (!hasFiles) {
                 const mode = fallbackModes[scope]

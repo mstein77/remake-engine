@@ -108,6 +108,7 @@ try {
         server = https.createServer(options, app)
         port = HTTPS_PORT
     }
+    process.on('uncaughtException', e => errorSection(e))
     server.listen(port)
     mainSection(`Listening on port ${port}${isPreview ? `. Game is available in your browser under ` + PREVIEW_URL : '..'}`)
 
