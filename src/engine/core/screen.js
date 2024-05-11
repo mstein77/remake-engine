@@ -475,7 +475,7 @@ class ScreenImpl extends PaneTreeProvider {
 
 const Screen = ( ...args ) => new ScreenImpl( ...args )
 
-const screens = {}
+let screens = {}
 let isLocked = false
 
 const ScreenRegistry = {
@@ -490,7 +490,11 @@ const ScreenRegistry = {
 
         return screen
     },
-    lock: () => isLocked = true
+    lock: () => isLocked = true,
+    clear: () => {
+        isLocked = false
+        screens = {}
+    }
 }
 
 export {

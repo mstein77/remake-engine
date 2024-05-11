@@ -323,6 +323,8 @@ class Game {
         this.log(`Booting game "${GAME_ID}"...`)
         // build game dom structure
 
+        TransitionRegistry.clear()
+        ScreenRegistry.clear()
         this.registerDefaultTransitions()
         const { game, globals } = this
         let startScreen = this.initHandler({ game, globals })

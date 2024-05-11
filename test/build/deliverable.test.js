@@ -245,7 +245,7 @@ test('WebApp getAssetsForScope', () => {
 
         // no default icon for favIcon
         expect(ext2baseFiles).toBeEmptyObject()
-        
+
          */
     }
 

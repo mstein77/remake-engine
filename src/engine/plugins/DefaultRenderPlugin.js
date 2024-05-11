@@ -448,7 +448,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                 {class: 'padded full-h'},
                 !isMobile && div(
                     {class: 'min-content-h nowrap-shorten hide-when-small', style: 'color: #9eaca9; font-family: Tahoma'},
-                    'Remake Engine V' + VERSION_ENGINE + ' - © 2023 do-while-true'
+                    'Remake Engine v' + VERSION_ENGINE + ' - © 2024 Code 23/7'
                 ),
                 div(
                     {class: 'flex mono', style: 'color: white'},
