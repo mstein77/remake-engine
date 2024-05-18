@@ -223,18 +223,18 @@ class Game {
 
     applyConfig() {
         const config = this.gameProps.config
-        this.gameProps.applyTo(this.props)
+        this.gameProps.applyPropsTo(this.props)
 
         this.fixOrientation = null
         const system = this.system
         if (system.isMobile) {
-            this.gameProps.mobile.applyTo(this.props)
+            this.gameProps.mobile.config.applyPropsTo(this.props)
 
             if (system.supportsOrientation) {
-                if (props.screenOrientation === 'max') {
+                if (this.props.screenOrientation === 'max') {
                     this.fixOrientation = this.width >= this.height ? 'landscape' : 'portrait'
-                } else if (props.screenOrientation !== 'free') {
-                    this.fixOrientation = props.screenOrientation
+                } else if (this.props.screenOrientation !== 'free') {
+                    this.fixOrientation = this.props.screenOrientation
                 }
             }
         }
@@ -1514,8 +1514,9 @@ class GamePropsInst extends Model {
         return [ this.mobile ]
     }
 
-    applyTo(obj) {
-        const keys = without(toKeys(this.config.getDefaults()), ['id', 'mobile'])
+    applyPropsTo(obj) {
+        // TODO check mobile here
+        const keys = without(toKeys(this.config.getDefaults()), ['id', 'xmobile'])
         for (const key of keys) {
             if (this[key] !== undefined) obj[key] = this[key]
         }

@@ -64,7 +64,6 @@ class Model {
      * @param {object} options
      */
     constructor(input, options) {
-
         let { fetch = true, type } = options
         this._type = type
 
