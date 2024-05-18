@@ -73,7 +73,7 @@ const windowsScaleSizes = {
 }
 
 const winIconSizes = {
-    minimum: [ 256 ],
+    minimal: [ 256 ],
     recommended: [ 16, 24, 32, 48, 256 ],
     all: [ 16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256 ]
 }
@@ -291,7 +291,7 @@ const scope2assets = {
             square: false,
             formats: ['png', 'ico'],
             sizes: {
-                minimum: [ 1024 ],
+                minimal: [ 1024 ],
                 recommended: [ 1024 ],
                 all: [ 512, 400, 256, 102 ]
             },
@@ -308,7 +308,7 @@ const scope2assets = {
             square: true,
             formats: ['png', 'ico'],
             sizes: {
-                minimum: [ 512 ],
+                minimal: [ 512 ],
                 recommended: [ 16, 32, 512 ],
                 all: [ 16, 32, 48, 64, 512 ],
             },
