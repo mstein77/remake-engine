@@ -448,7 +448,7 @@ class DefaultRenderPlugin extends RenderPlugin {
                 {class: 'padded full-h'},
                 !isMobile && div(
                     {class: 'min-content-h nowrap-shorten hide-when-small', style: 'color: #9eaca9; font-family: Tahoma'},
-                    'Remake Engine v' + VERSION_ENGINE + ' - © 2024 Code 23/7'
+                    'Remake Engine v' + VERSION_ENGINE + ' - © 2024 TyroLite Studios'
                 ),
                 div(
                     {class: 'flex mono', style: 'color: white'},

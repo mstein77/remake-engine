@@ -6,7 +6,6 @@ const { validateConfig, ASSET_GENERATION, buildDefaults, ASSET_TYPE} = require("
 const { fallbackModes, scope2assets } = require('./asset.cjs')
 const { execSync, NoStackError, log, subSectionWarning} = require('../shared/console.cjs')
 
-const vectorFormats = ['svg']
 const generatorFormats = ['png', 'gif']
 const relDir = 'assets/'
 
@@ -108,6 +107,17 @@ class Deliverable {
         return allowedTypes
     }
 
+    /**
+     * Adds user assets with a copy action to the given assets array and returns an object holding jobs for all assets
+     * which need to be generated for the scope
+     *
+     * @param {array} assets
+     * @param {string} scope
+     * @param {object} config
+     * @param {object} fileDeps
+     *
+     * @returns {object}
+     */
     addCopyUserAssetsForScope(assets, scope, config, fileDeps) {
 
         const { userAssetsDirPath, userAssetFiles, sizeOf } = fileDeps
@@ -366,7 +376,7 @@ class Deliverable {
             // generate assets with resizing and links
             this.addResizeAssets(assets, scope, mode2filesAndLinks)
         }
-        this.distTarget.assets = d(assets)
+        this.distTarget.assets = assets
     }
 
     async generateAssets() {

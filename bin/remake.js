@@ -112,7 +112,7 @@ try {
                 'index.js': [
                     'import { Game } from "' + enginePackage + '";',
                     '// your game starts here...',
-                    'console.log(\'Let the games begin...\')',
+                    'console.log(\'Starting game...\')',
                 ].join("\n"),
                 screens: {},
                 panes: {}
