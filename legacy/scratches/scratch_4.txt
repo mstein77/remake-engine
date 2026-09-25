@@ -1,0 +1,541 @@
+===============
+ Editor
+===============
+ - Der Editor muss wissen, ob von einer Resource eine Local-Variante vorhanden ist, und muss diese wiederherstellen
+   können
+    a) delete auf Server-Resource und keine Browser-Resource => lade lokal-Variante in den Editor
+    b) delete auf Browser-Resource und keine Server-Resource => lade lokal-Variante in den Editor
+
+ Ablauf:
+   + Beim betreten des Editors wird das Model der aktuellen Resource(n) übernommen (Browser > Server > Local)
+   + In einer Info wird dargestellt, worauf die Modelle im Spiel derzeit basieren.
+
+   + Beim Editieren wird auf dem aktuellen Model gearbeitet und wenn Änderungen auf dem Modell stattgefunden haben
+   wird eine Bestätigung nötig, ob die Änderungen wirklich discarded werden sollen.
+
+   + Speichern ist unabhängig von Änderungen immer möglich, und geschieht grundsätzlich im Browser, wobei die
+   Anzeige für die Basierung auf "Browser" umspringt. (=> RELOAD mit Resource-ID)
+
+   + Über einen "Restore"-Button wird das aktuelle Modell auf das Ausgangsmodell hergestellt (= das was in der
+   Herkunftsanzeige dargestellt wird) => RELOAD mit Resource-ID
+
+   + Export as Code
+
+   + Revert
+      Öffnet Modal in dem für jede Resource die Quelle bestimmt werden kann:
+       - code (falls vorhanden)
+       - server-resource (falls vorhanden)
+
+      Die Browser-Einträge werden hier auf jeden Fall gelöscht
+      Server-Einträge nur, wenn vorhanden und das Ziel "code" ist
+
+
+
+
+   Solange das aktuelle Modell keine Änderungen seit dem letzten Speichern hat, oder beim Initialen Model,
+   wird keine Warnung beim Verlassen angezeigt, ebenso stehen in dem Fall folgende Optionen zur Verfügung:
+
+    +  "Deploy to server" (falls Initial und source != "server" OR source = "browser"):
+       - Das aktuelle Modell wird auf dem Server gespeichert und bei Erfolg, wird die Resource aus dem Browser
+         gelöscht und das Herkunftsmodell angepasst => RELOAD mit Resource-ID
+
+    + "Delete from Server" (falls Initial und source = "server" und local-Resourcen vorhanden)
+       - Die Resource-ID wird vom Server gelöscht und bei Erfolg, der Editor mit Lokal-Modell neu gestartet
+       => RELOAD mit Resource-ID
+
+
+    BUGS:
+    - nach dem store-reload funzt das undo/redo nicht mehr
+
+TODO sonntag:
+
+ - BUG: zoom stimmt im Image-Selection nicht
+
+ - BUG: resize-Modal move => reset
+    => eContext-Update wegen MousePointer :-/
+
+ * TextPane-Blöcke erweitern um neue Props
+ * Preview: Textblock-Rendering und Props überarbeiten
+
+ - state-id-select bei new (+ids vom server checken)
+ - Deploy for state-Resources
+ - global settings
+
+
+
+
+----------------------
+ BufferedTilesPane
+----------------------
+ maxSpeed
+ endless.x
+ endless.y
+ tilesMap
+   - tileBits
+   - image => tilesImg
+   - tiles
+   - animations
+   - defaultTile
+   - map
+----------------------
+   ->addTile
+   ->addTiles
+   ->addAnimation
+   ->addAnimations
+
+
+
+=========================
+ Beispiel FontMap-Objekte
+=========================
+
+Der Editor beginnt mit der TextPaneConfig, hier stehen
+die Fonts wiederum als FontMap-Instanzen unter fonts.
+ - als Speichermodell dient nun font.config.getJson()
+ - wird ein neuer Font erzeugt, dann reicht hier auch
+   die FontMapConfig instantiierung und dann getJson()
+ - jeder dieser Modelle wird erweitert um einen
+   FontCharIndexProvider, welches sich aus diesem
+   initialisiert
+ - Die weitere Bearbeitung läuft auf diesem indem dieser
+   in einen Editor gegeben wird (scheiße)
+ - Beim Speichern der Pane wird eine PaneConfig erzeugt
+   die sich zu jedem Font ein JSON aus seinem Provider
+   geholt und das Image....bevor diese dann über
+   getResources wieder in Rebuild-JSONs zerlegt und
+   gespeichert werden
+
+
+=> getJSON enthält die aufgelösten
+   Props, mit denen die Pane
+
+   Wir brauchen eine Methode, welche aus dem applyModell
+   wieder ein Rebuild-JSON generiert
+    -
+
+   Phase I : Build
+   ---------------------
+     1. Conf wird mit einem Build-JSON initialisiert, welches auch geparsed (=> setter) wird
+     2. Auf der Conf-Instanz werden setter aufgerufen
+
+     Jeder setter wird die Eingaben validieren und anschliessend in einem key als value oder
+     Unter-Value ablegen (z.B. addRange('AD', 10, 10) => hält Ergebnisse in "map" fest)
+
+     ***Non-JSON-Resourcen sollten hier Resourcen bleiben, denn wir brauchen beim Rebuild-JSON
+     wieder die IDs
+
+     conf = new TextPaneConfig({id: 'myTextPane', fonts: [fontInstance, {id: 'new_font', map: [['ad', 10, 0]], image: ImageR} ]})
+     => {
+        id: 'myTextPane',
+        fonts: [
+            FontMap(fontInstance),   <--- werden rekursiv erzeugt über getValidatedConfigs
+            FontMap({
+                id: 'new_font',
+                map: [
+                    ['a', 10, 0], ['b', 20, 0], ['c', 30, 0], ['d', 40, 0]
+                ],
+                image: ImageResource({id: 'new_font_image'})
+            })
+        ]
+     }
+
+
+   Phase II : Resolve
+   ---------------------
+     Heisst das die Config gerade applied wird auf ein externes Object, deswegen wird die config
+     auf frozen gesetzt
+
+     Beim apply werden die meisten props einfach in das Object übernommen, hier können die
+     Image-Resourcen auch in einen Canvas (ohne ID) überführt werden.
+     Ebenso können Config-Resourcen hier in aufgelöster Form gespeichert werden (->getJson)
+     Das Object muss diese props modifizieren können, ohne das die Config selber sich ändert
+
+     conf.applyTo(instance)
+     => {
+        id: conf.id,
+        fonts: [  <--- hier wird rekursiv erzeugt elem.getJson()
+            {id: 'bla_font', map: [['A', 10, 0]], image: {id: 'xy', canvas}},
+            {id: 'new_font', map: [['a', 10, 0]], ...], image: {id: 'new_font_image', canvas: ...}}
+        ]
+     }
+
+   Phase III : Rebuild
+   ---------------------
+     Der Editor will den aktuelle Zustand seines Model-Object als Rebuild-JSON speichern
+     Dazu geht das object an die getRebuildJSON...aus dem object werden dazu die werte extrahiert
+
+     Die Config weiß, welches Prop zu welcher Resource gehört...wirklich? was ist mit einer
+     List an Config-Objects?
+     -> Die Conig-JSONs werden ein ID-Property haben und auch die Image/AudioResourcen haben
+        eine ID (sofern wir davon ausgehen, dass )
+
+     Falls deep === false werden alle Resourcen durch Ids statt ihrer values ersetzt
+     Bei deep = true müssen wieder Resourcen/Configs aus object-values und den in der Config
+     gespeicherten IDs generiert werden
+
+    deep=false:
+      - wir aufgerufen bei getResources()
+    ---------------------
+    => {
+        id: 'myTextPane',
+        fonts: [
+            'bla_font',
+            'new_font'
+        ]
+    }
+
+    deep=true
+      - wird aufgerufen bei addRebuildProps()
+    ---------------------
+    => {
+        id: 'myTextPane',
+        fonts: [
+            {id: 'bla_font', map: [['A', 10, 0]], image: ImageResource({id: 'xy', img: xxx})},
+            {id: 'new_font', map: [['AD', 10, 0]], image: ImageResource({id: 'new_font_image', img: canvas})}
+        ]
+    }
+
+
+
+   BuildJSON: {id: x, map: [['ad', 0, 0]], image: ImageResource(xxx)}
+
+
+
+
+     => resolve (beim aufruf von getJson())
+
+   1. apply(obj) => obj.id = x, obj.map = [['a', 0, 0], ..., ['d', 40, 0]],
+      obj.image = Canvas()
+
+        => obj kann nun beliebig verändern
+
+   2. getRebuildJSON(true) =>
+
+
+
+=> Rebuild-JSON liefert eine
+   kompaktes JSON, welches auch die
+   Helper-Props nutzen kann, auf denen
+   die Pane ncht arbeiten kann
+
+
+-----------------------
+ Image-Konvertierung:
+
+   Config wird erzeugt...
+     DataUrl => ImageResource (Fall c2)
+
+   ...im Game ist die ImageResource schon aufgelöst, wenn der Screen beginnt
+
+   Der Editor holt sich die Resourcen aus der Config, wobei der Apply
+   auf einem bereits aufgelösten Image/Canvas arbeiten kann
+   Das gilt auch für die Elemente aus getJson()
+
+   Der Provider bekommt das Model
+
+
+-----------------------
+ Generell:
+   - Images lassen sich NUR(?) über DataURLs erzeugen, was aber immer ein
+     asynchrone Weiterverarbeitung über decode() oder onLoad erfordert
+   - DataURLs lassen sich NUR über einen Canvas erzeugen und immer nur
+     für den kompletten Canvas
+   - Bildmanipulation ist immer NUR über einen Canvas möglich (abgesehen von
+     CSS-Filtern auf images)
+   - Bildausschnitte können wir sowohl aus einem Image als auch aus einem
+     Canvas mittels drawImage in einen ZielCanvas kopieren
+   - Bei beiden Verfahren können wir auch einen Zoom über destination-
+     width und -height hinbekommen
+   - Im Editor bietet sich deshalb die Strategie an, dass wir das BaseImage
+     in Originalgröße speichern und einen Canvas-Draw mit Koordinaten und
+     einem Zoom ermöglichen (=> kein Zoom-Caching mehr nötig, ABER testen!)
+   - Pixelmanipulationen auf einem Element werden immer auf dem Orginal-Image
+     ausgeführt werden - am besten über einen Canvas oder ImageData
+
+
+
+ CellProvider:
+   bekommt das
+
+-----------------------
+ a) canvas => imageData (Uint8ClampedArray)
+   1. canvas.getContext('2d')
+   2. ctx.getImageData(x, y, width, height)
+
+ b) imageData => canvas
+   1. canvas.getContext('2d')
+   2. ctx.putImageData(data, x, y [, dirtyX, dirtyY, dirtyWidth, dirtyHeight]);
+
+ c) canvas => image
+   1. canvas.toDataURL('image:png');
+   2. imageElem.src = dataUrl
+   3. imageElem.decode().then(...) => continue
+
+ c2) daturl => image
+   1. imageElem.src = dataUrl
+   2. imageElem.decode().then(...) => continue
+
+ d) image => canvas
+   1. canvas.getContext('2d')
+   2. ctx.drawImage(imageElem, x, y [, width, height] [, dx, dy, dWidth, dHeight])
+
+ e) canvas => canvas
+   1. canvas.getContext('2d')
+   2. ctx.drawImage(imageCanvas, x, y [, width, height] [, dx, dy, dWidth, dHeight])
+
+ f) imageData => image
+   1. window.createElement('canvas');
+   2. canvas.width = imageData.width; // +  height
+   3. canvas.getContext('2d')
+   4. ctx.putImageData(imageData)
+   5. canvas.getDataUrl()
+   6. image.src = dataURL
+    -----> imageData => canvas => image
+
+ g) image => imageData
+   1. window.createElement('canvas')
+   2. canvas.width = image.width // + height
+   3. canvas.getContext('2d')
+   4. ctx.drawImage(image, 0, 0)
+   5. ctx.getImageData(0, 0, canvas.width, canvas.height)
+    -----> image => canvas => imageData
+
+=============================
+ Resource-Edit+Storage
+=============================
+
+ 1. Editor wird initialisiert
+      - für jede Pane im akuellem Screen wird ein Eintrag erstellt:
+        {id: pane.id,  config: <resourceClass>, data: pane}
+        => screenResources
+
+ 2. Aus den (editierbaren) Screen-Resources wird eine Auswahl generiert
+
+ 3. Beim Klick auf Edit zu einer Resource
+      - wird geschaut, ob resource.data === null ist, und wenn ja dann
+        wird vom Resource-Loader die resource.id geladen und damit ein
+        new resource.config(content) unter resource.data gespeichert
+
+ 4. Ein Editor wird geöffnet, welcher die resource bekommt
+      - aus der resource erstellt der Editor sein initiales Modell auf
+        dem dann alle Änderungen passieren
+      - Bei der Initialisierung werden auch die verwendeten resource-ids
+        als storageIds festgehalten
+      - neben den eigentlichen Modell gibt es noch ein Resource-Tree
+        Modell, welches die Beziehung aller editierten Resourcen
+        zueinander anzeigt (mit Info über die Source der Resource)
+
+ 5. Beim "SAVE"
+      - Aus dem aktuellem Modell wird dynamisch eine
+        resource.config.Config-Instanz erstellt und über setter
+        aufgebaut. Die Images und Audio gehen hier als on-the-fly
+        generierte Resources rein.
+
+      - Es wird das resource.config damit instantiiert und dann über
+        getResources() die gesplitteten Resourcen und deren Dependencies
+        geholt
+
+      - Es werden nun alle diese Resourcen und Dependencies im SM
+        gespeichert und alle IDs aus dem storageIds, die nun nicht
+        mehr vorhanden sind, werden per safe-delete aus dem screen
+        gelöscht
+
+      - wird die resource.data auf null gesetzt, damit beim nächsten
+        Edit, das Modell auf den zuletzt abgespeicherten Resourcen
+        erstellt wird
+
+
+
+
+
+
+
+
+
+
+- der State ist am Anfang leer
+- der Start-Screen wird erzeugt und die screen.init(state) aufgerufen
+- Im init() werden über this.addResource(...) die zu ladenden Resourcen für den screen.build registriert
+   -- hier können prinzipiell auch die Zuweisungen an den global-state passieren
+- Die Resourcen werden jetzt geladen
+- Sobald alle Resourcen verfügbar, wird der screen.build mit diesen Resourcen aufgerufen
+
+a) der global state bekommt ebenfalls eine addResource(), welche sich die angeforderten Resourcen permanent(!) merkt
+   nachdem alle Resourcen verfügbar sind, werden zuerst alle lazyKeys ohne value mit state+resourcen aufgerufen
+   Danach geht es weiter mit dem build, der sowohl state als auch resources bekommt
+
+   Beim nächsten GotoScreen, werden alle nicht-permanenten Resourcen aus dem RL gelöscht
+
+   Beim ReloadScreen, werden alle Resourcen aus dem RL gelöscht und auch die LazyKeys im Proxy, danach werden aber
+   alle perma-Resourcen wieder im RL registriert und dann die screen.init(state) getriggert
+
+   Nachteil:
+    - der Screen.init bekommt die globals
+
+b) Der ScreenInit bindet einen neuen ResourceRequest, damit nur die erforderlichen Resource-Methoden über this
+   zur Verfügung stehen. Am gehen die Resourcen aus dem Request in den RL
+
+   Die Game-Instanz erlaubt einen StateInit, der einmal am Anfang an einen ResourceRequest gebindet wird und dann
+   einem stateBuild zurückgibt, der diese Resourcen übergeben bekommt. Die Resourcen gehen als perm-Resourcen in den RL
+
+   Beim Goto-Screen wird vor dem screen-build gecheckt, ob ein stateBuild erforderlich und ggf. vorher ausgeführt.
+
+   Der Reload löscht alle Resourcen im RL, fügt die Perm-Resources wieder hinzu und triggert einen neuen State-Build
+
+   Der State kann nur im stateInit das hinzusetzen von Configureables und Functions erlauben.
+
+1.)
+    - this.perm = {image: [], audio: [] json: []}
+    - this.hasPerm = false;
+
+    addResource(true, x, y)
+      - this.perm[type].push(x); ...alles wie gehabt
+       - this.hasPerm = true;
+
+    addResource(false, x, y)
+      - alles wie gehabt
+
+    load()
+      - alles wie gehabt
+
+# die IDs werden beim ersten add zusammen mit lokal-values wegeschrieben
+# beim Load wird durch schauen im LS oder dem Server entschieden, ob der Local-Value genommen wird (wenn weder LS+Server)
+# die Resource-ID haben nun ihr local oder Storage-Value in this.resources, und die IDs sind im Request gelöscht
+
+# Die Resourcen, die im global requested wurden, müssen beim Screen-Reload, noch mal den Resource-Check durchlaufen
+# d.h. diese Resourcen müssen a) markiert sein und b) müssen wir die local-values speichern, damit beim Löschen im
+# Storage, die local-Values restauriert werden können
+
+=> die permanent Resourcen werden separat gespeichert und ein Flag gibt an, ob die Perm-Resourcen schon geladen wurden
+=> der load checkt jedes mal ob die Perm-Resourcen noch nicht geladen wurden und fügt diese in dem Fall in die Queue ein
+=> der Screen-Reload löscht das flag, dass die Perm-Resourcen bereits geladen wurden
+
+     A) Einfacher Input ohne Namen
+         - Flex-Length (mit Min- bzw. Max)
+               <Block full="h" minWidth=x maxWidth=y>
+                  <Input full-h />
+               </Block>
+
+         - Fix-Length (size)
+               <Block>
+                  <Input size=x />
+               </Block>
+
+         - Fix-Width (width)
+               <Block width="x">
+                  <Input full="h"  />
+               </Block>
+
+         - Default-Length
+               <Block>
+                  <Input size=calcMin />
+               </Block>
+
+   <Stack max>
+      <Child
+   </Parent>
+
+
+
+
+
+
+Game-Loop:
+
+1.) boot()
+
+ startScreen = game.init()  // ruft die initialisierung des Spiels auf und gibt den start-screen zurück
+
+ game.gotoScreen(startScreen)
+   - game.stopAllAudio()
+   - OCM.clear()
+   - game.currentScreen = startScreen
+   - game.globals = Object.assign(game.globals, params);
+   - game.lastState = game.globals.getClone()
+   - RM.clearResources();
+   - game.build = game.screen.init(game.globals);
+
+ game.setRunning(true)
+   - game.running = <value>
+   - game.audio.continue/pauseAll
+
+ game.waitForNextFrame()
+   - screen = game.screens[game.currentScreen]
+   - if (screen.getState === 'READY') => exit
+   - if (!screen.hasAllDependencies()) => requestAnimationFrame(game.waitForNextFrame())
+   - game.build(RL.getResources(), Game.instance.globals)
+   - screen.setDimension(game.width, game.height)
+   - screen.render(true)
+   - requestAnimationFrame(game.updateFrame)
+       - screen.getState() !== 'READY' => game.waitForNextFrame()
+       - game.updateDom()
+       - if (running)
+            - game.render()
+            - if (screen.frameHandler) => screen.frameHandler()
+       - game.waitForNextFrame()
+
+
+
+
+
+
+
+React-Guide
+
+1: props VS state
+
+- props können nicht innerhalb der Component selber geändert werden, sondern müssen immer von aussen kommen
+- state wird in der Component gebildet:
+    bei Klassen im constructor oder bei Functions über useState
+- state kann sich nachträglich ändern über Aufrufe von setState (auch von aussen erreichbar) bzw. die setterMethod
+- Änderungen von state-values sollte bei Arrays und Objekten immer neue erzeugen
+- setStates() werden async ausgeführt, weshalb ein value nicht direkt auf einem anderen state-Value rechnen sollte
+- ein Aufruf von setState triggert auch einen Aufruf von render(), aber das DOM dahinter ändert nur die Teile, die
+  sich tatsächlich geändert haben (aber Achtung: alle SubComponents im Render rufen, ebenfalls render auf)
+
+Fragen:
+ - wird bei setState ein Rendering verhindert, wenn der neue value gleich dem alten?
+
+
+a) => 5px
+
+<div full-v padded>
+  Me
+</div>
+
+.full-v.padded => height: calc(100% - 2 * 5px), margin: 5px
+
+b) => 10px
+
+<div full-v padded>
+  <div padded>
+    Me
+  </div>
+</div>
+
+.full-v.padded => height: calc(100% - 2 * 5px), margin: 5px
+.padded:not(.full-v) => 5px
+
+c) => 5px
+
+<div full-v>
+  <div padded>
+    Me
+  </div>
+</div>
+
+.full-v => height: 100%
+.padded
+
+Editor:
+  Editor Context
+    past/future
+    doAction
+    activeSelection
+    hoverPart
+    activePart
+
+  .
+
+
+

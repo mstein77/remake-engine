@@ -1,0 +1,1142 @@
+import inst from "core/instances"
+import { ANIMATION } from "core/const"
+import { flattenResources, ResourceDependencies, isValidResourceId } from "./shared"
+import { d, csv2values, isNull, isString, isArray, isObject, isUrl, isDataUrl, ucfirst, union, without, intersect, toPairs, toValues, toKeys } from "shared/helper.cjs"
+import { typeText2tid } from "../../shared/resources.cjs"
+
+const getBaseUrl = () => typeof window !== 'undefined' && window.location.hostname === 'localhost' ? PREVIEW_URL : BASE_URL
+
+function getItemsCloneWithUpdatedItem(oldItems, index, props) {
+    const newItems = [...oldItems];
+    newItems[index] = Object.assign({}, oldItems[index], props);
+    return newItems;
+}
+
+function hex2rgb(hex) {
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null
+
+    const color = {};
+    color.r = parseInt(hex.substr(1, 2), 16);
+    color.g = parseInt(hex.substr(3, 2), 16);
+    color.b = parseInt(hex.substr(5, 2), 16);
+    color.a = hex.length === 9 ? parseInt(hex.substr(7, 2), 16) : 255;
+
+    return color
+}
+
+function hex2rgbaArray(hex) {
+    if ((hex[0] !== '#') || ![7, 9].includes(hex.length)) return null;
+    return [
+        parseInt(hex.substr(1, 2), 16)/255,
+        parseInt(hex.substr(3, 2), 16)/255,
+        parseInt(hex.substr(5, 2), 16)/255,
+        hex.length === 9 ? parseInt(hex.substr(7, 2), 16)/255 : 1.0
+    ]
+}
+
+function rgb2hex(rgb) {
+    if (typeof rgb === 'string') {
+        return rgb
+    }
+    return '#' + (rgb.r).toString(16).padStart(2, '0') + (rgb.g).toString(16).padStart(2, '0') + (rgb.b).toString(16).padStart(2, '0')
+}
+
+const getFlatDependencies = (indirect, resource, found = []) => {
+    if (indirect[resource] === undefined) {
+        return found;
+    }
+    for (let item of indirect[resource]) {
+        if (!found.includes(item)) {
+            found.push(item);
+            getFlatDependencies(indirect, item, found);
+        }
+    }
+    return found;
+};
+
+/**
+ * Returns an object where the resource ids of the given typed resource ids are distributed
+ * under a type key. The result object will have "image", "json" und "audio" key with an array
+ * of ids.
+ *
+ * @param {array} typedResourceIds
+ * @returns {object}
+ */
+const getDeflatedResources = typedResourceIds => {
+    const result = {json: [], image: [], audio: []}
+    for (let typedResourceId of typedResourceIds) {
+        const [ type, id ] = typedResourceId.split(':')
+        result[type].push(id)
+    }
+    return result
+}
+
+const getFlatObjectResources = resources => {
+    const result = [];
+    for(let obj of resources) {
+        result.push(obj.type + ':' + obj.id);
+    }
+    return result;
+}
+
+const getIdToItems = items => {
+    const id2items = {};
+    for (let item of items) {
+        id2items[item.id] = item;
+    }
+    return id2items;
+};
+
+const getIdsFromObjects = (items, idProp = 'id') => {
+    const ids = [];
+    for (let item of items) {
+        ids.push(item[idProp]);
+    }
+    return ids;
+};
+
+const getObjectWithId = (items, id) => {
+    for (let item of items) {
+        if (item.id === id) {
+            return item;
+        }
+    }
+    return null;
+};
+
+const getNextUid = (ids, baseId) => {
+    if (!ids.includes(baseId)) {
+        return baseId;
+    }
+    let no = 2;
+    while (ids.includes(baseId + no)) {
+        no++;
+    }
+    return baseId + no;
+};
+
+const getCanvasForDim = (width, height) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    return canvas;
+}
+
+const getCanvasObjForDim = (width, height, options = {}) => {
+    const elem = getCanvasForDim(width, height)
+    const { opaque = false, aliasing = false, gpu = false, parent, cls, style } = options
+    if (parent)
+        parent.appendChild(elem)
+    if (cls)
+        elem.setAttribute('class', cls)
+    if (style) {
+        elem.setAttribute('style', style)
+    }
+    const ctx = elem.getContext('2d', {alpha: !opaque, willReadFrequently: !gpu})
+    ctx.imageSmoothingEnabled = aliasing
+    return {
+        elem,
+        ctx
+    }
+}
+
+const getCanvasForBitmap = bitmap => {
+    const canvas = getCanvasForDim(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(bitmap, 0, 0);
+    return canvas;
+};
+
+const getImageDataForImage = image => {
+    const canvas = getCanvasForDim(image.width, image.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0);
+    return ctx.getImageData(0, 0, image.width, image.height);
+}
+
+const toHex = value => {
+    return  ('0' + (value & 0xFF).toString(16)).slice(-2);
+};
+
+const getColorsFromCanvas = (canvas, alpha = false) => {
+    const ctx = canvas.getContext('2d');
+    return getColorsFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height), alpha);
+};
+
+const getColorsFromImageData = (data, alpha = false) => {
+    const colors = [];
+
+    let pos = 0;
+    for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+            const color =
+                '#'
+                + toHex(data.data[pos])
+                + toHex(data.data[pos + 1])
+                + toHex(data.data[pos + 2])
+                + (alpha ? toHex(data.data[pos + 3]) : 'ff');
+            if (!colors.includes(color)) {
+                colors.push(color);
+            }
+            pos += 4;
+        }
+    }
+    return colors;
+};
+
+const getEmptyImageData = (width, height, color = '#00000000') => {
+    const canvas = getCanvasForDim(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height);
+};
+
+/**
+ *
+ * @param nodes
+ * @param resId
+ * @param dependencies
+ * @param level
+ */
+const addTreeResource = (nodes, resId, dependencies, level = 0) => {
+    const [ type, id ] = resId.split(':')
+    const tid = typeText2tid(type, id)
+    const source = inst.RL.getResourceOrigin(tid) ?? 'code'
+    nodes.push({ level, id, type, source: ucfirst(source) })
+
+    const deps = dependencies[resId]
+    if (!deps) return
+
+    for (let dep of deps) {
+        addTreeResource(nodes, dep, dependencies, level + 1)
+    }
+}
+
+/**
+ * Returns an array holding the nodes of a resource dependency tree of the given model. Each node is an object
+ * { id, level, type, source } whereas source returns where the resource was loaded from
+ *
+ * @param {object} config
+ * @param {object} model
+ *
+ * @returns {array}
+ */
+const getResourceTreeForJsonModel = model => {
+    const dependencies = model.getDependencies()
+    const nodes = []
+    addTreeResource(nodes, 'json:' + model.id, dependencies)
+    return nodes
+}
+
+const getBlockPos = (block, fonts, dim) => {
+    let blockDim = {};
+    let font = null;
+    if (block.canvas) {
+        blockDim.width = block.canvas.elem.width;
+        blockDim.height = block.canvas.elem.height;
+    } else {
+        font = getObjectWithId(fonts, block.font);
+        blockDim = getBlockDim(block, font);
+    }
+
+    let x = block.autoCenteringX ?
+        Math.ceil(dim.x/2) - Math.ceil(blockDim.width/2) : block.x;
+
+    let y = block.autoCenteringY ?
+        Math.ceil(dim.y/2) - Math.ceil(blockDim.height/2) : block.y;
+
+    if (block.alignToGrid) {
+        if (font === null) {
+            font = getObjectWithId(fonts, block.font);
+        }
+        x = Math.floor(x/font.width) * font.width;
+        y = Math.floor(y/font.height) * font.height;
+    }
+
+    return {x, y, width: blockDim.width, height: blockDim.height}
+};
+
+const drawTextBlocks = (ctx, dim, blocks, fonts, zoom = 1) => {
+    for (let block of blocks) {
+        const pos = getBlockPos(block, fonts, dim);
+        ctx.drawImage(
+            block.canvas.elem,
+            0,
+            0,
+            pos.width,
+            pos.height,
+            pos.x * zoom,
+            pos.y * zoom,
+            pos.width * zoom,
+            pos.height * zoom
+        );
+    }
+};
+
+const getBlockDim = (block, font) => {
+    const lines = block.text.split('\n');
+    block.height = lines.length;
+    let max = 0;
+    for (let line of lines) {
+        max = Math.max(line.length, max);
+    }
+    block.width = max;
+
+    // calc block dim
+    return {
+        width: font.width * block.width,
+        height: (font.height * block.height) + (block.lineSpacing * (block.height - 1))
+    }
+};
+
+const getTextBlockImage = (block, font, filterer = null) => {
+
+    if (block.font !== font.id) {
+        return null;
+    }
+    const blockDim = getBlockDim(block, font);
+
+    // get new canvas for block
+    let canvas = getCanvasForDim(
+        blockDim.width || 1,
+        blockDim.height || 1
+    );
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const lines = block.text.split('\n');
+    // process lines
+    let posY = 0;
+    for (let y = 0; y < block.height; y++) {
+        let line = lines[y];
+        // do text align on current line
+        if (block.textAlign !== 'left' && line.length < block.width) {
+            const pad = block.textAlign === 'right' ? block.width : (line.length + ((block.width - line.length) >> 1));
+            line = line.padStart(pad, ' ');
+        }
+        // draw each char in current line
+        for (let x = 0; x < line.length; x++) {
+            const char = font.map[line[x]];
+            if (char) {
+                ctx.drawImage(
+                    font.image.canvas,
+                    char.x,
+                    char.y,
+                    font.width,
+                    font.height,
+                    x * font.width,
+                    posY,
+                    font.width,
+                    font.height
+                );
+            } else {
+                // TODO? trigger = true;
+            }
+        }
+        posY += block.lineSpacing + font.height;
+    }
+
+    if (filterer && block.filters) {
+        canvas = filterer.getCanvasWithFiltersApplied(
+            block.filters,
+            {elem: canvas, ctx},
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        )[0].elem;
+    }
+    return canvas;
+};
+
+const drawCanvasToAvail = (canvas, ctx, x, y, avail, dim = null, pos = null) => {
+    if (!canvas.width) {
+        return;
+    }
+    const sizeX = dim === null ? canvas.width : dim.x;
+    const sizeY = dim === null ? canvas.height : dim.y;
+    const posX = pos === null ? 0 : pos.x;
+    const posY = pos === null ? 0 : pos.y;
+    const maxZoom = Math.min(Math.floor(avail.width/sizeX), Math.floor(avail.height/sizeY));
+    if (maxZoom >= 1) {
+        const targetWidth = sizeX * maxZoom;
+        const targetHeight = sizeY * maxZoom;
+        const offsetX = (avail.width - targetWidth) >> 1;
+        const offsetY = (avail.height - targetHeight) >> 1;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetWidth, targetHeight);
+    } else {
+        let targetX = avail.width;
+        let targetY = avail.height;
+        let offsetX = 0;
+        let offsetY = 0;
+        if (sizeX > sizeY) {
+            offsetY = targetY;
+            targetY = Math.round(targetY * (sizeY / sizeX));
+            offsetY = (offsetY - targetY) >> 1;
+        } else if (sizeY > sizeX) {
+            offsetX = targetX;
+            targetX = Math.round(targetX * (sizeX / sizeY));
+            offsetX = (offsetX - targetX) >> 1;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(canvas, posX, posY, sizeX, sizeY, x + offsetX, y + offsetY, targetX, targetY);
+    }
+};
+
+function drawEventsValue(ctx, eventIndex, values, x, y, zoom = 1) {
+    let box = 0;
+    for (let value of values) {
+        if (!eventIndex.drawEvent(ctx, value, x, y, zoom)) {
+            box++;
+        }
+    }
+    if (box) {
+        ctx.fillStyle = '#00FF0088';
+        ctx.fillRect(x + 2, y + 2, 12, 12);
+        ctx.strokeStyle = '#000000';
+        ctx.strokeRect(x + 2, y + 2, 12, 12);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '10px';
+        ctx.fillText('' + box, x + 6, y + 12, 12);
+    }
+}
+
+function getCanvasForEventMatrix(tilesIndex, eventIndex, matrix, maxDim = null) {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let cell of matrix[y]) {
+            if (plain) {
+                if (cell.length !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                drawEventsValue(tilesCtx, eventIndex, cell, posX, posY);
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+}
+
+const getCanvasForIndexMatrix = (tilesIndex, aliasIndex, matrix, maxDim = null) => {
+    const sizeX = tilesIndex.getSizeX();
+    const sizeY = tilesIndex.getSizeY();
+    const cellsY = matrix.length;
+    const cellsX = cellsY === 0 ? 0 : matrix[0].length;
+    const tilesWidth = cellsX * sizeX;
+    const tilesHeight = cellsY * sizeY;
+    const canvas = getCanvasForDim(tilesWidth, tilesHeight);
+    const tilesCtx = canvas.getContext('2d');
+
+    const plain = (maxDim !== null && (cellsX > maxDim || cellsY > maxDim));
+    if (plain) {
+        tilesCtx.fillStyle = '#ffffffff';
+    }
+
+    let posY = 0;
+    for (let y = 0; y < cellsY; y++) {
+        let posX = 0;
+        for (let tile of matrix[y]) {
+            if (plain) {
+                if (tile !== 0) {
+                    tilesCtx.fillRect(posX, posY, sizeX, sizeY);
+                }
+            } else {
+                if (typeof tile === 'string') {
+                    const index = aliasIndex.getEntityByPropValue('value', tile);
+                    aliasIndex.drawEntity(tilesCtx, index, posX, posY);
+                } else {
+                    tilesIndex.drawEntity(tilesCtx, tile, posX, posY);
+                }
+            }
+            posX += sizeX;
+        }
+        posY += sizeY;
+    }
+    return canvas;
+};
+
+/**
+ *  BitmapPlayer-Modes
+ * ----------------------------
+ *
+ *   DIR: forward, backwards, forward-backward, backward-forward
+ *   END: loop, stop, delete
+ *
+ * ----------------------------
+ *
+ */
+
+/**
+ * TODO: setSync(null|frameState)
+ *
+ *   getStep() -> holt sich den step aus dem frameState falls dieser gesetzt wurde, andernfalls aus this.step
+ *   addStep(value) -> führt diesen auf frameState aus
+ *
+ */
+class BitmapPlayer {
+
+    constructor() {
+        this.speed = 1;
+        this.state = ANIMATION.STATE.EMPTY;
+        this.frameNo = null;
+        this.pauseState = null;
+        this.dirty = false;
+    }
+
+    loadAnimation(frames, end = ANIMATION.END.STOP, dir = ANIMATION.DIR.FORWARD, speed = 1) {
+        this.frames = frames;
+        this.direction = dir;
+        this.end = end;
+        this.isForward = (dir === ANIMATION.DIR.FORWARD || dir === ANIMATION.DIR.FORWARD_BACKWARD);
+        this.speed = speed;
+        this.step = 0;
+        this.frameNo = this.isForward ? 0 : frames.length - 1;
+        this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
+    }
+
+    setSpeed(speed) {
+        this.speed = speed;
+    }
+
+    getState() {
+        return this.state;
+    }
+
+    handleForward() {
+        let frame = this.getFrame()
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
+            this.frameNo++;
+            if (this.frameNo === this.frames.length) {
+                this.frameNo--;
+                if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                    this.frameNo--;
+                    this.isForward = false;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else {
+                            this.frameNo = 0;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    handleBackward() {
+        let frame = this.getFrame();
+        while (this.step >= frame.duration) {
+            this.step -= frame.duration;
+            this.frameNo--;
+            if (this.frameNo < 0) {
+                this.frameNo = 0;
+                if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                    this.frameNo++;
+                    this.isForward = true;
+                } else {
+                    if (this.end === ANIMATION.END.DELETE) {
+                        this.state = ANIMATION.STATE.DESTROYED;
+                        this.frameNo = null;
+                    } else if (this.end === ANIMATION.END.LOOP) {
+                        if (this.direction === ANIMATION.DIR.BACKWARD_FORWARD) {
+                            this.isForward = false;
+                        } else if (this.direction === ANIMATION.DIR.FORWARD_BACKWARD) {
+                            this.isForward = true;
+                            this.frameNo = 0;
+                        } else {
+                            this.frameNo =  this.frames.length - 1;
+                        }
+                    } else {
+                        this.state = ANIMATION.STATE.DONE;
+                    }
+                }
+                break;
+            }
+            frame = this.getFrame();
+        }
+    }
+
+    nextStep() {
+        if (this.frames.length === 0 || this.frameNo === null || this.state === ANIMATION.STATE.PAUSED) {
+            this.dirty = false;
+            return;
+        }
+        const oldFrameNo = this.frameNo;
+        this.state = ANIMATION.STATE.RUNNING;
+        this.step += this.speed;
+        if (this.isForward) {
+            this.handleForward();
+            if (!this.isForward) {
+                this.handleBackward();
+            }
+        } else {
+            this.handleBackward();
+            if (this.isForward) {
+                this.handleForward();
+            }
+        }
+        this.dirty = (oldFrameNo !== this.frameNo);
+    }
+
+    getFrame() {
+        if (this.frameNo === null || !this.frames) {
+            return null;
+        }
+        return this.frames[this.frameNo];
+    }
+
+    hasEnded() {
+        return (this.state === ANIMATION.STATE.DONE || this.state === ANIMATION.STATE.DESTROYED);
+    }
+
+    reset() {
+        this.step = 0;
+        this.frameNo = this.frames.length === 0 ? null : (this.isForward ? 0 : this.frames.length - 1);
+        this.state = ANIMATION.STATE.WAITING;
+        this.dirty = true;
+        this.isForward = (this.direction === ANIMATION.DIR.FORWARD || this.direction === ANIMATION.DIR.FORWARD_BACKWARD);
+    }
+
+    pause() {
+        this.pauseState = this.state;
+        this.state = ANIMATION.STATE.PAUSED;
+        this.dirty = false;
+    }
+
+    isPaused() {
+        return this.state === ANIMATION.STATE.PAUSED;
+    }
+
+    continue() {
+        if (this.state === ANIMATION.STATE.PAUSED) {
+            this.state = this.pauseState;
+        }
+    }
+
+    reverse() {
+        switch(this.dir) {
+            case ANIMATION.DIR.FORWARD:
+                this.dir = ANIMATION.DIR.BACKWARD;
+                break;
+            case ANIMATION.DIR.BACKWARD:
+                this.dir = ANIMATION.DIR.FORWARD;
+                break;
+        }
+        if (this.state === ANIMATION.STATE.DONE) {
+            this.state = ANIMATION.STATE.WAITING;
+        }
+        this.isForward = !this.isForward;
+    }
+
+    isDirty() {
+        return this.dirty;
+    }
+}
+
+class Players {
+
+    constructor(animationIndex) {
+        this.index = animationIndex;
+        this.players = {};
+    }
+
+    setAnimations(animations) {
+        for (let name of Object.keys(this.players)) {
+            if (!animations.includes(name)) {
+                delete this.players[name];
+            }
+        }
+        for (let name of animations) {
+            if (this.players[name] === undefined) {
+                const index = this.index.getEntityByPropValue('value', name);
+                if (index !== null) {
+                    const animation = this.index.getEntityObject(index);
+                    const player = new BitmapPlayer();
+                    player.loadAnimation(animation.frames, animation.end, animation.dir, animation.speed);
+                    this.players[name] = player;
+                }
+            }
+        }
+    }
+
+    clear() {
+        this.players = {};
+    }
+
+    nextStep() {
+        let hasNewFrame = false;
+        for (let player of Object.values(this.players)) {
+            if (player.hasEnded()) {
+                player.reset();
+            }
+            player.nextStep();
+            if (!hasNewFrame && player.isDirty()) {
+                hasNewFrame = true;
+            }
+        }
+        return hasNewFrame;
+    }
+
+    getCurrFrame(animation) {
+        if (this.players[animation] === undefined) {
+            return null;
+        }
+        return this.players[animation].getFrame();
+    }
+
+    allPlayers(callback) {
+        for (let player of Object.values(this.players)) {
+            callback(player);
+        }
+    }
+
+    pause() {
+        this.allPlayers(player => player.pause())
+    }
+
+    play() {
+        this.allPlayers(player => player.play())
+    }
+
+    reset() {
+        this.allPlayers(player => player.reset())
+    }
+}
+
+function cloneDeep(value) {
+    if (value === undefined) return;
+    if (value === null) return null;
+    if (Array.isArray(value)) {
+        return value.map(item => cloneDeep(item));
+    } else if (typeof value === 'object') {
+        const obj = {};
+        for (let [key, subValue] of Object.entries(value)) {
+            obj[key] = cloneDeep(subValue);
+        }
+        return obj;
+    }
+    return value;
+}
+
+function clamp(min, curr, max) {
+    const minValue = min === null ? curr : Math.max(min, curr);
+    if (max == null) return minValue;
+    return Math.min(minValue, max)
+}
+
+function areDisjoint(a, b) {
+    return a.filter(item => b.includes(item)).length === 0;
+}
+
+const handleLeft = handler => {
+    return e => {
+        if (e.button !== 0) {
+            return;
+        }
+        handler(e);
+    }
+};
+
+const handleRight = handler => {
+    return e => {
+        if (e.button !== 2) {
+            return;
+        }
+        handler(e);
+        e.preventDefault();
+        e.stopPropagation();
+    }
+};
+
+const handleLeftRight = (leftHandler, rightHandler) => {
+    return e => {
+        if (e.button === 0) {
+            leftHandler(e);
+        } else if (e.button === 2) {
+            rightHandler(e);
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }
+};
+
+const copy2clipboard = content => {
+    return navigator.clipboard.writeText(content)
+};
+
+const explode = (str, substr, limit) => {
+    const parts = str.split(substr);
+    if (!limit) return parts;
+    const result = [];
+    while (limit > 0 && parts.length) {
+        result.push(parts.shift());
+        limit--
+    }
+    if (parts.length) {
+        result.push(parts.join(substr));
+    }
+    return result;
+}
+
+const getUniqueName = (template, reserved = []) => {
+    const parts = explode(template, '$', 2);
+    const name = parts.join('');
+    if (!reserved.includes(name)) return name;
+
+    let no = 2;
+    let currName = parts[0];
+    const matches = currName.match(/\_(\d)+$/);
+    if (matches) {
+        currName = currName.substr(0, matches.index + 1);
+        no = parseInt(matches[1])
+    } else {
+        currName += '_'
+    }
+    const postFix = parts.length > 1 ? parts[1] : '';
+    while (reserved.includes(currName + no + postFix)) {
+        no++;
+    }
+    return currName + no + postFix;
+};
+
+const getNextUniqueName = (curr, endTemplate, reserved = []) => {
+    const lastIndex = endTemplate.lastIndexOf('$');
+    const rawCurr = curr;
+    if (lastIndex !== -1) {
+        endTemplate = endTemplate.substr(lastIndex + 1);
+    }
+    if (curr.endsWith(endTemplate)) {
+        curr = curr.substr(0, curr.length - endTemplate.length);
+        const matches = curr.match(/\_(\d+)$/);
+        if (matches !== null) {
+            curr = curr.substr(0, curr.length - matches[0].length);
+        }
+    }
+    return getUniqueName(curr + '$' + endTemplate, [ rawCurr, ...reserved ])
+}
+
+const round = (value, decimals = 0, fill = false) => {
+    const reqDecimals = decimals;
+    let factor = 1;
+    while (decimals-- > 0) {
+        factor *= 10;
+    }
+    let rounded = Math.round(value * factor) / factor;
+    if (fill) {
+        const parts = ('' + rounded).split('.');
+        if (parts.length === 1) {
+            parts.push('');
+        }
+        parts[1] = parts[1].padEnd(reqDecimals, '0');
+        rounded = parts.join('.');
+    }
+    return rounded;
+};
+
+const isEventInRect = (e, rect) => {
+    return (rect.x <= e.clientX && (rect.x + rect.width) >= e.clientX &&
+        rect.y <= e.clientY && (rect.y + rect.height) >= e.clientY)
+}
+
+const entriesSort = (a, b) => a[0] === b[0] ? 0 : (a[0] < b[0] ? 1 : -1)
+
+const isEqual = (a, b) => {
+    if (isArray(a)) {
+        if (!isArray(b) || a.length !== b.length) return false
+        for (let i = 0; i < a.length; i++) if (!isEqual(a[i], b[i])) return false
+        return true
+    }
+    if (isObject(a)) {
+        if (!isObject(b)) return false
+        const aPairs = Object.entries(a)
+        const bPairs = Object.entries(b)
+        if (aPairs.length !== bPairs.length) return false
+        aPairs.sort(entriesSort)
+        bPairs.sort(entriesSort)
+        for (let i = 0; i < aPairs.length; i++) {
+            if (aPairs[i][0] !== bPairs[i][0] || !isEqual(aPairs[i][1], bPairs[i][1])) return false
+        }
+        return true
+    }
+    return a === b
+}
+
+function getParsedCssValueRec(value, splitBy = false) {
+    if (value === null) {
+        return null;
+    }
+    const result = [];
+    const parts = splitBy !== undefined ? value.split(splitBy) : [value];
+
+    for(let part of parts) {
+        part = part.trim();
+        if (part === '') continue;
+
+        if (part.match(/^[a-z\-]+\(/i)) {
+            const index = part.indexOf('(');
+            const lastIndex = part.lastIndexOf(')')
+            const func = part.substr(0, index);
+            const params = part.substr(index + 1, (lastIndex - index) - 1);
+            result.push({
+                func,
+                params: getParsedCssValueRec(params, ',')
+            });
+        } else {
+            const subValues = part.indexOf(' ') >= 0 ? getParsedCssValueRec(part, ' ') : part;
+            if (subValues !== null) {
+                result.push(subValues)
+            }
+        }
+    }
+    return (
+        result.length === 1 ? result[0] : result
+    )
+}
+
+function getPathByFunc(func, start, end, steps) {
+    const path = [];
+    const radSteps = 0.5 * Math.PI / (steps - 1);
+    const dist = Math.abs(end - start);
+    const sign = end < start ? -1 : 1;
+    for (let i = 0; i < steps; i++) {
+        path.push(func(radSteps * i) * sign * dist + start);
+    }
+    return path
+}
+
+function getSinePath(start, end, steps) {
+    return getPathByFunc(Math.sin, start, end, steps)
+}
+
+function getCosinePath(start, end, steps) {
+    return getPathByFunc(Math.cos, start, end, steps)
+}
+
+function reverse(items) {
+    return [ ...items ].reverse()
+}
+
+function sConsoleLog() {
+    var argArray = [];
+
+    if (arguments.length) {
+        var startTagRe = /<span\s+style=(['"])([^'"]*)\1\s*>/gi;
+        var endTagRe = /<\/span>/gi;
+
+        var reResultArray;
+        argArray.push(arguments[0].replace(startTagRe, '%c').replace(endTagRe, '%c'));
+        while (reResultArray = startTagRe.exec(arguments[0])) {
+            argArray.push(reResultArray[2]);
+            argArray.push('');
+        }
+
+        // pass through subsequent args since chrome dev tools does not (yet) support console.log styling of the following form: console.log('%cBlue!', 'color: blue;', '%cRed!', 'color: red;');
+        for (var j = 1; j < arguments.length; j++) {
+            argArray.push(arguments[j]);
+        }
+    }
+    console.log.apply(console, argArray);
+}
+
+const lastMarks = [];
+
+function ts(name) {
+    if (!name) name = 'timer' + (lastMarks.length + 1);
+    lastMarks.push(name);
+    performance.mark(name + '_start');
+}
+
+function td() {
+    if (lastMarks.length === 0) throw Error('No ts-call before td');
+    const lastMark = lastMarks.pop();
+    performance.mark(lastMark + '_end');
+    performance.measure(lastMark, lastMark + '_start', lastMark + '_end')
+    const entries = performance.getEntriesByName(lastMark);
+    let sum = 0;
+    for (let entry of entries) {
+        sum += entry.duration
+    }
+    sConsoleLog(
+        '<span style="background-color: darkgreen; color: antiquewhite"> Time </span>' +
+        '<span style="background-color: transparent; color: black"> ' + lastMark + ' </span>' +
+        '<span style="color: brown"> ' + round(entries[entries.length - 1].duration, 3, true) + ' ms</span> <span style="color: grey">| Ø: </span>' +
+        '<span style="color: green">' + round(sum/entries.length, 3, true) + ' ms </span>' +
+        '<span style="background-color: lightslategray; color: white"> ' + entries.length +  ' x </span>'
+    );
+}
+
+const noop = () => {};
+
+class RelativeBlock {
+    constructor(dim, block) {
+        this.dim = dim;
+        this.width = block.width;
+        this.height = block.height;
+        this.x = block.x;
+        this.y = block.y
+    }
+
+    centerX() {
+        this.x = Math.ceil(this.dim.width / 2) - Math.ceil(this.width / 2);
+        return this
+    }
+
+    centerY() {
+        this.y = Math.ceil(this.dim.height / 2) - Math.ceil(this.height / 2);
+        return this
+    }
+
+    center() {
+        this.centerX();
+        this.centerY();
+        return this
+    }
+
+    alignX(rasterWidth) {
+        this.x = Math.floor(this.x / rasterWidth) * rasterWidth;
+        return this
+    }
+
+    alignY(rasterHeight) {
+        this.y = Math.floor(this.y / rasterHeight) * rasterHeight;
+        return this
+    }
+
+    align(width, height) {
+        this.alignX(width);
+        this.alignY(height);
+        return this
+    }
+
+    getPos() {
+        return {
+            x: this.x,
+            y: this.y
+        }
+    }
+}
+
+function findSameRefs(a, b, path = '', pathElems = []) {
+    if (isObject(a) && isObject(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
+        }
+
+        for (const key of Object.keys(a)) {
+            if (key in b && key !== 'config') findSameRefs(a[key], b[key], path + '.' + key, [ ...pathElems, a])
+        }
+    }
+    if (isArray(a) && isArray(b)) {
+        if (a === b) d('FOUND!', path, a, b)
+        if (pathElems.includes(a)) {
+            d('CYCLE DETECTED!', path)
+            return
+        }
+        let i = 0
+        while (i < a.length && i < b.length) {
+            findSameRefs(a[i], a[i], path + '[' + i + ']', [ ...pathElems, a])
+            i++
+        }
+    }
+}
+
+export {
+    getBaseUrl,
+    d,
+    ts,
+    td,
+    noop,
+    toPairs,
+    toValues,
+    toKeys,
+    reverse,
+    round,
+    without,
+    union,
+    intersect,
+    ucfirst,
+    copy2clipboard,
+    clamp,
+    areDisjoint,
+    cloneDeep,
+    hex2rgb,
+    hex2rgbaArray,
+    rgb2hex,
+    isValidResourceId,
+    getItemsCloneWithUpdatedItem,
+    getSinePath,
+    getCosinePath,
+    ResourceDependencies,
+    flattenResources,
+    drawTextBlocks,
+    getUniqueName,
+    getFlatObjectResources,
+    getDeflatedResources,
+    getIdToItems,
+    getIdsFromObjects,
+    getObjectWithId,
+    getNextUid,
+    getNextUniqueName,
+    getCanvasForDim,
+    getCanvasObjForDim,
+    getCanvasForBitmap,
+    getImageDataForImage,
+    getColorsFromCanvas,
+    getColorsFromImageData,
+    getEmptyImageData,
+    getResourceTreeForJsonModel,
+    getTextBlockImage,
+    getBlockDim,
+    getBlockPos,
+    getParsedCssValueRec,
+    explode,
+    isEventInRect,
+    drawCanvasToAvail,
+    drawEventsValue,
+    getCanvasForIndexMatrix,
+    getCanvasForEventMatrix,
+    isUrl,
+    isDataUrl,
+    isObject,
+    isString,
+    isArray,
+    isNull,
+    isEqual,
+    BitmapPlayer,
+    ANIMATION,
+    Players,
+    RelativeBlock,
+    findSameRefs,
+    csv2values
+};

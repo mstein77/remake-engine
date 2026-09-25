@@ -1,0 +1,157 @@
+-------------------
+ FEATURES:
+
+
+-------------------
+:::::::Grid::::::::
+-------------------
+ - drawCellValue (?)
+ - drawGrid (?)
+
++ getEmptyCell
++ overwriteCell
++ getCellValue
++ getEmptyRow
+ - addRows
+ - insertRowsAt
+ - deleteRows
++ getClonedRow
+ - addColumns
+ - insertColumnsAt
+ - deleteColumns
++ getRect
++ fillRect
+ - reduceToRect
++ writePath
++ getEmptySelection
++ getSelection
+ - writeSelection
+ - fillRectWithSelection
+ - importSelection
+
+----------------------
+X - getRawSelection
+X - fillRectWithRawSelection
+X - importRawSelection
+
+
+SELECTED:
+
+A) TILE:
+
+  Entity
+  Type: Tile
+  Index:
+  Animation:
+  Properties:
+  Show: tileIndex.draw(index) | animationIndex.draw(getIndex(animation))
+  Edit: editTile(index)
+
+B) ALIAS:
+
+  Entity
+  Type: Alias
+  Name: Blahaha
+  Tile: 12
+  Animation: ????
+  Properties:
+  Show: aliasIndex.draw(index) | animationIndex.draw(...)
+  Edit: editAlias(index)
+
+  ---
+  EDIT | CLEAR
+
+C) BRUSH:
+
+  Entity
+  Type: Brush
+  Name: Balaha
+  Size: 12 x 20
+  Show: brushIndex.draw(index)
+  Edit: editBrush(index)
+
+  EDIT | CLEAR
+
+D) EVENT
+
+  Entity
+  1..n
+    Type: Event
+    Name: Bhashahs
+
+  Show: eventIndex.draw(getIndex(index1),...)
+  Edit: -
+
+  ADD | DELETE
+
+E) TILES-RECT/ROW/COLUMN
+
+  Tiles
+  Type: Tiles-Rect|Rows|Columns
+  Size: 3 x 10
+
+  Edit: ...tilesEditor (rect)
+
+  EDIT | BRUSH | CLEAR
+
+F) EVENTS-RECT/ROW/COLUMN
+
+  Tiles
+  Type: Events-Rect|Rows|Columns
+  Size: 10 x 20
+
+  CLEAR
+
+
+Anwendungsfälle:
+
+A) Event-Picker
+  -------------------
+   Click setzt "Selected" auf
+   Type "Event" mit Image und Name
+   + Mode: Event-Write
+
+   Raster-Mode: Event-Write
+
+   Sperrt: Selection-Leiste wird gesperrt und muss
+    durch ein Switch wieder in den Tile-Write gesetzt
+    werden
+
+   Cursor: 1 cell
+     -> Hovering: zeigt nur Events
+
+   Left-Click:
+      1. Start-Feld merken
+      3. Event aus dem Start-Feld löschen
+      2. Event auf dem End-Feld setzen
+
+   Right-Click: löscht das Event aus dem Feld
+
+B) Globaler Tiles<->Events Switch
+   --------------------
+    Ein Switch in den Events-Mode
+     - Schaltet den Select auf Cell: No-Event
+     - Deaktiviert: Row/Cell-Add-Buttons
+
+    Fast alle Cell-Operations funktionieren wie
+    gehabt, aber beziehen sich nur auf die Events
+    der Tiles.
+    - Gap-Insert verschiebt alle Events
+    - Move: bewegt nur die Events in die Richtung
+    - Multi-Cell überschreibt immer alle Events
+    - Delete: wirkt in die Gegenrichtung vom Gap-insert
+    + Crop: alles drum herum löschen
+
+   Mode:
+    - Pick: holt alle Events in den Select und
+       schaltet dann in den "Write"
+       (über diesen kann die Event-Liste editiert werden)
+    - Toggle/Move (nur verfügbar, wenn 1-cell):
+       arbeitet wie der Write in A)
+
+    Ein Switch in den Tiles-Mode
+     - Schaltet den Select auf Cell: 0
+
+
+
+

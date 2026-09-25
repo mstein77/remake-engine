@@ -1,0 +1,161 @@
+
+-----------------------------------
+  S O L V I N G - T I M E :
+-----------------------------------
+ Tree
+ - tree-model changes
+ - double-click optimization
+ - height-calc (?)
+ - compact path
+ - toggle-click triggert auch activation
+
+
+ Slider
+ - key-actions (arrow + shift keys, über button)
+ - plain slider handle
+ - auto-contrast für arrow-left?
+
+ Color-Input
+ - focus-coloring
+ - tabbing
+ - key-action
+ - thickness
+ - hex-value tooltip
+
+ Color-Picker
+ - BUG: close button does not work
+ - Borders um Canvas
+ - color from pick-mode (grid pick mode?)
+ - Selector auf Color-Mask
+ - HSL-Switcher
+ - Synchronisierung der Farbwerte
+ - ColorIndex über letzte Farben
+ - Before/Restore für alten Farbwert
+
+ Color-Pair
+ Color-Pairs
+
+
+-----------------------------------
+  P R I O :
+-----------------------------------
+ * CssManagement
+
+-----------------------------------
+  T H E M I N G :
+-----------------------------------
+ - secondary list items
+ - Cursor / Marker
+ - Section title
+
+-----------------------------------
+  I M P R O V E :
+-----------------------------------
+ - Filters-Modal finalisieren (zoom, multi, scroll)
+ - EntityStack: drag'n drop
+
+ - EntityList: hover
+ - EntityList: sorting
+ - EntityList: multi-marking + autoScroll
+ - Grid: buttons nur bei hover im FramedGrid
+
+
+
+
+
+ - Toolbar-Groups ordentlich machen
+
+-----------------------------------
+
+ - writeMode/pickMode mouseMove triggert komplette Aktualisierung
+ - SubGrid-Rendering-Performance suboptimal (und keine gaps + empty-Cells)
+
+BUGS:
+ - gaps: undo resetted marker nicht richtig
+ - gaps: mouse-over/click sollte auf ganze Zelle gehen
+
+=================================
+=================================
+
+Mini-Bugs?
+
+ * EntityManager
+
+ - scrolling auf preview-bereich
+ - BUG: new TextBlock => Filter
+
+ - zoom hotkeys
+ - outline auf resize-handle
+ - hover-highlight auf kompletten resize-handle
+ - resize-handle buttons für reverse
+ - Filter-Buttons mit Up-Down-Focus change
+ - BUG: resize handle ohne max wächst ins unendliche
+ - BUG: click auf resize-handle setzt falsch start-size
+ - EntityStack beim löschen/clonen auch den index in callback geben
+ - Preview sollte Background/Screensize aus Pane vorbelegen
+ - onMove etc. prüfen ob problematisch
+ - wrap statt shorten als option in EntityStack
+
+ - dimProps for TextAreaProp
+ - DimProps für Input
+ - DimProps für Select
+ -> Padding in scrollbereich (PropGrid)
+ -> besser lösung für flow-padding in stack
+
+ * Filtering-Modal
+ * EntityManager
+    - sorting
+    - groups
+    - marking-rect
+    - drag&drop
+ * Cursor/Marker-Overlays
+
+------------------------------
+ Input-Components
+------------------------------
+ BUG: Stack mit borders und nur Stack als child => Error
+
+ -> gameRestart (Problem mit Settings-Reload?)
+
+ -> Settings-Bereich
+   BUG: exclusive-mode wird nicht richtig gelöst? [deploy]
+   BUG: machmal stauchung im Settings-Modal
+
+ -> FormComponents:
+      - inputDim:
+          **min-/max-/height (textarea)
+          min-/max-/width (input, number, tuple)
+ -> Slider-Size?
+
+ -> FileInput
+ -> Tabs
+
+ -> EntityPicker
+
+------------------------------
+ FocusTabbing:
+------------------------------
+  - Grid-Navigation
+
+
+? Fishing-Sprites
+
+EDITOR:
+- auto-size
+- bug: hold button paint no reset outside grid
+
+FINETUNING:
+? Left-Right-Collision
+- Collect-Collision
+- pipe-down-collision and animation
+
+IDEAS:
+- cutscene controller
+- inputTracking + Replay
+- variant in object speichern
+- "%2" als speed-variante
+- animation state link
+- foreground/background tile assignment
+- pixel-rounding in masterslavescroller
+
+
