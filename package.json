@@ -1,6 +1,6 @@
 {
   "name": "remake-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Remake Engine - Javascript game engine",
   "exports": "./src/engine/index.js",
   "type": "module",
