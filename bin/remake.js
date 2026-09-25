@@ -21,7 +21,7 @@ try {
     log(dotenvPath)
     dotenv.config({path: dotenvPath})
 
-    const enginePackage = '2dfireengine'
+    const enginePackage = 'remake-engine'
     const packageJsonPath = './package.json'
     const engineBasePath = './node_modules/' + enginePackage
 
@@ -76,8 +76,7 @@ try {
 
         const hasPackage = (packageJson.dependencies !== undefined && packageJson.dependencies[enginePackage] !== undefined)
         if (!hasPackage) {
-            // TODO get PAT and link out of here
-            exec('npm install git+https://' + process.env.PAT + '@github.com/mstein77/2DFireEngine.git\\#feature/engineBuild')
+            exec('npm install git+https://git@github.com/mstein77/remake-engine.git')
             packageJson = syncFs.readJson(packageJsonPath)
         }
         const hasScript = (packageJson.scripts !== undefined && packageJson.scripts.game !== undefined)

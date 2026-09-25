@@ -25,7 +25,7 @@ The cli generates a build configuration file ``config.cjs`` which allows you to 
 | `browsers` `dist.browsers` | The minimum browsers in which the game should run                      |
 |                   `editor` | Boolean which indicates whether an editor should be available or not   |
  |                `editorKey` | The key which should open the editor                                   
- |          `resourceLoading` | The way                                                                
+ |          `resourceLoading` | The way resources are loaded                                                               
  |                   `server` | Boolean which indicates whether a server should be build or not        
 
 Besides directly assigning values to the properties in the configuration file, you also have the possibility to overwrite these via an environment, if you prefer this.  
