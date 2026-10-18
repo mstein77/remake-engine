@@ -16,7 +16,7 @@ The installation script makes the following scripts available, that you can call
 
 ### Build Configuration
 
-The cli generates a build configuration file ``config.cjs`` which allows you to configure the development and distribution build of your game at the same time.
+The cli generates a build configuration file ``build.cjs`` which allows you to configure the development and distribution build of your game at the same time.
 
 |              Property | Explanation                                                                                                                              | Default
 |----------------------:|------------------------------------------------------------------------------------------------------------------------------------------|---------
