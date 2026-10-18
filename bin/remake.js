@@ -5,7 +5,7 @@ import { dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { extractOptionsAndArguments, errorSection, log, FG } from '../src/shared/console.cjs'
 import syncFs from '../src/shared/syncFs.cjs'
-import { d, toPairs } from '../src/shared/helper.cjs'
+import { d, toPairs, isObject } from '../src/shared/helper.cjs'
 import { getDefaultConfig } from '../src/build/config.cjs'
 
 try {
@@ -14,8 +14,6 @@ try {
         'npx remake-start [game-id]',
         'Creates a new remake for the game with the given game-id in the folder with the same name'
     )
-    process.exit(0)
-
     const __dirname = syncFs.realpath(dirname(fileURLToPath(import.meta.url)) + '/../')
     const dotenvPath = __dirname + '/.env'
     log(dotenvPath)
@@ -25,12 +23,12 @@ try {
     const packageJsonPath = './package.json'
     const engineBasePath = './node_modules/' + enginePackage
 
-    function exec(cmd, expectedStatus = 0) {
+    function exec(cmd, expectedStatus = 0, options = {}) {
         log()
         log(FG.YELLOW + `Executing: ${FG.WHITE + cmd}`)
         log()
         try {
-            const stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit'})
+            const stdout = execSync(cmd, {encoding: 'utf8', stdio: 'inherit', ...options })
             return stdout !== null ? stdout.toString() : null
         } catch (err) {
             if (err.status === expectedStatus) {
@@ -48,7 +46,7 @@ try {
 
                 case 'string':
                     if (!syncFs.fileExists(itemPath)) {
-                        syncFs.writeFile(itemPath, content)
+                        syncFs.writeContent(itemPath, content)
                     }
                     break
 
@@ -67,8 +65,8 @@ try {
         if (!syncFs.fileExists('./package.json')) {
             exec('npm init -y')
         }
-        let packageJson = readJson(packageJsonPath)
-        if (!isObject('object'))
+        let packageJson = syncFs.readJson(packageJsonPath)
+        if (!isObject(packageJson))
             throw Error(`Could not parse package.json!`)
 
         if (packageJson.name === enginePackage)
@@ -107,6 +105,7 @@ try {
                 image: {},
                 audio: {}
             },
+            assets: {},
             src: {
                 'index.js': [
                     'import { Game } from "' + enginePackage + '";',
@@ -117,7 +116,7 @@ try {
                 panes: {}
             },
             dist: {},
-            '.npmrc': "loglevel=silent%",
+            '.npmrc': "loglevel=silent",
             '.gitignore': ["dist/", ".dist/", "dists/", "node_modules/", ".ssh", ".env"].join("\n"),
             'build.cjs': "module.exports = " + JSON.stringify(baseConfig, null, 2),
             'run.cjs': `const enginePackage = '${enginePackage}'
@@ -133,7 +132,7 @@ const result = spawnSync(
         cwd: path.resolve(__dirname, 'node_modules/' + enginePackage)
     }
 )
-if (result.status) {
+if (result.status !== 0) {
     process.exit(result.status)
 }
 `
@@ -141,7 +140,7 @@ if (result.status) {
 
         // trigger install of engine dependencies
         if (!syncFs.dirExists( + engineBasePath + '/node_modules')) {
-            exec('npm install', { cwd: engineBasePath })
+            exec('npm install', 0, { cwd: engineBasePath })
         }
         process.exit(0)
 } catch (e) {
