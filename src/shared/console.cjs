@@ -558,7 +558,7 @@ function spawnSync(cmd, args, options) {
  *
  * @param {object} info
  * @param {string} usage
- * @param {description} description
+ * @param {string} description
  *
  * @returns {object}
  */

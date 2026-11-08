@@ -137,9 +137,13 @@ const syncFs = {
 
     absPath: path.resolve,
 
+    join: path.join,
+
     basename: path.basename,
 
-    withoutExt: filePath => path.resolve(path.dirname(filePath), path.parse(filePath).name)
+    withoutExt: filePath => path.resolve(path.dirname(filePath), path.parse(filePath).name),
+
+    sep: path.sep
 }
 
 module.exports = syncFs
