@@ -8,7 +8,6 @@ import {
 } from '../src/shared/console.cjs'
 import syncFs from '../src/shared/syncFs.cjs'
 import { d, toPairs, isObject } from '../src/shared/helper.cjs'
-import { getDefaultConfig } from '../src/build/config.cjs'
 
 function exec(cmd, expectedStatus = 0, options = {}) {
     log()
@@ -247,7 +246,54 @@ try {
     subSectionOk()
 
     // create files and folders
-    const baseConfig = getDefaultConfig()
+    const baseConfig = {
+        "name": "{game.name} v{game.version}",
+        "shortName": "{game.id}",
+        "description": "{game.description}",
+        "keywords": "{game.keywords}",
+        "author": "{game.author}",
+        "browsers": ">2.25%, not ie 11, not op_mini all",
+        "editor": true,
+        "gzip": true,
+        "resourceLoading": "api",
+        "apiMaxJsonSize": "10mb",
+        "deploymentMethod": "checkout",
+        "hosting": "server-with-nodejs",
+        "deliverable": "web-app",
+        "deliverableConfig": {},
+        "targetPlatforms": "windows,android,apple",
+        "targetServers": "express",
+        "assetGeneration": "minimal",
+        "assetTypes": "icon,tile,store,splash,icons",
+        "assetsBgColor": "",
+        "assetsPadding": 30,
+        "minimize": false,
+        "server": true,
+        "https": false,
+        "host": "localhost",
+        "httpPort": 8080,
+        "httpsPort": 443,
+        "certificate": "",
+        "path": "",
+        "keepArtifacts": true,
+        "restrictedCors": false,
+        "sourceMaps": true,
+        "sourceMapType": "eval-cheap-source-map",
+        "openBrowser": "default",
+        "staticTypes": "audio,video",
+        "buildLogging": "normal",
+        "clientLogging": "info",
+        "serverLogging": "normal",
+        "serverLoggingFormat": "dev",
+        "stats": "normal",
+        "envPrefix": "RMK_",
+        "esLint": false,
+        "dist": {
+            "assetGeneration": "all",
+            "minimize": true,
+            "https": true
+        }
+    }
     mainSection('Create missing files and folders...')
     subSection('Create missing directories and files in game folder')
     addMissingDirsAndFiles(
