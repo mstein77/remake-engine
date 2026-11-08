@@ -1,5 +1,4 @@
 #! /usr/bin/env node
-import * as dotenv from 'dotenv'
 import { execSync } from 'child_process'
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -134,9 +133,6 @@ try {
     }
 
     const scriptBaseDir = syncFs.realpath(syncFs.join(dirname(fileURLToPath(import.meta.url)), '..'))
-    const dotenvPath = gamePath('.env')
-    dotenv.config({path: dotenvPath})
-
     const packageJsonPath = gamePath('package.json')
     let gameId = gameDirName
     let packageJson = undefined
