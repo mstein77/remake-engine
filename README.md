@@ -1,22 +1,27 @@
 ### Installation
 
-Go to a directory where you want to have a new folder with your game and type `npx remake-engine-cli start <game>` whereas  `<game>` should be an id for your game. The script will download and configure everything in  a
-new folder with your game id and at the end, open the new game in your browser, where you can also open the editor to create your new game. 
+You can start a new game by running the following CLI command, either with a filepath at the end or without if you want to use the current directory as game folder: 
+ 
+```bash
+npx git+https://git@github.com/mstein77/remake-engine.git
+```
+The script will set up the build environment, install all dependencies and create example source files. If there is already a game installed the script will only try to add the resources which are missing. If the script was successful you can go to your game folder and start your game by running one of the build scripts 
 
-### Scripts
+### Build scripts
 
-The installation script makes the following scripts available, that you can call on the command line terminal of your OS when you are in your game folder:
+The installation script makes the following build scripts available. You can call on the command line when you are in your game folder:
 
 |          Script | Explanation                                                                                                                 |
 |----------------:|-----------------------------------------------------------------------------------------------------------------------------|
 |  `npm run game` | Builds the current development version and opens it in the configured browser                                               |
+|  `npm run dev`  | Same like before
 |  `npm run dist` | Builds the distribution version of your game in the `dist` folder of your game                                              |
 | `npm run start` | Starts a webserver delivering the distribution version of your game and builds it automatically if this was not done before |
 
 
 ### Build Configuration
 
-The cli generates a build configuration file ``build.cjs`` which allows you to configure the development and distribution build of your game at the same time.
+The CLI script generates a build configuration file ``build.cjs`` which allows you to configure the development and distribution build of your game at the same time.
 
 |              Property | Explanation                                                                                                                              | Default
 |----------------------:|------------------------------------------------------------------------------------------------------------------------------------------|---------
@@ -62,9 +67,8 @@ The cli generates a build configuration file ``build.cjs`` which allows you to c
 |           `envPrefix` | The prefix used for game related environment variables                                                                                   | `"RMK_"`
 |              `esLint` | Indicates whether the source code should be linted with esLint or not                                                                    | `false`
 
-If you have to set a different value for a property for the dist build you can enter the same key with a `dist.` prefix and set the value for dist there.
-Besides directly assigning values to the properties in the configuration file, you also have the possibility to overwrite these via an environment variable but the name must start with the prefix defined as `envPrefix` in the config file. E.g. `RMK_HTTPS` (or `RMK_DIST_HTTPS`) to overwrite the `https` property (for the dist-build). 
+If you have to set a different value for a property for the dist build you can add them to a sub config under the `dist` key. Besides directly assigning values to the properties in the configuration file, you also have the possibility to overwrite these via an environment variable but the name must start with the prefix defined as `envPrefix` in the config file. E.g. `RMK_HTTPS` (or `RMK_DIST_HTTPS`) to overwrite the `https` property (for the dist-build). 
 
 ### Creating your game
 
-Learn the basic concepts of screens, areas and panes here and then create them using the game editor or in your favourite code editor.
+Learn the basic concepts of screens, areas and panes here and then create them using the game editor or your favourite code editor.

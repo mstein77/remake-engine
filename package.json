@@ -1,6 +1,6 @@
 {
   "name": "remake-engine",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Remake Engine - A Javascript game engine",
   "exports": "./src/engine/index.js",
   "type": "module",
@@ -22,7 +22,7 @@
     "type": "git",
     "url": "git+https://git@github.com/mstein77/remake-engine.git"
   },
-  "author": "Marc Stein",
+  "author": "Tyrolite Softworks",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mstein77/remake-engine/issues"
